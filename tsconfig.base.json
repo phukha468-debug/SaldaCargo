@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@saldacargo/shared-types": ["packages/shared-types/src"],
+      "@saldacargo/ui/*": ["packages/ui/src/*"],
+      "@saldacargo/api-client": ["packages/api-client/src"],
+      "@saldacargo/constants": ["packages/constants/src"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

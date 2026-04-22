@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "roles": { "type": "array", "items": { "type": "string" } },
+        "activeVehicleId": { "type": "string" },
+        "balance": { "type": "number" }
+      },
+      "required": ["email", "roles"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Fleet vehicle",
+      "type": "object",
+      "properties": {
+        "plate": { "type": "string" },
+        "model": { "type": "string" },
+        "type": { "type": "string", "enum": ["vaday", "gazelle", "mitsubishi"] },
+        "capacity": { "type": "string" },
+        "gpsEnabled": { "type": "boolean" },
+        "currentOdometer": { "type": "number" },
+        "nextServiceKm": { "type": "number" }
+      },
+      "required": ["plate", "model", "type"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "A work shift or trip",
+      "type": "object",
+      "properties": {
+        "driverId": { "type": "string" },
+        "loaderId": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "startOdometer": { "type": "number" },
+        "endOdometer": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "approved", "cancelled"] },
+        "revenue": { "type": "number" },
+        "driverSalary": { "type": "number" },
+        "loaderSalary": { "type": "number" },
+        "expenses": { "type": "number" },
+        "profit": { "type": "number" }
+      },
+      "required": ["driverId", "vehicleId", "startTime", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Specific delivery order within a trip",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "amount": { "type": "number" },
+        "driverSalary": { "type": "number" },
+        "loaderSalary": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "qr", "invoice", "debt", "card"] },
+        "settlementStatus": { "type": "string", "enum": ["pending", "completed"] },
+        "lifecycleStatus": { "type": "string", "enum": ["draft", "approved", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tripId", "amount", "paymentMethod", "settlementStatus", "lifecycleStatus"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Expense incurred during a trip",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "lifecycleStatus": { "type": "string", "enum": ["draft", "approved", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tripId", "amount", "category", "lifecycleStatus"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction for user balance",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["in", "out"] },
+        "category": { "type": "string" },
+        "tripId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "expenseId": { "type": "string" },
+        "settlementStatus": { "type": "string", "enum": ["pending", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" }
+      },
+      "required": ["userId", "amount", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "System users" },
+    "/vehicles/{vehicleId}": { "schema": "Vehicle", "description": "Fleet vehicles" },
+    "/trips/{tripId}": { "schema": "Trip", "description": "Trips and shifts" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Individual orders" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Trip expenses" },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Wallet movements" }
+  }
+}

@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── HELPERS ─────────────────────────────────────────────────────────────
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function emailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             role in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'phukha468@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         ('admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles ||
+          'owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles))
+      );
+    }
+
+    // ─── COLLECTIONS ─────────────────────────────────────────────────────────
+
+    // /users/{userId}
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+    }
+
+    // Standard READ for most business entities
+    match /vehicles/{vehicleId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /trips/{tripId} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
+    match /orders/{orderId} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
+    match /expenses/{expenseId} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
+    
+    // Transactions - more sensitive
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}

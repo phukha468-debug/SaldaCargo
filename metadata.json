@@ -1,0 +1,8 @@
+{
+  "name": "SaldaCargo",
+  "description": "Система управления автопарком: учёт рейсов, заказов, ГСМ и зарплат.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}

@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-workspace: #F5F5F0;
+  --color-navigation: #1A1F2E;
+  --color-accent-blue: #2563EB;
+  --color-accent-emerald: #059669;
+  --color-accent-amber: #D97706;
+  --color-accent-red: #DC2626;
+  --color-accent-gray: #6B7280;
+}
+
+@layer base {
+  body {
+    @apply bg-workspace text-navigation font-sans antialiased;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-accent-blue text-white font-semibold rounded-[4px] h-[48px] px-4 flex items-center justify-center hover:bg-[#1D4ED8] active:bg-[#1E40AF] active:scale-[0.98] transition-all disabled:bg-[#E5E7EB] disabled:text-[#9CA3AF] disabled:cursor-not-allowed disabled:scale-100;
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-[#E5E7EB] text-navigation font-semibold rounded-[4px] h-[48px] px-4 flex items-center justify-center hover:bg-workspace active:bg-[#E5E7EB] transition-all;
+  }
+
+  .btn-danger {
+    @apply bg-workspace border border-accent-red text-accent-red font-semibold rounded-[4px] h-[48px] px-4 flex items-center justify-center hover:bg-accent-red/5 active:scale-[0.98] transition-all;
+  }
+
+  .btn-amber {
+    @apply bg-accent-amber text-white font-semibold rounded-[4px] h-[48px] px-4 flex items-center justify-center hover:bg-[#B45309] active:scale-[0.98] transition-all;
+  }
+
+  .card-base {
+    @apply bg-white rounded-[8px] border border-[#E5E7EB] shadow-sm;
+  }
+
+  .section-title {
+    @apply text-[14px] font-semibold text-accent-gray uppercase tracking-wider mb-3 mt-2;
+  }
+
+  .order-card {
+    @apply bg-white border border-[#E5E7EB] border-l-[4px] border-l-accent-emerald rounded-r-[8px] rounded-l-[4px] p-4 mb-2 flex justify-between items-center min-h-[64px];
+  }
+
+  .order-card-draft {
+    @apply border-l-accent-gray;
+  }
+
+  .order-card-pending {
+    @apply bg-[#FFFBEB] border-l-accent-amber;
+  }
+
+  .input-base {
+    @apply bg-white border border-[#E5E7EB] rounded-[4px] h-[48px] px-3 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all;
+  }
+}
+

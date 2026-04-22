@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F8FAFC;
+    --foreground: #0F172A;
+  }
+
+  body {
+    @apply bg-[#F8FAFC] text-[#0F172A] antialiased;
+  }
+}
