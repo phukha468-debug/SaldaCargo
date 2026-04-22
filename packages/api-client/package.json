@@ -6,6 +6,6 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@supabase/supabase-js": "latest",
-    "@saldacargo/shared-types": "*"
+    "@saldacargo/shared-types": "workspace:*"
   }
 }

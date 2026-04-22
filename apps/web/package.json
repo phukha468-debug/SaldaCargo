@@ -9,31 +9,32 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hookform/resolvers": "latest",
+    "@saldacargo/api-client": "workspace:*",
+    "@saldacargo/constants": "workspace:*",
+    "@saldacargo/shared-types": "workspace:*",
+    "@saldacargo/ui": "workspace:*",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "latest",
+    "@tanstack/react-query": "latest",
+    "autoprefixer": "^10.0.0",
+    "clsx": "latest",
+    "date-fns": "latest",
+    "lucide-react": "latest",
     "next": "15.0.0",
+    "postcss": "^8.0.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "@supabase/supabase-js": "latest",
-    "@saldacargo/shared-types": "*",
-    "@saldacargo/ui": "*",
-    "@saldacargo/api-client": "*",
-    "@saldacargo/constants": "*",
-    "lucide-react": "latest",
-    "date-fns": "latest",
-    "recharts": "latest",
-    "clsx": "latest",
-    "tailwind-merge": "latest",
-    "sonner": "latest",
-    "zod": "latest",
     "react-hook-form": "latest",
-    "@hookform/resolvers": "latest",
-    "@tanstack/react-query": "latest",
+    "recharts": "latest",
+    "sonner": "latest",
+    "tailwind-merge": "latest",
     "tailwindcss": "^3.4.0",
-    "postcss": "^8.0.0",
-    "autoprefixer": "^10.0.0"
+    "zod": "latest"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.0.0"
   }
 }

@@ -71,7 +71,18 @@ NEXT_PUBLIC_VERSION=1.0.0
 
 ---
 
-## 5. База данных
+## 5. Детализация переменных
+
+| Переменная | Источник | Назначение |
+|------------|----------|------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase -> Settings -> API | Базовый URL БД |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase -> Settings -> API | Полный доступ (bypass RLS) |
+| `OPTI24_API_KEY` | Личный кабинет Опти24 | Синхронизация ГСМ |
+| `WIALON_API_TOKEN` | Wialon -> Управление | Проверка пробега |
+
+---
+
+## 6. База данных
 
 - Supabase PostgreSQL (Free tier, Europe Frankfurt)
 - 22 таблицы, все созданы и готовы

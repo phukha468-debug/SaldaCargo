@@ -1,3 +1,5 @@
+"use client"
+
 import { DriverHome } from "@/components/features/DriverHome"
 
 export default function DashboardPage() {

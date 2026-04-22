@@ -707,15 +707,27 @@ VALUES
   ('UTILITIES', 'РљРѕРјРјСѓРЅР°Р»РєР°', 'expense'),
   ('INSURANCE', 'РЎС‚СЂР°С…РѕРІРєРё', 'expense');
 
--- Payroll Rules
-INSERT INTO payroll_rules (name, rule_type, value, applies_to_asset_type_id, applies_to_trip_type, description)
-SELECT 
-  'Р“Р°Р·РµР»СЊ РіРѕСЂРѕРґ 30%', 'percent', 0.30, asset_types.id, 'local', 'РџРѕРґСЃРєР°Р·РєР° 30% РґР»СЏ РіРѕСЂРѕРґР°'
-FROM asset_types WHERE code = 'GAZELLE_3M'
-UNION ALL
-SELECT 
-  'Р“Р°Р·РµР»СЊ РјРµР¶РіРѕСЂРѕРґ 25%', 'percent', 0.25, asset_types.id, 'intercity', 'РџРѕРґСЃРєР°Р·РєР° 25% РґР»СЏ РјРµР¶РіРѕСЂРѕРґР°'
-FROM asset_types WHERE code = 'GAZELLE_4M';
+-- ============================================================
+-- 13. DATA FLOWS (Бизнес-логика)
+-- ============================================================
+
+-- [M] Водитель -> "Начать рейс":
+--   1. Выбор машины + Одометр + Фото
+--   -> INSERT trip (status: in_progress, lifecycle: draft)
+
+-- [M] Водитель -> "+ Заказ":
+--   1. Сумма + ЗП (ввод вручную) + Способ оплаты
+--   -> INSERT trip_orders
+--   -> INSERT transaction (income, draft)
+
+-- [D] Admin -> "Ревью смены":
+--   -> Проверка % ЗП (подсветка 25-40%)
+--   -> Кнопка "Утвердить"
+--   -> UPDATE trip + orders + transactions -> lifecycle: approved
+
+```sql
+-- Пример: Итого ЗП за рейс
+SELECT SUM(driver_pay) FROM trip_orders WHERE trip_id = '...';
 ```
 
 ---

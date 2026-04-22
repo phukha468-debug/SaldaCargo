@@ -26,7 +26,7 @@ type OrderFormValues = z.infer<typeof orderSchema>
 
 export function OrderForm({ onSubmit, onClose }: { onSubmit: (values: OrderFormValues) => void, onClose: () => void }) {
   const form = useForm<OrderFormValues>({
-    resolver: zodResolver(orderSchema),
+    resolver: zodResolver(orderSchema) as any,
     defaultValues: {
       clientName: "",
       amount: 0,
