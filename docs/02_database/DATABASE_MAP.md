@@ -1,31 +1,31 @@
-# SaldaBiz — Полная Карта Supabase
+# SaldaCargo вЂ” РџРѕР»РЅР°СЏ РљР°СЂС‚Р° Supabase
 
-**Статус:** MVP-ready  
-**Версия:** 2.3  
-**Тип БД:** PostgreSQL (Supabase)  
+**РЎС‚Р°С‚СѓСЃ:** MVP-ready  
+**Р’РµСЂСЃРёСЏ:** 2.3  
+**РўРёРї Р‘Р”:** PostgreSQL (Supabase)  
 
 ---
 
-## 1. Инициализация Supabase
+## 1. РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Supabase
 
 ```bash
-# 1. Создать проект на supabase.com
-# - Регион: Europe (Frankfurt) для низкой латенции из Салды
-# - Версия PostgreSQL: 14+
+# 1. РЎРѕР·РґР°С‚СЊ РїСЂРѕРµРєС‚ РЅР° supabase.com
+# - Р РµРіРёРѕРЅ: Europe (Frankfurt) РґР»СЏ РЅРёР·РєРѕР№ Р»Р°С‚РµРЅС†РёРё РёР· РЎР°Р»РґС‹
+# - Р’РµСЂСЃРёСЏ PostgreSQL: 14+
 
-# 2. Скопировать ключи из Project Settings:
+# 2. РЎРєРѕРїРёСЂРѕРІР°С‚СЊ РєР»СЋС‡Рё РёР· Project Settings:
 # - SUPABASE_URL
-# - SUPABASE_ANON_KEY (для клиента)
-# - SUPABASE_SERVICE_ROLE_KEY (для сервера)
+# - SUPABASE_ANON_KEY (РґР»СЏ РєР»РёРµРЅС‚Р°)
+# - SUPABASE_SERVICE_ROLE_KEY (РґР»СЏ СЃРµСЂРІРµСЂР°)
 
-# 3. Создать таблицы: запустить SQL в Supabase SQL Editor
+# 3. РЎРѕР·РґР°С‚СЊ С‚Р°Р±Р»РёС†С‹: Р·Р°РїСѓСЃС‚РёС‚СЊ SQL РІ Supabase SQL Editor
 ```
 
 ---
 
-## 2. ПОЛНЫЙ SQL INIT SCRIPT
+## 2. РџРћР›РќР«Р™ SQL INIT SCRIPT
 
-Скопировать весь код ниже в Supabase → SQL Editor → Run.
+РЎРєРѕРїРёСЂРѕРІР°С‚СЊ РІРµСЃСЊ РєРѕРґ РЅРёР¶Рµ РІ Supabase в†’ SQL Editor в†’ Run.
 
 ```sql
 -- ============================================================
@@ -36,10 +36,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_cron";
 
 -- ============================================================
--- 1. CORE TABLES (Справочники и основные сущности)
+-- 1. CORE TABLES (РЎРїСЂР°РІРѕС‡РЅРёРєРё Рё РѕСЃРЅРѕРІРЅС‹Рµ СЃСѓС‰РЅРѕСЃС‚Рё)
 -- ============================================================
 
--- LEGAL_ENTITIES (Юрлица)
+-- LEGAL_ENTITIES (Р®СЂР»РёС†Р°)
 CREATE TABLE legal_entities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE legal_entities (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- BUSINESS_UNITS (Направления бизнеса)
+-- BUSINESS_UNITS (РќР°РїСЂР°РІР»РµРЅРёСЏ Р±РёР·РЅРµСЃР°)
 CREATE TABLE business_units (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'LOGISTICS_LCV_CITY', 'LOGISTICS_TRUCK'
@@ -60,49 +60,49 @@ CREATE TABLE business_units (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ASSET_TYPES (Типы активов: Валдай, Газель и т.д.)
+-- ASSET_TYPES (РўРёРїС‹ Р°РєС‚РёРІРѕРІ: Р’Р°Р»РґР°Р№, Р“Р°Р·РµР»СЊ Рё С‚.Рґ.)
 CREATE TABLE asset_types (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'VALDAI_6M', 'GAZELLE_3M'
   name TEXT NOT NULL,
-  default_fuel_rate DECIMAL(5,2), -- литры на 100км
+  default_fuel_rate DECIMAL(5,2), -- Р»РёС‚СЂС‹ РЅР° 100РєРј
   has_gps BOOLEAN DEFAULT false,
   requires_odometer_photo BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- USERS (Персонал: водители, механики, админ)
+-- USERS (РџРµСЂСЃРѕРЅР°Р»: РІРѕРґРёС‚РµР»Рё, РјРµС…Р°РЅРёРєРё, Р°РґРјРёРЅ)
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  max_user_id TEXT UNIQUE, -- ID из MAX OAuth
+  max_user_id TEXT UNIQUE, -- ID РёР· MAX OAuth
   phone TEXT,
   full_name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('owner','admin','dispatcher','driver','mechanic','mechanic_lead','loader','accountant')),
   is_active BOOLEAN DEFAULT true,
-  current_asset_id UUID, -- если водитель — закреплённая машина
+  current_asset_id UUID, -- РµСЃР»Рё РІРѕРґРёС‚РµР»СЊ вЂ” Р·Р°РєСЂРµРїР»С‘РЅРЅР°СЏ РјР°С€РёРЅР°
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   
   CONSTRAINT fk_current_asset FOREIGN KEY (current_asset_id) REFERENCES asset_types(id)
 );
 
--- ASSETS (Автопарк: машины, оборудование)
+-- ASSETS (РђРІС‚РѕРїР°СЂРє: РјР°С€РёРЅС‹, РѕР±РѕСЂСѓРґРѕРІР°РЅРёРµ)
 CREATE TABLE assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_type_id UUID NOT NULL REFERENCES asset_types(id),
   business_unit_id UUID REFERENCES business_units(id),
   legal_entity_id UUID REFERENCES legal_entities(id),
   
-  plate_number TEXT UNIQUE NOT NULL, -- А099АА
+  plate_number TEXT UNIQUE NOT NULL, -- Рђ099РђРђ
   vin TEXT UNIQUE,
   year INT,
   odometer_current INT DEFAULT 0,
   
-  -- АМОРТИЗАЦИЯ ПО ОСТАТОЧНОЙ СТОИМОСТИ
-  residual_value DECIMAL(12,2) NOT NULL, -- остаточная стоимость
-  remaining_life_months INT NOT NULL, -- оставшийся срок в мес
+  -- РђРњРћР РўРР—РђР¦РРЇ РџРћ РћРЎРўРђРўРћР§РќРћР™ РЎРўРћРРњРћРЎРўР
+  residual_value DECIMAL(12,2) NOT NULL, -- РѕСЃС‚Р°С‚РѕС‡РЅР°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ
+  remaining_life_months INT NOT NULL, -- РѕСЃС‚Р°РІС€РёР№СЃСЏ СЃСЂРѕРє РІ РјРµСЃ
   monthly_depreciation DECIMAL(12,2) GENERATED ALWAYS AS (residual_value / remaining_life_months) STORED,
-  current_book_value DECIMAL(12,2), -- текущая (уменьшается ежемесячно)
+  current_book_value DECIMAL(12,2), -- С‚РµРєСѓС‰Р°СЏ (СѓРјРµРЅСЊС€Р°РµС‚СЃСЏ РµР¶РµРјРµСЃСЏС‡РЅРѕ)
   
   -- GPS
   wialon_object_id TEXT,
@@ -113,7 +113,7 @@ CREATE TABLE assets (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- WALLETS (Кошельки: касса, р/с, подотчёты)
+-- WALLETS (РљРѕС€РµР»СЊРєРё: РєР°СЃСЃР°, СЂ/СЃ, РїРѕРґРѕС‚С‡С‘С‚С‹)
 CREATE TABLE wallets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'ip_rs', 'cash_office', 'driver_vova'
@@ -125,7 +125,7 @@ CREATE TABLE wallets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- CATEGORIES (Категории доходов/расходов)
+-- CATEGORIES (РљР°С‚РµРіРѕСЂРёРё РґРѕС…РѕРґРѕРІ/СЂР°СЃС…РѕРґРѕРІ)
 CREATE TABLE categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'FREIGHT_LCV_CITY', 'FUEL', 'PAYROLL_DRIVER'
@@ -136,7 +136,7 @@ CREATE TABLE categories (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- COUNTERPARTIES (Клиенты и поставщики)
+-- COUNTERPARTIES (РљР»РёРµРЅС‚С‹ Рё РїРѕСЃС‚Р°РІС‰РёРєРё)
 CREATE TABLE counterparties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -152,34 +152,34 @@ CREATE TABLE counterparties (
 );
 
 -- ============================================================
--- 2. LOGISTICS (Рейсы и заказы)
+-- 2. LOGISTICS (Р РµР№СЃС‹ Рё Р·Р°РєР°Р·С‹)
 -- ============================================================
 
--- TRIPS (Путевые листы)
+-- TRIPS (РџСѓС‚РµРІС‹Рµ Р»РёСЃС‚С‹)
 CREATE TABLE trips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES assets(id),
   driver_id UUID NOT NULL REFERENCES users(id),
-  loader_id UUID REFERENCES users(id), -- если есть грузчик
+  loader_id UUID REFERENCES users(id), -- РµСЃР»Рё РµСЃС‚СЊ РіСЂСѓР·С‡РёРє
   
   trip_type TEXT DEFAULT 'local' CHECK (trip_type IN ('local','intercity','moving','hourly')),
   started_at TIMESTAMPTZ NOT NULL,
   ended_at TIMESTAMPTZ,
   
-  -- Одометр
+  -- РћРґРѕРјРµС‚СЂ
   odometer_start INT,
   odometer_end INT,
-  odometer_start_photo TEXT, -- URL в Supabase Storage
+  odometer_start_photo TEXT, -- URL РІ Supabase Storage
   odometer_end_photo TEXT,
   
-  -- GPS (если Валдай)
+  -- GPS (РµСЃР»Рё Р’Р°Р»РґР°Р№)
   gps_verified_mileage INT,
   gps_deviation_percent DECIMAL(5,2),
   gps_alert BOOLEAN DEFAULT false,
   
   route_description TEXT,
   
-  -- ДВУХОСНЫЙ СТАТУС
+  -- Р”Р’РЈРҐРћРЎРќР«Р™ РЎРўРђРўРЈРЎ
   lifecycle_status TEXT DEFAULT 'draft' CHECK (lifecycle_status IN ('draft','approved','cancelled')),
   approved_by UUID REFERENCES users(id),
   approved_at TIMESTAMPTZ,
@@ -192,32 +192,32 @@ CREATE TABLE trips (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TRIP_ORDERS ⭐ НОВАЯ ТАБЛИЦА - СТРОКИ ПУТЕВОГО ЛИСТА
+-- TRIP_ORDERS в­ђ РќРћР’РђРЇ РўРђР‘Р›РР¦Рђ - РЎРўР РћРљР РџРЈРўР•Р’РћР“Рћ Р›РРЎРўРђ
 CREATE TABLE trip_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   
   order_number INT NOT NULL, -- 1, 2, 3...
   counterparty_id UUID REFERENCES counterparties(id),
-  client_name TEXT, -- свободный текст ("Левша", "б/н")
-  description TEXT, -- "Переезд", "Доставка"
+  client_name TEXT, -- СЃРІРѕР±РѕРґРЅС‹Р№ С‚РµРєСЃС‚ ("Р›РµРІС€Р°", "Р±/РЅ")
+  description TEXT, -- "РџРµСЂРµРµР·Рґ", "Р”РѕСЃС‚Р°РІРєР°"
   amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
   
-  -- ЗП РУЧНОЙ ВВОД
+  -- Р—Рџ Р РЈР§РќРћР™ Р’Р’РћР”
   driver_pay DECIMAL(12,2) NOT NULL DEFAULT 0,
   loader_pay DECIMAL(12,2) DEFAULT 0,
-  driver_pay_percent DECIMAL(5,2), -- информационное: driver_pay/amount*100
+  driver_pay_percent DECIMAL(5,2), -- РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ: driver_pay/amount*100
   
   payment_method TEXT NOT NULL CHECK (payment_method IN (
-    'cash',           -- наличные
-    'qr',             -- QR на р/с (приход мгновенный)
-    'bank_invoice',   -- счёт клиенту (дебиторка)
-    'debt_cash',      -- долг наличный
-    'card_driver'     -- на карту водителя
+    'cash',           -- РЅР°Р»РёС‡РЅС‹Рµ
+    'qr',             -- QR РЅР° СЂ/СЃ (РїСЂРёС…РѕРґ РјРіРЅРѕРІРµРЅРЅС‹Р№)
+    'bank_invoice',   -- СЃС‡С‘С‚ РєР»РёРµРЅС‚Сѓ (РґРµР±РёС‚РѕСЂРєР°)
+    'debt_cash',      -- РґРѕР»Рі РЅР°Р»РёС‡РЅС‹Р№
+    'card_driver'     -- РЅР° РєР°СЂС‚Сѓ РІРѕРґРёС‚РµР»СЏ
   )),
   
   settlement_status TEXT DEFAULT 'completed' CHECK (settlement_status IN ('pending','completed')),
-  -- pending только для: bank_invoice и debt_cash
+  -- pending С‚РѕР»СЊРєРѕ РґР»СЏ: bank_invoice Рё debt_cash
   
   linked_income_tx_id UUID REFERENCES transactions(id),
   notes TEXT,
@@ -225,7 +225,7 @@ CREATE TABLE trip_orders (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TRIP_EXPENSES (Расходы в рейсе)
+-- TRIP_EXPENSES (Р Р°СЃС…РѕРґС‹ РІ СЂРµР№СЃРµ)
 CREATE TABLE trip_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
@@ -233,17 +233,17 @@ CREATE TABLE trip_expenses (
   amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
   payment_method TEXT NOT NULL CHECK (payment_method IN ('cash','card_driver','fuel_card')),
   description TEXT,
-  receipt_photo TEXT, -- URL фото чека
+  receipt_photo TEXT, -- URL С„РѕС‚Рѕ С‡РµРєР°
   linked_expense_tx_id UUID REFERENCES transactions(id),
   
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================================
--- 3. TRANSACTIONS (Финансовая система)
+-- 3. TRANSACTIONS (Р¤РёРЅР°РЅСЃРѕРІР°СЏ СЃРёСЃС‚РµРјР°)
 -- ============================================================
 
--- TRANSACTIONS (Источник истины)
+-- TRANSACTIONS (РСЃС‚РѕС‡РЅРёРє РёСЃС‚РёРЅС‹)
 CREATE TABLE transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -260,7 +260,7 @@ CREATE TABLE transactions (
   asset_id UUID REFERENCES assets(id),
   trip_id UUID REFERENCES trips(id),
   
-  -- ДВУХОСНЫЙ СТАТУС
+  -- Р”Р’РЈРҐРћРЎРќР«Р™ РЎРўРђРўРЈРЎ
   lifecycle_status TEXT DEFAULT 'draft' CHECK (lifecycle_status IN ('draft','approved','cancelled')),
   settlement_status TEXT DEFAULT 'completed' CHECK (settlement_status IN ('pending','completed')),
   
@@ -293,14 +293,14 @@ CREATE TABLE transactions (
 );
 
 -- ============================================================
--- 4. PAYROLL (ЗП и расчёты)
+-- 4. PAYROLL (Р—Рџ Рё СЂР°СЃС‡С‘С‚С‹)
 -- ============================================================
 
--- PAYROLL_RULES (Справочник подсказок для ЗП)
+-- PAYROLL_RULES (РЎРїСЂР°РІРѕС‡РЅРёРє РїРѕРґСЃРєР°Р·РѕРє РґР»СЏ Р—Рџ)
 CREATE TABLE payroll_rules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
-  name TEXT NOT NULL, -- "Газель город 30%"
+  name TEXT NOT NULL, -- "Р“Р°Р·РµР»СЊ РіРѕСЂРѕРґ 30%"
   rule_type TEXT NOT NULL CHECK (rule_type IN ('percent', 'per_km', 'fixed_daily', 'hourly_split')),
   value DECIMAL(10,4) NOT NULL,
   split_config JSONB, -- {"driver":0.33, "loader":0.33, "company":0.34}
@@ -313,7 +313,7 @@ CREATE TABLE payroll_rules (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- PAYROLL_PERIODS (Расчёт ЗП за период)
+-- PAYROLL_PERIODS (Р Р°СЃС‡С‘С‚ Р—Рџ Р·Р° РїРµСЂРёРѕРґ)
 CREATE TABLE payroll_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
@@ -323,12 +323,12 @@ CREATE TABLE payroll_periods (
   
   total_trips INT DEFAULT 0,
   total_revenue DECIMAL(12,2) DEFAULT 0,
-  total_earned DECIMAL(12,2) DEFAULT 0, -- SUM(driver_pay или loader_pay)
+  total_earned DECIMAL(12,2) DEFAULT 0, -- SUM(driver_pay РёР»Рё loader_pay)
   advances_paid DECIMAL(12,2) DEFAULT 0,
   balance_to_pay DECIMAL(12,2) DEFAULT 0,
   
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft','approved','paid')),
-  calculation_details JSONB, -- детализация
+  calculation_details JSONB, -- РґРµС‚Р°Р»РёР·Р°С†РёСЏ
   
   approved_by UUID REFERENCES users(id),
   approved_at TIMESTAMPTZ,
@@ -338,10 +338,10 @@ CREATE TABLE payroll_periods (
 );
 
 -- ============================================================
--- 5. FUEL (Топливо — Опти24)
+-- 5. FUEL (РўРѕРїР»РёРІРѕ вЂ” РћРїС‚Рё24)
 -- ============================================================
 
--- FUEL_CARDS (Топливные карты)
+-- FUEL_CARDS (РўРѕРїР»РёРІРЅС‹Рµ РєР°СЂС‚С‹)
 CREATE TABLE fuel_cards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   card_number TEXT UNIQUE NOT NULL,
@@ -351,7 +351,7 @@ CREATE TABLE fuel_cards (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- FUEL_TRANSACTIONS_RAW (Заправки из Опти24 API)
+-- FUEL_TRANSACTIONS_RAW (Р—Р°РїСЂР°РІРєРё РёР· РћРїС‚Рё24 API)
 CREATE TABLE fuel_transactions_raw (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   fuel_card_id UUID REFERENCES fuel_cards(id),
@@ -363,7 +363,7 @@ CREATE TABLE fuel_transactions_raw (
   
   opti24_transaction_id TEXT UNIQUE,
   
-  -- Соответствующая транзакция в основной системе
+  -- РЎРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰Р°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ РІ РѕСЃРЅРѕРІРЅРѕР№ СЃРёСЃС‚РµРјРµ
   linked_tx_id UUID REFERENCES transactions(id),
   
   is_synced BOOLEAN DEFAULT false,
@@ -372,10 +372,10 @@ CREATE TABLE fuel_transactions_raw (
 );
 
 -- ============================================================
--- 6. BANK (Банк)
+-- 6. BANK (Р‘Р°РЅРє)
 -- ============================================================
 
--- BANK_STATEMENTS_RAW (Выписка из банка)
+-- BANK_STATEMENTS_RAW (Р’С‹РїРёСЃРєР° РёР· Р±Р°РЅРєР°)
 CREATE TABLE bank_statements_raw (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_id UUID NOT NULL REFERENCES wallets(id),
@@ -396,24 +396,24 @@ CREATE TABLE bank_statements_raw (
 );
 
 -- ============================================================
--- 7. MAINTENANCE (СТО и регламенты)
+-- 7. MAINTENANCE (РЎРўРћ Рё СЂРµРіР»Р°РјРµРЅС‚С‹)
 -- ============================================================
 
--- MAINTENANCE_REGULATIONS (Регламенты ТО)
+-- MAINTENANCE_REGULATIONS (Р РµРіР»Р°РјРµРЅС‚С‹ РўРћ)
 CREATE TABLE maintenance_regulations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_type_id UUID NOT NULL REFERENCES asset_types(id),
   
-  name TEXT NOT NULL, -- "ТО-1", "Замена масла"
+  name TEXT NOT NULL, -- "РўРћ-1", "Р—Р°РјРµРЅР° РјР°СЃР»Р°"
   description TEXT,
-  interval_km INT, -- через сколько км
-  interval_months INT, -- или через сколько месяцев
+  interval_km INT, -- С‡РµСЂРµР· СЃРєРѕР»СЊРєРѕ РєРј
+  interval_months INT, -- РёР»Рё С‡РµСЂРµР· СЃРєРѕР»СЊРєРѕ РјРµСЃСЏС†РµРІ
   
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- MAINTENANCE_ALERTS (Уведомления о ТО)
+-- MAINTENANCE_ALERTS (РЈРІРµРґРѕРјР»РµРЅРёСЏ Рѕ РўРћ)
 CREATE TABLE maintenance_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES assets(id),
@@ -428,7 +428,7 @@ CREATE TABLE maintenance_alerts (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SERVICE_ORDERS (Заказ-наряды)
+-- SERVICE_ORDERS (Р—Р°РєР°Р·-РЅР°СЂСЏРґС‹)
 CREATE TABLE service_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES assets(id),
@@ -446,7 +446,7 @@ CREATE TABLE service_orders (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SERVICE_ORDER_WORKS (Работы в заказ-наряде)
+-- SERVICE_ORDER_WORKS (Р Р°Р±РѕС‚С‹ РІ Р·Р°РєР°Р·-РЅР°СЂСЏРґРµ)
 CREATE TABLE service_order_works (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
@@ -457,7 +457,7 @@ CREATE TABLE service_order_works (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SERVICE_ORDER_PARTS (Запчасти в заказ-наряде)
+-- SERVICE_ORDER_PARTS (Р—Р°РїС‡Р°СЃС‚Рё РІ Р·Р°РєР°Р·-РЅР°СЂСЏРґРµ)
 CREATE TABLE service_order_parts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
@@ -470,7 +470,7 @@ CREATE TABLE service_order_parts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- PARTS (Запчасти — справочник)
+-- PARTS (Р—Р°РїС‡Р°СЃС‚Рё вЂ” СЃРїСЂР°РІРѕС‡РЅРёРє)
 CREATE TABLE parts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -485,24 +485,24 @@ CREATE TABLE parts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- PART_MOVEMENTS (Инвентаризация)
+-- PART_MOVEMENTS (РРЅРІРµРЅС‚Р°СЂРёР·Р°С†РёСЏ)
 CREATE TABLE part_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   part_id UUID NOT NULL REFERENCES parts(id),
   
-  quantity_change INT NOT NULL, -- +5 или -2
+  quantity_change INT NOT NULL, -- +5 РёР»Рё -2
   movement_type TEXT CHECK (movement_type IN ('receipt','usage','adjustment')),
-  reference_id UUID, -- ссылка на заказ-наряд или поставку
+  reference_id UUID, -- СЃСЃС‹Р»РєР° РЅР° Р·Р°РєР°Р·-РЅР°СЂСЏРґ РёР»Рё РїРѕСЃС‚Р°РІРєСѓ
   
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================================
--- 8. EQUIPMENT (Оборудование и инвентарь)
+-- 8. EQUIPMENT (РћР±РѕСЂСѓРґРѕРІР°РЅРёРµ Рё РёРЅРІРµРЅС‚Р°СЂСЊ)
 -- ============================================================
 
--- FIXED_ASSETS (Основные средства)
+-- FIXED_ASSETS (РћСЃРЅРѕРІРЅС‹Рµ СЃСЂРµРґСЃС‚РІР°)
 CREATE TABLE fixed_assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -519,7 +519,7 @@ CREATE TABLE fixed_assets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TOOLS (Инструменты)
+-- TOOLS (РРЅСЃС‚СЂСѓРјРµРЅС‚С‹)
 CREATE TABLE tools (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -539,7 +539,7 @@ CREATE TABLE tools (
 -- 9. AUDIT & SYSTEM
 -- ============================================================
 
--- AUDIT_LOG (Лог всех изменений)
+-- AUDIT_LOG (Р›РѕРі РІСЃРµС… РёР·РјРµРЅРµРЅРёР№)
 CREATE TABLE audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -557,7 +557,7 @@ CREATE TABLE audit_log (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ATTACHMENTS (Файлы)
+-- ATTACHMENTS (Р¤Р°Р№Р»С‹)
 CREATE TABLE attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -577,7 +577,7 @@ CREATE TABLE attachments (
 -- 10. INDEXES & OPTIMIZATIONS
 -- ============================================================
 
--- Индексы для быстрых запросов
+-- РРЅРґРµРєСЃС‹ РґР»СЏ Р±С‹СЃС‚СЂС‹С… Р·Р°РїСЂРѕСЃРѕРІ
 CREATE INDEX idx_trips_driver_id ON trips(driver_id);
 CREATE INDEX idx_trips_asset_id ON trips(asset_id);
 CREATE INDEX idx_trips_lifecycle_status ON trips(lifecycle_status);
@@ -611,7 +611,7 @@ CREATE INDEX idx_audit_log_table_record ON audit_log(table_name, record_id);
 -- 11. ROW LEVEL SECURITY (RLS)
 -- ============================================================
 
--- Включить RLS на таблицы
+-- Р’РєР»СЋС‡РёС‚СЊ RLS РЅР° С‚Р°Р±Р»РёС†С‹
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
@@ -619,14 +619,14 @@ ALTER TABLE trip_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
 
--- Примеры политик (остальные добавить по аналогии)
+-- РџСЂРёРјРµСЂС‹ РїРѕР»РёС‚РёРє (РѕСЃС‚Р°Р»СЊРЅС‹Рµ РґРѕР±Р°РІРёС‚СЊ РїРѕ Р°РЅР°Р»РѕРіРёРё)
 
--- Policy: Водитель видит только свои рейсы
+-- Policy: Р’РѕРґРёС‚РµР»СЊ РІРёРґРёС‚ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЂРµР№СЃС‹
 CREATE POLICY driver_view_own_trips ON trips
   FOR SELECT
   USING (driver_id = auth.uid() OR loader_id = auth.uid());
 
--- Policy: Водитель видит только заказы из своих рейсов
+-- Policy: Р’РѕРґРёС‚РµР»СЊ РІРёРґРёС‚ С‚РѕР»СЊРєРѕ Р·Р°РєР°Р·С‹ РёР· СЃРІРѕРёС… СЂРµР№СЃРѕРІ
 CREATE POLICY driver_view_own_orders ON trip_orders
   FOR SELECT
   USING (
@@ -636,7 +636,7 @@ CREATE POLICY driver_view_own_orders ON trip_orders
     )
   );
 
--- Policy: Водитель может создавать заказы только в своих рейсах
+-- Policy: Р’РѕРґРёС‚РµР»СЊ РјРѕР¶РµС‚ СЃРѕР·РґР°РІР°С‚СЊ Р·Р°РєР°Р·С‹ С‚РѕР»СЊРєРѕ РІ СЃРІРѕРёС… СЂРµР№СЃР°С…
 CREATE POLICY driver_create_orders ON trip_orders
   FOR INSERT
   WITH CHECK (
@@ -646,7 +646,7 @@ CREATE POLICY driver_create_orders ON trip_orders
     )
   );
 
--- Policy: Админ видит всё
+-- Policy: РђРґРјРёРЅ РІРёРґРёС‚ РІСЃС‘
 CREATE POLICY admin_all_access ON trips
   FOR ALL
   USING (
@@ -657,202 +657,202 @@ CREATE POLICY admin_all_access ON trips
   );
 
 -- ============================================================
--- 12. INITIAL DATA (Справочники)
+-- 12. INITIAL DATA (РЎРїСЂР°РІРѕС‡РЅРёРєРё)
 -- ============================================================
 
 -- Asset Types
 INSERT INTO asset_types (code, name, default_fuel_rate, has_gps, requires_odometer_photo)
 VALUES
-  ('VALDAI_6M', 'Валдай 6 метров', 15.0, true, false),
-  ('VALDAI_5M', 'Валдай 5 метров', 14.0, true, false),
-  ('VALDAI_DUMP', 'Валдай Самосвал', 16.0, true, false),
-  ('GAZELLE_4M', 'Газель 4 метра (межгород)', 12.0, false, true),
-  ('GAZELLE_3M', 'Газель 3 метра (город)', 11.0, false, true),
-  ('CANTER_5T', 'Кантер 5т', 13.0, false, true);
+  ('VALDAI_6M', 'Р’Р°Р»РґР°Р№ 6 РјРµС‚СЂРѕРІ', 15.0, true, false),
+  ('VALDAI_5M', 'Р’Р°Р»РґР°Р№ 5 РјРµС‚СЂРѕРІ', 14.0, true, false),
+  ('VALDAI_DUMP', 'Р’Р°Р»РґР°Р№ РЎР°РјРѕСЃРІР°Р»', 16.0, true, false),
+  ('GAZELLE_4M', 'Р“Р°Р·РµР»СЊ 4 РјРµС‚СЂР° (РјРµР¶РіРѕСЂРѕРґ)', 12.0, false, true),
+  ('GAZELLE_3M', 'Р“Р°Р·РµР»СЊ 3 РјРµС‚СЂР° (РіРѕСЂРѕРґ)', 11.0, false, true),
+  ('CANTER_5T', 'РљР°РЅС‚РµСЂ 5С‚', 13.0, false, true);
 
 -- Business Units
 INSERT INTO business_units (code, name)
 VALUES
-  ('LOGISTICS_LCV_CITY', 'Логистика LCV — Город'),
-  ('LOGISTICS_LCV_INTERCITY', 'Логистика LCV — Межгород'),
-  ('LOGISTICS_TRUCK', 'Логистика Грузовики'),
-  ('LOGISTICS_5T', 'Логистика 5-тонник'),
-  ('SERVICE_STATION', 'СТО'),
-  ('BULK_MATERIALS', 'Сыпучие материалы'),
-  ('PARTS_SHOP', 'Магазин запчастей'),
-  ('PARKING', 'Платная стоянка');
+  ('LOGISTICS_LCV_CITY', 'Р›РѕРіРёСЃС‚РёРєР° LCV вЂ” Р“РѕСЂРѕРґ'),
+  ('LOGISTICS_LCV_INTERCITY', 'Р›РѕРіРёСЃС‚РёРєР° LCV вЂ” РњРµР¶РіРѕСЂРѕРґ'),
+  ('LOGISTICS_TRUCK', 'Р›РѕРіРёСЃС‚РёРєР° Р“СЂСѓР·РѕРІРёРєРё'),
+  ('LOGISTICS_5T', 'Р›РѕРіРёСЃС‚РёРєР° 5-С‚РѕРЅРЅРёРє'),
+  ('SERVICE_STATION', 'РЎРўРћ'),
+  ('BULK_MATERIALS', 'РЎС‹РїСѓС‡РёРµ РјР°С‚РµСЂРёР°Р»С‹'),
+  ('PARTS_SHOP', 'РњР°РіР°Р·РёРЅ Р·Р°РїС‡Р°СЃС‚РµР№'),
+  ('PARKING', 'РџР»Р°С‚РЅР°СЏ СЃС‚РѕСЏРЅРєР°');
 
 -- Categories (Income)
 INSERT INTO categories (code, name, direction)
 VALUES
-  ('FREIGHT_LCV_CITY', 'Доставка город (Газели)', 'income'),
-  ('FREIGHT_LCV_INTERCITY', 'Межгород (Газели)', 'income'),
-  ('FREIGHT_TRUCK', 'Грузоперевозки (Валдаи)', 'income'),
-  ('FREIGHT_5T', 'Грузоперевозки (Кантер)', 'income'),
-  ('MOVING', 'Переезды', 'income'),
-  ('SERVICE_WORKS', 'Услуги СТО (работы)', 'income'),
-  ('SERVICE_PARTS_SALE', 'Продажа запчастей (СТО)', 'income'),
-  ('BULK_SALES', 'Продажа сыпучих', 'income'),
-  ('PARKING_RENT', 'Аренда стоянки', 'income');
+  ('FREIGHT_LCV_CITY', 'Р”РѕСЃС‚Р°РІРєР° РіРѕСЂРѕРґ (Р“Р°Р·РµР»Рё)', 'income'),
+  ('FREIGHT_LCV_INTERCITY', 'РњРµР¶РіРѕСЂРѕРґ (Р“Р°Р·РµР»Рё)', 'income'),
+  ('FREIGHT_TRUCK', 'Р“СЂСѓР·РѕРїРµСЂРµРІРѕР·РєРё (Р’Р°Р»РґР°Рё)', 'income'),
+  ('FREIGHT_5T', 'Р“СЂСѓР·РѕРїРµСЂРµРІРѕР·РєРё (РљР°РЅС‚РµСЂ)', 'income'),
+  ('MOVING', 'РџРµСЂРµРµР·РґС‹', 'income'),
+  ('SERVICE_WORKS', 'РЈСЃР»СѓРіРё РЎРўРћ (СЂР°Р±РѕС‚С‹)', 'income'),
+  ('SERVICE_PARTS_SALE', 'РџСЂРѕРґР°Р¶Р° Р·Р°РїС‡Р°СЃС‚РµР№ (РЎРўРћ)', 'income'),
+  ('BULK_SALES', 'РџСЂРѕРґР°Р¶Р° СЃС‹РїСѓС‡РёС…', 'income'),
+  ('PARKING_RENT', 'РђСЂРµРЅРґР° СЃС‚РѕСЏРЅРєРё', 'income');
 
 -- Categories (Expense)
 INSERT INTO categories (code, name, direction)
 VALUES
-  ('FUEL', 'ГСМ', 'expense'),
-  ('REPAIR_PARTS', 'Ремонт — запчасти', 'expense'),
-  ('PAYROLL_DRIVER', 'ЗП водителя', 'expense'),
-  ('PAYROLL_LOADER', 'ЗП грузчика', 'expense'),
-  ('DEPRECIATION_VEHICLE', 'Амортизация транспорта', 'expense'),
-  ('RENT', 'Аренда', 'expense'),
-  ('UTILITIES', 'Коммуналка', 'expense'),
-  ('INSURANCE', 'Страховки', 'expense');
+  ('FUEL', 'Р“РЎРњ', 'expense'),
+  ('REPAIR_PARTS', 'Р РµРјРѕРЅС‚ вЂ” Р·Р°РїС‡Р°СЃС‚Рё', 'expense'),
+  ('PAYROLL_DRIVER', 'Р—Рџ РІРѕРґРёС‚РµР»СЏ', 'expense'),
+  ('PAYROLL_LOADER', 'Р—Рџ РіСЂСѓР·С‡РёРєР°', 'expense'),
+  ('DEPRECIATION_VEHICLE', 'РђРјРѕСЂС‚РёР·Р°С†РёСЏ С‚СЂР°РЅСЃРїРѕСЂС‚Р°', 'expense'),
+  ('RENT', 'РђСЂРµРЅРґР°', 'expense'),
+  ('UTILITIES', 'РљРѕРјРјСѓРЅР°Р»РєР°', 'expense'),
+  ('INSURANCE', 'РЎС‚СЂР°С…РѕРІРєРё', 'expense');
 
 -- Payroll Rules
 INSERT INTO payroll_rules (name, rule_type, value, applies_to_asset_type_id, applies_to_trip_type, description)
 SELECT 
-  'Газель город 30%', 'percent', 0.30, asset_types.id, 'local', 'Подсказка 30% для города'
+  'Р“Р°Р·РµР»СЊ РіРѕСЂРѕРґ 30%', 'percent', 0.30, asset_types.id, 'local', 'РџРѕРґСЃРєР°Р·РєР° 30% РґР»СЏ РіРѕСЂРѕРґР°'
 FROM asset_types WHERE code = 'GAZELLE_3M'
 UNION ALL
 SELECT 
-  'Газель межгород 25%', 'percent', 0.25, asset_types.id, 'intercity', 'Подсказка 25% для межгорода'
+  'Р“Р°Р·РµР»СЊ РјРµР¶РіРѕСЂРѕРґ 25%', 'percent', 0.25, asset_types.id, 'intercity', 'РџРѕРґСЃРєР°Р·РєР° 25% РґР»СЏ РјРµР¶РіРѕСЂРѕРґР°'
 FROM asset_types WHERE code = 'GAZELLE_4M';
 ```
 
 ---
 
-## 3. Диаграмма отношений (Entity Relationship Diagram)
+## 3. Р”РёР°РіСЂР°РјРјР° РѕС‚РЅРѕС€РµРЅРёР№ (Entity Relationship Diagram)
 
 ```
-┌─────────────────┐
-│  LEGAL_ENTITIES │
-└────────┬────────┘
-         │ (1:N)
-         │
-    ┌────┴────────┬────────────┬─────────────┐
-    │             │            │             │
-┌───▼──┐  ┌──────▼──┐  ┌──────▼──┐  ┌──────▼──┐
-│ASSETS│  │WALLETS  │  │USERS    │  │BUSINESS_│
-└───┬──┘  └─────────┘  └──────┬──┘  │  UNITS  │
-    │                         │     └─────────┘
-    │ (1:N)                   │ (1:N)
-    │                         │
-    ├─────────┬───────────────┘
-    │         │
-    │    ┌────▼──────────────┐
-    │    │ TRIPS             │
-    │    │ - asset_id        │
-    │    │ - driver_id       │
-    │    │ - loader_id       │
-    │    │ - lifecycle_status│
-    │    │ - settlement_*    │
-    │    └────┬──────────────┘
-    │         │ (1:N)
-    │         │
-    │    ┌────▼──────────────┐
-    │    │ TRIP_ORDERS       │◄── payment_method
-    │    │ - amount          │
-    │    │ - driver_pay      │
-    │    │ - loader_pay      │
-    │    │ - settlement_*    │
-    │    └────┬──────────────┘
-    │         │ (1:1)
-    │         │ linked_income_tx_id
-    │         │
-┌───▼─────────▼───────────────────────────────┐
-│ TRANSACTIONS (ИСТОЧНИК ИСТИНЫ)              │
-│ ─────────────────────────────────────────── │
-│ - direction (income/expense/transfer)       │
-│ - amount                                    │
-│ - from_wallet_id ──┬──────────┐             │
-│ - to_wallet_id    │          │             │
-│ - category_id     │    WALLETS│             │
-│ - lifecycle_status│          │             │
-│ - settlement_st.  └──────────┘             │
-│ - trip_id         (каждая T→ одна из Wallets)
-└───────────────────────────────────────────┘
+в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+в”‚  LEGAL_ENTITIES в”‚
+в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+         в”‚ (1:N)
+         в”‚
+    в”Њв”Ђв”Ђв”Ђв”Ђв”ґв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+    в”‚             в”‚            в”‚             в”‚
+в”Њв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ  в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ  в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ  в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ
+в”‚ASSETSв”‚  в”‚WALLETS  в”‚  в”‚USERS    в”‚  в”‚BUSINESS_в”‚
+в””в”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”  в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”  в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”  в”‚  UNITS  в”‚
+    в”‚                         в”‚     в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+    в”‚ (1:N)                   в”‚ (1:N)
+    в”‚                         в”‚
+    в”њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+    в”‚         в”‚
+    в”‚    в”Њв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+    в”‚    в”‚ TRIPS             в”‚
+    в”‚    в”‚ - asset_id        в”‚
+    в”‚    в”‚ - driver_id       в”‚
+    в”‚    в”‚ - loader_id       в”‚
+    в”‚    в”‚ - lifecycle_statusв”‚
+    в”‚    в”‚ - settlement_*    в”‚
+    в”‚    в””в”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+    в”‚         в”‚ (1:N)
+    в”‚         в”‚
+    в”‚    в”Њв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+    в”‚    в”‚ TRIP_ORDERS       в”‚в—„в”Ђв”Ђ payment_method
+    в”‚    в”‚ - amount          в”‚
+    в”‚    в”‚ - driver_pay      в”‚
+    в”‚    в”‚ - loader_pay      в”‚
+    в”‚    в”‚ - settlement_*    в”‚
+    в”‚    в””в”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+    в”‚         в”‚ (1:1)
+    в”‚         в”‚ linked_income_tx_id
+    в”‚         в”‚
+в”Њв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+в”‚ TRANSACTIONS (РРЎРўРћР§РќРРљ РРЎРўРРќР«)              в”‚
+в”‚ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ в”‚
+в”‚ - direction (income/expense/transfer)       в”‚
+в”‚ - amount                                    в”‚
+в”‚ - from_wallet_id в”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ             в”‚
+в”‚ - to_wallet_id    в”‚          в”‚             в”‚
+в”‚ - category_id     в”‚    WALLETSв”‚             в”‚
+в”‚ - lifecycle_statusв”‚          в”‚             в”‚
+в”‚ - settlement_st.  в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”             в”‚
+в”‚ - trip_id         (РєР°Р¶РґР°СЏ Tв†’ РѕРґРЅР° РёР· Wallets)
+в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
 
 PAYROLL:
-┌──────────────┐
-│ PAYROLL_RULES│ (справочник подсказок)
-└──────────────┘
+в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+в”‚ PAYROLL_RULESв”‚ (СЃРїСЂР°РІРѕС‡РЅРёРє РїРѕРґСЃРєР°Р·РѕРє)
+в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
 
-┌────────────────────────┐
-│ TRIP_ORDERS            │
-│ + driver_pay           │◄── вводится вручную
-│ + loader_pay           │
-│ + driver_pay_percent   │
-└──────────┬─────────────┘
-           │ (SUM за период)
-           │
-        ┌──▼──────────────────┐
-        │ PAYROLL_PERIODS     │
-        │ - total_earned      │
-        │ - balance_to_pay    │
-        └─────────────────────┘
+в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+в”‚ TRIP_ORDERS            в”‚
+в”‚ + driver_pay           в”‚в—„в”Ђв”Ђ РІРІРѕРґРёС‚СЃСЏ РІСЂСѓС‡РЅСѓСЋ
+в”‚ + loader_pay           в”‚
+в”‚ + driver_pay_percent   в”‚
+в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+           в”‚ (SUM Р·Р° РїРµСЂРёРѕРґ)
+           в”‚
+        в”Њв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+        в”‚ PAYROLL_PERIODS     в”‚
+        в”‚ - total_earned      в”‚
+        в”‚ - balance_to_pay    в”‚
+        в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
 ```
 
 ---
 
-## 4. Таблица со всеми полями (справочник для разработчика)
+## 4. РўР°Р±Р»РёС†Р° СЃРѕ РІСЃРµРјРё РїРѕР»СЏРјРё (СЃРїСЂР°РІРѕС‡РЅРёРє РґР»СЏ СЂР°Р·СЂР°Р±РѕС‚С‡РёРєР°)
 
-| Таблица | Поле | Тип | Constraints | Примечание |
+| РўР°Р±Р»РёС†Р° | РџРѕР»Рµ | РўРёРї | Constraints | РџСЂРёРјРµС‡Р°РЅРёРµ |
 |---------|------|-----|-------------|-----------|
 | **users** | id | UUID | PK | |
-| | max_user_id | TEXT | UNIQUE | Из MAX OAuth |
+| | max_user_id | TEXT | UNIQUE | РР· MAX OAuth |
 | | phone | TEXT | | |
 | | full_name | TEXT | NOT NULL | |
-| | role | TEXT | CHECK 8 вариантов | owner, admin, driver и т.д. |
-| | current_asset_id | UUID | FK → assets | Для водителя |
+| | role | TEXT | CHECK 8 РІР°СЂРёР°РЅС‚РѕРІ | owner, admin, driver Рё С‚.Рґ. |
+| | current_asset_id | UUID | FK в†’ assets | Р”Р»СЏ РІРѕРґРёС‚РµР»СЏ |
 | **assets** | id | UUID | PK | |
-| | asset_type_id | UUID | FK → asset_types | |
-| | plate_number | TEXT | UNIQUE | Госномер |
-| | residual_value | DECIMAL(12,2) | NOT NULL | Ост. стоимость сегодня |
-| | remaining_life_months | INT | NOT NULL | Оставшихся месяцев |
-| | monthly_depreciation | DECIMAL(12,2) | GENERATED | Вычисляется автоматически |
-| | current_book_value | DECIMAL(12,2) | | Уменьшается ежемесячно |
-| | odometer_current | INT | DEFAULT 0 | Текущий пробег |
-| | wialon_object_id | TEXT | | ID в Wialon (GPS) |
+| | asset_type_id | UUID | FK в†’ asset_types | |
+| | plate_number | TEXT | UNIQUE | Р“РѕСЃРЅРѕРјРµСЂ |
+| | residual_value | DECIMAL(12,2) | NOT NULL | РћСЃС‚. СЃС‚РѕРёРјРѕСЃС‚СЊ СЃРµРіРѕРґРЅСЏ |
+| | remaining_life_months | INT | NOT NULL | РћСЃС‚Р°РІС€РёС…СЃСЏ РјРµСЃСЏС†РµРІ |
+| | monthly_depreciation | DECIMAL(12,2) | GENERATED | Р’С‹С‡РёСЃР»СЏРµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё |
+| | current_book_value | DECIMAL(12,2) | | РЈРјРµРЅСЊС€Р°РµС‚СЃСЏ РµР¶РµРјРµСЃСЏС‡РЅРѕ |
+| | odometer_current | INT | DEFAULT 0 | РўРµРєСѓС‰РёР№ РїСЂРѕР±РµРі |
+| | wialon_object_id | TEXT | | ID РІ Wialon (GPS) |
 | **wallets** | id | UUID | PK | |
 | | code | TEXT | UNIQUE | 'ip_rs', 'cash_office', 'driver_vova' |
-| | type | TEXT | CHECK 5 вариантов | bank_account, cash_register и т.д. |
-| | owner_user_id | UUID | FK → users | Для подотчёта |
+| | type | TEXT | CHECK 5 РІР°СЂРёР°РЅС‚РѕРІ | bank_account, cash_register Рё С‚.Рґ. |
+| | owner_user_id | UUID | FK в†’ users | Р”Р»СЏ РїРѕРґРѕС‚С‡С‘С‚Р° |
 | **trips** | id | UUID | PK | |
-| | asset_id | UUID | FK → assets | |
-| | driver_id | UUID | FK → users | NOT NULL |
-| | loader_id | UUID | FK → users | Опционально |
+| | asset_id | UUID | FK в†’ assets | |
+| | driver_id | UUID | FK в†’ users | NOT NULL |
+| | loader_id | UUID | FK в†’ users | РћРїС†РёРѕРЅР°Р»СЊРЅРѕ |
 | | started_at | TIMESTAMPTZ | NOT NULL | |
 | | ended_at | TIMESTAMPTZ | | |
-| | lifecycle_status | TEXT | draft/approved/cancelled | **КЛЮЧЕВОЙ** |
-| | settlement_status | TEXT | pending/completed | **КЛЮЧЕВОЙ** |
-| | approved_by | UUID | FK → users | Кто утвердил |
-| | approved_at | TIMESTAMPTZ | | Когда утвердил |
+| | lifecycle_status | TEXT | draft/approved/cancelled | **РљР›Р®Р§Р•Р’РћР™** |
+| | settlement_status | TEXT | pending/completed | **РљР›Р®Р§Р•Р’РћР™** |
+| | approved_by | UUID | FK в†’ users | РљС‚Рѕ СѓС‚РІРµСЂРґРёР» |
+| | approved_at | TIMESTAMPTZ | | РљРѕРіРґР° СѓС‚РІРµСЂРґРёР» |
 | **trip_orders** | id | UUID | PK | |
-| | trip_id | UUID | FK → trips | |
+| | trip_id | UUID | FK в†’ trips | |
 | | order_number | INT | NOT NULL | 1, 2, 3... |
-| | amount | DECIMAL(12,2) | NOT NULL > 0 | Сумма заказа |
-| | driver_pay | DECIMAL(12,2) | NOT NULL | **РУЧНОЙ ВВОД** |
-| | loader_pay | DECIMAL(12,2) | DEFAULT 0 | **РУЧНОЙ ВВОД** |
-| | driver_pay_percent | DECIMAL(5,2) | | Информационное: driver_pay/amount*100 |
-| | payment_method | TEXT | CHECK 5 вариантов | cash, qr, bank_invoice, debt_cash, card_driver |
+| | amount | DECIMAL(12,2) | NOT NULL > 0 | РЎСѓРјРјР° Р·Р°РєР°Р·Р° |
+| | driver_pay | DECIMAL(12,2) | NOT NULL | **Р РЈР§РќРћР™ Р’Р’РћР”** |
+| | loader_pay | DECIMAL(12,2) | DEFAULT 0 | **Р РЈР§РќРћР™ Р’Р’РћР”** |
+| | driver_pay_percent | DECIMAL(5,2) | | РРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ: driver_pay/amount*100 |
+| | payment_method | TEXT | CHECK 5 РІР°СЂРёР°РЅС‚РѕРІ | cash, qr, bank_invoice, debt_cash, card_driver |
 | | settlement_status | TEXT | pending/completed | |
-| | linked_income_tx_id | UUID | FK → transactions | Автоссылка |
+| | linked_income_tx_id | UUID | FK в†’ transactions | РђРІС‚РѕСЃСЃС‹Р»РєР° |
 | **transactions** | id | UUID | PK | |
 | | direction | TEXT | income/expense/transfer | |
-| | amount | DECIMAL(12,2) | NOT NULL > 0 | **ВСЕГДА ÷ сюда не на сумму исходного заказа** |
-| | from_wallet_id | UUID | FK → wallets | |
-| | to_wallet_id | UUID | FK → wallets | |
-| | lifecycle_status | TEXT | **draft/approved/cancelled** | Кто утвердил |
-| | settlement_status | TEXT | **pending/completed** | Деньги прошли? |
-| | idempotency_key | TEXT | UNIQUE | Для идемпотентности |
-| | transaction_type | TEXT | CHECK 7 типов | regular, depreciation, payroll и т.д. |
+| | amount | DECIMAL(12,2) | NOT NULL > 0 | **Р’РЎР•Р“Р”Рђ Г· СЃСЋРґР° РЅРµ РЅР° СЃСѓРјРјСѓ РёСЃС…РѕРґРЅРѕРіРѕ Р·Р°РєР°Р·Р°** |
+| | from_wallet_id | UUID | FK в†’ wallets | |
+| | to_wallet_id | UUID | FK в†’ wallets | |
+| | lifecycle_status | TEXT | **draft/approved/cancelled** | РљС‚Рѕ СѓС‚РІРµСЂРґРёР» |
+| | settlement_status | TEXT | **pending/completed** | Р”РµРЅСЊРіРё РїСЂРѕС€Р»Рё? |
+| | idempotency_key | TEXT | UNIQUE | Р”Р»СЏ РёРґРµРјРїРѕС‚РµРЅС‚РЅРѕСЃС‚Рё |
+| | transaction_type | TEXT | CHECK 7 С‚РёРїРѕРІ | regular, depreciation, payroll Рё С‚.Рґ. |
 
 ---
 
-## 5. Как считаются балансы (КРИТИЧНО!)
+## 5. РљР°Рє СЃС‡РёС‚Р°СЋС‚СЃСЏ Р±Р°Р»Р°РЅСЃС‹ (РљР РРўРР§РќРћ!)
 
 ```sql
--- Баланс кошелька = SUM всех транзакций, где это кошелек "to" минус "from"
--- ТОЛЬКО по approved + completed
+-- Р‘Р°Р»Р°РЅСЃ РєРѕС€РµР»СЊРєР° = SUM РІСЃРµС… С‚СЂР°РЅР·Р°РєС†РёР№, РіРґРµ СЌС‚Рѕ РєРѕС€РµР»РµРє "to" РјРёРЅСѓСЃ "from"
+-- РўРћР›Р¬РљРћ РїРѕ approved + completed
 
 SELECT 
   wallet_id,
@@ -869,7 +869,7 @@ WHERE lifecycle_status = 'approved'
   AND actual_date <= CURRENT_DATE
 GROUP BY wallet_id;
 
--- P&L за период = доходы - расходы (только approved + completed)
+-- P&L Р·Р° РїРµСЂРёРѕРґ = РґРѕС…РѕРґС‹ - СЂР°СЃС…РѕРґС‹ (С‚РѕР»СЊРєРѕ approved + completed)
 SELECT 
   business_unit_id,
   SUM(amount) FILTER (WHERE direction = 'income') as income,
@@ -885,10 +885,10 @@ GROUP BY business_unit_id;
 
 ---
 
-## 6. Триггеры и автоматизация
+## 6. РўСЂРёРіРіРµСЂС‹ Рё Р°РІС‚РѕРјР°С‚РёР·Р°С†РёСЏ
 
 ```sql
--- ТРИГГЕР 1: При создании пользователя → автосоздание wallet (подотчёт)
+-- РўР РР“Р“Р•Р  1: РџСЂРё СЃРѕР·РґР°РЅРёРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ в†’ Р°РІС‚РѕСЃРѕР·РґР°РЅРёРµ wallet (РїРѕРґРѕС‚С‡С‘С‚)
 CREATE OR REPLACE FUNCTION create_employee_wallet()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -896,10 +896,10 @@ BEGIN
     INSERT INTO wallets (code, name, type, owner_user_id, legal_entity_id)
     VALUES (
       'employee_' || NEW.id,
-      'Подотчёт ' || NEW.full_name,
+      'РџРѕРґРѕС‚С‡С‘С‚ ' || NEW.full_name,
       'employee_accountable',
       NEW.id,
-      (SELECT id FROM legal_entities LIMIT 1) -- главное юрлицо
+      (SELECT id FROM legal_entities LIMIT 1) -- РіР»Р°РІРЅРѕРµ СЋСЂР»РёС†Рѕ
     );
   END IF;
   RETURN NEW;
@@ -909,13 +909,13 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_create_wallet AFTER INSERT ON users
 FOR EACH ROW EXECUTE FUNCTION create_employee_wallet();
 
--- ТРИГГЕР 2: При INSERT trip_orders → создание income transaction
+-- РўР РР“Р“Р•Р  2: РџСЂРё INSERT trip_orders в†’ СЃРѕР·РґР°РЅРёРµ income transaction
 CREATE OR REPLACE FUNCTION create_income_transaction()
 RETURNS TRIGGER AS $$
 DECLARE
   wallet_id UUID;
 BEGIN
-  -- Определить целевой кошелёк по payment_method
+  -- РћРїСЂРµРґРµР»РёС‚СЊ С†РµР»РµРІРѕР№ РєРѕС€РµР»С‘Рє РїРѕ payment_method
   wallet_id := CASE NEW.payment_method
     WHEN 'cash' THEN (SELECT id FROM wallets WHERE code = 'driver_wallet')
     WHEN 'qr' THEN (SELECT id FROM wallets WHERE code = 'ip_rs')
@@ -954,7 +954,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_create_tx AFTER INSERT ON trip_orders
 FOR EACH ROW EXECUTE FUNCTION create_income_transaction();
 
--- ТРИГГЕР 3: При UPDATE assets.odometer_current → проверка ТО
+-- РўР РР“Р“Р•Р  3: РџСЂРё UPDATE assets.odometer_current в†’ РїСЂРѕРІРµСЂРєР° РўРћ
 CREATE OR REPLACE FUNCTION check_maintenance_alert()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -976,41 +976,41 @@ FOR EACH ROW EXECUTE FUNCTION check_maintenance_alert();
 
 ---
 
-## 7. Миграция: как инициализировать БД
+## 7. РњРёРіСЂР°С†РёСЏ: РєР°Рє РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ Р‘Р”
 
 ```bash
-# 1. Скопировать весь SQL из п.2 выше
-# 2. Открыть Supabase SQL Editor
-# 3. Вставить и выполнить (может занять 1-2 минуты)
-# 4. Проверить: все таблицы созданы
+# 1. РЎРєРѕРїРёСЂРѕРІР°С‚СЊ РІРµСЃСЊ SQL РёР· Рї.2 РІС‹С€Рµ
+# 2. РћС‚РєСЂС‹С‚СЊ Supabase SQL Editor
+# 3. Р’СЃС‚Р°РІРёС‚СЊ Рё РІС‹РїРѕР»РЅРёС‚СЊ (РјРѕР¶РµС‚ Р·Р°РЅСЏС‚СЊ 1-2 РјРёРЅСѓС‚С‹)
+# 4. РџСЂРѕРІРµСЂРёС‚СЊ: РІСЃРµ С‚Р°Р±Р»РёС†С‹ СЃРѕР·РґР°РЅС‹
 
-# 5. Экспортировать типы в TypeScript
+# 5. Р­РєСЃРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ С‚РёРїС‹ РІ TypeScript
 supabase gen types typescript --schema public > packages/shared-types/database.types.ts
 
-# 6. Заполнить справочники (seed data)
-# — Контрагентов добавить вручную в Dashboard
-# — Машины добавить через Setup Wizard
+# 6. Р—Р°РїРѕР»РЅРёС‚СЊ СЃРїСЂР°РІРѕС‡РЅРёРєРё (seed data)
+# вЂ” РљРѕРЅС‚СЂР°РіРµРЅС‚РѕРІ РґРѕР±Р°РІРёС‚СЊ РІСЂСѓС‡РЅСѓСЋ РІ Dashboard
+# вЂ” РњР°С€РёРЅС‹ РґРѕР±Р°РІРёС‚СЊ С‡РµСЂРµР· Setup Wizard
 ```
 
 ---
 
-## 8. Резервная копия и восстановление
+## 8. Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ Рё РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ
 
 ```bash
-# Резервная копия:
+# Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ:
 pg_dump postgresql://user:password@host/db > backup.sql
 
-# Восстановление:
+# Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ:
 psql postgresql://user:password@host/db < backup.sql
 ```
 
 ---
 
-## Итого
+## РС‚РѕРіРѕ
 
-✅ **Полная Supabase схема готова к инициализации**  
-✅ **Все таблицы, индексы, триггеры, RLS**  
-✅ **Двухосный статус реализован на уровне БД**  
-✅ **Автоматизация через pg_cron и триггеры**  
+вњ… **РџРѕР»РЅР°СЏ Supabase СЃС…РµРјР° РіРѕС‚РѕРІР° Рє РёРЅРёС†РёР°Р»РёР·Р°С†РёРё**  
+вњ… **Р’СЃРµ С‚Р°Р±Р»РёС†С‹, РёРЅРґРµРєСЃС‹, С‚СЂРёРіРіРµСЂС‹, RLS**  
+вњ… **Р”РІСѓС…РѕСЃРЅС‹Р№ СЃС‚Р°С‚СѓСЃ СЂРµР°Р»РёР·РѕРІР°РЅ РЅР° СѓСЂРѕРІРЅРµ Р‘Р”**  
+вњ… **РђРІС‚РѕРјР°С‚РёР·Р°С†РёСЏ С‡РµСЂРµР· pg_cron Рё С‚СЂРёРіРіРµСЂС‹**  
 
-**Следующий файл:** ENVIRONMENT.md (переменные окружения)
+**РЎР»РµРґСѓСЋС‰РёР№ С„Р°Р№Р»:** ENVIRONMENT.md (РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ)
