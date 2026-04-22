@@ -13,6 +13,7 @@
     "@saldacargo/api-client": "workspace:*",
     "@saldacargo/shared-types": "workspace:*",
     "@saldacargo/ui": "workspace:*",
+    "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "latest",
     "@tanstack/react-query": "^5.99.2",
     "autoprefixer": "^10.0.0",
