@@ -16,7 +16,7 @@ import { usePathname, useRouter } from 'next/navigation'
 
 const menuItems = [
   { id: 'money-map',    icon: LayoutDashboard, label: 'Главная',      href: '/money-map' },
-  { id: 'trips',        icon: ClipboardList,   label: 'Ревью смены',  href: '/trips',        badge: 3 },
+  { id: 'review',       icon: ClipboardList,   label: 'Ревью смены',  href: '/review' },
   { id: 'assets',       icon: Truck,           label: 'Автопарк',     href: '/assets' },
   { id: 'transactions', icon: Wallet,          label: 'Транзакции',   href: '/transactions' },
   { id: 'payroll',      icon: Users,           label: 'Зарплаты',     href: '/payroll' },
