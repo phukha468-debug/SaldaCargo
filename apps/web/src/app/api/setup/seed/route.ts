@@ -8,20 +8,30 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient()
 
-    // 1. Юрлицо
-    const { data: legalEntity, error: legalError } = await (supabase
+    // 1. Юрлицо (используем существующее или создаем новое)
+    const { data: existingLegals } = await (supabase
       .from('legal_entities') as any)
-      .insert({
-        name: legal.name,
-        type: legal.type,
-        inn: legal.inn || null,
-        tax_regime: legal.tax_regime,
-        is_active: true,
-      })
-      .select()
-      .single()
+      .select('*')
+      .limit(1)
 
-    if (legalError) throw new Error(`Юрлицо: ${legalError.message}`)
+    let legalEntity = existingLegals?.[0]
+
+    if (!legalEntity) {
+      const { data, error: legalError } = await (supabase
+        .from('legal_entities') as any)
+        .insert({
+          name: legal.name,
+          type: legal.type,
+          inn: legal.inn || null,
+          tax_regime: legal.tax_regime,
+          is_active: true,
+        })
+        .select()
+        .single()
+
+      if (legalError) throw new Error(`Юрлицо: ${legalError.message}`)
+      legalEntity = data
+    }
 
     // 2. Системные кошельки (ext_clients, ext_suppliers уже созданы в seed)
     // Обновляем legal_entity_id для ip_rs и cash_office
@@ -88,11 +98,21 @@ export async function POST(request: Request) {
         }
       })
 
-    const { error: assetsError } = await (supabase
+    // Проверяем существующие активы, чтобы не было конфликтов по plate_number
+    const { data: existingAssets } = await (supabase
       .from('assets') as any)
-      .insert(assetsToInsert)
+      .select('plate_number')
 
-    if (assetsError) throw new Error(`Активы: ${assetsError.message}`)
+    const existingPlates = new Set((existingAssets || []).map((a: any) => a.plate_number))
+    const uniqueAssetsToInsert = assetsToInsert.filter((a: any) => !existingPlates.has(a.plate_number))
+
+    if (uniqueAssetsToInsert.length > 0) {
+      const { error: assetsError } = await (supabase
+        .from('assets') as any)
+        .insert(uniqueAssetsToInsert)
+
+      if (assetsError) throw new Error(`Активы: ${assetsError.message}`)
+    }
 
     // 5. Начальные остатки (transactions типа initial_balance)
     if (initialBalances && initialBalances.length > 0) {

@@ -2,13 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+
 @layer base {
   :root {
-    --background: #F8FAFC;
+    --background: #F1F5F9;
     --foreground: #0F172A;
   }
 
   body {
-    @apply bg-[#F8FAFC] text-[#0F172A] antialiased;
+    @apply bg-[#F1F5F9] text-[#0F172A] antialiased;
   }
+
+  /* Monospace для финансовых чисел */
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Кастомный скроллбар */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 }

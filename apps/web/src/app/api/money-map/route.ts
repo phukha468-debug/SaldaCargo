@@ -139,44 +139,47 @@ export async function GET() {
     const netPosition = cashTotal + fleetTotal + receivablesTotal - payablesTotal
 
     return NextResponse.json({
-      netPosition: Math.round(netPosition),
-      cash: {
-        total: cashTotal,
-        wallets: walletBalances,
-      },
-      fleet: {
-        total: Math.round(fleetTotal),
-        count: (assets || []).length,
-      },
-      receivables: {
-        total: Math.round(receivablesTotal),
-        overdue: Math.round(overdueTotal),
-      },
-      payables: {
-        total: Math.round(payablesTotal),
-      },
-      pnl: {
-        income: Math.round(monthIncome),
-        expense: Math.round(monthExpense),
-        profit: Math.round(monthProfit),
-        target: TARGET,
-        progressPercent: TARGET > 0 ? Math.min(Math.round((monthProfit / TARGET) * 100), 100) : 0,
-      },
-      today: {
-        date: today,
-        income: Math.round(todayIncome),
-        expense: Math.round(todayExpense),
-        profit: Math.round(todayIncome - todayExpense),
-        onLine,
-        totalActive,
-        loadPercent: totalActive > 0 ? Math.round((onLine / totalActive) * 100) : 0,
-      },
-      alerts: {
-        draftsCount: (drafts || []).length,
-        toAlertsCount,
-        overdueReceivables: Math.round(overdueTotal),
-        lowLoad: totalActive > 0 && onLine / totalActive < 0.3,
-      },
+      success: true,
+      data: {
+        netPosition: Math.round(netPosition),
+        cash: {
+          total: cashTotal,
+          wallets: walletBalances,
+        },
+        fleet: {
+          total: Math.round(fleetTotal),
+          count: (assets || []).length,
+        },
+        receivables: {
+          total: Math.round(receivablesTotal),
+          overdue: Math.round(overdueTotal),
+        },
+        payables: {
+          total: Math.round(payablesTotal),
+        },
+        pnl: {
+          income: Math.round(monthIncome),
+          expense: Math.round(monthExpense),
+          profit: Math.round(monthProfit),
+          target: TARGET,
+          progressPercent: TARGET > 0 ? Math.min(Math.round((monthProfit / TARGET) * 100), 100) : 0,
+        },
+        today: {
+          date: today,
+          income: Math.round(todayIncome),
+          expense: Math.round(todayExpense),
+          profit: Math.round(todayIncome - todayExpense),
+          onLine,
+          totalActive,
+          loadPercent: totalActive > 0 ? Math.round((onLine / totalActive) * 100) : 0,
+        },
+        alerts: {
+          draftsCount: (drafts || []).length,
+          toAlertsCount,
+          overdueReceivables: Math.round(overdueTotal),
+          lowLoad: totalActive > 0 && onLine / totalActive < 0.3,
+        },
+      }
     })
   } catch (error) {
     console.error('[money-map] Error:', error)

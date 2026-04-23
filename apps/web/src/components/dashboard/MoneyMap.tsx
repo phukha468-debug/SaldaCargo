@@ -31,7 +31,7 @@ export default function MoneyMap() {
           throw new Error(errData.error || 'Ошибка загрузки')
         }
         const json = await res.json()
-        setData(json)
+        setData(json.data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Неизвестная ошибка')
       } finally {

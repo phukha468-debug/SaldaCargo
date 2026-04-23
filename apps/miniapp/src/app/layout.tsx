@@ -1,33 +1,19 @@
-import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { Toaster } from "@saldacargo/ui";
-
-const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-inter" });
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  viewportFit: "cover",
-};
+import type { Metadata } from 'next'
+import './globals.css'
+import { Toaster } from "@saldacargo/ui"
 
 export const metadata: Metadata = {
-  title: "SaldaCargo | Driver",
-  description: "Приложение для водителей",
-};
+  title: 'SaldaCargo — Водитель',
+  description: 'Путевые листы и рейсы',
+}
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body className={`${inter.variable} font-sans antialiased overflow-x-hidden pt-safe pb-safe`}>
+      <body className="bg-slate-50 min-h-screen max-w-md mx-auto">
         {children}
         <Toaster />
       </body>
     </html>
-  );
+  )
 }

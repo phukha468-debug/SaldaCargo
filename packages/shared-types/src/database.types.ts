@@ -39,6 +39,26 @@ export interface Database {
         Insert: { id?: string; code: string; name: string; type: string; legal_entity_id?: string | null }
         Update: { id?: string; code?: string; name?: string; type?: string; legal_entity_id?: string | null }
       }
+      trips: {
+        Row: { id: string; asset_id: string; driver_id: string; loader_id: string | null; trip_type: string; started_at: string; ended_at: string | null; odometer_start: number | null; odometer_end: number | null; lifecycle_status: string; status: string; created_at: string | null }
+        Insert: { id?: string; asset_id: string; driver_id: string; loader_id?: string | null; trip_type?: string; started_at?: string; ended_at?: string | null; odometer_start?: number | null; odometer_end?: number | null; lifecycle_status?: string; status?: string; created_at?: string | null }
+        Update: { id?: string; asset_id?: string; driver_id?: string; loader_id?: string | null; trip_type?: string; started_at?: string; ended_at?: string | null; odometer_start?: number | null; odometer_end?: number | null; lifecycle_status?: string; status?: string; created_at?: string | null }
+      }
+      trip_orders: {
+        Row: { id: string; trip_id: string; order_number: number; client_name: string | null; amount: number; driver_pay: number; loader_pay: number | null; driver_pay_percent: number | null; payment_method: string; settlement_status: string; idempotency_key: string | null; created_at: string | null }
+        Insert: { id?: string; trip_id: string; order_number: number; client_name?: string | null; amount: number; driver_pay: number; loader_pay?: number | null; driver_pay_percent?: number | null; payment_method: string; settlement_status?: string; idempotency_key?: string | null; created_at?: string | null }
+        Update: { id?: string; trip_id?: string; order_number?: number; client_name?: string | null; amount?: number; driver_pay?: number; loader_pay?: number | null; driver_pay_percent?: number | null; payment_method?: string; settlement_status?: string; idempotency_key?: string | null; created_at?: string | null }
+      }
+      trip_expenses: {
+        Row: { id: string; trip_id: string; category_id: string; amount: number; payment_method: string; description: string | null; created_at: string | null }
+        Insert: { id?: string; trip_id: string; category_id: string; amount: number; payment_method?: string; description?: string | null; created_at?: string | null }
+        Update: { id?: string; trip_id?: string; category_id?: string; amount?: number; payment_method?: string; description?: string | null; created_at?: string | null }
+      }
+      categories: {
+        Row: { id: string; code: string; name: string; direction: string }
+        Insert: { id?: string; code: string; name: string; direction: string }
+        Update: { id?: string; code?: string; name?: string; direction?: string }
+      }
       transactions: {
         Row: { id: string; direction: string; amount: number; from_wallet_id: string | null; to_wallet_id: string | null; transaction_type: string | null; lifecycle_status: string; settlement_status: string; description: string | null; actual_date: string; created_at: string | null }
         Insert: { id?: string; direction: string; amount: number; from_wallet_id?: string | null; to_wallet_id?: string | null; transaction_type?: string | null; lifecycle_status?: string; settlement_status?: string; description?: string | null; actual_date?: string; created_at?: string | null }

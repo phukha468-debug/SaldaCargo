@@ -15,16 +15,20 @@ export default function WalletCard({ wallets, total }: WalletCardProps) {
   const fmt = (n: number) => n.toLocaleString('ru-RU')
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+    <div className="bg-[#EEF2F8] rounded-xl border border-slate-300/70 p-6 shadow-sm h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-slate-700">💵 Деньги</h3>
-        <span className="text-lg font-bold text-slate-800">{fmt(total)} ₽</span>
+        <h3 className="font-bold text-[14px] text-slate-800">Деньги</h3>
+        <span className="text-[17px] font-extrabold text-slate-800 font-mono tabular-nums">
+          {fmt(total)} ₽
+        </span>
       </div>
-      <div className="space-y-2">
+      <div className="flex flex-col gap-3 flex-1 justify-evenly">
         {wallets.map(w => (
-          <div key={w.id} className="flex justify-between items-center text-sm">
-            <span className="text-slate-500">{w.name}</span>
-            <span className={`font-medium ${w.balance < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+          <div key={w.id} className="flex justify-between items-center">
+            <span className="text-[13px] text-slate-500">{w.name}</span>
+            <span className={`text-[14px] font-semibold font-mono tabular-nums ${
+              w.balance < 0 ? 'text-red-600' : 'text-slate-800'
+            }`}>
               {fmt(w.balance)} ₽
             </span>
           </div>

@@ -1,31 +1,31 @@
-# SaldaCargo вЂ” РџРѕР»РЅР°СЏ РљР°СЂС‚Р° Supabase
+# SaldaCargo Р Р†Р вЂљРІР‚Сњ Р В РЎСџР В РЎвЂўР В Р’В»Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Р В РЎв„ўР В Р’В°Р РЋР вЂљР РЋРІР‚С™Р В Р’В° Supabase
 
-**РЎС‚Р°С‚СѓСЃ:** MVP-ready  
-**Р’РµСЂСЃРёСЏ:** 2.3  
-**РўРёРї Р‘Р”:** PostgreSQL (Supabase)  
+**Р В Р Р‹Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™Р РЋРЎвЂњР РЋР С“:** MVP-ready  
+**Р В РІР‚в„ўР В Р’ВµР РЋР вЂљР РЋР С“Р В РЎвЂР РЋР РЏ:** 2.3  
+**Р В РЎС›Р В РЎвЂР В РЎвЂ” Р В РІР‚ВР В РІР‚Сњ:** PostgreSQL (Supabase)  
 
 ---
 
-## 1. РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Supabase
+## 1. Р В Р’ВР В Р вЂ¦Р В РЎвЂР РЋРІР‚В Р В РЎвЂР В Р’В°Р В Р’В»Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ Supabase
 
 ```bash
-# 1. РЎРѕР·РґР°С‚СЊ РїСЂРѕРµРєС‚ РЅР° supabase.com
-# - Р РµРіРёРѕРЅ: Europe (Frankfurt) РґР»СЏ РЅРёР·РєРѕР№ Р»Р°С‚РµРЅС†РёРё РёР· РЎР°Р»РґС‹
-# - Р’РµСЂСЃРёСЏ PostgreSQL: 14+
+# 1. Р В Р Р‹Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р’ВµР В РЎвЂќР РЋРІР‚С™ Р В Р вЂ¦Р В Р’В° supabase.com
+# - Р В Р’В Р В Р’ВµР В РЎвЂ“Р В РЎвЂР В РЎвЂўР В Р вЂ¦: Europe (Frankfurt) Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ¦Р В РЎвЂР В Р’В·Р В РЎвЂќР В РЎвЂўР В РІвЂћвЂ“ Р В Р’В»Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР В Р вЂ¦Р РЋРІР‚В Р В РЎвЂР В РЎвЂ Р В РЎвЂР В Р’В· Р В Р Р‹Р В Р’В°Р В Р’В»Р В РўвЂР РЋРІР‚в„–
+# - Р В РІР‚в„ўР В Р’ВµР РЋР вЂљР РЋР С“Р В РЎвЂР РЋР РЏ PostgreSQL: 14+
 
-# 2. РЎРєРѕРїРёСЂРѕРІР°С‚СЊ РєР»СЋС‡Рё РёР· Project Settings:
+# 2. Р В Р Р‹Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р В РЎвЂР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР В РЎвЂ Р В РЎвЂР В Р’В· Project Settings:
 # - SUPABASE_URL
-# - SUPABASE_ANON_KEY (РґР»СЏ РєР»РёРµРЅС‚Р°)
-# - SUPABASE_SERVICE_ROLE_KEY (РґР»СЏ СЃРµСЂРІРµСЂР°)
+# - SUPABASE_ANON_KEY (Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂќР В Р’В»Р В РЎвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°)
+# - SUPABASE_SERVICE_ROLE_KEY (Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР С“Р В Р’ВµР РЋР вЂљР В Р вЂ Р В Р’ВµР РЋР вЂљР В Р’В°)
 
-# 3. РЎРѕР·РґР°С‚СЊ С‚Р°Р±Р»РёС†С‹: Р·Р°РїСѓСЃС‚РёС‚СЊ SQL РІ Supabase SQL Editor
+# 3. Р В Р Р‹Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋРІР‚в„–: Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ SQL Р В Р вЂ  Supabase SQL Editor
 ```
 
 ---
 
-## 2. РџРћР›РќР«Р™ SQL INIT SCRIPT
+## 2. Р В РЎСџР В РЎвЂєР В РІР‚С”Р В РЎСљР В Р’В«Р В РІвЂћСћ SQL INIT SCRIPT
 
-РЎРєРѕРїРёСЂРѕРІР°С‚СЊ РІРµСЃСЊ РєРѕРґ РЅРёР¶Рµ РІ Supabase в†’ SQL Editor в†’ Run.
+Р В Р Р‹Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р В РЎвЂР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В Р’ВµР РЋР С“Р РЋР Р‰ Р В РЎвЂќР В РЎвЂўР В РўвЂ Р В Р вЂ¦Р В РЎвЂР В Р’В¶Р В Р’Вµ Р В Р вЂ  Supabase Р Р†РІР‚В РІР‚в„ў SQL Editor Р Р†РІР‚В РІР‚в„ў Run.
 
 ```sql
 -- ============================================================
@@ -36,10 +36,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_cron";
 
 -- ============================================================
--- 1. CORE TABLES (РЎРїСЂР°РІРѕС‡РЅРёРєРё Рё РѕСЃРЅРѕРІРЅС‹Рµ СЃСѓС‰РЅРѕСЃС‚Рё)
+-- 1. CORE TABLES (Р В Р Р‹Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќР В РЎвЂ Р В РЎвЂ Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р РЋР С“Р РЋРЎвЂњР РЋРІР‚В°Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂ)
 -- ============================================================
 
--- LEGAL_ENTITIES (Р®СЂР»РёС†Р°)
+-- LEGAL_ENTITIES (Р В Р’В®Р РЋР вЂљР В Р’В»Р В РЎвЂР РЋРІР‚В Р В Р’В°)
 CREATE TABLE legal_entities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE legal_entities (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- BUSINESS_UNITS (РќР°РїСЂР°РІР»РµРЅРёСЏ Р±РёР·РЅРµСЃР°)
+-- BUSINESS_UNITS (Р В РЎСљР В Р’В°Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋР РЏ Р В Р’В±Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’ВµР РЋР С“Р В Р’В°)
 CREATE TABLE business_units (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'LOGISTICS_LCV_CITY', 'LOGISTICS_TRUCK'
@@ -60,49 +60,49 @@ CREATE TABLE business_units (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ASSET_TYPES (РўРёРїС‹ Р°РєС‚РёРІРѕРІ: Р’Р°Р»РґР°Р№, Р“Р°Р·РµР»СЊ Рё С‚.Рґ.)
+-- ASSET_TYPES (Р В РЎС›Р В РЎвЂР В РЎвЂ”Р РЋРІР‚в„– Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В РЎвЂўР В Р вЂ : Р В РІР‚в„ўР В Р’В°Р В Р’В»Р В РўвЂР В Р’В°Р В РІвЂћвЂ“, Р В РІР‚СљР В Р’В°Р В Р’В·Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В РЎвЂ Р РЋРІР‚С™.Р В РўвЂ.)
 CREATE TABLE asset_types (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'VALDAI_6M', 'GAZELLE_3M'
   name TEXT NOT NULL,
-  default_fuel_rate DECIMAL(5,2), -- Р»РёС‚СЂС‹ РЅР° 100РєРј
+  default_fuel_rate DECIMAL(5,2), -- Р В Р’В»Р В РЎвЂР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚в„– Р В Р вЂ¦Р В Р’В° 100Р В РЎвЂќР В РЎВ
   has_gps BOOLEAN DEFAULT false,
   requires_odometer_photo BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- USERS (РџРµСЂСЃРѕРЅР°Р»: РІРѕРґРёС‚РµР»Рё, РјРµС…Р°РЅРёРєРё, Р°РґРјРёРЅ)
+-- USERS (Р В РЎСџР В Р’ВµР РЋР вЂљР РЋР С“Р В РЎвЂўР В Р вЂ¦Р В Р’В°Р В Р’В»: Р В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р В РЎвЂ, Р В РЎВР В Р’ВµР РЋРІР‚В¦Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РЎвЂќР В РЎвЂ, Р В Р’В°Р В РўвЂР В РЎВР В РЎвЂР В Р вЂ¦)
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  max_user_id TEXT UNIQUE, -- ID РёР· MAX OAuth
+  max_user_id TEXT UNIQUE, -- ID Р В РЎвЂР В Р’В· MAX OAuth
   phone TEXT,
   full_name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('owner','admin','dispatcher','driver','mechanic','mechanic_lead','loader','accountant')),
   is_active BOOLEAN DEFAULT true,
-  current_asset_id UUID, -- РµСЃР»Рё РІРѕРґРёС‚РµР»СЊ вЂ” Р·Р°РєСЂРµРїР»С‘РЅРЅР°СЏ РјР°С€РёРЅР°
+  current_asset_id UUID, -- Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ Р Р†Р вЂљРІР‚Сњ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В Р’ВµР В РЎвЂ”Р В Р’В»Р РЋРІР‚ВР В Р вЂ¦Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Р В РЎВР В Р’В°Р РЋРІвЂљВ¬Р В РЎвЂР В Р вЂ¦Р В Р’В°
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   
   CONSTRAINT fk_current_asset FOREIGN KEY (current_asset_id) REFERENCES asset_types(id)
 );
 
--- ASSETS (РђРІС‚РѕРїР°СЂРє: РјР°С€РёРЅС‹, РѕР±РѕСЂСѓРґРѕРІР°РЅРёРµ)
+-- ASSETS (Р В РЎвЂ™Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂќ: Р В РЎВР В Р’В°Р РЋРІвЂљВ¬Р В РЎвЂР В Р вЂ¦Р РЋРІР‚в„–, Р В РЎвЂўР В Р’В±Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњР В РўвЂР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ)
 CREATE TABLE assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_type_id UUID NOT NULL REFERENCES asset_types(id),
   business_unit_id UUID REFERENCES business_units(id),
   legal_entity_id UUID REFERENCES legal_entities(id),
   
-  plate_number TEXT UNIQUE NOT NULL, -- Рђ099РђРђ
+  plate_number TEXT UNIQUE NOT NULL, -- Р В РЎвЂ™099Р В РЎвЂ™Р В РЎвЂ™
   vin TEXT UNIQUE,
   year INT,
   odometer_current INT DEFAULT 0,
   
-  -- РђРњРћР РўРР—РђР¦РРЇ РџРћ РћРЎРўРђРўРћР§РќРћР™ РЎРўРћРРњРћРЎРўР
-  residual_value DECIMAL(12,2) NOT NULL, -- РѕСЃС‚Р°С‚РѕС‡РЅР°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ
-  remaining_life_months INT NOT NULL, -- РѕСЃС‚Р°РІС€РёР№СЃСЏ СЃСЂРѕРє РІ РјРµСЃ
+  -- Р В РЎвЂ™Р В РЎС™Р В РЎвЂєР В Р’В Р В РЎС›Р В Р’ВР В РІР‚вЂќР В РЎвЂ™Р В Р’В¦Р В Р’ВР В Р вЂЎ Р В РЎСџР В РЎвЂє Р В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РЎС›Р В РЎвЂєР В Р’В§Р В РЎСљР В РЎвЂєР В РІвЂћСћ Р В Р Р‹Р В РЎС›Р В РЎвЂєР В Р’ВР В РЎС™Р В РЎвЂєР В Р Р‹Р В РЎС›Р В Р’В
+  residual_value DECIMAL(12,2) NOT NULL, -- Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В Р’В°Р РЋР РЏ Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В РЎвЂР В РЎВР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР Р‰
+  remaining_life_months INT NOT NULL, -- Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р РЋРІвЂљВ¬Р В РЎвЂР В РІвЂћвЂ“Р РЋР С“Р РЋР РЏ Р РЋР С“Р РЋР вЂљР В РЎвЂўР В РЎвЂќ Р В Р вЂ  Р В РЎВР В Р’ВµР РЋР С“
   monthly_depreciation DECIMAL(12,2) GENERATED ALWAYS AS (residual_value / remaining_life_months) STORED,
-  current_book_value DECIMAL(12,2), -- С‚РµРєСѓС‰Р°СЏ (СѓРјРµРЅСЊС€Р°РµС‚СЃСЏ РµР¶РµРјРµСЃСЏС‡РЅРѕ)
+  current_book_value DECIMAL(12,2), -- Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР РЋРІР‚В°Р В Р’В°Р РЋР РЏ (Р РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’В°Р В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ Р В Р’ВµР В Р’В¶Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋР РЏР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂў)
   
   -- GPS
   wialon_object_id TEXT,
@@ -113,7 +113,7 @@ CREATE TABLE assets (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- WALLETS (РљРѕС€РµР»СЊРєРё: РєР°СЃСЃР°, СЂ/СЃ, РїРѕРґРѕС‚С‡С‘С‚С‹)
+-- WALLETS (Р В РЎв„ўР В РЎвЂўР РЋРІвЂљВ¬Р В Р’ВµР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂ: Р В РЎвЂќР В Р’В°Р РЋР С“Р РЋР С“Р В Р’В°, Р РЋР вЂљ/Р РЋР С“, Р В РЎвЂ”Р В РЎвЂўР В РўвЂР В РЎвЂўР РЋРІР‚С™Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™Р РЋРІР‚в„–)
 CREATE TABLE wallets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'ip_rs', 'cash_office', 'driver_vova'
@@ -125,7 +125,7 @@ CREATE TABLE wallets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- CATEGORIES (РљР°С‚РµРіРѕСЂРёРё РґРѕС…РѕРґРѕРІ/СЂР°СЃС…РѕРґРѕРІ)
+-- CATEGORIES (Р В РЎв„ўР В Р’В°Р РЋРІР‚С™Р В Р’ВµР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂР В РЎвЂ Р В РўвЂР В РЎвЂўР РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В РЎвЂўР В Р вЂ /Р РЋР вЂљР В Р’В°Р РЋР С“Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В РЎвЂўР В Р вЂ )
 CREATE TABLE categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL, -- 'FREIGHT_LCV_CITY', 'FUEL', 'PAYROLL_DRIVER'
@@ -136,7 +136,7 @@ CREATE TABLE categories (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- COUNTERPARTIES (РљР»РёРµРЅС‚С‹ Рё РїРѕСЃС‚Р°РІС‰РёРєРё)
+-- COUNTERPARTIES (Р В РЎв„ўР В Р’В»Р В РЎвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРІР‚в„– Р В РЎвЂ Р В РЎвЂ”Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р РЋРІР‚В°Р В РЎвЂР В РЎвЂќР В РЎвЂ)
 CREATE TABLE counterparties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -152,34 +152,34 @@ CREATE TABLE counterparties (
 );
 
 -- ============================================================
--- 2. LOGISTICS (Р РµР№СЃС‹ Рё Р·Р°РєР°Р·С‹)
+-- 2. LOGISTICS (Р В Р’В Р В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р РЋРІР‚в„– Р В РЎвЂ Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·Р РЋРІР‚в„–)
 -- ============================================================
 
--- TRIPS (РџСѓС‚РµРІС‹Рµ Р»РёСЃС‚С‹)
+-- TRIPS (Р В РЎСџР РЋРЎвЂњР РЋРІР‚С™Р В Р’ВµР В Р вЂ Р РЋРІР‚в„–Р В Р’Вµ Р В Р’В»Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРІР‚в„–)
 CREATE TABLE trips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES assets(id),
   driver_id UUID NOT NULL REFERENCES users(id),
-  loader_id UUID REFERENCES users(id), -- РµСЃР»Рё РµСЃС‚СЊ РіСЂСѓР·С‡РёРє
+  loader_id UUID REFERENCES users(id), -- Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В·Р РЋРІР‚РЋР В РЎвЂР В РЎвЂќ
   
   trip_type TEXT DEFAULT 'local' CHECK (trip_type IN ('local','intercity','moving','hourly')),
   started_at TIMESTAMPTZ NOT NULL,
   ended_at TIMESTAMPTZ,
   
-  -- РћРґРѕРјРµС‚СЂ
+  -- Р В РЎвЂєР В РўвЂР В РЎвЂўР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљ
   odometer_start INT,
   odometer_end INT,
-  odometer_start_photo TEXT, -- URL РІ Supabase Storage
+  odometer_start_photo TEXT, -- URL Р В Р вЂ  Supabase Storage
   odometer_end_photo TEXT,
   
-  -- GPS (РµСЃР»Рё Р’Р°Р»РґР°Р№)
+  -- GPS (Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В РІР‚в„ўР В Р’В°Р В Р’В»Р В РўвЂР В Р’В°Р В РІвЂћвЂ“)
   gps_verified_mileage INT,
   gps_deviation_percent DECIMAL(5,2),
   gps_alert BOOLEAN DEFAULT false,
   
   route_description TEXT,
   
-  -- Р”Р’РЈРҐРћРЎРќР«Р™ РЎРўРђРўРЈРЎ
+  -- Р В РІР‚СњР В РІР‚в„ўР В Р в‚¬Р В РўС’Р В РЎвЂєР В Р Р‹Р В РЎСљР В Р’В«Р В РІвЂћСћ Р В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РЎС›Р В Р в‚¬Р В Р Р‹
   lifecycle_status TEXT DEFAULT 'draft' CHECK (lifecycle_status IN ('draft','approved','cancelled')),
   approved_by UUID REFERENCES users(id),
   approved_at TIMESTAMPTZ,
@@ -192,32 +192,32 @@ CREATE TABLE trips (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TRIP_ORDERS в­ђ РќРћР’РђРЇ РўРђР‘Р›РР¦Рђ - РЎРўР РћРљР РџРЈРўР•Р’РћР“Рћ Р›РРЎРўРђ
+-- TRIP_ORDERS Р Р†Р’В­РЎвЂ™ Р В РЎСљР В РЎвЂєР В РІР‚в„ўР В РЎвЂ™Р В Р вЂЎ Р В РЎС›Р В РЎвЂ™Р В РІР‚ВР В РІР‚С”Р В Р’ВР В Р’В¦Р В РЎвЂ™ - Р В Р Р‹Р В РЎС›Р В Р’В Р В РЎвЂєР В РЎв„ўР В Р’В Р В РЎСџР В Р в‚¬Р В РЎС›Р В РІР‚СћР В РІР‚в„ўР В РЎвЂєР В РІР‚СљР В РЎвЂє Р В РІР‚С”Р В Р’ВР В Р Р‹Р В РЎС›Р В РЎвЂ™
 CREATE TABLE trip_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   
   order_number INT NOT NULL, -- 1, 2, 3...
   counterparty_id UUID REFERENCES counterparties(id),
-  client_name TEXT, -- СЃРІРѕР±РѕРґРЅС‹Р№ С‚РµРєСЃС‚ ("Р›РµРІС€Р°", "Р±/РЅ")
-  description TEXT, -- "РџРµСЂРµРµР·Рґ", "Р”РѕСЃС‚Р°РІРєР°"
+  client_name TEXT, -- Р РЋР С“Р В Р вЂ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В РўвЂР В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™ ("Р В РІР‚С”Р В Р’ВµР В Р вЂ Р РЋРІвЂљВ¬Р В Р’В°", "Р В Р’В±/Р В Р вЂ¦")
+  description TEXT, -- "Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’ВµР В Р’В·Р В РўвЂ", "Р В РІР‚СњР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂќР В Р’В°"
   amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
   
-  -- Р—Рџ Р РЈР§РќРћР™ Р’Р’РћР”
+  -- Р В РІР‚вЂќР В РЎСџ Р В Р’В Р В Р в‚¬Р В Р’В§Р В РЎСљР В РЎвЂєР В РІвЂћСћ Р В РІР‚в„ўР В РІР‚в„ўР В РЎвЂєР В РІР‚Сњ
   driver_pay DECIMAL(12,2) NOT NULL DEFAULT 0,
   loader_pay DECIMAL(12,2) DEFAULT 0,
-  driver_pay_percent DECIMAL(5,2), -- РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ: driver_pay/amount*100
+  driver_pay_percent DECIMAL(5,2), -- Р В РЎвЂР В Р вЂ¦Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВР В Р’В°Р РЋРІР‚В Р В РЎвЂР В РЎвЂўР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В Р’Вµ: driver_pay/amount*100
   
   payment_method TEXT NOT NULL CHECK (payment_method IN (
-    'cash',           -- РЅР°Р»РёС‡РЅС‹Рµ
-    'qr',             -- QR РЅР° СЂ/СЃ (РїСЂРёС…РѕРґ РјРіРЅРѕРІРµРЅРЅС‹Р№)
-    'bank_invoice',   -- СЃС‡С‘С‚ РєР»РёРµРЅС‚Сѓ (РґРµР±РёС‚РѕСЂРєР°)
-    'debt_cash',      -- РґРѕР»Рі РЅР°Р»РёС‡РЅС‹Р№
-    'card_driver'     -- РЅР° РєР°СЂС‚Сѓ РІРѕРґРёС‚РµР»СЏ
+    'cash',           -- Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ
+    'qr',             -- QR Р В Р вЂ¦Р В Р’В° Р РЋР вЂљ/Р РЋР С“ (Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚В¦Р В РЎвЂўР В РўвЂ Р В РЎВР В РЎвЂ“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“)
+    'bank_invoice',   -- Р РЋР С“Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™ Р В РЎвЂќР В Р’В»Р В РЎвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРЎвЂњ (Р В РўвЂР В Р’ВµР В Р’В±Р В РЎвЂР РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В РЎвЂќР В Р’В°)
+    'debt_cash',      -- Р В РўвЂР В РЎвЂўР В Р’В»Р В РЎвЂ“ Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“
+    'card_driver'     -- Р В Р вЂ¦Р В Р’В° Р В РЎвЂќР В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР РЏ
   )),
   
   settlement_status TEXT DEFAULT 'completed' CHECK (settlement_status IN ('pending','completed')),
-  -- pending С‚РѕР»СЊРєРѕ РґР»СЏ: bank_invoice Рё debt_cash
+  -- pending Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В РўвЂР В Р’В»Р РЋР РЏ: bank_invoice Р В РЎвЂ debt_cash
   
   linked_income_tx_id UUID REFERENCES transactions(id),
   notes TEXT,
@@ -225,7 +225,7 @@ CREATE TABLE trip_orders (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TRIP_EXPENSES (Р Р°СЃС…РѕРґС‹ РІ СЂРµР№СЃРµ)
+-- TRIP_EXPENSES (Р В Р’В Р В Р’В°Р РЋР С“Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР РЋРІР‚в„– Р В Р вЂ  Р РЋР вЂљР В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р В Р’Вµ)
 CREATE TABLE trip_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
@@ -233,17 +233,17 @@ CREATE TABLE trip_expenses (
   amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
   payment_method TEXT NOT NULL CHECK (payment_method IN ('cash','card_driver','fuel_card')),
   description TEXT,
-  receipt_photo TEXT, -- URL С„РѕС‚Рѕ С‡РµРєР°
+  receipt_photo TEXT, -- URL Р РЋРІР‚С›Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂў Р РЋРІР‚РЋР В Р’ВµР В РЎвЂќР В Р’В°
   linked_expense_tx_id UUID REFERENCES transactions(id),
   
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================================
--- 3. TRANSACTIONS (Р¤РёРЅР°РЅСЃРѕРІР°СЏ СЃРёСЃС‚РµРјР°)
+-- 3. TRANSACTIONS (Р В Р’В¤Р В РЎвЂР В Р вЂ¦Р В Р’В°Р В Р вЂ¦Р РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р РЋР РЏ Р РЋР С“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РЎВР В Р’В°)
 -- ============================================================
 
--- TRANSACTIONS (РСЃС‚РѕС‡РЅРёРє РёСЃС‚РёРЅС‹)
+-- TRANSACTIONS (Р В Р’ВР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќ Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р РЋРІР‚в„–)
 CREATE TABLE transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -260,7 +260,7 @@ CREATE TABLE transactions (
   asset_id UUID REFERENCES assets(id),
   trip_id UUID REFERENCES trips(id),
   
-  -- Р”Р’РЈРҐРћРЎРќР«Р™ РЎРўРђРўРЈРЎ
+  -- Р В РІР‚СњР В РІР‚в„ўР В Р в‚¬Р В РўС’Р В РЎвЂєР В Р Р‹Р В РЎСљР В Р’В«Р В РІвЂћСћ Р В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РЎС›Р В Р в‚¬Р В Р Р‹
   lifecycle_status TEXT DEFAULT 'draft' CHECK (lifecycle_status IN ('draft','approved','cancelled')),
   settlement_status TEXT DEFAULT 'completed' CHECK (settlement_status IN ('pending','completed')),
   
@@ -293,14 +293,14 @@ CREATE TABLE transactions (
 );
 
 -- ============================================================
--- 4. PAYROLL (Р—Рџ Рё СЂР°СЃС‡С‘С‚С‹)
+-- 4. PAYROLL (Р В РІР‚вЂќР В РЎСџ Р В РЎвЂ Р РЋР вЂљР В Р’В°Р РЋР С“Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™Р РЋРІР‚в„–)
 -- ============================================================
 
--- PAYROLL_RULES (РЎРїСЂР°РІРѕС‡РЅРёРє РїРѕРґСЃРєР°Р·РѕРє РґР»СЏ Р—Рџ)
+-- PAYROLL_RULES (Р В Р Р‹Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋР С“Р В РЎвЂќР В Р’В°Р В Р’В·Р В РЎвЂўР В РЎвЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РІР‚вЂќР В РЎСџ)
 CREATE TABLE payroll_rules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
-  name TEXT NOT NULL, -- "Р“Р°Р·РµР»СЊ РіРѕСЂРѕРґ 30%"
+  name TEXT NOT NULL, -- "Р В РІР‚СљР В Р’В°Р В Р’В·Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ 30%"
   rule_type TEXT NOT NULL CHECK (rule_type IN ('percent', 'per_km', 'fixed_daily', 'hourly_split')),
   value DECIMAL(10,4) NOT NULL,
   split_config JSONB, -- {"driver":0.33, "loader":0.33, "company":0.34}
@@ -313,7 +313,7 @@ CREATE TABLE payroll_rules (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- PAYROLL_PERIODS (Р Р°СЃС‡С‘С‚ Р—Рџ Р·Р° РїРµСЂРёРѕРґ)
+-- PAYROLL_PERIODS (Р В Р’В Р В Р’В°Р РЋР С“Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™ Р В РІР‚вЂќР В РЎСџ Р В Р’В·Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В РЎвЂР В РЎвЂўР В РўвЂ)
 CREATE TABLE payroll_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
@@ -323,12 +323,12 @@ CREATE TABLE payroll_periods (
   
   total_trips INT DEFAULT 0,
   total_revenue DECIMAL(12,2) DEFAULT 0,
-  total_earned DECIMAL(12,2) DEFAULT 0, -- SUM(driver_pay РёР»Рё loader_pay)
+  total_earned DECIMAL(12,2) DEFAULT 0, -- SUM(driver_pay Р В РЎвЂР В Р’В»Р В РЎвЂ loader_pay)
   advances_paid DECIMAL(12,2) DEFAULT 0,
   balance_to_pay DECIMAL(12,2) DEFAULT 0,
   
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft','approved','paid')),
-  calculation_details JSONB, -- РґРµС‚Р°Р»РёР·Р°С†РёСЏ
+  calculation_details JSONB, -- Р В РўвЂР В Р’ВµР РЋРІР‚С™Р В Р’В°Р В Р’В»Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ
   
   approved_by UUID REFERENCES users(id),
   approved_at TIMESTAMPTZ,
@@ -338,10 +338,10 @@ CREATE TABLE payroll_periods (
 );
 
 -- ============================================================
--- 5. FUEL (РўРѕРїР»РёРІРѕ вЂ” РћРїС‚Рё24)
+-- 5. FUEL (Р В РЎС›Р В РЎвЂўР В РЎвЂ”Р В Р’В»Р В РЎвЂР В Р вЂ Р В РЎвЂў Р Р†Р вЂљРІР‚Сњ Р В РЎвЂєР В РЎвЂ”Р РЋРІР‚С™Р В РЎвЂ24)
 -- ============================================================
 
--- FUEL_CARDS (РўРѕРїР»РёРІРЅС‹Рµ РєР°СЂС‚С‹)
+-- FUEL_CARDS (Р В РЎС›Р В РЎвЂўР В РЎвЂ”Р В Р’В»Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р В РЎвЂќР В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРІР‚в„–)
 CREATE TABLE fuel_cards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   card_number TEXT UNIQUE NOT NULL,
@@ -351,7 +351,7 @@ CREATE TABLE fuel_cards (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- FUEL_TRANSACTIONS_RAW (Р—Р°РїСЂР°РІРєРё РёР· РћРїС‚Рё24 API)
+-- FUEL_TRANSACTIONS_RAW (Р В РІР‚вЂќР В Р’В°Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂќР В РЎвЂ Р В РЎвЂР В Р’В· Р В РЎвЂєР В РЎвЂ”Р РЋРІР‚С™Р В РЎвЂ24 API)
 CREATE TABLE fuel_transactions_raw (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   fuel_card_id UUID REFERENCES fuel_cards(id),
@@ -363,7 +363,7 @@ CREATE TABLE fuel_transactions_raw (
   
   opti24_transaction_id TEXT UNIQUE,
   
-  -- РЎРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰Р°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ РІ РѕСЃРЅРѕРІРЅРѕР№ СЃРёСЃС‚РµРјРµ
+  -- Р В Р Р‹Р В РЎвЂўР В РЎвЂўР РЋРІР‚С™Р В Р вЂ Р В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚В°Р В Р’В°Р РЋР РЏ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋРІР‚В Р В РЎвЂР РЋР РЏ Р В Р вЂ  Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“ Р РЋР С“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РЎВР В Р’Вµ
   linked_tx_id UUID REFERENCES transactions(id),
   
   is_synced BOOLEAN DEFAULT false,
@@ -372,10 +372,10 @@ CREATE TABLE fuel_transactions_raw (
 );
 
 -- ============================================================
--- 6. BANK (Р‘Р°РЅРє)
+-- 6. BANK (Р В РІР‚ВР В Р’В°Р В Р вЂ¦Р В РЎвЂќ)
 -- ============================================================
 
--- BANK_STATEMENTS_RAW (Р’С‹РїРёСЃРєР° РёР· Р±Р°РЅРєР°)
+-- BANK_STATEMENTS_RAW (Р В РІР‚в„ўР РЋРІР‚в„–Р В РЎвЂ”Р В РЎвЂР РЋР С“Р В РЎвЂќР В Р’В° Р В РЎвЂР В Р’В· Р В Р’В±Р В Р’В°Р В Р вЂ¦Р В РЎвЂќР В Р’В°)
 CREATE TABLE bank_statements_raw (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_id UUID NOT NULL REFERENCES wallets(id),
@@ -396,24 +396,24 @@ CREATE TABLE bank_statements_raw (
 );
 
 -- ============================================================
--- 7. MAINTENANCE (РЎРўРћ Рё СЂРµРіР»Р°РјРµРЅС‚С‹)
+-- 7. MAINTENANCE (Р В Р Р‹Р В РЎС›Р В РЎвЂє Р В РЎвЂ Р РЋР вЂљР В Р’ВµР В РЎвЂ“Р В Р’В»Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРІР‚в„–)
 -- ============================================================
 
--- MAINTENANCE_REGULATIONS (Р РµРіР»Р°РјРµРЅС‚С‹ РўРћ)
+-- MAINTENANCE_REGULATIONS (Р В Р’В Р В Р’ВµР В РЎвЂ“Р В Р’В»Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРІР‚в„– Р В РЎС›Р В РЎвЂє)
 CREATE TABLE maintenance_regulations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_type_id UUID NOT NULL REFERENCES asset_types(id),
   
-  name TEXT NOT NULL, -- "РўРћ-1", "Р—Р°РјРµРЅР° РјР°СЃР»Р°"
+  name TEXT NOT NULL, -- "Р В РЎС›Р В РЎвЂє-1", "Р В РІР‚вЂќР В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р В Р’В° Р В РЎВР В Р’В°Р РЋР С“Р В Р’В»Р В Р’В°"
   description TEXT,
-  interval_km INT, -- С‡РµСЂРµР· СЃРєРѕР»СЊРєРѕ РєРј
-  interval_months INT, -- РёР»Рё С‡РµСЂРµР· СЃРєРѕР»СЊРєРѕ РјРµСЃСЏС†РµРІ
+  interval_km INT, -- Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р РЋР С“Р В РЎвЂќР В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В РЎвЂќР В РЎВ
+  interval_months INT, -- Р В РЎвЂР В Р’В»Р В РЎвЂ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р РЋР С“Р В РЎвЂќР В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В РЎВР В Р’ВµР РЋР С“Р РЋР РЏР РЋРІР‚В Р В Р’ВµР В Р вЂ 
   
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- MAINTENANCE_ALERTS (РЈРІРµРґРѕРјР»РµРЅРёСЏ Рѕ РўРћ)
+-- MAINTENANCE_ALERTS (Р В Р в‚¬Р В Р вЂ Р В Р’ВµР В РўвЂР В РЎвЂўР В РЎВР В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋР РЏ Р В РЎвЂў Р В РЎС›Р В РЎвЂє)
 CREATE TABLE maintenance_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES assets(id),
@@ -428,7 +428,7 @@ CREATE TABLE maintenance_alerts (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SERVICE_ORDERS (Р—Р°РєР°Р·-РЅР°СЂСЏРґС‹)
+-- SERVICE_ORDERS (Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·-Р В Р вЂ¦Р В Р’В°Р РЋР вЂљР РЋР РЏР В РўвЂР РЋРІР‚в„–)
 CREATE TABLE service_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES assets(id),
@@ -446,7 +446,7 @@ CREATE TABLE service_orders (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SERVICE_ORDER_WORKS (Р Р°Р±РѕС‚С‹ РІ Р·Р°РєР°Р·-РЅР°СЂСЏРґРµ)
+-- SERVICE_ORDER_WORKS (Р В Р’В Р В Р’В°Р В Р’В±Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚в„– Р В Р вЂ  Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·-Р В Р вЂ¦Р В Р’В°Р РЋР вЂљР РЋР РЏР В РўвЂР В Р’Вµ)
 CREATE TABLE service_order_works (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
@@ -457,7 +457,7 @@ CREATE TABLE service_order_works (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SERVICE_ORDER_PARTS (Р—Р°РїС‡Р°СЃС‚Рё РІ Р·Р°РєР°Р·-РЅР°СЂСЏРґРµ)
+-- SERVICE_ORDER_PARTS (Р В РІР‚вЂќР В Р’В°Р В РЎвЂ”Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂ Р В Р вЂ  Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·-Р В Р вЂ¦Р В Р’В°Р РЋР вЂљР РЋР РЏР В РўвЂР В Р’Вµ)
 CREATE TABLE service_order_parts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
@@ -470,7 +470,7 @@ CREATE TABLE service_order_parts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- PARTS (Р—Р°РїС‡Р°СЃС‚Рё вЂ” СЃРїСЂР°РІРѕС‡РЅРёРє)
+-- PARTS (Р В РІР‚вЂќР В Р’В°Р В РЎвЂ”Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂ Р Р†Р вЂљРІР‚Сњ Р РЋР С“Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќ)
 CREATE TABLE parts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -485,24 +485,24 @@ CREATE TABLE parts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- PART_MOVEMENTS (РРЅРІРµРЅС‚Р°СЂРёР·Р°С†РёСЏ)
+-- PART_MOVEMENTS (Р В Р’ВР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ)
 CREATE TABLE part_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   part_id UUID NOT NULL REFERENCES parts(id),
   
-  quantity_change INT NOT NULL, -- +5 РёР»Рё -2
+  quantity_change INT NOT NULL, -- +5 Р В РЎвЂР В Р’В»Р В РЎвЂ -2
   movement_type TEXT CHECK (movement_type IN ('receipt','usage','adjustment')),
-  reference_id UUID, -- СЃСЃС‹Р»РєР° РЅР° Р·Р°РєР°Р·-РЅР°СЂСЏРґ РёР»Рё РїРѕСЃС‚Р°РІРєСѓ
+  reference_id UUID, -- Р РЋР С“Р РЋР С“Р РЋРІР‚в„–Р В Р’В»Р В РЎвЂќР В Р’В° Р В Р вЂ¦Р В Р’В° Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·-Р В Р вЂ¦Р В Р’В°Р РЋР вЂљР РЋР РЏР В РўвЂ Р В РЎвЂР В Р’В»Р В РЎвЂ Р В РЎвЂ”Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂќР РЋРЎвЂњ
   
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================================
--- 8. EQUIPMENT (РћР±РѕСЂСѓРґРѕРІР°РЅРёРµ Рё РёРЅРІРµРЅС‚Р°СЂСЊ)
+-- 8. EQUIPMENT (Р В РЎвЂєР В Р’В±Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњР В РўвЂР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ Р В РЎвЂ Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР Р‰)
 -- ============================================================
 
--- FIXED_ASSETS (РћСЃРЅРѕРІРЅС‹Рµ СЃСЂРµРґСЃС‚РІР°)
+-- FIXED_ASSETS (Р В РЎвЂєР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р РЋР С“Р РЋР вЂљР В Р’ВµР В РўвЂР РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В Р’В°)
 CREATE TABLE fixed_assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -519,7 +519,7 @@ CREATE TABLE fixed_assets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TOOLS (РРЅСЃС‚СЂСѓРјРµРЅС‚С‹)
+-- TOOLS (Р В Р’ВР В Р вЂ¦Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРІР‚в„–)
 CREATE TABLE tools (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -539,7 +539,7 @@ CREATE TABLE tools (
 -- 9. AUDIT & SYSTEM
 -- ============================================================
 
--- AUDIT_LOG (Р›РѕРі РІСЃРµС… РёР·РјРµРЅРµРЅРёР№)
+-- AUDIT_LOG (Р В РІР‚С”Р В РЎвЂўР В РЎвЂ“ Р В Р вЂ Р РЋР С“Р В Р’ВµР РЋРІР‚В¦ Р В РЎвЂР В Р’В·Р В РЎВР В Р’ВµР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“)
 CREATE TABLE audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -557,7 +557,7 @@ CREATE TABLE audit_log (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ATTACHMENTS (Р¤Р°Р№Р»С‹)
+-- ATTACHMENTS (Р В Р’В¤Р В Р’В°Р В РІвЂћвЂ“Р В Р’В»Р РЋРІР‚в„–)
 CREATE TABLE attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -577,7 +577,7 @@ CREATE TABLE attachments (
 -- 10. INDEXES & OPTIMIZATIONS
 -- ============================================================
 
--- РРЅРґРµРєСЃС‹ РґР»СЏ Р±С‹СЃС‚СЂС‹С… Р·Р°РїСЂРѕСЃРѕРІ
+-- Р В Р’ВР В Р вЂ¦Р В РўвЂР В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚в„– Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р’В±Р РЋРІР‚в„–Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРІР‚в„–Р РЋРІР‚В¦ Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ 
 CREATE INDEX idx_trips_driver_id ON trips(driver_id);
 CREATE INDEX idx_trips_asset_id ON trips(asset_id);
 CREATE INDEX idx_trips_lifecycle_status ON trips(lifecycle_status);
@@ -611,7 +611,7 @@ CREATE INDEX idx_audit_log_table_record ON audit_log(table_name, record_id);
 -- 11. ROW LEVEL SECURITY (RLS)
 -- ============================================================
 
--- Р’РєР»СЋС‡РёС‚СЊ RLS РЅР° С‚Р°Р±Р»РёС†С‹
+-- Р В РІР‚в„ўР В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р РЋР Р‰ RLS Р В Р вЂ¦Р В Р’В° Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋРІР‚в„–
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
@@ -619,14 +619,14 @@ ALTER TABLE trip_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
 
--- РџСЂРёРјРµСЂС‹ РїРѕР»РёС‚РёРє (РѕСЃС‚Р°Р»СЊРЅС‹Рµ РґРѕР±Р°РІРёС‚СЊ РїРѕ Р°РЅР°Р»РѕРіРёРё)
+-- Р В РЎСџР РЋР вЂљР В РЎвЂР В РЎВР В Р’ВµР РЋР вЂљР РЋРІР‚в„– Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂР В РЎвЂќ (Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р В РўвЂР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р В РЎвЂў Р В Р’В°Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р В РЎвЂР В РЎвЂ)
 
--- Policy: Р’РѕРґРёС‚РµР»СЊ РІРёРґРёС‚ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЂРµР№СЃС‹
+-- Policy: Р В РІР‚в„ўР В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР РЋРІР‚С™ Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р РЋР С“Р В Р вЂ Р В РЎвЂўР В РЎвЂ Р РЋР вЂљР В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р РЋРІР‚в„–
 CREATE POLICY driver_view_own_trips ON trips
   FOR SELECT
   USING (driver_id = auth.uid() OR loader_id = auth.uid());
 
--- Policy: Р’РѕРґРёС‚РµР»СЊ РІРёРґРёС‚ С‚РѕР»СЊРєРѕ Р·Р°РєР°Р·С‹ РёР· СЃРІРѕРёС… СЂРµР№СЃРѕРІ
+-- Policy: Р В РІР‚в„ўР В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР РЋРІР‚С™ Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·Р РЋРІР‚в„– Р В РЎвЂР В Р’В· Р РЋР С“Р В Р вЂ Р В РЎвЂўР В РЎвЂР РЋРІР‚В¦ Р РЋР вЂљР В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р В РЎвЂўР В Р вЂ 
 CREATE POLICY driver_view_own_orders ON trip_orders
   FOR SELECT
   USING (
@@ -636,7 +636,7 @@ CREATE POLICY driver_view_own_orders ON trip_orders
     )
   );
 
--- Policy: Р’РѕРґРёС‚РµР»СЊ РјРѕР¶РµС‚ СЃРѕР·РґР°РІР°С‚СЊ Р·Р°РєР°Р·С‹ С‚РѕР»СЊРєРѕ РІ СЃРІРѕРёС… СЂРµР№СЃР°С…
+-- Policy: Р В РІР‚в„ўР В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р’ВµР РЋРІР‚С™ Р РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·Р РЋРІР‚в„– Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В Р вЂ  Р РЋР С“Р В Р вЂ Р В РЎвЂўР В РЎвЂР РЋРІР‚В¦ Р РЋР вЂљР В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р В Р’В°Р РЋРІР‚В¦
 CREATE POLICY driver_create_orders ON trip_orders
   FOR INSERT
   WITH CHECK (
@@ -646,7 +646,7 @@ CREATE POLICY driver_create_orders ON trip_orders
     )
   );
 
--- Policy: РђРґРјРёРЅ РІРёРґРёС‚ РІСЃС‘
+-- Policy: Р В РЎвЂ™Р В РўвЂР В РЎВР В РЎвЂР В Р вЂ¦ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР РЋРІР‚С™ Р В Р вЂ Р РЋР С“Р РЋРІР‚В
 CREATE POLICY admin_all_access ON trips
   FOR ALL
   USING (
@@ -657,214 +657,214 @@ CREATE POLICY admin_all_access ON trips
   );
 
 -- ============================================================
--- 12. INITIAL DATA (РЎРїСЂР°РІРѕС‡РЅРёРєРё)
+-- 12. INITIAL DATA (Р В Р Р‹Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќР В РЎвЂ)
 -- ============================================================
 
 -- Asset Types
 INSERT INTO asset_types (code, name, default_fuel_rate, has_gps, requires_odometer_photo)
 VALUES
-  ('VALDAI_6M', 'Р’Р°Р»РґР°Р№ 6 РјРµС‚СЂРѕРІ', 15.0, true, false),
-  ('VALDAI_5M', 'Р’Р°Р»РґР°Р№ 5 РјРµС‚СЂРѕРІ', 14.0, true, false),
-  ('VALDAI_DUMP', 'Р’Р°Р»РґР°Р№ РЎР°РјРѕСЃРІР°Р»', 16.0, true, false),
-  ('GAZELLE_4M', 'Р“Р°Р·РµР»СЊ 4 РјРµС‚СЂР° (РјРµР¶РіРѕСЂРѕРґ)', 12.0, false, true),
-  ('GAZELLE_3M', 'Р“Р°Р·РµР»СЊ 3 РјРµС‚СЂР° (РіРѕСЂРѕРґ)', 11.0, false, true),
-  ('CANTER_5T', 'РљР°РЅС‚РµСЂ 5С‚', 13.0, false, true);
+  ('VALDAI_6M', 'Р В РІР‚в„ўР В Р’В°Р В Р’В»Р В РўвЂР В Р’В°Р В РІвЂћвЂ“ 6 Р В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р вЂ ', 15.0, true, false),
+  ('VALDAI_5M', 'Р В РІР‚в„ўР В Р’В°Р В Р’В»Р В РўвЂР В Р’В°Р В РІвЂћвЂ“ 5 Р В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р вЂ ', 14.0, true, false),
+  ('VALDAI_DUMP', 'Р В РІР‚в„ўР В Р’В°Р В Р’В»Р В РўвЂР В Р’В°Р В РІвЂћвЂ“ Р В Р Р‹Р В Р’В°Р В РЎВР В РЎвЂўР РЋР С“Р В Р вЂ Р В Р’В°Р В Р’В»', 16.0, true, false),
+  ('GAZELLE_4M', 'Р В РІР‚СљР В Р’В°Р В Р’В·Р В Р’ВµР В Р’В»Р РЋР Р‰ 4 Р В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљР В Р’В° (Р В РЎВР В Р’ВµР В Р’В¶Р В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ)', 12.0, false, true),
+  ('GAZELLE_3M', 'Р В РІР‚СљР В Р’В°Р В Р’В·Р В Р’ВµР В Р’В»Р РЋР Р‰ 3 Р В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљР В Р’В° (Р В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ)', 11.0, false, true),
+  ('CANTER_5T', 'Р В РЎв„ўР В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљ 5Р РЋРІР‚С™', 13.0, false, true);
 
 -- Business Units
 INSERT INTO business_units (code, name)
 VALUES
-  ('LOGISTICS_LCV_CITY', 'Р›РѕРіРёСЃС‚РёРєР° LCV вЂ” Р“РѕСЂРѕРґ'),
-  ('LOGISTICS_LCV_INTERCITY', 'Р›РѕРіРёСЃС‚РёРєР° LCV вЂ” РњРµР¶РіРѕСЂРѕРґ'),
-  ('LOGISTICS_TRUCK', 'Р›РѕРіРёСЃС‚РёРєР° Р“СЂСѓР·РѕРІРёРєРё'),
-  ('LOGISTICS_5T', 'Р›РѕРіРёСЃС‚РёРєР° 5-С‚РѕРЅРЅРёРє'),
-  ('SERVICE_STATION', 'РЎРўРћ'),
-  ('BULK_MATERIALS', 'РЎС‹РїСѓС‡РёРµ РјР°С‚РµСЂРёР°Р»С‹'),
-  ('PARTS_SHOP', 'РњР°РіР°Р·РёРЅ Р·Р°РїС‡Р°СЃС‚РµР№'),
-  ('PARKING', 'РџР»Р°С‚РЅР°СЏ СЃС‚РѕСЏРЅРєР°');
+  ('LOGISTICS_LCV_CITY', 'Р В РІР‚С”Р В РЎвЂўР В РЎвЂ“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В° LCV Р Р†Р вЂљРІР‚Сњ Р В РІР‚СљР В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ'),
+  ('LOGISTICS_LCV_INTERCITY', 'Р В РІР‚С”Р В РЎвЂўР В РЎвЂ“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В° LCV Р Р†Р вЂљРІР‚Сњ Р В РЎС™Р В Р’ВµР В Р’В¶Р В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ'),
+  ('LOGISTICS_TRUCK', 'Р В РІР‚С”Р В РЎвЂўР В РЎвЂ“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В° Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В Р’В·Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РЎвЂќР В РЎвЂ'),
+  ('LOGISTICS_5T', 'Р В РІР‚С”Р В РЎвЂўР В РЎвЂ“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В° 5-Р РЋРІР‚С™Р В РЎвЂўР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂР В РЎвЂќ'),
+  ('SERVICE_STATION', 'Р В Р Р‹Р В РЎС›Р В РЎвЂє'),
+  ('BULK_MATERIALS', 'Р В Р Р‹Р РЋРІР‚в„–Р В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚РЋР В РЎвЂР В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В РЎвЂР В Р’В°Р В Р’В»Р РЋРІР‚в„–'),
+  ('PARTS_SHOP', 'Р В РЎС™Р В Р’В°Р В РЎвЂ“Р В Р’В°Р В Р’В·Р В РЎвЂР В Р вЂ¦ Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РІвЂћвЂ“'),
+  ('PARKING', 'Р В РЎСџР В Р’В»Р В Р’В°Р РЋРІР‚С™Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР РЏР В Р вЂ¦Р В РЎвЂќР В Р’В°');
 
 -- Categories (Income)
 INSERT INTO categories (code, name, direction)
 VALUES
-  ('FREIGHT_LCV_CITY', 'Р”РѕСЃС‚Р°РІРєР° РіРѕСЂРѕРґ (Р“Р°Р·РµР»Рё)', 'income'),
-  ('FREIGHT_LCV_INTERCITY', 'РњРµР¶РіРѕСЂРѕРґ (Р“Р°Р·РµР»Рё)', 'income'),
-  ('FREIGHT_TRUCK', 'Р“СЂСѓР·РѕРїРµСЂРµРІРѕР·РєРё (Р’Р°Р»РґР°Рё)', 'income'),
-  ('FREIGHT_5T', 'Р“СЂСѓР·РѕРїРµСЂРµРІРѕР·РєРё (РљР°РЅС‚РµСЂ)', 'income'),
-  ('MOVING', 'РџРµСЂРµРµР·РґС‹', 'income'),
-  ('SERVICE_WORKS', 'РЈСЃР»СѓРіРё РЎРўРћ (СЂР°Р±РѕС‚С‹)', 'income'),
-  ('SERVICE_PARTS_SALE', 'РџСЂРѕРґР°Р¶Р° Р·Р°РїС‡Р°СЃС‚РµР№ (РЎРўРћ)', 'income'),
-  ('BULK_SALES', 'РџСЂРѕРґР°Р¶Р° СЃС‹РїСѓС‡РёС…', 'income'),
-  ('PARKING_RENT', 'РђСЂРµРЅРґР° СЃС‚РѕСЏРЅРєРё', 'income');
+  ('FREIGHT_LCV_CITY', 'Р В РІР‚СњР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂќР В Р’В° Р В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ (Р В РІР‚СљР В Р’В°Р В Р’В·Р В Р’ВµР В Р’В»Р В РЎвЂ)', 'income'),
+  ('FREIGHT_LCV_INTERCITY', 'Р В РЎС™Р В Р’ВµР В Р’В¶Р В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В РўвЂ (Р В РІР‚СљР В Р’В°Р В Р’В·Р В Р’ВµР В Р’В»Р В РЎвЂ)', 'income'),
+  ('FREIGHT_TRUCK', 'Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В Р’В·Р В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р В РЎвЂўР В Р’В·Р В РЎвЂќР В РЎвЂ (Р В РІР‚в„ўР В Р’В°Р В Р’В»Р В РўвЂР В Р’В°Р В РЎвЂ)', 'income'),
+  ('FREIGHT_5T', 'Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В Р’В·Р В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р В РЎвЂўР В Р’В·Р В РЎвЂќР В РЎвЂ (Р В РЎв„ўР В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљ)', 'income'),
+  ('MOVING', 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’ВµР В Р’В·Р В РўвЂР РЋРІР‚в„–', 'income'),
+  ('SERVICE_WORKS', 'Р В Р в‚¬Р РЋР С“Р В Р’В»Р РЋРЎвЂњР В РЎвЂ“Р В РЎвЂ Р В Р Р‹Р В РЎС›Р В РЎвЂє (Р РЋР вЂљР В Р’В°Р В Р’В±Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚в„–)', 'income'),
+  ('SERVICE_PARTS_SALE', 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РўвЂР В Р’В°Р В Р’В¶Р В Р’В° Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РІвЂћвЂ“ (Р В Р Р‹Р В РЎС›Р В РЎвЂє)', 'income'),
+  ('BULK_SALES', 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РўвЂР В Р’В°Р В Р’В¶Р В Р’В° Р РЋР С“Р РЋРІР‚в„–Р В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В¦', 'income'),
+  ('PARKING_RENT', 'Р В РЎвЂ™Р РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РўвЂР В Р’В° Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР РЏР В Р вЂ¦Р В РЎвЂќР В РЎвЂ', 'income');
 
 -- Categories (Expense)
 INSERT INTO categories (code, name, direction)
 VALUES
-  ('FUEL', 'Р“РЎРњ', 'expense'),
-  ('REPAIR_PARTS', 'Р РµРјРѕРЅС‚ вЂ” Р·Р°РїС‡Р°СЃС‚Рё', 'expense'),
-  ('PAYROLL_DRIVER', 'Р—Рџ РІРѕРґРёС‚РµР»СЏ', 'expense'),
-  ('PAYROLL_LOADER', 'Р—Рџ РіСЂСѓР·С‡РёРєР°', 'expense'),
-  ('DEPRECIATION_VEHICLE', 'РђРјРѕСЂС‚РёР·Р°С†РёСЏ С‚СЂР°РЅСЃРїРѕСЂС‚Р°', 'expense'),
-  ('RENT', 'РђСЂРµРЅРґР°', 'expense'),
-  ('UTILITIES', 'РљРѕРјРјСѓРЅР°Р»РєР°', 'expense'),
-  ('INSURANCE', 'РЎС‚СЂР°С…РѕРІРєРё', 'expense');
+  ('FUEL', 'Р В РІР‚СљР В Р Р‹Р В РЎС™', 'expense'),
+  ('REPAIR_PARTS', 'Р В Р’В Р В Р’ВµР В РЎВР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™ Р Р†Р вЂљРІР‚Сњ Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂ', 'expense'),
+  ('PAYROLL_DRIVER', 'Р В РІР‚вЂќР В РЎСџ Р В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР РЏ', 'expense'),
+  ('PAYROLL_LOADER', 'Р В РІР‚вЂќР В РЎСџ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В·Р РЋРІР‚РЋР В РЎвЂР В РЎвЂќР В Р’В°', 'expense'),
+  ('DEPRECIATION_VEHICLE', 'Р В РЎвЂ™Р В РЎВР В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В Р’В°', 'expense'),
+  ('RENT', 'Р В РЎвЂ™Р РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РўвЂР В Р’В°', 'expense'),
+  ('UTILITIES', 'Р В РЎв„ўР В РЎвЂўР В РЎВР В РЎВР РЋРЎвЂњР В Р вЂ¦Р В Р’В°Р В Р’В»Р В РЎвЂќР В Р’В°', 'expense'),
+  ('INSURANCE', 'Р В Р Р‹Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В¦Р В РЎвЂўР В Р вЂ Р В РЎвЂќР В РЎвЂ', 'expense');
 
 -- ============================================================
--- 13. DATA FLOWS (Бизнес-логика)
+-- 13. DATA FLOWS (Р вЂР С‘Р В·Р Р…Р ВµРЎРѓ-Р В»Р С•Р С–Р С‘Р С”Р В°)
 -- ============================================================
 
--- [M] Водитель -> "Начать рейс":
---   1. Выбор машины + Одометр + Фото
+-- [M] Р вЂ™Р С•Р Т‘Р С‘РЎвЂљР ВµР В»РЎРЉ -> "Р СњР В°РЎвЂЎР В°РЎвЂљРЎРЉ РЎР‚Р ВµР в„–РЎРѓ":
+--   1. Р вЂ™РЎвЂ№Р В±Р С•РЎР‚ Р СР В°РЎв‚¬Р С‘Р Р…РЎвЂ№ + Р С›Р Т‘Р С•Р СР ВµРЎвЂљРЎР‚ + Р В¤Р С•РЎвЂљР С•
 --   -> INSERT trip (status: in_progress, lifecycle: draft)
 
--- [M] Водитель -> "+ Заказ":
---   1. Сумма + ЗП (ввод вручную) + Способ оплаты
+-- [M] Р вЂ™Р С•Р Т‘Р С‘РЎвЂљР ВµР В»РЎРЉ -> "+ Р вЂ”Р В°Р С”Р В°Р В·":
+--   1. Р РЋРЎС“Р СР СР В° + Р вЂ”Р Сџ (Р Р†Р Р†Р С•Р Т‘ Р Р†РЎР‚РЎС“РЎвЂЎР Р…РЎС“РЎР‹) + Р РЋР С—Р С•РЎРѓР С•Р В± Р С•Р С—Р В»Р В°РЎвЂљРЎвЂ№
 --   -> INSERT trip_orders
 --   -> INSERT transaction (income, draft)
 
--- [D] Admin -> "Ревью смены":
---   -> Проверка % ЗП (подсветка 25-40%)
---   -> Кнопка "Утвердить"
+-- [D] Admin -> "Р В Р ВµР Р†РЎРЉРЎР‹ РЎРѓР СР ВµР Р…РЎвЂ№":
+--   -> Р СџРЎР‚Р С•Р Р†Р ВµРЎР‚Р С”Р В° % Р вЂ”Р Сџ (Р С—Р С•Р Т‘РЎРѓР Р†Р ВµРЎвЂљР С”Р В° 25-40%)
+--   -> Р С™Р Р…Р С•Р С—Р С”Р В° "Р Р€РЎвЂљР Р†Р ВµРЎР‚Р Т‘Р С‘РЎвЂљРЎРЉ"
 --   -> UPDATE trip + orders + transactions -> lifecycle: approved
 
 ```sql
--- Пример: Итого ЗП за рейс
+-- Р СџРЎР‚Р С‘Р СР ВµРЎР‚: Р ВРЎвЂљР С•Р С–Р С• Р вЂ”Р Сџ Р В·Р В° РЎР‚Р ВµР в„–РЎРѓ
 SELECT SUM(driver_pay) FROM trip_orders WHERE trip_id = '...';
 ```
 
 ---
 
-## 3. Р”РёР°РіСЂР°РјРјР° РѕС‚РЅРѕС€РµРЅРёР№ (Entity Relationship Diagram)
+## 3. Р В РІР‚СњР В РЎвЂР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В РЎВР В Р’В° Р В РЎвЂўР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР РЋРІвЂљВ¬Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ (Entity Relationship Diagram)
 
 ```
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-в”‚  LEGAL_ENTITIES в”‚
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-         в”‚ (1:N)
-         в”‚
-    в”Њв”Ђв”Ђв”Ђв”Ђв”ґв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-    в”‚             в”‚            в”‚             в”‚
-в”Њв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ  в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ  в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ  в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”ђ
-в”‚ASSETSв”‚  в”‚WALLETS  в”‚  в”‚USERS    в”‚  в”‚BUSINESS_в”‚
-в””в”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”  в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”  в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”  в”‚  UNITS  в”‚
-    в”‚                         в”‚     в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-    в”‚ (1:N)                   в”‚ (1:N)
-    в”‚                         в”‚
-    в”њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-    в”‚         в”‚
-    в”‚    в”Њв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-    в”‚    в”‚ TRIPS             в”‚
-    в”‚    в”‚ - asset_id        в”‚
-    в”‚    в”‚ - driver_id       в”‚
-    в”‚    в”‚ - loader_id       в”‚
-    в”‚    в”‚ - lifecycle_statusв”‚
-    в”‚    в”‚ - settlement_*    в”‚
-    в”‚    в””в”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-    в”‚         в”‚ (1:N)
-    в”‚         в”‚
-    в”‚    в”Њв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-    в”‚    в”‚ TRIP_ORDERS       в”‚в—„в”Ђв”Ђ payment_method
-    в”‚    в”‚ - amount          в”‚
-    в”‚    в”‚ - driver_pay      в”‚
-    в”‚    в”‚ - loader_pay      в”‚
-    в”‚    в”‚ - settlement_*    в”‚
-    в”‚    в””в”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-    в”‚         в”‚ (1:1)
-    в”‚         в”‚ linked_income_tx_id
-    в”‚         в”‚
-в”Њв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-в”‚ TRANSACTIONS (РРЎРўРћР§РќРРљ РРЎРўРРќР«)              в”‚
-в”‚ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ в”‚
-в”‚ - direction (income/expense/transfer)       в”‚
-в”‚ - amount                                    в”‚
-в”‚ - from_wallet_id в”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ             в”‚
-в”‚ - to_wallet_id    в”‚          в”‚             в”‚
-в”‚ - category_id     в”‚    WALLETSв”‚             в”‚
-в”‚ - lifecycle_statusв”‚          в”‚             в”‚
-в”‚ - settlement_st.  в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”             в”‚
-в”‚ - trip_id         (РєР°Р¶РґР°СЏ Tв†’ РѕРґРЅР° РёР· Wallets)
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+Р Р†РІР‚СњРІР‚С™  LEGAL_ENTITIES Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
+         Р Р†РІР‚СњРІР‚С™ (1:N)
+         Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРўвЂР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+    Р Р†РІР‚СњРІР‚С™             Р Р†РІР‚СњРІР‚С™            Р Р†РІР‚СњРІР‚С™             Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™  Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™  Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™  Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+Р Р†РІР‚СњРІР‚С™ASSETSР Р†РІР‚СњРІР‚С™  Р Р†РІР‚СњРІР‚С™WALLETS  Р Р†РІР‚СњРІР‚С™  Р Р†РІР‚СњРІР‚С™USERS    Р Р†РІР‚СњРІР‚С™  Р Р†РІР‚СњРІР‚С™BUSINESS_Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В  Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В  Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В  Р Р†РІР‚СњРІР‚С™  UNITS  Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™                         Р Р†РІР‚СњРІР‚С™     Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
+    Р Р†РІР‚СњРІР‚С™ (1:N)                   Р Р†РІР‚СњРІР‚С™ (1:N)
+    Р Р†РІР‚СњРІР‚С™                         Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРЎС™Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
+    Р Р†РІР‚СњРІР‚С™         Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ TRIPS             Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - asset_id        Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - driver_id       Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - loader_id       Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - lifecycle_statusР Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - settlement_*    Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
+    Р Р†РІР‚СњРІР‚С™         Р Р†РІР‚СњРІР‚С™ (1:N)
+    Р Р†РІР‚СњРІР‚С™         Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ TRIP_ORDERS       Р Р†РІР‚СњРІР‚С™Р Р†РІР‚вЂќРІР‚С›Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ payment_method
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - amount          Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - driver_pay      Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - loader_pay      Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚С™ - settlement_*    Р Р†РІР‚СњРІР‚С™
+    Р Р†РІР‚СњРІР‚С™    Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
+    Р Р†РІР‚СњРІР‚С™         Р Р†РІР‚СњРІР‚С™ (1:1)
+    Р Р†РІР‚СњРІР‚С™         Р Р†РІР‚СњРІР‚С™ linked_income_tx_id
+    Р Р†РІР‚СњРІР‚С™         Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+Р Р†РІР‚СњРІР‚С™ TRANSACTIONS (Р В Р’ВР В Р Р‹Р В РЎС›Р В РЎвЂєР В Р’В§Р В РЎСљР В Р’ВР В РЎв„ў Р В Р’ВР В Р Р‹Р В РЎС›Р В Р’ВР В РЎСљР В Р’В«)              Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - direction (income/expense/transfer)       Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - amount                                    Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - from_wallet_id Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™             Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - to_wallet_id    Р Р†РІР‚СњРІР‚С™          Р Р†РІР‚СњРІР‚С™             Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - category_id     Р Р†РІР‚СњРІР‚С™    WALLETSР Р†РІР‚СњРІР‚С™             Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - lifecycle_statusР Р†РІР‚СњРІР‚С™          Р Р†РІР‚СњРІР‚С™             Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - settlement_st.  Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В             Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ - trip_id         (Р В РЎвЂќР В Р’В°Р В Р’В¶Р В РўвЂР В Р’В°Р РЋР РЏ TР Р†РІР‚В РІР‚в„ў Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В Р’В° Р В РЎвЂР В Р’В· Wallets)
+Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
 
 PAYROLL:
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-в”‚ PAYROLL_RULESв”‚ (СЃРїСЂР°РІРѕС‡РЅРёРє РїРѕРґСЃРєР°Р·РѕРє)
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+Р Р†РІР‚СњРІР‚С™ PAYROLL_RULESР Р†РІР‚СњРІР‚С™ (Р РЋР С“Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋР С“Р В РЎвЂќР В Р’В°Р В Р’В·Р В РЎвЂўР В РЎвЂќ)
+Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
 
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-в”‚ TRIP_ORDERS            в”‚
-в”‚ + driver_pay           в”‚в—„в”Ђв”Ђ РІРІРѕРґРёС‚СЃСЏ РІСЂСѓС‡РЅСѓСЋ
-в”‚ + loader_pay           в”‚
-в”‚ + driver_pay_percent   в”‚
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-           в”‚ (SUM Р·Р° РїРµСЂРёРѕРґ)
-           в”‚
-        в”Њв”Ђв”Ђв–јв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-        в”‚ PAYROLL_PERIODS     в”‚
-        в”‚ - total_earned      в”‚
-        в”‚ - balance_to_pay    в”‚
-        в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+Р Р†РІР‚СњРІР‚С™ TRIP_ORDERS            Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ + driver_pay           Р Р†РІР‚СњРІР‚С™Р Р†РІР‚вЂќРІР‚С›Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ Р В Р вЂ Р В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р РЋР С“Р РЋР РЏ Р В Р вЂ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р РЋРЎвЂњР РЋР вЂ№
+Р Р†РІР‚СњРІР‚С™ + loader_pay           Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚С™ + driver_pay_percent   Р Р†РІР‚СњРІР‚С™
+Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В¬Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
+           Р Р†РІР‚СњРІР‚С™ (SUM Р В Р’В·Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В РЎвЂР В РЎвЂўР В РўвЂ)
+           Р Р†РІР‚СњРІР‚С™
+        Р Р†РІР‚СњР Р‰Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚вЂњРЎВР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњРЎвЂ™
+        Р Р†РІР‚СњРІР‚С™ PAYROLL_PERIODS     Р Р†РІР‚СњРІР‚С™
+        Р Р†РІР‚СњРІР‚С™ - total_earned      Р Р†РІР‚СњРІР‚С™
+        Р Р†РІР‚СњРІР‚С™ - balance_to_pay    Р Р†РІР‚СњРІР‚С™
+        Р Р†РІР‚СњРІР‚СњР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР’В
 ```
 
 ---
 
-## 4. РўР°Р±Р»РёС†Р° СЃРѕ РІСЃРµРјРё РїРѕР»СЏРјРё (СЃРїСЂР°РІРѕС‡РЅРёРє РґР»СЏ СЂР°Р·СЂР°Р±РѕС‚С‡РёРєР°)
+## 4. Р В РЎС›Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р В Р’В° Р РЋР С“Р В РЎвЂў Р В Р вЂ Р РЋР С“Р В Р’ВµР В РЎВР В РЎвЂ Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР РЏР В РЎВР В РЎвЂ (Р РЋР С“Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР вЂљР В Р’В°Р В Р’В·Р РЋР вЂљР В Р’В°Р В Р’В±Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚РЋР В РЎвЂР В РЎвЂќР В Р’В°)
 
-| РўР°Р±Р»РёС†Р° | РџРѕР»Рµ | РўРёРї | Constraints | РџСЂРёРјРµС‡Р°РЅРёРµ |
+| Р В РЎС›Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р В Р’В° | Р В РЎСџР В РЎвЂўР В Р’В»Р В Р’Вµ | Р В РЎС›Р В РЎвЂР В РЎвЂ” | Constraints | Р В РЎСџР РЋР вЂљР В РЎвЂР В РЎВР В Р’ВµР РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ |
 |---------|------|-----|-------------|-----------|
 | **users** | id | UUID | PK | |
-| | max_user_id | TEXT | UNIQUE | РР· MAX OAuth |
+| | max_user_id | TEXT | UNIQUE | Р В Р’ВР В Р’В· MAX OAuth |
 | | phone | TEXT | | |
 | | full_name | TEXT | NOT NULL | |
-| | role | TEXT | CHECK 8 РІР°СЂРёР°РЅС‚РѕРІ | owner, admin, driver Рё С‚.Рґ. |
-| | current_asset_id | UUID | FK в†’ assets | Р”Р»СЏ РІРѕРґРёС‚РµР»СЏ |
+| | role | TEXT | CHECK 8 Р В Р вЂ Р В Р’В°Р РЋР вЂљР В РЎвЂР В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂўР В Р вЂ  | owner, admin, driver Р В РЎвЂ Р РЋРІР‚С™.Р В РўвЂ. |
+| | current_asset_id | UUID | FK Р Р†РІР‚В РІР‚в„ў assets | Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР РЏ |
 | **assets** | id | UUID | PK | |
-| | asset_type_id | UUID | FK в†’ asset_types | |
-| | plate_number | TEXT | UNIQUE | Р“РѕСЃРЅРѕРјРµСЂ |
-| | residual_value | DECIMAL(12,2) | NOT NULL | РћСЃС‚. СЃС‚РѕРёРјРѕСЃС‚СЊ СЃРµРіРѕРґРЅСЏ |
-| | remaining_life_months | INT | NOT NULL | РћСЃС‚Р°РІС€РёС…СЃСЏ РјРµСЃСЏС†РµРІ |
-| | monthly_depreciation | DECIMAL(12,2) | GENERATED | Р’С‹С‡РёСЃР»СЏРµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё |
-| | current_book_value | DECIMAL(12,2) | | РЈРјРµРЅСЊС€Р°РµС‚СЃСЏ РµР¶РµРјРµСЃСЏС‡РЅРѕ |
-| | odometer_current | INT | DEFAULT 0 | РўРµРєСѓС‰РёР№ РїСЂРѕР±РµРі |
-| | wialon_object_id | TEXT | | ID РІ Wialon (GPS) |
+| | asset_type_id | UUID | FK Р Р†РІР‚В РІР‚в„ў asset_types | |
+| | plate_number | TEXT | UNIQUE | Р В РІР‚СљР В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљ |
+| | residual_value | DECIMAL(12,2) | NOT NULL | Р В РЎвЂєР РЋР С“Р РЋРІР‚С™. Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В РЎвЂР В РЎВР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р В Р’ВµР В РЎвЂ“Р В РЎвЂўР В РўвЂР В Р вЂ¦Р РЋР РЏ |
+| | remaining_life_months | INT | NOT NULL | Р В РЎвЂєР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚В¦Р РЋР С“Р РЋР РЏ Р В РЎВР В Р’ВµР РЋР С“Р РЋР РЏР РЋРІР‚В Р В Р’ВµР В Р вЂ  |
+| | monthly_depreciation | DECIMAL(12,2) | GENERATED | Р В РІР‚в„ўР РЋРІР‚в„–Р РЋРІР‚РЋР В РЎвЂР РЋР С“Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р’ВµР РЋР С“Р В РЎвЂќР В РЎвЂ |
+| | current_book_value | DECIMAL(12,2) | | Р В Р в‚¬Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’В°Р В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ Р В Р’ВµР В Р’В¶Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋР РЏР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂў |
+| | odometer_current | INT | DEFAULT 0 | Р В РЎС›Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР РЋРІР‚В°Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р’В±Р В Р’ВµР В РЎвЂ“ |
+| | wialon_object_id | TEXT | | ID Р В Р вЂ  Wialon (GPS) |
 | **wallets** | id | UUID | PK | |
 | | code | TEXT | UNIQUE | 'ip_rs', 'cash_office', 'driver_vova' |
-| | type | TEXT | CHECK 5 РІР°СЂРёР°РЅС‚РѕРІ | bank_account, cash_register Рё С‚.Рґ. |
-| | owner_user_id | UUID | FK в†’ users | Р”Р»СЏ РїРѕРґРѕС‚С‡С‘С‚Р° |
+| | type | TEXT | CHECK 5 Р В Р вЂ Р В Р’В°Р РЋР вЂљР В РЎвЂР В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂўР В Р вЂ  | bank_account, cash_register Р В РЎвЂ Р РЋРІР‚С™.Р В РўвЂ. |
+| | owner_user_id | UUID | FK Р Р†РІР‚В РІР‚в„ў users | Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР В РЎвЂўР РЋРІР‚С™Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™Р В Р’В° |
 | **trips** | id | UUID | PK | |
-| | asset_id | UUID | FK в†’ assets | |
-| | driver_id | UUID | FK в†’ users | NOT NULL |
-| | loader_id | UUID | FK в†’ users | РћРїС†РёРѕРЅР°Р»СЊРЅРѕ |
+| | asset_id | UUID | FK Р Р†РІР‚В РІР‚в„ў assets | |
+| | driver_id | UUID | FK Р Р†РІР‚В РІР‚в„ў users | NOT NULL |
+| | loader_id | UUID | FK Р Р†РІР‚В РІР‚в„ў users | Р В РЎвЂєР В РЎвЂ”Р РЋРІР‚В Р В РЎвЂР В РЎвЂўР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂў |
 | | started_at | TIMESTAMPTZ | NOT NULL | |
 | | ended_at | TIMESTAMPTZ | | |
-| | lifecycle_status | TEXT | draft/approved/cancelled | **РљР›Р®Р§Р•Р’РћР™** |
-| | settlement_status | TEXT | pending/completed | **РљР›Р®Р§Р•Р’РћР™** |
-| | approved_by | UUID | FK в†’ users | РљС‚Рѕ СѓС‚РІРµСЂРґРёР» |
-| | approved_at | TIMESTAMPTZ | | РљРѕРіРґР° СѓС‚РІРµСЂРґРёР» |
+| | lifecycle_status | TEXT | draft/approved/cancelled | **Р В РЎв„ўР В РІР‚С”Р В Р’В®Р В Р’В§Р В РІР‚СћР В РІР‚в„ўР В РЎвЂєР В РІвЂћСћ** |
+| | settlement_status | TEXT | pending/completed | **Р В РЎв„ўР В РІР‚С”Р В Р’В®Р В Р’В§Р В РІР‚СћР В РІР‚в„ўР В РЎвЂєР В РІвЂћСћ** |
+| | approved_by | UUID | FK Р Р†РІР‚В РІР‚в„ў users | Р В РЎв„ўР РЋРІР‚С™Р В РЎвЂў Р РЋРЎвЂњР РЋРІР‚С™Р В Р вЂ Р В Р’ВµР РЋР вЂљР В РўвЂР В РЎвЂР В Р’В» |
+| | approved_at | TIMESTAMPTZ | | Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РўвЂР В Р’В° Р РЋРЎвЂњР РЋРІР‚С™Р В Р вЂ Р В Р’ВµР РЋР вЂљР В РўвЂР В РЎвЂР В Р’В» |
 | **trip_orders** | id | UUID | PK | |
-| | trip_id | UUID | FK в†’ trips | |
+| | trip_id | UUID | FK Р Р†РІР‚В РІР‚в„ў trips | |
 | | order_number | INT | NOT NULL | 1, 2, 3... |
-| | amount | DECIMAL(12,2) | NOT NULL > 0 | РЎСѓРјРјР° Р·Р°РєР°Р·Р° |
-| | driver_pay | DECIMAL(12,2) | NOT NULL | **Р РЈР§РќРћР™ Р’Р’РћР”** |
-| | loader_pay | DECIMAL(12,2) | DEFAULT 0 | **Р РЈР§РќРћР™ Р’Р’РћР”** |
-| | driver_pay_percent | DECIMAL(5,2) | | РРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ: driver_pay/amount*100 |
-| | payment_method | TEXT | CHECK 5 РІР°СЂРёР°РЅС‚РѕРІ | cash, qr, bank_invoice, debt_cash, card_driver |
+| | amount | DECIMAL(12,2) | NOT NULL > 0 | Р В Р Р‹Р РЋРЎвЂњР В РЎВР В РЎВР В Р’В° Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В° |
+| | driver_pay | DECIMAL(12,2) | NOT NULL | **Р В Р’В Р В Р в‚¬Р В Р’В§Р В РЎСљР В РЎвЂєР В РІвЂћСћ Р В РІР‚в„ўР В РІР‚в„ўР В РЎвЂєР В РІР‚Сњ** |
+| | loader_pay | DECIMAL(12,2) | DEFAULT 0 | **Р В Р’В Р В Р в‚¬Р В Р’В§Р В РЎСљР В РЎвЂєР В РІвЂћСћ Р В РІР‚в„ўР В РІР‚в„ўР В РЎвЂєР В РІР‚Сњ** |
+| | driver_pay_percent | DECIMAL(5,2) | | Р В Р’ВР В Р вЂ¦Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВР В Р’В°Р РЋРІР‚В Р В РЎвЂР В РЎвЂўР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В Р’Вµ: driver_pay/amount*100 |
+| | payment_method | TEXT | CHECK 5 Р В Р вЂ Р В Р’В°Р РЋР вЂљР В РЎвЂР В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂўР В Р вЂ  | cash, qr, bank_invoice, debt_cash, card_driver |
 | | settlement_status | TEXT | pending/completed | |
-| | linked_income_tx_id | UUID | FK в†’ transactions | РђРІС‚РѕСЃСЃС‹Р»РєР° |
+| | linked_income_tx_id | UUID | FK Р Р†РІР‚В РІР‚в„ў transactions | Р В РЎвЂ™Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р РЋР С“Р РЋРІР‚в„–Р В Р’В»Р В РЎвЂќР В Р’В° |
 | **transactions** | id | UUID | PK | |
 | | direction | TEXT | income/expense/transfer | |
-| | amount | DECIMAL(12,2) | NOT NULL > 0 | **Р’РЎР•Р“Р”Рђ Г· СЃСЋРґР° РЅРµ РЅР° СЃСѓРјРјСѓ РёСЃС…РѕРґРЅРѕРіРѕ Р·Р°РєР°Р·Р°** |
-| | from_wallet_id | UUID | FK в†’ wallets | |
-| | to_wallet_id | UUID | FK в†’ wallets | |
-| | lifecycle_status | TEXT | **draft/approved/cancelled** | РљС‚Рѕ СѓС‚РІРµСЂРґРёР» |
-| | settlement_status | TEXT | **pending/completed** | Р”РµРЅСЊРіРё РїСЂРѕС€Р»Рё? |
-| | idempotency_key | TEXT | UNIQUE | Р”Р»СЏ РёРґРµРјРїРѕС‚РµРЅС‚РЅРѕСЃС‚Рё |
-| | transaction_type | TEXT | CHECK 7 С‚РёРїРѕРІ | regular, depreciation, payroll Рё С‚.Рґ. |
+| | amount | DECIMAL(12,2) | NOT NULL > 0 | **Р В РІР‚в„ўР В Р Р‹Р В РІР‚СћР В РІР‚СљР В РІР‚СњР В РЎвЂ™ Р вЂњР’В· Р РЋР С“Р РЋР вЂ№Р В РўвЂР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В° Р РЋР С“Р РЋРЎвЂњР В РЎВР В РЎВР РЋРЎвЂњ Р В РЎвЂР РЋР С“Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°** |
+| | from_wallet_id | UUID | FK Р Р†РІР‚В РІР‚в„ў wallets | |
+| | to_wallet_id | UUID | FK Р Р†РІР‚В РІР‚в„ў wallets | |
+| | lifecycle_status | TEXT | **draft/approved/cancelled** | Р В РЎв„ўР РЋРІР‚С™Р В РЎвЂў Р РЋРЎвЂњР РЋРІР‚С™Р В Р вЂ Р В Р’ВµР РЋР вЂљР В РўвЂР В РЎвЂР В Р’В» |
+| | settlement_status | TEXT | **pending/completed** | Р В РІР‚СњР В Р’ВµР В Р вЂ¦Р РЋР Р‰Р В РЎвЂ“Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІвЂљВ¬Р В Р’В»Р В РЎвЂ? |
+| | idempotency_key | TEXT | UNIQUE | Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В РЎвЂР В РўвЂР В Р’ВµР В РЎВР В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂ |
+| | transaction_type | TEXT | CHECK 7 Р РЋРІР‚С™Р В РЎвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ  | regular, depreciation, payroll Р В РЎвЂ Р РЋРІР‚С™.Р В РўвЂ. |
 
 ---
 
-## 5. РљР°Рє СЃС‡РёС‚Р°СЋС‚СЃСЏ Р±Р°Р»Р°РЅСЃС‹ (РљР РРўРР§РќРћ!)
+## 5. Р В РЎв„ўР В Р’В°Р В РЎвЂќ Р РЋР С“Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р В Р’В°Р РЋР вЂ№Р РЋРІР‚С™Р РЋР С“Р РЋР РЏ Р В Р’В±Р В Р’В°Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋР С“Р РЋРІР‚в„– (Р В РЎв„ўР В Р’В Р В Р’ВР В РЎС›Р В Р’ВР В Р’В§Р В РЎСљР В РЎвЂє!)
 
 ```sql
--- Р‘Р°Р»Р°РЅСЃ РєРѕС€РµР»СЊРєР° = SUM РІСЃРµС… С‚СЂР°РЅР·Р°РєС†РёР№, РіРґРµ СЌС‚Рѕ РєРѕС€РµР»РµРє "to" РјРёРЅСѓСЃ "from"
--- РўРћР›Р¬РљРћ РїРѕ approved + completed
+-- Р В РІР‚ВР В Р’В°Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋР С“ Р В РЎвЂќР В РЎвЂўР РЋРІвЂљВ¬Р В Р’ВµР В Р’В»Р РЋР Р‰Р В РЎвЂќР В Р’В° = SUM Р В Р вЂ Р РЋР С“Р В Р’ВµР РЋРІР‚В¦ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋРІР‚В Р В РЎвЂР В РІвЂћвЂ“, Р В РЎвЂ“Р В РўвЂР В Р’Вµ Р РЋР РЉР РЋРІР‚С™Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР РЋРІвЂљВ¬Р В Р’ВµР В Р’В»Р В Р’ВµР В РЎвЂќ "to" Р В РЎВР В РЎвЂР В Р вЂ¦Р РЋРЎвЂњР РЋР С“ "from"
+-- Р В РЎС›Р В РЎвЂєР В РІР‚С”Р В Р’В¬Р В РЎв„ўР В РЎвЂє Р В РЎвЂ”Р В РЎвЂў approved + completed
 
 SELECT 
   wallet_id,
@@ -881,7 +881,7 @@ WHERE lifecycle_status = 'approved'
   AND actual_date <= CURRENT_DATE
 GROUP BY wallet_id;
 
--- P&L Р·Р° РїРµСЂРёРѕРґ = РґРѕС…РѕРґС‹ - СЂР°СЃС…РѕРґС‹ (С‚РѕР»СЊРєРѕ approved + completed)
+-- P&L Р В Р’В·Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В РЎвЂР В РЎвЂўР В РўвЂ = Р В РўвЂР В РЎвЂўР РЋРІР‚В¦Р В РЎвЂўР В РўвЂР РЋРІР‚в„– - Р РЋР вЂљР В Р’В°Р РЋР С“Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР РЋРІР‚в„– (Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў approved + completed)
 SELECT 
   business_unit_id,
   SUM(amount) FILTER (WHERE direction = 'income') as income,
@@ -897,10 +897,10 @@ GROUP BY business_unit_id;
 
 ---
 
-## 6. РўСЂРёРіРіРµСЂС‹ Рё Р°РІС‚РѕРјР°С‚РёР·Р°С†РёСЏ
+## 6. Р В РЎС›Р РЋР вЂљР В РЎвЂР В РЎвЂ“Р В РЎвЂ“Р В Р’ВµР РЋР вЂљР РЋРІР‚в„– Р В РЎвЂ Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ
 
 ```sql
--- РўР РР“Р“Р•Р  1: РџСЂРё СЃРѕР·РґР°РЅРёРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ в†’ Р°РІС‚РѕСЃРѕР·РґР°РЅРёРµ wallet (РїРѕРґРѕС‚С‡С‘С‚)
+-- Р В РЎС›Р В Р’В Р В Р’ВР В РІР‚СљР В РІР‚СљР В РІР‚СћР В Р’В  1: Р В РЎСџР РЋР вЂљР В РЎвЂ Р РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР В РЎвЂ Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР РЏ Р Р†РІР‚В РІР‚в„ў Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ wallet (Р В РЎвЂ”Р В РЎвЂўР В РўвЂР В РЎвЂўР РЋРІР‚С™Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™)
 CREATE OR REPLACE FUNCTION create_employee_wallet()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -908,10 +908,10 @@ BEGIN
     INSERT INTO wallets (code, name, type, owner_user_id, legal_entity_id)
     VALUES (
       'employee_' || NEW.id,
-      'РџРѕРґРѕС‚С‡С‘С‚ ' || NEW.full_name,
+      'Р В РЎСџР В РЎвЂўР В РўвЂР В РЎвЂўР РЋРІР‚С™Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™ ' || NEW.full_name,
       'employee_accountable',
       NEW.id,
-      (SELECT id FROM legal_entities LIMIT 1) -- РіР»Р°РІРЅРѕРµ СЋСЂР»РёС†Рѕ
+      (SELECT id FROM legal_entities LIMIT 1) -- Р В РЎвЂ“Р В Р’В»Р В Р’В°Р В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В Р’Вµ Р РЋР вЂ№Р РЋР вЂљР В Р’В»Р В РЎвЂР РЋРІР‚В Р В РЎвЂў
     );
   END IF;
   RETURN NEW;
@@ -921,13 +921,13 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_create_wallet AFTER INSERT ON users
 FOR EACH ROW EXECUTE FUNCTION create_employee_wallet();
 
--- РўР РР“Р“Р•Р  2: РџСЂРё INSERT trip_orders в†’ СЃРѕР·РґР°РЅРёРµ income transaction
+-- Р В РЎС›Р В Р’В Р В Р’ВР В РІР‚СљР В РІР‚СљР В РІР‚СћР В Р’В  2: Р В РЎСџР РЋР вЂљР В РЎвЂ INSERT trip_orders Р Р†РІР‚В РІР‚в„ў Р РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ income transaction
 CREATE OR REPLACE FUNCTION create_income_transaction()
 RETURNS TRIGGER AS $$
 DECLARE
   wallet_id UUID;
 BEGIN
-  -- РћРїСЂРµРґРµР»РёС‚СЊ С†РµР»РµРІРѕР№ РєРѕС€РµР»С‘Рє РїРѕ payment_method
+  -- Р В РЎвЂєР В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В Р’ВµР В Р’В»Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚В Р В Р’ВµР В Р’В»Р В Р’ВµР В Р вЂ Р В РЎвЂўР В РІвЂћвЂ“ Р В РЎвЂќР В РЎвЂўР РЋРІвЂљВ¬Р В Р’ВµР В Р’В»Р РЋРІР‚ВР В РЎвЂќ Р В РЎвЂ”Р В РЎвЂў payment_method
   wallet_id := CASE NEW.payment_method
     WHEN 'cash' THEN (SELECT id FROM wallets WHERE code = 'driver_wallet')
     WHEN 'qr' THEN (SELECT id FROM wallets WHERE code = 'ip_rs')
@@ -966,7 +966,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_create_tx AFTER INSERT ON trip_orders
 FOR EACH ROW EXECUTE FUNCTION create_income_transaction();
 
--- РўР РР“Р“Р•Р  3: РџСЂРё UPDATE assets.odometer_current в†’ РїСЂРѕРІРµСЂРєР° РўРћ
+-- Р В РЎС›Р В Р’В Р В Р’ВР В РІР‚СљР В РІР‚СљР В РІР‚СћР В Р’В  3: Р В РЎСџР РЋР вЂљР В РЎвЂ UPDATE assets.odometer_current Р Р†РІР‚В РІР‚в„ў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В° Р В РЎС›Р В РЎвЂє
 CREATE OR REPLACE FUNCTION check_maintenance_alert()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -988,41 +988,41 @@ FOR EACH ROW EXECUTE FUNCTION check_maintenance_alert();
 
 ---
 
-## 7. РњРёРіСЂР°С†РёСЏ: РєР°Рє РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ Р‘Р”
+## 7. Р В РЎС™Р В РЎвЂР В РЎвЂ“Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ: Р В РЎвЂќР В Р’В°Р В РЎвЂќ Р В РЎвЂР В Р вЂ¦Р В РЎвЂР РЋРІР‚В Р В РЎвЂР В Р’В°Р В Р’В»Р В РЎвЂР В Р’В·Р В РЎвЂР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В РІР‚ВР В РІР‚Сњ
 
 ```bash
-# 1. РЎРєРѕРїРёСЂРѕРІР°С‚СЊ РІРµСЃСЊ SQL РёР· Рї.2 РІС‹С€Рµ
-# 2. РћС‚РєСЂС‹С‚СЊ Supabase SQL Editor
-# 3. Р’СЃС‚Р°РІРёС‚СЊ Рё РІС‹РїРѕР»РЅРёС‚СЊ (РјРѕР¶РµС‚ Р·Р°РЅСЏС‚СЊ 1-2 РјРёРЅСѓС‚С‹)
-# 4. РџСЂРѕРІРµСЂРёС‚СЊ: РІСЃРµ С‚Р°Р±Р»РёС†С‹ СЃРѕР·РґР°РЅС‹
+# 1. Р В Р Р‹Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р В РЎвЂР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В Р’ВµР РЋР С“Р РЋР Р‰ SQL Р В РЎвЂР В Р’В· Р В РЎвЂ”.2 Р В Р вЂ Р РЋРІР‚в„–Р РЋРІвЂљВ¬Р В Р’Вµ
+# 2. Р В РЎвЂєР РЋРІР‚С™Р В РЎвЂќР РЋР вЂљР РЋРІР‚в„–Р РЋРІР‚С™Р РЋР Р‰ Supabase SQL Editor
+# 3. Р В РІР‚в„ўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ Р В Р вЂ Р РЋРІР‚в„–Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р В Р вЂ¦Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ (Р В РЎВР В РЎвЂўР В Р’В¶Р В Р’ВµР РЋРІР‚С™ Р В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋР РЏР РЋРІР‚С™Р РЋР Р‰ 1-2 Р В РЎВР В РЎвЂР В Р вЂ¦Р РЋРЎвЂњР РЋРІР‚С™Р РЋРІР‚в„–)
+# 4. Р В РЎСџР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р РЋР Р‰: Р В Р вЂ Р РЋР С“Р В Р’Вµ Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋРІР‚в„– Р РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋРІР‚в„–
 
-# 5. Р­РєСЃРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ С‚РёРїС‹ РІ TypeScript
+# 5. Р В Р’В­Р В РЎвЂќР РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С™Р В РЎвЂР В РЎвЂ”Р РЋРІР‚в„– Р В Р вЂ  TypeScript
 supabase gen types typescript --schema public > packages/shared-types/database.types.ts
 
-# 6. Р—Р°РїРѕР»РЅРёС‚СЊ СЃРїСЂР°РІРѕС‡РЅРёРєРё (seed data)
-# вЂ” РљРѕРЅС‚СЂР°РіРµРЅС‚РѕРІ РґРѕР±Р°РІРёС‚СЊ РІСЂСѓС‡РЅСѓСЋ РІ Dashboard
-# вЂ” РњР°С€РёРЅС‹ РґРѕР±Р°РІРёС‚СЊ С‡РµСЂРµР· Setup Wizard
+# 6. Р В РІР‚вЂќР В Р’В°Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р В Р вЂ¦Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РЎвЂќР В РЎвЂ (seed data)
+# Р Р†Р вЂљРІР‚Сњ Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂўР В Р вЂ  Р В РўвЂР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р РЋРЎвЂњР РЋР вЂ№ Р В Р вЂ  Dashboard
+# Р Р†Р вЂљРІР‚Сњ Р В РЎС™Р В Р’В°Р РЋРІвЂљВ¬Р В РЎвЂР В Р вЂ¦Р РЋРІР‚в„– Р В РўвЂР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Setup Wizard
 ```
 
 ---
 
-## 8. Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ Рё РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ
+## 8. Р В Р’В Р В Р’ВµР В Р’В·Р В Р’ВµР РЋР вЂљР В Р вЂ Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р В РЎвЂР РЋР РЏ Р В РЎвЂ Р В Р вЂ Р В РЎвЂўР РЋР С“Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ
 
 ```bash
-# Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ:
+# Р В Р’В Р В Р’ВµР В Р’В·Р В Р’ВµР РЋР вЂљР В Р вЂ Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р В РЎвЂР РЋР РЏ:
 pg_dump postgresql://user:password@host/db > backup.sql
 
-# Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ:
+# Р В РІР‚в„ўР В РЎвЂўР РЋР С“Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ:
 psql postgresql://user:password@host/db < backup.sql
 ```
 
 ---
 
-## РС‚РѕРіРѕ
+## Р В Р’ВР РЋРІР‚С™Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў
 
-вњ… **РџРѕР»РЅР°СЏ Supabase СЃС…РµРјР° РіРѕС‚РѕРІР° Рє РёРЅРёС†РёР°Р»РёР·Р°С†РёРё**  
-вњ… **Р’СЃРµ С‚Р°Р±Р»РёС†С‹, РёРЅРґРµРєСЃС‹, С‚СЂРёРіРіРµСЂС‹, RLS**  
-вњ… **Р”РІСѓС…РѕСЃРЅС‹Р№ СЃС‚Р°С‚СѓСЃ СЂРµР°Р»РёР·РѕРІР°РЅ РЅР° СѓСЂРѕРІРЅРµ Р‘Р”**  
-вњ… **РђРІС‚РѕРјР°С‚РёР·Р°С†РёСЏ С‡РµСЂРµР· pg_cron Рё С‚СЂРёРіРіРµСЂС‹**  
+Р Р†РЎС™РІР‚В¦ **Р В РЎСџР В РЎвЂўР В Р’В»Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Supabase Р РЋР С“Р РЋРІР‚В¦Р В Р’ВµР В РЎВР В Р’В° Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В Р’В° Р В РЎвЂќ Р В РЎвЂР В Р вЂ¦Р В РЎвЂР РЋРІР‚В Р В РЎвЂР В Р’В°Р В Р’В»Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР В РЎвЂ**  
+Р Р†РЎС™РІР‚В¦ **Р В РІР‚в„ўР РЋР С“Р В Р’Вµ Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋРІР‚в„–, Р В РЎвЂР В Р вЂ¦Р В РўвЂР В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚в„–, Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎвЂ“Р В РЎвЂ“Р В Р’ВµР РЋР вЂљР РЋРІР‚в„–, RLS**  
+Р Р†РЎС™РІР‚В¦ **Р В РІР‚СњР В Р вЂ Р РЋРЎвЂњР РЋРІР‚В¦Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™Р РЋРЎвЂњР РЋР С“ Р РЋР вЂљР В Р’ВµР В Р’В°Р В Р’В»Р В РЎвЂР В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦ Р В Р вЂ¦Р В Р’В° Р РЋРЎвЂњР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В Р’Вµ Р В РІР‚ВР В РІР‚Сњ**  
+Р Р†РЎС™РІР‚В¦ **Р В РЎвЂ™Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· pg_cron Р В РЎвЂ Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎвЂ“Р В РЎвЂ“Р В Р’ВµР РЋР вЂљР РЋРІР‚в„–**  
 
-**РЎР»РµРґСѓСЋС‰РёР№ С„Р°Р№Р»:** ENVIRONMENT.md (РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ)
+**Р В Р Р‹Р В Р’В»Р В Р’ВµР В РўвЂР РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚В°Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С›Р В Р’В°Р В РІвЂћвЂ“Р В Р’В»:** ENVIRONMENT.md (Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р В РЎвЂўР В РЎвЂќР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋР РЏ)

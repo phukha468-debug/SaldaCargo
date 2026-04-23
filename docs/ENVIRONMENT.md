@@ -1,48 +1,48 @@
-# SaldaCargo — Среда разработки
+# SaldaCargo РІР‚вЂќ Р РЋРЎР‚Р ВµР Т‘Р В° РЎР‚Р В°Р В·РЎР‚Р В°Р В±Р С•РЎвЂљР С”Р С‘
 
 ---
 
-## 1. Фреймворк и версия
+## 1. Р В¤РЎР‚Р ВµР в„–Р СР Р†Р С•РЎР‚Р С” Р С‘ Р Р†Р ВµРЎР‚РЎРѓР С‘РЎРЏ
 
-- Фреймворк: Next.js 15 (App Router)
+- Р В¤РЎР‚Р ВµР в„–Р СР Р†Р С•РЎР‚Р С”: Next.js 15 (App Router)
 - React: 19
 - TypeScript: 5.x (strict mode)
 - Node.js: 18+
-- Документация Next.js: https://nextjs.org/docs
+- Р вЂќР С•Р С”РЎС“Р СР ВµР Р…РЎвЂљР В°РЎвЂ Р С‘РЎРЏ Next.js: https://nextjs.org/docs
 
 ---
 
-## 2. Структура монорепо
+## 2. Р РЋРЎвЂљРЎР‚РЎС“Р С”РЎвЂљРЎС“РЎР‚Р В° Р СР С•Р Р…Р С•РЎР‚Р ВµР С—Р С•
 
 ```
 SaldaCargo/
-├── apps/
-│   ├── web/          # Dashboard владельца/админа (порт 3000)
-│   └── miniapp/      # Mini App для водителей в MAX (порт 3001)
-├── packages/
-│   ├── shared-types/ # TypeScript типы из Supabase (@saldacargo/shared-types)
-│   └── ui/           # Общие UI компоненты (@saldacargo/ui)
-├── docs/             # Документация проекта (BOOT, RULES, BRIEF, ENVIRONMENT, LESSONS)
-├── tasks/
-│   ├── todo/         # Задачи в работе
-│   └── done/         # Завершённые задачи
-├── pnpm-workspace.yaml
-├── .env.example
-└── package.json
+РІвЂќСљРІвЂќР‚РІвЂќР‚ apps/
+РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ web/          # Dashboard Р Р†Р В»Р В°Р Т‘Р ВµР В»РЎРЉРЎвЂ Р В°/Р В°Р Т‘Р СР С‘Р Р…Р В° (Р С—Р С•РЎР‚РЎвЂљ 3000)
+РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ miniapp/      # Mini App Р Т‘Р В»РЎРЏ Р Р†Р С•Р Т‘Р С‘РЎвЂљР ВµР В»Р ВµР в„– Р Р† MAX (Р С—Р С•РЎР‚РЎвЂљ 3001)
+РІвЂќСљРІвЂќР‚РІвЂќР‚ packages/
+РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ shared-types/ # TypeScript РЎвЂљР С‘Р С—РЎвЂ№ Р С‘Р В· Supabase (@saldacargo/shared-types)
+РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ ui/           # Р С›Р В±РЎвЂ°Р С‘Р Вµ UI Р С”Р С•Р СР С—Р С•Р Р…Р ВµР Р…РЎвЂљРЎвЂ№ (@saldacargo/ui)
+РІвЂќСљРІвЂќР‚РІвЂќР‚ docs/             # Р вЂќР С•Р С”РЎС“Р СР ВµР Р…РЎвЂљР В°РЎвЂ Р С‘РЎРЏ Р С—РЎР‚Р С•Р ВµР С”РЎвЂљР В° (BOOT, RULES, BRIEF, ENVIRONMENT, LESSONS)
+РІвЂќСљРІвЂќР‚РІвЂќР‚ tasks/
+РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ todo/         # Р вЂ”Р В°Р Т‘Р В°РЎвЂЎР С‘ Р Р† РЎР‚Р В°Р В±Р С•РЎвЂљР Вµ
+РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ done/         # Р вЂ”Р В°Р Р†Р ВµРЎР‚РЎв‚¬РЎвЂР Р…Р Р…РЎвЂ№Р Вµ Р В·Р В°Р Т‘Р В°РЎвЂЎР С‘
+РІвЂќСљРІвЂќР‚РІвЂќР‚ pnpm-workspace.yaml
+РІвЂќСљРІвЂќР‚РІвЂќР‚ .env.example
+РІвЂќвЂќРІвЂќР‚РІвЂќР‚ package.json
 ```
 
 ---
 
-## 3. Переменные окружения
+## 3. Р СџР ВµРЎР‚Р ВµР СР ВµР Р…Р Р…РЎвЂ№Р Вµ Р С•Р С”РЎР‚РЎС“Р В¶Р ВµР Р…Р С‘РЎРЏ
 
-Файлы: apps/web/.env.local и apps/miniapp/.env.local (не в git!)
-Шаблон: .env.example в корне репо
+Р В¤Р В°Р в„–Р В»РЎвЂ№: apps/web/.env.local Р С‘ apps/miniapp/.env.local (Р Р…Р Вµ Р Р† git!)
+Р РЃР В°Р В±Р В»Р С•Р Р…: .env.example Р Р† Р С”Р С•РЎР‚Р Р…Р Вµ РЎР‚Р ВµР С—Р С•
 
 ```bash
-# Supabase (обязательно)
+# Supabase (Р С•Р В±РЎРЏР В·Р В°РЎвЂљР ВµР В»РЎРЉР Р…Р С•)
 NEXT_PUBLIC_SUPABASE_URL=        # https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=   # публичный ключ (RLS ограничивает)
-SUPABASE_SERVICE_ROLE_KEY=       # серверный ключ (обходит RLS — только сервер!)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Р С—РЎС“Р В±Р В»Р С‘РЎвЂЎР Р…РЎвЂ№Р в„– Р С”Р В»РЎР‹РЎвЂЎ (RLS Р С•Р С–РЎР‚Р В°Р Р…Р С‘РЎвЂЎР С‘Р Р†Р В°Р ВµРЎвЂљ)
+SUPABASE_SERVICE_ROLE_KEY=       # РЎРѓР ВµРЎР‚Р Р†Р ВµРЎР‚Р Р…РЎвЂ№Р в„– Р С”Р В»РЎР‹РЎвЂЎ (Р С•Р В±РЎвЂ¦Р С•Р Т‘Р С‘РЎвЂљ RLS РІР‚вЂќ РЎвЂљР С•Р В»РЎРЉР С”Р С• РЎРѓР ВµРЎР‚Р Р†Р ВµРЎР‚!)
 
 # MAX SDK (Mini App)
 NEXT_PUBLIC_MAX_BOT_TOKEN=
@@ -61,82 +61,82 @@ NEXT_PUBLIC_VERSION=1.0.0
 
 ---
 
-## 4. Supabase клиенты
+## 4. Supabase Р С”Р В»Р С‘Р ВµР Р…РЎвЂљРЎвЂ№
 
-| Файл | Ключ | Где использовать |
+| Р В¤Р В°Р в„–Р В» | Р С™Р В»РЎР‹РЎвЂЎ | Р вЂњР Т‘Р Вµ Р С‘РЎРѓР С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљРЎРЉ |
 |------|------|-----------------|
 | src/lib/supabase/client.ts | ANON_KEY | Client Components ('use client') |
 | src/lib/supabase/server.ts | ANON_KEY | Server Components, Route Handlers |
-| src/lib/supabase/admin.ts | SERVICE_ROLE_KEY | Только API Routes (сервер!) |
+| src/lib/supabase/admin.ts | SERVICE_ROLE_KEY | Р СћР С•Р В»РЎРЉР С”Р С• API Routes (РЎРѓР ВµРЎР‚Р Р†Р ВµРЎР‚!) |
 
 ---
 
-## 5. Детализация переменных
+## 5. Р вЂќР ВµРЎвЂљР В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ Р С—Р ВµРЎР‚Р ВµР СР ВµР Р…Р Р…РЎвЂ№РЎвЂ¦
 
-| Переменная | Источник | Назначение |
+| Р СџР ВµРЎР‚Р ВµР СР ВµР Р…Р Р…Р В°РЎРЏ | Р ВРЎРѓРЎвЂљР С•РЎвЂЎР Р…Р С‘Р С” | Р СњР В°Р В·Р Р…Р В°РЎвЂЎР ВµР Р…Р С‘Р Вµ |
 |------------|----------|------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase -> Settings -> API | Базовый URL БД |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase -> Settings -> API | Полный доступ (bypass RLS) |
-| `OPTI24_API_KEY` | Личный кабинет Опти24 | Синхронизация ГСМ |
-| `WIALON_API_TOKEN` | Wialon -> Управление | Проверка пробега |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase -> Settings -> API | Р вЂР В°Р В·Р С•Р Р†РЎвЂ№Р в„– URL Р вЂР вЂќ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase -> Settings -> API | Р СџР С•Р В»Р Р…РЎвЂ№Р в„– Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— (bypass RLS) |
+| `OPTI24_API_KEY` | Р вЂєР С‘РЎвЂЎР Р…РЎвЂ№Р в„– Р С”Р В°Р В±Р С‘Р Р…Р ВµРЎвЂљ Р С›Р С—РЎвЂљР С‘24 | Р РЋР С‘Р Р…РЎвЂ¦РЎР‚Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ Р вЂњР РЋР Сљ |
+| `WIALON_API_TOKEN` | Wialon -> Р Р€Р С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С‘Р Вµ | Р СџРЎР‚Р С•Р Р†Р ВµРЎР‚Р С”Р В° Р С—РЎР‚Р С•Р В±Р ВµР С–Р В° |
 
 ---
 
-## 6. База данных
+## 6. Р вЂР В°Р В·Р В° Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦
 
 - Supabase PostgreSQL (Free tier, Europe Frankfurt)
-- 22 таблицы, все созданы и готовы
-- RLS включён на: users, assets, trips, trip_orders, transactions, wallets
-- pg_cron установлен (v1.6.4)
-- Seed data загружены: asset_types, business_units, categories, payroll_rules, wallets
+- 22 РЎвЂљР В°Р В±Р В»Р С‘РЎвЂ РЎвЂ№, Р Р†РЎРѓР Вµ РЎРѓР С•Р В·Р Т‘Р В°Р Р…РЎвЂ№ Р С‘ Р С–Р С•РЎвЂљР С•Р Р†РЎвЂ№
+- RLS Р Р†Р С”Р В»РЎР‹РЎвЂЎРЎвЂР Р… Р Р…Р В°: users, assets, trips, trip_orders, transactions, wallets
+- pg_cron РЎС“РЎРѓРЎвЂљР В°Р Р…Р С•Р Р†Р В»Р ВµР Р… (v1.6.4)
+- Seed data Р В·Р В°Р С–РЎР‚РЎС“Р В¶Р ВµР Р…РЎвЂ№: asset_types, business_units, categories, payroll_rules, wallets
 
 Supabase Dashboard: https://supabase.com/dashboard
 
 ---
 
-## 6. Зависимости (основные)
+## 6. Р вЂ”Р В°Р Р†Р С‘РЎРѓР С‘Р СР С•РЎРѓРЎвЂљР С‘ (Р С•РЎРѓР Р…Р С•Р Р†Р Р…РЎвЂ№Р Вµ)
 
-| Пакет | Назначение |
+| Р СџР В°Р С”Р ВµРЎвЂљ | Р СњР В°Р В·Р Р…Р В°РЎвЂЎР ВµР Р…Р С‘Р Вµ |
 |-------|-----------|
-| @supabase/supabase-js | Supabase клиент |
-| @supabase/ssr | SSR-совместимый клиент для Next.js |
-| @tanstack/react-query | Кэш и синхронизация данных |
-| react-hook-form | Управление формами |
-| zod | Валидация схем |
-| @hookform/resolvers | Связка zod + react-hook-form |
-| shadcn/ui | UI компоненты (только в apps/web) |
-| tailwindcss | Стилизация |
+| @supabase/supabase-js | Supabase Р С”Р В»Р С‘Р ВµР Р…РЎвЂљ |
+| @supabase/ssr | SSR-РЎРѓР С•Р Р†Р СР ВµРЎРѓРЎвЂљР С‘Р СРЎвЂ№Р в„– Р С”Р В»Р С‘Р ВµР Р…РЎвЂљ Р Т‘Р В»РЎРЏ Next.js |
+| @tanstack/react-query | Р С™РЎРЊРЎв‚¬ Р С‘ РЎРѓР С‘Р Р…РЎвЂ¦РЎР‚Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦ |
+| react-hook-form | Р Р€Р С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С‘Р Вµ РЎвЂћР С•РЎР‚Р СР В°Р СР С‘ |
+| zod | Р вЂ™Р В°Р В»Р С‘Р Т‘Р В°РЎвЂ Р С‘РЎРЏ РЎРѓРЎвЂ¦Р ВµР С |
+| @hookform/resolvers | Р РЋР Р†РЎРЏР В·Р С”Р В° zod + react-hook-form |
+| shadcn/ui | UI Р С”Р С•Р СР С—Р С•Р Р…Р ВµР Р…РЎвЂљРЎвЂ№ (РЎвЂљР С•Р В»РЎРЉР С”Р С• Р Р† apps/web) |
+| tailwindcss | Р РЋРЎвЂљР С‘Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ |
 
 ---
 
-## 7. Команды
+## 7. Р С™Р С•Р СР В°Р Р…Р Т‘РЎвЂ№
 
 ```bash
-# Разработка
-pnpm dev:web          # Dashboard на localhost:3000
-pnpm dev:miniapp      # Mini App на localhost:3001
+# Р В Р В°Р В·РЎР‚Р В°Р В±Р С•РЎвЂљР С”Р В°
+pnpm dev:web          # Dashboard Р Р…Р В° localhost:3000
+pnpm dev:miniapp      # Mini App Р Р…Р В° localhost:3001
 
-# Сборка
+# Р РЋР В±Р С•РЎР‚Р С”Р В°
 pnpm build:web
 pnpm build:miniapp
 
-# Установка пакетов
+# Р Р€РЎРѓРЎвЂљР В°Р Р…Р С•Р Р†Р С”Р В° Р С—Р В°Р С”Р ВµРЎвЂљР С•Р Р†
 pnpm --filter web add <pkg>
 pnpm --filter miniapp add <pkg>
 pnpm --filter @saldacargo/shared-types add <pkg>
 
-# Из корня
-pnpm install          # Установить все зависимости
+# Р ВР В· Р С”Р С•РЎР‚Р Р…РЎРЏ
+pnpm install          # Р Р€РЎРѓРЎвЂљР В°Р Р…Р С•Р Р†Р С‘РЎвЂљРЎРЉ Р Р†РЎРѓР Вµ Р В·Р В°Р Р†Р С‘РЎРѓР С‘Р СР С•РЎРѓРЎвЂљР С‘
 ```
 
 ---
 
-## 8. Известные ограничения
+## 8. Р ВР В·Р Р†Р ВµРЎРѓРЎвЂљР Р…РЎвЂ№Р Вµ Р С•Р С–РЎР‚Р В°Р Р…Р С‘РЎвЂЎР ВµР Р…Р С‘РЎРЏ
 
-- Vercel Hobby: нет Cron Jobs → используем pg_cron в Supabase (бесплатно)
-- Supabase Free: 500 МБ БД, 1 ГБ Storage, 50k API/мес
-- Сборка на Vercel: SUPABASE_SERVICE_ROLE_KEY должен быть добавлен в Vercel Environment Variables
+- Vercel Hobby: Р Р…Р ВµРЎвЂљ Cron Jobs РІвЂ вЂ™ Р С‘РЎРѓР С—Р С•Р В»РЎРЉР В·РЎС“Р ВµР С pg_cron Р Р† Supabase (Р В±Р ВµРЎРѓР С—Р В»Р В°РЎвЂљР Р…Р С•)
+- Supabase Free: 500 Р СљР вЂ Р вЂР вЂќ, 1 Р вЂњР вЂ Storage, 50k API/Р СР ВµРЎРѓ
+- Р РЋР В±Р С•РЎР‚Р С”Р В° Р Р…Р В° Vercel: SUPABASE_SERVICE_ROLE_KEY Р Т‘Р С•Р В»Р В¶Р ВµР Р… Р В±РЎвЂ№РЎвЂљРЎРЉ Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р… Р Р† Vercel Environment Variables
 
 ---
 
-*Последнее обновление: 22.04.2026*
+*Р СџР С•РЎРѓР В»Р ВµР Т‘Р Р…Р ВµР Вµ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘Р Вµ: 22.04.2026*

@@ -1,17 +1,18 @@
-import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-admin';
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: Request) {
-  const supabase = createAdminClient();
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId');
+export async function GET() {
+  try {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('actual_date', { ascending: false })
+      .limit(50)
 
-  let query = supabase.from('transactions').select('*');
-  
-  if (userId) query = query.eq('user_id', userId);
-
-  const { data, error } = await query.order('created_at', { ascending: false });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    if (error) throw error
+    return NextResponse.json(data)
+  } catch (error) {
+    return NextResponse.json({ error: (error as any).message }, { status: 500 })
+  }
 }

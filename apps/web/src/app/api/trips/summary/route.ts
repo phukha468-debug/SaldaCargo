@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { startOfDay, endOfDay } from "date-fns";
 
 export async function GET() {
@@ -14,31 +14,39 @@ export async function GET() {
       .from("trips")
       .select(`
         *,
-        driver:users(id, display_name),
-        vehicle:assets(id, plate, model),
+        driver:users!trips_driver_id_fkey(id, full_name),
+        vehicle:assets(id, plate_number, notes),
         orders:trip_orders(amount),
         expenses:trip_expenses(amount)
       `)
-      .gte("start_time", start)
-      .lte("start_time", end);
+      .gte("started_at", start)
+      .lte("started_at", end);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error("[api/trips/summary] Database error:", error);
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
 
     const summary = (trips || []).map(trip => {
-      const revenue = (trip.orders || []).reduce((s: number, o: any) => s + Number(o.amount), 0);
-      const expenses = (trip.expenses || []).reduce((s: number, e: any) => s + Number(e.amount), 0);
+      const orders = Array.isArray(trip.orders) ? trip.orders : [];
+      const expenses = Array.isArray(trip.expenses) ? trip.expenses : [];
+      
+      const revenue = orders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
+      const expenses_total = expenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+      
       return {
         ...trip,
         revenue,
-        expenses_total: expenses,
-        order_count: trip.orders?.length || 0,
-        staff_pay: Number(trip.driver_salary) + Number(trip.loader_salary)
+        expenses_total,
+        order_count: orders.length,
+        staff_pay: 0
       };
     });
 
     return NextResponse.json({ success: true, data: summary });
 
   } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[api/trips/summary] Catch-all error:", error);
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }
