@@ -4,8 +4,10 @@ const config: Config = {
   darkMode: ["class"],
   content: [
     "./src/**/*.{ts,tsx}",
-    "../../apps/web/app/**/*.{ts,tsx}",
-    "../../apps/miniapp/app/**/*.{ts,tsx}",
+    "../../apps/web/src/app/**/*.{ts,tsx}",
+    "../../apps/miniapp/src/app/**/*.{ts,tsx}",
+    "../../apps/web/src/components/**/*.{ts,tsx}",
+    "../../apps/miniapp/src/components/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {

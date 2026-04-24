@@ -25,9 +25,162 @@ export interface Database {
         Update: { id?: string; full_name?: string; role?: string; phone?: string | null; is_active?: boolean | null; created_at?: string | null }
       }
       assets: {
-        Row: { id: string; plate_number: string; asset_type_id: string; business_unit_id: string; legal_entity_id: string; status: string; year: number | null; odometer_current: number; residual_value: number; remaining_life_months: number; current_book_value: number | null; notes: string | null; created_at: string | null }
-        Insert: { id?: string; plate_number: string; asset_type_id: string; business_unit_id: string; legal_entity_id: string; status?: string; year?: number | null; odometer_current?: number; residual_value: number; remaining_life_months: number; current_book_value?: number | null; notes?: string | null; created_at?: string | null }
-        Update: { id?: string; plate_number?: string; asset_type_id?: string; business_unit_id?: string; legal_entity_id?: string; status?: string; year?: number | null; odometer_current?: number; residual_value?: number; remaining_life_months?: number; current_book_value?: number | null; notes?: string | null; created_at?: string | null }
+        Row: { 
+          id: string; 
+          plate_number: string; 
+          asset_type_id: string; 
+          business_unit_id: string; 
+          legal_entity_id: string; 
+          status: string; 
+          year: number | null; 
+          odometer_current: number; 
+          next_service_km: number | null;
+          last_service_km: number | null;
+          insurance_expiry_date: string | null;
+          residual_value: number; 
+          remaining_life_months: number; 
+          current_book_value: number | null; 
+          notes: string | null; 
+          created_at: string | null 
+        }
+        Insert: { 
+          id?: string; 
+          plate_number: string; 
+          asset_type_id: string; 
+          business_unit_id: string; 
+          legal_entity_id: string; 
+          status?: string; 
+          year?: number | null; 
+          odometer_current?: number; 
+          next_service_km?: number | null;
+          last_service_km?: number | null;
+          insurance_expiry_date?: string | null;
+          residual_value: number; 
+          remaining_life_months: number; 
+          current_book_value?: number | null; 
+          notes?: string | null; 
+          created_at?: string | null 
+        }
+        Update: { 
+          id?: string; 
+          plate_number?: string; 
+          asset_type_id?: string; 
+          business_unit_id?: string; 
+          legal_entity_id?: string; 
+          status?: string; 
+          year?: number | null; 
+          odometer_current?: number; 
+          next_service_km?: number | null;
+          last_service_km?: number | null;
+          insurance_expiry_date?: string | null;
+          residual_value?: number; 
+          remaining_life_months?: number; 
+          current_book_value?: number | null; 
+          notes?: string | null; 
+          created_at?: string | null 
+        }
+      }
+      service_orders: {
+        Row: {
+          id: string;
+          asset_id: string;
+          mechanic_id: string | null;
+          description: string | null;
+          odometer: number | null;
+          parts_cost: number;
+          labor_cost: number;
+          cost: number;
+          status: string;
+          lifecycle_status: string;
+          created_at: string | null;
+        }
+        Insert: {
+          id?: string;
+          asset_id: string;
+          mechanic_id?: string | null;
+          description?: string | null;
+          odometer?: number | null;
+          parts_cost?: number;
+          labor_cost?: number;
+          cost?: number;
+          status?: string;
+          lifecycle_status?: string;
+          created_at?: string | null;
+        }
+        Update: {
+          id?: string;
+          asset_id?: string;
+          mechanic_id?: string | null;
+          description?: string | null;
+          odometer?: number | null;
+          parts_cost?: number;
+          labor_cost?: number;
+          cost?: number;
+          status?: string;
+          lifecycle_status?: string;
+          created_at?: string | null;
+        }
+      }
+      debts: {
+        Row: {
+          id: string;
+          counterparty_name: string;
+          amount: number;
+          promise_date: string | null;
+          status: string;
+          created_at: string | null;
+        }
+        Insert: {
+          id?: string;
+          counterparty_name: string;
+          amount: number;
+          promise_date?: string | null;
+          status?: string;
+          created_at?: string | null;
+        }
+        Update: {
+          id?: string;
+          counterparty_name?: string;
+          amount?: number;
+          promise_date?: string | null;
+          status?: string;
+          created_at?: string | null;
+        }
+      }
+      obligations: {
+        Row: {
+          id: string;
+          name: string;
+          type: string;
+          total_amount: number;
+          monthly_payment: number;
+          payment_day: number;
+          start_date: string | null;
+          end_date: string | null;
+          created_at: string | null;
+        }
+        Insert: {
+          id?: string;
+          name: string;
+          type: string;
+          total_amount: number;
+          monthly_payment: number;
+          payment_day: number;
+          start_date?: string | null;
+          end_date?: string | null;
+          created_at?: string | null;
+        }
+        Update: {
+          id?: string;
+          name?: string;
+          type?: string;
+          total_amount?: number;
+          monthly_payment?: number;
+          payment_day?: number;
+          start_date?: string | null;
+          end_date?: string | null;
+          created_at?: string | null;
+        }
       }
       asset_types: {
         Row: { id: string; code: string; name: string }

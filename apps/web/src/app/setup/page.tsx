@@ -1,9 +1,9 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import SetupWizard from '@/components/setup/SetupWizard'
 
 export default async function SetupPage() {
-  const supabase = createAdminClient()
+  const supabase = await createClient()
   const { data } = await supabase
     .from('legal_entities')
     .select('id')

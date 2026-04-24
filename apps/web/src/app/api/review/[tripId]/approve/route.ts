@@ -9,6 +9,15 @@ export async function POST(
     const { tripId } = await params
     const supabase = createAdminClient()
 
+    // 0. Получаем данные рейса для даты
+    const { data: tripInfo } = await supabase
+      .from('trips')
+      .select('started_at')
+      .eq('id', tripId)
+      .single()
+
+    const tripDate = tripInfo?.started_at ? tripInfo.started_at.split('T')[0] : new Date().toISOString().split('T')[0]
+
     // 1. Подтверждаем рейс
     const { error: tripError } = await supabase
       .from('trips')
@@ -27,20 +36,15 @@ export async function POST(
 
     if (ordersError) throw ordersError
 
-    // 3. Получаем нужные кошельки
-    const { data: wallets } = await supabase
-      .from('wallets')
-      .select('id, code')
+    // 3+4. Кошельки и категории — параллельно
+    const [{ data: wallets }, { data: categories }] = await Promise.all([
+      supabase.from('wallets').select('id, code'),
+      supabase.from('categories').select('id, code'),
+    ])
 
     const walletMap = Object.fromEntries(
       (wallets || []).map(w => [w.code, w.id])
     )
-
-    // 4. Получаем категории
-    const { data: categories } = await supabase
-      .from('categories')
-      .select('id, code')
-
     const categoryMap = Object.fromEntries(
       (categories || []).map(c => [c.code, c.id])
     )
@@ -68,7 +72,7 @@ export async function POST(
         lifecycle_status: 'approved',
         settlement_status: settlementStatus,
         transaction_type: 'regular',
-        actual_date: new Date().toISOString().split('T')[0],
+        actual_date: tripDate,
         description: 'Доход от заказа',
       })
 
@@ -83,7 +87,7 @@ export async function POST(
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           transaction_type: 'payroll',
-          actual_date: new Date().toISOString().split('T')[0],
+          actual_date: tripDate,
           description: 'ЗП водителя',
         })
       }
@@ -99,7 +103,7 @@ export async function POST(
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           transaction_type: 'payroll',
-          actual_date: new Date().toISOString().split('T')[0],
+          actual_date: tripDate,
           description: 'ЗП грузчика',
         })
       }
@@ -121,7 +125,7 @@ export async function POST(
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         transaction_type: 'regular',
-        actual_date: new Date().toISOString().split('T')[0],
+        actual_date: tripDate,
         description: expense.description || 'Расход в рейсе',
       })
     }

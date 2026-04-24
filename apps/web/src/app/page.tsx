@@ -1,11 +1,12 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import MoneyMap from '@/components/dashboard/MoneyMap'
 
 export default async function HomePage() {
-  const supabase = createAdminClient()
-  const { data } = await (supabase
-    .from('legal_entities') as any)
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('legal_entities')
     .select('id')
     .limit(1)
 

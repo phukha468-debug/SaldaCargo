@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@saldacargo/shared-types'
+import type { Database } from '../../../../../packages/shared-types/src/database.types'
 
 // ТОЛЬКО для серверных API Routes — никогда не импортировать на клиенте!
 export function createAdminClient() {
