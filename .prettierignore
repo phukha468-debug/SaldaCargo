@@ -1,0 +1,11 @@
+node_modules
+.next
+.turbo
+dist
+build
+out
+coverage
+.vercel
+*.lock
+*.log
+docs/business/examples/

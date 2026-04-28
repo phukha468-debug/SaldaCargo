@@ -1,0 +1,31 @@
+{
+  "name": "saldacargo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Система управления транспортным бизнесом — MiniApp в МАХ + Web Dashboard",
+  "packageManager": "pnpm@10.33.1",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
+    "gen:types": "supabase gen types typescript --local > packages/shared-types/src/database.types.ts",
+    "seed:apply": "tsx scripts/seed-from-md.ts",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.2.5",
+    "tsx": "^4.7.1",
+    "turbo": "^2.0.3",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
