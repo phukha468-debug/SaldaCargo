@@ -1,0 +1,212 @@
+<!DOCTYPE html><html lang="ru"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>SaldaCargo Admin Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed-dim": "#c6c6c9",
+                      "on-tertiary-fixed-variant": "#44474a",
+                      "on-secondary-fixed": "#1a1c1e",
+                      "tertiary-fixed-dim": "#c4c7ca",
+                      "secondary-container": "#e2e2e5",
+                      "error": "#ba1a1a",
+                      "surface-container-high": "#e7e8e9",
+                      "on-secondary-container": "#636467",
+                      "on-primary": "#ffffff",
+                      "surface-tint": "#a04100",
+                      "primary-container": "#ff6b00",
+                      "on-tertiary-container": "#2e3134",
+                      "on-secondary-fixed-variant": "#454749",
+                      "surface-bright": "#f8f9fa",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed": "#e2e2e5",
+                      "on-tertiary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "tertiary-container": "#97999c",
+                      "background": "#f8f9fa",
+                      "primary": "#a04100",
+                      "tertiary": "#5c5f62",
+                      "surface-dim": "#d9dadb",
+                      "outline-variant": "#e2bfb0",
+                      "on-primary-fixed": "#351000",
+                      "error-container": "#ffdad6",
+                      "on-secondary": "#ffffff",
+                      "primary-fixed-dim": "#ffb693",
+                      "inverse-primary": "#ffb693",
+                      "outline": "#8e7164",
+                      "on-primary-fixed-variant": "#7a3000",
+                      "tertiary-fixed": "#e1e2e6",
+                      "on-background": "#191c1d",
+                      "inverse-surface": "#2e3132",
+                      "surface": "#f8f9fa",
+                      "on-surface-variant": "#5a4136",
+                      "inverse-on-surface": "#f0f1f2",
+                      "surface-container-low": "#f3f4f5",
+                      "on-surface": "#191c1d",
+                      "surface-container-highest": "#e1e3e4",
+                      "surface-container": "#edeeef",
+                      "surface-container-lowest": "#ffffff",
+                      "on-tertiary-fixed": "#191c1f",
+                      "surface-variant": "#e1e3e4",
+                      "secondary": "#5d5e61",
+                      "primary-fixed": "#ffdbcc",
+                      "on-primary-container": "#572000"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "unit": "8px",
+                      "container-padding": "20px",
+                      "touch-target-min": "48px",
+                      "gutter": "16px",
+                      "margin-tablet": "24px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "display": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "label-md": ["Inter"],
+                      "h2": ["Inter"],
+                      "h1": ["Inter"],
+                      "label-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0", "fontWeight": "400"}],
+                      "display": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "26px", "letterSpacing": "0", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                      "h2": ["20px", {"lineHeight": "28px", "letterSpacing": "0", "fontWeight": "600"}],
+                      "h1": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md text-body-md pb-24 pt-16">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 h-16 bg-white dark:bg-zinc-950 border-b-2 border-zinc-200 dark:border-zinc-800 transition-all">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" data-alt="Close-up portrait of a professional man in industrial setting, sharp focus, natural lighting, wearing a hardhat" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBicabvVji33VfXV096ut1ZitDAftQ1dnl8t72XWP7kTA0F8pMSAMNkf1w-9zy0I_nCj6AodGHoRq8Y9vwd_oy8oc0H7SsFP1TclbbnfK1liKv_kDwrd-qssuT8IVg4g4Oh2Y2n4_8hqPAkZr7z4J8fSeFXYfpw604eNdtkkWXxDSREjf5DW8IWo1yGcotgy7hG34oeJm0Ad3ZjKMO4w_4Po2-CMAfOUJ-CrYx6KOv2VL6sSBwv47DIcADs8PVVbA6Znifmnr8TeOA" style="">
+</div>
+<h1 class="text-xl font-black text-zinc-900 dark:text-zinc-100 font-['Inter'] font-bold uppercase tracking-wider" style="">SaldaCargo</h1>
+</div>
+<button class="w-12 h-12 flex items-center justify-center rounded-full text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors active:opacity-80" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">signal_cellular_4_bar</span>
+</button>
+</header>
+<main class="px-margin-mobile md:px-margin-tablet py-unit max-w-3xl mx-auto flex flex-col gap-unit">
+<!-- Summary Card (Bento Style) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden flex flex-col mb-2">
+<div class="bg-surface-container-high px-4 py-3 border-b border-outline-variant">
+<h2 class="font-h2 text-h2 text-on-surface" style="">Сводка</h2>
+</div>
+<div class="p-4 flex flex-col gap-3">
+<div class="flex justify-between items-center border-b border-surface-variant pb-2">
+<span class="font-body-md text-body-md text-on-surface-variant" style="">Выручка</span>
+<span class="font-h2 text-h2 text-on-surface font-bold" style="">245,000 ₽</span>
+</div>
+<div class="flex justify-between items-center border-b border-surface-variant pb-2">
+<span class="font-body-md text-body-md text-on-surface-variant" style="">ФОТ</span>
+<span class="font-h2 text-h2 text-on-surface font-bold" style="">82,400 ₽</span>
+</div>
+<div class="flex justify-between items-center border-b border-surface-variant pb-2 relative">
+<div class="absolute left-[-16px] top-1/2 -translate-y-1/2 w-1 h-full bg-primary"></div>
+<span class="font-body-md text-body-md text-on-surface-variant" style="">Прибыль</span>
+<span class="font-h1 text-h1 text-primary font-black" style="">162,600 ₽</span>
+</div>
+<div class="flex justify-between items-center pt-1">
+<span class="font-body-md text-body-md text-on-surface-variant" style="">Машин в работе</span>
+<div class="flex items-center gap-2">
+<div class="w-24 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[84%]"></div>
+</div>
+<span class="font-label-md text-label-md text-on-surface" style="">42/50</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Alerts -->
+<section class="flex flex-col gap-2 mb-2">
+<!-- Alert 1: Red -->
+<div class="bg-error-container border border-error rounded-lg p-4 flex items-start gap-3 relative overflow-hidden min-h-[64px]">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-error"></div>
+<span class="material-symbols-outlined text-on-error-container" style="font-variation-settings: &quot;FILL&quot; 1;">warning</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-error-container font-bold" style="">Требуется внимание</span>
+<span class="font-body-md text-body-md text-on-error-container" style="">3 рейса ждут ревью</span>
+</div>
+</div>
+<!-- Alert 2: Yellow (Using Outline Variant as a proxy for caution in this theme) -->
+<div class="bg-[#FFF8E1] border border-[#FFC107] rounded-lg p-4 flex items-start gap-3 relative overflow-hidden min-h-[64px]">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-[#FFC107]"></div>
+<span class="material-symbols-outlined text-[#FF8F00]" style="font-variation-settings: &quot;FILL&quot; 1;">notifications_active</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-[#FF8F00] font-bold" style="">Лимит кассы</span>
+<span class="font-body-md text-body-md text-[#FF8F00]" style="">Касса &gt; 500,000 ₽</span>
+</div>
+</div>
+</section>
+<!-- Action Grid -->
+<section class="grid grid-cols-2 gap-unit">
+<!-- Action 1 -->
+<button class="bg-primary hover:bg-surface-tint active:opacity-80 transition-colors rounded-lg flex flex-col items-center justify-center p-4 min-h-[120px] text-on-primary shadow-sm" style="">
+<span class="material-symbols-outlined text-[32px] mb-2" style="font-variation-settings: &quot;FILL&quot; 1;">payments</span>
+<span class="font-label-md text-label-md text-center font-bold" style="">Забрать выручку</span>
+</button>
+<!-- Action 2 -->
+<button class="bg-tertiary hover:bg-secondary active:opacity-80 transition-colors rounded-lg flex flex-col items-center justify-center p-4 min-h-[120px] text-on-tertiary shadow-sm" style="">
+<span class="material-symbols-outlined text-[32px] mb-2" style="font-variation-settings: &quot;FILL&quot; 0;">add_circle</span>
+<span class="font-label-md text-label-md text-center font-bold" style="">Приход</span>
+</button>
+<!-- Action 3 -->
+<button class="bg-surface-container-highest border-2 border-outline-variant hover:bg-surface-dim active:opacity-80 transition-colors rounded-lg flex flex-col items-center justify-center p-4 min-h-[120px] text-on-surface shadow-sm" style="">
+<span class="material-symbols-outlined text-[32px] mb-2 text-on-surface-variant" style="font-variation-settings: &quot;FILL&quot; 0;">do_not_disturb_on</span>
+<span class="font-label-md text-label-md text-center font-bold" style="">Расход</span>
+</button>
+<!-- Action 4 -->
+<button class="bg-surface-container-highest border-2 border-outline-variant hover:bg-surface-dim active:opacity-80 transition-colors rounded-lg flex flex-col items-center justify-center p-4 min-h-[120px] text-on-surface shadow-sm" style="">
+<span class="material-symbols-outlined text-[32px] mb-2 text-on-surface-variant" style="font-variation-settings: &quot;FILL&quot; 0;">swap_horiz</span>
+<span class="font-label-md text-label-md text-center font-bold" style="">Перевод</span>
+</button>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-2 bg-white dark:bg-zinc-950 border-t-2 border-zinc-200 dark:border-zinc-800">
+<!-- Home (Active) -->
+<button class="flex flex-col items-center justify-center text-orange-600 dark:text-orange-500 border-t-4 border-orange-600 pt-1 hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-95 transition-transform w-full h-full" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">home</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Домой<br></span>
+</button>
+<!-- Money -->
+<button class="flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 pt-2 border-t-4 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-95 transition-transform w-full h-full" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">account_balance</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Деньги</span>
+</button>
+<!-- Profile -->
+<button class="flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 pt-2 border-t-4 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-95 transition-transform w-full h-full" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">account_circle</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Профиль<br></span>
+</button>
+</nav>
+</body></html>

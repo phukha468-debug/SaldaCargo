@@ -13,7 +13,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "gen:types": "supabase gen types typescript --local > packages/shared-types/src/database.types.ts",
-    "seed:apply": "tsx scripts/seed-from-md.ts",
+    "seed:generate": "tsx scripts/generate-seed-from-md.ts",
+    "seed:apply": "tsx scripts/apply-seed.ts",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -24,6 +25,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.2.5",
+    "supabase": "^2.95.6",
     "tsx": "^4.7.1",
     "turbo": "^2.0.3",
     "typescript": "^5.4.5"

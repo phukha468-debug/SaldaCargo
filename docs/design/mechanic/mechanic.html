@@ -1,0 +1,235 @@
+<!DOCTYPE html><html lang="ru"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Mechanic Home Screen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#c6c6c9",
+                        "on-tertiary-fixed-variant": "#44474a",
+                        "on-secondary-fixed": "#1a1c1e",
+                        "tertiary-fixed-dim": "#c4c7ca",
+                        "secondary-container": "#e2e2e5",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#e7e8e9",
+                        "on-secondary-container": "#636467",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#a04100",
+                        "primary-container": "#ff6b00",
+                        "on-tertiary-container": "#2e3134",
+                        "on-secondary-fixed-variant": "#454749",
+                        "surface-bright": "#f8f9fa",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#e2e2e5",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "tertiary-container": "#97999c",
+                        "background": "#f8f9fa",
+                        "primary": "#a04100",
+                        "tertiary": "#5c5f62",
+                        "surface-dim": "#d9dadb",
+                        "outline-variant": "#e2bfb0",
+                        "on-primary-fixed": "#351000",
+                        "error-container": "#ffdad6",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed-dim": "#ffb693",
+                        "inverse-primary": "#ffb693",
+                        "outline": "#8e7164",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "tertiary-fixed": "#e1e2e6",
+                        "on-background": "#191c1d",
+                        "inverse-surface": "#2e3132",
+                        "surface": "#f8f9fa",
+                        "on-surface-variant": "#5a4136",
+                        "inverse-on-surface": "#f0f1f2",
+                        "surface-container-low": "#f3f4f5",
+                        "on-surface": "#191c1d",
+                        "surface-container-highest": "#e1e3e4",
+                        "surface-container": "#edeeef",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed": "#191c1f",
+                        "surface-variant": "#e1e3e4",
+                        "secondary": "#5d5e61",
+                        "primary-fixed": "#ffdbcc",
+                        "on-primary-container": "#572000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "unit": "8px",
+                        "container-padding": "20px",
+                        "touch-target-min": "48px",
+                        "gutter": "16px",
+                        "margin-tablet": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
+                        "body-lg": ["Inter", "sans-serif"],
+                        "label-md": ["Inter", "sans-serif"],
+                        "h2": ["Inter", "sans-serif"],
+                        "h1": ["Inter", "sans-serif"],
+                        "label-sm": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0", "fontWeight": "400" }],
+                        "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "26px", "letterSpacing": "0", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "h2": ["20px", { "lineHeight": "28px", "letterSpacing": "0", "fontWeight": "600" }],
+                        "h1": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased min-h-screen pb-[160px] pt-[64px]">
+<!-- TopAppBar from JSON -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 h-16 bg-surface-container-lowest border-b-2 border-surface-variant flat no shadows font-['Inter'] font-bold uppercase tracking-wider">
+<div class="flex items-center gap-unit">
+<div class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant" style="font-variation-settings: &quot;FILL&quot; 1;">account_circle</span>
+</div>
+<span class="text-xl font-black text-on-surface" style="">SaldaCargo</span>
+</div>
+<div class="text-primary hover:bg-surface-container active:opacity-80 transition-all p-2 rounded-DEFAULT cursor-pointer">
+<span class="material-symbols-outlined" style="">signal_cellular_4_bar</span>
+</div>
+</header>
+<main class="p-margin-mobile md:p-margin-tablet max-w-4xl mx-auto space-y-gutter">
+<!-- Order Header Sub-Bar -->
+<div class="bg-surface-container-lowest border border-surface-variant p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-unit">
+<div class="flex flex-col">
+<span class="font-h2 text-h2 text-on-surface" style="">Наряд №142</span>
+<span class="font-body-md text-body-md text-on-surface-variant" style="">Газель 099 · одометр 340 580</span>
+</div>
+<span class="bg-error-container text-on-error-container font-label-sm text-label-sm px-3 py-1 rounded-full uppercase tracking-wider self-start md:self-center" style="">Активный</span>
+</div>
+<!-- Timer Card (High Priority) -->
+<div class="bg-surface-container-lowest border-2 border-primary rounded-lg p-6 flex flex-col items-center justify-center gap-4 text-center">
+<div class="flex flex-col items-center">
+<span class="font-label-md text-label-md text-primary uppercase tracking-wider mb-1" style="">Идёт работа</span>
+<span class="font-h1 text-h1 text-on-surface" style="">Замена сцепления</span>
+<span class="font-display text-display text-primary mt-2 font-mono" style="">1ч 23м</span>
+</div>
+<div class="flex w-full gap-gutter mt-2">
+<button class="flex-1 bg-surface-container border border-surface-variant text-on-surface font-label-md text-label-md min-h-[touch-target-min] rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-surface-variant transition-colors active:scale-95" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">pause</span>
+                    Пауза
+                </button>
+<button class="flex-1 bg-secondary text-on-secondary font-label-md text-label-md min-h-[touch-target-min] rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-tertiary transition-colors active:scale-95" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">stop</span>
+                    Стоп
+                </button>
+</div>
+</div>
+<!-- Works List -->
+<section class="space-y-unit">
+<h2 class="font-h2 text-h2 text-on-surface" style="">Список работ</h2>
+<div class="bg-surface-container-lowest border border-surface-variant rounded-lg p-4 flex flex-col gap-2 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex justify-between items-start pl-2">
+<span class="font-h2 text-h2 text-on-surface" style="">Замена сцепления</span>
+<span class="bg-primary text-on-primary font-label-sm text-label-sm px-2 py-1 rounded-DEFAULT" style="">В работе</span>
+</div>
+<div class="pl-2 flex flex-col sm:flex-row sm:items-center gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="" style="">Норма: 240 мин</span>
+<span class="hidden sm:inline text-surface-variant" style="">|</span>
+<span class="" style="">Факт: 1ч 23м</span>
+</div>
+</div>
+</section>
+<!-- Parts List (Empty State) -->
+<section class="space-y-unit">
+<h2 class="font-h2 text-h2 text-on-surface" style="">Запчасти и материалы</h2>
+<div class="border-2 border-dashed border-surface-variant rounded-lg p-8 flex flex-col items-center justify-center text-center gap-2 bg-surface">
+<span class="material-symbols-outlined text-tertiary-container text-4xl" style="">inventory_2</span>
+<span class="font-body-lg text-body-lg text-on-surface-variant" style="">Запчасти не списаны</span>
+</div>
+</section>
+<!-- Action Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-gutter mt-margin-tablet">
+<button class="border-2 border-secondary text-secondary font-label-md text-label-md min-h-[touch-target-min] rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-surface-container transition-colors active:scale-95" style="">
+<span class="material-symbols-outlined" style="">add</span>
+                Добавить работу
+            </button>
+<button class="border-2 border-secondary text-secondary font-label-md text-label-md min-h-[touch-target-min] rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-surface-container transition-colors active:scale-95" style="">
+<span class="material-symbols-outlined" style="">add</span>
+                Запчасть со склада
+            </button>
+<button class="border-2 border-secondary text-secondary font-label-md text-label-md min-h-[touch-target-min] rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-surface-container transition-colors active:scale-95" style="">
+<span class="material-symbols-outlined" style="">photo_camera</span>
+                Найден дефект
+            </button>
+</div>
+</main>
+<!-- Floating Action Button for Barcode (as per style guidance) -->
+<button class="fixed bottom-[100px] right-margin-mobile w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:bg-surface-tint active:scale-95 transition-all z-40" style="">
+<span class="material-symbols-outlined" style="">qr_code_scanner</span>
+</button>
+<!-- Bottom Action Bar (Massive Finish Button) -->
+<div class="fixed bottom-20 left-0 w-full px-margin-mobile bg-background pb-4 z-40">
+<button class="w-full bg-primary text-on-primary font-h2 text-h2 min-h-[64px] rounded-lg flex items-center justify-center gap-2 hover:bg-surface-tint transition-colors active:scale-95 shadow-md" style="">
+<span class="material-symbols-outlined" style="">sports_score</span>
+            Завершить наряд
+        </button>
+</div>
+<!-- BottomNavBar from JSON -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-2 bg-surface-container-lowest border-t-2 border-surface-variant flat no shadows">
+<!-- Home (Active) -->
+<a class="flex flex-col items-center justify-center text-primary border-t-4 border-primary pt-1 w-full h-full active:scale-95 transition-transform" href="#" style="">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">home</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Домой</span>
+</a>
+<!-- Orders (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 w-full h-full hover:text-on-surface active:scale-95 transition-transform" href="#" style="">
+<span class="material-symbols-outlined" style="">build</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Заказы</span>
+</a>
+<!-- Warehouse (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 w-full h-full hover:text-on-surface active:scale-95 transition-transform" href="#" style="">
+<span class="material-symbols-outlined" style="">inventory_2</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Склад<br></span>
+</a>
+<!-- Profile (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 w-full h-full hover:text-on-surface active:scale-95 transition-transform" href="#" style="">
+<span class="material-symbols-outlined" style="">account_circle</span>
+<span class="font-['Inter'] font-bold text-[12px] mt-1" style="">Профиль</span>
+</a>
+</nav>
+</body></html>

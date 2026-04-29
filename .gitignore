@@ -38,6 +38,8 @@ yarn-error.log*
 .supabase/
 supabase/.branches/
 supabase/.temp/
+supabase/seed/01-people.sql
+supabase/seed/02-fleet.sql
 
 # Testing
 coverage/
