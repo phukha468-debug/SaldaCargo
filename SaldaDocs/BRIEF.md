@@ -80,14 +80,11 @@ SaldaCargo — система учёта транспортного бизнес
 - [x] БД инициализирована (22 таблицы, RLS, pg_cron, seed data)
 - [x] Монорепо создано (apps/web + apps/miniapp + packages)
 - [x] docs/ заполнены
-- [x] Supabase клиент подключён (003)
-- [x] Setup Wizard (004)
-- [x] Главная страница / Money Map (005)
-- [x] Mini App водителя — рейсы (006)
+- [x] Авторизация Web (magic-link) и MiniApp (MAX OAuth) (010)
 
 ### В работе:
 
-- [ ] Ревью смены в Dashboard (007)
+- [ ] Главный экран водителя (011)
 
 ### Следующие шаги:
 
