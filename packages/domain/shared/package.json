@@ -1,0 +1,22 @@
+﻿{
+    "scripts":  {
+                    "lint":  "eslint src/",
+                    "typecheck":  "tsc --noEmit"
+                },
+    "devDependencies":  {
+                            "@types/uuid":  "^9.0.0",
+                            "typescript":  "^5.4.5"
+                        },
+    "types":  "./src/index.ts",
+    "version":  "0.1.0",
+    "name":  "@saldacargo/shared",
+    "private":  true,
+    "exports":  {
+                    ".":  "./src/index.ts"
+                },
+    "main":  "./src/index.ts",
+    "dependencies":  {
+                         "@saldacargo/shared-types":  "workspace:*",
+                         "uuid":  "^9.0.0"
+                     }
+}
