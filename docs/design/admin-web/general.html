@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+
+<html lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#fcf8fa",
+                    "surface-dim": "#dcd9db",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#3a485c",
+                    "inverse-surface": "#303032",
+                    "on-tertiary-fixed-variant": "#574425",
+                    "surface-container": "#f0edef",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed": "#d5e3fd",
+                    "surface-container-highest": "#e4e2e4",
+                    "on-error-container": "#93000a",
+                    "surface": "#fcf8fa",
+                    "tertiary-fixed": "#fcdeb5",
+                    "surface-variant": "#e4e2e4",
+                    "tertiary-fixed-dim": "#dec29a",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-container": "#57657b",
+                    "on-background": "#1b1b1d",
+                    "inverse-primary": "#bec6e0",
+                    "error-container": "#ffdad6",
+                    "on-surface-variant": "#45464d",
+                    "primary-fixed": "#dae2fd",
+                    "primary": "#000000",
+                    "secondary-fixed-dim": "#b9c7e0",
+                    "outline": "#76777d",
+                    "on-surface": "#1b1b1d",
+                    "primary-container": "#131b2e",
+                    "outline-variant": "#c6c6cd",
+                    "on-tertiary-fixed": "#271901",
+                    "secondary-container": "#d5e3fd",
+                    "surface-tint": "#565e74",
+                    "on-secondary-fixed": "#0d1c2f",
+                    "tertiary-container": "#271901",
+                    "on-error": "#ffffff",
+                    "on-tertiary-container": "#98805d",
+                    "secondary": "#515f74",
+                    "on-primary-fixed": "#131b2e",
+                    "primary-fixed-dim": "#bec6e0",
+                    "on-tertiary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "background": "#fcf8fa",
+                    "on-primary-container": "#7c839b",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "surface-container-low": "#f6f3f5",
+                    "inverse-on-surface": "#f3f0f2",
+                    "surface-container-high": "#eae7e9",
+                    "tertiary": "#000000"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "container-padding": "24px",
+                    "input-padding-y": "8px",
+                    "card-gap": "20px",
+                    "gutter": "16px",
+                    "input-padding-x": "12px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "h3": ["Inter"],
+                    "h2": ["Inter"],
+                    "body-md": ["Inter"],
+                    "data-mono": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "h1": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "h3": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "h2": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "h1": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface-bright text-on-surface min-h-screen">
+<!-- TopNavBar (Global Navigation Shell) -->
+<header class="bg-white sticky top-0 z-50 border-b border-slate-200">
+<div class="flex justify-between items-center w-full px-6 h-16 max-w-[1920px] mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tight text-slate-900">SaldaCargo</span>
+<nav class="hidden md:flex gap-6 h-16 items-center">
+<!-- Главная is Active -->
+<a class="font-sans antialiased text-sm font-medium text-slate-900 border-b-2 border-slate-900 pb-4 mt-4" href="#">Главная</a>
+<a class="font-sans antialiased text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 mt-4 transition-colors" href="#">Ревью</a>
+<a class="font-sans antialiased text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 mt-4 transition-colors" href="#">Автопарк</a>
+<a class="font-sans antialiased text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 mt-4 transition-colors" href="#">Гараж</a>
+<a class="font-sans antialiased text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 mt-4 transition-colors" href="#">Финансы</a>
+<a class="font-sans antialiased text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 mt-4 transition-colors" href="#">Персонал</a>
+<a class="font-sans antialiased text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 mt-4 transition-colors" href="#">Настройки</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<input class="bg-slate-50 border-slate-200 rounded text-sm px-4 py-2 w-64 focus:ring-1 focus:ring-primary focus:outline-none" placeholder="Поиск по системе..." type="text"/>
+</div>
+<button class="p-2 hover:bg-slate-50 rounded-full transition-colors">
+<span class="material-symbols-outlined text-slate-600">notifications</span>
+</button>
+<div class="flex items-center gap-2 pl-4 border-l border-slate-200">
+<div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+<img alt="User profile" data-alt="professional male executive in a corporate setting, clean lighting, minimalist background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8ZDwxBmlssSnYbW-FCsafqIYjVEm32IYJBoN66XDOCKtHI5V6UPze5fGzftQ9SAzvW06zd3Hy4PoV2Jj9Z6TY1bM48Wx_jGQLzn7FuiAAjAfFbc5CQpl_ON2YLFUMtbZnCcIHb2dsGD39qkzARAItf7kCCH290dB1K2v7I8X2iESEnVa-2LGDG8NjCJi-VGmBgU_QTIe1pxFgz8tgWrrR95jWzbTBZiczMVQPUV1hUok2qnISCFVuCTkQW9WqTNNf7wNBpnlK"/>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Filters Sub-header -->
+<section class="bg-slate-50 border-b border-slate-200 sticky top-16 z-40">
+<div class="flex items-center w-full px-6 h-10 max-w-[1920px] mx-auto gap-4">
+<span class="font-sans text-xs uppercase tracking-wider text-emerald-600 font-bold cursor-pointer">Текущий месяц</span>
+<span class="font-sans text-xs uppercase tracking-wider text-slate-500 hover:text-slate-900 cursor-pointer">Прошлый месяц</span>
+<span class="font-sans text-xs uppercase tracking-wider text-slate-500 hover:text-slate-900 cursor-pointer">Квартал</span>
+<div class="ml-auto flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="font-sans text-xs uppercase tracking-wider text-slate-600 font-bold">Online</span>
+</div>
+</div>
+</section>
+<main class="max-w-[1920px] mx-auto p-6 space-y-6">
+<!-- Section 1: Top KPI Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+<!-- Card 1: Revenue -->
+<div class="bg-white border border-slate-200 p-5 rounded-lg">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-caps font-label-caps text-slate-500">ВЫРУЧКА</span>
+<span class="text-body-sm font-body-sm text-emerald-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-[16px] mr-1">trending_up</span> +12.5%
+                    </span>
+</div>
+<div class="text-h2 font-h2 text-slate-900">12 450 000 ₽</div>
+<div class="mt-4 h-12 w-full flex items-end gap-1">
+<!-- Sparkline Mockup -->
+<div class="bg-slate-100 w-full h-4 rounded-t-sm"></div>
+<div class="bg-slate-100 w-full h-6 rounded-t-sm"></div>
+<div class="bg-slate-200 w-full h-5 rounded-t-sm"></div>
+<div class="bg-emerald-100 w-full h-8 rounded-t-sm"></div>
+<div class="bg-emerald-200 w-full h-10 rounded-t-sm"></div>
+<div class="bg-emerald-300 w-full h-12 rounded-t-sm"></div>
+</div>
+</div>
+<!-- Card 2: Expenses -->
+<div class="bg-white border border-slate-200 p-5 rounded-lg">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-caps font-label-caps text-slate-500">РАСХОДЫ</span>
+<span class="text-body-sm font-body-sm text-rose-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-[16px] mr-1">trending_up</span> +4.2%
+                    </span>
+</div>
+<div class="text-h2 font-h2 text-slate-900">8 120 400 ₽</div>
+<div class="mt-4 h-12 w-full flex items-end gap-1">
+<div class="bg-slate-100 w-full h-10 rounded-t-sm"></div>
+<div class="bg-slate-100 w-full h-8 rounded-t-sm"></div>
+<div class="bg-rose-100 w-full h-9 rounded-t-sm"></div>
+<div class="bg-rose-200 w-full h-11 rounded-t-sm"></div>
+<div class="bg-rose-300 w-full h-7 rounded-t-sm"></div>
+<div class="bg-slate-200 w-full h-10 rounded-t-sm"></div>
+</div>
+</div>
+<!-- Card 3: Profit -->
+<div class="bg-white border border-slate-200 p-5 rounded-lg">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-caps font-label-caps text-slate-500">ПРИБЫЛЬ</span>
+<span class="text-body-sm font-body-sm text-emerald-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-[16px] mr-1">trending_up</span> +28.1%
+                    </span>
+</div>
+<div class="text-h2 font-h2 text-slate-900">4 329 600 ₽</div>
+<div class="mt-4 h-12 w-full flex items-end gap-1">
+<div class="bg-emerald-50 w-full h-4 rounded-t-sm"></div>
+<div class="bg-emerald-100 w-full h-6 rounded-t-sm"></div>
+<div class="bg-emerald-200 w-full h-7 rounded-t-sm"></div>
+<div class="bg-emerald-300 w-full h-9 rounded-t-sm"></div>
+<div class="bg-emerald-400 w-full h-10 rounded-t-sm"></div>
+<div class="bg-emerald-500 w-full h-12 rounded-t-sm"></div>
+</div>
+</div>
+<!-- Card 4: Progress -->
+<div class="bg-white border border-slate-200 p-5 rounded-lg">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-caps font-label-caps text-slate-500">ПРОГРЕСС ЦЕЛИ</span>
+<span class="text-body-sm font-body-sm text-slate-500 font-medium">82%</span>
+</div>
+<div class="text-h2 font-h2 text-slate-900">15 000 000 ₽</div>
+<div class="mt-6 w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[82%]"></div>
+</div>
+<p class="text-body-sm font-body-sm text-slate-400 mt-2">Осталось 2 550 000 ₽ до KPI</p>
+</div>
+</div>
+<!-- Section 2: Alerts Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+<!-- Critical -->
+<div class="bg-rose-50 border border-rose-100 p-4 rounded flex gap-4">
+<div class="bg-rose-200 text-rose-700 w-10 h-10 flex items-center justify-center rounded shrink-0">
+<span class="material-symbols-outlined">warning</span>
+</div>
+<div>
+<h4 class="font-h3 text-rose-900 text-sm">Критическая дебиторка</h4>
+<p class="text-body-sm text-rose-700 opacity-80">ООО "Логист+" просрочка 14 дней на 1.2M ₽</p>
+</div>
+</div>
+<!-- Warning -->
+<div class="bg-amber-50 border border-amber-100 p-4 rounded flex gap-4">
+<div class="bg-amber-200 text-amber-700 w-10 h-10 flex items-center justify-center rounded shrink-0">
+<span class="material-symbols-outlined">pending_actions</span>
+</div>
+<div>
+<h4 class="font-h3 text-amber-900 text-sm">3 рейса ждут ревью</h4>
+<p class="text-body-sm text-amber-700 opacity-80">Требуется подтверждение документов</p>
+</div>
+</div>
+<!-- Info -->
+<div class="bg-sky-50 border border-sky-100 p-4 rounded flex gap-4">
+<div class="bg-sky-200 text-sky-700 w-10 h-10 flex items-center justify-center rounded shrink-0">
+<span class="material-symbols-outlined">info</span>
+</div>
+<div>
+<h4 class="font-h3 text-sky-900 text-sm">ТО через 500 км</h4>
+<p class="text-body-sm text-sky-700 opacity-80">Для 5 единиц техники Scania R450</p>
+</div>
+</div>
+</div>
+<!-- Section 3: Net Position & Today Summary -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left: Net Position (8 columns) -->
+<div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Assets Card -->
+<div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+<div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+<span class="text-label-caps font-label-caps text-slate-700">АКТИВЫ</span>
+<span class="text-h3 font-h3 text-emerald-600">45 200 000 ₽</span>
+</div>
+<div class="p-0">
+<table class="w-full text-left">
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">account_balance_wallet</span>
+                                        Деньги (все счета)
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">12 400 000 ₽</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">local_shipping</span>
+                                        Автопарк (оценка)
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">28 000 000 ₽</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">inventory_2</span>
+                                        Склад (запчасти)
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">1 300 000 ₽</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">request_quote</span>
+                                        Дебиторка
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">3 500 000 ₽</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Liabilities Card -->
+<div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+<div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+<span class="text-label-caps font-label-caps text-slate-700">ПАССИВЫ</span>
+<span class="text-h3 font-h3 text-rose-600">18 450 000 ₽</span>
+</div>
+<div class="p-0">
+<table class="w-full text-left">
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">credit_card</span>
+                                        Кредиторка
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">12 000 000 ₽</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">group</span>
+                                        ЗП (фонд выплат)
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">4 200 000 ₽</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-600 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">account_balance</span>
+                                        Налоги (прогноз)
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-900 font-semibold">2 250 000 ₽</td>
+</tr>
+<tr class="bg-slate-50/30">
+<td class="px-5 py-3 text-body-md font-body-md text-slate-400 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-300 text-[18px]">lock</span>
+                                        Прочее
+                                    </td>
+<td class="px-5 py-3 text-data-mono font-data-mono text-right text-slate-400 italic">данные уточняются</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right: Today Summary (4 columns) -->
+<div class="lg:col-span-4 space-y-6">
+<div class="bg-white border border-slate-200 rounded-lg p-5">
+<h3 class="text-h3 font-h3 text-slate-900 mb-4">Выручка по часам (Сегодня)</h3>
+<!-- Bar Chart Mockup (Tremor style) -->
+<div class="flex items-end justify-between h-48 gap-2 pt-4">
+<div class="flex flex-col items-center flex-1">
+<div class="bg-slate-100 w-full h-8 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">09</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<div class="bg-slate-200 w-full h-16 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">10</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<div class="bg-primary w-full h-24 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">11</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<div class="bg-primary w-full h-40 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">12</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<div class="bg-primary w-full h-32 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">13</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<div class="bg-slate-100 w-full h-12 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">14</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<div class="bg-slate-50 w-full h-6 rounded-sm"></div>
+<span class="text-[10px] text-slate-400 mt-2">15</span>
+</div>
+</div>
+<div class="mt-6 pt-6 border-t border-slate-100 space-y-3">
+<div class="flex justify-between items-center">
+<span class="text-body-sm text-slate-500">Всего за сегодня</span>
+<span class="text-body-md font-bold text-slate-900">842 000 ₽</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-body-sm text-slate-500">Заказов исполнено</span>
+<span class="text-body-md font-bold text-slate-900">42 рейса</span>
+</div>
+</div>
+</div>
+<!-- Secondary Summary Action -->
+<div class="bg-primary-container text-white p-5 rounded-lg flex flex-col justify-between h-[140px] relative overflow-hidden">
+<div class="z-10">
+<h4 class="font-h3 text-white">Новый рейс</h4>
+<p class="text-body-sm text-on-primary-container opacity-80 mt-1">Оформить путевой лист за 2 минуты</p>
+</div>
+<button class="z-10 bg-white text-primary px-4 py-2 rounded text-sm font-bold self-start mt-4 hover:bg-slate-100 transition-colors">
+                        Создать сейчас
+                    </button>
+<!-- Background Decoration -->
+<span class="material-symbols-outlined absolute -right-4 -bottom-4 text-[120px] opacity-10">add_task</span>
+</div>
+</div>
+</div>
+<!-- Latest Transactions Table (Bento Grid Style) -->
+<div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white">
+<h3 class="text-h3 font-h3 text-slate-900">Последние операции</h3>
+<button class="text-body-sm font-medium text-slate-500 hover:text-primary transition-colors flex items-center gap-1">
+                    Все транзакции <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-slate-50 border-b border-slate-200">
+<tr>
+<th class="px-6 py-3 text-label-caps font-label-caps text-slate-500 uppercase">Дата</th>
+<th class="px-6 py-3 text-label-caps font-label-caps text-slate-500 uppercase">Описание</th>
+<th class="px-6 py-3 text-label-caps font-label-caps text-slate-500 uppercase">Категория</th>
+<th class="px-6 py-3 text-label-caps font-label-caps text-slate-500 uppercase text-right">Сумма</th>
+<th class="px-6 py-3 text-label-caps font-label-caps text-slate-500 uppercase text-right">Статус</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-data-mono text-slate-500">14:24 Сегодня</td>
+<td class="px-6 py-4">
+<div class="text-body-md font-medium text-slate-900">Заправка топливом (Лукойл-23)</div>
+<div class="text-body-sm text-slate-500">Scania A777AA 199</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[11px] font-bold uppercase tracking-wider">Топливо</span>
+</td>
+<td class="px-6 py-4 text-right text-rose-600 font-semibold">-42 500,00 ₽</td>
+<td class="px-6 py-4 text-right">
+<span class="px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-[11px] font-bold">УСПЕШНО</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-data-mono text-slate-500">12:05 Сегодня</td>
+<td class="px-6 py-4">
+<div class="text-body-md font-medium text-slate-900">Оплата рейса #44590</div>
+<div class="text-body-sm text-slate-500">ООО "Агро-Продукт"</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[11px] font-bold uppercase tracking-wider">Выручка</span>
+</td>
+<td class="px-6 py-4 text-right text-emerald-600 font-semibold">+180 000,00 ₽</td>
+<td class="px-6 py-4 text-right">
+<span class="px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-[11px] font-bold">УСПЕШНО</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-data-mono text-slate-500">Вчера</td>
+<td class="px-6 py-4">
+<div class="text-body-md font-medium text-slate-900">Запчасти: Тормозные колодки</div>
+<div class="text-body-sm text-slate-500">Склад Москва-Юг</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[11px] font-bold uppercase tracking-wider">Запчасти</span>
+</td>
+<td class="px-6 py-4 text-right text-rose-600 font-semibold">-12 800,00 ₽</td>
+<td class="px-6 py-4 text-right">
+<span class="px-2 py-1 bg-amber-50 text-amber-700 rounded text-[11px] font-bold">В ОБРАБОТКЕ</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+<!-- Floating Action Suppressed per Guidelines (Transactional Context) -->
+<footer class="mt-12 mb-8 px-6 max-w-[1920px] mx-auto text-center">
+<p class="text-body-sm text-slate-400">© 2024 SaldaCargo ERP. Системный мониторинг логистических процессов.</p>
+</footer>
+</body></html>

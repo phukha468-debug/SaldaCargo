@@ -426,8 +426,8 @@ curl -H "Authorization: Bearer $ANON_KEY" http://localhost:3000/api/trips
 ## COMPLETION LOG
 
 **Статус:** _pending_
-**Исполнитель:** **_
-**Время фактическое:** _**
+**Исполнитель:** **\_
+**Время фактическое:** \_**
 **Что сделано:**
 
 - [ ] /apps/web/app/api/trips/route.ts (GET + POST)

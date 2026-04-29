@@ -1,0 +1,402 @@
+<!DOCTYPE html><html lang="ru"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#fcf8fa",
+                        "surface-dim": "#dcd9db",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed-variant": "#3a485c",
+                        "inverse-surface": "#303032",
+                        "on-tertiary-fixed-variant": "#574425",
+                        "surface-container": "#f0edef",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#d5e3fd",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-error-container": "#93000a",
+                        "surface": "#fcf8fa",
+                        "tertiary-fixed": "#fcdeb5",
+                        "surface-variant": "#e4e2e4",
+                        "tertiary-fixed-dim": "#dec29a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-container": "#57657b",
+                        "on-background": "#1b1b1d",
+                        "inverse-primary": "#bec6e0",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#45464d",
+                        "primary-fixed": "#dae2fd",
+                        "primary": "#000000",
+                        "secondary-fixed-dim": "#b9c7e0",
+                        "outline": "#76777d",
+                        "on-surface": "#1b1b1d",
+                        "primary-container": "#131b2e",
+                        "outline-variant": "#c6c6cd",
+                        "on-tertiary-fixed": "#271901",
+                        "secondary-container": "#d5e3fd",
+                        "surface-tint": "#565e74",
+                        "on-secondary-fixed": "#0d1c2f",
+                        "tertiary-container": "#271901",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#98805d",
+                        "secondary": "#515f74",
+                        "on-primary-fixed": "#131b2e",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "background": "#fcf8fa",
+                        "on-primary-container": "#7c839b",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface-container-low": "#f6f3f5",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontSize": {
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "h3": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "h2": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "h1": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface-bright min-h-screen text-on-surface antialiased">
+<!-- TopNavBar (Shared Component 1) -->
+<header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
+<div class="flex justify-between items-center w-full px-6 h-16 max-w-[1920px] mx-auto">
+<div class="text-xl font-bold tracking-tight text-slate-900 dark:text-white" style="">SaldaCargo</div>
+<nav class="hidden md:flex gap-8 h-full items-center">
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 pb-4 h-full flex items-center translate-y-2" href="#" style="">Главная</a>
+<a class="text-slate-900 dark:text-white border-b-2 border-slate-900 dark:border-white pb-4 h-full flex items-center translate-y-2" href="#" style="">Ревью</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 pb-4 h-full flex items-center translate-y-2" href="#" style="">Автопарк</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 pb-4 h-full flex items-center translate-y-2" href="#" style="">Гараж</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 pb-4 h-full flex items-center translate-y-2" href="#" style="">Финансы</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 pb-4 h-full flex items-center translate-y-2" href="#" style="">Персонал</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 pb-4 h-full flex items-center translate-y-2" href="#" style="">Настройки</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-slate-500" data-icon="notifications" style="">notifications</button>
+<div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+<img alt="User profile with dropdown" data-alt="Professional headshot of a logistics manager in a clean office setting, soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKjdbuAumzjHAhKHYl-D1hNP8W4ZjlkkVpjG8pD1KrW-t4ymVN0gNRWf-fWO6Ul5bc9Ru3Etg7PkTOH8Ffv4w98is6k7j0DHS4th4ZHaa063Wbu2WXfoVbc_0oIjRNUZ4ZJMImz19RX1i9GIz3S5bUnddLM5SrNnjZKCtCDycBgDQQjo0M0VC1ch1zMrQYhX3ySqVgjTNuyYsckS-YYq_XhJWe0QZm-2PenqMQ2PgO4aDmWKQcz45DbSAXTRUQpBuRM9zk9s3I" class="" style="">
+</div>
+</div>
+</div>
+</header>
+<!-- Filters / Secondary Nav (Shared Component 2) -->
+<div class="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 sticky top-16 z-40">
+<div class="flex items-center w-full px-6 h-10 max-w-[1920px] mx-auto gap-6">
+<div class="text-emerald-600 dark:text-emerald-400 font-bold font-label-caps text-xs uppercase tracking-wider cursor-pointer" style="">Текущий месяц</div>
+<div class="flex-grow"></div>
+<div class="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-label-caps text-xs uppercase tracking-wider" style="">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                Online
+            </div>
+</div>
+</div>
+<main class="max-w-[1920px] mx-auto p-6 space-y-6">
+<!-- Header Controls -->
+<div class="flex items-end justify-between border-b border-outline-variant pb-4">
+<div class="flex gap-1">
+<button class="px-6 py-2 bg-primary text-on-primary font-h3 text-h3 rounded-t-lg border-b-2 border-primary" style="">Рейсы водителей</button>
+<button class="px-6 py-2 text-on-surface-variant font-h3 text-h3 hover:bg-surface-container transition-colors rounded-t-lg" style="">Наряды механиков</button>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded shadow-sm hover:bg-emerald-700 transition-colors font-h3 text-h3" style="">
+<span class="material-symbols-outlined" data-icon="check_circle" style="">check_circle</span>
+                    Утвердить всё
+                </button>
+</div>
+</div>
+<!-- Shift Cards Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+<!-- Card 1: Active Content -->
+<div class="bg-white border border-slate-200 rounded shadow-none overflow-hidden flex flex-col">
+<div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="local_shipping" style="">local_shipping</span>
+<h2 class="font-h2 text-h2 text-slate-900" style="">🚚 Газель 866 · Вова + Серёга</h2>
+</div>
+<span class="px-2 py-1 bg-slate-200 text-slate-700 text-label-caps font-label-caps rounded uppercase" style="">Смена #4421</span>
+</div>
+<div class="p-0 overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-slate-50/50 border-b border-slate-200">
+<tr>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider" style="">Клиент</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">Сумма</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">ЗП вод.</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-center" style="">%&nbsp;</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">ЗП груз.</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider" style="">Оплата</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="p-3 font-body-md text-body-md" style="">ООО "Вектор"</td>
+<td class="p-3 font-data-mono text-data-mono text-right" style="">12 400,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">2 480,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-center" style="">20%</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">1 200,00 ₽</td>
+<td class="p-3 font-body-sm text-body-sm text-slate-500" style="">Расч. счет</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="p-3 font-body-md text-body-md" style="">ИП Соколов (Кв. переезд)</td>
+<td class="p-3 font-data-mono text-data-mono text-right" style="">4 500,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">900,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-center" style="">20%</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">450,00 ₽</td>
+<td class="p-3 font-body-sm text-body-sm text-slate-500" style="">Наличные</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="p-3 font-body-md text-body-md" style="">Доставка Леруа</td>
+<td class="p-3 font-data-mono text-data-mono text-right" style="">8 200,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">1 640,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-center" style="">20%</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">800,00 ₽</td>
+<td class="p-3 font-body-sm text-body-sm text-slate-500" style="">Карта</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-auto border-t border-slate-200">
+<div class="grid grid-cols-5 p-4 bg-slate-50 gap-4 text-center">
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Выручка</div>
+<div class="font-h3 text-h3 text-slate-900" style="">25 100,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Итого ЗП</div>
+<div class="font-h3 text-h3 text-emerald-600" style="">7 470,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Топливо</div>
+<div class="font-h3 text-h3 text-rose-600" style="">3 200,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Прибыль</div>
+<div class="font-h3 text-h3 text-slate-900" style="">14 430,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Пробег</div>
+<div class="font-h3 text-h3 text-slate-900" style="">142 км</div>
+</div>
+</div>
+<div class="p-4 flex gap-2 border-t border-slate-200">
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-slate-300 rounded text-body-sm font-body-sm hover:bg-slate-50" style="">
+<span class="material-symbols-outlined text-slate-500" data-icon="photo_camera" style="">photo_camera</span>
+                            Фото одометров
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-body-sm font-body-sm hover:bg-emerald-100" style="">
+<span class="material-symbols-outlined" data-icon="check" style="">check</span>
+                            Утвердить
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded text-body-sm font-body-sm hover:bg-rose-100" style="">
+<span class="material-symbols-outlined" data-icon="undo" style="">undo</span>
+                            Вернуть
+                        </button>
+<button class="px-3 py-2 border border-slate-300 rounded text-slate-500 hover:bg-slate-50" style="">
+<span class="material-symbols-outlined" data-icon="edit" style="">edit</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Card 2: Skeleton Loader State -->
+<div class="bg-white border border-slate-200 rounded shadow-none overflow-hidden animate-pulse">
+<div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+<div class="h-6 w-48 bg-slate-200 rounded"></div>
+<div class="h-5 w-24 bg-slate-200 rounded"></div>
+</div>
+<div class="p-4 space-y-4">
+<div class="h-4 bg-slate-100 rounded w-full"></div>
+<div class="h-4 bg-slate-100 rounded w-full"></div>
+<div class="h-4 bg-slate-100 rounded w-3/4"></div>
+</div>
+<div class="mt-auto border-t border-slate-200 bg-slate-50 p-4 grid grid-cols-5 gap-4">
+<div class="h-10 bg-slate-200 rounded"></div>
+<div class="h-10 bg-slate-200 rounded"></div>
+<div class="h-10 bg-slate-200 rounded"></div>
+<div class="h-10 bg-slate-200 rounded"></div>
+<div class="h-10 bg-slate-200 rounded"></div>
+</div>
+<div class="p-4 flex gap-2">
+<div class="h-10 bg-slate-200 rounded flex-1"></div>
+<div class="h-10 bg-slate-200 rounded flex-1"></div>
+<div class="h-10 bg-slate-200 rounded flex-1"></div>
+</div>
+</div>
+<!-- Card 3: Detailed content -->
+<div class="bg-white border border-slate-200 rounded shadow-none overflow-hidden flex flex-col">
+<div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="local_shipping" style="">local_shipping</span>
+<h2 class="font-h2 text-h2 text-slate-900" style="">🚚 Ford Transit 902 · Андрей</h2>
+</div>
+<span class="px-2 py-1 bg-slate-200 text-slate-700 text-label-caps font-label-caps rounded uppercase" style="">Смена #4422</span>
+</div>
+<div class="p-0">
+<table class="w-full text-left border-collapse">
+<thead class="bg-slate-50/50 border-b border-slate-200">
+<tr>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider" style="">Клиент</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">Сумма</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">ЗП вод.</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">ЗП груз.</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider" style="">Оплата</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr>
+<td class="p-3 font-body-md text-body-md" style="">СберМаркет</td>
+<td class="p-3 font-data-mono text-data-mono text-right" style="">18 000,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">3 600,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-slate-400" style="">0,00 ₽</td>
+<td class="p-3 font-body-sm text-body-sm text-slate-500" style="">Безнал</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-auto border-t border-slate-200">
+<div class="grid grid-cols-5 p-4 bg-slate-50 gap-4 text-center">
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Выручка</div>
+<div class="font-h3 text-h3 text-slate-900" style="">18 000,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Итого ЗП</div>
+<div class="font-h3 text-h3 text-emerald-600" style="">3 600,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Топливо</div>
+<div class="font-h3 text-h3 text-rose-600" style="">2 150,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Прибыль</div>
+<div class="font-h3 text-h3 text-slate-900" style="">12 250,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Пробег</div>
+<div class="font-h3 text-h3 text-slate-900" style="">88 км</div>
+</div>
+</div>
+<div class="p-4 flex gap-2 border-t border-slate-200">
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-slate-300 rounded text-body-sm font-body-sm hover:bg-slate-50" style="">
+<span class="material-symbols-outlined text-slate-500" data-icon="photo_camera" style="">photo_camera</span>
+                            Фото одометров
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-body-sm font-body-sm hover:bg-emerald-100" style="">
+<span class="material-symbols-outlined" data-icon="check" style="">check</span>
+                            Утвердить
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded text-body-sm font-body-sm hover:bg-rose-100" style="">
+<span class="material-symbols-outlined" data-icon="undo" style="">undo</span>
+                            Вернуть
+                        </button>
+<button class="px-3 py-2 border border-slate-300 rounded text-slate-500 hover:bg-slate-50" style="">
+<span class="material-symbols-outlined" data-icon="edit" style="">edit</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Card 4: Multi-order shift -->
+<div class="bg-white border border-slate-200 rounded shadow-none overflow-hidden flex flex-col">
+<div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="local_shipping" style="">local_shipping</span>
+<h2 class="font-h2 text-h2 text-slate-900" style="">🚚 Камаз 001 · Димон</h2>
+</div>
+<span class="px-2 py-1 bg-slate-200 text-slate-700 text-label-caps font-label-caps rounded uppercase" style="">Смена #4423</span>
+</div>
+<div class="p-0">
+<table class="w-full text-left border-collapse">
+<thead class="bg-slate-50/50 border-b border-slate-200">
+<tr>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider" style="">Клиент</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">Сумма</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">ЗП вод.</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider text-right" style="">ЗП груз.</th>
+<th class="p-3 text-label-caps font-label-caps text-slate-500 uppercase tracking-wider" style="">Оплата</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr>
+<td class="p-3 font-body-md text-body-md" style="">ТехноСнаб</td>
+<td class="p-3 font-data-mono text-data-mono text-right" style="">45 000,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">9 000,00 ₽</td>
+<td class="p-3 font-data-mono text-data-mono text-right text-emerald-600" style="">3 000,00 ₽</td>
+<td class="p-3 font-body-sm text-body-sm text-slate-500" style="">Расч. счет</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-auto border-t border-slate-200">
+<div class="grid grid-cols-5 p-4 bg-slate-50 gap-4 text-center">
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Выручка</div>
+<div class="font-h3 text-h3 text-slate-900" style="">45 000,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Итого ЗП</div>
+<div class="font-h3 text-h3 text-emerald-600" style="">12 000,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Топливо</div>
+<div class="font-h3 text-h3 text-rose-600" style="">12 400,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Прибыль</div>
+<div class="font-h3 text-h3 text-slate-900" style="">20 600,00 ₽</div>
+</div>
+<div>
+<div class="text-label-caps font-label-caps text-slate-500 uppercase" style="">Пробег</div>
+<div class="font-h3 text-h3 text-slate-900" style="">420 км</div>
+</div>
+</div>
+<div class="p-4 flex gap-2 border-t border-slate-200">
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-slate-300 rounded text-body-sm font-body-sm hover:bg-slate-50" style="">
+<span class="material-symbols-outlined text-slate-500" data-icon="photo_camera" style="">photo_camera</span>
+                            Фото одометров
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-body-sm font-body-sm hover:bg-emerald-100" style="">
+<span class="material-symbols-outlined" data-icon="check" style="">check</span>
+                            Утвердить
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded text-body-sm font-body-sm hover:bg-rose-100" style="">
+<span class="material-symbols-outlined" data-icon="undo" style="">undo</span>
+                            Вернуть
+                        </button>
+<button class="px-3 py-2 border border-slate-300 rounded text-slate-500 hover:bg-slate-50" style="">
+<span class="material-symbols-outlined" data-icon="edit" style="">edit</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Map View Preview (Decorative/Auxiliary) -->
+</body></html>
