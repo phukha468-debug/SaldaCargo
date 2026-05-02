@@ -1,94 +1,59 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { NetworkIndicator } from '@saldacargo/ui';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 
-type AppState = 'loading' | 'unauthorized' | 'ready';
+export default function RootDispatcher() {
+  const router = useRouter();
 
-export default function MiniAppRoot() {
-  const [state, setState] = useState<AppState>('loading');
-  const [userName, setUserName] = useState('');
-  const [error, setError] = useState('');
+  const { data: user, isLoading, isError } = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const res = await fetch('/api/driver/me', { cache: 'no-store' }); // Общий эндпоинт для получения профиля
+      if (res.status === 401) {
+        throw new Error('Unauthorized');
+      }
+      if (!res.ok) throw new Error('Not authenticated');
+      return res.json();
+    },
+    retry: false,
+  });
 
   useEffect(() => {
-    // На MVP: симулируем получение max_user_id из МАХ SDK
-    // TODO: заменить на реальный MAX Mini App SDK вызов
-    const mockMaxUserId = new URLSearchParams(window.location.search).get('uid');
+    if (isLoading) return;
 
-    if (!mockMaxUserId) {
-      // В реальном МАХ окружении SDK всегда передаёт данные
-      // Здесь показываем экран ошибки только если совсем нет данных
-      setTimeout(() => {
-        setState('unauthorized');
-        setError('Откройте приложение через МАХ');
-      }, 0);
+    if (isError || !user) {
+      router.push('/login');
       return;
     }
 
-    fetch('/api/auth/max', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData: { max_user_id: mockMaxUserId } }),
-    })
-      .then((r) => r.json())
-      .then((data: { user?: { name: string }; error?: string }) => {
-        if (data.user) {
-          setUserName(data.user.name);
-          setState('ready');
-        } else {
-          setError(data.error ?? 'Ошибка');
-          setState('unauthorized');
-        }
-      })
-      .catch(() => {
-        setError('Нет соединения с сервером');
-        setState('unauthorized');
-      });
-  }, []);
+    const rawRoles = user.roles;
+    const roles = Array.isArray(rawRoles) ? rawRoles : [];
 
-  if (state === 'loading') {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-orange-50">
-        <div className="text-center">
-          <div className="text-3xl animate-spin mb-4">⚙️</div>
-          <p className="text-slate-600">Загрузка...</p>
-        </div>
-      </main>
-    );
-  }
+    console.log('[Dispatcher Debug] Processing roles:', roles, 'for user:', user.name);
 
-  if (state === 'unauthorized') {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-orange-50 p-6">
-        <div className="text-center">
-          <div className="text-4xl mb-4">🚫</div>
-          <h1 className="text-xl font-bold text-slate-900">Доступ запрещён</h1>
-          <p className="mt-2 text-slate-600">{error}</p>
-          <p className="mt-4 text-sm text-slate-400">Обратитесь к администратору</p>
-        </div>
-      </main>
-    );
-  }
+    if (roles.includes('admin') || roles.includes('owner')) {
+      console.log('[Dispatcher] Redirecting to /admin');
+      router.push('/admin');
+    } else if (roles.includes('mechanic') || roles.includes('mechanic_lead')) {
+      console.log('[Dispatcher] Redirecting to /mechanic');
+      router.push('/mechanic');
+    } else if (roles.includes('driver')) {
+      console.log('[Dispatcher] Redirecting to /driver');
+      router.push('/driver');
+    } else {
+      console.warn('[Dispatcher Debug] No matching role found for:', roles);
+      router.push('/login');
+    }
+  }, [user, isLoading, router]);
 
   return (
-    <main className="flex min-h-screen flex-col bg-orange-50">
-      {/* Шапка */}
-      <header className="flex items-center justify-between bg-white px-4 py-3 shadow-sm">
-        <div>
-          <p className="text-xs text-slate-400">SaldaCargo</p>
-          <p className="font-semibold text-slate-900">{userName}</p>
-        </div>
-        <NetworkIndicator />
-      </header>
-
-      {/* Заглушка — роутинг по роли будет в TASK_11 */}
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="text-center">
-          <div className="text-4xl mb-4">✅</div>
-          <p className="font-semibold text-slate-900">Авторизация прошла</p>
-          <p className="mt-1 text-sm text-slate-500">Главный экран — в TASK_11</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">SaldaCargo</p>
       </div>
-    </main>
+    </div>
   );
 }

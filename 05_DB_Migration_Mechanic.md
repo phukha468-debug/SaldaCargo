@@ -303,7 +303,7 @@ CREATE POLICY "work_catalog_modify_admins"
   USING (EXISTS (
     SELECT 1 FROM users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('owner','admin','mechanic_lead')
+      AND u.roles && ARRAY['owner','admin','mechanic_lead']::user_role[]
   ));
 
 -- service_order_works: механик видит свои наряды, админ видит всё
@@ -316,7 +316,7 @@ CREATE POLICY "sow_select_own_or_admin"
       SELECT 1 FROM service_orders so
       JOIN users u ON u.id = auth.uid()
       WHERE so.id = service_order_works.service_order_id
-        AND (u.role IN ('owner','admin','mechanic_lead','accountant') OR so.assigned_mechanic_id = auth.uid())
+        AND (u.roles && ARRAY['owner','admin','mechanic_lead','accountant']::user_role[] OR so.assigned_mechanic_id = auth.uid())
     )
   );
 
@@ -327,7 +327,7 @@ CREATE POLICY "sow_modify_own_or_admin"
       SELECT 1 FROM service_orders so
       JOIN users u ON u.id = auth.uid()
       WHERE so.id = service_order_works.service_order_id
-        AND (u.role IN ('owner','admin','mechanic_lead') OR so.assigned_mechanic_id = auth.uid())
+        AND (u.roles && ARRAY['owner','admin','mechanic_lead']::user_role[] OR so.assigned_mechanic_id = auth.uid())
     )
   );
 
@@ -342,7 +342,7 @@ CREATE POLICY "wtl_access_own_or_admin"
       JOIN service_orders so ON so.id = sow.service_order_id
       JOIN users u ON u.id = auth.uid()
       WHERE sow.id = work_time_logs.service_order_work_id
-        AND (u.role IN ('owner','admin','mechanic_lead') OR so.assigned_mechanic_id = auth.uid())
+        AND (u.roles && ARRAY['owner','admin','mechanic_lead']::user_role[] OR so.assigned_mechanic_id = auth.uid())
     )
   );
 
@@ -366,7 +366,7 @@ CREATE POLICY "defect_update_admin"
   USING (EXISTS (
     SELECT 1 FROM users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('owner','admin','mechanic_lead')
+      AND u.roles && ARRAY['owner','admin','mechanic_lead']::user_role[]
   ));
 
 -- ----------------------------------------------------------------------------

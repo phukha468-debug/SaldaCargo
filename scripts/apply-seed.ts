@@ -33,8 +33,8 @@ async function main() {
     const filePath = join(SEED_DIR, file);
     console.log(`   → ${file}`);
     try {
-      // Пытаемся выполнить через npx supabase
-      execSync(`npx supabase db execute --file "${filePath}"`, { stdio: 'inherit', cwd: ROOT });
+      // Исправлено: используем 'db query' с флагом '--file' и '--linked' для удаленной БД
+      execSync(`npx supabase db query --file "${filePath}" --linked`, { stdio: 'inherit', cwd: ROOT });
     } catch (err) {
       console.warn(
         `⚠️  Не удалось применить файл ${file} через CLI. Возможно, CLI не настроен или нет доступа к БД.`,

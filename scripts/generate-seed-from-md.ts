@@ -185,6 +185,12 @@ function generatePeopleSeed(): string {
   ];
 
   lines.push('-- ПОЛЬЗОВАТЕЛИ');
+  lines.push('DO $$ BEGIN');
+  lines.push('  -- Очистка старых тестовых данных (созданных без стабильных ID)');
+  lines.push('  UPDATE assets SET assigned_driver_id = NULL WHERE assigned_driver_id IN (SELECT id FROM users WHERE max_user_id IS NULL);');
+  lines.push('  DELETE FROM wallets WHERE owner_user_id IN (SELECT id FROM users WHERE max_user_id IS NULL);');
+  lines.push('  DELETE FROM users WHERE max_user_id IS NULL;');
+  lines.push('END $$;');
   lines.push('');
 
   for (const section of sections) {
@@ -198,40 +204,39 @@ function generatePeopleSeed(): string {
       const maxUserId = val(person['max_user_id']);
       const phone = val(person['phone']);
       const role = val(person['role']) ?? section.defaultRoles[0];
-      const isActive = !!maxUserId; // активен только если привязан к МАХ
       const notes = val(person['notes']);
       const assignedReg = val(person['assigned_reg']);
-
+      
+      // Генерируем стабильный UUID на основе имени, чтобы не плодить дубликаты
+      // Для "двух Вов" используем также assignedReg
+      const seedName = `${name}-${assignedReg || ''}`;
+      
       lines.push(`-- ${name} (${role})`);
       lines.push(`DO $$
 DECLARE
-  v_user_id UUID;
+  v_user_id UUID := extensions.uuid_generate_v5('fd109355-6804-44b2-9216-56a81878b2d1', ${sqlStr(seedName)});
   v_asset_id UUID;
 BEGIN
-  -- Upsert пользователя по имени (до привязки MAX)
+  -- Upsert пользователя
   INSERT INTO users (id, name, phone, max_user_id, roles, is_active, notes)
   VALUES (
-    uuid_generate_v4(),
+    v_user_id,
     ${sqlStr(name)},
     ${sqlStr(phone)},
     ${sqlStr(maxUserId)},
     ARRAY[${sqlStr(role)}]::user_role[],
-    ${isActive},
+    true, -- ДЛЯ ТЕСТОВ ВСЕ АКТИВНЫ
     ${sqlStr(notes)}
   )
-  ON CONFLICT (max_user_id) WHERE max_user_id IS NOT NULL
+  ON CONFLICT (id) 
   DO UPDATE SET
     name = EXCLUDED.name,
     phone = EXCLUDED.phone,
+    max_user_id = EXCLUDED.max_user_id,
     roles = EXCLUDED.roles,
     is_active = EXCLUDED.is_active,
     notes = EXCLUDED.notes,
-    updated_at = now()
-  RETURNING id INTO v_user_id;
-
-  IF v_user_id IS NULL THEN
-    SELECT id INTO v_user_id FROM users WHERE name = ${sqlStr(name)} LIMIT 1;
-  END IF;
+    updated_at = now();
 
   -- Привязать машину если указана
   ${

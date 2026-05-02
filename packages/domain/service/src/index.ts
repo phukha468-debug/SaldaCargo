@@ -1,4 +1,5 @@
 export { ServiceOrderStatus, WorkStatus } from '@saldacargo/shared-types';
+export * from './services';
 
 /**
  * Вычисляет фактическое время работы из сегментов таймера.

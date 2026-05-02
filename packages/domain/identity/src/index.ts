@@ -1,4 +1,5 @@
 export { UserRole, type User } from '@saldacargo/shared-types';
+export * from './utils/max-auth';
 
 /**
  * Проверяет, имеет ли пользователь указанную роль.

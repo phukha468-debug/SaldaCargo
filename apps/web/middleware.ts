@@ -1,45 +1,25 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  // В MVP используем простую куку salda_auth_token с ID пользователя
+  const authToken = request.cookies.get('salda_auth_token')?.value;
+  const { pathname } = request.nextUrl;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
+  // Публичные пути
+  const publicPaths = ['/login', '/auth/callback', '/auth/error', '/api/auth/login'];
+  const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Публичные пути — не требуют авторизации
-  const publicPaths = ['/login', '/auth/callback', '/auth/error'];
-  const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p));
-
-  if (!user && !isPublic) {
+  // Если нет токена и путь не публичный — на логин
+  if (!authToken && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  // Если есть токен и мы на логине — в корень
+  if (authToken && pathname === '/login') {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {

@@ -1,54 +1,42 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 import { Button } from '@saldacargo/ui';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [phone, setPhone] = useState('+79221800911');
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, pin }),
+      });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setSent(true);
+      const data = await response.json();
+
+      if (response.ok) {
+        // Next.js middleware подхватит куку, установленную API
+        router.push('/');
+        router.refresh();
+      } else {
+        setError(data.error || 'Ошибка входа');
+      }
+    } catch (_err) {
+      setError('Ошибка сервера');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
-
-  if (sent) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="w-full max-w-sm text-center">
-          <div className="text-4xl mb-4">📧</div>
-          <h1 className="text-xl font-bold text-slate-900">Проверьте почту</h1>
-          <p className="mt-2 text-slate-600">
-            Мы отправили ссылку для входа на <span className="font-medium">{email}</span>
-          </p>
-          <button
-            onClick={() => setSent(false)}
-            className="mt-6 text-sm text-slate-400 hover:text-slate-600"
-          >
-            Отправить снова
-          </button>
-        </div>
-      </main>
-    );
   }
 
   return (
@@ -61,31 +49,43 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-              Email
+            <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
+              Номер телефона
             </label>
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               required
-              placeholder="admin@example.com"
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div>
+            <label htmlFor="pin" className="block text-sm font-medium text-slate-700 mb-1">
+              ПИН-код
+            </label>
+            <input
+              id="pin"
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              required
+              placeholder="0000"
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            />
+          </div>
 
-          <Button type="submit" size="mobile" disabled={loading || !email}>
-            {loading ? 'Отправляем...' : 'Получить ссылку для входа'}
+          {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
+
+          <Button type="submit" size="mobile" disabled={loading}>
+            {loading ? 'Входим...' : 'Войти'}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          Доступ только для администраторов.
-          <br />
-          Водители и механики используют МАХ.
+          Только для персонала SaldaCargo
         </p>
       </div>
     </main>

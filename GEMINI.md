@@ -147,9 +147,6 @@ gemini --context docs/architecture/01-overview.md \
        --context docs/architecture/03-conventions.md \
        --context docs/modules/logistics/README.md \
        "Добавь функцию отмены рейса"
-```
-
-Если работаешь через IDE-плагин — открывай эти файлы в соседних вкладках, чтобы плагин их подтянул.
 
 ---
 

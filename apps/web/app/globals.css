@@ -1,11 +1,121 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block');
+@import "tailwindcss";
 
-:root {
-  --font-inter: 'Inter', system-ui, sans-serif;
+/* Шрифты и иконки должны быть в самом начале */
+
+@theme {
+  /* Цвета из референса */
+  --color-surface-bright: #fcf8fa;
+  --color-surface-dim: #dcd9db;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-fixed-variant: #3a485c;
+  --color-inverse-surface: #303032;
+  --color-on-tertiary-fixed-variant: #574425;
+  --color-surface-container: #f0edef;
+  --color-on-primary: #ffffff;
+  --color-secondary-fixed: #d5e3fd;
+  --color-surface-container-highest: #e4e2e4;
+  --color-on-error-container: #93000a;
+  --color-surface: #fcf8fa;
+  --color-tertiary-fixed: #fcdeb5;
+  --color-surface-variant: #e4e2e4;
+  --color-tertiary-fixed-dim: #dec29a;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-secondary-container: #57657b;
+  --color-on-background: #1b1b1d;
+  --color-inverse-primary: #bec6e0;
+  --color-error-container: #ffdad6;
+  --color-on-surface-variant: #45464d;
+  --color-primary-fixed: #dae2fd;
+  --color-primary: #000000;
+  --color-secondary-fixed-dim: #b9c7e0;
+  --color-outline: #76777d;
+  --color-on-surface: #1b1b1d;
+  --color-primary-container: #131b2e;
+  --color-outline-variant: #c6c6cd;
+  --color-on-tertiary-fixed: #271901;
+  --color-secondary-container: #d5e3fd;
+  --color-surface-tint: #565e74;
+  --color-on-secondary-fixed: #0d1c2f;
+  --color-tertiary-container: #271901;
+  --color-on-error: #ffffff;
+  --color-on-tertiary-container: #98805d;
+  --color-secondary: #515f74;
+  --color-on-primary-fixed: #131b2e;
+  --color-primary-fixed-dim: #bec6e0;
+  --color-on-tertiary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-background: #fcf8fa;
+  --color-on-primary-container: #7c839b;
+  --color-on-primary-fixed-variant: #3f465c;
+  --color-surface-container-low: #f6f3f5;
+  --color-inverse-on-surface: #f3f0f2;
+  --color-surface-container-high: #eae7e9;
+  --color-tertiary: #000000;
+
+  /* Типографика */
+  --font-inter: "Inter", system-ui, sans-serif;
+  
+  --font-size-h1: 24px;
+  --font-size-h2: 20px;
+  --font-size-h3: 16px;
+  --font-size-body-md: 14px;
+  --font-size-body-sm: 13px;
+  --font-size-data-mono: 14px;
+  --font-size-label-caps: 11px;
 }
 
-body {
-  font-family: var(--font-inter);
+@layer base {
+  body {
+    background-color: var(--color-surface-bright);
+    color: var(--color-on-surface);
+    font-family: var(--font-inter);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Используем чистый CSS для базовых стилей, чтобы избежать ошибок @apply */
+  h1 {
+    font-size: var(--font-size-h1);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: var(--font-size-h2);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: var(--font-size-h3);
+    font-weight: 600;
+  }
+}
+
+/* Кастомные классы через @utility */
+@utility text-label-caps {
+  font-size: var(--font-size-label-caps);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@utility material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+}
+
+@utility sparkline-bar {
+  width: 100%;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+  transition: all 0.5s ease-out;
 }

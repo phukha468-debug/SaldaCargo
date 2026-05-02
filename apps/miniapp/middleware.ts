@@ -1,15 +1,22 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-/**
- * MiniApp не использует стандартный Supabase Auth —
- * авторизация через МАХ SDK (max_user_id).
- * Middleware только блокирует прямой доступ к API routes извне.
- */
 export async function middleware(request: NextRequest) {
-  // API routes открыты — авторизацию проверяет сам handler
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    return NextResponse.next();
+  const userId = request.cookies.get('salda_user_id')?.value;
+  const { pathname } = request.nextUrl;
+
+  console.log(`[Middleware Debug] Path: ${pathname}, UserID in Cookie: ${userId || 'NONE'}`);
+
+  const isAuthPage = pathname === '/login';
+  const isAuthApi = pathname.startsWith('/api/auth/');
+
+  if (!userId && !isAuthPage && !isAuthApi) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
+
+  if (userId && isAuthPage) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
   return NextResponse.next();
 }
 

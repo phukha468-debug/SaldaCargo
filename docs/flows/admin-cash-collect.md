@@ -27,7 +27,7 @@ Use-case:
          (SELECT MAX(created_at) FROM transactions WHERE to_wallet_id = w.id OR from_wallet_id = w.id) AS last_activity
        FROM users u
        JOIN wallets w ON w.owner_user_id = u.id
-       WHERE u.role IN ('driver','loader')
+       WHERE ('driver' = ANY(u.roles) OR 'loader' = ANY(u.roles))
          AND w.type = 'employee_accountable'
          AND finance.getWalletBalance(w.id) > 0
        ORDER BY balance DESC

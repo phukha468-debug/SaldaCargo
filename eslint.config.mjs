@@ -1,5 +1,6 @@
 import boundaries from 'eslint-plugin-boundaries';
 import tsParser from '@typescript-eslint/parser';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 /** @type {import('eslint').Linter.Config[]} */
 const config = [
@@ -17,6 +18,7 @@ const config = [
     },
     plugins: {
       boundaries,
+      '@typescript-eslint': tsPlugin,
     },
     settings: {
       'boundaries/elements': [
@@ -29,6 +31,7 @@ const config = [
       ],
     },
     rules: {
+      ...tsPlugin.configs.recommended.rules,
       // domain-модули могут импортировать только из domain/shared и shared-types
       'boundaries/element-types': [
         'error',
@@ -55,3 +58,4 @@ const config = [
 ];
 
 export default config;
+

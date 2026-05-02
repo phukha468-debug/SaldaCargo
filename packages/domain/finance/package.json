@@ -1,21 +1,21 @@
-﻿{
-    "scripts":  {
-                    "lint":  "eslint src/",
-                    "typecheck":  "tsc --noEmit"
-                },
-    "devDependencies":  {
-                            "typescript":  "^5.4.5"
-                        },
-    "types":  "./src/index.ts",
-    "version":  "0.1.0",
-    "name":  "@saldacargo/finance",
-    "private":  true,
-    "exports":  {
-                    ".":  "./src/index.ts"
-                },
-    "main":  "./src/index.ts",
-    "dependencies": {
-      "@saldacargo/shared": "workspace:*",
-      "@saldacargo/shared-types": "workspace:*"
-    }
+{
+  "name": "@saldacargo/domain-finance",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saldacargo/shared": "workspace:*",
+    "@saldacargo/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
 }

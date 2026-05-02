@@ -32,19 +32,20 @@ export function useUser(): UseUserResult {
         return;
       }
 
-      const { data, error } = await (supabase
+      const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('max_user_id', authUser.id)
-        .single() as any);
+        .single();
 
       if (error) {
         // Попробуем по email (для web-логина через magic link)
-        const { data: byEmail, error: emailError } = await (supabase
+        const { data: byEmail, error: emailError } = await supabase
           .from('users')
           .select('*')
           .eq('phone', authUser.email ?? '')
-          .single() as any);
+          .single();
+
 
         if (emailError) {
           setError('Пользователь не найден в системе');

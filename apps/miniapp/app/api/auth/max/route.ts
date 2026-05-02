@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -11,6 +12,8 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   const body = (await request.json()) as { initData?: { max_user_id?: string } };
   const maxUserId = body.initData?.max_user_id;
+
+  console.log('[MAX Auth Debug] Incoming maxUserId:', maxUserId);
 
   if (!maxUserId) {
     return NextResponse.json({ error: 'Нет данных авторизации' }, { status: 400 });
@@ -29,7 +32,7 @@ export async function POST(request: Request) {
 
   if (error || !user) {
     return NextResponse.json(
-      { error: 'Доступ запрещён. Обратитесь к администратору.' },
+      { error: `Доступ запрещён. Ваш MAX ID: ${maxUserId}. Сообщите его администратору.` },
       { status: 403 },
     );
   }
