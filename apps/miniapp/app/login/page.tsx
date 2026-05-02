@@ -83,6 +83,8 @@ export default function LoginPage() {
   const selectedUserName = users.find(u => u.id === selectedUserId)?.name || 'Пользователь';
 
   const reset = () => {
+    // Очищаем куку сессии для чистого теста
+    document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     setStep('role');
     setSelectedRole(null);
     setSelectedUserId('');
@@ -92,6 +94,14 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-4">
+      {/* Кнопка сброса для тестов */}
+      <button 
+        onClick={reset}
+        className="fixed top-4 right-4 bg-zinc-200 text-zinc-500 text-[10px] font-bold uppercase px-3 py-1 rounded-full hover:bg-zinc-300 transition-colors"
+      >
+        Сбросить сессию
+      </button>
+
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl shadow-zinc-200/50 border border-zinc-100 overflow-hidden">
         <div className="p-8">
           <div className="text-center mb-8">
