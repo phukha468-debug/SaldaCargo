@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "projects": [
+    {
+      "name": "saldacargo-web",
+      "src": "apps/web"
+    },
+    {
+      "name": "saldacargo-miniapp",
+      "src": "apps/miniapp"
+    }
+  ]
+}

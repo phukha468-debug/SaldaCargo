@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Добавить заказ</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#ffdbcc",
+                        "outline-variant": "#e2bfb0",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#572000",
+                        "tertiary-fixed": "#e1e2e6",
+                        "surface-bright": "#f8f9fa",
+                        "surface-tint": "#a04100",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#d9dadb",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#c6c6c9",
+                        "on-primary-fixed": "#351000",
+                        "inverse-surface": "#2e3132",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-container": "#2e3134",
+                        "surface-container-low": "#f3f4f5",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#ffb693",
+                        "surface-container-high": "#e7e8e9",
+                        "surface-container": "#edeeef",
+                        "primary-container": "#ff6b00",
+                        "on-surface-variant": "#5a4136",
+                        "secondary": "#5d5e61",
+                        "on-secondary-fixed-variant": "#454749",
+                        "on-secondary-fixed": "#1a1c1e",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "background": "#f8f9fa",
+                        "outline": "#8e7164",
+                        "on-surface": "#191c1d",
+                        "on-background": "#191c1d",
+                        "inverse-on-surface": "#f0f1f2",
+                        "surface-container-highest": "#e1e3e4",
+                        "tertiary": "#5c5f62",
+                        "surface": "#f8f9fa",
+                        "on-tertiary-fixed": "#191c1f",
+                        "tertiary-container": "#97999c",
+                        "primary": "#a04100",
+                        "on-secondary-container": "#636467",
+                        "tertiary-fixed-dim": "#c4c7ca",
+                        "on-tertiary-fixed-variant": "#44474a",
+                        "surface-variant": "#e1e3e4",
+                        "secondary-container": "#e2e2e5",
+                        "secondary-fixed": "#e2e2e5",
+                        "inverse-primary": "#ffb693"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "touch-target-min": "48px",
+                        "margin-tablet": "24px",
+                        "container-padding": "20px",
+                        "unit": "8px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "display": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "h2": ["Inter"],
+                        "h1": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "26px", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "h2": ["20px", { "lineHeight": "28px", "letterSpacing": "0", "fontWeight": "600" }],
+                        "h1": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col pt-14 pb-8">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center h-14 px-4 bg-white border-b-2 border-zinc-200 shadow-none">
+<button class="mr-4 text-orange-600 hover:bg-zinc-100 active:opacity-80 transition-opacity flex items-center justify-center w-10 h-10 rounded-DEFAULT">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-lg font-black text-zinc-900 font-inter tracking-tight uppercase flex-1">New Order</h1>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 w-full max-w-2xl mx-auto px-margin-mobile md:px-margin-tablet py-6 space-y-6">
+<!-- Client Section -->
+<section class="bg-surface-container-lowest border border-[#DDE2E5] rounded-DEFAULT p-4 space-y-4">
+<header class="flex justify-between items-center bg-[#F1F3F5] -mx-4 -mt-4 px-4 py-3 border-b border-[#DDE2E5]">
+<h2 class="font-h2 text-h2 text-on-surface">Клиент</h2>
+<button class="flex items-center gap-2 text-primary-container font-label-md text-label-md hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-sm">add</span>
+                    Новый клиент
+                </button>
+</header>
+<div class="relative mt-2">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-container">search</span>
+<input class="w-full h-touch-target-min pl-10 pr-4 bg-surface-bright border border-outline-variant focus:border-2 focus:border-primary-container rounded-DEFAULT font-body-md text-body-md text-on-surface placeholder:text-tertiary-container focus:ring-0 transition-all outline-none" placeholder="Начните вводить..." type="text"/>
+</div>
+</section>
+<!-- Description Section -->
+<section class="bg-surface-container-lowest border border-[#DDE2E5] rounded-DEFAULT p-4 space-y-4">
+<header class="bg-[#F1F3F5] -mx-4 -mt-4 px-4 py-3 border-b border-[#DDE2E5]">
+<h2 class="font-h2 text-h2 text-on-surface">Описание</h2>
+</header>
+<div class="mt-2">
+<textarea class="w-full p-3 bg-surface-bright border border-outline-variant focus:border-2 focus:border-primary-container rounded-DEFAULT font-body-md text-body-md text-on-surface placeholder:text-tertiary-container focus:ring-0 transition-all outline-none resize-none" placeholder="Доставка плитки" rows="3"></textarea>
+</div>
+</section>
+<!-- Amount Section -->
+<section class="bg-surface-container-lowest border border-[#DDE2E5] rounded-DEFAULT p-4 space-y-4">
+<header class="bg-[#F1F3F5] -mx-4 -mt-4 px-4 py-3 border-b border-[#DDE2E5]">
+<h2 class="font-h2 text-h2 text-on-surface">Сумма (₽)</h2>
+</header>
+<div class="mt-2 relative">
+<input class="w-full h-16 px-4 bg-surface-bright border border-outline-variant focus:border-2 focus:border-primary-container rounded-DEFAULT font-display text-display text-on-surface focus:ring-0 transition-all outline-none text-right" type="number" value="0"/>
+<span class="absolute left-4 top-1/2 -translate-y-1/2 font-display text-display text-tertiary-container">₽</span>
+</div>
+</section>
+<!-- Payroll Section (Split Cards) -->
+<section class="grid grid-cols-2 gap-4">
+<!-- Driver Pay -->
+<div class="bg-surface-container-lowest border border-[#DDE2E5] rounded-DEFAULT p-4 flex flex-col">
+<header class="bg-[#F1F3F5] -mx-4 -mt-4 px-4 py-2 border-b border-[#DDE2E5] mb-4">
+<h3 class="font-label-md text-label-md text-on-surface">ЗП Водителя</h3>
+</header>
+<div class="flex-1 flex flex-col justify-end">
+<input class="w-full h-touch-target-min px-3 bg-surface-bright border border-outline-variant focus:border-2 focus:border-secondary rounded-DEFAULT font-body-lg text-body-lg text-on-surface focus:ring-0 transition-all outline-none text-right mb-1" type="number" value="0"/>
+<p class="font-label-sm text-label-sm text-tertiary text-right">~810 (30%)</p>
+</div>
+</div>
+<!-- Loader Pay -->
+<div class="bg-surface-container-lowest border border-[#DDE2E5] rounded-DEFAULT p-4 flex flex-col">
+<header class="bg-[#F1F3F5] -mx-4 -mt-4 px-4 py-2 border-b border-[#DDE2E5] mb-4">
+<h3 class="font-label-md text-label-md text-on-surface">ЗП Грузчика</h3>
+</header>
+<div class="flex-1 flex flex-col justify-end">
+<input class="w-full h-touch-target-min px-3 bg-surface-bright border border-outline-variant focus:border-2 focus:border-secondary rounded-DEFAULT font-body-lg text-body-lg text-on-surface focus:ring-0 transition-all outline-none text-right mb-1" type="number" value="0"/>
+<p class="font-label-sm text-label-sm text-tertiary text-right">~810</p>
+</div>
+</div>
+</section>
+<!-- Payment Method Section -->
+<section class="bg-surface-container-lowest border border-[#DDE2E5] rounded-DEFAULT p-4 space-y-4">
+<header class="bg-[#F1F3F5] -mx-4 -mt-4 px-4 py-3 border-b border-[#DDE2E5]">
+<h2 class="font-h2 text-h2 text-on-surface">Способ оплаты</h2>
+</header>
+<div class="mt-4 flex justify-between items-center gap-2">
+<!-- Cash -->
+<button class="flex-1 h-14 flex flex-col items-center justify-center gap-1 bg-primary-fixed border-2 border-primary-container rounded-DEFAULT text-on-primary-fixed transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
+</button>
+<!-- QR -->
+<button class="flex-1 h-14 flex flex-col items-center justify-center gap-1 bg-surface border border-[#DDE2E5] hover:border-outline-variant rounded-DEFAULT text-tertiary transition-all">
+<span class="material-symbols-outlined">qr_code</span>
+</button>
+<!-- Bank Invoice -->
+<button class="flex-1 h-14 flex flex-col items-center justify-center gap-1 bg-surface border border-[#DDE2E5] hover:border-outline-variant rounded-DEFAULT text-tertiary transition-all">
+<span class="material-symbols-outlined">account_balance</span>
+</button>
+<!-- Debt -->
+<button class="flex-1 h-14 flex flex-col items-center justify-center gap-1 bg-surface border border-[#DDE2E5] hover:border-outline-variant rounded-DEFAULT text-tertiary transition-all">
+<span class="material-symbols-outlined">assignment_late</span>
+</button>
+<!-- Card -->
+<button class="flex-1 h-14 flex flex-col items-center justify-center gap-1 bg-surface border border-[#DDE2E5] hover:border-outline-variant rounded-DEFAULT text-tertiary transition-all">
+<span class="material-symbols-outlined">credit_card</span>
+</button>
+</div>
+</section>
+<!-- Actions -->
+<div class="pt-6 pb-8 space-y-4 flex flex-col items-center">
+<button class="w-full h-touch-target-min bg-primary-container text-on-primary flex items-center justify-center gap-2 rounded-DEFAULT font-label-md text-label-md uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined">check</span>
+                Добавить заказ
+            </button>
+<button class="w-full h-touch-target-min bg-transparent border-2 border-secondary text-secondary flex items-center justify-center rounded-DEFAULT font-label-md text-label-md uppercase hover:bg-surface-variant active:scale-95 transition-all">
+                Отмена
+            </button>
+</div>
+</main>
+</body></html>

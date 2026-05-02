@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Добавить расход - SaldaCargo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "primary": "#a04100",
+                        "outline-variant": "#e2bfb0",
+                        "on-tertiary-fixed-variant": "#44474a",
+                        "surface": "#f8f9fa",
+                        "on-tertiary-container": "#2e3134",
+                        "inverse-on-surface": "#f0f1f2",
+                        "inverse-surface": "#2e3132",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#351000",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#5a4136",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#c4c7ca",
+                        "secondary-fixed-dim": "#c6c6c9",
+                        "surface-variant": "#e1e3e4",
+                        "surface-tint": "#a04100",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#e1e2e6",
+                        "tertiary-container": "#97999c",
+                        "surface-container-low": "#f3f4f5",
+                        "surface-dim": "#d9dadb",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "primary-fixed": "#ffdbcc",
+                        "on-surface": "#191c1d",
+                        "secondary-fixed": "#e2e2e5",
+                        "primary-fixed-dim": "#ffb693",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#ff6b00",
+                        "secondary": "#5d5e61",
+                        "on-primary-container": "#572000",
+                        "on-tertiary-fixed": "#191c1f",
+                        "surface-container": "#edeeef",
+                        "on-background": "#191c1d",
+                        "outline": "#8e7164",
+                        "background": "#f8f9fa",
+                        "on-secondary-fixed-variant": "#454749",
+                        "tertiary": "#5c5f62",
+                        "surface-container-high": "#e7e8e9",
+                        "on-secondary-container": "#636467",
+                        "inverse-primary": "#ffb693",
+                        "surface-bright": "#f8f9fa",
+                        "secondary-container": "#e2e2e5",
+                        "on-secondary-fixed": "#1a1c1e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "gutter": "16px",
+                        "touch-target-min": "48px",
+                        "container-padding": "20px",
+                        "unit": "8px",
+                        "margin-tablet": "24px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "h2": ["Inter"],
+                        "display": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "h1": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "26px", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h2": ["20px", { "lineHeight": "28px", "letterSpacing": "0", "fontWeight": "600" }],
+                        "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h1": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col antialiased">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full h-[64px] px-4 bg-white border-b-2 border-[#DDE2E5] sticky top-0 z-10 shrink-0">
+<button class="flex items-center justify-center w-12 h-12 hover:bg-zinc-100 active:opacity-80 transition-opacity rounded-full">
+<span class="material-symbols-outlined text-[#FF6B00]">arrow_back</span>
+</button>
+<div class="font-['Inter'] font-bold tracking-tight uppercase text-zinc-900 text-lg">
+            Добавить расход
+        </div>
+<div class="w-12 h-12 flex items-center justify-center">
+<!-- Empty placeholder for balance -->
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col p-4 gap-6 max-w-2xl mx-auto w-full pb-32">
+<!-- Amount Input -->
+<section class="bg-white border border-[#DDE2E5] rounded-lg p-6 flex flex-col gap-2 relative">
+<div class="absolute top-0 left-0 bottom-0 w-1 bg-error rounded-l-lg"></div>
+<label class="font-label-md text-label-md text-tertiary">Сумма расхода (₽)</label>
+<div class="flex items-center gap-2">
+<input class="w-full bg-transparent border-none text-display font-display font-bold text-on-surface focus:ring-0 p-0 placeholder:text-surface-dim appearance-none" inputmode="decimal" placeholder="0.00" type="number"/>
+<span class="text-display font-display text-tertiary">₽</span>
+</div>
+<div class="h-[2px] w-full bg-surface-variant mt-2"></div>
+</section>
+<!-- Category Selection -->
+<section class="flex flex-col gap-3">
+<h2 class="font-h2 text-h2 text-on-surface">Категория</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+<button class="h-[48px] border-2 border-primary-container bg-primary-fixed text-on-primary-container rounded flex items-center justify-center gap-2 px-3 font-label-md text-label-md active:scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">local_gas_station</span>
+                    ГСМ
+                </button>
+<button class="h-[48px] border border-[#DDE2E5] bg-white text-on-surface rounded flex items-center justify-center gap-2 px-3 font-label-md text-label-md hover:bg-surface-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined">local_car_wash</span>
+                    Мойка
+                </button>
+<button class="h-[48px] border border-[#DDE2E5] bg-white text-on-surface rounded flex items-center justify-center gap-2 px-3 font-label-md text-label-md hover:bg-surface-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined">local_parking</span>
+                    Стоянка
+                </button>
+<button class="h-[48px] border border-[#DDE2E5] bg-white text-on-surface rounded flex items-center justify-center gap-2 px-3 font-label-md text-label-md hover:bg-surface-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined">build</span>
+                    Мелкий ремонт
+                </button>
+<button class="h-[48px] border border-[#DDE2E5] bg-white text-on-surface rounded flex items-center justify-center gap-2 px-3 font-label-md text-label-md hover:bg-surface-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined">more_horiz</span>
+                    Прочее
+                </button>
+</div>
+</section>
+<!-- Payment Method -->
+<section class="flex flex-col gap-3">
+<h2 class="font-h2 text-h2 text-on-surface">Способ оплаты</h2>
+<div class="flex flex-col gap-2">
+<label class="flex items-center p-4 border border-[#DDE2E5] bg-white rounded-lg cursor-pointer hover:bg-surface-container transition-colors min-h-[64px]">
+<input class="w-5 h-5 text-primary-container border-outline focus:ring-primary-container" name="payment_method" type="radio"/>
+<div class="ml-4 flex items-center gap-3">
+<span class="text-xl">💵</span>
+<span class="font-body-md text-body-md text-on-surface font-semibold">Наличные</span>
+</div>
+</label>
+<label class="flex items-center p-4 border border-[#DDE2E5] bg-white rounded-lg cursor-pointer hover:bg-surface-container transition-colors min-h-[64px]">
+<input class="w-5 h-5 text-primary-container border-outline focus:ring-primary-container" name="payment_method" type="radio"/>
+<div class="ml-4 flex items-center gap-3">
+<span class="text-xl">💳</span>
+<span class="font-body-md text-body-md text-on-surface font-semibold">Карта водителя</span>
+</div>
+</label>
+<label class="flex items-center p-4 border-2 border-primary-container bg-primary-fixed rounded-lg cursor-pointer min-h-[64px]">
+<input checked="" class="w-5 h-5 text-primary-container border-outline focus:ring-primary-container" name="payment_method" type="radio"/>
+<div class="ml-4 flex items-center gap-3">
+<span class="text-xl">⛽</span>
+<span class="font-body-md text-body-md text-on-surface font-semibold">Топливная карта Опти24</span>
+</div>
+</label>
+</div>
+<!-- Helpful Note (Visible when Fuel Card selected) -->
+<div class="bg-surface-container-high rounded p-3 flex gap-3 items-start border-l-4 border-primary-container mt-1">
+<span class="material-symbols-outlined text-primary-container text-sm mt-0.5">info</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">
+                    Заправки по картам Опти24 загружаются автоматически.
+                </p>
+</div>
+</section>
+<!-- Description -->
+<section class="flex flex-col gap-2">
+<label class="font-h2 text-h2 text-on-surface" for="description">Комментарий (необязательно)</label>
+<textarea class="w-full p-4 border border-outline rounded bg-white text-on-surface font-body-md text-body-md placeholder:text-surface-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container resize-none" id="description" placeholder="Дополнительная информация..." rows="3"></textarea>
+</section>
+<!-- Attachment -->
+<section class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<h2 class="font-h2 text-h2 text-on-surface">Фото чека</h2>
+<span class="bg-surface-container-high text-on-surface-variant px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Желательно</span>
+</div>
+<button class="w-full min-h-[96px] border-2 border-dashed border-outline bg-surface-container-lowest flex flex-col items-center justify-center gap-2 rounded-lg hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-tertiary text-3xl">add_a_photo</span>
+<span class="font-label-md text-label-md text-tertiary">Прикрепить фото</span>
+</button>
+</section>
+</main>
+<!-- Footer Actions -->
+<div class="fixed bottom-0 left-0 w-full bg-white border-t border-[#DDE2E5] p-4 flex flex-col gap-3 pb-8 z-20">
+<button class="w-full h-[64px] bg-[#FF6B00] text-white font-label-lg text-lg font-bold rounded flex items-center justify-center gap-2 active:opacity-80 transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            ДОБАВИТЬ РАСХОД
+        </button>
+<button class="w-full h-[48px] border-2 border-on-surface text-on-surface font-label-md text-label-md font-bold rounded flex items-center justify-center hover:bg-surface-container transition-colors">
+            ОТМЕНА
+        </button>
+</div>
+</body></html>
