@@ -1,11 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block');
-@import "tailwindcss";
+@import 'tailwindcss';
+@source "../../../packages/ui/src";
 
 @theme {
-  --font-inter: "Inter", system-ui, sans-serif;
-  
-  /* Цвета Zinc (для тех, кто привык к v3) */
+  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-sans: var(--font-inter);
+
+  /* Zinc colors */
   --color-zinc-50: #fafafa;
   --color-zinc-100: #f4f4f5;
   --color-zinc-200: #e4e4e7;
@@ -17,7 +17,7 @@
   --color-zinc-800: #27272a;
   --color-zinc-900: #18181b;
 
-  /* Цвета Orange */
+  /* Orange colors */
   --color-orange-50: #fff7ed;
   --color-orange-100: #ffedd5;
   --color-orange-200: #fed7aa;
@@ -31,6 +31,9 @@
 }
 
 @layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block');
+
   body {
     background-color: var(--color-zinc-50);
     color: var(--color-zinc-900);
