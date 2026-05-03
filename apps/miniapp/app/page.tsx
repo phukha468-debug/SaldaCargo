@@ -7,23 +7,39 @@ import { useQuery } from '@tanstack/react-query';
 export default function RootDispatcher() {
   const router = useRouter();
   const [maxError, setMaxError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState('');
-
-  useEffect(() => {
-    setDebugInfo(window.location.href);
-  }, []);
 
   const { data: user, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
-      // [DEBUG] Выводим полную ссылку для диагностики MAX SDK
-      if (typeof window !== 'undefined') {
-        console.log('[DEBUG] Full URL:', window.location.href);
-      }
-
       // 1. Проверяем среду МАХ перед запросом профиля
-      const searchParams = new URLSearchParams(window.location.search);
-      const maxUserId = searchParams.get('uid');
+      let maxUserId: string | null = null;
+
+      try {
+        if (typeof window !== 'undefined') {
+          // Сначала проверяем классический uid в поиске (для тестов)
+          const searchParams = new URLSearchParams(window.location.search);
+          maxUserId = searchParams.get('uid');
+
+          // Если нет в поиске, парсим hash (основной формат МАХ)
+          // #WebAppData=chat%3D...%26user%3D%257B%2522id%2522%253A56628256...
+          if (!maxUserId && window.location.hash) {
+            const hashString = window.location.hash.replace('#', '');
+            const hashParams = new URLSearchParams(hashString);
+            const webAppDataStr = hashParams.get('WebAppData');
+            
+            if (webAppDataStr) {
+              const webAppData = new URLSearchParams(decodeURIComponent(webAppDataStr));
+              const userStr = webAppData.get('user');
+              if (userStr) {
+                const userData = JSON.parse(decodeURIComponent(userStr));
+                maxUserId = userData.id?.toString() || null;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[MAX Auth] URL Parse Error:', e);
+      }
 
       if (maxUserId) {
         console.log('[Dispatcher] MAX environment detected, attempting auto-login for:', maxUserId);
@@ -34,7 +50,6 @@ export default function RootDispatcher() {
         });
 
         if (maxAuth.ok) {
-          // Если МАХ авторизация успешна, продолжаем получать профиль
           console.log('[Dispatcher] MAX auto-login successful');
         } else {
           const errData = await maxAuth.json();
@@ -86,9 +101,6 @@ export default function RootDispatcher() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 text-center">
-      <div className="absolute top-0 left-0 w-full bg-black text-green-400 text-[10px] break-all p-2 z-[9999] opacity-90">
-        URL: {debugInfo}
-      </div>
       <div className="flex flex-col items-center gap-4">
         {maxError ? (
           <div className="space-y-4">
@@ -100,9 +112,6 @@ export default function RootDispatcher() {
           <>
             <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">SaldaCargo</p>
-            <p className="text-[8px] text-zinc-500 break-all px-4 mt-4">
-              {typeof window !== 'undefined' ? window.location.href : 'loading...'}
-            </p>
           </>
         )}
       </div>
