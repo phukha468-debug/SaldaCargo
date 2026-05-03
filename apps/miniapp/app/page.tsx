@@ -8,6 +8,7 @@ export default function RootDispatcher() {
   const router = useRouter();
   const [maxError, setMaxError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [availableRoutes, setAvailableRoutes] = useState<{path: string, label: string}[] | null>(null);
 
   const { data: user, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
@@ -89,13 +90,25 @@ export default function RootDispatcher() {
 
     console.log('[Dispatcher Debug] Processing roles:', roles, 'for user:', user.name);
 
+    const routes = [];
     if (roles.includes('admin') || roles.includes('owner')) {
-      router.push('/admin');
-    } else if (roles.includes('mechanic') || roles.includes('mechanic_lead')) {
-      router.push('/mechanic');
-    } else if (roles.includes('driver')) {
-      router.push('/driver');
+      routes.push({ path: '/admin', label: '👑 Панель управления (Админ)' });
+    }
+    if (roles.includes('driver')) {
+      routes.push({ path: '/driver', label: '🚛 Мои рейсы (Водитель)' });
+    }
+    if (roles.includes('mechanic') || roles.includes('mechanic_lead')) {
+      routes.push({ path: '/mechanic', label: '🔧 Ремзона (Механик)' });
+    }
+
+    if (routes.length === 1) {
+      // Если роль только одна — моментальный редирект
+      router.push(routes[0].path);
+    } else if (routes.length > 1) {
+      // Если ролей несколько — показываем UI выбора
+      setAvailableRoutes(routes);
     } else {
+      // Если ролей нет или они неизвестны
       router.push('/login');
     }
   }, [user, isLoading, isError, error, router]);
@@ -111,6 +124,48 @@ export default function RootDispatcher() {
   };
 
   const extractedId = maxError?.match(/MAX ID: (.*)\. /)?.[1];
+
+  if (availableRoutes) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-6 font-sans antialiased">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
+              Salda<span className="text-orange-600">Cargo</span>
+            </h1>
+            <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-2">Выберите роль</p>
+          </div>
+          
+          <div className="grid gap-4">
+            {availableRoutes.map(route => (
+              <button
+                key={route.path}
+                onClick={() => router.push(route.path)}
+                className="w-full p-6 bg-white border border-zinc-200 rounded-3xl shadow-sm shadow-zinc-200/50 text-left text-zinc-800 font-black uppercase tracking-wide active:scale-[0.98] transition-all hover:border-orange-200 group"
+              >
+                <div className="flex items-center justify-between">
+                  <span>{route.label}</span>
+                  <span className="text-zinc-300 group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-8 text-center">
+            <button 
+              onClick={() => {
+                document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+                router.push('/login');
+              }}
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-600 transition-colors"
+            >
+              Выйти из аккаунта
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6 text-center font-sans antialiased">
