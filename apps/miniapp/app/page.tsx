@@ -2,128 +2,85 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 
 export default function RootDispatcher() {
-  const router = useRouter();
-  const [maxError, setMaxError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [unregisteredId, setUnregisteredId] = useState<string | null>(null);
   const [availableRoutes, setAvailableRoutes] = useState<{path: string, label: string}[] | null>(null);
-
-  const { data: user, isLoading, isError, error } = useQuery({
-    queryKey: ['me'],
-    queryFn: async () => {
-      // 1. Проверяем среду МАХ перед запросом профиля
-      let maxUserId: string | null = null;
-
-      try {
-        if (typeof window !== 'undefined') {
-          // Сначала проверяем классический uid в поиске (для тестов)
-          const searchParams = new URLSearchParams(window.location.search);
-          maxUserId = searchParams.get('uid');
-
-          // Если нет в поиске, парсим hash (основной формат МАХ)
-          // #WebAppData=chat%3D...%26user%3D%257B%2522id%2522%253A56628256...
-          if (!maxUserId && window.location.hash) {
-            const hashString = window.location.hash.replace('#', '');
-            const hashParams = new URLSearchParams(hashString);
-            const webAppDataStr = hashParams.get('WebAppData');
-            
-            if (webAppDataStr) {
-              const webAppData = new URLSearchParams(decodeURIComponent(webAppDataStr));
-              const userStr = webAppData.get('user');
-              if (userStr) {
-                const userData = JSON.parse(decodeURIComponent(userStr));
-                maxUserId = userData.id?.toString() || null;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[MAX Auth] URL Parse Error:', e);
-      }
-
-      if (maxUserId) {
-        console.log('[Dispatcher] MAX environment detected, attempting auto-login for:', maxUserId);
-        const maxAuth = await fetch('/api/auth/max', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: { max_user_id: maxUserId } }),
-        });
-
-        if (maxAuth.ok) {
-          console.log('[Dispatcher] MAX auto-login successful');
-        } else {
-          const errData = await maxAuth.json();
-          throw new Error(errData.error || 'MAX Auth Failed');
-        }
-      }
-
-      const res = await fetch('/api/driver/me', { cache: 'no-store' }); 
-      if (res.status === 401) {
-        throw new Error('Unauthorized');
-      }
-      if (!res.ok) throw new Error('Not authenticated');
-      return res.json();
-    },
-    retry: false,
-  });
+  const [copied, setCopied] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return;
+    const initAuth = async () => {
+      try {
+        // 1. Ищем данные MAX в URL
+        const hash = window.location.hash;
+        const params = new URLSearchParams(hash.replace('#tgWebAppData=', '').replace('#WebAppData=', ''));
+        const userParam = params.get('user');
 
-    if (isError || !user) {
-      // Если была ошибка МАХ авторизации (например 403 с ID), прокидываем её на страницу логина
-      const errorMsg = isError ? (error as Error)?.message || 'Unauthorized' : '';
-      
-      // Если это ошибка "не зарегистрирован", НЕ ПЕРЕНАПРАВЛЯЕМ автоматически
-      if (errorMsg.includes('MAX ID')) {
-         setMaxError(errorMsg);
-      } else {
-         router.push('/login');
+        if (userParam) {
+          // СЦЕНАРИЙ А: Вход через мессенджер МАХ
+          const decodedUser = decodeURIComponent(userParam);
+          const userData = JSON.parse(decodedUser);
+          const maxUserId = userData.id.toString();
+
+          const res = await fetch('/api/auth/max', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: { max_user_id: maxUserId } })
+          });
+
+          if (res.status === 403) {
+            // НЕТ В БАЗЕ -> ПОКАЗЫВАЕМ ID И ОСТАНАВЛИВАЕМСЯ (БЕЗ РЕДИРЕКТА НА /login)
+            setUnregisteredId(maxUserId);
+            return; 
+          }
+
+          if (res.ok) {
+            // ЕСТЬ В БАЗЕ -> РАЗБИРАЕМ РОЛИ
+            const data = await res.json();
+            const roles = data.user?.roles || [];
+            const routes: { path: string; label: string }[] = [];
+
+            if (roles.includes('admin') || roles.includes('owner')) {
+              routes.push({ path: '/admin', label: '👑 Панель управления' });
+            }
+            if (roles.includes('driver')) {
+              routes.push({ path: '/driver', label: '🚛 Мои рейсы' });
+            }
+            if (roles.includes('mechanic')) {
+              routes.push({ path: '/mechanic', label: '🔧 Ремзона' });
+            }
+
+            if (routes.length === 1) {
+              router.push(routes[0]!.path);
+            } else if (routes.length > 1) {
+              setAvailableRoutes(routes);
+            } else {
+              router.push('/login');
+            }
+            return;
+          }
+        }
+
+        // СЦЕНАРИЙ Б: Нет MAX данных (десктоп) -> Идем на ручной ввод ПИН-кода
+        router.push('/login');
+
+      } catch (error) {
+        console.error('Auth Init Error:', error);
+        router.push('/login');
       }
-      return;
-    }
+    };
 
-    const rawRoles = user.roles;
-    const roles = Array.isArray(rawRoles) ? rawRoles : [];
-
-    console.log('[Dispatcher Debug] Processing roles:', roles, 'for user:', user.name);
-
-    const routes: { path: string; label: string }[] = [];
-    if (roles.includes('admin') || roles.includes('owner')) {
-      routes.push({ path: '/admin', label: '👑 Панель управления (Админ)' });
-    }
-    if (roles.includes('driver')) {
-      routes.push({ path: '/driver', label: '🚛 Мои рейсы (Водитель)' });
-    }
-    if (roles.includes('mechanic') || roles.includes('mechanic_lead')) {
-      routes.push({ path: '/mechanic', label: '🔧 Ремзона (Механик)' });
-    }
-
-    if (routes.length === 1) {
-      // Если роль только одна — моментальный редирект
-      router.push(routes[0]!.path);
-    } else if (routes.length > 1) {
-      // Если ролей несколько — показываем UI выбора
-      setAvailableRoutes(routes);
-    } else {
-      // Если ролей нет или они неизвестны
-      router.push('/login');
-    }
-  }, [user, isLoading, isError, error, router]);
+    initAuth();
+  }, [router]);
 
   const handleCopy = () => {
-    const match = maxError?.match(/MAX ID: (.*)\. /);
-    const id = match ? match[1] : '';
-    if (id) {
-      navigator.clipboard.writeText(id);
+    if (unregisteredId) {
+      navigator.clipboard.writeText(unregisteredId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const extractedId = maxError?.match(/MAX ID: (.*)\. /)?.[1];
 
   if (availableRoutes) {
     return (
@@ -170,7 +127,7 @@ export default function RootDispatcher() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6 text-center font-sans antialiased">
       <div className="flex flex-col items-center gap-4 w-full max-w-sm">
-        {maxError && extractedId ? (
+        {unregisteredId ? (
           <div className="bg-white rounded-3xl shadow-xl shadow-zinc-200/50 border border-zinc-100 p-8 w-full animate-in fade-in zoom-in duration-300">
             <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">
               👋
@@ -189,7 +146,7 @@ export default function RootDispatcher() {
               className="bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-2xl p-4 mb-4 cursor-pointer hover:border-orange-300 transition-colors group relative"
             >
               <span className="font-mono text-lg font-black text-zinc-800 tracking-wider">
-                {extractedId}
+                {unregisteredId}
               </span>
               <div className="text-[10px] font-black uppercase text-orange-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 {copied ? '✅ Скопировано' : 'Нажмите, чтобы скопировать'}
@@ -204,12 +161,6 @@ export default function RootDispatcher() {
                 Ввести ПИН-код вручную
               </button>
             </div>
-          </div>
-        ) : maxError ? (
-          <div className="space-y-4">
-             <div className="text-4xl">🚫</div>
-             <p className="text-red-600 font-bold text-sm leading-relaxed max-w-xs">{maxError}</p>
-             <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest">Перенаправление на вход...</p>
           </div>
         ) : (
           <>
