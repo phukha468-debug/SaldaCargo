@@ -33,9 +33,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const filteredUsers = users?.filter(u => 
+    const usersData = (users || []) as any[];
+
+    const filteredUsers = usersData.filter(u => 
       u.roles && (u.roles as string[]).some((r: string) => targetRoles.includes(r))
-    ) || [];
+    );
 
     return NextResponse.json(filteredUsers);
   } catch (err: any) {
