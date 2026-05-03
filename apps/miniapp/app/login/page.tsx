@@ -4,18 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@saldacargo/ui';
 
-type Step = 'role' | 'user' | 'pin';
-type Role = 'driver' | 'mechanic' | 'admin';
-
-const ROLES: { value: Role; label: string; icon: string }[] = [
-  { value: 'driver', label: 'Водитель', icon: '🚚' },
-  { value: 'mechanic', label: 'Механик', icon: '🔧' },
-  { value: 'admin', label: 'Админ', icon: '🔑' },
-];
+type Step = 'user' | 'pin';
 
 export default function LoginPage() {
-  const [step, setStep] = useState<Step>('role');
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [step, setStep] = useState<Step>('user');
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [pin, setPin] = useState('');
@@ -23,23 +15,21 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // Загружаем список пользователей при выборе роли
+  // Загружаем всех активных пользователей для входа по ПИН-коду (fallback-сценарий)
   useEffect(() => {
-    if (selectedRole) {
-      setLoading(true);
-      fetch(`/api/auth/users?role=${selectedRole}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setUsers(data);
-          } else {
-            setError('Ошибка загрузки пользователей');
-          }
-        })
-        .catch(() => setError('Ошибка сервера'))
-        .finally(() => setLoading(false));
-    }
-  }, [selectedRole]);
+    setLoading(true);
+    fetch('/api/auth/users?role=all')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setUsers(data);
+        } else {
+          setError('Ошибка загрузки пользователей');
+        }
+      })
+      .catch(() => setError('Ошибка сервера'))
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +46,7 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
-        // Успешный вход -> отдаем управление диспетчеру
+        // Успешный вход -> отдаем управление корневому диспетчеру
         router.push('/');
         router.refresh();
       } else {
@@ -71,11 +61,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleRoleSelect = (role: Role) => {
-    setSelectedRole(role);
-    setStep('user');
-  };
-
   const handleUserSelect = (userId: string) => {
     console.log('Selected user:', userId);
     setSelectedUserId(userId);
@@ -87,8 +72,7 @@ export default function LoginPage() {
   const reset = () => {
     // Очищаем куку сессии для чистого теста
     document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    setStep('role');
-    setSelectedRole(null);
+    setStep('user');
     setSelectedUserId('');
     setPin('');
     setError('');
@@ -111,38 +95,15 @@ export default function LoginPage() {
               Salda<span className="text-orange-600">Cargo</span>
             </h1>
             <p className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest mt-1">
-              Система управления
+              Вход по ПИН-коду
             </p>
           </div>
 
-          {step === 'role' && (
-            <div className="space-y-3">
-              <h2 className="text-center font-black text-zinc-900 uppercase tracking-tight mb-6">
-                Кто заходит?
-              </h2>
-              <div className="grid gap-3">
-                {ROLES.map((r) => (
-                  <button
-                    key={r.value}
-                    onClick={() => handleRoleSelect(r.value)}
-                    className="flex items-center gap-4 bg-zinc-50 hover:bg-zinc-100 border-2 border-zinc-100 rounded-2xl p-4 transition-all active:scale-[0.98] group"
-                  >
-                    <span className="text-2xl group-hover:scale-110 transition-transform">{r.icon}</span>
-                    <span className="font-bold text-zinc-800 uppercase tracking-wide">{r.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {step === 'user' && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-6">
-                <button onClick={reset} className="text-zinc-400 hover:text-zinc-600">←</button>
-                <h2 className="flex-1 text-center font-black text-zinc-900 uppercase tracking-tight">
-                  Выбери себя
-                </h2>
-              </div>
+              <h2 className="text-center font-black text-zinc-900 uppercase tracking-tight mb-6">
+                Выбери себя
+              </h2>
               
               {loading ? (
                 <div className="py-12 flex justify-center">
