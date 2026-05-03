@@ -24,9 +24,8 @@ export async function GET(request: Request) {
     // Ищем пользователей, у которых есть хотя бы одна из целевых ролей
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, name')
+      .select('id, name, roles')
       .eq('is_active', true)
-      .overlaps('roles', targetRoles)
       .order('name');
 
     if (error) {
@@ -34,7 +33,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(users);
+    const filteredUsers = users?.filter(u => 
+      u.roles && (u.roles as string[]).some((r: string) => targetRoles.includes(r))
+    ) || [];
+
+    return NextResponse.json(filteredUsers);
   } catch (err: any) {
     console.error('[API Auth Users] Fatal Error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

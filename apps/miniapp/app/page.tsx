@@ -8,7 +8,7 @@ export default function RootDispatcher() {
   const router = useRouter();
   const [maxError, setMaxError] = useState<string | null>(null);
 
-  const { data: user, isLoading, isError } = useQuery({
+  const { data: user, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       // [DEBUG] Выводим полную ссылку для диагностики MAX SDK
@@ -52,7 +52,7 @@ export default function RootDispatcher() {
 
     if (isError || !user) {
       // Если была ошибка МАХ авторизации (например 403 с ID), прокидываем её на страницу логина
-      const errorMsg = isError ? (data as any)?.message || 'Unauthorized' : '';
+      const errorMsg = isError ? (error as Error)?.message || 'Unauthorized' : '';
       if (errorMsg.includes('MAX ID')) {
          // Сохраняем ошибку в стейт чтобы показать пользователю перед редиректом
          setMaxError(errorMsg);
@@ -92,6 +92,9 @@ export default function RootDispatcher() {
           <>
             <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">SaldaCargo</p>
+            <p className="text-[8px] text-zinc-500 break-all px-4 mt-4">
+              {typeof window !== 'undefined' ? window.location.href : 'loading...'}
+            </p>
           </>
         )}
       </div>
