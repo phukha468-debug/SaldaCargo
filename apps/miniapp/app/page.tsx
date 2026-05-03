@@ -90,7 +90,7 @@ export default function RootDispatcher() {
 
     console.log('[Dispatcher Debug] Processing roles:', roles, 'for user:', user.name);
 
-    const routes = [];
+    const routes: { path: string; label: string }[] = [];
     if (roles.includes('admin') || roles.includes('owner')) {
       routes.push({ path: '/admin', label: '👑 Панель управления (Админ)' });
     }
@@ -103,7 +103,7 @@ export default function RootDispatcher() {
 
     if (routes.length === 1) {
       // Если роль только одна — моментальный редирект
-      router.push(routes[0].path);
+      router.push(routes[0]!.path);
     } else if (routes.length > 1) {
       // Если ролей несколько — показываем UI выбора
       setAvailableRoutes(routes);
