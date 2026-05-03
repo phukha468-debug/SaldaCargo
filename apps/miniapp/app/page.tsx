@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 export default function RootDispatcher() {
   const router = useRouter();
   const [maxError, setMaxError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: user, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
@@ -73,10 +74,10 @@ export default function RootDispatcher() {
     if (isError || !user) {
       // Если была ошибка МАХ авторизации (например 403 с ID), прокидываем её на страницу логина
       const errorMsg = isError ? (error as Error)?.message || 'Unauthorized' : '';
+      
+      // Если это ошибка "не зарегистрирован", НЕ ПЕРЕНАПРАВЛЯЕМ автоматически
       if (errorMsg.includes('MAX ID')) {
-         // Сохраняем ошибку в стейт чтобы показать пользователю перед редиректом
          setMaxError(errorMsg);
-         setTimeout(() => router.push(`/login?error=${encodeURIComponent(errorMsg)}`), 3000);
       } else {
          router.push('/login');
       }
@@ -97,12 +98,59 @@ export default function RootDispatcher() {
     } else {
       router.push('/login');
     }
-  }, [user, isLoading, isError, router]);
+  }, [user, isLoading, isError, error, router]);
+
+  const handleCopy = () => {
+    const match = maxError?.match(/MAX ID: (.*)\. /);
+    const id = match ? match[1] : '';
+    if (id) {
+      navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const extractedId = maxError?.match(/MAX ID: (.*)\. /)?.[1];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 text-center">
-      <div className="flex flex-col items-center gap-4">
-        {maxError ? (
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6 text-center font-sans antialiased">
+      <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+        {maxError && extractedId ? (
+          <div className="bg-white rounded-3xl shadow-xl shadow-zinc-200/50 border border-zinc-100 p-8 w-full animate-in fade-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">
+              👋
+            </div>
+            
+            <h1 className="text-xl font-black text-zinc-900 uppercase tracking-tight mb-2">
+              Вы почти с нами!
+            </h1>
+            
+            <p className="text-sm text-zinc-500 mb-8 leading-relaxed">
+              Ваш аккаунт ещё не активирован. Передайте этот идентификатор администратору:
+            </p>
+
+            <div 
+              onClick={handleCopy}
+              className="bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-2xl p-4 mb-4 cursor-pointer hover:border-orange-300 transition-colors group relative"
+            >
+              <span className="font-mono text-lg font-black text-zinc-800 tracking-wider">
+                {extractedId}
+              </span>
+              <div className="text-[10px] font-black uppercase text-orange-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {copied ? '✅ Скопировано' : 'Нажмите, чтобы скопировать'}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-4">
+              <button 
+                onClick={() => router.push('/login')}
+                className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                Ввести ПИН-код вручную
+              </button>
+            </div>
+          </div>
+        ) : maxError ? (
           <div className="space-y-4">
              <div className="text-4xl">🚫</div>
              <p className="text-red-600 font-bold text-sm leading-relaxed max-w-xs">{maxError}</p>
@@ -111,7 +159,9 @@ export default function RootDispatcher() {
         ) : (
           <>
             <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">SaldaCargo</p>
+            <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">
+              Salda<span className="text-orange-600">Cargo</span>
+            </p>
           </>
         )}
       </div>
