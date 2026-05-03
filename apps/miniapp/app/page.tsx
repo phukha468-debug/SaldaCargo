@@ -7,6 +7,11 @@ import { useQuery } from '@tanstack/react-query';
 export default function RootDispatcher() {
   const router = useRouter();
   const [maxError, setMaxError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState('');
+
+  useEffect(() => {
+    setDebugInfo(window.location.href);
+  }, []);
 
   const { data: user, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
@@ -81,6 +86,9 @@ export default function RootDispatcher() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 text-center">
+      <div className="absolute top-0 left-0 w-full bg-black text-green-400 text-[10px] break-all p-2 z-[9999] opacity-90">
+        URL: {debugInfo}
+      </div>
       <div className="flex flex-col items-center gap-4">
         {maxError ? (
           <div className="space-y-4">
