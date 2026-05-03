@@ -22,12 +22,11 @@ export async function GET(request: Request) {
     const targetRoles = roleMapping[role as string] || [role as string];
 
     // Ищем пользователей, у которых есть хотя бы одна из целевых ролей
-    // Используем фильтр 'ov' (overlap) для массивов
     const { data: users, error } = await supabase
       .from('users')
       .select('id, name')
       .eq('is_active', true)
-      .filter('roles', 'ov', `{${targetRoles.join(',')}}`)
+      .overlaps('roles', targetRoles)
       .order('name');
 
     if (error) {
