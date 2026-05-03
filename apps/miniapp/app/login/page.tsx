@@ -56,16 +56,18 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
+        // Успешный вход -> отдаем управление диспетчеру
         router.push('/');
         router.refresh();
       } else {
         const data = await response.json();
         setError(data.error || 'Ошибка входа');
+        setLoading(false); // Снимаем зависание при ошибке валидации
       }
-    } catch (_err) {
-      setError('Ошибка сервера');
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Ошибка сервера');
+      setLoading(false); // Снимаем зависание при фатальной ошибке
     }
   }
 

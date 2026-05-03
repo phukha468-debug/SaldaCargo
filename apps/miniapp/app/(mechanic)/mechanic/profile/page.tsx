@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 
 export default function MechanicProfilePage() {
-  const router = useRouter();
   const { data: user, isLoading } = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
@@ -15,9 +14,14 @@ export default function MechanicProfilePage() {
   });
 
   const logout = async () => {
-    // В MVP просто удаляем куку или редиректим на логин
-    document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    router.push('/login');
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login'; 
+    } catch (error) {
+      console.error('Logout failed', error);
+      document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      window.location.href = '/login';
+    }
   };
 
   if (isLoading) return <div className="p-4 animate-pulse">Загрузка...</div>;

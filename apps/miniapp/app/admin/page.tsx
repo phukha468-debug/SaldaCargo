@@ -5,8 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@saldacargo/ui';
 
 export default function AdminDashboard() {
-  const router = useRouter();
-
   const { data: me } = useQuery({
     queryKey: ['me'],
     queryFn: () => fetch('/api/driver/me').then((r) => r.json()),
@@ -60,10 +58,14 @@ export default function AdminDashboard() {
       <div className="mt-8 text-center">
         <button 
           onClick={async () => {
-            // Простой логаут - удаление куки через API или просто редирект на логин
-            // Для MVP просто редирект
-            document.cookie = "salda_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            router.push('/login');
+            try {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              window.location.href = '/login'; 
+            } catch (error) {
+              console.error('Logout failed', error);
+              document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+              window.location.href = '/login';
+            }
           }}
           className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest hover:text-red-500 transition-colors"
         >

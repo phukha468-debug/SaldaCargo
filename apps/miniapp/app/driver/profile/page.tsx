@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation';
 const MOCK_DRIVER_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function ProfilePage() {
-  const router = useRouter();
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ['driver-profile', MOCK_DRIVER_ID],
     queryFn: async () => {
@@ -30,6 +29,19 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      // Обязательно делаем жесткую перезагрузку, чтобы сбросить стейты и куки
+      window.location.href = '/login'; 
+    } catch (error) {
+      console.error('Logout failed', error);
+      // Fallback на случай ошибки API
+      document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <div className="p-4 space-y-8">
@@ -57,11 +69,7 @@ export default function ProfilePage() {
         </button>
         
         <button
-          onClick={() => {
-            // В реальном приложении здесь логаут
-            alert('Выход из системы');
-            router.push('/login');
-          }}
+          onClick={handleLogout}
           className="w-full h-14 bg-red-50 text-red-600 rounded-lg font-black uppercase tracking-widest active:bg-red-100 transition-colors mt-4"
         >
           Выйти
