@@ -11,6 +11,11 @@ export default function RootDispatcher() {
   const { data: user, isLoading, isError } = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
+      // [DEBUG] Выводим полную ссылку для диагностики MAX SDK
+      if (typeof window !== 'undefined') {
+        console.log('[DEBUG] Full URL:', window.location.href);
+      }
+
       // 1. Проверяем среду МАХ перед запросом профиля
       const searchParams = new URLSearchParams(window.location.search);
       const maxUserId = searchParams.get('uid');
