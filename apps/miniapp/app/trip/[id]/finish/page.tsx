@@ -38,6 +38,9 @@ export default function FinishTripPage() {
           settlement_status: string;
           lifecycle_status: string;
         }>;
+        trip_expenses: Array<{
+          amount: string;
+        }>;
       }>;
     },
   });

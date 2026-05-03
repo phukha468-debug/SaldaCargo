@@ -1,10 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": [".env.local", "tsconfig.base.json"],
+  "globalPassThroughEnv": ["MAX_BOT_TOKEN"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "MAX_BOT_TOKEN"
+      ]
     },
     "lint": {
       "outputs": []

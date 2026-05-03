@@ -24,12 +24,12 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
 
     // 1. Проверяем нет ли активного рейса у этого водителя
-    const { data: existing } = await supabase
+    const { data: existing } = await (supabase
       .from('trips')
       .select('id, trip_number')
       .eq('driver_id', userId)
       .eq('status', 'in_progress')
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (existing) {
       return NextResponse.json(
@@ -39,8 +39,8 @@ export async function POST(request: Request) {
     }
 
     // 2. Создаем новый рейс
-    const { data, error } = await supabase
-      .from('trips')
+    const { data, error } = await ((supabase
+      .from('trips') as any)
       .insert({
         driver_id: userId,
         asset_id: body.asset_id,
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         started_at: new Date().toISOString(),
       })
       .select()
-      .single();
+      .single() as any);
 
     if (error) {
       console.error('[API Trips] Insert Error:', error);

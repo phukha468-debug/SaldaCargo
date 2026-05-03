@@ -3,7 +3,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
@@ -11,6 +11,14 @@ import { formatDate } from '@saldacargo/shared';
 const MOCK_DRIVER_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function FinancePage() {
+  return (
+    <Suspense fallback={<DriverHomeSkeleton />}>
+      <FinanceContent />
+    </Suspense>
+  );
+}
+
+function FinanceContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') === 'pay' ? 'pay' : 'accountable';
   const [activeTab, setActiveTab] = useState<'accountable' | 'pay'>(initialTab);
@@ -25,17 +33,7 @@ export default function FinancePage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="p-4 space-y-4 animate-pulse">
-        <div className="h-10 bg-zinc-200 rounded mb-6" />
-        <div className="h-32 bg-zinc-200 rounded-lg" />
-        <div className="space-y-3 pt-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-zinc-200 rounded-lg h-16" />
-          ))}
-        </div>
-      </div>
-    );
+    return <DriverHomeSkeleton />;
   }
 
   return (
@@ -67,6 +65,20 @@ export default function FinancePage() {
           <SalaryTab trips={data?.salary?.trips} />
         )}
       </main>
+    </div>
+  );
+}
+
+function DriverHomeSkeleton() {
+  return (
+    <div className="p-4 space-y-4 animate-pulse">
+      <div className="h-10 bg-zinc-200 rounded mb-6" />
+      <div className="h-32 bg-zinc-200 rounded-lg" />
+      <div className="space-y-3 pt-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-zinc-200 rounded-lg h-16" />
+        ))}
+      </div>
     </div>
   );
 }

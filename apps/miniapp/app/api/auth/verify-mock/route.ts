@@ -14,11 +14,13 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    const { data: user, error } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .select('id, roles, is_active')
       .eq('id', userId)
       .single();
+
+    const user = data as { id: string; roles: string[]; is_active: boolean } | null;
 
     if (error || !user) {
       console.error('[Auth Debug] User not found:', userId);

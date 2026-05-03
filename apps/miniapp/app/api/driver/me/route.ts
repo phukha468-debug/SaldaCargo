@@ -9,20 +9,26 @@ export async function GET() {
   console.log('[API /me] Checking cookie:', customUserId || 'NOT FOUND');
 
   if (!customUserId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }, {
-      headers: { 'Cache-Control': 'no-store' }
-    });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { 
+        status: 401,
+        headers: { 'Cache-Control': 'no-store' }
+      }
+    );
   }
 
   try {
     const supabase = createAdminClient();
     
     // Ищем пользователя по ID из куки
-    const { data: user, error } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('id', customUserId)
       .single();
+
+    const user = data as any;
 
     if (error || !user) {
       console.error('[API /me] User not found in DB for ID:', customUserId);

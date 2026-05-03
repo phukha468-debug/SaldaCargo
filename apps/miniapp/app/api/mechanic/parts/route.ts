@@ -16,8 +16,10 @@ export async function GET(request: Request) {
       query = query.or(`name.ilike.%${search}%,article.ilike.%${search}%`);
     }
 
-    const { data: parts, error } = await query.limit(50);
+    const { data, error } = await query.limit(50);
     if (error) throw error;
+
+    const parts = (data || []) as any[];
 
     // В MVP остаток считаем как заглушку или через movements
     // Для простоты добавим случайный остаток если в таблице нет поля stock

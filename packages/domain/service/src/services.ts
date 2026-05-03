@@ -102,8 +102,8 @@ export async function getOrderDetail(supabase: Client, orderId: string) {
 export async function startWork(supabase: Client, workId: string) {
   // 1. Проверяем, нет ли уже запущенного таймера у этого механика (делается триггером в БД)
   // Но мы всё равно отправим запрос
-  const { data, error } = await supabase
-    .from('work_time_logs')
+  const { data, error } = await (supabase
+    .from('work_time_logs') as any)
     .insert({
       service_order_work_id: workId,
       status: 'running',
@@ -115,21 +115,21 @@ export async function startWork(supabase: Client, workId: string) {
   if (error) throw error;
 
   // 2. Обновляем статус работы и наряда
-  await supabase
-    .from('service_order_works')
+  await (supabase
+    .from('service_order_works') as any)
     .update({ status: 'in_progress' })
     .eq('id', workId);
 
   // Получаем ID наряда чтобы обновить его статус
-  const { data: work } = await supabase
-    .from('service_order_works')
+  const { data: work } = await (supabase
+    .from('service_order_works') as any)
     .select('service_order_id')
     .eq('id', workId)
     .single();
 
   if (work) {
-    await supabase
-      .from('service_orders')
+    await (supabase
+      .from('service_orders') as any)
       .update({ status: 'in_progress' })
       .eq('id', work.service_order_id);
   }
@@ -144,8 +144,8 @@ export async function stopWork(supabase: Client, workId: string, status: 'paused
   const now = new Date().toISOString();
 
   // 1. Закрываем активный лог времени
-  const { error: logError } = await supabase
-    .from('work_time_logs')
+  const { error: logError } = await (supabase
+    .from('work_time_logs') as any)
     .update({ 
       stopped_at: now,
       status: status === 'paused' ? 'paused' : 'completed'
@@ -156,8 +156,8 @@ export async function stopWork(supabase: Client, workId: string, status: 'paused
   if (logError) throw logError;
 
   // 2. Обновляем статус самой работы
-  const { error: workError } = await supabase
-    .from('service_order_works')
+  const { error: workError } = await (supabase
+    .from('service_order_works') as any)
     .update({ status: status })
     .eq('id', workId);
 

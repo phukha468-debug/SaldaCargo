@@ -1,10 +1,13 @@
-@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block');
+@import "tailwindcss";
+
 @source "../../../packages/ui/src";
 
 @theme {
-  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-inter: "Inter", system-ui, sans-serif;
   --font-sans: var(--font-inter);
-
+  
   /* Zinc colors */
   --color-zinc-50: #fafafa;
   --color-zinc-100: #f4f4f5;
@@ -31,9 +34,6 @@
 }
 
 @layer base {
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-  @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block');
-
   body {
     background-color: var(--color-zinc-50);
     color: var(--color-zinc-900);

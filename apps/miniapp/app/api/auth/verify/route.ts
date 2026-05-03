@@ -20,10 +20,10 @@ export async function POST(request: Request) {
   // 2. Ищем пользователя по номеру телефона в БД
   const supabase = await createClient();
   const { data: user, error } = await (supabase
-    .from('users') as any)
+    .from('users')
     .select('*')
     .eq('phone', phone)
-    .single();
+    .single() as any);
 
   if (error || !user) {
     return NextResponse.json({ error: 'User not found or access denied' }, { status: 403 });
