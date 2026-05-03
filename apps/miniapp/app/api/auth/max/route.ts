@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /**
@@ -19,14 +19,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Нет данных авторизации' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Используем Admin клиент для обхода RLS при поиске пользователя
+  const supabaseAdmin = createAdminClient();
 
   // Ищем пользователя в нашей таблице
-  const { data, error } = await (supabase
+  const { data, error } = await (supabaseAdmin
     .from('users')
     .select('id, name, roles, is_active')
     .eq('max_user_id', maxUserId)
     .single() as any);
+
+  console.log('[MAX Auth DB Result]:', { userId: data?.id, error: error?.message });
 
   const user = data as { id: string; name: string; roles: string[]; is_active: boolean } | null;
 

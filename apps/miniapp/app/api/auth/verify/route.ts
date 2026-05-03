@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { verifyMaxContact } from '@saldacargo/domain-identity';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
   const { vcf_info, hash, phone } = await request.json();
@@ -18,8 +18,9 @@ export async function POST(request: Request) {
   }
 
   // 2. Ищем пользователя по номеру телефона в БД
-  const supabase = await createClient();
-  const { data: user, error } = await (supabase
+  // Используем Admin клиент для обхода RLS, так как запрос идет от неавторизованного пользователя
+  const supabaseAdmin = createAdminClient();
+  const { data: user, error } = await (supabaseAdmin
     .from('users')
     .select('*')
     .eq('phone', phone)
