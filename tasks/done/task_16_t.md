@@ -5,8 +5,8 @@
 Кусочек лога Vercel:
 
 Plaintext
-@saldacargo/miniapp:build:   30 |     }
-@saldacargo/miniapp:build:   31 |
+@saldacargo/miniapp:build: 30 | }
+@saldacargo/miniapp:build: 31 |
 @saldacargo/miniapp:build: Next.js build worker exited with code: 1
 Также есть ворнинг от Turborepo: MAX_BOT_TOKEN is set on your Vercel project, but missing from "turbo.json".
 

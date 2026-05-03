@@ -28,21 +28,21 @@ console.log('[MAX Auth Debug] Incoming maxUserId:', maxUserId);
 Найди блок кода, который срабатывает, если пользователя нет в базе (ошибка базы или !user):
 
 TypeScript
-  if (error || !user) {
-    return NextResponse.json(
-      { error: 'Доступ запрещён. Обратитесь к администратору.' },
-      { status: 403 },
-    );
-  }
+if (error || !user) {
+return NextResponse.json(
+{ error: 'Доступ запрещён. Обратитесь к администратору.' },
+{ status: 403 },
+);
+}
 Измени строку error так, чтобы она динамически выводила пришедший ID.
 Новый код должен выглядеть так:
 
 TypeScript
-  if (error || !user) {
-    return NextResponse.json(
-      { error: `Доступ запрещён. Ваш MAX ID: ${maxUserId}. Сообщите его администратору.` },
-      { status: 403 },
-    );
-  }
+if (error || !user) {
+return NextResponse.json(
+{ error: `Доступ запрещён. Ваш MAX ID: ${maxUserId}. Сообщите его администратору.` },
+{ status: 403 },
+);
+}
 [EXPECTED DELIVERABLE]
 Выведи только полный обновленный код файла route.ts. Никаких дополнительных рассуждений не требуется.
