@@ -27,10 +27,17 @@ export default function RootDispatcher() {
 
   // 1. При входе сбрасываем старую куку, если мы на первом шаге
   useEffect(() => {
+    console.log('--- SELECTOR FLOW LOADED ---');
     if (step === 'role') {
       document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
   }, [step]);
+
+  const handleResetAll = () => {
+    document.cookie = "salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    localStorage.clear();
+    window.location.reload();
+  };
 
   // Загрузка пользователей при выборе роли
   const handleRoleSelect = async (role: string) => {
@@ -117,6 +124,15 @@ export default function RootDispatcher() {
                   </div>
                 </button>
               ))}
+            </div>
+
+            <div className="pt-8 text-center">
+              <button 
+                onClick={handleResetAll}
+                className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 hover:text-zinc-500 transition-colors"
+              >
+                Очистить кэш и сбросить всё
+              </button>
             </div>
           </div>
         );
