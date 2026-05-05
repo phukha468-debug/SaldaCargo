@@ -39,10 +39,6 @@ export default function RootPage() {
     queryKey: ['me'],
     queryFn: async () => {
       const res = await fetch('/api/driver/me');
-      if (res.status === 401) {
-        document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        throw new Error('Unauthorized');
-      }
       if (!res.ok) throw new Error('Not authenticated');
       return res.json();
     },

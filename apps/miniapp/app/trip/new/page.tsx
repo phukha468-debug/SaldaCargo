@@ -34,7 +34,7 @@ export default function NewTripPage() {
 
   const { data: assets = [], isLoading: assetsLoading } = useQuery({
     queryKey: ['driver', 'assets'],
-    queryFn: () => fetch('/api/driver/assets').then((r) => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/vehicles/public').then((r) => r.ok ? r.json() : []),
   });
 
   const { data: loaders = [], isLoading: loadersLoading } = useQuery({
@@ -65,9 +65,12 @@ export default function NewTripPage() {
   const selectedAssetId = watch('asset_id');
   const selectedAsset = assets.find((a: any) => a.id === selectedAssetId);
 
-  // Автоматически выбираем закрепленную машину
+  // Подставляем машину из localStorage (выбранную на старте)
   useEffect(() => {
-    if (me?.current_asset_id && assets.length > 0 && !selectedAssetId) {
+    const savedVehicleId = localStorage.getItem('active_vehicle_id');
+    if (savedVehicleId && assets.length > 0) {
+      setValue('asset_id', savedVehicleId);
+    } else if (me?.current_asset_id && assets.length > 0 && !selectedAssetId) {
       setValue('asset_id', me.current_asset_id);
     }
   }, [me, assets, setValue, selectedAssetId]);
@@ -125,29 +128,22 @@ export default function NewTripPage() {
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
-        {/* Машина */}
+        {/* Машина (только отображение) */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Машина</label>
-          <div className="relative">
-            <select
-              {...register('asset_id')}
-              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-zinc-900 bg-white font-bold focus:border-orange-500 focus:outline-none transition-colors appearance-none"
-            >
-              <option value="">Выберите машину</option>
-              {assets.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  {a.short_name} ({a.reg_number})
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">▼</div>
+          <div className="w-full rounded-lg border-2 border-zinc-100 bg-zinc-50 px-4 h-14 flex items-center">
+            {selectedAsset ? (
+              <span className="font-black text-zinc-900 uppercase">
+                {selectedAsset.short_name} ({selectedAsset.reg_number})
+              </span>
+            ) : (
+              <span className="text-red-500 font-bold text-xs uppercase">Машина не выбрана</span>
+            )}
+            <input type="hidden" {...register('asset_id')} />
           </div>
-          {assets.length === 0 && !assetsLoading && (
-            <p className="text-orange-600 text-[10px] font-bold mt-1 pl-1">⚠ Список машин пуст. Проверьте БД.</p>
-          )}
-          {errors.asset_id && (
-            <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.asset_id.message}</p>
-          )}
+          <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest pl-1">
+            Машина выбрана при входе. Чтобы сменить — перезайдите в приложение.
+          </p>
         </div>
 
         {/* Тип рейса */}

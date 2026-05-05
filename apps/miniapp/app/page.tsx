@@ -63,10 +63,10 @@ export default function RootDispatcher() {
     if (selectedRole === 'driver') {
       setLoading(true);
       try {
-        const res = await fetch('/api/driver/assets');
+        const res = await fetch('/api/vehicles/public');
         const data = await res.json();
         // Фильтруем отладочные ошибки, если они есть
-        setVehicles(Array.isArray(data) ? data.filter((v: any) => v.id !== 'err' && v.id !== 'empty') : []);
+        setVehicles(Array.isArray(data) ? data : []);
         setStep('vehicle');
       } catch (error) {
         console.error('Failed to fetch vehicles:', error);

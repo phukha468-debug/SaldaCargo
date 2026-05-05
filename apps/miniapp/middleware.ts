@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname === '/login';
   const isAuthApi = pathname.startsWith('/api/auth/');
-  const isPublicApi = pathname.startsWith('/api/users/public');
+  const isPublicApi = pathname.startsWith('/api/users/public') || pathname.startsWith('/api/vehicles/public');
 
   if (!userId && !isAuthPage && !isAuthApi && !isPublicApi && pathname !== '/') {
     return NextResponse.redirect(new URL('/login', request.url));
