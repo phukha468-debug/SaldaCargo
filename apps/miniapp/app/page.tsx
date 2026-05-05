@@ -29,15 +29,14 @@ export default function RootDispatcher() {
             body: JSON.stringify({ initData: { max_user_id: maxUserId } })
           });
 
-          if (res.status === 403) {
-            // НЕТ В БАЗЕ -> ПОКАЗЫВАЕМ ID И ОСТАНАВЛИВАЕМСЯ (БЕЗ РЕДИРЕКТА НА /login)
+          if (!res.ok) {
+            // ЛЮБАЯ ОШИБКА (404, 403, 401) -> ПОКАЗЫВАЕМ ID И ОСТАНАВЛИВАЕМСЯ
             setUnregisteredId(maxUserId);
             return; 
           }
 
-          if (res.ok) {
-            // ЕСТЬ В БАЗЕ -> РАЗБИРАЕМ РОЛИ
-            const data = await res.json();
+          // ЕСТЬ В БАЗЕ -> РАЗБИРАЕМ РОЛИ
+          const data = await res.json();
             const roles = data.user?.roles || [];
             const routes: { path: string; label: string }[] = [];
 
@@ -59,7 +58,6 @@ export default function RootDispatcher() {
               router.push('/login');
             }
             return;
-          }
         }
 
         // СЦЕНАРИЙ Б: Нет MAX данных (десктоп) -> Идем на ручной ввод ПИН-кода
@@ -155,7 +153,7 @@ export default function RootDispatcher() {
 
             <div className="space-y-3 pt-4">
               <button 
-                onClick={() => router.push('/login')}
+                onClick={() => router.push(`/login?userId=${unregisteredId}`)}
                 className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-600 transition-colors"
               >
                 Ввести ПИН-код вручную
