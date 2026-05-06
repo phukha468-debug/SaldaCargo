@@ -65,13 +65,13 @@ export default function RootDispatcher() {
       try {
         const res = await fetch('/api/vehicles/public');
         const data = await res.json();
+        console.log('[Selector Flow] Received vehicles:', data);
         // Фильтруем отладочные ошибки, если они есть
         setVehicles(Array.isArray(data) ? data : []);
         setStep('vehicle');
       } catch (error) {
         console.error('Failed to fetch vehicles:', error);
-        // Если машины не загрузились, все равно пускаем (Bypass)
-        router.push('/driver');
+        // Оставляем на текущем шаге, чтобы пользователь увидел ошибку в консоли
       } finally {
         setLoading(false);
       }

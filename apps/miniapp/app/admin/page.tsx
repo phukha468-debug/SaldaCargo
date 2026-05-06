@@ -60,11 +60,11 @@ export default function AdminDashboard() {
           onClick={async () => {
             try {
               await fetch('/api/auth/logout', { method: 'POST' });
-              window.location.href = '/login'; 
+              window.location.href = '/'; 
             } catch (error) {
               console.error('Logout failed', error);
               document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-              window.location.href = '/login';
+              window.location.href = '/';
             }
           }}
           className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest hover:text-red-500 transition-colors"
