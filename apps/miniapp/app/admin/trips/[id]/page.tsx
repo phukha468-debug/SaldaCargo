@@ -13,6 +13,7 @@ export default function AdminTripDetailPage() {
   const queryClient = useQueryClient();
   const [returnNote, setReturnNote] = useState('');
   const [showReturnForm, setShowReturnForm] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const { data: trip, isLoading } = useQuery<any>({
     queryKey: ['admin-trip', id],
@@ -21,17 +22,23 @@ export default function AdminTripDetailPage() {
   });
 
   const action = useMutation({
-    mutationFn: (body: { action: 'approve' | 'return'; note?: string }) =>
-      fetch(`/api/admin/trips/${id}`, {
+    mutationFn: async (body: { action: 'approve' | 'return'; note?: string }) => {
+      const r = await fetch(`/api/admin/trips/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }).then((r) => r.json()),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
+      return data;
+    },
     onSuccess: () => {
+      setActionError('');
       queryClient.invalidateQueries({ queryKey: ['admin-trips'] });
       queryClient.invalidateQueries({ queryKey: ['admin-summary'] });
       router.push('/admin/trips?filter=review');
     },
+    onError: (e: Error) => setActionError(e.message),
   });
 
   if (isLoading) {
@@ -42,7 +49,13 @@ export default function AdminTripDetailPage() {
     );
   }
 
-  if (!trip) return null;
+  if (!trip || trip.error) {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+        <p className="text-red-500 font-bold">{trip?.error ?? 'Рейс не найден'}</p>
+      </div>
+    );
+  }
 
   const activeOrders = (trip.trip_orders ?? []).filter(
     (o: any) => o.lifecycle_status !== 'cancelled',
@@ -88,6 +101,7 @@ export default function AdminTripDetailPage() {
           </p>
           <p className="text-sm font-bold text-zinc-500">
             {trip.driver?.name} · {formatDate(trip.started_at)}
+            {trip.ended_at && ` → ${formatDate(trip.ended_at)}`}
           </p>
           {mileage && <p className="text-sm font-bold text-zinc-500">Пробег: {mileage} км</p>}
           {trip.driver_note && (
@@ -121,6 +135,9 @@ export default function AdminTripDetailPage() {
           <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
             Заказы ({activeOrders.length})
           </h2>
+          {activeOrders.length === 0 && (
+            <p className="text-center text-zinc-400 font-bold text-xs py-4">Заказов нет</p>
+          )}
           {activeOrders.map((order: any) => (
             <div
               key={order.id}
@@ -168,6 +185,11 @@ export default function AdminTripDetailPage() {
       {/* Кнопки действий (только для рейсов на ревью) */}
       {isPendingReview && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50">
+          {actionError && (
+            <p className="text-red-600 text-xs font-black uppercase text-center bg-red-50 rounded-lg py-2 px-3">
+              ❌ {actionError}
+            </p>
+          )}
           {showReturnForm ? (
             <div className="space-y-3">
               <textarea
@@ -179,7 +201,10 @@ export default function AdminTripDetailPage() {
               />
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => setShowReturnForm(false)}
+                  onClick={() => {
+                    setShowReturnForm(false);
+                    setActionError('');
+                  }}
                   className="h-12 rounded-lg border-2 border-zinc-200 font-black text-xs uppercase text-zinc-600 active:scale-95 transition-all"
                 >
                   Отмена
@@ -196,7 +221,10 @@ export default function AdminTripDetailPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setShowReturnForm(true)}
+                onClick={() => {
+                  setShowReturnForm(true);
+                  setActionError('');
+                }}
                 disabled={action.isPending}
                 className="h-14 rounded-2xl border-2 border-amber-300 bg-amber-50 text-amber-700 font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
               >
@@ -207,7 +235,7 @@ export default function AdminTripDetailPage() {
                 disabled={action.isPending}
                 className="h-14 rounded-2xl bg-green-600 text-white font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md disabled:opacity-50"
               >
-                {action.isPending ? '...' : '✓ Одобрить'}
+                {action.isPending ? '⏳ Сохраняем...' : '✓ Одобрить'}
               </button>
             </div>
           )}
