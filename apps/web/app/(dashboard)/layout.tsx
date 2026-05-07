@@ -10,6 +10,7 @@ const navItems = [
   { href: '/fleet', label: 'Автопарк' },
   { href: '/garage', label: 'Гараж' },
   { href: '/finance', label: 'Финансы' },
+  { href: '/receivables', label: 'Дебиторка' },
   { href: '/staff', label: 'Персонал' },
   { href: '/settings', label: 'Настройки' },
 ] as const;
