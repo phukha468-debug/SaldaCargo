@@ -39,10 +39,8 @@ export default function AddOrderPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [idempotencyKey] = useState(() => uuid());
-  const [counterparties, setCounterparties] = useState<Array<{ id: string; name: string }>>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
@@ -51,6 +49,12 @@ export default function AddOrderPage() {
     queryKey: ['trip', tripId],
     queryFn: () => fetch(`/api/trips/${tripId}`).then((r) => r.json()),
     staleTime: 60000,
+  });
+
+  const { data: counterparties = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['driver', 'counterparties'],
+    queryFn: () => fetch('/api/driver/counterparties').then((r) => r.json()),
+    staleTime: 5 * 60 * 1000,
   });
 
   const {
@@ -72,13 +76,6 @@ export default function AddOrderPage() {
   const selectedCounterpartyId = watch('counterparty_id');
   const selectedCounterparty = counterparties.find((c) => c.id === selectedCounterpartyId);
 
-  useState(() => {
-    fetch('/api/driver/counterparties')
-      .then((r) => r.json())
-      .then(setCounterparties)
-      .catch(console.error);
-  });
-
   const amountRaw = watch('amount');
   const amount = amountRaw ? Number(amountRaw) : 0;
   const suggestedPay = amount ? Math.round((amount * SUGGEST_PERCENT) / 100) : 0;
@@ -99,9 +96,7 @@ export default function AddOrderPage() {
       });
       if (res.ok) {
         const newClient = await res.json();
-        setCounterparties((prev) =>
-          [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        queryClient.invalidateQueries({ queryKey: ['driver', 'counterparties'] });
         setValue('counterparty_id', newClient.id);
         setShowNewClient(false);
         setNewClientName('');
@@ -118,33 +113,29 @@ export default function AddOrderPage() {
   }
 
   async function onSubmit(data: FormData) {
-    if (submitting || submitted) return;
+    if (submitting) return;
     setSubmitting(true);
     setError('');
 
-    const res = await fetch(`/api/trips/${tripId}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...data,
-        amount: String(data.amount),
-        driver_pay: String(data.driver_pay),
-        loader_pay: String(data.loader_pay),
-        loader2_pay: String(data.loader2_pay),
-        idempotency_key: idempotencyKey,
-      }),
+    const payload = JSON.stringify({
+      ...data,
+      amount: String(data.amount),
+      driver_pay: String(data.driver_pay),
+      loader_pay: String(data.loader_pay),
+      loader2_pay: String(data.loader2_pay),
+      idempotency_key: idempotencyKey,
     });
 
-    if (!res.ok) {
-      const result = (await res.json()) as { error?: string };
-      setError(result.error ?? 'Ошибка');
-      setSubmitting(false);
-      return;
-    }
-
-    setSubmitted(true);
-    await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    // Navigate immediately — server request runs in background
     router.push(`/trip/${tripId}`);
+
+    fetch(`/api/trips/${tripId}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    });
   }
 
   return (
@@ -366,10 +357,10 @@ export default function AddOrderPage() {
           <Button
             type="submit"
             size="hero"
-            disabled={submitting || submitted}
+            disabled={submitting}
             className="font-black uppercase tracking-widest"
           >
-            {submitting ? 'Сохраняем...' : submitted ? 'Сохранено ✓' : '✅ Добавить заказ'}
+            {submitting ? 'Сохраняем...' : '✅ Добавить заказ'}
           </Button>
         </div>
       </form>

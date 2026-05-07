@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,12 +31,13 @@ export default function AddExpensePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; code: string }>>(
-    [],
-  );
   const [idempotencyKey] = useState(() => uuid());
+
+  const { data: categories = [] } = useQuery<Array<{ id: string; name: string; code: string }>>({
+    queryKey: ['driver', 'categories'],
+    queryFn: () => fetch('/api/driver/categories').then((r) => r.json()),
+    staleTime: 10 * 60 * 1000,
+  });
 
   const {
     register,
@@ -52,38 +53,26 @@ export default function AddExpensePage() {
 
   const selectedPaymentMethod = watch('payment_method');
 
-  useEffect(() => {
-    fetch('/api/driver/categories')
-      .then((r) => r.json())
-      .then(setCategories)
-      .catch(console.error);
-  }, []);
-
   async function onSubmit(data: FormData) {
-    if (submitting || submitted) return;
+    if (submitting) return;
     setSubmitting(true);
-    setError('');
 
-    const res = await fetch(`/api/trips/${tripId}/expenses`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...data,
-        amount: String(data.amount),
-        idempotency_key: idempotencyKey,
-      }),
+    const payload = JSON.stringify({
+      ...data,
+      amount: String(data.amount),
+      idempotency_key: idempotencyKey,
     });
 
-    if (!res.ok) {
-      const result = (await res.json()) as { error?: string };
-      setError(result.error ?? 'Ошибка');
-      setSubmitting(false);
-      return;
-    }
-
-    setSubmitted(true);
-    await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    // Navigate immediately — server request runs in background
     router.push(`/trip/${tripId}`);
+
+    fetch(`/api/trips/${tripId}/expenses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    });
   }
 
   return (
@@ -187,20 +176,14 @@ export default function AddExpensePage() {
           />
         </div>
 
-        {error && (
-          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
-            {error}
-          </div>
-        )}
-
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50">
           <Button
             type="submit"
             size="hero"
-            disabled={submitting || submitted}
+            disabled={submitting}
             className="font-black uppercase tracking-widest"
           >
-            {submitting ? 'Сохраняем...' : submitted ? 'Сохранено ✓' : '✅ Добавить расход'}
+            {submitting ? 'Сохраняем...' : '✅ Добавить расход'}
           </Button>
         </div>
       </form>
