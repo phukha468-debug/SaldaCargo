@@ -44,8 +44,9 @@ export async function POST(request: Request) {
       direction: body.direction,
       category_id: body.category_id,
       amount: body.amount,
-      description: body.description ?? null,
-      payment_method: body.payment_method,
+      description: body.description
+        ? `${body.description} [${body.payment_method}]`
+        : `[${body.payment_method}]`,
       lifecycle_status: 'approved',
       settlement_status: 'completed',
       created_by: adminId,
