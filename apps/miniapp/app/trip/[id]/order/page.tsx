@@ -36,6 +36,7 @@ export default function AddOrderPage() {
   const tripId = params.id as string;
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [idempotencyKey] = useState(() => uuid());
   const [counterparties, setCounterparties] = useState<Array<{ id: string; name: string }>>([]);
@@ -59,11 +60,11 @@ export default function AddOrderPage() {
   });
 
   const selectedCounterpartyId = watch('counterparty_id');
-  const selectedCounterparty = counterparties.find(c => c.id === selectedCounterpartyId);
+  const selectedCounterparty = counterparties.find((c) => c.id === selectedCounterpartyId);
 
   useState(() => {
     fetch('/api/driver/counterparties')
-      .then(r => r.json())
+      .then((r) => r.json())
       .then(setCounterparties)
       .catch(console.error);
   });
@@ -72,9 +73,10 @@ export default function AddOrderPage() {
   const amount = amountRaw ? Number(amountRaw) : 0;
   const suggestedPay = amount ? Math.round((amount * SUGGEST_PERCENT) / 100) : 0;
 
-  const filteredCounterparties = searchTerm.length > 0 
-    ? counterparties.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : [];
+  const filteredCounterparties =
+    searchTerm.length > 0
+      ? counterparties.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      : [];
 
   async function handleAddClient() {
     if (!newClientName.trim()) return;
@@ -87,7 +89,9 @@ export default function AddOrderPage() {
       });
       if (res.ok) {
         const newClient = await res.json();
-        setCounterparties(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
+        setCounterparties((prev) =>
+          [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)),
+        );
         setValue('counterparty_id', newClient.id);
         setShowNewClient(false);
         setNewClientName('');
@@ -96,7 +100,7 @@ export default function AddOrderPage() {
         const err = await res.json();
         setError(err.error || 'Ошибка при добавлении клиента');
       }
-    } catch (_e) {
+    } catch {
       setError('Ошибка сети');
     } finally {
       setSubmitting(false);
@@ -104,6 +108,7 @@ export default function AddOrderPage() {
   }
 
   async function onSubmit(data: FormData) {
+    if (submitting || submitted) return;
     setSubmitting(true);
     setError('');
 
@@ -126,31 +131,41 @@ export default function AddOrderPage() {
       return;
     }
 
+    setSubmitted(true);
     router.push(`/trip/${tripId}`);
   }
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
-        <button onClick={() => router.back()} className="text-zinc-500 text-2xl active:scale-95 transition-transform">
+        <button
+          onClick={() => router.back()}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+        >
           ←
         </button>
-        <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">Добавить заказ</h1>
+        <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">
+          Добавить заказ
+        </h1>
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
         {/* Клиент */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Клиент</label>
-          
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Клиент
+          </label>
+
           {selectedCounterparty ? (
             <div className="flex items-center justify-between bg-orange-50 border-2 border-orange-200 rounded-lg px-4 h-14">
               <span className="font-bold text-orange-900">{selectedCounterparty.name}</span>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setValue('counterparty_id', undefined)}
                 className="text-orange-500 font-black"
-              >✕</button>
+              >
+                ✕
+              </button>
             </div>
           ) : showNewClient ? (
             <div className="space-y-2">
@@ -167,12 +182,16 @@ export default function AddOrderPage() {
                   type="button"
                   onClick={handleAddClient}
                   className="bg-orange-600 text-white rounded-lg px-4 font-bold"
-                >OK</button>
+                >
+                  OK
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowNewClient(false)}
                   className="bg-zinc-200 text-zinc-600 rounded-lg px-4 font-bold"
-                >✕</button>
+                >
+                  ✕
+                </button>
               </div>
             </div>
           ) : (
@@ -186,7 +205,7 @@ export default function AddOrderPage() {
               />
               {searchTerm.length > 0 && (
                 <div className="absolute top-full left-0 right-0 bg-white border-2 border-zinc-200 rounded-lg mt-1 shadow-xl z-10 max-h-60 overflow-y-auto">
-                  {filteredCounterparties.map(c => (
+                  {filteredCounterparties.map((c) => (
                     <button
                       key={c.id}
                       type="button"
@@ -223,7 +242,9 @@ export default function AddOrderPage() {
 
         {/* Сумма */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Сумма заказа, ₽</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Сумма заказа, ₽
+          </label>
           <input
             type="number"
             inputMode="numeric"
@@ -231,12 +252,16 @@ export default function AddOrderPage() {
             placeholder="2 700"
             className="w-full rounded-lg border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
           />
-          {errors.amount && <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>}
+          {errors.amount && (
+            <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>
+          )}
         </div>
 
         {/* Способ оплаты */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Способ оплаты</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Способ оплаты
+          </label>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {PAYMENT_METHODS.map((m) => (
               <label key={m.value} className="flex-shrink-0">
@@ -248,7 +273,9 @@ export default function AddOrderPage() {
                 />
                 <div className="flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-lg px-3 h-20 min-w-[84px] cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 transition-all active:scale-95">
                   <span className="text-2xl">{m.icon}</span>
-                  <span className="text-[9px] font-black text-center leading-tight uppercase tracking-tighter">{m.label}</span>
+                  <span className="text-[9px] font-black text-center leading-tight uppercase tracking-tighter">
+                    {m.label}
+                  </span>
                 </div>
               </label>
             ))}
@@ -258,8 +285,10 @@ export default function AddOrderPage() {
         {/* ЗП водителя */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            ЗП водителя, ₽ 
-            <span className="ml-2 text-zinc-400 normal-case font-medium">Подсказка: ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)</span>
+            ЗП водителя, ₽
+            <span className="ml-2 text-zinc-400 normal-case font-medium">
+              Подсказка: ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)
+            </span>
           </label>
           <input
             type="number"
@@ -272,7 +301,9 @@ export default function AddOrderPage() {
 
         {/* Описание */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Описание (опционально)</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Описание (опционально)
+          </label>
           <input
             type="text"
             {...register('description')}
@@ -288,8 +319,13 @@ export default function AddOrderPage() {
         )}
 
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50">
-          <Button type="submit" size="hero" disabled={submitting} className="font-black uppercase tracking-widest">
-            {submitting ? 'Сохраняем...' : '✅ Добавить заказ'}
+          <Button
+            type="submit"
+            size="hero"
+            disabled={submitting || submitted}
+            className="font-black uppercase tracking-widest"
+          >
+            {submitting ? 'Сохраняем...' : submitted ? 'Сохранено ✓' : '✅ Добавить заказ'}
           </Button>
         </div>
       </form>

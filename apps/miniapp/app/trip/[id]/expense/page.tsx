@@ -29,8 +29,11 @@ export default function AddExpensePage() {
   const tripId = params.id as string;
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; code: string }>>(
+    [],
+  );
   const [idempotencyKey] = useState(() => uuid());
 
   const {
@@ -55,6 +58,7 @@ export default function AddExpensePage() {
   }, []);
 
   async function onSubmit(data: FormData) {
+    if (submitting || submitted) return;
     setSubmitting(true);
     setError('');
 
@@ -75,22 +79,30 @@ export default function AddExpensePage() {
       return;
     }
 
+    setSubmitted(true);
     router.push(`/trip/${tripId}`);
   }
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
-        <button onClick={() => router.back()} className="text-zinc-500 text-2xl active:scale-95 transition-transform">
+        <button
+          onClick={() => router.back()}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+        >
           ←
         </button>
-        <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">Добавить расход</h1>
+        <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">
+          Добавить расход
+        </h1>
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
         {/* Категория */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Категория</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Категория
+          </label>
           <div className="grid grid-cols-2 gap-2">
             {categories.map((c) => (
               <label key={c.id} className="relative">
@@ -113,7 +125,9 @@ export default function AddExpensePage() {
 
         {/* Сумма */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Сумма расхода, ₽</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Сумма расхода, ₽
+          </label>
           <input
             type="number"
             inputMode="numeric"
@@ -121,12 +135,16 @@ export default function AddExpensePage() {
             placeholder="1 500"
             className="w-full rounded-lg border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
           />
-          {errors.amount && <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>}
+          {errors.amount && (
+            <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>
+          )}
         </div>
 
         {/* Способ оплаты */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Способ оплаты</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Способ оплаты
+          </label>
           <div className="flex gap-2">
             {PAYMENT_METHODS.map((m) => (
               <label key={m.value} className="flex-1">
@@ -138,21 +156,26 @@ export default function AddExpensePage() {
                 />
                 <div className="flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-lg h-20 cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 transition-all active:scale-95">
                   <span className="text-2xl">{m.icon}</span>
-                  <span className="text-[9px] font-black text-center leading-tight uppercase tracking-tighter">{m.label}</span>
+                  <span className="text-[9px] font-black text-center leading-tight uppercase tracking-tighter">
+                    {m.label}
+                  </span>
                 </div>
               </label>
             ))}
           </div>
           {selectedPaymentMethod === 'fuel_card' && (
             <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wide mt-2 bg-orange-50 p-2 rounded border border-orange-100">
-              Заправки по картам Опти24 обычно загружаются автоматически, используйте это только для ручного ввода чека.
+              Заправки по картам Опти24 обычно загружаются автоматически, используйте это только для
+              ручного ввода чека.
             </p>
           )}
         </div>
 
         {/* Описание */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Описание (опционально)</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Описание (опционально)
+          </label>
           <input
             type="text"
             {...register('description')}
@@ -168,8 +191,13 @@ export default function AddExpensePage() {
         )}
 
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50">
-          <Button type="submit" size="hero" disabled={submitting} className="font-black uppercase tracking-widest">
-            {submitting ? 'Сохраняем...' : '✅ Добавить расход'}
+          <Button
+            type="submit"
+            size="hero"
+            disabled={submitting || submitted}
+            className="font-black uppercase tracking-widest"
+          >
+            {submitting ? 'Сохраняем...' : submitted ? 'Сохранено ✓' : '✅ Добавить расход'}
           </Button>
         </div>
       </form>
