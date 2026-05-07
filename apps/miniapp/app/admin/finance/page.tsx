@@ -127,20 +127,23 @@ const INCOME_CATEGORIES = [
     name: 'Выручка с ремонта',
     code: 'SERVICE_REVENUE',
   },
+  { id: '84562648-767a-47b8-8821-a5c938da6e75', name: 'Продажа актива', code: 'ASSET_SALE' },
   { id: '68225ea2-d7de-4442-8ed8-ce2366b5d369', name: 'Прочий доход', code: 'OTHER_INCOME' },
 ];
 
 const EXPENSE_CATEGORIES = [
   { id: '62cebf3f-9982-4cc6-904b-48c6169cf5e4', name: 'ГСМ', code: 'FUEL' },
   { id: '9d18370d-3228-4f2a-8530-52b168cfa8d7', name: 'Запчасти', code: 'REPAIR_PARTS' },
+  { id: '8c5f3080-d0a8-49ea-b759-3286f2084940', name: 'Сторонний ремонт', code: 'REPAIR_EXTERNAL' },
   { id: '59ef1110-6c3f-49c7-a29c-b9e97a3a3d92', name: 'Аренда', code: 'RENT' },
   { id: 'f4a66f83-63c0-4ba0-8eaa-0d42ce19d3ca', name: 'Налоги', code: 'TAX' },
   { id: '73f565eb-f509-4538-9658-9cdff69bee37', name: 'Офис и связь', code: 'OFFICE_COMMS' },
   { id: '992ed3ae-66a7-4a16-a2da-cecd9b7086c5', name: 'Страховка', code: 'INSURANCE' },
-  { id: '8c5f3080-d0a8-49ea-b759-3286f2084940', name: 'Сторонний ремонт', code: 'REPAIR_EXTERNAL' },
   { id: 'd79213ee-3bc6-4433-b58a-ca7ea1040d00', name: 'ЗП водителя', code: 'PAYROLL_DRIVER' },
   { id: '18792fa8-fda8-472d-8e04-e19d2c6c053c', name: 'ЗП грузчика', code: 'PAYROLL_LOADER' },
   { id: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', name: 'ЗП механика', code: 'PAYROLL_MECHANIC' },
+  { id: 'c88b4234-2a91-4223-aad4-56f6e1ab4ded', name: 'Амортизация', code: 'DEPRECIATION' },
+  { id: '63babd3d-b1d3-4710-86e2-5d1ff348b21f', name: 'Списание актива', code: 'ASSET_WRITE_OFF' },
   { id: 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30', name: 'Прочий расход', code: 'OTHER_EXPENSE' },
 ];
 
