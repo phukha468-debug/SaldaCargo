@@ -34,7 +34,7 @@ export default function RootDispatcher() {
   }, [step]);
 
   const handleResetAll = () => {
-    document.cookie = "salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     localStorage.clear();
     window.location.reload();
   };
@@ -63,7 +63,7 @@ export default function RootDispatcher() {
     if (selectedRole === 'driver') {
       setLoading(true);
       try {
-        const res = await fetch('/api/vehicles/public');
+        const res = await fetch('/api/vehicles/public', { cache: 'no-store' });
         const data = await res.json();
         console.log('[Selector Flow] Received vehicles:', data);
         // Фильтруем отладочные ошибки, если они есть
@@ -77,7 +77,8 @@ export default function RootDispatcher() {
       }
     } else {
       // Для других ролей - сразу редирект
-      const path = selectedRole === 'admin' || selectedRole === 'owner' ? '/admin' : `/${selectedRole}`;
+      const path =
+        selectedRole === 'admin' || selectedRole === 'owner' ? '/admin' : `/${selectedRole}`;
       router.push(path);
     }
   };
@@ -92,7 +93,9 @@ export default function RootDispatcher() {
       return (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Загрузка...</p>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">
+            Загрузка...
+          </p>
         </div>
       );
     }
@@ -105,13 +108,15 @@ export default function RootDispatcher() {
               <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
                 Salda<span className="text-orange-600">Cargo</span>
               </h1>
-              <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-2">Выберите роль</p>
+              <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-2">
+                Выберите роль
+              </p>
             </div>
             <div className="grid gap-4">
               {[
                 { id: 'driver', label: '🚛 ВОДИТЕЛЬ', color: 'hover:border-orange-200' },
                 { id: 'mechanic', label: '🔧 МЕХАНИК', color: 'hover:border-green-200' },
-                { id: 'admin', label: '👑 АДМИНИСТРАЦИЯ', color: 'hover:border-blue-200' }
+                { id: 'admin', label: '👑 АДМИНИСТРАЦИЯ', color: 'hover:border-blue-200' },
               ].map((role) => (
                 <button
                   key={role.id}
@@ -120,14 +125,16 @@ export default function RootDispatcher() {
                 >
                   <div className="flex items-center justify-between">
                     <span>{role.label}</span>
-                    <span className="text-zinc-300 group-hover:translate-x-1 transition-transform">→</span>
+                    <span className="text-zinc-300 group-hover:translate-x-1 transition-transform">
+                      →
+                    </span>
                   </div>
                 </button>
               ))}
             </div>
 
             <div className="pt-8 text-center">
-              <button 
+              <button
                 onClick={handleResetAll}
                 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 hover:text-zinc-500 transition-colors"
               >
@@ -141,8 +148,15 @@ export default function RootDispatcher() {
         return (
           <div className="w-full max-w-sm space-y-6">
             <div className="flex items-center gap-4 mb-4">
-              <button onClick={() => setStep('role')} className="text-zinc-400 hover:text-zinc-600 font-bold">← Назад</button>
-              <h2 className="text-xl font-black text-zinc-900 uppercase tracking-tight">Выберите себя</h2>
+              <button
+                onClick={() => setStep('role')}
+                className="text-zinc-400 hover:text-zinc-600 font-bold"
+              >
+                ← Назад
+              </button>
+              <h2 className="text-xl font-black text-zinc-900 uppercase tracking-tight">
+                Выберите себя
+              </h2>
             </div>
             <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {users.map((user) => (
@@ -155,7 +169,9 @@ export default function RootDispatcher() {
                 </button>
               ))}
               {users.length === 0 && (
-                <p className="text-center text-zinc-400 font-bold uppercase py-10">Сотрудники не найдены</p>
+                <p className="text-center text-zinc-400 font-bold uppercase py-10">
+                  Сотрудники не найдены
+                </p>
               )}
             </div>
           </div>
@@ -164,9 +180,16 @@ export default function RootDispatcher() {
       case 'vehicle':
         return (
           <div className="w-full max-w-sm space-y-6">
-             <div className="flex items-center gap-4 mb-4">
-              <button onClick={() => setStep('user')} className="text-zinc-400 hover:text-zinc-600 font-bold">← Назад</button>
-              <h2 className="text-xl font-black text-zinc-900 uppercase tracking-tight">Выберите машину</h2>
+            <div className="flex items-center gap-4 mb-4">
+              <button
+                onClick={() => setStep('user')}
+                className="text-zinc-400 hover:text-zinc-600 font-bold"
+              >
+                ← Назад
+              </button>
+              <h2 className="text-xl font-black text-zinc-900 uppercase tracking-tight">
+                Выберите машину
+              </h2>
             </div>
             <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {vehicles.map((v) => (
@@ -176,7 +199,9 @@ export default function RootDispatcher() {
                   className="w-full p-5 bg-white border border-zinc-100 rounded-3xl shadow-sm text-left active:scale-[0.98] transition-all hover:border-orange-200"
                 >
                   <div className="font-black text-zinc-800 uppercase">{v.short_name}</div>
-                  <div className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{v.reg_number}</div>
+                  <div className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+                    {v.reg_number}
+                  </div>
                 </button>
               ))}
               <button
@@ -195,9 +220,16 @@ export default function RootDispatcher() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6 font-sans antialiased">
       {renderStep()}
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e4e4e7;
+          border-radius: 10px;
+        }
       `}</style>
     </div>
   );

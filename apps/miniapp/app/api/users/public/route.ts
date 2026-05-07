@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-/** 
- * GET /api/users/public 
+/**
+ * GET /api/users/public
  * Возвращает список активных пользователей для упрощенного входа.
  * Использует Admin Client для обхода RLS.
  */
@@ -12,11 +13,11 @@ export async function GET(request: Request) {
     const role = searchParams.get('role');
 
     const supabase = createAdminClient();
-    
+
     let query = supabase
       .from('users')
       .select('id, name, roles')
-      .eq('is_active', true)
+      .eq('id_active', true)
       .order('name');
 
     const { data: users, error } = await query;
@@ -31,8 +32,8 @@ export async function GET(request: Request) {
     // Фильтруем по роли на стороне сервера, так как roles - это JSONB/Array
     let filteredUsers = usersData;
     if (role) {
-      filteredUsers = filteredUsers.filter(u => 
-        u.roles && Array.isArray(u.roles) && u.roles.includes(role)
+      filteredUsers = filteredUsers.filter(
+        (u) => u.roles && Array.isArray(u.roles) && u.roles.includes(role),
       );
     }
 
