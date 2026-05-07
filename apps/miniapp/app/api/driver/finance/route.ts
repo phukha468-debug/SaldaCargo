@@ -37,9 +37,20 @@ export async function GET() {
       .map((o: any) => ({ ...o, trip_number: trip.trip_number, asset: trip.asset })),
   );
 
-  const cashBalance = cashOrders
-    .reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0)
-    .toFixed(2);
+  const cashIn = cashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0);
+
+  // Subtract cash collected by admin (инкассации)
+  const { data: collections } = await (supabase
+    .from('cash_collections')
+    .select('amount')
+    .eq('driver_id', driverId) as any);
+
+  const cashOut = (collections ?? []).reduce(
+    (sum: number, c: any) => sum + parseFloat(c.amount),
+    0,
+  );
+
+  const cashBalance = Math.max(0, cashIn - cashOut).toFixed(2);
 
   // 2. ЗП по рейсам (текущий месяц)
   const now = new Date();
