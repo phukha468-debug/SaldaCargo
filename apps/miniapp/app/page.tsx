@@ -23,6 +23,7 @@ export default function RootDispatcher() {
   const [users, setUsers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const router = useRouter();
 
   // 1. При входе сбрасываем старую куку, если мы на первом шаге
@@ -66,7 +67,7 @@ export default function RootDispatcher() {
         const res = await fetch('/api/vehicles/public', { cache: 'no-store' });
         const data = await res.json();
         console.log('[Selector Flow] Received vehicles:', data);
-        // Фильтруем отладочные ошибки, если они есть
+        setDebugInfo(`status:${res.status} | ${JSON.stringify(data).slice(0, 200)}`);
         setVehicles(Array.isArray(data) ? data : []);
         setStep('vehicle');
       } catch (error) {
@@ -180,6 +181,11 @@ export default function RootDispatcher() {
       case 'vehicle':
         return (
           <div className="w-full max-w-sm space-y-6">
+            {debugInfo && (
+              <pre className="text-[9px] bg-zinc-100 p-2 rounded break-all whitespace-pre-wrap text-zinc-500">
+                {debugInfo}
+              </pre>
+            )}
             <div className="flex items-center gap-4 mb-4">
               <button
                 onClick={() => setStep('user')}
