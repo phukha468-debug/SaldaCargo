@@ -1,24 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-  // В MVP используем простую куку salda_auth_token с ID пользователя
-  const authToken = request.cookies.get('salda_auth_token')?.value;
-  const { pathname } = request.nextUrl;
-
-  // Публичные пути
-  const publicPaths = ['/login', '/auth/callback', '/auth/error', '/api/auth/login'];
-  const isPublic = publicPaths.some((p) => pathname.startsWith(p));
-
-  // Если нет токена и путь не публичный — на логин
-  if (!authToken && !isPublic) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  // Если есть токен и мы на логине — в корень
-  if (authToken && pathname === '/login') {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
+export async function middleware(): Promise<NextResponse> {
+  // AUTH DISABLED FOR LOCAL TESTING
   return NextResponse.next();
 }
 

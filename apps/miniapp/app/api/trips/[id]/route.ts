@@ -14,9 +14,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       *,
       asset:assets(short_name, reg_number),
       driver:users!trips_driver_id_fkey(name),
-      loader:users!trips_loader_id_fkey(name),
       trip_orders(
-        id, amount, driver_pay, loader_pay, payment_method, 
+        id, amount, driver_pay, loader_pay, loader2_pay, payment_method,
         settlement_status, lifecycle_status, description,
         counterparty:counterparties(name)
       ),

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as {
       asset_id: string;
-      loader_id?: string;
+      loaders_count?: number;
       trip_type: string;
       odometer_start: number;
       idempotency_key: string;
@@ -39,12 +39,11 @@ export async function POST(request: Request) {
     }
 
     // 2. Создаем новый рейс
-    const { data, error } = await ((supabase
-      .from('trips') as any)
+    const { data, error } = await ((supabase.from('trips') as any)
       .insert({
         driver_id: userId,
         asset_id: body.asset_id,
-        loader_id: body.loader_id || null,
+        loaders_count: body.loaders_count ?? 0,
         trip_type: body.trip_type as any,
         odometer_start: body.odometer_start,
         status: 'in_progress',

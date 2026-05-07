@@ -57,6 +57,56 @@ export default function FinancePage() {
     <div className="space-y-6 p-4 max-w-7xl mx-auto animate-in fade-in duration-500">
       <h1 className="text-2xl font-bold text-slate-900">Финансы</h1>
 
+      {/* Навигация по разделам */}
+      <div className="grid grid-cols-2 gap-4">
+        <a
+          href="/receivables"
+          className="group flex items-center gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-amber-300 hover:shadow-md transition-all"
+        >
+          <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-2xl shrink-0 group-hover:bg-amber-100 transition-colors">
+            📋
+          </div>
+          <div>
+            <p className="font-bold text-slate-900 text-sm">Дебиторка</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Долги контрагентов, просрочка, отметить оплаченным
+            </p>
+          </div>
+          <svg
+            className="ml-auto w-4 h-4 text-slate-300 group-hover:text-amber-400 transition-colors shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
+        <a
+          href="/loans"
+          className="group flex items-center gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-blue-300 hover:shadow-md transition-all"
+        >
+          <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl shrink-0 group-hover:bg-blue-100 transition-colors">
+            🏦
+          </div>
+          <div>
+            <p className="font-bold text-slate-900 text-sm">Кредиты и лизинг</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Обязательства компании, остатки, платёжный календарь
+            </p>
+          </div>
+          <svg
+            className="ml-auto w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
+      </div>
+
       {/* P&L по месяцам */}
       <section className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
         <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/80">

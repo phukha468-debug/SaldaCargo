@@ -11,6 +11,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     amount: string;
     driver_pay: string;
     loader_pay: string;
+    loader2_pay: string;
     payment_method: string;
     idempotency_key: string;
   };
@@ -29,6 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       amount: body.amount,
       driver_pay: body.driver_pay,
       loader_pay: body.loader_pay,
+      loader2_pay: body.loader2_pay ?? '0',
       payment_method: body.payment_method,
       settlement_status: settlementStatus,
       lifecycle_status: 'draft',

@@ -16,12 +16,13 @@ interface TripDetail {
   trip_type: string;
   asset: { short_name: string; reg_number: string };
   driver: { name: string };
-  loader: { name: string } | null;
+  loaders_count: number;
   trip_orders: Array<{
     id: string;
     amount: string;
     driver_pay: string;
     loader_pay: string;
+    loader2_pay: string;
     payment_method: string;
     settlement_status: string;
     lifecycle_status: string;
@@ -118,7 +119,8 @@ export default function TripDetailPage() {
   const totals = {
     revenue: activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0),
     driverPay: activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0),
-    loaderPay: activeOrders.reduce((s, o) => s + parseFloat(o.loader_pay), 0),
+    loaderPay: activeOrders.reduce((s, o) => s + parseFloat(o.loader_pay ?? '0'), 0),
+    loader2Pay: activeOrders.reduce((s, o) => s + parseFloat(o.loader2_pay ?? '0'), 0),
     expenses: (trip.trip_expenses ?? []).reduce((s, e) => s + parseFloat(e.amount), 0),
   };
 
@@ -151,7 +153,11 @@ export default function TripDetailPage() {
             <span className="text-zinc-400 font-bold ml-1">{trip.asset.reg_number}</span>
           </h1>
           <p className="font-bold text-sm text-zinc-500 uppercase tracking-wide">
-            {trip.driver.name} {trip.loader ? `+ ${trip.loader.name}` : ''} ·{' '}
+            {trip.driver.name}
+            {trip.loaders_count > 0
+              ? ` + ${trip.loaders_count} грузчик${trip.loaders_count === 2 ? 'а' : ''}`
+              : ''}{' '}
+            ·{' '}
             {isActive ? <TripDuration startedAt={trip.started_at} /> : formatDate(trip.started_at)}
           </p>
         </section>
@@ -166,6 +172,15 @@ export default function TripDetailPage() {
           />
           <StatCard label="ЗП Водителя" value={<Money amount={totals.driverPay.toString()} />} />
           <StatCard label="Расходы" value={<Money amount={totals.expenses.toString()} />} error />
+          {trip.loaders_count >= 1 && (
+            <StatCard label="ЗП Грузчик 1" value={<Money amount={totals.loaderPay.toString()} />} />
+          )}
+          {trip.loaders_count >= 2 && (
+            <StatCard
+              label="ЗП Грузчик 2"
+              value={<Money amount={totals.loader2Pay.toString()} />}
+            />
+          )}
         </section>
 
         {/* Orders List */}

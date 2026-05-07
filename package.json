@@ -23,6 +23,7 @@
   "devDependencies": {
     "@supabase/supabase-js": "^2.105.1",
     "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
     "@typescript-eslint/parser": "^8.59.1",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",

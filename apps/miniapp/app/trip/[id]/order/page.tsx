@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,6 +14,7 @@ const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
   driver_pay: z.coerce.number().min(0),
   loader_pay: z.coerce.number().min(0),
+  loader2_pay: z.coerce.number().min(0),
   payment_method: z.enum(['cash', 'qr', 'bank_invoice', 'debt_cash', 'card_driver']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
@@ -46,6 +47,12 @@ export default function AddOrderPage() {
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
 
+  const { data: trip } = useQuery<{ loaders_count: number }>({
+    queryKey: ['trip', tripId],
+    queryFn: () => fetch(`/api/trips/${tripId}`).then((r) => r.json()),
+    staleTime: 60000,
+  });
+
   const {
     register,
     handleSubmit,
@@ -58,6 +65,7 @@ export default function AddOrderPage() {
       payment_method: 'cash',
       driver_pay: 0,
       loader_pay: 0,
+      loader2_pay: 0,
     },
   });
 
@@ -122,6 +130,7 @@ export default function AddOrderPage() {
         amount: String(data.amount),
         driver_pay: String(data.driver_pay),
         loader_pay: String(data.loader_pay),
+        loader2_pay: String(data.loader2_pay),
         idempotency_key: idempotencyKey,
       }),
     });
@@ -301,6 +310,38 @@ export default function AddOrderPage() {
             className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
           />
         </div>
+
+        {/* ЗП грузчика 1 */}
+        {(trip?.loaders_count ?? 0) >= 1 && (
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+              ЗП Грузчик 1, ₽
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              {...register('loader_pay')}
+              placeholder="0"
+              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+            />
+          </div>
+        )}
+
+        {/* ЗП грузчика 2 */}
+        {(trip?.loaders_count ?? 0) >= 2 && (
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+              ЗП Грузчик 2, ₽
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              {...register('loader2_pay')}
+              placeholder="0"
+              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+            />
+          </div>
+        )}
 
         {/* Описание */}
         <div className="space-y-2">

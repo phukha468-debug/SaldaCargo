@@ -13,7 +13,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 const schema = z.object({
   asset_id: z.string().min(1, 'Выберите машину'),
   trip_type: z.enum(['local', 'intercity', 'moving', 'hourly']),
-  loader_id: z.string().optional(),
+  loaders_count: z.coerce.number().min(0).max(2),
   odometer_start: z.coerce.number().min(0, 'Введите одометр'),
 });
 
@@ -37,11 +37,6 @@ export default function NewTripPage() {
     queryFn: () => fetch('/api/vehicles/public').then((r) => (r.ok ? r.json() : [])),
   });
 
-  const { data: loaders = [], isLoading: loadersLoading } = useQuery({
-    queryKey: ['driver', 'loaders'],
-    queryFn: () => fetch('/api/driver/loaders').then((r) => (r.ok ? r.json() : [])),
-  });
-
   const { data: me } = useQuery({
     queryKey: ['driver', 'me'],
     queryFn: () => fetch('/api/driver/me').then((r) => (r.ok ? r.json() : null)),
@@ -59,6 +54,7 @@ export default function NewTripPage() {
     resolver: zodResolver(schema as any) as any,
     defaultValues: {
       trip_type: 'local',
+      loaders_count: 0,
     },
   });
 
@@ -108,7 +104,7 @@ export default function NewTripPage() {
 
   const onSubmit = (data: FormData) => mutation.mutate(data);
 
-  const isLoading = assetsLoading || loadersLoading;
+  const isLoading = assetsLoading;
 
   if (isLoading) {
     return (
@@ -175,26 +171,25 @@ export default function NewTripPage() {
           </div>
         </div>
 
-        {/* Грузчик */}
+        {/* Грузчики */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Грузчик
+            Грузчики
           </label>
-          <div className="relative">
-            <select
-              {...register('loader_id')}
-              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-zinc-900 bg-white font-bold focus:border-orange-500 focus:outline-none transition-colors appearance-none"
-            >
-              <option value="">Без грузчика</option>
-              {loaders.map((l: any) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-              ▼
-            </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[0, 1, 2].map((n) => (
+              <label key={n} className="relative">
+                <input
+                  type="radio"
+                  value={n}
+                  {...register('loaders_count')}
+                  className="sr-only peer"
+                />
+                <div className="border-2 border-zinc-200 rounded-lg p-3 text-center cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:text-orange-700 font-black text-sm uppercase tracking-wide transition-all active:scale-[0.97]">
+                  {n === 0 ? 'Без' : n === 1 ? '1 грузчик' : '2 грузчика'}
+                </div>
+              </label>
+            ))}
           </div>
         </div>
 
