@@ -13,7 +13,7 @@ export async function GET() {
     const { data: drivers, error: driversError } = await (supabase
       .from('users')
       .select('id, name')
-      .eq('role', 'driver')
+      .contains('roles', ['driver'])
       .eq('is_active', true) as any);
 
     if (driversError) return NextResponse.json({ error: driversError.message }, { status: 500 });
