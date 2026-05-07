@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** GET /api/driver/counterparties — список клиентов для водителя */
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await (supabase
     .from('counterparties')

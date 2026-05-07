@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** GET /api/driver/finance?driver_id=xxx — финансовая информация водителя */
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'driver_id required' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // 1. Кошелёк подотчёта
   const { data: wallet } = await (supabase
@@ -28,12 +28,14 @@ export async function GET(request: Request) {
     // История транзакций (последние 20)
     const { data: txns } = await (supabase
       .from('transactions')
-      .select(`
+      .select(
+        `
         id, amount, direction, description, created_at,
         from_wallet:wallets!transactions_from_wallet_id_fkey(name),
         to_wallet:wallets!transactions_to_wallet_id_fkey(name),
         category:transaction_categories(name)
-      `)
+      `,
+      )
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'completed')
       .or(`from_wallet_id.eq.${wallet.id},to_wallet_id.eq.${wallet.id}`)
@@ -65,11 +67,13 @@ export async function GET(request: Request) {
 
   const { data: salaryTrips } = await (supabase
     .from('trips')
-    .select(`
+    .select(
+      `
       id, trip_number, started_at, lifecycle_status,
       asset:assets(short_name),
       trip_orders(driver_pay, lifecycle_status)
-    `)
+    `,
+    )
     .eq('driver_id', driverId)
     .gte('started_at', monthStart)
     .order('started_at', { ascending: false }) as any);

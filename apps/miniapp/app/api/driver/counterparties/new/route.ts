@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** POST /api/driver/counterparties/new — создать нового клиента */
 export async function POST(request: Request) {
   const body = (await request.json()) as { name: string; type: string };
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  const { data, error } = await ((supabase
-    .from('counterparties') as any)
+  const { data, error } = await ((supabase.from('counterparties') as any)
     .insert({
       name: body.name,
       type: body.type || 'client',

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** POST /api/trips/:id/finish — завершить рейс */
@@ -10,10 +10,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     driver_note?: string;
   };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  const { data, error } = await ((supabase
-    .from('trips') as any)
+  const { data, error } = await ((supabase.from('trips') as any)
     .update({
       status: 'completed',
       lifecycle_status: 'draft', // ждёт апрува админа

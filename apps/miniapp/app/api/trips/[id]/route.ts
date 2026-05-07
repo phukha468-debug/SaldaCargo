@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips/:id — детали рейса */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await (supabase
     .from('trips')
@@ -25,10 +25,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         category:transaction_categories(name)
       )
       `,
-      )
-      .eq('id', id)
-      .single() as any);
-
+    )
+    .eq('id', id)
+    .single() as any);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
   return NextResponse.json(data);
@@ -38,9 +37,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = (await request.json()) as Record<string, unknown>;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  const { data, error } = await ((supabase.from('trips') as any).update(body).eq('id', id).select().single() as any);
+  const { data, error } = await ((supabase.from('trips') as any)
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single() as any);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

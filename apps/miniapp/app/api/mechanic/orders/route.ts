@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { getMechanicOrders } from '@saldacargo/domain-service';
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const orders = await getMechanicOrders(supabase, mechanicId, status);
     return NextResponse.json(orders);
   } catch (error) {

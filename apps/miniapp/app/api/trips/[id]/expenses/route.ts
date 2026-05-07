@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** POST /api/trips/:id/expenses — добавить расход */
@@ -14,10 +14,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     idempotency_key: string;
   };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  const { data, error } = await ((supabase
-    .from('trip_expenses') as any)
+  const { data, error } = await ((supabase.from('trip_expenses') as any)
     .insert({
       trip_id: tripId,
       category_id: body.category_id,

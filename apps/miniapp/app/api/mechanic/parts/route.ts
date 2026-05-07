@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -6,7 +7,7 @@ export async function GET(request: Request) {
   const search = searchParams.get('search') || '';
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     let query = supabase
       .from('parts')
       .select('id, name, article, unit, min_stock, is_active')
@@ -23,9 +24,9 @@ export async function GET(request: Request) {
 
     // В MVP остаток считаем как заглушку или через movements
     // Для простоты добавим случайный остаток если в таблице нет поля stock
-    const partsWithStock = parts.map(p => ({
+    const partsWithStock = parts.map((p) => ({
       ...p,
-      stock: Math.floor(Math.random() * 10) // TODO: Реальный расчет из movements
+      stock: Math.floor(Math.random() * 10), // TODO: Реальный расчет из movements
     }));
 
     return NextResponse.json(partsWithStock);

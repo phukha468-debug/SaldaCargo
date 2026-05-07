@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
@@ -14,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Активный рейс
   const { data: activeTrip } = await (supabase

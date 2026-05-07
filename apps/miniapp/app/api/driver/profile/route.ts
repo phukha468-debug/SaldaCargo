@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** GET /api/driver/profile?driver_id=xxx — профиль водителя */
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'driver_id required' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: user, error } = await (supabase
     .from('users')

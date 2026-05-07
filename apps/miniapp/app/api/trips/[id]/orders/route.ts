@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** POST /api/trips/:id/orders — добавить заказ */
@@ -15,14 +15,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     idempotency_key: string;
   };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Определяем settlement_status по способу оплаты
   const pendingMethods = ['bank_invoice', 'debt_cash'];
   const settlementStatus = pendingMethods.includes(body.payment_method) ? 'pending' : 'completed';
 
-  const { data, error } = await ((supabase
-    .from('trip_orders') as any)
+  const { data, error } = await ((supabase.from('trip_orders') as any)
     .insert({
       trip_id: tripId,
       counterparty_id: body.counterparty_id ?? null,
