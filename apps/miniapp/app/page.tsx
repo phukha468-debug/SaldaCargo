@@ -23,12 +23,10 @@ export default function RootDispatcher() {
   const [users, setUsers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
   const router = useRouter();
 
   // 1. При входе сбрасываем старую куку, если мы на первом шаге
   useEffect(() => {
-    console.log('--- SELECTOR FLOW LOADED ---');
     if (step === 'role') {
       document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
@@ -66,8 +64,6 @@ export default function RootDispatcher() {
       try {
         const res = await fetch('/api/vehicles/public', { cache: 'no-store' });
         const data = await res.json();
-        console.log('[Selector Flow] Received vehicles:', data);
-        setDebugInfo(`status:${res.status} | ${JSON.stringify(data).slice(0, 200)}`);
         setVehicles(Array.isArray(data) ? data : []);
         setStep('vehicle');
       } catch (error) {
@@ -181,11 +177,6 @@ export default function RootDispatcher() {
       case 'vehicle':
         return (
           <div className="w-full max-w-sm space-y-6">
-            {debugInfo && (
-              <pre className="text-[9px] bg-zinc-100 p-2 rounded break-all whitespace-pre-wrap text-zinc-500">
-                {debugInfo}
-              </pre>
-            )}
             <div className="flex items-center gap-4 mb-4">
               <button
                 onClick={() => setStep('user')}
