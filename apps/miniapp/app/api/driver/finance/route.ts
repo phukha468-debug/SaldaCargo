@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
-/** GET /api/driver/finance?driver_id=xxx — финансовая информация водителя */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const driverId = searchParams.get('driver_id');
+/** GET /api/driver/finance — финансовая информация текущего водителя */
+export async function GET() {
+  const cookieStore = await cookies();
+  const driverId = cookieStore.get('salda_user_id')?.value;
 
-  if (!driverId) {
-    return NextResponse.json({ error: 'driver_id required' }, { status: 400 });
-  }
+  if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();
 
@@ -25,16 +24,11 @@ export async function GET(request: Request) {
   let accountableBalance = '0';
 
   if (wallet) {
-    // История транзакций (последние 20)
     const { data: txns } = await (supabase
       .from('transactions')
       .select(
-        `
-        id, amount, direction, description, created_at,
-        from_wallet:wallets!transactions_from_wallet_id_fkey(name),
-        to_wallet:wallets!transactions_to_wallet_id_fkey(name),
-        category:transaction_categories(name)
-      `,
+        `id, amount, direction, description, created_at,
+         category:transaction_categories(name)`,
       )
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'completed')
@@ -44,7 +38,6 @@ export async function GET(request: Request) {
 
     accountableTransactions = txns ?? [];
 
-    // Баланс (пересчитываем для надежности)
     const { data: allTxns } = await (supabase
       .from('transactions')
       .select('amount, from_wallet_id, to_wallet_id')
@@ -68,23 +61,16 @@ export async function GET(request: Request) {
   const { data: salaryTrips } = await (supabase
     .from('trips')
     .select(
-      `
-      id, trip_number, started_at, lifecycle_status,
-      asset:assets(short_name),
-      trip_orders(driver_pay, lifecycle_status)
-    `,
+      `id, trip_number, started_at, lifecycle_status,
+       asset:assets(short_name),
+       trip_orders(driver_pay, lifecycle_status)`,
     )
     .eq('driver_id', driverId)
     .gte('started_at', monthStart)
     .order('started_at', { ascending: false }) as any);
 
   return NextResponse.json({
-    accountable: {
-      balance: accountableBalance,
-      transactions: accountableTransactions,
-    },
-    salary: {
-      trips: salaryTrips ?? [],
-    },
+    accountable: { balance: accountableBalance, transactions: accountableTransactions },
+    salary: { trips: salaryTrips ?? [] },
   });
 }

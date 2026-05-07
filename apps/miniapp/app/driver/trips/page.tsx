@@ -6,17 +6,15 @@ import Link from 'next/link';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
-// TODO: получать из авторизации
-const MOCK_DRIVER_ID = '00000000-0000-0000-0000-000000000000';
-
 export default function TripsPage() {
   const { data: trips, isLoading } = useQuery<any[]>({
-    queryKey: ['driver-trips', MOCK_DRIVER_ID],
+    queryKey: ['driver-trips'],
     queryFn: async () => {
-      const res = await fetch(`/api/driver/trips?driver_id=${MOCK_DRIVER_ID}`);
+      const res = await fetch('/api/driver/trips');
       if (!res.ok) throw new Error('Ошибка загрузки');
       return res.json();
     },
+    staleTime: 30000,
   });
 
   if (isLoading) {
@@ -33,7 +31,9 @@ export default function TripsPage() {
   return (
     <div className="p-4 space-y-6">
       <header>
-        <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">История рейсов</h1>
+        <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
+          История рейсов
+        </h1>
       </header>
 
       <div className="space-y-3">
@@ -50,13 +50,11 @@ export default function TripsPage() {
 }
 
 function TripHistoryCard({ trip }: { trip: any }) {
-  const revenue = (trip.trip_orders ?? [])
-    .filter((o: any) => o.lifecycle_status !== 'cancelled')
-    .reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
-
-  const driverPay = (trip.trip_orders ?? [])
-    .filter((o: any) => o.lifecycle_status !== 'cancelled')
-    .reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
+  const activeOrders = (trip.trip_orders ?? []).filter(
+    (o: any) => o.lifecycle_status !== 'cancelled',
+  );
+  const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
+  const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
 
   return (
     <Link href={`/trip/${trip.id}`}>
@@ -64,7 +62,7 @@ function TripHistoryCard({ trip }: { trip: any }) {
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
         <div className="pl-2">
           <p className="font-bold text-zinc-900 text-sm">
-            Рейс №{trip.trip_number} · {trip.asset.short_name}
+            Рейс №{trip.trip_number} · {trip.asset?.short_name ?? '—'}
           </p>
           <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
             {formatDate(trip.started_at)}

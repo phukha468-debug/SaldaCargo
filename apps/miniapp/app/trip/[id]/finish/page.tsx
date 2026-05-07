@@ -92,16 +92,23 @@ export default function FinishTripPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
-        <button onClick={() => router.back()} className="text-zinc-500 text-2xl active:scale-95 transition-transform">
+        <button
+          onClick={() => router.back()}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+        >
           ←
         </button>
-        <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">Завершить рейс</h1>
+        <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">
+          Завершить рейс
+        </h1>
       </header>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
+      <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-8">
         {/* Сводка */}
         <div className="bg-white rounded-lg border-2 border-zinc-200 p-4 shadow-sm space-y-3">
-          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-50 pb-2">Итоги рейса</h2>
+          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-50 pb-2">
+            Итоги рейса
+          </h2>
           <SummaryRow label="Заказов" value={String(activeOrders.length)} />
           <SummaryRow label="Выручка" value={<Money amount={revenue.toString()} />} />
           <SummaryRow label="ЗП водителя" value={<Money amount={driverPay.toString()} />} />
@@ -111,7 +118,10 @@ export default function FinishTripPage() {
               label="⏳ Долги"
               value={
                 <span className="text-amber-600">
-                  <Money amount={debtOrders.reduce((s, o) => s + parseFloat(o.amount), 0).toString()} /> ({debtOrders.length} кл.)
+                  <Money
+                    amount={debtOrders.reduce((s, o) => s + parseFloat(o.amount), 0).toString()}
+                  />{' '}
+                  ({debtOrders.length} кл.)
                 </span>
               }
             />
@@ -135,9 +145,17 @@ export default function FinishTripPage() {
             {...register('odometer_end')}
             placeholder="340 160"
             className="w-full rounded-lg border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+            onFocus={(e) =>
+              setTimeout(
+                () => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+                300,
+              )
+            }
           />
           {errors.odometer_end && (
-            <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.odometer_end.message}</p>
+            <p className="text-red-500 text-xs font-bold mt-1 pl-1">
+              {errors.odometer_end.message}
+            </p>
           )}
         </div>
 
@@ -160,11 +178,14 @@ export default function FinishTripPage() {
           </div>
         )}
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50">
-          <Button type="submit" size="hero" disabled={submitting} className="font-black uppercase tracking-widest">
-            {submitting ? 'Отправляем...' : '📤 Отправить на ревью'}
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          size="hero"
+          disabled={submitting}
+          className="font-black uppercase tracking-widest w-full"
+        >
+          {submitting ? 'Отправляем...' : '📤 Отправить на ревью'}
+        </Button>
       </form>
     </div>
   );

@@ -1,26 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
-/** GET /api/driver/trips?driver_id=xxx — история рейсов водителя */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const driverId = searchParams.get('driver_id');
+/** GET /api/driver/trips — история рейсов текущего водителя */
+export async function GET() {
+  const cookieStore = await cookies();
+  const driverId = cookieStore.get('salda_user_id')?.value;
 
-  if (!driverId) {
-    return NextResponse.json({ error: 'driver_id required' }, { status: 400 });
-  }
+  if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();
 
   const { data, error } = await (supabase
     .from('trips')
     .select(
-      `
-      id, trip_number, status, lifecycle_status, started_at, ended_at,
-      asset:assets(short_name),
-      trip_orders(amount, driver_pay, lifecycle_status)
-    `,
+      `id, trip_number, status, lifecycle_status, started_at, ended_at,
+       asset:assets(short_name),
+       trip_orders(amount, driver_pay, lifecycle_status)`,
     )
     .eq('driver_id', driverId)
     .order('started_at', { ascending: false }) as any);
