@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: assets, error } = await supabase
       .from('assets')
-      .select('id, short_name, reg_number')
+      .select('id, short_name, reg_number, odometer_current, status')
       .order('short_name');
 
     if (error) {

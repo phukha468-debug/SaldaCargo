@@ -34,17 +34,17 @@ export default function NewTripPage() {
 
   const { data: assets = [], isLoading: assetsLoading } = useQuery({
     queryKey: ['driver', 'assets'],
-    queryFn: () => fetch('/api/vehicles/public').then((r) => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/vehicles/public').then((r) => (r.ok ? r.json() : [])),
   });
 
   const { data: loaders = [], isLoading: loadersLoading } = useQuery({
     queryKey: ['driver', 'loaders'],
-    queryFn: () => fetch('/api/driver/loaders').then((r) => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/driver/loaders').then((r) => (r.ok ? r.json() : [])),
   });
 
   const { data: me } = useQuery({
     queryKey: ['driver', 'me'],
-    queryFn: () => fetch('/api/driver/me').then((r) => r.ok ? r.json() : null),
+    queryFn: () => fetch('/api/driver/me').then((r) => (r.ok ? r.json() : null)),
   });
 
   // ─── Форма ─────────────────────────────────────────────────────────────
@@ -113,7 +113,9 @@ export default function NewTripPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <div className="text-zinc-400 font-bold uppercase tracking-widest animate-pulse">Загрузка...</div>
+        <div className="text-zinc-400 font-bold uppercase tracking-widest animate-pulse">
+          Загрузка...
+        </div>
       </div>
     );
   }
@@ -121,7 +123,10 @@ export default function NewTripPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
-        <button onClick={() => router.back()} className="text-zinc-500 text-2xl active:scale-95 transition-transform">
+        <button
+          onClick={() => router.back()}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+        >
           ←
         </button>
         <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">Новый рейс</h1>
@@ -130,7 +135,9 @@ export default function NewTripPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
         {/* Машина (только отображение) */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Машина</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Машина
+          </label>
           <div className="w-full rounded-lg border-2 border-zinc-100 bg-zinc-50 px-4 h-14 flex items-center">
             {selectedAsset ? (
               <span className="font-black text-zinc-900 uppercase">
@@ -148,7 +155,9 @@ export default function NewTripPage() {
 
         {/* Тип рейса */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Тип рейса</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Тип рейса
+          </label>
           <div className="grid grid-cols-2 gap-2">
             {TRIP_TYPES.map((t) => (
               <label key={t.value} className="relative">
@@ -168,7 +177,9 @@ export default function NewTripPage() {
 
         {/* Грузчик */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Грузчик</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Грузчик
+          </label>
           <div className="relative">
             <select
               {...register('loader_id')}
@@ -181,13 +192,17 @@ export default function NewTripPage() {
                 </option>
               ))}
             </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">▼</div>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+              ▼
+            </div>
           </div>
         </div>
 
         {/* Одометр */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Одометр (км)</label>
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Одометр (км)
+          </label>
           <input
             type="number"
             inputMode="numeric"
@@ -195,13 +210,15 @@ export default function NewTripPage() {
             placeholder="340 100"
             className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-zinc-900 text-2xl font-black focus:border-orange-500 focus:outline-none transition-colors"
           />
-          {selectedAsset && (
+          {selectedAsset && selectedAsset.odometer_current != null && (
             <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-1 pl-1">
               Последнее значение: {selectedAsset.odometer_current.toLocaleString('ru-RU')} км
             </p>
           )}
           {errors.odometer_start && (
-            <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.odometer_start.message}</p>
+            <p className="text-red-500 text-xs font-bold mt-1 pl-1">
+              {errors.odometer_start.message}
+            </p>
           )}
         </div>
 
@@ -212,10 +229,10 @@ export default function NewTripPage() {
         )}
 
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50">
-          <Button 
-            type="submit" 
-            size="hero" 
-            disabled={mutation.isPending} 
+          <Button
+            type="submit"
+            size="hero"
+            disabled={mutation.isPending}
             className="font-black uppercase tracking-widest"
           >
             {mutation.isPending ? 'Создаём рейс...' : '▶ Поехали'}
