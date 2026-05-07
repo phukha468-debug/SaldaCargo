@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type Step = 'role' | 'user' | 'vehicle';
+type Step = 'restoring' | 'role' | 'user' | 'vehicle';
 
 interface User {
   id: string;
@@ -17,28 +17,47 @@ interface Vehicle {
   reg_number: string;
 }
 
+function getCookieValue(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 export default function RootDispatcher() {
-  const [step, setStep] = useState<Step>('role');
+  const [step, setStep] = useState<Step>('restoring');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // 1. При входе сбрасываем старую куку, если мы на первом шаге
+  // При монтировании: проверяем сохранённую сессию
   useEffect(() => {
-    if (step === 'role') {
-      document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    const existingUserId = getCookieValue('salda_user_id');
+    const savedRole = localStorage.getItem('selected_role');
+    const savedVehicleId = localStorage.getItem('active_vehicle_id');
+
+    if (existingUserId && savedRole) {
+      if (savedRole === 'driver' && savedVehicleId) {
+        router.replace('/driver');
+      } else if (savedRole === 'admin' || savedRole === 'owner') {
+        router.replace('/admin');
+      } else if (savedRole === 'mechanic') {
+        router.replace('/mechanic');
+      } else {
+        // Сессия есть, но роль неизвестна — показываем выбор
+        setStep('role');
+      }
+    } else {
+      setStep('role');
     }
-  }, [step]);
+  }, []);
 
   const handleResetAll = () => {
     document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     localStorage.clear();
-    window.location.reload();
+    setStep('role');
   };
 
-  // Загрузка пользователей при выборе роли
   const handleRoleSelect = async (role: string) => {
     setSelectedRole(role);
     setLoading(true);
@@ -54,10 +73,9 @@ export default function RootDispatcher() {
     }
   };
 
-  // Загрузка машин для водителя
   const handleUserSelect = async (user: User) => {
-    // Сохраняем ID пользователя в куку для Middleware
     document.cookie = `salda_user_id=${user.id}; path=/; max-age=${60 * 60 * 24 * 7}`;
+    localStorage.setItem('selected_role', selectedRole ?? '');
 
     if (selectedRole === 'driver') {
       setLoading(true);
@@ -68,12 +86,10 @@ export default function RootDispatcher() {
         setStep('vehicle');
       } catch (error) {
         console.error('Failed to fetch vehicles:', error);
-        // Оставляем на текущем шаге, чтобы пользователь увидел ошибку в консоли
       } finally {
         setLoading(false);
       }
     } else {
-      // Для других ролей - сразу редирект
       const path =
         selectedRole === 'admin' || selectedRole === 'owner' ? '/admin' : `/${selectedRole}`;
       router.push(path);
@@ -86,12 +102,12 @@ export default function RootDispatcher() {
   };
 
   const renderStep = () => {
-    if (loading) {
+    if (step === 'restoring' || loading) {
       return (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">
-            Загрузка...
+            {step === 'restoring' ? 'Восстановление...' : 'Загрузка...'}
           </p>
         </div>
       );
