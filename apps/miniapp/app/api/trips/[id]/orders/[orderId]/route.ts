@@ -10,11 +10,10 @@ export async function PATCH(
   const { id: tripId, orderId } = await params;
   const supabase = createAdminClient();
 
-  const { error } = await (supabase
-    .from('trip_orders')
+  const { error } = await (supabase.from('trip_orders') as any)
     .update({ lifecycle_status: 'cancelled' })
     .eq('id', orderId)
-    .eq('trip_id', tripId) as any);
+    .eq('trip_id', tripId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
