@@ -12,47 +12,34 @@ export async function GET() {
 
   const supabase = createAdminClient();
 
-  // 1. Кошелёк подотчёта
-  const { data: wallet } = await (supabase
-    .from('wallets')
-    .select('id, name')
-    .eq('owner_user_id', driverId)
-    .eq('type', 'driver_accountable')
-    .maybeSingle() as any);
+  // 1. Подотчёт: нал на руках у водителя
+  // Считаем напрямую из заказов — нал получен сразу, не ждём ревью от админа.
+  // cash = наличные заказы, card_driver = оплата на карту водителя (тоже у него)
+  const CASH_METHODS = ['cash', 'card_driver'];
 
-  let accountableTransactions: any[] = [];
-  let accountableBalance = '0';
+  const { data: cashTrips } = await (supabase
+    .from('trips')
+    .select(
+      `id, trip_number, started_at, ended_at, status,
+       asset:assets(short_name),
+       trip_orders(id, amount, payment_method, lifecycle_status, created_at)`,
+    )
+    .eq('driver_id', driverId)
+    .order('started_at', { ascending: false })
+    .limit(60) as any);
 
-  if (wallet) {
-    const { data: txns } = await (supabase
-      .from('transactions')
-      .select(
-        `id, amount, direction, description, created_at,
-         category:transaction_categories(name)`,
+  // Все наличные заказы по всем рейсам (не отменённые)
+  const cashOrders: any[] = (cashTrips ?? []).flatMap((trip: any) =>
+    (trip.trip_orders ?? [])
+      .filter(
+        (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
       )
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'completed')
-      .or(`from_wallet_id.eq.${wallet.id},to_wallet_id.eq.${wallet.id}`)
-      .order('created_at', { ascending: false })
-      .limit(20) as any);
+      .map((o: any) => ({ ...o, trip_number: trip.trip_number, asset: trip.asset })),
+  );
 
-    accountableTransactions = txns ?? [];
-
-    const { data: allTxns } = await (supabase
-      .from('transactions')
-      .select('amount, from_wallet_id, to_wallet_id')
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'completed')
-      .or(`from_wallet_id.eq.${wallet.id},to_wallet_id.eq.${wallet.id}`) as any);
-
-    const balance = (allTxns ?? []).reduce((sum: number, t: any) => {
-      const amount = parseFloat(t.amount);
-      if (t.to_wallet_id === wallet.id) return sum + amount;
-      if (t.from_wallet_id === wallet.id) return sum - amount;
-      return sum;
-    }, 0);
-    accountableBalance = balance.toFixed(2);
-  }
+  const cashBalance = cashOrders
+    .reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0)
+    .toFixed(2);
 
   // 2. ЗП по рейсам (текущий месяц)
   const now = new Date();
@@ -70,7 +57,17 @@ export async function GET() {
     .order('started_at', { ascending: false }) as any);
 
   return NextResponse.json({
-    accountable: { balance: accountableBalance, transactions: accountableTransactions },
+    accountable: {
+      balance: cashBalance,
+      // Показываем последние 20 наличных заказов как историю
+      transactions: cashOrders.slice(0, 20).map((o: any) => ({
+        id: o.id,
+        amount: o.amount,
+        description: `Рейс №${o.trip_number} · ${o.asset?.short_name ?? ''}`,
+        payment_method: o.payment_method,
+        created_at: o.created_at,
+      })),
+    },
     salary: { trips: salaryTrips ?? [] },
   });
 }

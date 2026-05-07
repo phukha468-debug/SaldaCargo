@@ -87,18 +87,21 @@ function AccountableTab({ data }: { data: any }) {
     <div className="space-y-6">
       <div className="bg-white rounded-lg border-2 border-zinc-200 p-6 text-center shadow-sm">
         <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
-          На руках сейчас
+          На руках сейчас (нал + карта)
         </p>
         <Money amount={data?.balance ?? '0'} className="text-4xl font-black text-zinc-900" />
+        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-3">
+          Сумма всех наличных заказов · нужно сдать в конце смены
+        </p>
       </div>
 
       <div className="space-y-3">
         <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
-          История операций
+          Наличные заказы
         </h2>
         {(data?.transactions ?? []).length === 0 ? (
           <p className="text-center py-10 text-zinc-400 font-bold uppercase text-xs">
-            Операций нет
+            Наличных заказов нет
           </p>
         ) : (
           data?.transactions?.map((tx: any) => (
@@ -107,18 +110,13 @@ function AccountableTab({ data }: { data: any }) {
               className="bg-white rounded-lg p-4 border border-zinc-200 flex justify-between items-center shadow-sm"
             >
               <div>
-                <p className="font-bold text-zinc-900 text-sm">
-                  {tx.category?.name ?? tx.description ?? 'Перевод'}
-                </p>
+                <p className="font-bold text-zinc-900 text-sm">{tx.description}</p>
                 <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
+                  {tx.payment_method === 'cash' ? '💵 Наличные' : '💳 Карта водителя'} ·{' '}
                   {formatDate(tx.created_at)}
                 </p>
               </div>
-              <Money
-                amount={tx.amount}
-                className={`font-black text-sm ${tx.direction === 'income' ? 'text-green-600' : 'text-red-600'}`}
-                showSign
-              />
+              <Money amount={tx.amount} className="font-black text-sm text-zinc-900" />
             </div>
           ))
         )}
