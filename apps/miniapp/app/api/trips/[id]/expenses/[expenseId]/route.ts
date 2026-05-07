@@ -7,22 +7,8 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string; expenseId: string }> },
 ) {
-  const { id: tripId, expenseId } = await params;
+  const { expenseId } = await params;
   const supabase = createAdminClient();
-
-  // Удаляем только по id — убеждаемся что запись принадлежит этому рейсу
-  const { data: existing, error: fetchError } = await (supabase
-    .from('trip_expenses')
-    .select('id, trip_id')
-    .eq('id', expenseId)
-    .single() as any);
-
-  if (fetchError || !existing) {
-    return NextResponse.json({ error: 'Расход не найден' }, { status: 404 });
-  }
-  if (existing.trip_id !== tripId) {
-    return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
-  }
 
   const { error } = await (supabase.from('trip_expenses').delete().eq('id', expenseId) as any);
 

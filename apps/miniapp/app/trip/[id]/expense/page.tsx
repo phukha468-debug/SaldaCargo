@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ export default function AddExpensePage() {
   const params = useParams();
   const tripId = params.id as string;
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -80,6 +82,7 @@ export default function AddExpensePage() {
     }
 
     setSubmitted(true);
+    await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
     router.push(`/trip/${tripId}`);
   }
 

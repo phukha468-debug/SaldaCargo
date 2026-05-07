@@ -53,6 +53,7 @@ export default function TripDetailPage() {
       if (!res.ok) throw new Error('Рейс не найден');
       return res.json() as Promise<TripDetail>;
     },
+    staleTime: 0,
     refetchInterval: 30000,
   });
 
