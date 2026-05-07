@@ -14,11 +14,7 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
 
-    let query = supabase
-      .from('users')
-      .select('id, name, roles')
-      .eq('id_active', true)
-      .order('name');
+    let query = supabase.from('users').select('id, name, roles').order('name');
 
     const { data: users, error } = await query;
 
