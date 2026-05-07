@@ -10,13 +10,26 @@ export async function DELETE(
   const { id: tripId, expenseId } = await params;
   const supabase = createAdminClient();
 
-  const { error } = await (supabase
+  // Удаляем только по id — убеждаемся что запись принадлежит этому рейсу
+  const { data: existing, error: fetchError } = await (supabase
     .from('trip_expenses')
-    .delete()
+    .select('id, trip_id')
     .eq('id', expenseId)
-    .eq('trip_id', tripId) as any);
+    .single() as any);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (fetchError || !existing) {
+    return NextResponse.json({ error: 'Расход не найден' }, { status: 404 });
+  }
+  if (existing.trip_id !== tripId) {
+    return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
+  }
+
+  const { error } = await (supabase.from('trip_expenses').delete().eq('id', expenseId) as any);
+
+  if (error) {
+    console.error('[DELETE expense] error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }
