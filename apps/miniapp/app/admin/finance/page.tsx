@@ -156,9 +156,20 @@ function CashCollectionForm({
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
-  const { data: balances = [], isLoading } = useQuery<any[]>({
+  const {
+    data: balances = [],
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery<any[]>({
     queryKey: ['admin-cash-balances'],
-    queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/admin/cash-collections');
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
+      if (!Array.isArray(data)) throw new Error('Неверный ответ сервера');
+      return data;
+    },
     staleTime: 0,
   });
 
@@ -200,6 +211,10 @@ function CashCollectionForm({
           <div className="h-12 bg-zinc-200 rounded-lg" />
           <div className="h-12 bg-zinc-200 rounded-lg" />
         </div>
+      ) : isError ? (
+        <p className="text-center py-4 text-red-500 font-bold text-xs uppercase">
+          ❌ {(queryError as Error)?.message ?? 'Ошибка загрузки'}
+        </p>
       ) : balances.length === 0 ? (
         <p className="text-center py-4 text-zinc-400 font-bold text-xs uppercase">
           Нет данных по водителям
