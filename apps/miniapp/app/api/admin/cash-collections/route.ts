@@ -3,50 +3,42 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+const CASH_METHODS = ['cash', 'card_driver'];
+
 /** GET /api/admin/cash-collections — drivers with current cash balances */
 export async function GET() {
   const supabase = createAdminClient();
 
-  // Get all drivers
-  const { data: drivers, error: driversError } = await (supabase
-    .from('users')
-    .select('id, name')
-    .eq('role', 'driver')
-    .eq('is_active', true) as any);
+  const [{ data: drivers, error: driversError }, { data: trips }, { data: collections }] =
+    await Promise.all([
+      supabase.from('users').select('id, name').eq('role', 'driver').eq('is_active', true) as any,
+      supabase
+        .from('trips')
+        .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)') as any,
+      supabase.from('cash_collections').select('driver_id, amount') as any,
+    ]);
 
   if (driversError) return NextResponse.json({ error: driversError.message }, { status: 500 });
 
-  const CASH_METHODS = ['cash', 'card_driver'];
+  const result = (drivers ?? []).map((driver: any) => {
+    const cashIn = (trips ?? [])
+      .filter((t: any) => t.driver_id === driver.id)
+      .flatMap((t: any) => t.trip_orders ?? [])
+      .filter(
+        (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
+      )
+      .reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
 
-  // For each driver: sum non-cancelled cash orders - sum collections
-  const result = await Promise.all(
-    (drivers ?? []).map(async (driver: any) => {
-      const { data: orders } = await (supabase
-        .from('trip_orders')
-        .select('amount, payment_method, lifecycle_status, trips!inner(driver_id)')
-        .eq('trips.driver_id', driver.id)
-        .in('payment_method', CASH_METHODS)
-        .neq('lifecycle_status', 'cancelled') as any);
+    const cashOut = (collections ?? [])
+      .filter((c: any) => c.driver_id === driver.id)
+      .reduce((s: number, c: any) => s + parseFloat(c.amount), 0);
 
-      const cashIn = (orders ?? []).reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
-
-      const { data: collections } = await (supabase
-        .from('cash_collections')
-        .select('amount')
-        .eq('driver_id', driver.id) as any);
-
-      const cashOut = (collections ?? []).reduce(
-        (s: number, c: any) => s + parseFloat(c.amount),
-        0,
-      );
-
-      return {
-        driver_id: driver.id,
-        driver_name: driver.name,
-        balance: (cashIn - cashOut).toFixed(2),
-      };
-    }),
-  );
+    return {
+      driver_id: driver.id,
+      driver_name: driver.name,
+      balance: (cashIn - cashOut).toFixed(2),
+    };
+  });
 
   return NextResponse.json(result);
 }
