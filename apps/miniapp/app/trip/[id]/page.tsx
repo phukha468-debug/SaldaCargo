@@ -43,8 +43,8 @@ export default function TripDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // id карточки, для которой открыто подтверждение удаления
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: trip, isLoading } = useQuery<TripDetail>({
     queryKey: ['trip', id],
@@ -58,13 +58,19 @@ export default function TripDetailPage() {
   });
 
   const deleteExpense = useMutation({
-    mutationFn: (expenseId: string) =>
-      fetch(`/api/trips/${id}/expenses/${expenseId}`, { method: 'DELETE' }).then((r) => {
-        if (!r.ok) throw new Error('Ошибка удаления');
-      }),
+    mutationFn: async (expenseId: string) => {
+      const r = await fetch(`/api/trips/${id}/expenses/${expenseId}`, { method: 'DELETE' });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error ?? 'Ошибка удаления');
+      return body;
+    },
     onSuccess: () => {
       setConfirmDelete(null);
+      setDeleteError(null);
       queryClient.invalidateQueries({ queryKey: ['trip', id] });
+    },
+    onError: (err: Error) => {
+      setDeleteError(err.message);
     },
   });
 
@@ -248,6 +254,11 @@ export default function TripDetailPage() {
           <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pb-1 border-b-2 border-zinc-100">
             Расходы
           </h2>
+          {deleteError && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
+              {deleteError}
+            </div>
+          )}
           {(trip.trip_expenses ?? []).length === 0 ? (
             <div className="bg-zinc-100 border-2 border-zinc-200 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center opacity-60">
               <p className="font-bold text-zinc-400 uppercase tracking-tight text-xs">

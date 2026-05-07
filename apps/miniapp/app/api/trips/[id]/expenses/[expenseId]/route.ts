@@ -10,12 +10,21 @@ export async function DELETE(
   const { expenseId } = await params;
   const supabase = createAdminClient();
 
-  const { error } = await (supabase.from('trip_expenses').delete().eq('id', expenseId) as any);
+  const { data, error } = await (supabase
+    .from('trip_expenses')
+    .delete()
+    .eq('id', expenseId)
+    .select() as any);
+
+  console.log('[DELETE expense] id:', expenseId, '| deleted:', data, '| error:', error);
 
   if (error) {
-    console.error('[DELETE expense] error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: `Расход не найден (id: ${expenseId})` }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true, deleted: data.length });
 }
