@@ -22,11 +22,27 @@ export async function GET(request: Request) {
 
     const parts = (data || []) as any[];
 
-    // В MVP остаток считаем как заглушку или через movements
-    // Для простоты добавим случайный остаток если в таблице нет поля stock
+    // Считаем остаток через SUM(in) - SUM(out) из part_movements
+    const { data: movements } = await (supabase as any)
+      .from('part_movements')
+      .select('part_id, direction, quantity')
+      .in(
+        'part_id',
+        parts.map((p) => p.id),
+      );
+
+    const stockMap = new Map<string, number>();
+    for (const m of movements ?? []) {
+      const cur = stockMap.get(m.part_id) ?? 0;
+      stockMap.set(
+        m.part_id,
+        cur + (m.direction === 'in' ? Number(m.quantity) : -Number(m.quantity)),
+      );
+    }
+
     const partsWithStock = parts.map((p) => ({
       ...p,
-      stock: Math.floor(Math.random() * 10), // TODO: Реальный расчет из movements
+      stock: Math.max(0, stockMap.get(p.id) ?? 0),
     }));
 
     return NextResponse.json(partsWithStock);
