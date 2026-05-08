@@ -48,21 +48,33 @@ export default function RootPage() {
   useEffect(() => {
     if (!isUserLoading && user) {
       const roles = user.roles || [];
-      if (roles.includes('mechanic') || roles.includes('mechanic_lead')) {
+      const isDriver =
+        roles.includes('driver') || roles.includes('owner') || roles.includes('admin');
+      const isMechanicOnly =
+        !isDriver && (roles.includes('mechanic') || roles.includes('mechanic_lead'));
+      if (isMechanicOnly) {
         router.push('/mechanic');
       }
     }
   }, [user, isUserLoading, router]);
 
   // 2. Загружаем данные водителя (если это водитель)
-  const { data, isLoading: isDataLoading, error } = useQuery<DriverSummary>({
+  const {
+    data,
+    isLoading: isDataLoading,
+    error,
+  } = useQuery<DriverSummary>({
     queryKey: ['driver-summary'],
     queryFn: async () => {
       const res = await fetch(`/api/driver/summary`);
       if (!res.ok) throw new Error('Ошибка загрузки');
       return res.json() as Promise<DriverSummary>;
     },
-    enabled: !!user && !(user.roles || []).includes('mechanic'),
+    enabled:
+      !!user &&
+      ((user.roles || []).includes('driver') ||
+        (user.roles || []).includes('owner') ||
+        (user.roles || []).includes('admin')),
   });
 
   if (isUserLoading || isDataLoading) {
