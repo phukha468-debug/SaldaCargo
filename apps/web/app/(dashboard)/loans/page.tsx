@@ -76,7 +76,11 @@ export default function LoansPage() {
 
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
     queryKey: ['loans'],
-    queryFn: () => fetch('/api/loans').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/loans');
+      const json = await r.json();
+      return Array.isArray(json) ? json : [];
+    },
     staleTime: 60000,
   });
 
