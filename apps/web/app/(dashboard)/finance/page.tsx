@@ -58,7 +58,7 @@ export default function FinancePage() {
       <h1 className="text-2xl font-bold text-slate-900">Финансы</h1>
 
       {/* Навигация по разделам */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <a
           href="/receivables"
           className="group flex items-center gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-amber-300 hover:shadow-md transition-all"
@@ -97,6 +97,27 @@ export default function FinancePage() {
           </div>
           <svg
             className="ml-auto w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
+        <a
+          href="/payables"
+          className="group flex items-center gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-rose-300 hover:shadow-md transition-all"
+        >
+          <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-2xl shrink-0 group-hover:bg-rose-100 transition-colors">
+            🧾
+          </div>
+          <div>
+            <p className="font-bold text-slate-900 text-sm">Долги поставщикам</p>
+            <p className="text-xs text-slate-500 mt-0.5">Кредиторка: Опти24, Новиков, Ромашин</p>
+          </div>
+          <svg
+            className="ml-auto w-4 h-4 text-slate-300 group-hover:text-rose-400 transition-colors shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
