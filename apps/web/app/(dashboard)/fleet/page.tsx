@@ -161,7 +161,9 @@ function AssetModal({
       status: form.status,
       odometer_current: form.odometer_current ? parseInt(form.odometer_current) : 0,
       assigned_driver_id: form.assigned_driver_id || null,
-      current_book_value: form.current_book_value || null,
+      current_book_value: form.current_book_value
+        ? parseFloat(form.current_book_value).toFixed(2)
+        : '0.00',
       remaining_depreciation_months: form.remaining_depreciation_months
         ? parseInt(form.remaining_depreciation_months)
         : null,
