@@ -40,7 +40,7 @@ export default function MechanicOrdersPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="bg-white border-b border-slate-200 sticky top-16 z-40 px-4 flex gap-6 h-12 items-center">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 flex gap-6 h-12 items-center">
         <button
           onClick={() => setTab('active')}
           className={cn(

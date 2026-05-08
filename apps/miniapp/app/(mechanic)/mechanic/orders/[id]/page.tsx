@@ -48,11 +48,13 @@ function BottomSheet({
   onClose,
   title,
   children,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   return (
     <div
@@ -77,10 +79,11 @@ function BottomSheet({
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{title}</h3>
           <button onClick={onClose} className="text-slate-400 text-xl leading-none">
-            x
+            ×
           </button>
         </div>
         <div className="overflow-y-auto flex-1 p-4">{children}</div>
+        {footer && <div className="p-4 border-t border-slate-100">{footer}</div>}
       </div>
     </div>
   );
@@ -143,8 +146,20 @@ function AddWorkModal({
     }
   };
 
+  const addButton = (
+    <button
+      onClick={handleAdd}
+      disabled={
+        addMutation.isPending || (tab === 'catalog' ? !selectedCatalogId : !customName.trim())
+      }
+      className="w-full bg-orange-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-40"
+    >
+      {addMutation.isPending ? 'Добавляем...' : 'Добавить работу'}
+    </button>
+  );
+
   return (
-    <BottomSheet open={open} onClose={onClose} title="Добавить работу">
+    <BottomSheet open={open} onClose={onClose} title="Добавить работу" footer={addButton}>
       <div className="flex gap-2 mb-4">
         {(['catalog', 'custom'] as const).map((t) => (
           <button
@@ -210,16 +225,6 @@ function AddWorkModal({
           </div>
         </div>
       )}
-
-      <button
-        onClick={handleAdd}
-        disabled={
-          addMutation.isPending || (tab === 'catalog' ? !selectedCatalogId : !customName.trim())
-        }
-        className="mt-4 w-full bg-orange-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-40"
-      >
-        {addMutation.isPending ? 'Добавляем...' : 'Добавить работу'}
-      </button>
     </BottomSheet>
   );
 }
@@ -516,6 +521,19 @@ export default function OrderDetailPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-detail', id] }),
   });
 
+  const acceptMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/mechanic/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+      if (!res.ok) throw new Error('Ошибка');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-detail', id] }),
+  });
+
   const completeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/mechanic/orders/${id}`, {
@@ -539,6 +557,7 @@ export default function OrderDetailPage() {
   const allWorksComplete =
     order.works.length > 0 && order.works.every((w) => w.status === 'completed');
   const canComplete = allWorksComplete && order.status === 'in_progress';
+  const needsAccept = order.status === 'created';
 
   return (
     <>
@@ -555,6 +574,20 @@ export default function OrderDetailPage() {
             {order.machine_type === 'own' ? order.asset?.reg_number : order.client_vehicle_reg}
           </p>
         </div>
+
+        {/* Баннер: наряд ещё не принят */}
+        {needsAccept && (
+          <section className="px-4">
+            <div className="bg-zinc-900 text-white rounded-2xl p-5 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                Новый наряд
+              </p>
+              <p className="text-base font-bold leading-snug">
+                Ознакомьтесь с задачей и нажмите кнопку ниже, чтобы принять наряд в работу
+              </p>
+            </div>
+          </section>
+        )}
 
         <section className="px-4">
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
@@ -632,19 +665,29 @@ export default function OrderDetailPage() {
         </section>
       </div>
 
-      {canComplete && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200">
-          <button
-            onClick={() => {
-              if (window.confirm('Завершить наряд? Все работы выполнены.')) {
-                completeMutation.mutate();
-              }
-            }}
-            disabled={completeMutation.isPending}
-            className="w-full bg-green-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-60"
-          >
-            {completeMutation.isPending ? 'Завершаем...' : 'Закрыть наряд'}
-          </button>
+      {(needsAccept || canComplete) && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg">
+          {needsAccept ? (
+            <button
+              onClick={() => acceptMutation.mutate()}
+              disabled={acceptMutation.isPending}
+              className="w-full bg-zinc-900 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-60"
+            >
+              {acceptMutation.isPending ? 'Принимаем...' : '▶ Принять наряд в работу'}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (window.confirm('Завершить наряд? Все работы выполнены.')) {
+                  completeMutation.mutate();
+                }
+              }}
+              disabled={completeMutation.isPending}
+              className="w-full bg-green-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-60"
+            >
+              {completeMutation.isPending ? 'Завершаем...' : '✓ Закрыть наряд'}
+            </button>
+          )}
         </div>
       )}
 
