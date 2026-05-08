@@ -22,7 +22,7 @@ export async function GET() {
       { data: monthOrders },
       { data: monthExpenses },
       { data: todayOrders },
-      { data: reviewTrips },
+      { count: reviewTripsCount },
       { data: recentTransactions },
       { data: tripFuelExpenses },
       { data: tripPayroll },
@@ -173,7 +173,7 @@ export async function GET() {
         tripsCount: todayTripsCount,
       },
       alerts: {
-        tripsForReview: (reviewTrips as any)?.length ?? 0,
+        tripsForReview: reviewTripsCount ?? 0,
       },
       recentTransactions: recentTransactions ?? [],
     });

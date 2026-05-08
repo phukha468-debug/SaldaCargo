@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@saldacargo/shared-types';
 
@@ -10,11 +11,13 @@ export async function getMechanicSummary(supabase: Client, mechanicId: string) {
   // 1. Ищем активный наряд (где есть запущенный таймер)
   const { data: activeOrder } = await supabase
     .from('service_orders')
-    .select(`
+    .select(
+      `
       id, order_number, machine_type, asset_id, status,
       asset:assets(short_name, reg_number),
       client_vehicle_brand, client_vehicle_reg
-    `)
+    `,
+    )
     .eq('assigned_mechanic_id', mechanicId)
     .eq('status', 'in_progress')
     .maybeSingle();
@@ -29,7 +32,7 @@ export async function getMechanicSummary(supabase: Client, mechanicId: string) {
   // 3. Считаем завершённые сегодня
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const { count: completedToday } = await supabase
     .from('service_orders')
     .select('*', { count: 'exact', head: true })
@@ -50,11 +53,13 @@ export async function getMechanicSummary(supabase: Client, mechanicId: string) {
 export async function getMechanicOrders(supabase: Client, mechanicId: string, status?: string) {
   let query = supabase
     .from('service_orders')
-    .select(`
+    .select(
+      `
       id, order_number, machine_type, status, priority, created_at,
       asset:assets(short_name),
       client_vehicle_brand, client_vehicle_reg
-    `)
+    `,
+    )
     .eq('assigned_mechanic_id', mechanicId)
     .order('priority', { ascending: false })
     .order('created_at', { ascending: false });
@@ -76,7 +81,8 @@ export async function getMechanicOrders(supabase: Client, mechanicId: string, st
 export async function getOrderDetail(supabase: Client, orderId: string) {
   const { data, error } = await supabase
     .from('service_orders')
-    .select(`
+    .select(
+      `
       *,
       asset:assets(*),
       works:service_order_works(
@@ -88,7 +94,8 @@ export async function getOrderDetail(supabase: Client, orderId: string) {
         *,
         part:parts(name, unit)
       )
-    `)
+    `,
+    )
     .eq('id', orderId)
     .single();
 
@@ -100,36 +107,28 @@ export async function getOrderDetail(supabase: Client, orderId: string) {
  * Начинает работу по наряду (запускает таймер).
  */
 export async function startWork(supabase: Client, workId: string) {
-  // 1. Проверяем, нет ли уже запущенного таймера у этого механика (делается триггером в БД)
-  // Но мы всё равно отправим запрос
-  const { data, error } = await (supabase
-    .from('work_time_logs') as any)
+  const { data, error } = await (supabase.from('work_time_logs') as any)
     .insert({
       service_order_work_id: workId,
       status: 'running',
-      started_at: new Date().toISOString()
+      started_at: new Date().toISOString(),
     })
     .select()
     .single();
 
   if (error) throw error;
 
-  // 2. Обновляем статус работы и наряда
-  await (supabase
-    .from('service_order_works') as any)
+  await (supabase.from('service_order_works') as any)
     .update({ status: 'in_progress' })
     .eq('id', workId);
 
-  // Получаем ID наряда чтобы обновить его статус
-  const { data: work } = await (supabase
-    .from('service_order_works') as any)
+  const { data: work } = await (supabase.from('service_order_works') as any)
     .select('service_order_id')
     .eq('id', workId)
     .single();
 
   if (work) {
-    await (supabase
-      .from('service_orders') as any)
+    await (supabase.from('service_orders') as any)
       .update({ status: 'in_progress' })
       .eq('id', work.service_order_id);
   }
@@ -138,30 +137,50 @@ export async function startWork(supabase: Client, workId: string) {
 }
 
 /**
- * Останавливает/паузит работу.
+ * Останавливает/паузит работу и сохраняет фактическое время.
  */
 export async function stopWork(supabase: Client, workId: string, status: 'paused' | 'completed') {
   const now = new Date().toISOString();
 
-  // 1. Закрываем активный лог времени
-  const { error: logError } = await (supabase
-    .from('work_time_logs') as any)
-    .update({ 
-      stopped_at: now,
-      status: status === 'paused' ? 'paused' : 'completed'
-    })
+  // 1. Находим активный лог чтобы знать started_at
+  const { data: runningLog, error: findError } = await (supabase.from('work_time_logs') as any)
+    .select('id, started_at')
     .eq('service_order_work_id', workId)
-    .eq('status', 'running');
+    .eq('status', 'running')
+    .single();
+
+  if (findError || !runningLog) throw new Error('Активный таймер не найден');
+
+  // 2. Закрываем лог
+  const { error: logError } = await (supabase.from('work_time_logs') as any)
+    .update({
+      stopped_at: now,
+      status: status === 'paused' ? 'paused' : 'completed',
+    })
+    .eq('id', runningLog.id);
 
   if (logError) throw logError;
 
-  // 2. Обновляем статус самой работы
-  const { error: workError } = await (supabase
-    .from('service_order_works') as any)
-    .update({ status: status })
+  // 3. Суммируем actual_minutes по ВСЕМ закрытым логам этой работы
+  const { data: allLogs } = await (supabase.from('work_time_logs') as any)
+    .select('started_at, stopped_at')
+    .eq('service_order_work_id', workId)
+    .not('stopped_at', 'is', null);
+
+  const totalMinutes = ((allLogs as any[]) ?? []).reduce((sum: number, log: any) => {
+    const ms = new Date(log.stopped_at).getTime() - new Date(log.started_at).getTime();
+    return sum + Math.max(0, Math.floor(ms / 60000));
+  }, 0);
+
+  // 4. Обновляем статус работы и фактическое время
+  const { error: workError } = await (supabase.from('service_order_works') as any)
+    .update({
+      status,
+      actual_minutes: totalMinutes,
+    })
     .eq('id', workId);
 
   if (workError) throw workError;
 
-  return { success: true };
+  return { success: true, actual_minutes: totalMinutes };
 }
