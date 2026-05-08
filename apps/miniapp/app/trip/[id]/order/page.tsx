@@ -223,7 +223,10 @@ export default function AddOrderPage() {
                   ))}
                   <button
                     type="button"
-                    onClick={() => setShowNewClient(true)}
+                    onClick={() => {
+                      setNewClientName(searchTerm);
+                      setShowNewClient(true);
+                    }}
                     className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
                   >
                     + Новый клиент &quot;{searchTerm}&quot;

@@ -132,8 +132,13 @@ export default function CounterpartiesPage() {
     }
   };
 
-  const toggleActive = (cp: Counterparty) => {
-    updateMutation.mutate({ id: cp.id, body: { is_active: !cp.is_active } });
+  const handleDelete = (cp: Counterparty) => {
+    if (!window.confirm(`Удалить контрагента "${cp.name}"? Это действие необратимо.`)) return;
+    updateMutation.mutate({ id: cp.id, body: { is_active: false } });
+  };
+
+  const handleRestore = (cp: Counterparty) => {
+    updateMutation.mutate({ id: cp.id, body: { is_active: true } });
   };
 
   const visible = counterparties.filter((cp) => (showInactive ? true : cp.is_active));
@@ -350,16 +355,21 @@ export default function CounterpartiesPage() {
                   >
                     Изменить
                   </button>
-                  <button
-                    onClick={() => toggleActive(cp)}
-                    className={`text-xs px-3 py-1.5 rounded border transition-colors ${
-                      cp.is_active
-                        ? 'text-slate-400 hover:text-rose-600 border-slate-200 hover:border-rose-200'
-                        : 'text-emerald-600 hover:text-emerald-700 border-emerald-200 hover:border-emerald-300'
-                    }`}
-                  >
-                    {cp.is_active ? 'Деактивировать' : 'Активировать'}
-                  </button>
+                  {cp.is_active ? (
+                    <button
+                      onClick={() => handleDelete(cp)}
+                      className="text-xs px-3 py-1.5 rounded border transition-colors text-slate-400 hover:text-rose-600 border-slate-200 hover:border-rose-200"
+                    >
+                      Удалить
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleRestore(cp)}
+                      className="text-xs px-3 py-1.5 rounded border transition-colors text-emerald-600 hover:text-emerald-700 border-emerald-200 hover:border-emerald-300"
+                    >
+                      Восстановить
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
