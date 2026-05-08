@@ -683,7 +683,7 @@ function StaffCard({
               : 'text-emerald-600 hover:text-emerald-700 border-emerald-100 hover:border-emerald-200'
           }`}
         >
-          {user.is_active ? 'Деактивировать' : 'Активировать'}
+          {user.is_active ? 'Деактивировать' : 'Восстановить'}
         </button>
       </div>
     </div>
@@ -840,9 +840,12 @@ export default function StaffPage() {
               user={user}
               assetMap={assetMap}
               onEdit={() => setModalUser(user)}
-              onToggleActive={() =>
-                patchMutation.mutate({ id: user.id, body: { is_active: !user.is_active } })
-              }
+              onToggleActive={() => {
+                if (user.is_active) {
+                  if (!window.confirm(`Деактивировать сотрудника "${user.name}"?`)) return;
+                }
+                patchMutation.mutate({ id: user.id, body: { is_active: !user.is_active } });
+              }}
               onSelect={() => setSelectedUser(user)}
             />
           ))}
