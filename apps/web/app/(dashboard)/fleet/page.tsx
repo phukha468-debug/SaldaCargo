@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -54,8 +55,6 @@ const STATUS_COLOR: Record<string, string> = {
   repair: 'bg-amber-100 text-amber-700',
   reserve: 'bg-slate-100 text-slate-500',
 };
-
-const PERIOD_LABEL: Record<string, string> = { day: 'День', week: 'Неделя', month: 'Месяц' };
 
 const emptyForm = {
   short_name: '',
@@ -507,11 +506,11 @@ function AssetTile({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 type VehicleFilter = 'all' | 'trucks' | 'gazelles';
-type Period = 'day' | 'week' | 'month';
 
 export default function FleetPage() {
   const qc = useQueryClient();
-  const [period, setPeriod] = useState<Period>('month');
+  const searchParams = useSearchParams();
+  const period = searchParams.get('period') ?? 'current_month';
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>('all');
   const [modalAsset, setModalAsset] = useState<Asset | 'new' | null>(null);
 
@@ -617,24 +616,6 @@ export default function FleetPage() {
               }`}
             >
               {l}
-            </button>
-          ))}
-        </div>
-
-        {/* Период аналитики */}
-        <div className="flex bg-slate-100 p-0.5 rounded-xl ml-auto">
-          <span className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center">
-            Период:
-          </span>
-          {(['day', 'week', 'month'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                period === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              {PERIOD_LABEL[p]}
             </button>
           ))}
         </div>

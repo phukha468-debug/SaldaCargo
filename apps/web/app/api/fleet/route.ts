@@ -2,26 +2,32 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-function getPeriodStart(period: string): string {
+function getPeriodRange(period: string): { start: string; end: string } {
   const now = new Date();
-  if (period === 'day') {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  if (period === 'last_month') {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString(),
+      end: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString(),
+    };
   }
-  if (period === 'week') {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 6);
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
+  if (period === 'quarter') {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString(),
+      end: now.toISOString(),
+    };
   }
-  // month (default)
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  // current_month (default)
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+    end: now.toISOString(),
+  };
 }
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get('period') ?? 'month';
-    const periodStart = getPeriodStart(period);
+    const period = searchParams.get('period') ?? 'current_month';
+    const { start: periodStart, end: periodEnd } = getPeriodRange(period);
 
     const supabase = createAdminClient();
 
@@ -56,14 +62,16 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
         .eq('trips.lifecycle_status', 'approved')
-        .gte('trips.started_at', periodStart),
+        .gte('trips.started_at', periodStart)
+        .lte('trips.started_at', periodEnd),
 
       // Расходы за период: trip_expenses → trips approved
       (supabase as any)
         .from('trip_expenses')
         .select('amount, trip:trips!inner(asset_id, started_at, lifecycle_status)')
         .eq('trips.lifecycle_status', 'approved')
-        .gte('trips.started_at', periodStart),
+        .gte('trips.started_at', periodStart)
+        .lte('trips.started_at', periodEnd),
 
       // Километры за период
       (supabase as any)
@@ -72,7 +80,8 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .eq('status', 'completed')
         .not('odometer_end', 'is', null)
-        .gte('started_at', periodStart),
+        .gte('started_at', periodStart)
+        .lte('started_at', periodEnd),
     ]);
 
     if (assetsError) return NextResponse.json({ error: assetsError.message }, { status: 500 });

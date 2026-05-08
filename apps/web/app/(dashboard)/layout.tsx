@@ -1,8 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@saldacargo/ui';
+
+type Period = 'current_month' | 'last_month' | 'quarter';
+const PERIODS: { value: Period; label: string }[] = [
+  { value: 'current_month', label: 'Текущий месяц' },
+  { value: 'last_month', label: 'Прошлый месяц' },
+  { value: 'quarter', label: 'Квартал' },
+];
 
 const navItems = [
   { href: '/', label: 'Главная' },
@@ -18,6 +25,15 @@ const FINANCE_PATHS = ['/finance', '/receivables', '/loans'];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activePeriod = (searchParams.get('period') as Period) ?? 'current_month';
+
+  const setPeriod = (p: Period) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('period', p);
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   return (
     <div className="min-h-screen bg-surface-bright flex flex-col">
@@ -71,16 +87,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </header>
 
       <section className="bg-slate-50 border-b border-slate-200 sticky top-16 z-40">
-        <div className="flex items-center w-full px-6 h-10 max-w-[1920px] mx-auto gap-4">
-          <span className="font-sans text-[10px] uppercase tracking-wider text-emerald-600 font-bold cursor-pointer">
-            Текущий месяц
-          </span>
-          <span className="font-sans text-[10px] uppercase tracking-wider text-slate-500 hover:text-slate-900 cursor-pointer">
-            Прошлый месяц
-          </span>
-          <span className="font-sans text-[10px] uppercase tracking-wider text-slate-500 hover:text-slate-900 cursor-pointer">
-            Квартал
-          </span>
+        <div className="flex items-center w-full px-6 h-10 max-w-[1920px] mx-auto gap-1">
+          {PERIODS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setPeriod(value)}
+              className={cn(
+                'font-sans text-[10px] uppercase tracking-wider font-bold px-3 h-full transition-colors border-b-2',
+                activePeriod === value
+                  ? 'text-emerald-600 border-emerald-500'
+                  : 'text-slate-500 hover:text-slate-900 border-transparent',
+              )}
+            >
+              {label}
+            </button>
+          ))}
           <div className="ml-auto flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span className="font-sans text-[10px] uppercase tracking-wider text-slate-600 font-bold">
