@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const CASH_METHODS = ['cash', 'card_driver'];
+const CASH_METHODS = ['cash'];
 
 /** GET /api/admin/cash-collections — drivers with current cash balances */
 export async function GET() {

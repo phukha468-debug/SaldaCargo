@@ -4,6 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Money } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
+type Wallets = {
+  bank: { name: string; balance: string };
+  cash: { name: string; balance: string };
+  card: { name: string; balance: string };
+  drivers_accountable: string;
+};
+
 type Summary = {
   month: { revenue: string; expenses: string; profit: string; fuel: string; payroll: string };
   today: { revenue: string; tripsCount: number };
@@ -23,6 +30,13 @@ export default function DashboardHome() {
   const { data, isLoading, isError } = useQuery<Summary>({
     queryKey: ['dashboard-summary'],
     queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({
+    queryKey: ['wallets'],
+    queryFn: () => fetch('/api/wallets').then((r) => r.json()),
     staleTime: 30000,
     refetchInterval: 60000,
   });
@@ -78,6 +92,59 @@ export default function DashboardHome() {
           isLoading={isLoading}
         />
       </div>
+
+      {/* Кошельки */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          {
+            key: 'bank' as const,
+            icon: '🏦',
+            color: 'text-sky-700',
+            bg: 'bg-sky-50 border-sky-200',
+          },
+          {
+            key: 'cash' as const,
+            icon: '💵',
+            color: 'text-emerald-700',
+            bg: 'bg-emerald-50 border-emerald-200',
+          },
+          {
+            key: 'card' as const,
+            icon: '💳',
+            color: 'text-violet-700',
+            bg: 'bg-violet-50 border-violet-200',
+          },
+        ].map(({ key, icon, color, bg }) => (
+          <div key={key} className={`border rounded-xl px-5 py-4 flex items-center gap-4 ${bg}`}>
+            <span className="text-3xl">{icon}</span>
+            <div>
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${color} opacity-70`}>
+                {wallets?.[key]?.name ?? '...'}
+              </p>
+              {walletsLoading ? (
+                <div className="h-6 w-28 bg-slate-200 rounded animate-pulse mt-1" />
+              ) : (
+                <p className={`text-xl font-black ${color}`}>
+                  <Money amount={wallets?.[key]?.balance ?? '0'} />
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {!walletsLoading && parseFloat(wallets?.drivers_accountable ?? '0') > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🚛</span>
+            <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">
+              У водителей (подотчёт наличных)
+            </p>
+          </div>
+          <p className="text-base font-black text-amber-700">
+            <Money amount={wallets!.drivers_accountable} />
+          </p>
+        </div>
+      )}
 
       {/* Расшифровка расходов */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
