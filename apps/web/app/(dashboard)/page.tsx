@@ -5,7 +5,7 @@ import { Money } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
 type Summary = {
-  month: { revenue: string; expenses: string; profit: string };
+  month: { revenue: string; expenses: string; profit: string; fuel: string; payroll: string };
   today: { revenue: string; tripsCount: number };
   alerts: { tripsForReview: number };
   recentTransactions: Array<{
@@ -77,6 +77,55 @@ export default function DashboardHome() {
           sub={today ? `${today.tripsCount} рейсов` : undefined}
           isLoading={isLoading}
         />
+      </div>
+
+      {/* Расшифровка расходов */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+        <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/80">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            Основные статьи расходов (месяц)
+          </span>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-slate-100">
+          <div className="px-6 py-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined !text-[20px] text-amber-500">
+                local_gas_station
+              </span>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+                ГСМ
+              </p>
+              {isLoading ? (
+                <div className="h-6 w-24 bg-slate-100 rounded animate-pulse" />
+              ) : (
+                <p className="text-lg font-black text-amber-600">
+                  <Money amount={month?.fuel ?? '0'} />
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="px-6 py-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined !text-[20px] text-violet-500">
+                payments
+              </span>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+                Зарплаты
+              </p>
+              {isLoading ? (
+                <div className="h-6 w-24 bg-slate-100 rounded animate-pulse" />
+              ) : (
+                <p className="text-lg font-black text-violet-600">
+                  <Money amount={month?.payroll ?? '0'} />
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Alerts */}

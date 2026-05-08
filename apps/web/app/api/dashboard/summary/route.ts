@@ -11,12 +11,23 @@ export async function GET() {
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
+    const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+    const CAT_PAYROLL = [
+      'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // ЗП водителя
+      '18792fa8-fda8-472d-8e04-e19d2c6c053c', // ЗП грузчика
+      '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // ЗП механика
+    ];
+
     const [
       { data: monthOrders },
       { data: monthExpenses },
       { data: todayOrders },
       { data: reviewTrips },
       { data: recentTransactions },
+      { data: tripFuelExpenses },
+      { data: tripPayroll },
+      { data: txFuel },
+      { data: txPayroll },
     ] = await Promise.all([
       // Выручка за месяц: одобренные заказы
       (supabase as any)
@@ -27,7 +38,7 @@ export async function GET() {
         .gte('trips.started_at', monthStart)
         .lte('trips.started_at', monthEnd),
 
-      // Расходы за месяц: транзакции + расходы в рейсах
+      // Расходы за месяц: прямые транзакции
       (supabase as any)
         .from('transactions')
         .select('amount')
@@ -58,6 +69,41 @@ export async function GET() {
         )
         .order('created_at', { ascending: false })
         .limit(8),
+
+      // Все расходы из рейсов (trip_expenses) — для ГСМ и общей суммы
+      (supabase as any)
+        .from('trip_expenses')
+        .select('amount, category_id, trips!inner(started_at, lifecycle_status)')
+        .eq('trips.lifecycle_status', 'approved')
+        .gte('trips.started_at', monthStart)
+        .lte('trips.started_at', monthEnd),
+
+      // ЗП из заказов (driver_pay + loader_pay + loader2_pay)
+      (supabase as any)
+        .from('trip_orders')
+        .select('driver_pay, loader_pay, loader2_pay, trips!inner(started_at, lifecycle_status)')
+        .eq('lifecycle_status', 'approved')
+        .eq('trips.lifecycle_status', 'approved')
+        .gte('trips.started_at', monthStart)
+        .lte('trips.started_at', monthEnd),
+
+      // ГСМ из прямых транзакций
+      (supabase as any)
+        .from('transactions')
+        .select('amount')
+        .eq('category_id', CAT_FUEL)
+        .eq('lifecycle_status', 'approved')
+        .gte('created_at', monthStart)
+        .lte('created_at', monthEnd),
+
+      // ЗП из прямых транзакций
+      (supabase as any)
+        .from('transactions')
+        .select('amount')
+        .in('category_id', CAT_PAYROLL)
+        .eq('lifecycle_status', 'approved')
+        .gte('created_at', monthStart)
+        .lte('created_at', monthEnd),
     ]);
 
     const revenue = (monthOrders ?? []).reduce(
@@ -79,11 +125,48 @@ export async function GET() {
       (todayOrders ?? []).map((o: any) => o.trips?.id).filter(Boolean),
     ).size;
 
+    // trip_expenses — все расходы в рейсах (ГСМ, прочее)
+    const tripExpensesTotal = (tripFuelExpenses ?? []).reduce(
+      (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
+      0,
+    );
+
+    // ГСМ из trips + прямых транзакций (для плитки)
+    const fuelFromTrips = (tripFuelExpenses ?? [])
+      .filter((e: any) => e.category_id === CAT_FUEL)
+      .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+    const fuelFromTx = (txFuel ?? []).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const fuelTotal = fuelFromTrips + fuelFromTx;
+
+    // ЗП из trip_orders (не попадает в transactions — отдельный источник)
+    const payrollFromOrders = (tripPayroll ?? []).reduce(
+      (s: number, o: any) =>
+        s +
+        parseFloat(o.driver_pay ?? '0') +
+        parseFloat(o.loader_pay ?? '0') +
+        parseFloat(o.loader2_pay ?? '0'),
+      0,
+    );
+    // ЗП из transactions — уже входит в expenses, только для плитки
+    const payrollFromTx = (txPayroll ?? []).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const payrollTotal = payrollFromOrders + payrollFromTx;
+
+    // Итог: transactions + trip_expenses + driver_pay (без двойного счёта)
+    const totalExpenses = expenses + tripExpensesTotal + payrollFromOrders;
+
     return NextResponse.json({
       month: {
         revenue: revenue.toFixed(2),
-        expenses: expenses.toFixed(2),
-        profit: (revenue - expenses).toFixed(2),
+        expenses: totalExpenses.toFixed(2),
+        profit: (revenue - totalExpenses).toFixed(2),
+        fuel: fuelTotal.toFixed(2),
+        payroll: payrollTotal.toFixed(2),
       },
       today: {
         revenue: todayRevenue.toFixed(2),
