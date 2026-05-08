@@ -61,7 +61,7 @@ function BottomSheet({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 transition-all duration-300',
+        'fixed inset-0 z-[60] transition-all duration-300',
         open ? 'pointer-events-auto' : 'pointer-events-none',
       )}
     >
@@ -87,7 +87,7 @@ function BottomSheet({
             ×
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 p-4">{children}</div>
+        <div className="overflow-y-auto flex-1 p-4 pb-2">{children}</div>
         {footer && (
           <div className="shrink-0 px-4 py-4 border-t border-slate-100 bg-white">{footer}</div>
         )}
@@ -850,7 +850,7 @@ export default function OrderDetailPage() {
 
       {/* Фиксированная кнопка снизу */}
       {(needsAccept || canComplete) && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg px-4 pt-3 pb-6">
+        <div className="fixed bottom-0 left-0 right-0 z-[55] bg-white border-t border-slate-200 shadow-lg px-4 pt-3 pb-6">
           {acceptError && (
             <p className="text-xs text-red-500 font-bold text-center mb-2">Ошибка: {acceptError}</p>
           )}
