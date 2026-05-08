@@ -356,10 +356,12 @@ function AssetTile({
   asset,
   onEdit,
   onChangeStatus,
+  onDelete,
 }: {
   asset: Asset;
   onEdit: () => void;
   onChangeStatus: (status: string) => void;
+  onDelete: () => void;
 }) {
   const a = asset.analytics;
   const profit = parseFloat(a.profit);
@@ -490,6 +492,13 @@ function AssetTile({
             ⏸
           </button>
         )}
+        <button
+          onClick={onDelete}
+          className="text-xs font-medium text-rose-400 hover:text-rose-600 border border-rose-100 hover:border-rose-300 rounded-lg py-1.5 px-2.5 transition-colors"
+          title="Удалить"
+        >
+          🗑
+        </button>
       </div>
     </div>
   );
@@ -526,6 +535,17 @@ export default function FleetPage() {
         body: JSON.stringify(body),
       }).then((r) => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fleet'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/fleet/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Ошибка удаления');
+      return json;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fleet'] }),
+    onError: (err: Error) => alert(err.message),
   });
 
   const summary = data?.summary;
@@ -640,6 +660,10 @@ export default function FleetPage() {
               asset={asset}
               onEdit={() => setModalAsset(asset)}
               onChangeStatus={(status) => patchMutation.mutate({ id: asset.id, body: { status } })}
+              onDelete={() => {
+                if (confirm(`Удалить "${asset.short_name}" (${asset.reg_number})?`))
+                  deleteMutation.mutate(asset.id);
+              }}
             />
           ))}
         </div>

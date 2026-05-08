@@ -2,6 +2,30 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const supabase = createAdminClient();
+
+    const { count } = await (supabase.from('trips') as any)
+      .select('id', { count: 'exact', head: true })
+      .eq('asset_id', id);
+
+    if (count && count > 0) {
+      return NextResponse.json(
+        { error: `Нельзя удалить: у машины ${count} рейс(ов). Переведите в статус "Списана".` },
+        { status: 409 },
+      );
+    }
+
+    const { error } = await (supabase.from('assets') as any).delete().eq('id', id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
