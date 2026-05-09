@@ -27,7 +27,6 @@ export async function GET() {
       { data: tripFuelExpenses },
       { data: tripPayroll },
       { data: txFuel },
-      { data: txPayroll },
     ] = await Promise.all([
       // Выручка за месяц: одобренные заказы
       (supabase as any)
@@ -38,12 +37,13 @@ export async function GET() {
         .gte('trips.started_at', monthStart)
         .lte('trips.started_at', monthEnd),
 
-      // Расходы за месяц: прямые транзакции
+      // Расходы за месяц: прямые транзакции (без PAYROLL — они считаются через trip_orders)
       (supabase as any)
         .from('transactions')
         .select('amount')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
+        .not('category_id', 'in', `(${CAT_PAYROLL.join(',')})`)
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 
@@ -95,15 +95,6 @@ export async function GET() {
         .eq('lifecycle_status', 'approved')
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
-
-      // ЗП из прямых транзакций
-      (supabase as any)
-        .from('transactions')
-        .select('amount')
-        .in('category_id', CAT_PAYROLL)
-        .eq('lifecycle_status', 'approved')
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd),
     ]);
 
     const revenue = (monthOrders ?? []).reduce(
@@ -150,12 +141,8 @@ export async function GET() {
         parseFloat(o.loader2_pay ?? '0'),
       0,
     );
-    // ЗП из transactions — уже входит в expenses, только для плитки
-    const payrollFromTx = (txPayroll ?? []).reduce(
-      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
-      0,
-    );
-    const payrollTotal = payrollFromOrders + payrollFromTx;
+    // Плитка ЗП = начисленная ЗП из рейсов (единственный источник)
+    const payrollTotal = payrollFromOrders;
 
     // Итог: transactions + trip_expenses + driver_pay (без двойного счёта)
     const totalExpenses = expenses + tripExpensesTotal + payrollFromOrders;
