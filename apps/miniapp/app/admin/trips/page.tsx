@@ -408,9 +408,7 @@ function HistoryTripCard({
   approving: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit } =
-    calcTrip(trip);
-  const totalCosts = driverPay + loaderPay + totalExpenses;
+  const { activeOrders, expenses, revenue, driverPay, loaderPay, mileage, profit } = calcTrip(trip);
   const canReview = trip.status === 'completed' && trip.lifecycle_status === 'draft';
 
   return (
@@ -550,7 +548,12 @@ function HistoryTripCard({
           )}
 
           {/* Итоги */}
-          <div className="grid grid-cols-3 border-t border-zinc-100 bg-zinc-50">
+          <div
+            className={cn(
+              'border-t border-zinc-100 bg-zinc-50',
+              loaderPay > 0 ? 'grid grid-cols-2' : 'grid grid-cols-3',
+            )}
+          >
             <div className="text-center px-2 py-3 border-r border-zinc-100">
               <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
                 Выручка
@@ -559,14 +562,29 @@ function HistoryTripCard({
                 <Money amount={revenue.toFixed(2)} />
               </p>
             </div>
-            <div className="text-center px-2 py-3 border-r border-zinc-100">
+            <div
+              className={cn(
+                'text-center px-2 py-3',
+                loaderPay > 0 ? '' : 'border-r border-zinc-100',
+              )}
+            >
               <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
-                Расходы
+                ЗП Водитель
               </p>
-              <p className="font-bold text-rose-500 text-sm">
-                <Money amount={totalCosts.toFixed(2)} />
+              <p className="font-bold text-green-600 text-sm">
+                <Money amount={driverPay.toFixed(2)} />
               </p>
             </div>
+            {loaderPay > 0 && (
+              <div className="text-center px-2 py-3 border-r border-zinc-100 border-t border-t-zinc-100">
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
+                  ЗП Грузчик
+                </p>
+                <p className="font-bold text-blue-500 text-sm">
+                  <Money amount={loaderPay.toFixed(2)} />
+                </p>
+              </div>
+            )}
             <div className="text-center px-2 py-3">
               <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
                 Прибыль
