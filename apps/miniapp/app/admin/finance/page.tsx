@@ -373,7 +373,7 @@ type DebtItem =
 function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [selected, setSelected] = useState<DebtItem | null>(null);
   const [amount, setAmount] = useState('');
-  const [walletId, setWalletId] = useState(WALLET_OPTIONS[0].id);
+  const [walletId, setWalletId] = useState(WALLET_OPTIONS[0]?.id ?? '');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 

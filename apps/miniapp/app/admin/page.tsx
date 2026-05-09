@@ -244,8 +244,8 @@ function WalletsSection({
 }
 
 function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const [from, setFrom] = useState(WALLET_OPTIONS[0].id);
-  const [to, setTo] = useState(WALLET_OPTIONS[1].id);
+  const [from, setFrom] = useState(WALLET_OPTIONS[0]?.id ?? '');
+  const [to, setTo] = useState(WALLET_OPTIONS[1]?.id ?? '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
