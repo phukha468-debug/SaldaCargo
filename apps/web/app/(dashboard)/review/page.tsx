@@ -422,39 +422,45 @@ function TripCard({
             </span>
           </div>
 
-          {/* Center: metrics */}
-          <div className="flex-1 flex items-center justify-center gap-4">
-            <div className="text-center">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                Выручка
-              </span>
-              <span className="text-sm font-bold text-slate-700">
-                <Money amount={revenue.toFixed(2)} />
-              </span>
-            </div>
-            <span className="text-slate-200 text-sm">−</span>
-            <div className="text-center">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                Расходы
-              </span>
-              <span className="text-sm font-bold text-rose-500">
-                <Money amount={totalCosts.toFixed(2)} />
-              </span>
-            </div>
-            <span className="text-slate-200 text-sm">=</span>
-            <div className="text-center">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                Прибыль
-              </span>
-              <span
-                className={cn(
-                  'text-base font-black',
-                  profit > 0 ? 'text-emerald-600' : profit < 0 ? 'text-rose-600' : 'text-slate-500',
-                )}
-              >
-                {profit < 0 ? '−' : ''}
-                <Money amount={Math.abs(profit).toFixed(2)} />
-              </span>
+          {/* Center: metrics — fixed widths so columns align across cards */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex items-center">
+              <div className="w-28 text-center">
+                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Выручка
+                </span>
+                <span className="text-sm font-bold text-slate-700">
+                  <Money amount={revenue.toFixed(2)} />
+                </span>
+              </div>
+              <span className="w-5 text-center text-slate-200 text-sm shrink-0">−</span>
+              <div className="w-28 text-center">
+                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Расходы
+                </span>
+                <span className="text-sm font-bold text-rose-500">
+                  <Money amount={totalCosts.toFixed(2)} />
+                </span>
+              </div>
+              <span className="w-5 text-center text-slate-200 text-sm shrink-0">=</span>
+              <div className="w-28 text-center">
+                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Прибыль
+                </span>
+                <span
+                  className={cn(
+                    'text-base font-black',
+                    profit > 0
+                      ? 'text-emerald-600'
+                      : profit < 0
+                        ? 'text-rose-600'
+                        : 'text-slate-500',
+                  )}
+                >
+                  {profit < 0 ? '−' : ''}
+                  <Money amount={Math.abs(profit).toFixed(2)} />
+                </span>
+              </div>
             </div>
           </div>
 
@@ -780,8 +786,12 @@ export default function ReviewPage() {
     }
   }
 
-  // Aggregate stats for review mode
+  // Aggregate stats
   const totalRevenue = trips.reduce((s, t) => s + calcTrip(t).revenue, 0);
+  const totalCostsAll = trips.reduce((s, t) => {
+    const c = calcTrip(t);
+    return s + c.driverPay + c.loaderPay + c.totalExpenses;
+  }, 0);
   const totalProfit = trips.reduce((s, t) => s + calcTrip(t).profit, 0);
 
   return (
@@ -902,21 +912,78 @@ export default function ReviewPage() {
               )}
             </div>
           ) : (
-            trips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                mode={mode}
-                expanded={expandedIds.has(trip.id)}
-                onToggle={() => toggleExpand(trip.id)}
-                onEdit={() => setEditTrip(trip)}
-                onApprove={() => handleApprove(trip.id)}
-                onReturn={() => handleReturn(trip.id)}
-                onDelete={() => handleDelete(trip.id)}
-                approving={approvingId === trip.id}
-                deleting={deletingId === trip.id}
-              />
-            ))
+            <>
+              {trips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  mode={mode}
+                  expanded={expandedIds.has(trip.id)}
+                  onToggle={() => toggleExpand(trip.id)}
+                  onEdit={() => setEditTrip(trip)}
+                  onApprove={() => handleApprove(trip.id)}
+                  onReturn={() => handleReturn(trip.id)}
+                  onDelete={() => handleDelete(trip.id)}
+                  approving={approvingId === trip.id}
+                  deleting={deletingId === trip.id}
+                />
+              ))}
+
+              {/* Daily totals strip */}
+              <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white">
+                <div className="px-4 py-2 border-b border-slate-700 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-slate-400 text-[16px]">
+                    summarize
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Итого за день · {trips.length} рейс
+                    {trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}
+                  </span>
+                </div>
+                <div className="flex items-center px-4 py-3">
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="flex items-center">
+                      <div className="w-28 text-center">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
+                          Выручка
+                        </span>
+                        <span className="text-base font-black text-white">
+                          <Money amount={totalRevenue.toFixed(2)} />
+                        </span>
+                      </div>
+                      <span className="w-5 text-center text-slate-600 text-sm shrink-0">−</span>
+                      <div className="w-28 text-center">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
+                          Расходы
+                        </span>
+                        <span className="text-base font-black text-rose-400">
+                          <Money amount={totalCostsAll.toFixed(2)} />
+                        </span>
+                      </div>
+                      <span className="w-5 text-center text-slate-600 text-sm shrink-0">=</span>
+                      <div className="w-28 text-center">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
+                          Прибыль
+                        </span>
+                        <span
+                          className={cn(
+                            'text-lg font-black',
+                            totalProfit > 0
+                              ? 'text-emerald-400'
+                              : totalProfit < 0
+                                ? 'text-rose-400'
+                                : 'text-slate-400',
+                          )}
+                        >
+                          {totalProfit < 0 ? '−' : ''}
+                          <Money amount={Math.abs(totalProfit).toFixed(2)} />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
