@@ -26,7 +26,7 @@ function FinanceContent() {
   const searchParams = useSearchParams();
   const initialAction = searchParams.get('action');
   const [showForm, setShowForm] = useState<
-    'income' | 'expense' | 'collection' | 'debts' | 'salary' | null
+    'income' | 'expense' | 'collection' | 'debts' | 'salary' | 'receivables' | null
   >(
     initialAction === 'income'
       ? 'income'
@@ -38,7 +38,9 @@ function FinanceContent() {
             ? 'debts'
             : initialAction === 'salary'
               ? 'salary'
-              : null,
+              : initialAction === 'receivables'
+                ? 'receivables'
+                : null,
   );
   const queryClient = useQueryClient();
 
@@ -85,6 +87,13 @@ function FinanceContent() {
             >
               <span className="text-xl">💼</span>
               <span className="text-[10px] font-black uppercase tracking-widest">Инкасс.</span>
+            </button>
+            <button
+              onClick={() => setShowForm('receivables')}
+              className="col-span-2 bg-orange-500 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            >
+              <span className="text-xl">📋</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">Дебиторка</span>
             </button>
             <button
               onClick={() => setShowForm('salary')}
@@ -139,6 +148,18 @@ function FinanceContent() {
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-payroll'] });
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              setShowForm(null);
+            }}
+          />
+        )}
+
+        {/* Форма погашения дебиторки */}
+        {showForm === 'receivables' && (
+          <ReceivablesForm
+            onClose={() => setShowForm(null)}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
               setShowForm(null);
             }}
           />
@@ -851,6 +872,230 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
         >
           {mutation.isPending ? 'Проводим...' : '✓ Выплатить ЗП'}
         </button>
+      )}
+    </div>
+  );
+}
+
+type ReceivableOrder = {
+  id: string;
+  amount: string;
+  payment_method: string;
+  created_at: string;
+  trip_number: number | null;
+  started_at: string | null;
+  driver_name: string | null;
+};
+
+type Debtor = {
+  counterparty_id: string;
+  counterparty_name: string;
+  total: string;
+  oldest_at: string;
+  orders: ReceivableOrder[];
+};
+
+function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [selectedDebtorId, setSelectedDebtorId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<ReceivableOrder | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery<{ debtors: Debtor[]; totalAmount: string }>({
+    queryKey: ['admin-receivables'],
+    queryFn: async () => {
+      const r = await fetch('/api/admin/receivables');
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка сервера');
+      return json;
+    },
+    staleTime: 0,
+  });
+
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedOrder) throw new Error('Не выбран заказ');
+      const r = await fetch('/api/admin/receivables/settle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: selectedOrder.id,
+          payment_method: paymentMethod,
+          note: note || undefined,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
+      setSelectedOrder(null);
+      setNote('');
+      setError('');
+      onSuccess();
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const debtors = data?.debtors ?? [];
+  const selectedDebtor = debtors.find((d) => d.counterparty_id === selectedDebtorId) ?? null;
+
+  const DEBT_PAYMENT_METHODS = [
+    { value: 'cash', label: '💵 Нал' },
+    { value: 'bank_transfer', label: '🏦 Безнал' },
+    { value: 'card', label: '💳 Карта' },
+  ];
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black uppercase text-sm text-orange-600">📋 Дебиторка</h2>
+        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+          ✕
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-14 bg-zinc-200 rounded-xl" />
+          ))}
+        </div>
+      ) : isError ? (
+        <p className="text-center py-4 text-red-500 font-bold text-xs uppercase">
+          ❌ {(queryError as Error)?.message ?? 'Ошибка загрузки'}
+        </p>
+      ) : debtors.length === 0 ? (
+        <p className="text-center py-6 text-zinc-400 font-bold text-xs uppercase">Долгов нет 🎉</p>
+      ) : (
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            Должники · итого {parseFloat(data?.totalAmount ?? '0').toLocaleString('ru-RU')} ₽
+          </label>
+          {debtors.map((d) => {
+            const isSelected = selectedDebtorId === d.counterparty_id;
+            return (
+              <div key={d.counterparty_id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDebtorId(isSelected ? null : d.counterparty_id);
+                    setSelectedOrder(null);
+                    setError('');
+                  }}
+                  className={`w-full p-3 rounded-xl border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-orange-500 bg-orange-50 text-orange-900'
+                      : 'border-zinc-200 text-zinc-700'
+                  }`}
+                >
+                  <span>{d.counterparty_name}</span>
+                  <div className="text-right">
+                    <p className="font-black text-xs text-orange-600">
+                      {parseFloat(d.total).toLocaleString('ru-RU')} ₽
+                    </p>
+                    <p className="text-[9px] text-zinc-400 font-bold uppercase">
+                      {d.orders.length} заказ{d.orders.length > 1 ? 'а' : ''}
+                    </p>
+                  </div>
+                </button>
+
+                {isSelected && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {selectedDebtor?.orders.map((order) => {
+                      const isOrderSelected = selectedOrder?.id === order.id;
+                      return (
+                        <div key={order.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrder(isOrderSelected ? null : order);
+                              setError('');
+                            }}
+                            className={`w-full p-3 rounded-lg border-2 flex justify-between items-center text-xs font-bold transition-all active:scale-[0.98] ${
+                              isOrderSelected
+                                ? 'border-orange-400 bg-orange-50 text-orange-800'
+                                : 'border-zinc-100 text-zinc-600 bg-zinc-50'
+                            }`}
+                          >
+                            <div className="text-left">
+                              {order.trip_number && (
+                                <p className="font-black text-zinc-700">
+                                  Рейс №{order.trip_number}
+                                </p>
+                              )}
+                              <p className="text-[10px] text-zinc-400 uppercase">
+                                {formatDate(order.created_at)}
+                                {order.driver_name ? ` · ${order.driver_name}` : ''}
+                              </p>
+                            </div>
+                            <p className="font-black text-orange-600">
+                              {parseFloat(order.amount).toLocaleString('ru-RU')} ₽
+                            </p>
+                          </button>
+
+                          {isOrderSelected && (
+                            <div className="mt-2 ml-2 p-3 bg-orange-50 rounded-lg border border-orange-200 space-y-3">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                                  Способ оплаты
+                                </label>
+                                <div className="flex gap-2">
+                                  {DEBT_PAYMENT_METHODS.map((m) => (
+                                    <button
+                                      key={m.value}
+                                      type="button"
+                                      onClick={() => setPaymentMethod(m.value)}
+                                      className={`flex-1 py-2.5 rounded-lg border-2 text-xs font-black transition-all active:scale-[0.97] ${
+                                        paymentMethod === m.value
+                                          ? 'border-orange-500 bg-orange-100 text-orange-700'
+                                          : 'border-zinc-200 bg-white text-zinc-500'
+                                      }`}
+                                    >
+                                      {m.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <input
+                                type="text"
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                placeholder="Комментарий (необязательно)"
+                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
+                              />
+                              {error && (
+                                <p className="text-red-600 text-xs font-bold uppercase">{error}</p>
+                              )}
+                              <button
+                                onClick={() => mutation.mutate()}
+                                disabled={mutation.isPending}
+                                className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-white bg-orange-500 active:scale-[0.97] transition-all disabled:opacity-50"
+                              >
+                                {mutation.isPending
+                                  ? 'Проводим...'
+                                  : `✓ Погасить ${parseFloat(order.amount).toLocaleString('ru-RU')} ₽`}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
