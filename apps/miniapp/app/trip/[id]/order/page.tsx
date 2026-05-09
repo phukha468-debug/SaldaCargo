@@ -114,6 +114,10 @@ export default function AddOrderPage() {
 
   async function onSubmit(data: FormData) {
     if (submitting) return;
+    if (!data.counterparty_id) {
+      setError('Укажите клиента перед добавлением заказа');
+      return;
+    }
     setSubmitting(true);
     setError('');
 

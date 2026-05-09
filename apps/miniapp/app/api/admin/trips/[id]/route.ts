@@ -41,6 +41,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       driver_pay?: string;
       loader_pay?: string;
       payment_method?: string;
+      counterparty_name?: string;
     }>;
   };
   const supabase = createAdminClient();
@@ -56,6 +57,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (fields.loader_pay !== undefined)
         update.loader_pay = parseFloat(fields.loader_pay).toFixed(2);
       if (fields.payment_method !== undefined) update.payment_method = fields.payment_method;
+      if (fields.counterparty_name !== undefined) {
+        const name = fields.counterparty_name.trim();
+        if (name) {
+          const { data: found } = await (supabase.from('counterparties') as any)
+            .select('id')
+            .ilike('name', name)
+            .maybeSingle();
+          if (found) {
+            update.counterparty_id = found.id;
+          } else {
+            const { data: created, error: createErr } = await (
+              supabase.from('counterparties') as any
+            )
+              .insert({ name, type: 'client' })
+              .select('id')
+              .single();
+            if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
+            update.counterparty_id = created.id;
+          }
+        }
+      }
       if (Object.keys(update).length > 0) {
         const { error } = await (supabase.from('trip_orders') as any)
           .update(update)

@@ -62,6 +62,10 @@ export default function AdminTripDetailPage() {
   );
   const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
   const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
+  const loaderPay = activeOrders.reduce(
+    (s: number, o: any) => s + parseFloat(o.loader_pay ?? '0'),
+    0,
+  );
   const expenses = (trip.trip_expenses ?? []).reduce(
     (s: number, e: any) => s + parseFloat(e.amount),
     0,
@@ -115,15 +119,25 @@ export default function AdminTripDetailPage() {
         </section>
 
         {/* Итоги */}
-        <section className="grid grid-cols-3 gap-3">
+        <section className={`grid gap-3 ${loaderPay > 0 ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Выручка</p>
             <Money amount={revenue.toString()} className="text-base font-black text-orange-600" />
           </div>
           <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
-            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">ЗП</p>
+            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+              ЗП Водитель
+            </p>
             <Money amount={driverPay.toString()} className="text-base font-black text-green-600" />
           </div>
+          {loaderPay > 0 && (
+            <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
+              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                ЗП Грузчик
+              </p>
+              <Money amount={loaderPay.toString()} className="text-base font-black text-blue-500" />
+            </div>
+          )}
           <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Расходы</p>
             <Money amount={expenses.toString()} className="text-base font-black text-red-500" />

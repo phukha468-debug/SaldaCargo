@@ -228,7 +228,12 @@ function EditModal({
   const activeOrders = (trip.trip_orders ?? []).filter(
     (o: any) => o.lifecycle_status !== 'cancelled',
   );
-  const [orders, setOrders] = useState(activeOrders.map((o: any) => ({ ...o })));
+  const [orders, setOrders] = useState(
+    activeOrders.map((o: any) => ({
+      ...o,
+      counterparty_name: o.counterparty?.name ?? '',
+    })),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -290,8 +295,19 @@ function EditModal({
             <div key={order.id} className="space-y-3">
               <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
                 Заявка {idx + 1}
-                {order.counterparty?.name ? ` · ${order.counterparty.name}` : ''}
               </p>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
+                  Клиент
+                </label>
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={order.counterparty_name}
+                  placeholder="Название клиента"
+                  onChange={(e) => update(order.id, 'counterparty_name', e.target.value)}
+                />
+              </div>
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
                   Сумма, ₽
