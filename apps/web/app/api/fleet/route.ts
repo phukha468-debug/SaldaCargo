@@ -37,6 +37,7 @@ export async function GET(request: Request) {
       { data: revenueOrders },
       { data: expenseRows },
       { data: kmTrips },
+      { data: payRows },
     ] = await Promise.all([
       // Все машины
       (supabase as any)
@@ -82,6 +83,15 @@ export async function GET(request: Request) {
         .not('odometer_end', 'is', null)
         .gte('started_at', periodStart)
         .lte('started_at', periodEnd),
+
+      // ЗП водителей и грузчиков за период (для себестоимости)
+      (supabase as any)
+        .from('trip_orders')
+        .select('driver_pay, loader_pay, trip:trips!inner(asset_id, started_at, lifecycle_status)')
+        .eq('lifecycle_status', 'approved')
+        .eq('trips.lifecycle_status', 'approved')
+        .gte('trips.started_at', periodStart)
+        .lte('trips.started_at', periodEnd),
     ]);
 
     if (assetsError) return NextResponse.json({ error: assetsError.message }, { status: 500 });
@@ -105,18 +115,29 @@ export async function GET(request: Request) {
       if (km > 0) kmMap.set(t.asset_id, (kmMap.get(t.asset_id) ?? 0) + km);
     }
 
+    const payMap = new Map<string, number>();
+    for (const o of (payRows as any[]) ?? []) {
+      const id = o.trip?.asset_id;
+      if (id) {
+        const pay = parseFloat(o.driver_pay ?? '0') + parseFloat(o.loader_pay ?? '0');
+        payMap.set(id, (payMap.get(id) ?? 0) + pay);
+      }
+    }
+
     const rows = ((assets as any[]) ?? []).map((a: any) => {
       const revenue = revenueMap.get(a.id) ?? 0;
-      const expenses = expenseMap.get(a.id) ?? 0;
+      const tripExpenses = expenseMap.get(a.id) ?? 0;
+      const pay = payMap.get(a.id) ?? 0;
+      const totalCosts = tripExpenses + pay;
       const km = kmMap.get(a.id) ?? 0;
       return {
         ...a,
         analytics: {
           revenue: revenue.toFixed(2),
-          expenses: expenses.toFixed(2),
-          profit: (revenue - expenses).toFixed(2),
+          expenses: totalCosts.toFixed(2),
+          profit: (revenue - totalCosts).toFixed(2),
           km,
-          cost_per_km: km > 0 ? (expenses / km).toFixed(2) : null,
+          cost_per_km: km > 0 ? (totalCosts / km).toFixed(2) : null,
         },
       };
     });

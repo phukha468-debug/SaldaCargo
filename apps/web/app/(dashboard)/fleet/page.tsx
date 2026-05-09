@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
+import { cn } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,25 +71,6 @@ const emptyForm = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function OdometerBar({ km }: { km: number }) {
-  const pct = Math.min((km / 300000) * 100, 100);
-  const color = pct > 80 ? 'bg-rose-500' : pct > 55 ? 'bg-amber-400' : 'bg-emerald-400';
-  return (
-    <div>
-      <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-        <span>Одометр</span>
-        <span className="font-medium text-slate-600">{km.toLocaleString('ru-RU')} км</span>
-      </div>
-      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
 
 function StatRow({
   label,
@@ -351,7 +333,7 @@ function AssetModal({
   );
 }
 
-// ─── Tile ────────────────────────────────────────────────────────────────────
+// ─── Compact collapsible tile ─────────────────────────────────────────────────
 
 function AssetTile({
   asset,
@@ -364,143 +346,272 @@ function AssetTile({
   onChangeStatus: (status: string) => void;
   onDelete: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const a = asset.analytics;
   const profit = parseFloat(a.profit);
   const isProfit = profit >= 0;
+  const emoji = asset.asset_type?.code?.startsWith('gazelle') ? '🚐' : '🚛';
+
+  const accentBorder =
+    asset.status === 'repair'
+      ? 'border-l-amber-400'
+      : asset.status === 'reserve'
+        ? 'border-l-slate-300'
+        : isProfit
+          ? 'border-l-emerald-400'
+          : 'border-l-rose-400';
+
+  const handleDelete = () => {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true);
+      deleteTimer.current = setTimeout(() => setDeleteConfirm(false), 4000);
+    } else {
+      if (deleteTimer.current) clearTimeout(deleteTimer.current);
+      setDeleteConfirm(false);
+      onDelete();
+    }
+  };
+
+  const pct = Math.min(((asset.odometer_current ?? 0) / 300000) * 100, 100);
+  const odomColor = pct > 80 ? 'bg-rose-500' : pct > 55 ? 'bg-amber-400' : 'bg-emerald-400';
 
   return (
     <div
-      className={`bg-white border rounded-2xl shadow-sm flex flex-col overflow-hidden transition-all hover:shadow-md ${
-        asset.needs_update ? 'border-rose-200' : 'border-slate-200'
-      }`}
+      className={cn(
+        'bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md border-l-4',
+        accentBorder,
+        asset.needs_update && 'border-rose-200',
+      )}
     >
-      {/* Шапка плитки */}
+      {/* Compact header — always visible */}
       <div
-        className={`px-4 pt-4 pb-3 ${asset.status === 'repair' ? 'bg-amber-50/60' : asset.status === 'reserve' ? 'bg-slate-50' : ''}`}
+        className="px-4 py-2.5 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
+        onClick={() => setExpanded((v) => !v)}
       >
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">
-              {asset.asset_type?.code?.startsWith('gazelle') ? '🚐' : '🚛'}
-            </span>
-            <div>
-              <p className="font-black text-slate-900 text-lg leading-tight">{asset.short_name}</p>
-              <p className="text-xs text-slate-400">{asset.reg_number}</p>
+        <div className="flex items-center gap-3">
+          {/* Identity */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-lg shrink-0">{emoji}</span>
+            <div className="min-w-0">
+              <p className="font-black text-slate-900 text-sm leading-tight truncate">
+                {asset.short_name}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">{asset.reg_number}</p>
             </div>
-          </div>
-          <div className="flex flex-col items-end gap-1">
             <span
-              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_COLOR[asset.status]}`}
+              className={cn(
+                'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0',
+                STATUS_COLOR[asset.status] ?? 'bg-slate-100 text-slate-500',
+              )}
             >
-              {STATUS_LABEL[asset.status]}
+              {STATUS_LABEL[asset.status] ?? asset.status}
             </span>
             {asset.needs_update && (
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-500 border border-rose-200">
-                Нет данных
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-500 border border-rose-200 shrink-0">
+                !
               </span>
             )}
           </div>
+
+          {/* Key stats */}
+          <div className="shrink-0 flex items-center gap-4 text-right">
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                Пробег
+              </p>
+              <p className="text-xs font-bold text-slate-700">
+                {(asset.odometer_current ?? 0).toLocaleString('ru-RU')} км
+              </p>
+            </div>
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                Прибыль
+              </p>
+              <p
+                className={cn(
+                  'text-sm font-black',
+                  isProfit ? 'text-emerald-600' : 'text-rose-600',
+                )}
+              >
+                {isProfit ? '' : '−'}
+                <Money amount={Math.abs(profit).toFixed(2)} />
+              </p>
+            </div>
+            {a.cost_per_km && parseFloat(a.cost_per_km) > 0 && (
+              <div>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                  ₽/км
+                </p>
+                <p className="text-xs font-bold text-slate-600">
+                  {parseFloat(a.cost_per_km).toFixed(0)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Chevron */}
+          <span
+            className={cn(
+              'material-symbols-outlined text-slate-300 text-[20px] shrink-0 transition-transform duration-300',
+              expanded ? 'rotate-180' : '',
+            )}
+          >
+            expand_more
+          </span>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
-          {asset.asset_type && <span>{asset.asset_type.name}</span>}
-          {asset.year && <span>{asset.year} г.</span>}
-          {asset.asset_type?.has_gps && <span className="text-sky-600 font-medium">GPS</span>}
-          {asset.driver && (
-            <span className="text-slate-700 font-semibold">👤 {asset.driver.name}</span>
-          )}
+        {/* Odometer mini-bar always visible */}
+        <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
+          <div className={cn('h-full rounded-full', odomColor)} style={{ width: `${pct}%` }} />
         </div>
       </div>
 
-      {/* Одометр */}
-      <div className="px-4 py-3 border-t border-slate-50">
-        <OdometerBar km={asset.odometer_current ?? 0} />
-      </div>
+      {/* Expanded details */}
+      {expanded && (
+        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+          {/* Driver + meta */}
+          <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap gap-x-4 gap-y-1">
+            {asset.driver && (
+              <span className="text-xs text-slate-700 font-semibold">👤 {asset.driver.name}</span>
+            )}
+            {asset.asset_type && (
+              <span className="text-xs text-slate-500">{asset.asset_type.name}</span>
+            )}
+            {asset.year && <span className="text-xs text-slate-400">{asset.year} г.</span>}
+            {asset.asset_type?.has_gps && (
+              <span className="text-xs text-sky-600 font-semibold">GPS</span>
+            )}
+            {asset.notes && (
+              <span className="text-xs text-slate-400 italic w-full">{asset.notes}</span>
+            )}
+          </div>
 
-      {/* Аналитика */}
-      <div className="px-4 py-3 border-t border-slate-50 flex-1">
-        <StatRow label="Выручка" value={<Money amount={a.revenue} />} color="text-emerald-600" />
-        <StatRow label="Расходы" value={<Money amount={a.expenses} />} color="text-rose-500" />
-        <StatRow
-          label="Прибыль"
-          value={
-            <>
-              {isProfit ? '+' : ''}
-              <Money amount={a.profit} />
-            </>
-          }
-          color={isProfit ? 'text-emerald-700' : 'text-rose-600'}
-        />
-        <StatRow
-          label="Пробег за период"
-          value={a.km > 0 ? `${a.km.toLocaleString('ru-RU')} км` : '—'}
-        />
-        <StatRow
-          label="Себестоимость 1 км"
-          value={a.cost_per_km ? `${parseFloat(a.cost_per_km).toFixed(0)} ₽/км` : '—'}
-          color={a.cost_per_km ? 'text-slate-700' : 'text-slate-400'}
-        />
-        {asset.current_book_value && (
-          <StatRow
-            label="Балансовая стоимость"
-            value={<Money amount={asset.current_book_value} />}
-          />
-        )}
-        {asset.remaining_depreciation_months && (
-          <StatRow
-            label="Амортизация"
-            value={`ещё ${asset.remaining_depreciation_months} мес.`}
-            color="text-slate-500"
-          />
-        )}
-        {asset.notes && (
-          <p className="text-[10px] text-slate-400 italic mt-2 border-t border-slate-50 pt-2">
-            {asset.notes}
-          </p>
-        )}
-      </div>
+          {/* Analytics */}
+          <div className="px-4 py-3 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+              <StatRow
+                label="Выручка"
+                value={<Money amount={a.revenue} />}
+                color="text-emerald-600"
+              />
+              <StatRow
+                label="Расходы (ЗП + затраты)"
+                value={<Money amount={a.expenses} />}
+                color="text-rose-500"
+              />
+              <StatRow
+                label="Прибыль"
+                value={
+                  <>
+                    {isProfit ? '+' : ''}
+                    <Money amount={a.profit} />
+                  </>
+                }
+                color={isProfit ? 'text-emerald-700' : 'text-rose-600'}
+              />
+              <StatRow
+                label="Пробег за период"
+                value={a.km > 0 ? `${a.km.toLocaleString('ru-RU')} км` : '—'}
+              />
+              <StatRow
+                label="Себестоимость 1 км"
+                value={
+                  a.cost_per_km && parseFloat(a.cost_per_km) > 0
+                    ? `${parseFloat(a.cost_per_km).toFixed(0)} ₽/км`
+                    : '—'
+                }
+                color={
+                  a.cost_per_km && parseFloat(a.cost_per_km) > 0
+                    ? 'text-slate-700'
+                    : 'text-slate-400'
+                }
+              />
+              {asset.current_book_value && (
+                <StatRow
+                  label="Балансовая стоимость"
+                  value={<Money amount={asset.current_book_value} />}
+                />
+              )}
+              {asset.remaining_depreciation_months != null && (
+                <StatRow
+                  label="Амортизация"
+                  value={`ещё ${asset.remaining_depreciation_months} мес.`}
+                  color="text-slate-500"
+                />
+              )}
+            </div>
+          </div>
 
-      {/* Действия */}
-      <div className="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
-        <button
-          onClick={onEdit}
-          className="flex-1 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg py-1.5 transition-colors"
-        >
-          Изменить
-        </button>
-        {asset.status === 'active' && (
-          <button
-            onClick={() => onChangeStatus('repair')}
-            className="flex-1 text-xs font-medium text-amber-600 hover:text-amber-700 border border-amber-200 hover:border-amber-300 rounded-lg py-1.5 transition-colors"
-          >
-            В ремонт
-          </button>
-        )}
-        {asset.status === 'repair' && (
-          <button
-            onClick={() => onChangeStatus('active')}
-            className="flex-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-lg py-1.5 transition-colors"
-          >
-            Активна
-          </button>
-        )}
-        {asset.status !== 'reserve' && asset.status !== 'sold' && (
-          <button
-            onClick={() => onChangeStatus('reserve')}
-            className="text-xs font-medium text-slate-400 hover:text-slate-600 border border-slate-100 hover:border-slate-200 rounded-lg py-1.5 px-2.5 transition-colors"
-            title="В резерв"
-          >
-            ⏸
-          </button>
-        )}
-        <button
-          onClick={onDelete}
-          className="text-xs font-medium text-rose-400 hover:text-rose-600 border border-rose-100 hover:border-rose-300 rounded-lg py-1.5 px-2.5 transition-colors"
-          title="Удалить"
-        >
-          🗑
-        </button>
-      </div>
+          {/* Actions */}
+          <div className="px-4 py-2.5 border-t border-slate-100 bg-white flex items-center justify-between">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              className={cn(
+                'flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all',
+                deleteConfirm
+                  ? 'bg-rose-600 text-white animate-pulse'
+                  : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50',
+              )}
+            >
+              <span className="material-symbols-outlined text-[14px]">
+                {deleteConfirm ? 'warning' : 'delete_outline'}
+              </span>
+              {deleteConfirm ? 'Ещё раз — удалить!' : 'Удалить'}
+            </button>
+
+            <div className="flex items-center gap-2">
+              {asset.status === 'active' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChangeStatus('repair');
+                  }}
+                  className="text-xs font-medium text-amber-600 hover:text-amber-700 border border-amber-200 hover:border-amber-300 rounded-lg py-1.5 px-3 transition-colors"
+                >
+                  В ремонт
+                </button>
+              )}
+              {asset.status === 'repair' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChangeStatus('active');
+                  }}
+                  className="text-xs font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 rounded-lg py-1.5 px-3 transition-colors"
+                >
+                  Активна
+                </button>
+              )}
+              {asset.status !== 'reserve' && asset.status !== 'sold' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChangeStatus('reserve');
+                  }}
+                  className="text-xs font-medium text-slate-400 hover:text-slate-600 border border-slate-100 hover:border-slate-200 rounded-lg py-1.5 px-3 transition-colors"
+                >
+                  В резерв
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="text-xs font-bold text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg py-1.5 px-4 transition-colors"
+              >
+                Изменить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -625,9 +736,9 @@ export default function FleetPage() {
 
       {/* Плитки */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="space-y-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-80 bg-slate-100 rounded-2xl animate-pulse" />
+            <div key={i} className="h-14 bg-slate-100 rounded-2xl animate-pulse" />
           ))}
         </div>
       ) : assets.length === 0 ? (
@@ -636,17 +747,14 @@ export default function FleetPage() {
           <p className="font-medium text-slate-500">Машины не найдены</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
           {assets.map((asset) => (
             <AssetTile
               key={asset.id}
               asset={asset}
               onEdit={() => setModalAsset(asset)}
               onChangeStatus={(status) => patchMutation.mutate({ id: asset.id, body: { status } })}
-              onDelete={() => {
-                if (confirm(`Удалить "${asset.short_name}" (${asset.reg_number})?`))
-                  deleteMutation.mutate(asset.id);
-              }}
+              onDelete={() => deleteMutation.mutate(asset.id)}
             />
           ))}
         </div>
