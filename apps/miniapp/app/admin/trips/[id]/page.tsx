@@ -119,7 +119,7 @@ export default function AdminTripDetailPage() {
         </section>
 
         {/* Итоги */}
-        <section className={`grid gap-3 ${loaderPay > 0 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        <section className={`grid gap-3 ${trip.loader ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Выручка</p>
             <Money amount={revenue.toString()} className="text-base font-black text-orange-600" />
@@ -130,7 +130,7 @@ export default function AdminTripDetailPage() {
             </p>
             <Money amount={driverPay.toString()} className="text-base font-black text-green-600" />
           </div>
-          {loaderPay > 0 && (
+          {trip.loader && (
             <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
               <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
                 ЗП Грузчик

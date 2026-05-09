@@ -548,58 +548,60 @@ function HistoryTripCard({
           )}
 
           {/* Итоги */}
-          <div
-            className={cn(
-              'border-t border-zinc-100 bg-zinc-50',
-              loaderPay > 0 ? 'grid grid-cols-2' : 'grid grid-cols-3',
-            )}
-          >
-            <div className="text-center px-2 py-3 border-r border-zinc-100">
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
-                Выручка
-              </p>
-              <p className="font-bold text-zinc-800 text-sm">
-                <Money amount={revenue.toFixed(2)} />
-              </p>
-            </div>
-            <div
-              className={cn(
-                'text-center px-2 py-3',
-                loaderPay > 0 ? '' : 'border-r border-zinc-100',
-              )}
-            >
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
-                ЗП Водитель
-              </p>
-              <p className="font-bold text-green-600 text-sm">
-                <Money amount={driverPay.toFixed(2)} />
-              </p>
-            </div>
-            {loaderPay > 0 && (
-              <div className="text-center px-2 py-3 border-r border-zinc-100 border-t border-t-zinc-100">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
-                  ЗП Грузчик
-                </p>
-                <p className="font-bold text-blue-500 text-sm">
-                  <Money amount={loaderPay.toFixed(2)} />
-                </p>
-              </div>
-            )}
-            <div className="text-center px-2 py-3">
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
-                Прибыль
-              </p>
-              <p
+          {(() => {
+            const hasLoader = !!trip.loader;
+            return (
+              <div
                 className={cn(
-                  'font-black text-sm',
-                  profit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                  'border-t border-zinc-100 bg-zinc-50',
+                  hasLoader ? 'grid grid-cols-2' : 'grid grid-cols-3',
                 )}
               >
-                {profit < 0 ? '−' : ''}
-                <Money amount={Math.abs(profit).toFixed(2)} />
-              </p>
-            </div>
-          </div>
+                <div className="text-center px-2 py-3 border-r border-zinc-100">
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
+                    Выручка
+                  </p>
+                  <p className="font-bold text-zinc-800 text-sm">
+                    <Money amount={revenue.toFixed(2)} />
+                  </p>
+                </div>
+                <div
+                  className={cn('text-center px-2 py-3', !hasLoader && 'border-r border-zinc-100')}
+                >
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
+                    ЗП Водитель
+                  </p>
+                  <p className="font-bold text-green-600 text-sm">
+                    <Money amount={driverPay.toFixed(2)} />
+                  </p>
+                </div>
+                {hasLoader && (
+                  <div className="text-center px-2 py-3 border-r border-zinc-100">
+                    <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
+                      ЗП Грузчик
+                    </p>
+                    <p className="font-bold text-blue-500 text-sm">
+                      <Money amount={loaderPay.toFixed(2)} />
+                    </p>
+                  </div>
+                )}
+                <div className="text-center px-2 py-3">
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
+                    Прибыль
+                  </p>
+                  <p
+                    className={cn(
+                      'font-black text-sm',
+                      profit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                    )}
+                  >
+                    {profit < 0 ? '−' : ''}
+                    <Money amount={Math.abs(profit).toFixed(2)} />
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Пробег + заметка водителя */}
           {(mileage || trip.driver_note) && (
