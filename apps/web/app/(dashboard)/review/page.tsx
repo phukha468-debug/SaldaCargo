@@ -108,12 +108,12 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
   const isToday = date === today;
 
   return (
-    <div className="bg-white rounded-2xl border border-sky-100 shadow-sm overflow-hidden">
-      {/* Day nav — compact single row */}
+    <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      {/* Day nav — compact single row, dark theme */}
       <div className="flex items-stretch h-14">
         <button
           onClick={() => shift(-1)}
-          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-400"
+          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-600"
           aria-label="Предыдущий день"
         >
           <span className="text-3xl font-black group-hover:-translate-x-1 transition-transform select-none">
@@ -130,7 +130,7 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
             className="sr-only"
           />
           <span className="material-symbols-outlined text-sky-400 text-[20px]">calendar_today</span>
-          <span className="text-xl font-black text-slate-900 hover:text-sky-600 transition-colors whitespace-nowrap">
+          <span className="text-xl font-black text-white hover:text-sky-300 transition-colors whitespace-nowrap">
             {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
               day: 'numeric',
               month: 'long',
@@ -143,7 +143,7 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
             })}
           </span>
           {!isToday && (
-            <span className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+            <span className="text-[10px] font-bold text-sky-300 bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 rounded-full whitespace-nowrap">
               → сегодня
             </span>
           )}
@@ -152,7 +152,7 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
         <button
           onClick={() => shift(1)}
           disabled={date >= today}
-          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 disabled:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed group border-l border-sky-400 disabled:border-slate-200"
+          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed group border-l border-sky-600 disabled:border-slate-600"
           aria-label="Следующий день"
         >
           <span className="text-3xl font-black group-hover:translate-x-1 transition-transform select-none">
@@ -162,7 +162,7 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
       </div>
 
       {/* Month quick buttons */}
-      <div className="flex border-t border-slate-100">
+      <div className="flex border-t border-slate-700">
         {months.map((m) => {
           const active = m.month === curMonth && m.year === curYear;
           return (
@@ -170,10 +170,10 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
               key={`${m.year}-${m.month}`}
               onClick={() => goMonth(m.year, m.month)}
               className={cn(
-                'flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-100 last:border-r-0',
+                'flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-700 last:border-r-0',
                 active
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700',
+                  ? 'bg-sky-500 text-white'
+                  : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200',
               )}
             >
               {m.label}
@@ -404,8 +404,8 @@ function TripCard({
         onClick={onToggle}
       >
         <div className="flex items-center gap-3">
-          {/* Left: identity */}
-          <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+          {/* Left: identity — flex-1 so it takes remaining space after fixed metrics */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <span className="font-black text-slate-900 text-sm whitespace-nowrap">
               🚚 {trip.asset.short_name}
             </span>
@@ -422,45 +422,39 @@ function TripCard({
             </span>
           </div>
 
-          {/* Center: metrics — fixed widths so columns align across cards */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex items-center">
-              <div className="w-28 text-center">
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Выручка
-                </span>
-                <span className="text-sm font-bold text-slate-700">
-                  <Money amount={revenue.toFixed(2)} />
-                </span>
-              </div>
-              <span className="w-5 text-center text-slate-200 text-sm shrink-0">−</span>
-              <div className="w-28 text-center">
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Расходы
-                </span>
-                <span className="text-sm font-bold text-rose-500">
-                  <Money amount={totalCosts.toFixed(2)} />
-                </span>
-              </div>
-              <span className="w-5 text-center text-slate-200 text-sm shrink-0">=</span>
-              <div className="w-28 text-center">
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Прибыль
-                </span>
-                <span
-                  className={cn(
-                    'text-base font-black',
-                    profit > 0
-                      ? 'text-emerald-600'
-                      : profit < 0
-                        ? 'text-rose-600'
-                        : 'text-slate-500',
-                  )}
-                >
-                  {profit < 0 ? '−' : ''}
-                  <Money amount={Math.abs(profit).toFixed(2)} />
-                </span>
-              </div>
+          {/* Center: metrics — shrink-0 with pixel-fixed widths → true vertical alignment */}
+          <div className="shrink-0 flex items-center">
+            <div className="w-[100px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Выручка
+              </span>
+              <span className="text-sm font-bold text-slate-700">
+                <Money amount={revenue.toFixed(2)} />
+              </span>
+            </div>
+            <span className="w-5 text-center text-slate-200 text-sm">−</span>
+            <div className="w-[100px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Расходы
+              </span>
+              <span className="text-sm font-bold text-rose-500">
+                <Money amount={totalCosts.toFixed(2)} />
+              </span>
+            </div>
+            <span className="w-5 text-center text-slate-200 text-sm">=</span>
+            <div className="w-[100px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Прибыль
+              </span>
+              <span
+                className={cn(
+                  'text-base font-black',
+                  profit > 0 ? 'text-emerald-600' : profit < 0 ? 'text-rose-600' : 'text-slate-500',
+                )}
+              >
+                {profit < 0 ? '−' : ''}
+                <Money amount={Math.abs(profit).toFixed(2)} />
+              </span>
             </div>
           </div>
 
@@ -943,7 +937,7 @@ export default function ReviewPage() {
                 <div className="flex items-center px-4 py-3">
                   <div className="flex-1 flex items-center justify-center">
                     <div className="flex items-center">
-                      <div className="w-28 text-center">
+                      <div className="w-[100px] text-center">
                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
                           Выручка
                         </span>
@@ -951,8 +945,8 @@ export default function ReviewPage() {
                           <Money amount={totalRevenue.toFixed(2)} />
                         </span>
                       </div>
-                      <span className="w-5 text-center text-slate-600 text-sm shrink-0">−</span>
-                      <div className="w-28 text-center">
+                      <span className="w-5 text-center text-slate-600 text-sm">−</span>
+                      <div className="w-[100px] text-center">
                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
                           Расходы
                         </span>
@@ -960,8 +954,8 @@ export default function ReviewPage() {
                           <Money amount={totalCostsAll.toFixed(2)} />
                         </span>
                       </div>
-                      <span className="w-5 text-center text-slate-600 text-sm shrink-0">=</span>
-                      <div className="w-28 text-center">
+                      <span className="w-5 text-center text-slate-600 text-sm">=</span>
+                      <div className="w-[100px] text-center">
                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
                           Прибыль
                         </span>
