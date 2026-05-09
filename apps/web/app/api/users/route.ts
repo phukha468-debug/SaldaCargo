@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         max_user_id: max_user_id || null,
         roles,
         current_asset_id: current_asset_id || null,
+        auto_settle: body.auto_settle ?? false,
         notes: notes || null,
         is_active: true,
       })

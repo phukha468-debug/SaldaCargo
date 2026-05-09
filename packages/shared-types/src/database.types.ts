@@ -921,6 +921,7 @@ export type Database = {
           lifecycle_status: Database['public']['Enums']['lifecycle_status'];
           machine_type: Database['public']['Enums']['service_order_machine_type'];
           mechanic_note: string | null;
+          mechanic_pay: number | null;
           odometer_end: number | null;
           odometer_start: number | null;
           order_number: number;
@@ -950,6 +951,7 @@ export type Database = {
           lifecycle_status?: Database['public']['Enums']['lifecycle_status'];
           machine_type?: Database['public']['Enums']['service_order_machine_type'];
           mechanic_note?: string | null;
+          mechanic_pay?: number | null;
           odometer_end?: number | null;
           odometer_start?: number | null;
           order_number?: number;
@@ -979,6 +981,7 @@ export type Database = {
           lifecycle_status?: Database['public']['Enums']['lifecycle_status'];
           machine_type?: Database['public']['Enums']['service_order_machine_type'];
           mechanic_note?: string | null;
+          mechanic_pay?: number | null;
           odometer_end?: number | null;
           odometer_start?: number | null;
           order_number?: number;
@@ -1056,6 +1059,7 @@ export type Database = {
       transactions: {
         Row: {
           amount: number;
+          asset_id: string | null;
           cancelled_reason: string | null;
           category_id: string;
           counterparty_id: string | null;
@@ -1068,6 +1072,7 @@ export type Database = {
           idempotency_key: string;
           lifecycle_status: Database['public']['Enums']['lifecycle_status'];
           photo_url: string | null;
+          related_user_id: string | null;
           service_order_id: string | null;
           settlement_status: Database['public']['Enums']['settlement_status'];
           to_wallet_id: string | null;
@@ -1077,6 +1082,7 @@ export type Database = {
         };
         Insert: {
           amount: number;
+          asset_id?: string | null;
           cancelled_reason?: string | null;
           category_id: string;
           counterparty_id?: string | null;
@@ -1089,6 +1095,7 @@ export type Database = {
           idempotency_key: string;
           lifecycle_status?: Database['public']['Enums']['lifecycle_status'];
           photo_url?: string | null;
+          related_user_id?: string | null;
           service_order_id?: string | null;
           settlement_status?: Database['public']['Enums']['settlement_status'];
           to_wallet_id?: string | null;
@@ -1098,6 +1105,7 @@ export type Database = {
         };
         Update: {
           amount?: number;
+          asset_id?: string | null;
           cancelled_reason?: string | null;
           category_id?: string;
           counterparty_id?: string | null;
@@ -1110,6 +1118,7 @@ export type Database = {
           idempotency_key?: string;
           lifecycle_status?: Database['public']['Enums']['lifecycle_status'];
           photo_url?: string | null;
+          related_user_id?: string | null;
           service_order_id?: string | null;
           settlement_status?: Database['public']['Enums']['settlement_status'];
           to_wallet_id?: string | null;
@@ -1123,6 +1132,13 @@ export type Database = {
             columns: ['service_order_id'];
             isOneToOne: false;
             referencedRelation: 'service_orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'transactions_asset_id_fkey';
+            columns: ['asset_id'];
+            isOneToOne: false;
+            referencedRelation: 'assets';
             referencedColumns: ['id'];
           },
           {
@@ -1151,6 +1167,13 @@ export type Database = {
             columns: ['from_wallet_id'];
             isOneToOne: false;
             referencedRelation: 'wallets';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'transactions_related_user_id_fkey';
+            columns: ['related_user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
             referencedColumns: ['id'];
           },
           {
@@ -1412,6 +1435,7 @@ export type Database = {
       };
       users: {
         Row: {
+          auto_settle: boolean;
           created_at: string | null;
           current_asset_id: string | null;
           id: string;
@@ -1424,6 +1448,7 @@ export type Database = {
           updated_at: string | null;
         };
         Insert: {
+          auto_settle?: boolean;
           created_at?: string | null;
           current_asset_id?: string | null;
           id?: string;
@@ -1436,6 +1461,7 @@ export type Database = {
           updated_at?: string | null;
         };
         Update: {
+          auto_settle?: boolean;
           created_at?: string | null;
           current_asset_id?: string | null;
           id?: string;

@@ -14,6 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'roles',
       'current_asset_id',
       'is_active',
+      'auto_settle',
       'notes',
     ];
     const update: Record<string, any> = {};
