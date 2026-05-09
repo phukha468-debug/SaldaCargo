@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { Suspense } from 'react';
 import { cn } from '@saldacargo/ui';
 
 type Period = 'current_month' | 'last_month' | 'quarter';
@@ -25,6 +26,14 @@ const navItems = [
 const FINANCE_PATHS = ['/finance', '/receivables', '/loans'];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-surface-bright" />}>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </Suspense>
+  );
+}
+
+function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
