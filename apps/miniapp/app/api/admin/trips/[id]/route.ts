@@ -29,11 +29,43 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return NextResponse.json(data);
 }
 
-/** PATCH /api/admin/trips/:id — одобрить или вернуть рейс */
+/** PATCH /api/admin/trips/:id — одобрить, вернуть или отредактировать заказы */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = (await request.json()) as { action: 'approve' | 'return'; note?: string };
+  const body = (await request.json()) as {
+    action: 'approve' | 'return' | 'edit_orders';
+    note?: string;
+    orders?: Array<{
+      id: string;
+      amount?: string;
+      driver_pay?: string;
+      loader_pay?: string;
+      payment_method?: string;
+    }>;
+  };
   const supabase = createAdminClient();
+
+  if (body.action === 'edit_orders') {
+    if (!body.orders?.length) return NextResponse.json({ ok: true });
+    for (const order of body.orders) {
+      const { id: orderId, ...fields } = order;
+      const update: Record<string, any> = {};
+      if (fields.amount !== undefined) update.amount = parseFloat(fields.amount).toFixed(2);
+      if (fields.driver_pay !== undefined)
+        update.driver_pay = parseFloat(fields.driver_pay).toFixed(2);
+      if (fields.loader_pay !== undefined)
+        update.loader_pay = parseFloat(fields.loader_pay).toFixed(2);
+      if (fields.payment_method !== undefined) update.payment_method = fields.payment_method;
+      if (Object.keys(update).length > 0) {
+        const { error } = await (supabase.from('trip_orders') as any)
+          .update(update)
+          .eq('id', orderId)
+          .eq('trip_id', id);
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
 
   if (body.action === 'approve') {
     // Одобряем рейс и все его заказы
