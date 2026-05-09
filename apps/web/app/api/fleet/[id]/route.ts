@@ -41,6 +41,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'assigned_driver_id',
       'current_book_value',
       'remaining_depreciation_months',
+      'monthly_fixed_cost',
       'notes',
       'needs_update',
     ];

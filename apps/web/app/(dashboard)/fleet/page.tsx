@@ -14,9 +14,19 @@ type Driver = { id: string; name: string };
 type Analytics = {
   revenue: string;
   expenses: string;
+  maintenance: string;
+  fixed_cost: string;
+  total_costs: string;
   profit: string;
+  true_profit: string;
   km: number;
+  trip_count: number;
+  order_count: number;
+  avg_order_value: string | null;
+  avg_km_per_trip: number | null;
   cost_per_km: string | null;
+  true_cost_per_km: string | null;
+  margin_pct: number | null;
 };
 
 type Asset = {
@@ -28,6 +38,7 @@ type Asset = {
   odometer_current: number;
   current_book_value: string | null;
   remaining_depreciation_months: number | null;
+  monthly_fixed_cost: string;
   needs_update: boolean;
   notes: string | null;
   asset_type: AssetType | null;
@@ -67,6 +78,7 @@ const emptyForm = {
   assigned_driver_id: '',
   current_book_value: '',
   remaining_depreciation_months: '',
+  monthly_fixed_cost: '',
   notes: '',
 };
 
@@ -116,6 +128,7 @@ function AssetModal({
           assigned_driver_id: editAsset.driver?.id ?? '',
           current_book_value: editAsset.current_book_value ?? '',
           remaining_depreciation_months: editAsset.remaining_depreciation_months?.toString() ?? '',
+          monthly_fixed_cost: editAsset.monthly_fixed_cost ?? '',
           notes: editAsset.notes ?? '',
         }
       : emptyForm,
@@ -149,6 +162,9 @@ function AssetModal({
       remaining_depreciation_months: form.remaining_depreciation_months
         ? parseInt(form.remaining_depreciation_months)
         : null,
+      monthly_fixed_cost: form.monthly_fixed_cost
+        ? parseFloat(form.monthly_fixed_cost).toFixed(2)
+        : '0.00',
       notes: form.notes || null,
       needs_update: false,
     };
@@ -300,6 +316,22 @@ function AssetModal({
           </div>
 
           <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">
+              Постоянные расходы в месяц (₽)
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Страховка + налог + лизинг/кредит"
+              type="number"
+              value={form.monthly_fixed_cost}
+              onChange={f('monthly_fixed_cost')}
+            />
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              ОСАГО + транспортный налог / 12 + платёж по лизингу
+            </p>
+          </div>
+
+          <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Примечание</label>
             <textarea
               className={`${inputCls} resize-none`}
@@ -351,8 +383,8 @@ function AssetTile({
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const a = asset.analytics;
-  const profit = parseFloat(a.profit);
-  const isProfit = profit >= 0;
+  const trueProfit = parseFloat(a.true_profit);
+  const isTrueProfit = trueProfit >= 0;
   const emoji = asset.asset_type?.code?.startsWith('gazelle') ? '🚐' : '🚛';
 
   const accentBorder =
@@ -360,7 +392,7 @@ function AssetTile({
       ? 'border-l-amber-400'
       : asset.status === 'reserve'
         ? 'border-l-slate-300'
-        : isProfit
+        : isTrueProfit
           ? 'border-l-emerald-400'
           : 'border-l-rose-400';
 
@@ -420,10 +452,10 @@ function AssetTile({
           <div className="shrink-0 flex items-center gap-4 text-right">
             <div>
               <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                Пробег
+                Рейсов
               </p>
               <p className="text-xs font-bold text-slate-700">
-                {(asset.odometer_current ?? 0).toLocaleString('ru-RU')} км
+                {a.trip_count > 0 ? a.trip_count : '—'}
               </p>
             </div>
             <div>
@@ -433,20 +465,39 @@ function AssetTile({
               <p
                 className={cn(
                   'text-sm font-black',
-                  isProfit ? 'text-emerald-600' : 'text-rose-600',
+                  isTrueProfit ? 'text-emerald-600' : 'text-rose-600',
                 )}
               >
-                {isProfit ? '' : '−'}
-                <Money amount={Math.abs(profit).toFixed(2)} />
+                {trueProfit < 0 ? '−' : ''}
+                <Money amount={Math.abs(trueProfit).toFixed(2)} />
               </p>
             </div>
-            {a.cost_per_km && parseFloat(a.cost_per_km) > 0 && (
+            {a.margin_pct !== null && (
+              <div>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                  Маржа
+                </p>
+                <p
+                  className={cn(
+                    'text-xs font-black',
+                    a.margin_pct >= 20
+                      ? 'text-emerald-600'
+                      : a.margin_pct >= 0
+                        ? 'text-amber-500'
+                        : 'text-rose-600',
+                  )}
+                >
+                  {a.margin_pct}%
+                </p>
+              </div>
+            )}
+            {a.true_cost_per_km && parseFloat(a.true_cost_per_km) > 0 && (
               <div>
                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
                   ₽/км
                 </p>
                 <p className="text-xs font-bold text-slate-600">
-                  {parseFloat(a.cost_per_km).toFixed(0)}
+                  {parseFloat(a.true_cost_per_km).toFixed(0)}
                 </p>
               </div>
             )}
@@ -491,6 +542,17 @@ function AssetTile({
 
           {/* Analytics */}
           <div className="px-4 py-3 border-t border-slate-100">
+            {/* Unprofitable warning */}
+            {!isTrueProfit && parseFloat(a.revenue) > 0 && (
+              <div className="mb-3 flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                <span className="material-symbols-outlined text-rose-500 text-[16px]">warning</span>
+                <span className="text-xs font-bold text-rose-700">
+                  Убыточная машина — рассмотреть продажу
+                </span>
+              </div>
+            )}
+
+            {/* Revenue & costs breakdown */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
               <StatRow
                 label="Выручка"
@@ -498,51 +560,124 @@ function AssetTile({
                 color="text-emerald-600"
               />
               <StatRow
-                label="Расходы (ЗП + затраты)"
+                label="Кол-во рейсов"
+                value={a.trip_count > 0 ? `${a.trip_count} рейс.` : '—'}
+              />
+              <StatRow
+                label="Операц. расходы (ЗП + ГСМ)"
                 value={<Money amount={a.expenses} />}
                 color="text-rose-500"
               />
               <StatRow
-                label="Прибыль"
-                value={
-                  <>
-                    {isProfit ? '+' : ''}
-                    <Money amount={a.profit} />
-                  </>
-                }
-                color={isProfit ? 'text-emerald-700' : 'text-rose-600'}
+                label="Кол-во заказов"
+                value={a.order_count > 0 ? `${a.order_count} заказ.` : '—'}
+              />
+              <StatRow
+                label="Обслуживание (запчасти)"
+                value={parseFloat(a.maintenance) > 0 ? <Money amount={a.maintenance} /> : '—'}
+                color="text-amber-600"
+              />
+              <StatRow
+                label="Средний чек"
+                value={a.avg_order_value ? `${parseFloat(a.avg_order_value).toFixed(0)} ₽` : '—'}
+              />
+              <StatRow
+                label="Пост. расходы (страховка, налог)"
+                value={parseFloat(a.fixed_cost) > 0 ? <Money amount={a.fixed_cost} /> : '—'}
+                color="text-slate-600"
               />
               <StatRow
                 label="Пробег за период"
                 value={a.km > 0 ? `${a.km.toLocaleString('ru-RU')} км` : '—'}
               />
+            </div>
+
+            {/* Profit section */}
+            <div className="mt-2 pt-2 border-t border-dashed border-slate-200 grid grid-cols-2 gap-x-6 gap-y-1.5">
               <StatRow
-                label="Себестоимость 1 км"
+                label="Опер. прибыль (без пост/ТО)"
+                value={
+                  <>
+                    {parseFloat(a.profit) >= 0 ? '+' : ''}
+                    <Money amount={a.profit} />
+                  </>
+                }
+                color={parseFloat(a.profit) >= 0 ? 'text-emerald-600' : 'text-rose-600'}
+              />
+              <StatRow
+                label="Себестоим. 1 км (опер.)"
                 value={
                   a.cost_per_km && parseFloat(a.cost_per_km) > 0
                     ? `${parseFloat(a.cost_per_km).toFixed(0)} ₽/км`
                     : '—'
                 }
+              />
+              <StatRow
+                label="Реальная прибыль (все расходы)"
+                value={
+                  <>
+                    {trueProfit >= 0 ? '+' : ''}
+                    <Money amount={a.true_profit} />
+                  </>
+                }
+                color={isTrueProfit ? 'text-emerald-700 font-black' : 'text-rose-700 font-black'}
+              />
+              <StatRow
+                label="Полная себестоим. 1 км"
+                value={
+                  a.true_cost_per_km && parseFloat(a.true_cost_per_km) > 0
+                    ? `${parseFloat(a.true_cost_per_km).toFixed(0)} ₽/км`
+                    : '—'
+                }
                 color={
-                  a.cost_per_km && parseFloat(a.cost_per_km) > 0
+                  a.true_cost_per_km && parseFloat(a.true_cost_per_km) > 0
                     ? 'text-slate-700'
                     : 'text-slate-400'
                 }
               />
-              {asset.current_book_value && (
+              {a.margin_pct !== null && (
                 <StatRow
-                  label="Балансовая стоимость"
-                  value={<Money amount={asset.current_book_value} />}
+                  label="Маржинальность"
+                  value={`${a.margin_pct}%`}
+                  color={
+                    a.margin_pct >= 20
+                      ? 'text-emerald-600'
+                      : a.margin_pct >= 0
+                        ? 'text-amber-500'
+                        : 'text-rose-600'
+                  }
                 />
               )}
-              {asset.remaining_depreciation_months != null && (
-                <StatRow
-                  label="Амортизация"
-                  value={`ещё ${asset.remaining_depreciation_months} мес.`}
-                  color="text-slate-500"
-                />
+              {a.avg_km_per_trip !== null && (
+                <StatRow label="Средний пробег/рейс" value={`${a.avg_km_per_trip} км`} />
               )}
             </div>
+
+            {/* Book value */}
+            {(asset.current_book_value || asset.remaining_depreciation_months != null) && (
+              <div className="mt-2 pt-2 border-t border-dashed border-slate-200 grid grid-cols-2 gap-x-6 gap-y-1.5">
+                {asset.current_book_value && parseFloat(asset.current_book_value) > 0 && (
+                  <StatRow
+                    label="Балансовая стоимость"
+                    value={<Money amount={asset.current_book_value} />}
+                  />
+                )}
+                {asset.remaining_depreciation_months != null && (
+                  <StatRow
+                    label="Амортизация"
+                    value={`ещё ${asset.remaining_depreciation_months} мес.`}
+                    color="text-slate-500"
+                  />
+                )}
+                {parseFloat(asset.monthly_fixed_cost) > 0 && (
+                  <StatRow
+                    label="Постоянные/мес."
+                    value={<Money amount={asset.monthly_fixed_cost} />}
+                    color="text-slate-600"
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

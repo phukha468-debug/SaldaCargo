@@ -2,24 +2,27 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-function getPeriodRange(period: string): { start: string; end: string } {
+function getPeriodRange(period: string): { start: string; end: string; months: number } {
   const now = new Date();
   if (period === 'last_month') {
     return {
       start: new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString(),
       end: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString(),
+      months: 1,
     };
   }
   if (period === 'quarter') {
     return {
       start: new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString(),
       end: now.toISOString(),
+      months: 3,
     };
   }
   // current_month (default)
   return {
     start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
     end: now.toISOString(),
+    months: 1,
   };
 }
 
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') ?? 'current_month';
-    const { start: periodStart, end: periodEnd } = getPeriodRange(period);
+    const { start: periodStart, end: periodEnd, months: periodMonths } = getPeriodRange(period);
 
     const supabase = createAdminClient();
 
@@ -38,6 +41,9 @@ export async function GET(request: Request) {
       { data: expenseRows },
       { data: kmTrips },
       { data: payRows },
+      { data: tripCountRows },
+      { data: orderCountRows },
+      { data: partCostRows },
     ] = await Promise.all([
       // Все машины
       (supabase as any)
@@ -45,7 +51,9 @@ export async function GET(request: Request) {
         .select(
           `
           id, short_name, reg_number, year, status, odometer_current,
-          current_book_value, remaining_depreciation_months, needs_update, notes,
+          current_book_value, remaining_depreciation_months,
+          monthly_fixed_cost,
+          needs_update, notes,
           asset_type:asset_types(id, code, name, capacity_m, has_gps),
           driver:users!assets_assigned_driver_id_fkey(id, name)
         `,
@@ -56,7 +64,7 @@ export async function GET(request: Request) {
       // Список типов для формы
       (supabase as any).from('asset_types').select('id, code, name').order('name'),
 
-      // Выручка за период: trip_orders approved+completed → trips approved
+      // Выручка за период
       (supabase as any)
         .from('trip_orders')
         .select('amount, trip:trips!inner(asset_id, started_at, lifecycle_status)')
@@ -66,7 +74,7 @@ export async function GET(request: Request) {
         .gte('trips.started_at', periodStart)
         .lte('trips.started_at', periodEnd),
 
-      // Расходы за период: trip_expenses → trips approved
+      // Расходы рейсов (ГСМ и т.д.)
       (supabase as any)
         .from('trip_expenses')
         .select('amount, trip:trips!inner(asset_id, started_at, lifecycle_status)')
@@ -84,7 +92,7 @@ export async function GET(request: Request) {
         .gte('started_at', periodStart)
         .lte('started_at', periodEnd),
 
-      // ЗП водителей и грузчиков за период (для себестоимости)
+      // ЗП водителей и грузчиков
       (supabase as any)
         .from('trip_orders')
         .select('driver_pay, loader_pay, trip:trips!inner(asset_id, started_at, lifecycle_status)')
@@ -92,12 +100,43 @@ export async function GET(request: Request) {
         .eq('trips.lifecycle_status', 'approved')
         .gte('trips.started_at', periodStart)
         .lte('trips.started_at', periodEnd),
+
+      // Кол-во рейсов на машину
+      (supabase as any)
+        .from('trips')
+        .select('asset_id')
+        .eq('lifecycle_status', 'approved')
+        .eq('status', 'completed')
+        .gte('started_at', periodStart)
+        .lte('started_at', periodEnd),
+
+      // Кол-во заказов на машину (для среднего чека)
+      (supabase as any)
+        .from('trip_orders')
+        .select('amount, trip:trips!inner(asset_id, started_at, lifecycle_status)')
+        .eq('lifecycle_status', 'approved')
+        .eq('trips.lifecycle_status', 'approved')
+        .gte('trips.started_at', periodStart)
+        .lte('trips.started_at', periodEnd),
+
+      // Расходы на запчасти из нарядов СТО по своим машинам
+      (supabase as any)
+        .from('part_movements')
+        .select(
+          'quantity, unit_price, service_order:service_orders!inner(asset_id, machine_type, status)',
+        )
+        .eq('direction', 'out')
+        .eq('service_orders.machine_type', 'own')
+        .eq('service_orders.status', 'completed')
+        .not('service_orders.asset_id', 'is', null),
     ]);
 
     if (assetsError) return NextResponse.json({ error: assetsError.message }, { status: 500 });
 
-    // Агрегация по asset_id
+    // ── Агрегация ──────────────────────────────────────────────────────────────
+
     const revenueMap = new Map<string, number>();
+    const orderCountMap = new Map<string, number>();
     for (const o of (revenueOrders as any[]) ?? []) {
       const id = o.trip?.asset_id;
       if (id) revenueMap.set(id, (revenueMap.get(id) ?? 0) + parseFloat(o.amount ?? '0'));
@@ -124,20 +163,62 @@ export async function GET(request: Request) {
       }
     }
 
+    const tripCountMap = new Map<string, number>();
+    for (const t of (tripCountRows as any[]) ?? []) {
+      tripCountMap.set(t.asset_id, (tripCountMap.get(t.asset_id) ?? 0) + 1);
+    }
+
+    for (const o of (orderCountRows as any[]) ?? []) {
+      const id = o.trip?.asset_id;
+      if (id) orderCountMap.set(id, (orderCountMap.get(id) ?? 0) + 1);
+    }
+
+    const maintenanceMap = new Map<string, number>();
+    for (const m of (partCostRows as any[]) ?? []) {
+      const id = m.service_order?.asset_id;
+      if (id) {
+        const cost = parseFloat(m.unit_price ?? '0') * parseFloat(m.quantity ?? '0');
+        maintenanceMap.set(id, (maintenanceMap.get(id) ?? 0) + cost);
+      }
+    }
+
+    // ── Построение строк ───────────────────────────────────────────────────────
+
     const rows = ((assets as any[]) ?? []).map((a: any) => {
       const revenue = revenueMap.get(a.id) ?? 0;
       const tripExpenses = expenseMap.get(a.id) ?? 0;
       const pay = payMap.get(a.id) ?? 0;
-      const totalCosts = tripExpenses + pay;
+      const maintenance = maintenanceMap.get(a.id) ?? 0;
+      const fixedCost = parseFloat(a.monthly_fixed_cost ?? '0') * periodMonths;
+      const operationalCosts = tripExpenses + pay; // операционные (на рейс)
+      const totalCosts = operationalCosts + maintenance + fixedCost; // полные
       const km = kmMap.get(a.id) ?? 0;
+      const tripCount = tripCountMap.get(a.id) ?? 0;
+      const orderCount = orderCountMap.get(a.id) ?? 0;
+
       return {
         ...a,
         analytics: {
           revenue: revenue.toFixed(2),
-          expenses: totalCosts.toFixed(2),
-          profit: (revenue - totalCosts).toFixed(2),
+          // expenses = только операционные (для отображения рейсовых расходов)
+          expenses: operationalCosts.toFixed(2),
+          maintenance: maintenance.toFixed(2),
+          fixed_cost: fixedCost.toFixed(2),
+          total_costs: totalCosts.toFixed(2),
+          // profit = операционный (без постоянных/ТО)
+          profit: (revenue - operationalCosts).toFixed(2),
+          // true_profit = после вычета всех расходов
+          true_profit: (revenue - totalCosts).toFixed(2),
           km,
-          cost_per_km: km > 0 ? (totalCosts / km).toFixed(2) : null,
+          trip_count: tripCount,
+          order_count: orderCount,
+          avg_order_value: orderCount > 0 ? (revenue / orderCount).toFixed(2) : null,
+          avg_km_per_trip: tripCount > 0 ? Math.round(km / tripCount) : null,
+          // операционная себестоимость (без постоянных)
+          cost_per_km: km > 0 ? (operationalCosts / km).toFixed(2) : null,
+          // полная себестоимость (включая постоянные и ТО)
+          true_cost_per_km: km > 0 ? (totalCosts / km).toFixed(2) : null,
+          margin_pct: revenue > 0 ? Math.round(((revenue - totalCosts) / revenue) * 100) : null,
         },
       };
     });
@@ -150,7 +231,7 @@ export async function GET(request: Request) {
       needsUpdate: rows.filter((a: any) => a.needs_update).length,
     };
 
-    return NextResponse.json({ assets: rows, summary, assetTypes: assetTypes ?? [] });
+    return NextResponse.json({ assets: rows, summary, assetTypes });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
@@ -158,38 +239,33 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
-      short_name: string;
-      reg_number: string;
-      asset_type_id: string;
-      year?: number;
-      status?: string;
-      odometer_current?: number;
-      assigned_driver_id?: string;
-      current_book_value?: string;
-      remaining_depreciation_months?: number;
-      notes?: string;
+    const body = (await request.json()) as Record<string, any>;
+    const supabase = createAdminClient();
+
+    const payload: Record<string, any> = {
+      short_name: body.short_name?.trim(),
+      reg_number: body.reg_number?.trim(),
+      asset_type_id: body.asset_type_id,
+      year: body.year ?? null,
+      status: body.status ?? 'active',
+      odometer_current: body.odometer_current ?? 0,
+      assigned_driver_id: body.assigned_driver_id ?? null,
+      current_book_value: body.current_book_value ?? '0.00',
+      remaining_depreciation_months: body.remaining_depreciation_months ?? null,
+      monthly_fixed_cost: body.monthly_fixed_cost ?? '0.00',
+      notes: body.notes ?? null,
+      needs_update: false,
     };
 
-    if (!body.short_name?.trim() || !body.reg_number?.trim() || !body.asset_type_id) {
-      return NextResponse.json({ error: 'Название, госномер и тип обязательны' }, { status: 400 });
+    if (!payload.short_name || !payload.reg_number || !payload.asset_type_id) {
+      return NextResponse.json(
+        { error: 'short_name, reg_number, asset_type_id — обязательны' },
+        { status: 400 },
+      );
     }
 
-    const supabase = createAdminClient();
     const { data, error } = await (supabase.from('assets') as any)
-      .insert({
-        short_name: body.short_name.trim(),
-        reg_number: body.reg_number.trim(),
-        asset_type_id: body.asset_type_id,
-        year: body.year ?? null,
-        status: body.status ?? 'active',
-        odometer_current: body.odometer_current ?? 0,
-        assigned_driver_id: body.assigned_driver_id || null,
-        current_book_value: body.current_book_value || null,
-        remaining_depreciation_months: body.remaining_depreciation_months ?? null,
-        notes: body.notes?.trim() || null,
-        needs_update: false,
-      })
+      .insert(payload)
       .select()
       .single();
 
