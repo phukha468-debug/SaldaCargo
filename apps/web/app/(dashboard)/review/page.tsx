@@ -187,6 +187,8 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
 
 // ── Edit Modal ──────────────────────────────────────────────
 
+type EditableOrder = TripOrder & { counterparty_name: string };
+
 function EditModal({
   trip,
   onClose,
@@ -197,21 +199,27 @@ function EditModal({
   onSaved: () => void;
 }) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
-  const [orders, setOrders] = useState(activeOrders.map((o) => ({ ...o })));
+  const [orders, setOrders] = useState<EditableOrder[]>(
+    activeOrders.map((o) => ({ ...o, counterparty_name: o.counterparty?.name ?? '' })),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const update = (id: string, field: keyof TripOrder, value: string) => {
+  const update = (id: string, field: keyof EditableOrder, value: string) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [field]: value } : o)));
   };
 
   const save = async () => {
     setSaving(true);
     setError('');
+    const payload = orders.map(({ counterparty_name, ...rest }) => ({
+      ...rest,
+      counterparty_name,
+    }));
     const res = await fetch(`/api/trips/${trip.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orders }),
+      body: JSON.stringify({ orders: payload }),
     });
     const json = await res.json();
     setSaving(false);
@@ -256,8 +264,19 @@ function EditModal({
             >
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Заявка {idx + 1}
-                {order.counterparty?.name ? ` · ${order.counterparty.name}` : ''}
               </p>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                  Клиент
+                </label>
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={order.counterparty_name}
+                  placeholder="Название клиента"
+                  onChange={(e) => update(order.id, 'counterparty_name', e.target.value)}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">

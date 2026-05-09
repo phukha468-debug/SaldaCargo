@@ -290,7 +290,7 @@ function EditModal({
         </div>
 
         {/* Список заказов */}
-        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+        <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-5">
           {orders.map((order: any, idx: number) => (
             <div key={order.id} className="space-y-3">
               <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
@@ -365,27 +365,28 @@ function EditModal({
           ))}
         </div>
 
-        {error && (
-          <div className="mx-5 mb-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl">
-            <p className="text-sm text-rose-700 font-medium">{error}</p>
-          </div>
-        )}
-
         {/* Кнопки */}
-        <div className="px-5 pb-8 pt-3 flex gap-3 border-t border-zinc-100">
-          <button
-            onClick={save}
-            disabled={saving}
-            className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
-          >
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
-          >
-            Отмена
-          </button>
+        <div className="px-5 pb-8 pt-3 border-t border-zinc-100 space-y-2">
+          {error && (
+            <p className="text-sm text-rose-700 font-medium bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
+            >
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </button>
+            <button
+              onClick={onClose}
+              className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
+            >
+              Отмена
+            </button>
+          </div>
         </div>
       </div>
     </div>
