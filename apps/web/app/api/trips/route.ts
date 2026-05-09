@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips — рейсы для ревью или истории */
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
   const status = searchParams.get('status');
   const date = searchParams.get('date'); // YYYY-MM-DD
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   let query = supabase
     .from('trips')
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     query = query.gte('started_at', start).lte('started_at', end);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await (query as any);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     }>;
   };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Создаём рейс
   const { data: trip, error: tripError } = await supabase
