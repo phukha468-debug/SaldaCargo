@@ -109,52 +109,45 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
 
   return (
     <div className="bg-white rounded-2xl border border-sky-100 shadow-sm overflow-hidden">
-      {/* Day nav */}
-      <div className="flex items-stretch">
+      {/* Day nav — compact single row */}
+      <div className="flex items-stretch h-14">
         <button
           onClick={() => shift(-1)}
           className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-400"
           aria-label="Предыдущий день"
         >
-          <span className="text-4xl font-black group-hover:-translate-x-1 transition-transform select-none">
+          <span className="text-3xl font-black group-hover:-translate-x-1 transition-transform select-none">
             ←
           </span>
         </button>
 
-        <div className="flex-1 flex items-center justify-center py-3 gap-3">
-          <label className="cursor-pointer flex flex-col items-center gap-0.5">
-            <input
-              type="date"
-              value={date}
-              max={today}
-              onChange={(e) => e.target.value && onChange(e.target.value)}
-              className="sr-only"
-            />
-            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-[0.15em]">
-              {isToday ? 'Сегодня' : 'Выбранная дата'}
-            </span>
-            <span className="text-xl font-black text-slate-900 leading-tight hover:text-sky-600 transition-colors text-center">
-              {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
-                day: 'numeric',
-                month: 'long',
-              })}
-            </span>
-            <span className="text-xs font-medium text-slate-400">
-              {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                year: 'numeric',
-              })}
-            </span>
-          </label>
+        <label className="flex-1 flex items-center justify-center gap-2.5 cursor-pointer px-4">
+          <input
+            type="date"
+            value={date}
+            max={today}
+            onChange={(e) => e.target.value && onChange(e.target.value)}
+            className="sr-only"
+          />
+          <span className="material-symbols-outlined text-sky-400 text-[20px]">calendar_today</span>
+          <span className="text-xl font-black text-slate-900 hover:text-sky-600 transition-colors whitespace-nowrap">
+            {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
+              day: 'numeric',
+              month: 'long',
+            })}
+          </span>
+          <span className="text-sm font-medium text-slate-400 whitespace-nowrap hidden sm:block">
+            {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
+              weekday: 'short',
+              year: 'numeric',
+            })}
+          </span>
           {!isToday && (
-            <button
-              onClick={() => onChange(today)}
-              className="text-[10px] font-bold text-sky-600 hover:text-sky-800 transition-colors bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-full border border-sky-200 whitespace-nowrap"
-            >
+            <span className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full whitespace-nowrap">
               → сегодня
-            </button>
+            </span>
           )}
-        </div>
+        </label>
 
         <button
           onClick={() => shift(1)}
@@ -162,14 +155,14 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
           className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 disabled:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed group border-l border-sky-400 disabled:border-slate-200"
           aria-label="Следующий день"
         >
-          <span className="text-4xl font-black group-hover:translate-x-1 transition-transform select-none">
+          <span className="text-3xl font-black group-hover:translate-x-1 transition-transform select-none">
             →
           </span>
         </button>
       </div>
 
       {/* Month quick buttons */}
-      <div className="flex border-t border-sky-50">
+      <div className="flex border-t border-slate-100">
         {months.map((m) => {
           const active = m.month === curMonth && m.year === curYear;
           return (
@@ -177,10 +170,10 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
               key={`${m.year}-${m.month}`}
               onClick={() => goMonth(m.year, m.month)}
               className={cn(
-                'flex-1 py-2 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-sky-50 last:border-r-0',
+                'flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-100 last:border-r-0',
                 active
-                  ? 'bg-sky-500 text-white'
-                  : 'text-slate-400 hover:bg-sky-50 hover:text-sky-700',
+                  ? 'bg-slate-700 text-white'
+                  : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700',
               )}
             >
               {m.label}
@@ -405,87 +398,81 @@ function TripCard({
         accentColor,
       )}
     >
-      {/* Collapsed header */}
+      {/* Collapsed header — single compact row */}
       <div
-        className="px-5 py-4 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
+        className="px-4 py-2.5 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
         onClick={onToggle}
       >
-        <div className="flex items-start justify-between gap-4">
-          {/* Left: info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-black text-slate-900 text-sm">🚚 {trip.asset.short_name}</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-sm text-slate-700 font-semibold">{trip.driver.name}</span>
-              {trip.loader && (
-                <span className="text-xs text-slate-400 font-medium">+ {trip.loader.name}</span>
-              )}
-              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                #{trip.trip_number}
+        <div className="flex items-center gap-3">
+          {/* Left: identity */}
+          <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+            <span className="font-black text-slate-900 text-sm whitespace-nowrap">
+              🚚 {trip.asset.short_name}
+            </span>
+            <span className="text-slate-300 text-xs">·</span>
+            <span className="text-sm text-slate-700 font-semibold truncate max-w-[90px]">
+              {trip.driver.name.split(' ')[0]}
+            </span>
+            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold shrink-0">
+              #{trip.trip_number}
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden sm:block">
+              {formatTime(trip.started_at)}
+              {trip.ended_at && `–${formatTime(trip.ended_at)}`}
+            </span>
+          </div>
+
+          {/* Center: metrics */}
+          <div className="flex-1 flex items-center justify-center gap-4">
+            <div className="text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Выручка
+              </span>
+              <span className="text-sm font-bold text-slate-700">
+                <Money amount={revenue.toFixed(2)} />
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium mt-1.5">
-              {formatTime(trip.started_at)}
-              {trip.ended_at && ` — ${formatTime(trip.ended_at)}`}
-              {mileage > 0 && ` · ${mileage} км`}
-              {activeOrders.length > 0 &&
-                ` · ${activeOrders.length} заявк${activeOrders.length === 1 ? 'а' : activeOrders.length < 5 ? 'и' : ''}`}
-            </p>
-
-            {/* Key metrics row */}
-            <div className="flex flex-wrap items-end gap-5 mt-3">
-              <div>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">
-                  Выручка
-                </span>
-                <span className="text-base font-bold text-slate-800">
-                  <Money amount={revenue.toFixed(2)} />
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">
-                  Расходы
-                </span>
-                <span className="text-base font-bold text-rose-500">
-                  −<Money amount={totalCosts.toFixed(2)} />
-                </span>
-              </div>
-              <div className="ml-auto">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5 text-right">
-                  Прибыль
-                </span>
-                <span
-                  className={cn(
-                    'text-xl font-black',
-                    profit > 0
-                      ? 'text-emerald-600'
-                      : profit < 0
-                        ? 'text-rose-600'
-                        : 'text-slate-500',
-                  )}
-                >
-                  {profit >= 0 ? '' : '−'}
-                  <Money amount={Math.abs(profit).toFixed(2)} />
-                </span>
-              </div>
+            <span className="text-slate-200 text-sm">−</span>
+            <div className="text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Расходы
+              </span>
+              <span className="text-sm font-bold text-rose-500">
+                <Money amount={totalCosts.toFixed(2)} />
+              </span>
+            </div>
+            <span className="text-slate-200 text-sm">=</span>
+            <div className="text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Прибыль
+              </span>
+              <span
+                className={cn(
+                  'text-base font-black',
+                  profit > 0 ? 'text-emerald-600' : profit < 0 ? 'text-rose-600' : 'text-slate-500',
+                )}
+              >
+                {profit < 0 ? '−' : ''}
+                <Money amount={Math.abs(profit).toFixed(2)} />
+              </span>
             </div>
           </div>
 
           {/* Right: edit + chevron */}
-          <div className="flex flex-col items-center gap-1.5 shrink-0 pt-0.5">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
               }}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-700"
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-300 hover:text-slate-600"
               title="Редактировать заказы"
             >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
+              <span className="material-symbols-outlined text-[16px]">edit</span>
             </button>
             <span
               className={cn(
-                'material-symbols-outlined text-slate-400 text-[20px] transition-transform duration-300',
+                'material-symbols-outlined text-slate-300 text-[20px] transition-transform duration-300',
                 expanded ? 'rotate-180' : '',
               )}
             >
