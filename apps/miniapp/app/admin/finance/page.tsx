@@ -25,14 +25,16 @@ export default function AdminFinancePage() {
 function FinanceContent() {
   const searchParams = useSearchParams();
   const initialAction = searchParams.get('action');
-  const [showForm, setShowForm] = useState<'income' | 'expense' | 'collection' | null>(
+  const [showForm, setShowForm] = useState<'income' | 'expense' | 'collection' | 'debts' | null>(
     initialAction === 'income'
       ? 'income'
       : initialAction === 'expense'
         ? 'expense'
         : initialAction === 'collection'
           ? 'collection'
-          : null,
+          : initialAction === 'debts'
+            ? 'debts'
+            : null,
   );
   const queryClient = useQueryClient();
 
@@ -51,7 +53,7 @@ function FinanceContent() {
       <div className="p-4 space-y-4">
         {/* Кнопки добавления */}
         {!showForm && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setShowForm('income')}
               className="bg-green-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
@@ -67,6 +69,13 @@ function FinanceContent() {
               <span className="text-[10px] font-black uppercase tracking-widest">Расход</span>
             </button>
             <button
+              onClick={() => setShowForm('debts')}
+              className="bg-rose-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            >
+              <span className="text-xl">💳</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">Долги</span>
+            </button>
+            <button
               onClick={() => setShowForm('collection')}
               className="bg-blue-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
             >
@@ -80,6 +89,17 @@ function FinanceContent() {
         {(showForm === 'income' || showForm === 'expense') && (
           <AddTransactionForm
             direction={showForm}
+            onClose={() => setShowForm(null)}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              setShowForm(null);
+            }}
+          />
+        )}
+
+        {/* Форма оплаты долгов */}
+        {showForm === 'debts' && (
+          <DebtPaymentForm
             onClose={() => setShowForm(null)}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
@@ -303,6 +323,289 @@ function CashCollectionForm({
             {mutation.isPending ? 'Сохраняем...' : '✓ Провести инкассацию'}
           </button>
         </>
+      )}
+    </div>
+  );
+}
+
+const WALLET_OPTIONS = [
+  { id: '10000000-0000-0000-0000-000000000001', label: '🏦 Расчётный счёт' },
+  { id: '10000000-0000-0000-0000-000000000002', label: '💵 Сейф (Наличные)' },
+  { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
+];
+
+type DebtItem =
+  | {
+      kind: 'loan';
+      id: string;
+      name: string;
+      remaining: string;
+      monthly: string | null;
+      nextDate: string | null;
+    }
+  | { kind: 'supplier'; id: string; name: string; icon: string; debt: string };
+
+function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [selected, setSelected] = useState<DebtItem | null>(null);
+  const [amount, setAmount] = useState('');
+  const [walletId, setWalletId] = useState(WALLET_OPTIONS[0].id);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const { data: loans = [], isLoading: loansLoading } = useQuery<any[]>({
+    queryKey: ['admin-loans'],
+    queryFn: () => fetch('/api/admin/loans').then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<any[]>({
+    queryKey: ['admin-payables'],
+    queryFn: () => fetch('/api/admin/payables').then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  const isLoading = loansLoading || suppliersLoading;
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) throw new Error('Не выбрано');
+      const url =
+        selected.kind === 'loan' ? '/api/admin/loan-payment' : '/api/admin/supplier-payment';
+      const body =
+        selected.kind === 'loan'
+          ? { loan_id: selected.id, amount, from_wallet_id: walletId, description: note }
+          : { supplier_id: selected.id, amount, from_wallet_id: walletId, description: note };
+
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      return json;
+    },
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const selectItem = (item: DebtItem) => {
+    setSelected(item);
+    setError('');
+    if (item.kind === 'loan' && item.monthly) {
+      setAmount(parseFloat(item.monthly).toFixed(0));
+    } else if (item.kind === 'supplier') {
+      setAmount(parseFloat(item.debt).toFixed(0));
+    } else {
+      setAmount('');
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!selected) return setError('Выберите что оплачиваем');
+    if (!amount || parseFloat(amount) <= 0) return setError('Введите сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  const hasDebts =
+    loans.some((l) => parseFloat(l.remaining_amount) > 0) ||
+    suppliers.some((s) => parseFloat(s.debt) > 0);
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black uppercase text-sm text-rose-600">💳 Оплата долгов</h2>
+        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+          ✕
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-14 bg-zinc-200 rounded-xl" />
+          ))}
+        </div>
+      ) : !hasDebts ? (
+        <p className="text-center py-6 text-zinc-400 font-bold text-xs uppercase">Долгов нет 🎉</p>
+      ) : (
+        <div className="space-y-2">
+          {/* Кредиты */}
+          {loans.filter((l) => parseFloat(l.remaining_amount) > 0).length > 0 && (
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              Кредиты и займы
+            </p>
+          )}
+          {loans
+            .filter((l) => parseFloat(l.remaining_amount) > 0)
+            .map((l) => {
+              const item: DebtItem = {
+                kind: 'loan',
+                id: l.id,
+                name: l.lender_name,
+                remaining: l.remaining_amount,
+                monthly: l.monthly_payment,
+                nextDate: l.next_payment_date,
+              };
+              const isSelected = selected?.id === l.id;
+              const daysLeft = l.next_payment_date
+                ? Math.round((new Date(l.next_payment_date).getTime() - Date.now()) / 86400000)
+                : null;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => selectItem(item)}
+                  className={`w-full p-3 rounded-xl border-2 text-left transition-all active:scale-[0.98] ${
+                    isSelected ? 'border-rose-500 bg-rose-50' : 'border-zinc-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p
+                        className={`font-black text-sm ${isSelected ? 'text-rose-800' : 'text-zinc-900'}`}
+                      >
+                        🏦 {l.lender_name}
+                      </p>
+                      {l.monthly_payment && (
+                        <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
+                          Платёж: {parseFloat(l.monthly_payment).toLocaleString('ru-RU')} ₽/мес
+                          {daysLeft !== null && daysLeft <= 7 && (
+                            <span
+                              className={`ml-2 ${daysLeft < 0 ? 'text-red-500' : 'text-amber-500'}`}
+                            >
+                              {daysLeft < 0 ? '⚠ просрочен!' : `· через ${daysLeft} дн.`}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-black text-rose-600">
+                        {parseFloat(l.remaining_amount).toLocaleString('ru-RU')} ₽
+                      </p>
+                      <p className="text-[9px] text-zinc-400 font-bold uppercase">остаток</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+
+          {/* Поставщики */}
+          {suppliers.filter((s) => parseFloat(s.debt) > 0).length > 0 && (
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pt-2">
+              Долги поставщикам
+            </p>
+          )}
+          {suppliers
+            .filter((s) => parseFloat(s.debt) > 0)
+            .map((s) => {
+              const item: DebtItem = {
+                kind: 'supplier',
+                id: s.id,
+                name: s.name,
+                icon: s.icon,
+                debt: s.debt,
+              };
+              const isSelected = selected?.id === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => selectItem(item)}
+                  className={`w-full p-3 rounded-xl border-2 text-left transition-all active:scale-[0.98] ${
+                    isSelected ? 'border-rose-500 bg-rose-50' : 'border-zinc-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <p
+                      className={`font-black text-sm ${isSelected ? 'text-rose-800' : 'text-zinc-900'}`}
+                    >
+                      {s.icon} {s.name}
+                    </p>
+                    <div className="text-right">
+                      <p className="text-xs font-black text-rose-600">
+                        {parseFloat(s.debt).toLocaleString('ru-RU')} ₽
+                      </p>
+                      <p className="text-[9px] text-zinc-400 font-bold uppercase">долг</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      )}
+
+      {/* Форма оплаты после выбора */}
+      {selected && (
+        <div className="space-y-3 pt-2 border-t border-zinc-100">
+          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            Оплата: {selected.name}
+            {selected.kind === 'loan' && selected.monthly && (
+              <span className="text-zinc-300 ml-1">
+                · рекомендуемый платёж: {parseFloat(selected.monthly).toLocaleString('ru-RU')} ₽
+              </span>
+            )}
+          </p>
+
+          <input
+            type="number"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-rose-500 focus:outline-none"
+            onFocus={(e) =>
+              setTimeout(
+                () => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+                300,
+              )
+            }
+          />
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              Списать с
+            </label>
+            <div className="flex gap-2">
+              {WALLET_OPTIONS.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWalletId(w.id)}
+                  className={`flex-1 py-2.5 rounded-lg border-2 text-xs font-black transition-all active:scale-[0.97] ${
+                    walletId === w.id
+                      ? 'border-rose-500 bg-rose-50 text-rose-700'
+                      : 'border-zinc-200 text-zinc-500'
+                  }`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Комментарий (необязательно)"
+            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-11 text-sm font-bold text-zinc-900 focus:border-rose-500 focus:outline-none"
+          />
+        </div>
+      )}
+
+      {error && <p className="text-red-600 text-xs font-bold uppercase">{error}</p>}
+
+      {selected && (
+        <button
+          onClick={handleSubmit}
+          disabled={mutation.isPending}
+          className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-rose-600 active:scale-[0.97] transition-all disabled:opacity-50"
+        >
+          {mutation.isPending ? 'Проводим...' : '✓ Провести платёж'}
+        </button>
       )}
     </div>
   );
