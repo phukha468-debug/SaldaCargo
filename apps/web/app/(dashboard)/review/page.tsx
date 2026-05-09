@@ -108,24 +108,21 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
   const isToday = date === today;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* Big day nav */}
+    <div className="bg-white rounded-2xl border border-sky-100 shadow-sm overflow-hidden">
+      {/* Day nav */}
       <div className="flex items-stretch">
         <button
           onClick={() => shift(-1)}
-          className="flex items-center justify-center w-20 bg-slate-900 hover:bg-slate-700 active:bg-slate-800 transition-colors text-white shrink-0 group"
+          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-400"
           aria-label="Предыдущий день"
         >
-          <span className="text-3xl font-black group-hover:-translate-x-0.5 transition-transform">
+          <span className="text-4xl font-black group-hover:-translate-x-1 transition-transform select-none">
             ←
           </span>
         </button>
 
-        <div className="flex-1 flex flex-col items-center justify-center py-5 gap-1 cursor-pointer group">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">
-            {isToday ? 'Сегодня' : 'Выбранная дата'}
-          </p>
-          <label className="cursor-pointer">
+        <div className="flex-1 flex items-center justify-center py-3 gap-3">
+          <label className="cursor-pointer flex flex-col items-center gap-0.5">
             <input
               type="date"
               value={date}
@@ -133,13 +130,16 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
               onChange={(e) => e.target.value && onChange(e.target.value)}
               className="sr-only"
             />
-            <span className="text-2xl font-black text-slate-900 text-center block leading-tight hover:text-slate-600 transition-colors">
+            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-[0.15em]">
+              {isToday ? 'Сегодня' : 'Выбранная дата'}
+            </span>
+            <span className="text-xl font-black text-slate-900 leading-tight hover:text-sky-600 transition-colors text-center">
               {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
                 day: 'numeric',
                 month: 'long',
               })}
             </span>
-            <span className="text-sm font-semibold text-slate-400 block text-center mt-0.5">
+            <span className="text-xs font-medium text-slate-400">
               {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
                 weekday: 'long',
                 year: 'numeric',
@@ -149,9 +149,9 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
           {!isToday && (
             <button
               onClick={() => onChange(today)}
-              className="mt-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full"
+              className="text-[10px] font-bold text-sky-600 hover:text-sky-800 transition-colors bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-full border border-sky-200 whitespace-nowrap"
             >
-              Вернуться к сегодня
+              → сегодня
             </button>
           )}
         </div>
@@ -159,17 +159,17 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
         <button
           onClick={() => shift(1)}
           disabled={date >= today}
-          className="flex items-center justify-center w-20 bg-slate-900 hover:bg-slate-700 active:bg-slate-800 transition-colors text-white shrink-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed group"
+          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 disabled:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed group border-l border-sky-400 disabled:border-slate-200"
           aria-label="Следующий день"
         >
-          <span className="text-3xl font-black group-hover:translate-x-0.5 transition-transform group-disabled:translate-x-0">
+          <span className="text-4xl font-black group-hover:translate-x-1 transition-transform select-none">
             →
           </span>
         </button>
       </div>
 
       {/* Month quick buttons */}
-      <div className="flex border-t border-slate-100">
+      <div className="flex border-t border-sky-50">
         {months.map((m) => {
           const active = m.month === curMonth && m.year === curYear;
           return (
@@ -177,10 +177,10 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
               key={`${m.year}-${m.month}`}
               onClick={() => goMonth(m.year, m.month)}
               className={cn(
-                'flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-100 last:border-r-0',
+                'flex-1 py-2 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-sky-50 last:border-r-0',
                 active
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+                  ? 'bg-sky-500 text-white'
+                  : 'text-slate-400 hover:bg-sky-50 hover:text-sky-700',
               )}
             >
               {m.label}
