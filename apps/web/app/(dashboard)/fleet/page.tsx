@@ -747,7 +747,7 @@ export default function FleetPage() {
           <p className="font-medium text-slate-500">Машины не найдены</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 items-start">
           {assets.map((asset) => (
             <AssetTile
               key={asset.id}
