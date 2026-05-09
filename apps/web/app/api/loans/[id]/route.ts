@@ -19,6 +19,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.started_at !== undefined) update.started_at = body.started_at;
     if (body.ends_at !== undefined) update.ends_at = body.ends_at || null;
     if (body.notes !== undefined) update.notes = body.notes?.trim() || null;
+    if (body.next_payment_date !== undefined)
+      update.next_payment_date = body.next_payment_date || null;
     if (body.is_active !== undefined) update.is_active = body.is_active;
 
     const { data, error } = await (supabase.from('loans') as any)

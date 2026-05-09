@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@saldacargo/ui';
 
 type Period = 'current_month' | 'last_month' | 'quarter';
@@ -29,6 +30,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const searchParams = useSearchParams();
   const activePeriod = (searchParams.get('period') as Period) ?? 'current_month';
 
+  const { data: loanAlerts } = useQuery<{ count: number; items: { overdue: boolean }[] }>({
+    queryKey: ['loan-alerts'],
+    queryFn: () => fetch('/api/loans/alerts').then((r) => r.json()),
+    staleTime: 60000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const alertCount = loanAlerts?.count ?? 0;
+  const hasOverdue = loanAlerts?.items.some((i) => i.overdue) ?? false;
+
   const setPeriod = (p: Period) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('period', p);
@@ -48,18 +58,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     ? FINANCE_PATHS.some((p) => pathname === p || pathname.startsWith(p))
                     : pathname === item.href ||
                       (item.href !== '/' && pathname.startsWith(item.href));
+                const showAlert = item.href === '/finance' && alertCount > 0;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'font-sans antialiased text-sm font-medium h-full flex items-center transition-colors border-b-2 mt-[2px]',
+                      'font-sans antialiased text-sm font-medium h-full flex items-center gap-1.5 transition-colors border-b-2 mt-[2px]',
                       isActive
                         ? 'text-slate-900 border-slate-900'
                         : 'text-slate-500 hover:text-slate-700 border-transparent',
                     )}
                   >
                     {item.label}
+                    {showAlert && (
+                      <span
+                        className={cn(
+                          'text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none',
+                          hasOverdue ? 'bg-rose-500 text-white' : 'bg-amber-400 text-white',
+                        )}
+                      >
+                        {alertCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

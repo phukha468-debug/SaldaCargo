@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         monthly_payment: body.monthly_payment || null,
         started_at: body.started_at,
         ends_at: body.ends_at || null,
+        next_payment_date: body.next_payment_date || null,
         notes: body.notes?.trim() || null,
       })
       .select()

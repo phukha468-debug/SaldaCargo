@@ -15,6 +15,7 @@ type Loan = {
   monthly_payment: string | null;
   started_at: string;
   ends_at: string | null;
+  next_payment_date: string | null;
   notes: string | null;
   is_active: boolean;
 };
@@ -41,6 +42,7 @@ const emptyForm = {
   monthly_payment: '',
   started_at: '',
   ends_at: '',
+  next_payment_date: '',
   notes: '',
 };
 
@@ -50,6 +52,15 @@ function fmtDate(d: string) {
     month: '2-digit',
     year: 'numeric',
   });
+}
+
+function daysUntil(dateStr: string | null): number | null {
+  if (!dateStr) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - now.getTime()) / 86400000);
 }
 
 function monthsLeft(endsAt: string | null): number | null {
@@ -144,6 +155,7 @@ export default function LoansPage() {
       monthly_payment: loan.monthly_payment ?? '',
       started_at: loan.started_at,
       ends_at: loan.ends_at ?? '',
+      next_payment_date: loan.next_payment_date ?? '',
       notes: loan.notes ?? '',
     });
     setFormError('');
@@ -329,6 +341,17 @@ export default function LoansPage() {
                 onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
               />
             </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 block mb-1">
+                Следующий платёж 🔔
+              </label>
+              <input
+                type="date"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+                value={form.next_payment_date}
+                onChange={(e) => setForm({ ...form, next_payment_date: e.target.value })}
+              />
+            </div>
             <div className="md:col-span-2 lg:col-span-3">
               <label className="text-xs font-medium text-slate-500 block mb-1">Примечание</label>
               <input
@@ -417,6 +440,9 @@ function LoanCard({
   const pct = paidPct(loan.original_amount, loan.remaining_amount);
   const months = monthsLeft(loan.ends_at);
   const paid = (parseFloat(loan.original_amount) - parseFloat(loan.remaining_amount)).toFixed(2);
+  const payDays = daysUntil(loan.next_payment_date);
+  const payAlert = payDays !== null && payDays <= 7 && payDays >= 0;
+  const payOverdue = payDays !== null && payDays < 0;
 
   return (
     <div
@@ -486,6 +512,21 @@ function LoanCard({
             )}
           </div>
 
+          {loan.next_payment_date && (
+            <div
+              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                payOverdue
+                  ? 'bg-rose-100 text-rose-700'
+                  : payAlert
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              🔔 Следующий платёж: {fmtDate(loan.next_payment_date)}
+              {payOverdue && ' — просрочен!'}
+              {payAlert && !payOverdue && ` — через ${payDays} дн.`}
+            </div>
+          )}
           {loan.notes && <p className="text-xs text-slate-400 italic mt-2">{loan.notes}</p>}
         </div>
 
