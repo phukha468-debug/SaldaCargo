@@ -652,83 +652,6 @@ function HistoryTripCard({
   );
 }
 
-// ── Карточка рейса на ревью (с кнопками Одобрить/Вернуть) ───
-
-function ReviewTripCard({
-  trip,
-  onApprove,
-  onReturn,
-  approving,
-}: {
-  trip: any;
-  onApprove: (id: string) => void;
-  onReturn: (id: string) => void;
-  approving: boolean;
-}) {
-  const activeOrders = (trip.trip_orders ?? []).filter(
-    (o: any) => o.lifecycle_status !== 'cancelled',
-  );
-  const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
-  const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
-  const expenses = (trip.trip_expenses ?? []).reduce(
-    (s: number, e: any) => s + parseFloat(e.amount),
-    0,
-  );
-
-  return (
-    <div className="bg-white rounded-2xl border-2 border-orange-300 shadow-sm overflow-hidden">
-      <div className="relative p-4">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500" />
-        <div className="pl-2">
-          <div className="flex items-start justify-between mb-2 gap-2">
-            <div className="min-w-0">
-              <Link href={`/admin/trips/${trip.id}`}>
-                <span className="font-black text-zinc-900 text-sm hover:text-orange-600 transition-colors">
-                  №{trip.trip_number} · {trip.asset?.short_name ?? '—'}
-                </span>
-              </Link>
-              <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
-                {trip.driver?.name ?? '—'} · {formatDate(trip.started_at)}
-              </p>
-            </div>
-            <LifecycleBadge status={trip.lifecycle_status} />
-          </div>
-          <div className="flex gap-4 text-xs">
-            <span className="text-zinc-900 font-bold">
-              Выручка: <Money amount={revenue.toFixed(2)} className="font-black" />
-            </span>
-            <span className="text-green-600 font-bold">
-              ЗП: <Money amount={driverPay.toFixed(2)} />
-            </span>
-            {expenses > 0 && (
-              <span className="text-red-500 font-bold">
-                Расх: <Money amount={expenses.toFixed(2)} />
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 pb-4 flex gap-2 border-t border-orange-100 pt-3">
-        <button
-          onClick={() => onReturn(trip.id)}
-          disabled={approving}
-          className="flex-1 h-11 rounded-xl border-2 border-amber-300 bg-amber-50 text-amber-700 font-black text-xs uppercase tracking-widest active:bg-amber-100 transition-all disabled:opacity-50"
-        >
-          ↩ Вернуть
-        </button>
-        <button
-          onClick={() => onApprove(trip.id)}
-          disabled={approving}
-          className="flex-[2] h-11 rounded-xl bg-green-600 text-white font-black text-xs uppercase tracking-widest active:bg-green-700 transition-all disabled:opacity-50 shadow-sm"
-        >
-          {approving ? '⏳...' : '✓ Одобрить'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── Активные рейсы: простые карточки (ссылки) ────────────────
 
 function SimpleTripCard({ trip }: { trip: any }) {
@@ -937,9 +860,10 @@ function TripsContent() {
         <div className="p-4 space-y-3">
           {trips.map((trip: any) =>
             filter === 'review' ? (
-              <ReviewTripCard
+              <HistoryTripCard
                 key={trip.id}
                 trip={trip}
+                onEdit={(t) => setEditTrip(t)}
                 onApprove={handleApprove}
                 onReturn={handleReturn}
                 approving={approvingId === trip.id}

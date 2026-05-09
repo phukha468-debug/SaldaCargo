@@ -46,18 +46,35 @@ export async function GET(request: Request) {
     return NextResponse.json(data ?? []);
   }
 
-  // Лёгкая выборка для review / active
+  // Полная выборка для review, лёгкая для active
+  const reviewSelect = `
+    id, trip_number, status, lifecycle_status, started_at, ended_at,
+    trip_type, odometer_start, odometer_end, driver_note,
+    driver:users!trips_driver_id_fkey(id, name),
+    asset:assets(short_name, reg_number),
+    loader:users!trips_loader_id_fkey(id, name),
+    trip_orders(
+      id, amount, driver_pay, loader_pay,
+      payment_method, settlement_status, lifecycle_status,
+      counterparty:counterparties(name)
+    ),
+    trip_expenses(
+      id, amount, payment_method, description,
+      category:transaction_categories(name)
+    )
+  `;
+
+  const activeSelect = `
+    id, trip_number, status, lifecycle_status, started_at, ended_at, trip_type,
+    driver:users!trips_driver_id_fkey(name),
+    asset:assets(short_name, reg_number),
+    trip_orders(amount, driver_pay, lifecycle_status),
+    trip_expenses(amount)
+  `;
+
   let query = supabase
     .from('trips')
-    .select(
-      `
-      id, trip_number, status, lifecycle_status, started_at, ended_at, trip_type,
-      driver:users!trips_driver_id_fkey(name),
-      asset:assets(short_name, reg_number),
-      trip_orders(amount, driver_pay, lifecycle_status),
-      trip_expenses(amount)
-    `,
-    )
+    .select(filter === 'review' ? reviewSelect : activeSelect)
     .order('started_at', { ascending: false })
     .limit(50) as any;
 
