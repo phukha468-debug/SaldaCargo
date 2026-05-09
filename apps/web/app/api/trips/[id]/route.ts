@@ -47,3 +47,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }
+
+/** DELETE /api/trips/:id — отменить рейс (soft-delete) */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const supabase = createAdminClient();
+
+    const { error } = await (supabase.from('trips') as any)
+      .update({ lifecycle_status: 'cancelled' })
+      .eq('id', id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
+  }
+}
