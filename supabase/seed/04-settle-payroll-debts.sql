@@ -102,13 +102,13 @@ SELECT
     WHEN 'driver' = ANY(u.roles) THEN 'd79213ee-3bc6-4433-b58a-ca7ea1040d00'
     WHEN 'loader' = ANY(u.roles) THEN '18792fa8-fda8-472d-8e04-e19d2c6c053c'
     ELSE '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'
-  END,
-  d.debt::numeric(12,2)::text,
+  END::uuid,
+  d.debt::numeric(12,2),
   'ЗП: ' || u.name || ' (расчёт)',
   'approved',
   'completed',
-  d.user_id,
-  '10000000-0000-0000-0000-000000000002',
+  d.user_id::uuid,
+  '10000000-0000-0000-0000-000000000002'::uuid,
   (SELECT id FROM users WHERE 'admin' = ANY(roles) ORDER BY created_at LIMIT 1),
   gen_random_uuid()
 FROM debts d
