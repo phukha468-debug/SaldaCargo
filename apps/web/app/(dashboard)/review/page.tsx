@@ -14,6 +14,7 @@ interface TripForReview {
   trip_type: string;
   odometer_start: number;
   odometer_end: number | null;
+  driver_note: string | null;
   asset: { short_name: string; reg_number: string };
   driver: { id: string; name: string };
   loader: { id: string; name: string } | null;
@@ -26,6 +27,13 @@ interface TripForReview {
     settlement_status: string;
     lifecycle_status: string;
     counterparty: { name: string } | null;
+  }>;
+  trip_expenses: Array<{
+    id: string;
+    amount: string;
+    payment_method: string;
+    description: string | null;
+    category: { name: string } | null;
   }>;
 }
 
@@ -196,11 +204,13 @@ export default function ReviewPage() {
         {Array.isArray(trips) &&
           trips.map((trip) => {
             const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
+            const expenses = trip.trip_expenses ?? [];
             const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
             const driverPay = activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0);
             const loaderPay = activeOrders.reduce((s, o) => s + parseFloat(o.loader_pay), 0);
+            const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
             const mileage = trip.odometer_end ? trip.odometer_end - trip.odometer_start : 0;
-            const profit = revenue - driverPay - loaderPay; // Упрощенно, пока без топлива
+            const profit = revenue - driverPay - loaderPay - totalExpenses;
 
             return (
               <div
@@ -299,6 +309,28 @@ export default function ReviewPage() {
                           </tr>
                         );
                       })}
+                      {expenses.map((exp) => (
+                        <tr
+                          key={exp.id}
+                          className="bg-rose-50/40 hover:bg-rose-50/60 transition-colors"
+                        >
+                          <td className="px-6 py-2.5 text-rose-700 font-medium text-sm">
+                            ↳ {exp.category?.name ?? 'Расход'}
+                            {exp.description ? ` · ${exp.description}` : ''}
+                          </td>
+                          <td className="px-6 py-2.5 font-data-mono font-semibold text-rose-700">
+                            −<Money amount={exp.amount} />
+                          </td>
+                          <td className="px-6 py-2.5 text-slate-300 text-right">—</td>
+                          <td className="px-6 py-2.5 text-slate-300 text-center">—</td>
+                          <td className="px-6 py-2.5 text-slate-300 text-right">—</td>
+                          <td className="px-6 py-2.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-600">
+                              {PAYMENT_LABELS[exp.payment_method] ?? exp.payment_method}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -323,9 +355,18 @@ export default function ReviewPage() {
                   </div>
                   <div className="flex flex-col">
                     <span className="font-label-caps text-[9px] text-slate-400 uppercase tracking-wider font-bold">
-                      ТОПЛИВО
+                      РАСХОДЫ
                     </span>
-                    <span className="font-data-mono text-sm font-semibold text-slate-600">—</span>
+                    <span className="font-data-mono text-sm font-semibold text-rose-600">
+                      {totalExpenses > 0 ? (
+                        <>
+                          <span>−</span>
+                          <Money amount={totalExpenses.toFixed(2)} />
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="font-label-caps text-[9px] text-slate-400 uppercase tracking-wider font-bold">

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     .select(
       `
       id, trip_number, status, lifecycle_status, started_at, ended_at,
-      trip_type, odometer_start, odometer_end,
+      trip_type, odometer_start, odometer_end, driver_note,
       asset:assets(short_name, reg_number),
       driver:users!trips_driver_id_fkey(id, name),
       loader:users!trips_loader_id_fkey(id, name),
@@ -23,6 +23,10 @@ export async function GET(request: Request) {
         id, amount, driver_pay, loader_pay,
         payment_method, settlement_status, lifecycle_status,
         counterparty:counterparties(name)
+      ),
+      trip_expenses(
+        id, amount, payment_method, description,
+        category:transaction_categories(name)
       )
     `,
     )
