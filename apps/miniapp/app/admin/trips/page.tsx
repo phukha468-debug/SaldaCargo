@@ -4,7 +4,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatTime } from '@saldacargo/shared';
 
@@ -237,6 +237,13 @@ function EditModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   const update = (id: string, field: string, value: string) => {
     setOrders((prev: any[]) => prev.map((o: any) => (o.id === id ? { ...o, [field]: value } : o)));
   };
@@ -290,7 +297,7 @@ function EditModal({
         </div>
 
         {/* Список заказов */}
-        <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-5">
+        <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-5 overscroll-contain">
           {orders.map((order: any, idx: number) => (
             <div key={order.id} className="space-y-3">
               <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
