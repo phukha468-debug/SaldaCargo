@@ -25,7 +25,9 @@ export default function AdminFinancePage() {
 function FinanceContent() {
   const searchParams = useSearchParams();
   const initialAction = searchParams.get('action');
-  const [showForm, setShowForm] = useState<'income' | 'expense' | 'collection' | 'debts' | null>(
+  const [showForm, setShowForm] = useState<
+    'income' | 'expense' | 'collection' | 'debts' | 'salary' | null
+  >(
     initialAction === 'income'
       ? 'income'
       : initialAction === 'expense'
@@ -34,7 +36,9 @@ function FinanceContent() {
           ? 'collection'
           : initialAction === 'debts'
             ? 'debts'
-            : null,
+            : initialAction === 'salary'
+              ? 'salary'
+              : null,
   );
   const queryClient = useQueryClient();
 
@@ -82,6 +86,15 @@ function FinanceContent() {
               <span className="text-xl">💼</span>
               <span className="text-[10px] font-black uppercase tracking-widest">Инкасс.</span>
             </button>
+            <button
+              onClick={() => setShowForm('salary')}
+              className="col-span-2 bg-violet-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            >
+              <span className="text-xl">💰</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                ЗП сотрудников
+              </span>
+            </button>
           </div>
         )}
 
@@ -114,6 +127,18 @@ function FinanceContent() {
             onClose={() => setShowForm(null)}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-cash-balances'] });
+              setShowForm(null);
+            }}
+          />
+        )}
+
+        {/* Форма выплаты ЗП */}
+        {showForm === 'salary' && (
+          <SalaryPaymentForm
+            onClose={() => setShowForm(null)}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin-payroll'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
               setShowForm(null);
             }}
           />
@@ -605,6 +630,226 @@ function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucces
           className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-rose-600 active:scale-[0.97] transition-all disabled:opacity-50"
         >
           {mutation.isPending ? 'Проводим...' : '✓ Провести платёж'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+type PayrollStaff = {
+  id: string;
+  name: string;
+  roles: string[];
+  auto_settle: boolean;
+  earned: string;
+  paid: string;
+  debt: string;
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  driver: 'Водитель',
+  loader: 'Грузчик',
+  mechanic: 'Механик',
+  mechanic_lead: 'Ст.механик',
+};
+
+function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [selected, setSelected] = useState<PayrollStaff | null>(null);
+  const [amount, setAmount] = useState('');
+  const [walletId, setWalletId] = useState(WALLET_OPTIONS[0]!.id);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const {
+    data: staff = [],
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery<PayrollStaff[]>({
+    queryKey: ['admin-payroll', year, month],
+    queryFn: async () => {
+      const r = await fetch(`/api/admin/payroll?year=${year}&month=${month}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
+      return data;
+    },
+    staleTime: 0,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) throw new Error('Не выбран сотрудник');
+      const r = await fetch('/api/admin/staff-settle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: selected.id,
+          amount,
+          from_wallet_id: walletId,
+          description: note || undefined,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      return json;
+    },
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const selectStaff = (s: PayrollStaff) => {
+    setSelected(s);
+    setAmount(parseFloat(s.debt) > 0 ? parseFloat(s.debt).toFixed(0) : '');
+    setError('');
+  };
+
+  const handleSubmit = () => {
+    if (!selected) return setError('Выберите сотрудника');
+    if (!amount || parseFloat(amount) <= 0) return setError('Введите сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  const getRoleLabel = (roles: string[]) => {
+    for (const r of ['mechanic_lead', 'mechanic', 'loader', 'driver']) {
+      if (roles.includes(r)) return ROLE_LABELS[r] ?? r;
+    }
+    return roles[0] ?? '—';
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black uppercase text-sm text-violet-600">💰 Выплата ЗП</h2>
+        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+          ✕
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-14 bg-zinc-200 rounded-xl" />
+          ))}
+        </div>
+      ) : isError ? (
+        <p className="text-center py-4 text-red-500 font-bold text-xs uppercase">
+          ❌ {(queryError as Error)?.message ?? 'Ошибка загрузки'}
+        </p>
+      ) : staff.length === 0 ? (
+        <p className="text-center py-6 text-zinc-400 font-bold text-xs uppercase">
+          Долгов по ЗП нет 🎉
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            Сотрудник (долг за месяц)
+          </label>
+          {staff.map((s) => {
+            const isSelected = selected?.id === s.id;
+            const hasDebt = parseFloat(s.debt) > 0;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => selectStaff(s)}
+                className={`w-full p-3 rounded-xl border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.98] ${
+                  isSelected
+                    ? 'border-violet-500 bg-violet-50 text-violet-900'
+                    : 'border-zinc-200 text-zinc-700'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wide text-zinc-400">
+                    {getRoleLabel(s.roles)}
+                  </span>
+                  <span>{s.name}</span>
+                </div>
+                <div className="text-right">
+                  <p
+                    className={`font-black text-xs ${hasDebt ? 'text-rose-600' : 'text-zinc-400'}`}
+                  >
+                    {parseFloat(s.debt).toLocaleString('ru-RU')} ₽
+                  </p>
+                  <p className="text-[9px] text-zinc-400 font-bold uppercase">долг</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {selected && (
+        <div className="space-y-3 pt-2 border-t border-zinc-100">
+          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            Выплата: {selected.name}
+            {parseFloat(selected.debt) > 0 && (
+              <span className="text-rose-400 ml-1 normal-case">
+                · долг: {parseFloat(selected.debt).toLocaleString('ru-RU')} ₽
+              </span>
+            )}
+          </p>
+
+          <input
+            type="number"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-violet-500 focus:outline-none"
+            onFocus={(e) =>
+              setTimeout(
+                () => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+                300,
+              )
+            }
+          />
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              Списать с
+            </label>
+            <div className="flex gap-2">
+              {WALLET_OPTIONS.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWalletId(w.id)}
+                  className={`flex-1 py-2.5 rounded-lg border-2 text-xs font-black transition-all active:scale-[0.97] ${
+                    walletId === w.id
+                      ? 'border-violet-500 bg-violet-50 text-violet-700'
+                      : 'border-zinc-200 text-zinc-500'
+                  }`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Комментарий (необязательно)"
+            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-11 text-sm font-bold text-zinc-900 focus:border-violet-500 focus:outline-none"
+          />
+        </div>
+      )}
+
+      {error && <p className="text-red-600 text-xs font-bold uppercase">{error}</p>}
+
+      {selected && (
+        <button
+          onClick={handleSubmit}
+          disabled={mutation.isPending}
+          className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-violet-600 active:scale-[0.97] transition-all disabled:opacity-50"
+        >
+          {mutation.isPending ? 'Проводим...' : '✓ Выплатить ЗП'}
         </button>
       )}
     </div>
