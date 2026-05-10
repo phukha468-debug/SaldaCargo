@@ -268,7 +268,7 @@ function OrderCard({
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { worksTotal, partsTotal, total } = calcOrderTotals(order);
-  const canReview = order.status === 'completed' && order.lifecycle_status === 'draft';
+  const canReview = order.lifecycle_status === 'draft';
   const isActive = ['created', 'in_progress'].includes(order.status);
 
   const vehicle = vehicleLabel(order);
