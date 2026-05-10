@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       .select('id, trip_number')
       .eq('driver_id', userId)
       .eq('status', 'in_progress')
+      .neq('lifecycle_status', 'cancelled')
       .maybeSingle() as any);
 
     if (existing) {
