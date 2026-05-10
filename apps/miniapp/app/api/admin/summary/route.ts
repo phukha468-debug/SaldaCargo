@@ -7,11 +7,12 @@ export async function GET() {
   const supabase = createAdminClient();
 
   const [tripsRes, reviewRes, todayRes] = await Promise.all([
-    // Активные рейсы прямо сейчас
+    // Активные рейсы прямо сейчас (без отменённых)
     supabase
       .from('trips')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'in_progress') as any,
+      .eq('status', 'in_progress')
+      .neq('lifecycle_status', 'cancelled') as any,
     // Рейсы ожидающие ревью (завершены, но ещё draft)
     supabase
       .from('trips')
