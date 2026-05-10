@@ -224,7 +224,7 @@ function PayModal({
   onDone: () => void;
 }) {
   const [amount, setAmount] = useState(Math.max(0, parseFloat(supplier.debt)).toFixed(2));
-  const [wallet, setWallet] = useState(WALLETS[0].id);
+  const [wallet, setWallet] = useState(WALLETS[0]!.id);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 

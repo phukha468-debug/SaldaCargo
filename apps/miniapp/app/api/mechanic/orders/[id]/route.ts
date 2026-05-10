@@ -24,9 +24,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { status } = body as { status: string };
 
     const supabase = createAdminClient();
+    const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+    // При завершении механиком — сбрасываем lifecycle_status в draft,
+    // чтобы наряд попал на ревью администратору (даже если был возвращён ранее)
+    if (status === 'completed') update.lifecycle_status = 'draft';
+
     const { data, error } = await (supabase as any)
       .from('service_orders')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(update)
       .eq('id', id)
       .select('id, status')
       .single();

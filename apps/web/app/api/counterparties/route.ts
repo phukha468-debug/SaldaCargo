@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
     let q = (supabase as any)
       .from('counterparties')
-      .select('id, name, phone, type, credit_limit, notes, is_active')
+      .select('id, name, phone, type, credit_limit, notes, is_active, payable_amount')
       .order('name');
 
     if (type) q = q.eq('type', type);

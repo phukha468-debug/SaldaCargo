@@ -27,6 +27,7 @@ export async function getMechanicSummary(supabase: Client, mechanicId: string) {
     .from('service_orders')
     .select('*', { count: 'exact', head: true })
     .eq('assigned_mechanic_id', mechanicId)
+    .eq('lifecycle_status', 'approved')
     .eq('status', 'created');
 
   // 3. Считаем завершённые сегодня
@@ -67,7 +68,7 @@ export async function getMechanicOrders(supabase: Client, mechanicId: string, st
   if (status) {
     query = query.eq('status', status);
   } else {
-    query = query.in('status', ['created', 'in_progress']);
+    query = query.eq('lifecycle_status', 'approved').in('status', ['created', 'in_progress']);
   }
 
   const { data, error } = await query;

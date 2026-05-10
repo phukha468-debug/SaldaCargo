@@ -13,6 +13,7 @@ type Counterparty = {
   notes: string | null;
   is_active: boolean;
   outstanding_debt: string;
+  payable_amount: string;
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -34,7 +35,14 @@ const FILTERS = [
   { key: 'both', label: 'Оба' },
 ] as const;
 
-const emptyForm = { name: '', type: 'client', phone: '', credit_limit: '', notes: '' };
+const emptyForm = {
+  name: '',
+  type: 'client',
+  phone: '',
+  credit_limit: '',
+  notes: '',
+  payable_amount: '',
+};
 
 export default function CounterpartiesPage() {
   const qc = useQueryClient();
@@ -115,6 +123,8 @@ export default function CounterpartiesPage() {
       phone: cp.phone ?? '',
       credit_limit: cp.credit_limit ?? '',
       notes: cp.notes ?? '',
+      payable_amount:
+        parseFloat(cp.payable_amount ?? '0') > 0 ? parseFloat(cp.payable_amount).toFixed(0) : '',
     });
     setFormError('');
     setShowForm(true);
@@ -146,6 +156,11 @@ export default function CounterpartiesPage() {
   const totalDebt = counterparties
     .filter((cp) => cp.is_active)
     .reduce((s, cp) => s + parseFloat(cp.outstanding_debt), 0)
+    .toFixed(2);
+
+  const totalPayable = counterparties
+    .filter((cp) => cp.is_active)
+    .reduce((s, cp) => s + parseFloat(cp.payable_amount ?? '0'), 0)
     .toFixed(2);
 
   return (
@@ -210,6 +225,23 @@ export default function CounterpartiesPage() {
                 onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
               />
             </div>
+            {(form.type === 'supplier' || form.type === 'both') && (
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">
+                  Мы должны им (₽)
+                </label>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  placeholder="0"
+                  type="number"
+                  value={form.payable_amount}
+                  onChange={(e) => setForm({ ...form, payable_amount: e.target.value })}
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Текущая кредиторская задолженность
+                </p>
+              </div>
+            )}
             <div className="md:col-span-2">
               <label className="text-xs font-medium text-slate-500 block mb-1">Примечание</label>
               <input
@@ -271,13 +303,25 @@ export default function CounterpartiesPage() {
         </label>
       </div>
 
-      {/* Сводка долга */}
-      {parseFloat(totalDebt) > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3">
-          <span className="text-amber-600 font-bold text-sm">Общий долг контрагентов:</span>
-          <span className="text-amber-700 font-bold text-lg">
-            <Money amount={totalDebt} />
-          </span>
+      {/* Сводка долгов */}
+      {(parseFloat(totalDebt) > 0 || parseFloat(totalPayable) > 0) && (
+        <div className="flex gap-3 flex-wrap">
+          {parseFloat(totalDebt) > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3">
+              <span className="text-amber-600 font-bold text-sm">Нам должны:</span>
+              <span className="text-amber-700 font-bold text-lg">
+                <Money amount={totalDebt} />
+              </span>
+            </div>
+          )}
+          {parseFloat(totalPayable) > 0 && (
+            <div className="bg-rose-50 border border-rose-200 rounded-lg px-4 py-3 flex items-center gap-3">
+              <span className="text-rose-600 font-bold text-sm">Мы должны поставщикам:</span>
+              <span className="text-rose-700 font-bold text-lg">
+                <Money amount={totalPayable} />
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -337,12 +381,26 @@ export default function CounterpartiesPage() {
                   </div>
                 </div>
 
-                {/* Долг */}
+                {/* Дебиторка (они нам должны) */}
                 {parseFloat(cp.outstanding_debt) > 0 && (
                   <div className="text-right shrink-0">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Долг</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">
+                      Они должны нам
+                    </p>
                     <p className="text-sm font-bold text-amber-600">
                       <Money amount={cp.outstanding_debt} />
+                    </p>
+                  </div>
+                )}
+
+                {/* Кредиторка (мы им должны) */}
+                {parseFloat(cp.payable_amount ?? '0') > 0 && (
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">
+                      Мы должны им
+                    </p>
+                    <p className="text-sm font-bold text-rose-600">
+                      <Money amount={cp.payable_amount} />
                     </p>
                   </div>
                 )}

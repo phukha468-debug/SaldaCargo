@@ -2,40 +2,67 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+/** GET /api/garage/orders?filter=review|active|history&date=YYYY-MM-DD */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get('status') || '';
-  const search = searchParams.get('search') || '';
+  const filter = searchParams.get('filter') ?? 'review';
+  const date = searchParams.get('date');
 
   try {
     const supabase = createAdminClient();
-    let query = (supabase as any)
-      .from('service_orders')
-      .select(
-        `
-        id, order_number, status, priority, machine_type,
-        problem_description, created_at, updated_at,
-        asset:assets(id, short_name, reg_number),
-        client_vehicle_brand, client_vehicle_reg, client_name,
-        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
-        works:service_order_works(id, status)
-      `,
+
+    const fullSelect = `
+      id, order_number, machine_type, status, lifecycle_status, priority,
+      problem_description, mechanic_note, admin_note, created_at, updated_at,
+      asset:assets(id, short_name, reg_number),
+      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
+      client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
+      client_name, client_phone,
+      works:service_order_works(
+        id, custom_work_name, status, actual_minutes, price_client, norm_minutes,
+        work_catalog:work_catalog(name)
+      ),
+      parts:service_order_parts(
+        id, quantity, price_per_unit,
+        part:parts(name, unit)
       )
+    `;
+
+    const activeSelect = `
+      id, order_number, machine_type, status, lifecycle_status, priority, created_at,
+      asset:assets(short_name, reg_number),
+      mechanic:users!service_orders_assigned_mechanic_id_fkey(name),
+      client_vehicle_brand, client_vehicle_reg
+    `;
+
+    if (filter === 'history') {
+      let q = (supabase.from('service_orders') as any)
+        .select(fullSelect)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (date) {
+        q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
+      }
+
+      const { data, error } = await q;
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(data ?? []);
+    }
+
+    let q = (supabase.from('service_orders') as any)
+      .select(filter === 'review' ? fullSelect : activeSelect)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(50);
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (search) {
-      query = query.or(
-        `problem_description.ilike.%${search}%,client_vehicle_brand.ilike.%${search}%,client_name.ilike.%${search}%`,
-      );
+    if (filter === 'review') {
+      q = q.eq('lifecycle_status', 'draft');
+    } else if (filter === 'active') {
+      q = q.eq('lifecycle_status', 'approved').in('status', ['created', 'in_progress']);
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-
+    const { data, error } = await q;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? []);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
@@ -92,7 +119,7 @@ export async function POST(request: Request) {
         priority: body.priority ?? 'normal',
         admin_note: body.admin_note?.trim() || null,
         status: 'created',
-        lifecycle_status: 'draft',
+        lifecycle_status: 'approved',
         created_by: adminUsers?.id ?? null,
       })
       .select()

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { cn } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -75,13 +75,6 @@ const PRIORITY_COLOR: Record<string, string> = {
   urgent: 'bg-red-100 text-red-600',
 };
 
-const STATUS_TABS = [
-  { value: '', label: 'Все' },
-  { value: 'created', label: 'В очереди' },
-  { value: 'in_progress', label: 'В работе' },
-  { value: 'completed', label: 'Завершённые' },
-];
-
 const emptyForm = {
   machine_type: 'own' as 'own' | 'client',
   asset_id: '',
@@ -104,12 +97,6 @@ function fmtDate(s: string) {
     month: '2-digit',
     year: 'numeric',
   });
-}
-
-function worksProgress(works: Array<{ status: string }>) {
-  if (!works.length) return null;
-  const done = works.filter((w) => w.status === 'completed').length;
-  return `${done}/${works.length}`;
 }
 
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
@@ -659,172 +646,546 @@ function CreateOrderModal({
   );
 }
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
+// ─── Collapsible Order Card ──────────────────────────────────────────────────
 
-function OrderCard({ order, onClick }: { order: OrderRow; onClick: () => void }) {
-  const progress = worksProgress(order.works);
+type TabOrder = Omit<OrderRow, 'works'> & {
+  lifecycle_status?: string;
+  mechanic_note?: string | null;
+  admin_note?: string | null;
+  works: Array<{
+    id: string;
+    status: string;
+    custom_work_name?: string | null;
+    actual_minutes?: number | null;
+    price_client?: string | null;
+    norm_minutes?: number;
+    work_catalog?: { name: string } | null;
+  }>;
+  parts?: Array<{
+    id: string;
+    quantity: number;
+    price_per_unit?: string | null;
+    part: { name: string; unit: string };
+  }>;
+};
+
+function CollapsibleOrderCard({
+  order,
+  showActions,
+  onApprove,
+  onReturn,
+  onCancel,
+  onDelete,
+  onOpenDetail,
+}: {
+  order: TabOrder;
+  showActions: boolean;
+  onApprove?: () => void;
+  onReturn?: () => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+  onOpenDetail: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const cancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const worksTotal = (order.works ?? []).reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0);
+  const partsTotal = (order.parts ?? []).reduce(
+    (s, p) => s + parseFloat(p.price_per_unit ?? '0') * p.quantity,
+    0,
+  );
+  const total = worksTotal + partsTotal;
+
   const vehicleName =
     order.machine_type === 'own'
-      ? `${order.asset?.short_name ?? '?'} · ${order.asset?.reg_number ?? ''}`
-      : `${order.client_vehicle_brand ?? 'Неизвестно'} · ${order.client_vehicle_reg ?? ''}`;
+      ? (order.asset?.short_name ?? '—')
+      : (order.client_vehicle_brand ?? 'Клиент.авто');
+
+  const handleCancel = () => {
+    if (!cancelConfirm) {
+      setCancelConfirm(true);
+      cancelTimer.current = setTimeout(() => setCancelConfirm(false), 4000);
+    } else {
+      if (cancelTimer.current) clearTimeout(cancelTimer.current);
+      setCancelConfirm(false);
+      onCancel?.();
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setDeleteConfirm(true);
+    deleteTimer.current = setTimeout(() => setDeleteConfirm(false), 4000);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteTimer.current) clearTimeout(deleteTimer.current);
+    setDeleteConfirm(false);
+    onDelete?.();
+  };
+
+  const priorityBorder =
+    order.priority === 'urgent'
+      ? 'border-l-red-500'
+      : order.lifecycle_status === 'approved'
+        ? 'border-l-emerald-400'
+        : 'border-l-slate-300';
 
   return (
     <div
-      onClick={onClick}
-      className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-400 hover:shadow-sm transition-all cursor-pointer"
+      className={cn(
+        'bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden border-l-4',
+        priorityBorder,
+      )}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-slate-400">#{order.order_number}</span>
+      <div
+        className="px-4 py-3 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-black text-slate-900 text-sm">#{order.order_number}</span>
+              <span className="font-semibold text-slate-700 text-sm truncate">{vehicleName}</span>
+              {order.machine_type === 'own' && order.asset?.reg_number && (
+                <span className="text-[10px] text-slate-400">{order.asset.reg_number}</span>
+              )}
+              <span
+                className={cn(
+                  'text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full',
+                  PRIORITY_COLOR[order.priority] ?? 'bg-slate-100 text-slate-500',
+                )}
+              >
+                {PRIORITY_LABEL[order.priority] ?? order.priority}
+              </span>
+              <span
+                className={cn(
+                  'text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full',
+                  STATUS_COLOR[order.status] ?? 'bg-slate-100 text-slate-500',
+                )}
+              >
+                {STATUS_LABEL[order.status] ?? order.status}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 mt-0.5">
+              {order.mechanic && (
+                <span className="text-[10px] text-slate-500">👤 {order.mechanic.name}</span>
+              )}
+              <span className="text-[10px] text-slate-400">{fmtDate(order.created_at)}</span>
+              {order.problem_description && (
+                <span className="text-[10px] text-slate-400 truncate max-w-xs">
+                  {order.problem_description}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0 text-right flex items-center gap-2">
+            {total > 0 && (
+              <p className="text-sm font-black text-slate-800">{total.toLocaleString('ru-RU')} ₽</p>
+            )}
             <span
               className={cn(
-                'text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                STATUS_COLOR[order.status],
+                'material-symbols-outlined text-slate-300 text-[20px] transition-transform duration-300',
+                expanded ? 'rotate-180' : '',
               )}
             >
-              {STATUS_LABEL[order.status] ?? order.status}
+              expand_more
             </span>
-            {order.priority === 'urgent' && (
-              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                Срочно
-              </span>
-            )}
           </div>
-          <p className="text-sm font-bold text-slate-900">{vehicleName}</p>
-          {order.machine_type === 'client' && order.client_name && (
-            <p className="text-xs text-slate-500">{order.client_name}</p>
-          )}
         </div>
-        <span className="text-xs text-slate-400 shrink-0">{fmtDate(order.created_at)}</span>
       </div>
 
-      <p className="text-sm text-slate-600 line-clamp-2 mb-3">{order.problem_description}</p>
+      {expanded && (
+        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+          {/* Работы */}
+          {(order.works ?? []).length > 0 && (
+            <div className="px-4 py-3 border-t border-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                Работы
+              </p>
+              <div className="space-y-1">
+                {order.works.map((w) => {
+                  const name = w.work_catalog?.name ?? w.custom_work_name ?? '—';
+                  return (
+                    <div key={w.id} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'w-1.5 h-1.5 rounded-full shrink-0',
+                            w.status === 'completed' ? 'bg-emerald-400' : 'bg-slate-300',
+                          )}
+                        />
+                        <span className="text-slate-700">{name}</span>
+                      </div>
+                      {w.price_client && parseFloat(w.price_client) > 0 && (
+                        <span className="font-bold text-slate-700 shrink-0">
+                          {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {worksTotal > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-slate-600 pt-1 border-t border-slate-100 mt-1">
+                    <span>Итого работы</span>
+                    <span>{worksTotal.toLocaleString('ru-RU')} ₽</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>{order.mechanic ? order.mechanic.name : 'Механик не назначен'}</span>
-        {progress && <span className="font-semibold text-slate-600">Работы: {progress}</span>}
-      </div>
+          {/* Запчасти */}
+          {(order.parts ?? []).length > 0 && (
+            <div className="px-4 py-3 border-t border-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                Запчасти
+              </p>
+              <div className="space-y-1">
+                {(order.parts ?? []).map((p) => {
+                  const lineTotal = parseFloat(p.price_per_unit ?? '0') * p.quantity;
+                  return (
+                    <div key={p.id} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-700">
+                        {p.part?.name ?? '—'} × {p.quantity} {p.part?.unit ?? 'шт'}
+                      </span>
+                      {lineTotal > 0 && (
+                        <span className="font-bold text-slate-700 shrink-0">
+                          {lineTotal.toLocaleString('ru-RU')} ₽
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {partsTotal > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-slate-600 pt-1 border-t border-slate-100 mt-1">
+                    <span>Итого запчасти</span>
+                    <span>{partsTotal.toLocaleString('ru-RU')} ₽</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {total > 0 && (
+            <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                Итого наряд
+              </span>
+              <span className="text-base font-black text-slate-900">
+                {total.toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          )}
+
+          {order.mechanic_note && (
+            <div className="px-4 py-2 border-t border-slate-100 bg-amber-50/40">
+              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-0.5">
+                Заметка механика
+              </p>
+              <p className="text-xs text-slate-700">{order.mechanic_note}</p>
+            </div>
+          )}
+
+          {order.admin_note && (
+            <div className="px-4 py-2 border-t border-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+                Заметка администратора
+              </p>
+              <p className="text-xs text-slate-700">{order.admin_note}</p>
+            </div>
+          )}
+
+          {/* Действия */}
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2 bg-white">
+            <div className="flex gap-2">
+              {showActions && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCancel();
+                  }}
+                  className={cn(
+                    'flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all',
+                    cancelConfirm
+                      ? 'bg-rose-600 text-white animate-pulse'
+                      : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50',
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {cancelConfirm ? 'warning' : 'delete_outline'}
+                  </span>
+                  {cancelConfirm ? 'Ещё раз!' : 'Отменить'}
+                </button>
+              )}
+              {onDelete && !deleteConfirm && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick();
+                  }}
+                  className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[14px]">delete_forever</span>
+                  Удалить
+                </button>
+              )}
+              {onDelete && deleteConfirm && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-red-700 font-bold">Удалить насовсем?</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirm(false);
+                      if (deleteTimer.current) clearTimeout(deleteTimer.current);
+                    }}
+                    className="text-xs font-bold px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteConfirm();
+                    }}
+                    className="text-xs font-bold px-2.5 py-1 rounded-lg bg-red-700 text-white hover:bg-red-800 transition-colors"
+                  >
+                    Да, удалить
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenDetail();
+                }}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-400 rounded-lg py-1.5 px-3 transition-colors"
+              >
+                ✏️ Изменить
+              </button>
+              {showActions && onReturn && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReturn();
+                  }}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-200 text-amber-600 hover:border-amber-300 transition-colors"
+                >
+                  ↩ Вернуть
+                </button>
+              )}
+              {showActions && onApprove && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApprove();
+                  }}
+                  className="text-xs font-bold px-4 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                >
+                  ✓ Одобрить
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Date Navigation ──────────────────────────────────────────────────────────
+
+function DateNav({ date, onChange }: { date: string; onChange: (d: string) => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const shift = (days: number) => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    onChange(d.toISOString().slice(0, 10));
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => shift(-1)}
+        className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+      >
+        <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_left</span>
+      </button>
+      <input
+        type="date"
+        value={date}
+        max={today}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-sm font-semibold text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-400"
+      />
+      <button
+        onClick={() => shift(1)}
+        disabled={date >= today}
+        className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-30"
+      >
+        <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_right</span>
+      </button>
+      {date !== today && (
+        <button
+          onClick={() => onChange(today)}
+          className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded border border-slate-200 hover:border-slate-400 transition-colors"
+        >
+          Сегодня
+        </button>
+      )}
     </div>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+type GarageTab = 'review' | 'active' | 'history';
+
 export default function GaragePage() {
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<GarageTab>('review');
+  const [historyDate, setHistoryDate] = useState(new Date().toISOString().slice(0, 10));
   const [showCreate, setShowCreate] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const qc = useQueryClient();
 
-  const { data: orders = [], isLoading } = useQuery<OrderRow[]>({
-    queryKey: ['garage-orders', statusFilter, search],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (statusFilter) params.set('status', statusFilter);
-      if (search) params.set('search', search);
-      const r = await fetch(`/api/garage/orders?${params}`);
-      const json = await r.json();
-      return Array.isArray(json) ? json : [];
+  const queryKey = ['garage-orders', tab, tab === 'history' ? historyDate : ''];
+
+  const {
+    data: orders = [],
+    isLoading,
+    isError,
+  } = useQuery<TabOrder[]>({
+    queryKey,
+    queryFn: () => {
+      const url =
+        tab === 'history'
+          ? `/api/garage/orders?filter=history&date=${historyDate}`
+          : `/api/garage/orders?filter=${tab}`;
+      return fetch(url)
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : []));
     },
+    staleTime: 30000,
   });
 
   const { data: mechanics = [] } = useQuery<Mechanic[]>({
     queryKey: ['mechanics-list'],
-    queryFn: async () => {
-      const r = await fetch('/api/users?role=mechanic');
-      const json = await r.json();
-      return Array.isArray(json) ? json : [];
-    },
+    queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
+    staleTime: 300000,
   });
 
   const { data: assets = [] } = useQuery<Asset[]>({
     queryKey: ['assets-select'],
     queryFn: async () => {
-      const r = await fetch('/api/fleet');
-      const json = await r.json();
+      const json = await fetch('/api/fleet').then((r) => r.json());
       return Array.isArray(json?.assets) ? json.assets : [];
     },
+    staleTime: 300000,
   });
 
-  const counts = {
-    created: orders.filter((o) => o.status === 'created').length,
-    in_progress: orders.filter((o) => o.status === 'in_progress').length,
-    completed: orders.filter((o) => o.status === 'completed').length,
-  };
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+      fetch(`/api/garage/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['garage-orders'] }),
+  });
+
+  const TABS: { key: GarageTab; label: string }[] = [
+    { key: 'review', label: 'На ревью' },
+    { key: 'active', label: 'Активные' },
+    { key: 'history', label: 'История' },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Гараж / СТО</h1>
-          <p className="text-sm text-slate-500">Наряды на техническое обслуживание</p>
-        </div>
+    <div className="space-y-6 max-w-[1920px] animate-in fade-in duration-500">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-slate-900">Гараж / Наряды</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors"
+          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors"
         >
           + Новый наряд
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'В очереди', value: counts.created, color: 'text-slate-700' },
-          { label: 'В работе', value: counts.in_progress, color: 'text-amber-600' },
-          { label: 'Завершены', value: counts.completed, color: 'text-emerald-600' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{label}</p>
-            <p className={cn('text-3xl font-bold mt-1', color)}>{value}</p>
-          </div>
+      {/* Вкладки */}
+      <div className="flex items-center gap-0 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors',
+              tab === t.key
+                ? 'border-slate-900 text-slate-900'
+                : 'border-transparent text-slate-500 hover:text-slate-700',
+            )}
+          >
+            {t.label}
+          </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
-              className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors',
-                statusFilter === tab.value
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700',
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {tab === 'history' && <DateNav date={historyDate} onChange={setHistoryDate} />}
+
+      {isError && (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-700 font-bold">
+          Ошибка загрузки данных
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по описанию или клиенту..."
-          className="flex-1 min-w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
-        />
-      </div>
+      )}
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="bg-white border border-slate-200 rounded-xl p-4 animate-pulse h-32"
-            />
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
           ))}
         </div>
       ) : orders.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
-          <p className="text-4xl mb-3">🔧</p>
-          <p className="font-semibold">Нарядов нет</p>
-          {statusFilter && <p className="text-sm mt-1">Попробуйте изменить фильтр</p>}
+        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+          <p className="text-5xl mb-3">🔧</p>
+          <p className="font-medium text-slate-500">
+            {tab === 'review'
+              ? 'Нарядов на ревью нет'
+              : tab === 'active'
+                ? 'Активных нарядов нет'
+                : 'За этот день нарядов нет'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-2">
           {orders.map((order) => (
-            <OrderCard key={order.id} order={order} onClick={() => setSelectedOrderId(order.id)} />
+            <CollapsibleOrderCard
+              key={order.id}
+              order={order}
+              showActions={tab === 'review'}
+              onApprove={
+                tab === 'review'
+                  ? () => patch.mutate({ id: order.id, body: { lifecycle_status: 'approved' } })
+                  : undefined
+              }
+              onReturn={
+                tab === 'review'
+                  ? () => patch.mutate({ id: order.id, body: { lifecycle_status: 'returned' } })
+                  : undefined
+              }
+              onCancel={
+                tab === 'review'
+                  ? () => patch.mutate({ id: order.id, body: { lifecycle_status: 'cancelled' } })
+                  : undefined
+              }
+              onDelete={() =>
+                fetch(`/api/garage/orders/${order.id}`, { method: 'DELETE' }).then(() =>
+                  qc.invalidateQueries({ queryKey: ['garage-orders'] }),
+                )
+              }
+              onOpenDetail={() => setSelectedOrderId(order.id)}
+            />
           ))}
         </div>
       )}

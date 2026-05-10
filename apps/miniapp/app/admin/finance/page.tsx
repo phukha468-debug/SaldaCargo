@@ -26,7 +26,15 @@ function FinanceContent() {
   const searchParams = useSearchParams();
   const initialAction = searchParams.get('action');
   const [showForm, setShowForm] = useState<
-    'income' | 'expense' | 'collection' | 'debts' | 'salary' | 'receivables' | null
+    | 'income_menu'
+    | 'expense_menu'
+    | 'income'
+    | 'expense'
+    | 'collection'
+    | 'debts'
+    | 'salary'
+    | 'receivables'
+    | null
   >(
     initialAction === 'income'
       ? 'income'
@@ -57,53 +65,109 @@ function FinanceContent() {
       </header>
 
       <div className="p-4 space-y-4">
-        {/* Кнопки добавления */}
+        {/* Главный экран — 2 кнопки */}
         {!showForm && (
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => setShowForm('income')}
-              className="bg-green-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              onClick={() => setShowForm('income_menu')}
+              className="bg-green-600 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
             >
-              <span className="text-xl">➕</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">Доход</span>
+              <span className="text-2xl">➕</span>
+              <span className="text-[11px] font-black uppercase tracking-widest">Доход</span>
             </button>
             <button
-              onClick={() => setShowForm('expense')}
-              className="bg-zinc-800 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              onClick={() => setShowForm('expense_menu')}
+              className="bg-zinc-800 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
             >
-              <span className="text-xl">➖</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">Расход</span>
+              <span className="text-2xl">➖</span>
+              <span className="text-[11px] font-black uppercase tracking-widest">Расход</span>
             </button>
-            <button
-              onClick={() => setShowForm('debts')}
-              className="bg-rose-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-            >
-              <span className="text-xl">💳</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">Долги</span>
-            </button>
-            <button
-              onClick={() => setShowForm('collection')}
-              className="bg-blue-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-            >
-              <span className="text-xl">💼</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">Инкасс.</span>
-            </button>
-            <button
-              onClick={() => setShowForm('receivables')}
-              className="col-span-2 bg-orange-500 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-            >
-              <span className="text-xl">📋</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">Дебиторка</span>
-            </button>
-            <button
-              onClick={() => setShowForm('salary')}
-              className="col-span-2 bg-violet-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-            >
-              <span className="text-xl">💰</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                ЗП сотрудников
+          </div>
+        )}
+
+        {/* Подменю ДОХОД */}
+        {showForm === 'income_menu' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowForm(null)}
+                className="text-zinc-400 font-bold text-sm active:scale-[0.97]"
+              >
+                ← Назад
+              </button>
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">
+                ➕ Доход
               </span>
-            </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setShowForm('income')}
+                className="bg-green-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">📝</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  Добавить доход
+                </span>
+              </button>
+              <button
+                onClick={() => setShowForm('collection')}
+                className="bg-blue-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">💼</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Инкасс.</span>
+              </button>
+              <button
+                onClick={() => setShowForm('receivables')}
+                className="col-span-2 bg-orange-500 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">📋</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Дебиторка</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Подменю РАСХОД */}
+        {showForm === 'expense_menu' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowForm(null)}
+                className="text-zinc-400 font-bold text-sm active:scale-[0.97]"
+              >
+                ← Назад
+              </button>
+              <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                ➖ Расход
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setShowForm('expense')}
+                className="bg-zinc-800 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">📝</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  Добавить расход
+                </span>
+              </button>
+              <button
+                onClick={() => setShowForm('debts')}
+                className="bg-rose-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">💳</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Кредиты</span>
+              </button>
+              <button
+                onClick={() => setShowForm('salary')}
+                className="col-span-2 bg-violet-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">💰</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  ЗП сотрудников
+                </span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -111,7 +175,7 @@ function FinanceContent() {
         {(showForm === 'income' || showForm === 'expense') && (
           <AddTransactionForm
             direction={showForm}
-            onClose={() => setShowForm(null)}
+            onClose={() => setShowForm(showForm === 'income' ? 'income_menu' : 'expense_menu')}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
               setShowForm(null);
@@ -119,10 +183,10 @@ function FinanceContent() {
           />
         )}
 
-        {/* Форма оплаты долгов */}
+        {/* Форма оплаты кредитов */}
         {showForm === 'debts' && (
           <DebtPaymentForm
-            onClose={() => setShowForm(null)}
+            onClose={() => setShowForm('expense_menu')}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
               setShowForm(null);
@@ -133,7 +197,7 @@ function FinanceContent() {
         {/* Форма инкассации */}
         {showForm === 'collection' && (
           <CashCollectionForm
-            onClose={() => setShowForm(null)}
+            onClose={() => setShowForm('income_menu')}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-cash-balances'] });
               setShowForm(null);
@@ -144,7 +208,7 @@ function FinanceContent() {
         {/* Форма выплаты ЗП */}
         {showForm === 'salary' && (
           <SalaryPaymentForm
-            onClose={() => setShowForm(null)}
+            onClose={() => setShowForm('expense_menu')}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-payroll'] });
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
@@ -156,7 +220,7 @@ function FinanceContent() {
         {/* Форма погашения дебиторки */}
         {showForm === 'receivables' && (
           <ReceivablesForm
-            onClose={() => setShowForm(null)}
+            onClose={() => setShowForm('income_menu')}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
               queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
@@ -166,7 +230,7 @@ function FinanceContent() {
         )}
 
         {/* История */}
-        {!showForm && (
+        {showForm === null && (
           <section className="space-y-3">
             <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
               Последние операции
@@ -461,7 +525,7 @@ function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucces
   return (
     <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-black uppercase text-sm text-rose-600">💳 Оплата долгов</h2>
+        <h2 className="font-black uppercase text-sm text-rose-600">💳 Кредиты и долги</h2>
         <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
           ✕
         </button>
@@ -1116,15 +1180,9 @@ const EXPENSE_CATEGORIES = [
   { id: '62cebf3f-9982-4cc6-904b-48c6169cf5e4', name: 'ГСМ', code: 'FUEL' },
   { id: '9d18370d-3228-4f2a-8530-52b168cfa8d7', name: 'Запчасти', code: 'REPAIR_PARTS' },
   { id: '8c5f3080-d0a8-49ea-b759-3286f2084940', name: 'Сторонний ремонт', code: 'REPAIR_EXTERNAL' },
-  { id: '59ef1110-6c3f-49c7-a29c-b9e97a3a3d92', name: 'Аренда', code: 'RENT' },
   { id: 'f4a66f83-63c0-4ba0-8eaa-0d42ce19d3ca', name: 'Налоги', code: 'TAX' },
   { id: '73f565eb-f509-4538-9658-9cdff69bee37', name: 'Офис и связь', code: 'OFFICE_COMMS' },
   { id: '992ed3ae-66a7-4a16-a2da-cecd9b7086c5', name: 'Страховка', code: 'INSURANCE' },
-  { id: 'd79213ee-3bc6-4433-b58a-ca7ea1040d00', name: 'ЗП водителя', code: 'PAYROLL_DRIVER' },
-  { id: '18792fa8-fda8-472d-8e04-e19d2c6c053c', name: 'ЗП грузчика', code: 'PAYROLL_LOADER' },
-  { id: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', name: 'ЗП механика', code: 'PAYROLL_MECHANIC' },
-  { id: 'c88b4234-2a91-4223-aad4-56f6e1ab4ded', name: 'Амортизация', code: 'DEPRECIATION' },
-  { id: '63babd3d-b1d3-4710-86e2-5d1ff348b21f', name: 'Списание актива', code: 'ASSET_WRITE_OFF' },
   { id: 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30', name: 'Прочий расход', code: 'OTHER_EXPENSE' },
 ];
 

@@ -13,6 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       credit_limit?: string | null;
       notes?: string | null;
       is_active?: boolean;
+      payable_amount?: string | null;
     };
 
     const supabase = createAdminClient();
@@ -24,6 +25,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.credit_limit !== undefined) update.credit_limit = body.credit_limit || null;
     if (body.notes !== undefined) update.notes = body.notes?.trim() || null;
     if (body.is_active !== undefined) update.is_active = body.is_active;
+    if (body.payable_amount !== undefined)
+      update.payable_amount = body.payable_amount
+        ? parseFloat(body.payable_amount).toFixed(2)
+        : '0.00';
 
     const { data, error } = await (supabase.from('counterparties') as any)
       .update(update)
