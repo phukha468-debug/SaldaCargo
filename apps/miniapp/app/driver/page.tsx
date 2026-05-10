@@ -92,11 +92,11 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
       style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[92dvh] overflow-y-auto">
-        <div className="flex justify-center pt-3 pb-1">
+      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[92dvh] flex flex-col">
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
-        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="font-black text-zinc-900 text-base">🔧 Заявка на ремонт</h2>
             <p className="text-xs text-zinc-400 mt-0.5">
@@ -111,7 +111,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           </button>
         </div>
 
-        <div className="overflow-y-auto p-5 space-y-4 overscroll-contain">
+        <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-4 overscroll-contain">
           {/* Машина */}
           <div>
             <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">

@@ -274,14 +274,14 @@ function EditModal({
       style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[92dvh] flex flex-col">
         {/* Хэндл */}
-        <div className="flex justify-center pt-3 pb-1">
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
 
         {/* Заголовок */}
-        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="font-black text-zinc-900 text-base">
               Рейс #{trip.trip_number} · {trip.asset?.short_name}
@@ -296,7 +296,7 @@ function EditModal({
           </button>
         </div>
 
-        {/* Список заказов */}
+        {/* Список заказов + кнопки */}
         <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-5 overscroll-contain">
           {orders.map((order: any, idx: number) => (
             <div key={order.id} className="space-y-3">
@@ -370,29 +370,29 @@ function EditModal({
               {idx < orders.length - 1 && <div className="border-t border-zinc-100" />}
             </div>
           ))}
-        </div>
 
-        {/* Кнопки */}
-        <div className="px-5 pb-8 pt-3 border-t border-zinc-100 space-y-2">
-          {error && (
-            <p className="text-sm text-rose-700 font-medium bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5">
-              {error}
-            </p>
-          )}
-          <div className="flex gap-3">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
-            >
-              {saving ? 'Сохранение...' : 'Сохранить'}
-            </button>
-            <button
-              onClick={onClose}
-              className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
-            >
-              Отмена
-            </button>
+          {/* Кнопки внутри скролла */}
+          <div className="pt-3 border-t border-zinc-100 space-y-2 pb-8">
+            {error && (
+              <p className="text-sm text-rose-700 font-medium bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5">
+                {error}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={save}
+                disabled={saving}
+                className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
+              >
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+              <button
+                onClick={onClose}
+                className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
+              >
+                Отмена
+              </button>
+            </div>
           </div>
         </div>
       </div>
