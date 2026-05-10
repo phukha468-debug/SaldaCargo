@@ -14,11 +14,12 @@ interface TripDetail {
   lifecycle_status: string;
   started_at: string;
   trip_type: string;
+  loaders_count: number;
   asset: { short_name: string; reg_number: string };
   driver: { name: string };
-  loaders_count: number;
   trip_orders: Array<{
     id: string;
+    counterparty_id: string | null;
     amount: string;
     driver_pay: string;
     loader_pay: string;
@@ -38,6 +39,97 @@ interface TripDetail {
   }>;
 }
 
+// ── Bottom-sheet смены грузчиков ──────────────────────────────
+
+function LoaderChangeSheet({
+  current,
+  onClose,
+  onSave,
+}: {
+  current: number;
+  onClose: () => void;
+  onSave: (count: number) => void;
+}) {
+  const [selected, setSelected] = useState(current);
+
+  useEffect(() => {
+    const y = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${y}px`;
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, y);
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end"
+      style={{
+        background: 'rgba(0,0,0,0.5)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="bg-white rounded-t-3xl shadow-2xl"
+        style={
+          {
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            maxHeight: 'calc(100vh - 80px)',
+          } as React.CSSProperties
+        }
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-zinc-200 rounded-full" />
+        </div>
+        <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-black text-zinc-900 text-base">Изменить грузчиков</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">Текущий рейс продолжится</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold active:bg-zinc-200"
+          >
+            ×
+          </button>
+        </div>
+        <div className="px-4 pt-4 pb-6 space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            {[0, 1, 2].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setSelected(n)}
+                className={`py-4 rounded-xl border-2 font-black text-sm uppercase tracking-wide transition-all active:scale-[0.97] ${
+                  selected === n
+                    ? 'bg-orange-600 text-white border-orange-600'
+                    : 'bg-white text-zinc-600 border-zinc-200'
+                }`}
+              >
+                {n === 0 ? 'Без' : n === 1 ? '1 грузчик' : '2 грузчика'}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => onSave(selected)}
+            className="w-full bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 transition-all text-sm uppercase tracking-widest"
+          >
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Главная страница рейса ────────────────────────────────────
+
 export default function TripDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -46,6 +138,7 @@ export default function TripDetailPage() {
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showLoaderChange, setShowLoaderChange] = useState(false);
 
   const { data: trip, isLoading } = useQuery<TripDetail>({
     queryKey: ['trip', id],
@@ -77,11 +170,30 @@ export default function TripDetailPage() {
 
   const cancelOrder = useMutation({
     mutationFn: (orderId: string) =>
-      fetch(`/api/trips/${id}/orders/${orderId}`, { method: 'PATCH' }).then((r) => {
+      fetch(`/api/trips/${id}/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      }).then((r) => {
         if (!r.ok) throw new Error('Ошибка отмены');
       }),
     onSuccess: () => {
       setConfirmDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['trip', id] });
+    },
+  });
+
+  const changeLoaders = useMutation({
+    mutationFn: (loaders_count: number) =>
+      fetch(`/api/trips/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loaders_count }),
+      }).then((r) => {
+        if (!r.ok) throw new Error('Ошибка изменения грузчиков');
+      }),
+    onSuccess: () => {
+      setShowLoaderChange(false);
       queryClient.invalidateQueries({ queryKey: ['trip', id] });
     },
   });
@@ -114,6 +226,7 @@ export default function TripDetailPage() {
   }
 
   const isActive = trip.status === 'in_progress';
+  const canEdit = trip.lifecycle_status !== 'approved';
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
 
   const totals = {
@@ -146,20 +259,40 @@ export default function TripDetailPage() {
 
       <main className="p-4 space-y-6 max-w-4xl mx-auto">
         {/* Status Card */}
-        <section className="bg-white border-2 border-zinc-200 rounded-lg p-4 shadow-sm relative overflow-hidden flex flex-col justify-between items-start gap-1">
+        <section className="bg-white border-2 border-zinc-200 rounded-lg p-4 shadow-sm relative overflow-hidden">
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
-          <h1 className="font-black text-xl text-zinc-900 leading-tight">
-            {trip.asset.short_name}{' '}
-            <span className="text-zinc-400 font-bold ml-1">{trip.asset.reg_number}</span>
-          </h1>
-          <p className="font-bold text-sm text-zinc-500 uppercase tracking-wide">
-            {trip.driver.name}
-            {trip.loaders_count > 0
-              ? ` + ${trip.loaders_count} грузчик${trip.loaders_count === 2 ? 'а' : ''}`
-              : ''}{' '}
-            ·{' '}
-            {isActive ? <TripDuration startedAt={trip.started_at} /> : formatDate(trip.started_at)}
-          </p>
+          <div className="pl-2 space-y-1">
+            <h1 className="font-black text-xl text-zinc-900 leading-tight">
+              {trip.asset.short_name}{' '}
+              <span className="text-zinc-400 font-bold ml-1">{trip.asset.reg_number}</span>
+            </h1>
+            <p className="font-bold text-sm text-zinc-500 uppercase tracking-wide">
+              {trip.driver.name} ·{' '}
+              {isActive ? (
+                <TripDuration startedAt={trip.started_at} />
+              ) : (
+                formatDate(trip.started_at)
+              )}
+            </p>
+            {/* Грузчики с кнопкой изменения */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-sm font-bold text-zinc-600">
+                {trip.loaders_count === 0
+                  ? 'Без грузчиков'
+                  : trip.loaders_count === 1
+                    ? '+ 1 грузчик'
+                    : '+ 2 грузчика'}
+              </span>
+              {isActive && (
+                <button
+                  onClick={() => setShowLoaderChange(true)}
+                  className="text-[10px] font-black text-orange-600 uppercase tracking-wide bg-orange-50 border border-orange-200 rounded-lg px-2 py-0.5 active:bg-orange-100 transition-colors"
+                >
+                  Изменить
+                </button>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* Summary Grid */}
@@ -198,7 +331,6 @@ export default function TripDetailPage() {
               {activeOrders.map((order) => (
                 <div key={order.id}>
                   {confirmDelete === order.id ? (
-                    // Инлайн-подтверждение удаления
                     <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-center justify-between gap-3">
                       <p className="text-red-700 font-black text-xs uppercase tracking-wide flex-1">
                         Отменить заказ?
@@ -221,40 +353,54 @@ export default function TripDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white border-2 border-zinc-200 rounded-lg p-4 flex justify-between items-center relative overflow-hidden active:bg-zinc-50 transition-colors">
+                    <div className="bg-white border-2 border-zinc-200 rounded-lg p-4 relative overflow-hidden">
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
-                      <div className="flex-1 pl-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-zinc-400 text-lg">
-                            {order.payment_method === 'cash'
-                              ? '💵'
-                              : order.payment_method === 'bank_invoice'
-                                ? '🏦'
-                                : order.payment_method === 'qr'
-                                  ? '📱'
-                                  : order.payment_method === 'debt_cash'
-                                    ? '⏳'
-                                    : '💳'}
-                          </span>
-                          <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">
-                            {order.counterparty?.name ?? order.description ?? 'Без названия'}
-                          </h3>
+                      <div className="pl-2 flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-zinc-400 text-lg flex-shrink-0">
+                              {order.payment_method === 'cash'
+                                ? '💵'
+                                : order.payment_method === 'bank_invoice'
+                                  ? '🏦'
+                                  : order.payment_method === 'qr'
+                                    ? '📱'
+                                    : order.payment_method === 'debt_cash'
+                                      ? '⏳'
+                                      : '💳'}
+                            </span>
+                            <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight truncate">
+                              {order.counterparty?.name ?? order.description ?? 'Без названия'}
+                            </h3>
+                          </div>
+                          <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">
+                            ЗП: <Money amount={order.driver_pay} />
+                          </p>
                         </div>
-                        <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">
-                          ЗП: <Money amount={order.driver_pay} />
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Money amount={order.amount} className="font-black text-lg text-zinc-900" />
-                        {isActive && (
-                          <button
-                            onClick={() => setConfirmDelete(order.id)}
-                            className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1"
-                            aria-label="Отменить заказ"
-                          >
-                            🗑️
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Money
+                            amount={order.amount}
+                            className="font-black text-lg text-zinc-900"
+                          />
+                          {canEdit && (
+                            <div className="flex flex-col gap-1">
+                              <Link
+                                href={`/trip/${id}/order/${order.id}`}
+                                className="text-zinc-400 hover:text-orange-500 active:scale-90 transition-all p-1 text-base leading-none"
+                                aria-label="Редактировать заказ"
+                              >
+                                ✏️
+                              </Link>
+                              <button
+                                onClick={() => setConfirmDelete(order.id)}
+                                className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1 text-base leading-none"
+                                aria-label="Отменить заказ"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -285,7 +431,6 @@ export default function TripDetailPage() {
               {trip.trip_expenses.map((expense) => (
                 <div key={expense.id}>
                   {confirmDelete === expense.id ? (
-                    // Инлайн-подтверждение удаления
                     <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-center justify-between gap-3">
                       <p className="text-red-700 font-black text-xs uppercase tracking-wide flex-1">
                         Удалить расход {expense.category.name}?
@@ -367,6 +512,15 @@ export default function TripDetailPage() {
             <span>🏁</span> Завершить рейс
           </Link>
         </div>
+      )}
+
+      {/* Loader Change Sheet */}
+      {showLoaderChange && (
+        <LoaderChangeSheet
+          current={trip.loaders_count}
+          onClose={() => setShowLoaderChange(false)}
+          onSave={(count) => changeLoaders.mutate(count)}
+        />
       )}
     </div>
   );
