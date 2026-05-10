@@ -565,31 +565,39 @@ function OrdersContent() {
   const [editOrder, setEditOrder] = useState<any>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
 
-  const toArray = (d: unknown) => (Array.isArray(d) ? d : []);
+  const fetchOrders = async (url: string) => {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? 'Ошибка загрузки нарядов');
+    return Array.isArray(json) ? json : [];
+  };
 
-  const { data: simpleOrders = [], isLoading: simpleLoading } = useQuery<any[]>({
+  const {
+    data: simpleOrders = [],
+    isLoading: simpleLoading,
+    error: simpleError,
+  } = useQuery<any[]>({
     queryKey: ['admin-orders', filter],
-    queryFn: () =>
-      fetch(`/api/admin/service-orders?filter=${filter}`)
-        .then((r) => r.json())
-        .then(toArray),
+    queryFn: () => fetchOrders(`/api/admin/service-orders?filter=${filter}`),
     enabled: filter !== 'history',
     staleTime: 15000,
     refetchInterval: 30000,
   });
 
-  const { data: historyOrders = [], isLoading: historyLoading } = useQuery<any[]>({
+  const {
+    data: historyOrders = [],
+    isLoading: historyLoading,
+    error: historyError,
+  } = useQuery<any[]>({
     queryKey: ['admin-orders-history', selectedDate],
-    queryFn: () =>
-      fetch(`/api/admin/service-orders?filter=history&date=${selectedDate}`)
-        .then((r) => r.json())
-        .then(toArray),
+    queryFn: () => fetchOrders(`/api/admin/service-orders?filter=history&date=${selectedDate}`),
     enabled: filter === 'history',
     staleTime: 30000,
   });
 
   const orders = filter === 'history' ? historyOrders : simpleOrders;
   const isLoading = filter === 'history' ? historyLoading : simpleLoading;
+  const queryError = (filter === 'history' ? historyError : simpleError) as Error | null;
 
   const refresh = () => {
     if (filter === 'history') {
@@ -661,6 +669,15 @@ function OrdersContent() {
 
       {isLoading ? (
         <Skeleton />
+      ) : queryError ? (
+        <div className="p-4">
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
+            <p className="text-xs font-black text-rose-600 uppercase tracking-widest mb-1">
+              Ошибка загрузки
+            </p>
+            <p className="text-sm text-rose-700 font-mono break-all">{queryError.message}</p>
+          </div>
+        </div>
       ) : orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-zinc-400">
           <span className="text-5xl mb-4">{emptyIcon}</span>
