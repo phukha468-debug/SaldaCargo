@@ -11,10 +11,22 @@ const PAYROLL_CATEGORIES: Record<string, string> = {
 };
 const FALLBACK_CATEGORY = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30'; // OTHER_EXPENSE
 
+async function resolveUserId(supabase: any): Promise<string> {
+  const cookieStore = await cookies();
+  const fromCookie = cookieStore.get('salda_user_id')?.value;
+  if (fromCookie) return fromCookie;
+  const { data } = await (supabase.from('users') as any)
+    .select('id')
+    .overlaps('roles', ['owner', 'admin'])
+    .limit(1)
+    .single();
+  return data?.id ?? '00000000-0000-0000-0000-000000000000';
+}
+
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get('salda_user_id')?.value ?? null;
+    const supabase = createAdminClient();
+    const adminId = await resolveUserId(supabase);
 
     const body = (await request.json()) as {
       user_id: string;
@@ -34,8 +46,6 @@ export async function POST(request: Request) {
     if (isNaN(amount) || amount <= 0) {
       return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
     }
-
-    const supabase = createAdminClient();
 
     // Определяем категорию ЗП по роли сотрудника
     const { data: user } = await (supabase as any)
