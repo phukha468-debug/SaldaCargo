@@ -20,6 +20,7 @@ export async function GET() {
        trip_orders(amount, driver_pay, lifecycle_status)`,
     )
     .eq('driver_id', driverId)
+    .neq('lifecycle_status', 'cancelled')
     .order('started_at', { ascending: false }) as any);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
