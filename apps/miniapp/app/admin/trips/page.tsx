@@ -277,17 +277,29 @@ function EditModal({
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+      style={{
+        background: 'rgba(0,0,0,0.5)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+      }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col">
+      <div
+        className="bg-white rounded-t-3xl shadow-2xl"
+        style={
+          {
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            maxHeight: 'calc(100vh - 80px)',
+          } as React.CSSProperties
+        }
+      >
         {/* Хэндл */}
-        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+        <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
 
         {/* Заголовок */}
-        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
           <div>
             <h2 className="font-black text-zinc-900 text-base">
               Рейс #{trip.trip_number} · {trip.asset?.short_name}
@@ -303,15 +315,7 @@ function EditModal({
         </div>
 
         {/* Список заказов + кнопки */}
-        <div
-          className="overflow-y-auto flex-1 min-h-0 p-5 space-y-5"
-          style={
-            {
-              WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain',
-            } as React.CSSProperties
-          }
-        >
+        <div className="p-5 space-y-5">
           {orders.map((order: any, idx: number) => (
             <div key={order.id} className="space-y-3">
               <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
@@ -385,8 +389,8 @@ function EditModal({
             </div>
           ))}
 
-          {/* Кнопки внутри скролла */}
-          <div className="pt-3 border-t border-zinc-100 space-y-2 pb-8">
+          {/* Кнопки */}
+          <div className="pt-3 border-t border-zinc-100 space-y-2 pb-4">
             {error && (
               <p className="text-sm text-rose-700 font-medium bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5">
                 {error}
