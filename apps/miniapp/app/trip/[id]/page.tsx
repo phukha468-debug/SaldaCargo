@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDuration, formatDate } from '@saldacargo/shared';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface TripDetail {
   id: string;
@@ -139,6 +139,9 @@ export default function TripDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showLoaderChange, setShowLoaderChange] = useState(false);
+  const [confirmDeleteTrip, setConfirmDeleteTrip] = useState(false);
+  const [deleteTripError, setDeleteTripError] = useState<string | null>(null);
+  const deleteTripTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: trip, isLoading } = useQuery<TripDetail>({
     queryKey: ['trip', id],
@@ -198,6 +201,34 @@ export default function TripDetailPage() {
     },
   });
 
+  const deleteTrip = useMutation({
+    mutationFn: () =>
+      fetch(`/api/trips/${id}`, { method: 'DELETE' }).then(async (r) => {
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error ?? 'Ошибка удаления');
+        return body;
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
+      router.push('/');
+    },
+    onError: (err: Error) => {
+      setDeleteTripError(err.message);
+      setConfirmDeleteTrip(false);
+    },
+  });
+
+  function handleDeleteTripClick() {
+    if (!confirmDeleteTrip) {
+      setConfirmDeleteTrip(true);
+      if (deleteTripTimerRef.current) clearTimeout(deleteTripTimerRef.current);
+      deleteTripTimerRef.current = setTimeout(() => setConfirmDeleteTrip(false), 4000);
+    } else {
+      if (deleteTripTimerRef.current) clearTimeout(deleteTripTimerRef.current);
+      deleteTrip.mutate();
+    }
+  }
+
   const isMutating = deleteExpense.isPending || cancelOrder.isPending;
 
   if (isLoading) {
@@ -251,6 +282,14 @@ export default function TripDetailPage() {
           <span className="text-xl font-black text-zinc-900 uppercase tracking-tight">
             Рейс №{trip.trip_number}
           </span>
+          {canEdit && (
+            <Link
+              href={`/trip/${id}/edit`}
+              className="text-[10px] font-black text-orange-600 uppercase tracking-wide bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 active:bg-orange-100 transition-colors"
+            >
+              ✏️ Изменить
+            </Link>
+          )}
         </div>
         <LifecycleBadge
           status={trip.lifecycle_status as 'draft' | 'approved' | 'returned' | 'cancelled'}
@@ -288,7 +327,7 @@ export default function TripDetailPage() {
                   onClick={() => setShowLoaderChange(true)}
                   className="text-[10px] font-black text-orange-600 uppercase tracking-wide bg-orange-50 border border-orange-200 rounded-lg px-2 py-0.5 active:bg-orange-100 transition-colors"
                 >
-                  Изменить
+                  {trip.loaders_count === 0 ? '+ Добавить' : 'Изменить'}
                 </button>
               )}
             </div>
@@ -469,7 +508,7 @@ export default function TripDetailPage() {
                           amount={expense.amount}
                           className="font-black text-lg text-red-600"
                         />
-                        {isActive && (
+                        {canEdit && (
                           <button
                             onClick={() => setConfirmDelete(expense.id)}
                             className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1"
@@ -486,6 +525,31 @@ export default function TripDetailPage() {
             </div>
           )}
         </section>
+        {/* Delete Trip */}
+        {canEdit && (
+          <section className="pt-4 border-t-2 border-zinc-100">
+            {deleteTripError && (
+              <div className="mb-3 bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
+                {deleteTripError}
+              </div>
+            )}
+            <button
+              onClick={handleDeleteTripClick}
+              disabled={deleteTrip.isPending}
+              className={`w-full rounded-lg h-12 font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 ${
+                confirmDeleteTrip
+                  ? 'bg-red-600 text-white border-2 border-red-600'
+                  : 'bg-white text-red-500 border-2 border-red-200'
+              }`}
+            >
+              {deleteTrip.isPending
+                ? 'Удаляем...'
+                : confirmDeleteTrip
+                  ? '⚠️ Нажмите ещё раз для подтверждения'
+                  : '🗑️ Удалить рейс'}
+            </button>
+          </section>
+        )}
       </main>
 
       {/* Action Buttons */}
