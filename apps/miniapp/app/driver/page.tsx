@@ -92,7 +92,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
       style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[92dvh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
@@ -111,7 +111,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-4 overscroll-contain">
+        <div className="overflow-y-auto p-5 space-y-4 overscroll-contain">
           {/* Машина */}
           <div>
             <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
@@ -181,22 +181,23 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
               {error}
             </p>
           )}
-        </div>
 
-        <div className="px-5 pb-8 pt-3 border-t border-zinc-100 flex gap-3">
-          <button
-            onClick={submit}
-            disabled={saving}
-            className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
-          >
-            {saving ? 'Отправка...' : 'Отправить заявку'}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
-          >
-            Отмена
-          </button>
+          {/* Кнопки внутри скролла — всегда доступны */}
+          <div className="flex gap-3 pt-2 pb-6">
+            <button
+              onClick={submit}
+              disabled={saving}
+              className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
+            >
+              {saving ? 'Отправка...' : 'Отправить заявку'}
+            </button>
+            <button
+              onClick={onClose}
+              className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
+            >
+              Отмена
+            </button>
+          </div>
         </div>
       </div>
     </div>
