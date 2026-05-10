@@ -14,7 +14,7 @@ const fullSelect = `
     work_catalog:work_catalog(name)
   ),
   parts:service_order_parts(
-    id, quantity, price_per_unit,
+    id, quantity, unit_price,
     part:parts(name, unit)
   )
 `;

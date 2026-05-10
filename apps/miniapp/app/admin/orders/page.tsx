@@ -32,7 +32,7 @@ function calcOrderTotals(order: any) {
   const parts = order.parts ?? [];
   const worksTotal = works.reduce((s: number, w: any) => s + parseFloat(w.price_client ?? '0'), 0);
   const partsTotal = parts.reduce(
-    (s: number, p: any) => s + parseFloat(p.price_per_unit ?? '0') * parseFloat(p.quantity ?? '1'),
+    (s: number, p: any) => s + parseFloat(p.unit_price ?? '0') * parseFloat(p.quantity ?? '1'),
     0,
   );
   return { worksTotal, partsTotal, total: worksTotal + partsTotal };
@@ -419,7 +419,7 @@ function OrderCard({
               </p>
               {parts.map((p: any) => {
                 const qty = parseFloat(p.quantity ?? '1');
-                const ppu = parseFloat(p.price_per_unit ?? '0');
+                const ppu = parseFloat(p.unit_price ?? '0');
                 const line = qty * ppu;
                 return (
                   <div key={p.id} className="flex items-center justify-between gap-2">

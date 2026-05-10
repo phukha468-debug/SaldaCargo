@@ -664,7 +664,7 @@ type TabOrder = Omit<OrderRow, 'works'> & {
   parts?: Array<{
     id: string;
     quantity: number;
-    price_per_unit?: string | null;
+    unit_price?: string | null;
     part: { name: string; unit: string };
   }>;
 };
@@ -694,7 +694,7 @@ function CollapsibleOrderCard({
 
   const worksTotal = (order.works ?? []).reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0);
   const partsTotal = (order.parts ?? []).reduce(
-    (s, p) => s + parseFloat(p.price_per_unit ?? '0') * p.quantity,
+    (s, p) => s + parseFloat(p.unit_price ?? '0') * p.quantity,
     0,
   );
   const total = worksTotal + partsTotal;
@@ -845,7 +845,7 @@ function CollapsibleOrderCard({
               </p>
               <div className="space-y-1">
                 {(order.parts ?? []).map((p) => {
-                  const lineTotal = parseFloat(p.price_per_unit ?? '0') * p.quantity;
+                  const lineTotal = parseFloat(p.unit_price ?? '0') * p.quantity;
                   return (
                     <div key={p.id} className="flex items-center justify-between text-xs">
                       <span className="text-slate-700">
