@@ -23,8 +23,7 @@ export async function GET(request: Request) {
     const [
       { data: users },
       { data: driverTrips },
-      { data: loader1Trips },
-      { data: loader2Trips },
+      { data: loaderTrips },
       { data: mechanicOrders },
       { data: paidRows },
     ] = await Promise.all([
@@ -40,26 +39,16 @@ export async function GET(request: Request) {
       // ЗП водителей (driver_pay из одобренных рейсов)
       (supabase as any)
         .from('trips')
-        .select('driver_id, trip_orders(driver_pay)')
+        .select('driver_id, trip_orders(driver_pay, lifecycle_status)')
         .eq('lifecycle_status', 'approved')
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
 
-      // ЗП грузчиков (loader_pay — первый грузчик)
+      // ЗП грузчиков (loader_id/loader2_id теперь в заказах)
       (supabase as any)
         .from('trips')
-        .select('loader_id, trip_orders(loader_pay)')
+        .select('trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)')
         .eq('lifecycle_status', 'approved')
-        .not('loader_id', 'is', null)
-        .gte('started_at', monthStart)
-        .lte('started_at', monthEnd),
-
-      // ЗП грузчиков (loader2_pay — второй грузчик)
-      (supabase as any)
-        .from('trips')
-        .select('loader2_id, trip_orders(loader2_pay)')
-        .eq('lifecycle_status', 'approved')
-        .not('loader2_id', 'is', null)
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
 
@@ -92,31 +81,28 @@ export async function GET(request: Request) {
     for (const trip of (driverTrips as any[]) ?? []) {
       const uid = trip.driver_id;
       if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'),
-        0,
-      );
+      const pay = ((trip.trip_orders as any[]) ?? [])
+        .filter((o: any) => o.lifecycle_status !== 'cancelled')
+        .reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
       earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
     }
 
-    for (const trip of (loader1Trips as any[]) ?? []) {
-      const uid = trip.loader_id;
-      if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.loader_pay ?? '0'),
-        0,
-      );
-      earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
-    }
-
-    for (const trip of (loader2Trips as any[]) ?? []) {
-      const uid = trip.loader2_id;
-      if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.loader2_pay ?? '0'),
-        0,
-      );
-      earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
+    for (const trip of (loaderTrips as any[]) ?? []) {
+      for (const order of (trip.trip_orders as any[]) ?? []) {
+        if (order.lifecycle_status === 'cancelled') continue;
+        if (order.loader_id) {
+          earnedMap.set(
+            order.loader_id,
+            (earnedMap.get(order.loader_id) ?? 0) + parseFloat(order.loader_pay ?? '0'),
+          );
+        }
+        if (order.loader2_id) {
+          earnedMap.set(
+            order.loader2_id,
+            (earnedMap.get(order.loader2_id) ?? 0) + parseFloat(order.loader2_pay ?? '0'),
+          );
+        }
+      }
     }
 
     for (const order of (mechanicOrders as any[]) ?? []) {
@@ -140,13 +126,16 @@ export async function GET(request: Request) {
       if (trip.driver_id)
         tripCountMap.set(trip.driver_id, (tripCountMap.get(trip.driver_id) ?? 0) + 1);
     }
-    for (const trip of (loader1Trips as any[]) ?? []) {
-      if (trip.loader_id)
-        tripCountMap.set(trip.loader_id, (tripCountMap.get(trip.loader_id) ?? 0) + 1);
-    }
-    for (const trip of (loader2Trips as any[]) ?? []) {
-      if (trip.loader2_id)
-        tripCountMap.set(trip.loader2_id, (tripCountMap.get(trip.loader2_id) ?? 0) + 1);
+    for (const trip of (loaderTrips as any[]) ?? []) {
+      const loaderIds = new Set<string>();
+      for (const order of (trip.trip_orders as any[]) ?? []) {
+        if (order.lifecycle_status === 'cancelled') continue;
+        if (order.loader_id) loaderIds.add(order.loader_id);
+        if (order.loader2_id) loaderIds.add(order.loader2_id);
+      }
+      for (const uid of loaderIds) {
+        tripCountMap.set(uid, (tripCountMap.get(uid) ?? 0) + 1);
+      }
     }
     const orderCountMap = new Map<string, number>();
     for (const o of (mechanicOrders as any[]) ?? []) {

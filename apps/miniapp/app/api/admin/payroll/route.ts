@@ -23,8 +23,7 @@ export async function GET(request: Request) {
     const [
       { data: users },
       { data: driverTrips },
-      { data: loader1Trips },
-      { data: loader2Trips },
+      { data: loaderTrips },
       { data: mechanicOrders },
       { data: paidRows },
     ] = await Promise.all([
@@ -36,24 +35,15 @@ export async function GET(request: Request) {
 
       (supabase as any)
         .from('trips')
-        .select('driver_id, trip_orders(driver_pay)')
+        .select('driver_id, trip_orders(driver_pay, lifecycle_status)')
         .eq('lifecycle_status', 'approved')
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
 
       (supabase as any)
         .from('trips')
-        .select('loader_id, trip_orders(loader_pay)')
+        .select('trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)')
         .eq('lifecycle_status', 'approved')
-        .not('loader_id', 'is', null)
-        .gte('started_at', monthStart)
-        .lte('started_at', monthEnd),
-
-      (supabase as any)
-        .from('trips')
-        .select('loader2_id, trip_orders(loader2_pay)')
-        .eq('lifecycle_status', 'approved')
-        .not('loader2_id', 'is', null)
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
 
@@ -82,31 +72,28 @@ export async function GET(request: Request) {
     for (const trip of (driverTrips as any[]) ?? []) {
       const uid = trip.driver_id;
       if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'),
-        0,
-      );
+      const pay = ((trip.trip_orders as any[]) ?? [])
+        .filter((o: any) => o.lifecycle_status !== 'cancelled')
+        .reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
       earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
     }
 
-    for (const trip of (loader1Trips as any[]) ?? []) {
-      const uid = trip.loader_id;
-      if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.loader_pay ?? '0'),
-        0,
-      );
-      earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
-    }
-
-    for (const trip of (loader2Trips as any[]) ?? []) {
-      const uid = trip.loader2_id;
-      if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.loader2_pay ?? '0'),
-        0,
-      );
-      earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
+    for (const trip of (loaderTrips as any[]) ?? []) {
+      for (const order of (trip.trip_orders as any[]) ?? []) {
+        if (order.lifecycle_status === 'cancelled') continue;
+        if (order.loader_id) {
+          earnedMap.set(
+            order.loader_id,
+            (earnedMap.get(order.loader_id) ?? 0) + parseFloat(order.loader_pay ?? '0'),
+          );
+        }
+        if (order.loader2_id) {
+          earnedMap.set(
+            order.loader2_id,
+            (earnedMap.get(order.loader2_id) ?? 0) + parseFloat(order.loader2_pay ?? '0'),
+          );
+        }
+      }
     }
 
     for (const order of (mechanicOrders as any[]) ?? []) {

@@ -16,9 +16,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       asset:assets(short_name, reg_number),
       driver:users!trips_driver_id_fkey(name),
       trip_orders(
-        id, counterparty_id, amount, driver_pay, loader_pay, loader2_pay, payment_method,
+        id, counterparty_id, amount, driver_pay, loader_pay, loader2_pay,
+        loader_id, loader2_id, payment_method,
         settlement_status, lifecycle_status, description,
-        counterparty:counterparties(name)
+        counterparty:counterparties(name),
+        loader:users!trip_orders_loader_id_fkey(id, name),
+        loader2:users!trip_orders_loader2_id_fkey(id, name)
       ),
       trip_expenses(
         id, amount, payment_method, description,
@@ -55,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Рейс уже одобрен администратором' }, { status: 403 });
   }
 
-  const allowed = ['loaders_count', 'trip_type'];
+  const allowed = ['trip_type'];
   const update = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)));
 
   const { data, error } = await (supabase.from('trips') as any)

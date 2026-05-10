@@ -11,7 +11,6 @@ import { Button } from '@saldacargo/ui';
 
 const schema = z.object({
   trip_type: z.enum(['local', 'intercity', 'moving', 'hourly']),
-  loaders_count: z.coerce.number().min(0).max(2),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -27,7 +26,6 @@ interface Trip {
   id: string;
   trip_number: number;
   trip_type: string;
-  loaders_count: number;
   lifecycle_status: string;
   asset: { short_name: string };
 }
@@ -55,13 +53,12 @@ export default function EditTripPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
-    defaultValues: { trip_type: 'local', loaders_count: 0 },
+    defaultValues: { trip_type: 'local' },
   });
 
   useEffect(() => {
     if (trip && !initialized) {
       setValue('trip_type', trip.trip_type as any);
-      setValue('loaders_count', trip.loaders_count);
       setInitialized(true);
     }
   }, [trip, initialized, setValue]);
@@ -176,28 +173,6 @@ export default function EditTripPage() {
           {errors.trip_type && (
             <p className="text-red-500 text-xs font-bold pl-1">{errors.trip_type.message}</p>
           )}
-        </div>
-
-        {/* Грузчики */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Грузчики
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((n) => (
-              <label key={n} className="relative">
-                <input
-                  type="radio"
-                  value={n}
-                  {...register('loaders_count')}
-                  className="sr-only peer"
-                />
-                <div className="border-2 border-zinc-200 rounded-lg p-4 text-center cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:text-orange-700 font-black text-sm uppercase tracking-wide transition-all active:scale-[0.97]">
-                  {n === 0 ? 'Без' : n === 1 ? '1' : '2'}
-                </div>
-              </label>
-            ))}
-          </div>
         </div>
 
         {error && (

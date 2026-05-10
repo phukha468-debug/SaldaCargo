@@ -13,14 +13,23 @@ import { Button } from '@saldacargo/ui';
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
   driver_pay: z.coerce.number().min(0),
-  loader_pay: z.coerce.number().min(0),
-  loader2_pay: z.coerce.number().min(0),
   payment_method: z.enum(['cash', 'qr', 'bank_invoice', 'debt_cash', 'card_driver']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
+
+interface Loader {
+  id: string;
+  name: string;
+}
+
+interface SelectedLoader {
+  id: string;
+  name: string;
+  pay: string;
+}
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Наличные', icon: '💵' },
@@ -30,7 +39,6 @@ const PAYMENT_METHODS = [
   { value: 'card_driver', label: 'На карту', icon: '💳' },
 ] as const;
 
-// Подсказка ЗП: ~30% от суммы
 const SUGGEST_PERCENT = 30;
 
 export default function AddOrderPage() {
@@ -44,17 +52,19 @@ export default function AddOrderPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
-
-  const { data: trip } = useQuery<{ loaders_count: number }>({
-    queryKey: ['trip', tripId],
-    queryFn: () => fetch(`/api/trips/${tripId}`).then((r) => r.json()),
-    staleTime: 60000,
-  });
+  const [loaders, setLoaders] = useState<SelectedLoader[]>([]);
+  const [showLoaderPicker, setShowLoaderPicker] = useState(false);
 
   const { data: counterparties = [] } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ['driver', 'counterparties'],
     queryFn: () => fetch('/api/driver/counterparties').then((r) => r.json()),
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: allLoaders = [] } = useQuery<Loader[]>({
+    queryKey: ['driver', 'loaders'],
+    queryFn: () => fetch('/api/driver/loaders').then((r) => r.json()),
+    staleTime: 10 * 60 * 1000,
   });
 
   const {
@@ -65,12 +75,7 @@ export default function AddOrderPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
-    defaultValues: {
-      payment_method: 'cash',
-      driver_pay: 0,
-      loader_pay: 0,
-      loader2_pay: 0,
-    },
+    defaultValues: { payment_method: 'cash', driver_pay: 0 },
   });
 
   const selectedCounterpartyId = watch('counterparty_id');
@@ -84,6 +89,21 @@ export default function AddOrderPage() {
     searchTerm.length > 0
       ? counterparties.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
       : [];
+
+  const availableLoaders = allLoaders.filter((l) => !loaders.find((s) => s.id === l.id));
+
+  function addLoader(loader: Loader) {
+    setLoaders((prev) => [...prev, { id: loader.id, name: loader.name, pay: '' }]);
+    setShowLoaderPicker(false);
+  }
+
+  function removeLoader(id: string) {
+    setLoaders((prev) => prev.filter((l) => l.id !== id));
+  }
+
+  function setLoaderPay(id: string, pay: string) {
+    setLoaders((prev) => prev.map((l) => (l.id === id ? { ...l, pay } : l)));
+  }
 
   async function handleAddClient() {
     if (!newClientName.trim()) return;
@@ -121,16 +141,19 @@ export default function AddOrderPage() {
     setSubmitting(true);
     setError('');
 
+    const [loader1, loader2] = loaders;
+
     const payload = JSON.stringify({
       ...data,
       amount: String(data.amount),
       driver_pay: String(data.driver_pay),
-      loader_pay: String(data.loader_pay),
-      loader2_pay: String(data.loader2_pay),
+      loader_id: loader1?.id ?? null,
+      loader_pay: loader1 ? String(parseFloat(loader1.pay || '0')) : '0',
+      loader2_id: loader2?.id ?? null,
+      loader2_pay: loader2 ? String(parseFloat(loader2.pay || '0')) : '0',
       idempotency_key: idempotencyKey,
     });
 
-    // Navigate immediately — server request runs in background
     router.push(`/trip/${tripId}`);
 
     fetch(`/api/trips/${tripId}/orders`, {
@@ -309,37 +332,55 @@ export default function AddOrderPage() {
           />
         </div>
 
-        {/* ЗП грузчика 1 */}
-        {(trip?.loaders_count ?? 0) >= 1 && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              ЗП Грузчик 1, ₽
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              {...register('loader_pay')}
-              placeholder="0"
-              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-            />
-          </div>
-        )}
+        {/* Грузчики */}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Грузчики
+          </label>
 
-        {/* ЗП грузчика 2 */}
-        {(trip?.loaders_count ?? 0) >= 2 && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              ЗП Грузчик 2, ₽
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              {...register('loader2_pay')}
-              placeholder="0"
-              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-            />
-          </div>
-        )}
+          {loaders.map((loader, idx) => (
+            <div
+              key={loader.id}
+              className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-900 text-sm">
+                  {idx + 1}. {loader.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeLoader(loader.id)}
+                  className="text-blue-400 font-black text-lg leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">
+                  ЗП грузчика, ₽
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={loader.pay}
+                  onChange={(e) => setLoaderPay(loader.id, e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-lg border-2 border-blue-200 px-4 h-12 text-xl font-black text-zinc-900 focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+          ))}
+
+          {loaders.length < 2 && (
+            <button
+              type="button"
+              onClick={() => setShowLoaderPicker(true)}
+              className="w-full text-left px-4 h-12 border-2 border-dashed border-blue-300 rounded-lg text-blue-500 font-bold"
+            >
+              + Добавить грузчика
+            </button>
+          )}
+        </div>
 
         {/* Описание */}
         <div className="space-y-2">
@@ -371,6 +412,51 @@ export default function AddOrderPage() {
           </Button>
         </div>
       </form>
+
+      {/* Loader picker bottom sheet */}
+      {showLoaderPicker && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{
+            background: 'rgba(0,0,0,0.5)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowLoaderPicker(false)}
+        >
+          <div className="bg-white rounded-t-3xl shadow-2xl max-h-[70vh] overflow-y-auto">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-zinc-200 rounded-full" />
+            </div>
+            <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
+              <h2 className="font-black text-zinc-900 text-base">Выбрать грузчика</h2>
+              <button
+                onClick={() => setShowLoaderPicker(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-4 py-3 space-y-2">
+              {availableLoaders.length === 0 ? (
+                <p className="text-zinc-400 font-bold text-sm text-center py-4">
+                  Все грузчики уже добавлены
+                </p>
+              ) : (
+                availableLoaders.map((loader) => (
+                  <button
+                    key={loader.id}
+                    type="button"
+                    onClick={() => addLoader(loader)}
+                    className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-blue-50 border-2 border-zinc-100 rounded-lg"
+                  >
+                    {loader.name}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

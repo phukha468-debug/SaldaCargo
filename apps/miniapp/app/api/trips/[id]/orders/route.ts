@@ -10,7 +10,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     description?: string;
     amount: string;
     driver_pay: string;
+    loader_id?: string;
     loader_pay: string;
+    loader2_id?: string;
     loader2_pay: string;
     payment_method: string;
     idempotency_key: string;
@@ -29,7 +31,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       description: body.description ?? null,
       amount: body.amount,
       driver_pay: body.driver_pay,
-      loader_pay: body.loader_pay,
+      loader_id: body.loader_id ?? null,
+      loader_pay: body.loader_pay ?? '0',
+      loader2_id: body.loader2_id ?? null,
       loader2_pay: body.loader2_pay ?? '0',
       payment_method: body.payment_method,
       settlement_status: settlementStatus,

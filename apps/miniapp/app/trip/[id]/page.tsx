@@ -7,6 +7,24 @@ import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDuration, formatDate } from '@saldacargo/shared';
 import { useState, useEffect, useRef } from 'react';
 
+interface TripOrder {
+  id: string;
+  counterparty_id: string | null;
+  amount: string;
+  driver_pay: string;
+  loader_pay: string;
+  loader2_pay: string;
+  loader_id: string | null;
+  loader2_id: string | null;
+  payment_method: string;
+  settlement_status: string;
+  lifecycle_status: string;
+  description: string | null;
+  counterparty: { name: string } | null;
+  loader: { id: string; name: string } | null;
+  loader2: { id: string; name: string } | null;
+}
+
 interface TripDetail {
   id: string;
   trip_number: number;
@@ -14,22 +32,9 @@ interface TripDetail {
   lifecycle_status: string;
   started_at: string;
   trip_type: string;
-  loaders_count: number;
   asset: { short_name: string; reg_number: string };
   driver: { name: string };
-  trip_orders: Array<{
-    id: string;
-    counterparty_id: string | null;
-    amount: string;
-    driver_pay: string;
-    loader_pay: string;
-    loader2_pay: string;
-    payment_method: string;
-    settlement_status: string;
-    lifecycle_status: string;
-    description: string | null;
-    counterparty: { name: string } | null;
-  }>;
+  trip_orders: TripOrder[];
   trip_expenses: Array<{
     id: string;
     amount: string;
@@ -39,97 +44,6 @@ interface TripDetail {
   }>;
 }
 
-// ── Bottom-sheet смены грузчиков ──────────────────────────────
-
-function LoaderChangeSheet({
-  current,
-  onClose,
-  onSave,
-}: {
-  current: number;
-  onClose: () => void;
-  onSave: (count: number) => void;
-}) {
-  const [selected, setSelected] = useState(current);
-
-  useEffect(() => {
-    const y = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${y}px`;
-    document.body.style.width = '100%';
-    return () => {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, y);
-    };
-  }, []);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{
-        background: 'rgba(0,0,0,0.5)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="bg-white rounded-t-3xl shadow-2xl"
-        style={
-          {
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            maxHeight: 'calc(100vh - 80px)',
-          } as React.CSSProperties
-        }
-      >
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-zinc-200 rounded-full" />
-        </div>
-        <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
-          <div>
-            <h2 className="font-black text-zinc-900 text-base">Изменить грузчиков</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">Текущий рейс продолжится</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold active:bg-zinc-200"
-          >
-            ×
-          </button>
-        </div>
-        <div className="px-4 pt-4 pb-6 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setSelected(n)}
-                className={`py-4 rounded-xl border-2 font-black text-sm uppercase tracking-wide transition-all active:scale-[0.97] ${
-                  selected === n
-                    ? 'bg-orange-600 text-white border-orange-600'
-                    : 'bg-white text-zinc-600 border-zinc-200'
-                }`}
-              >
-                {n === 0 ? 'Без' : n === 1 ? '1 грузчик' : '2 грузчика'}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => onSave(selected)}
-            className="w-full bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 transition-all text-sm uppercase tracking-widest"
-          >
-            Сохранить
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Главная страница рейса ────────────────────────────────────
-
 export default function TripDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -138,7 +52,6 @@ export default function TripDetailPage() {
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [showLoaderChange, setShowLoaderChange] = useState(false);
   const [confirmDeleteTrip, setConfirmDeleteTrip] = useState(false);
   const [deleteTripError, setDeleteTripError] = useState<string | null>(null);
   const deleteTripTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,21 +95,6 @@ export default function TripDetailPage() {
       }),
     onSuccess: () => {
       setConfirmDelete(null);
-      queryClient.invalidateQueries({ queryKey: ['trip', id] });
-    },
-  });
-
-  const changeLoaders = useMutation({
-    mutationFn: (loaders_count: number) =>
-      fetch(`/api/trips/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loaders_count }),
-      }).then((r) => {
-        if (!r.ok) throw new Error('Ошибка изменения грузчиков');
-      }),
-    onSuccess: () => {
-      setShowLoaderChange(false);
       queryClient.invalidateQueries({ queryKey: ['trip', id] });
     },
   });
@@ -268,6 +166,8 @@ export default function TripDetailPage() {
     expenses: (trip.trip_expenses ?? []).reduce((s, e) => s + parseFloat(e.amount), 0),
   };
 
+  const hasLoaders = totals.loaderPay > 0 || totals.loader2Pay > 0;
+
   return (
     <div className="min-h-screen bg-zinc-50 pb-40">
       {/* Шапка */}
@@ -313,24 +213,6 @@ export default function TripDetailPage() {
                 formatDate(trip.started_at)
               )}
             </p>
-            {/* Грузчики с кнопкой изменения */}
-            <div className="flex items-center gap-2 pt-1">
-              <span className="text-sm font-bold text-zinc-600">
-                {trip.loaders_count === 0
-                  ? 'Без грузчиков'
-                  : trip.loaders_count === 1
-                    ? '+ 1 грузчик'
-                    : '+ 2 грузчика'}
-              </span>
-              {isActive && (
-                <button
-                  onClick={() => setShowLoaderChange(true)}
-                  className="text-[10px] font-black text-orange-600 uppercase tracking-wide bg-orange-50 border border-orange-200 rounded-lg px-2 py-0.5 active:bg-orange-100 transition-colors"
-                >
-                  {trip.loaders_count === 0 ? '+ Добавить' : 'Изменить'}
-                </button>
-              )}
-            </div>
           </div>
         </section>
 
@@ -344,13 +226,10 @@ export default function TripDetailPage() {
           />
           <StatCard label="ЗП Водителя" value={<Money amount={totals.driverPay.toString()} />} />
           <StatCard label="Расходы" value={<Money amount={totals.expenses.toString()} />} error />
-          {trip.loaders_count >= 1 && (
-            <StatCard label="ЗП Грузчик 1" value={<Money amount={totals.loaderPay.toString()} />} />
-          )}
-          {trip.loaders_count >= 2 && (
+          {hasLoaders && (
             <StatCard
-              label="ЗП Грузчик 2"
-              value={<Money amount={totals.loader2Pay.toString()} />}
+              label="ЗП Грузчики"
+              value={<Money amount={(totals.loaderPay + totals.loader2Pay).toString()} />}
             />
           )}
         </section>
@@ -415,6 +294,17 @@ export default function TripDetailPage() {
                           <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">
                             ЗП: <Money amount={order.driver_pay} />
                           </p>
+                          {order.loader && (
+                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">
+                              {order.loader.name}: <Money amount={order.loader_pay} />
+                              {order.loader2 && (
+                                <>
+                                  {' '}
+                                  · {order.loader2.name}: <Money amount={order.loader2_pay} />
+                                </>
+                              )}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Money
@@ -525,6 +415,7 @@ export default function TripDetailPage() {
             </div>
           )}
         </section>
+
         {/* Delete Trip */}
         {canEdit && (
           <section className="pt-4 border-t-2 border-zinc-100">
@@ -576,15 +467,6 @@ export default function TripDetailPage() {
             <span>🏁</span> Завершить рейс
           </Link>
         </div>
-      )}
-
-      {/* Loader Change Sheet */}
-      {showLoaderChange && (
-        <LoaderChangeSheet
-          current={trip.loaders_count}
-          onClose={() => setShowLoaderChange(false)}
-          onSave={(count) => changeLoaders.mutate(count)}
-        />
       )}
     </div>
   );
