@@ -168,13 +168,6 @@ function NoteModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-
   const save = async () => {
     setSaving(true);
     setError('');
@@ -195,15 +188,18 @@ function NoteModal({
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+      style={{ background: 'rgba(0,0,0,0.5)', touchAction: 'none' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl shadow-2xl">
-        <div className="flex justify-center pt-3 pb-1">
+      <div
+        className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col"
+        style={{ touchAction: 'none' }}
+      >
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
 
-        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="font-black text-zinc-900 text-base">Наряд #{order.order_number}</h2>
             <p className="text-xs text-zinc-400 mt-0.5">Заметка администратора</p>
@@ -216,7 +212,10 @@ function NoteModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div
+          className="overflow-y-auto flex-1 min-h-0 p-5 space-y-4"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } as React.CSSProperties}
+        >
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -229,7 +228,7 @@ function NoteModal({
               {error}
             </p>
           )}
-          <div className="flex gap-3 pb-4">
+          <div className="flex gap-3 pb-6">
             <button
               onClick={save}
               disabled={saving}
@@ -551,9 +550,14 @@ function OrdersContent() {
   const [editOrder, setEditOrder] = useState<any>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
 
+  const toArray = (d: unknown) => (Array.isArray(d) ? d : []);
+
   const { data: simpleOrders = [], isLoading: simpleLoading } = useQuery<any[]>({
     queryKey: ['admin-orders', filter],
-    queryFn: () => fetch(`/api/admin/service-orders?filter=${filter}`).then((r) => r.json()),
+    queryFn: () =>
+      fetch(`/api/admin/service-orders?filter=${filter}`)
+        .then((r) => r.json())
+        .then(toArray),
     enabled: filter !== 'history',
     staleTime: 15000,
     refetchInterval: 30000,
@@ -562,7 +566,9 @@ function OrdersContent() {
   const { data: historyOrders = [], isLoading: historyLoading } = useQuery<any[]>({
     queryKey: ['admin-orders-history', selectedDate],
     queryFn: () =>
-      fetch(`/api/admin/service-orders?filter=history&date=${selectedDate}`).then((r) => r.json()),
+      fetch(`/api/admin/service-orders?filter=history&date=${selectedDate}`)
+        .then((r) => r.json())
+        .then(toArray),
     enabled: filter === 'history',
     staleTime: 30000,
   });

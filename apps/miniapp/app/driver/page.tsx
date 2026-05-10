@@ -40,13 +40,6 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-
   const { data: assets = [] } = useQuery<
     Array<{ id: string; short_name: string; reg_number: string }>
   >({
@@ -89,10 +82,13 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+      style={{ background: 'rgba(0,0,0,0.5)', touchAction: 'none' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[92dvh] flex flex-col">
+      <div
+        className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col"
+        style={{ touchAction: 'none' }}
+      >
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
@@ -111,7 +107,10 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 min-h-0 p-5 space-y-4 overscroll-contain">
+        <div
+          className="overflow-y-auto flex-1 min-h-0 p-5 space-y-4"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } as React.CSSProperties}
+        >
           {/* Машина */}
           <div>
             <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
