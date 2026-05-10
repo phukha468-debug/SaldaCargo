@@ -15,11 +15,17 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       lifecycle_status: 'returned',
       odometer_end: null,
       ended_at: null,
-      driver_note: null, // опционально: оставить или сбросить
+      driver_note: null,
     })
     .eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Откатываем заказы в draft — не должны учитываться в P&L до повторного апрува
+  await (supabase.from('trip_orders') as any)
+    .update({ lifecycle_status: 'draft' })
+    .eq('trip_id', id)
+    .neq('lifecycle_status', 'cancelled');
 
   return NextResponse.json({ success: true });
 }

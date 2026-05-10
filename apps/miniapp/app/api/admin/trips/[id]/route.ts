@@ -111,6 +111,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Откатываем заказы в draft — не должны учитываться в P&L до повторного апрува
+    await (supabase.from('trip_orders') as any)
+      .update({ lifecycle_status: 'draft' })
+      .eq('trip_id', id)
+      .neq('lifecycle_status', 'cancelled');
+
     return NextResponse.json({ ok: true, action: 'returned' });
   }
 
