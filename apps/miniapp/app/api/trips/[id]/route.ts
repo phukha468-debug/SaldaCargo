@@ -90,7 +90,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const { error } = await (supabase.from('trips') as any)
-    .update({ lifecycle_status: 'cancelled', cancelled_reason: 'Удалён водителем' })
+    .update({ lifecycle_status: 'cancelled' })
     .eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
