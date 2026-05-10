@@ -96,27 +96,34 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+      style={{
+        background: 'rgba(0,0,0,0.5)',
+        // сдвигаем лист вверх на высоту home indicator / toolbar мессенджера
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+      }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="bg-white rounded-t-3xl shadow-2xl flex flex-col"
+        className="bg-white rounded-t-3xl shadow-2xl"
         style={
           {
-            maxHeight: '88vh',
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
+            maxHeight: 'calc(100vh - 80px)',
           } as React.CSSProperties
         }
       >
         {/* Хэндл */}
-        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+        <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
 
         {/* Заголовок */}
-        <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
-          <h2 className="font-black text-zinc-900 text-base">🔧 Заявка на ремонт</h2>
+        <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-black text-zinc-900 text-base">🔧 Заявка на ремонт</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">Администратор направит механика</p>
+          </div>
           <button
             onClick={onClose}
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold active:bg-zinc-200"
@@ -125,11 +132,10 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           </button>
         </div>
 
-        {/* Контент — компактный, умещается без скролла */}
-        <div className="px-4 pt-3 pb-4 space-y-3">
+        <div className="px-4 pt-4 pb-4 space-y-4">
           {/* Машина */}
           <div>
-            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
               Автомобиль
             </label>
             <select
@@ -149,7 +155,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
 
           {/* Приоритет */}
           <div>
-            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
               Срочность
             </label>
             <div className="flex gap-2">
@@ -163,7 +169,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
                   type="button"
                   onClick={() => setPriority(p.value)}
                   className={cn(
-                    'flex-1 py-2 rounded-xl text-xs font-bold border transition-all',
+                    'flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all',
                     priority === p.value
                       ? p.value === 'urgent'
                         ? 'bg-rose-600 text-white border-rose-600'
@@ -179,7 +185,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
 
           {/* Описание */}
           <div>
-            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
               Что случилось?
             </label>
             <textarea
@@ -198,11 +204,11 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           )}
 
           {/* Кнопки */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3">
             <button
               onClick={submit}
               disabled={saving}
-              className="flex-1 bg-zinc-900 text-white font-black py-3.5 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
+              className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
             >
               {saving ? 'Отправка...' : 'Отправить заявку'}
             </button>
