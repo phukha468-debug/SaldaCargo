@@ -14,8 +14,7 @@ const FALLBACK_CATEGORY = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30'; // OTHER_EXPEN
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
-    const adminId = cookieStore.get('salda_user_id')?.value;
-    if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const adminId = cookieStore.get('salda_user_id')?.value ?? null;
 
     const body = (await request.json()) as {
       user_id: string;
