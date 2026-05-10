@@ -17,18 +17,18 @@ export async function GET() {
 
   const supabase = createAdminClient();
 
-  // Активный рейс
+  // Активный рейс (только in_progress и не отменённые)
   const { data: activeTrip } = await (supabase
     .from('trips')
     .select(
       `
       id, trip_number, status, started_at, trip_type,
-      asset:assets(short_name, reg_number),
-      loader:users!trips_loader_id_fkey(name)
+      asset:assets(short_name, reg_number)
     `,
     )
     .eq('driver_id', driverId)
     .eq('status', 'in_progress')
+    .neq('lifecycle_status', 'cancelled')
     .maybeSingle() as any);
 
   // Последние 3 рейса (не активные)
@@ -42,8 +42,7 @@ export async function GET() {
     `,
     )
     .eq('driver_id', driverId)
-    .neq('status', 'in_progress')
-    .neq('lifecycle_status', 'cancelled')
+    .eq('lifecycle_status', 'approved')
     .order('started_at', { ascending: false })
     .limit(3) as any);
 

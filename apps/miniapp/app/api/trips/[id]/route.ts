@@ -17,11 +17,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       driver:users!trips_driver_id_fkey(name),
       trip_orders(
         id, counterparty_id, amount, driver_pay, loader_pay, loader2_pay,
-        loader_id, loader2_id, payment_method,
-        settlement_status, lifecycle_status, description,
-        counterparty:counterparties(name),
-        loader:users!trip_orders_loader_id_fkey(id, name),
-        loader2:users!trip_orders_loader2_id_fkey(id, name)
+        payment_method, settlement_status, lifecycle_status, description,
+        counterparty:counterparties(name)
       ),
       trip_expenses(
         id, amount, payment_method, description,

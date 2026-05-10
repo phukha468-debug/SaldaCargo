@@ -14,15 +14,11 @@ interface TripOrder {
   driver_pay: string;
   loader_pay: string;
   loader2_pay: string;
-  loader_id: string | null;
-  loader2_id: string | null;
   payment_method: string;
   settlement_status: string;
   lifecycle_status: string;
   description: string | null;
   counterparty: { name: string } | null;
-  loader: { id: string; name: string } | null;
-  loader2: { id: string; name: string } | null;
 }
 
 interface TripDetail {
@@ -108,6 +104,7 @@ export default function TripDetailPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
       router.push('/');
     },
     onError: (err: Error) => {
@@ -294,15 +291,15 @@ export default function TripDetailPage() {
                           <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">
                             ЗП: <Money amount={order.driver_pay} />
                           </p>
-                          {order.loader && (
+                          {parseFloat(order.loader_pay ?? '0') > 0 && (
                             <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">
-                              {order.loader.name}: <Money amount={order.loader_pay} />
-                              {order.loader2 && (
-                                <>
-                                  {' '}
-                                  · {order.loader2.name}: <Money amount={order.loader2_pay} />
-                                </>
-                              )}
+                              Грузчики:{' '}
+                              <Money
+                                amount={(
+                                  parseFloat(order.loader_pay ?? '0') +
+                                  parseFloat(order.loader2_pay ?? '0')
+                                ).toString()}
+                              />
                             </p>
                           )}
                         </div>
