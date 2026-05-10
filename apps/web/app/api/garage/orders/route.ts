@@ -38,6 +38,9 @@ export async function GET(request: Request) {
     if (filter === 'history') {
       let q = (supabase.from('service_orders') as any)
         .select(fullSelect)
+        .or(
+          'lifecycle_status.in.(cancelled,returned),and(lifecycle_status.eq.approved,status.eq.completed)',
+        )
         .order('created_at', { ascending: false })
         .limit(100);
 
