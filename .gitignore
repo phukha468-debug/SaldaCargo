@@ -46,4 +46,6 @@ coverage/
 
 # Cache
 .eslintcache
-.cache/
+
+# Claude Code (may contain API keys)
+.claude/
