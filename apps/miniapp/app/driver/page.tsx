@@ -40,6 +40,20 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // position:fixed on body blocks background scroll without breaking inner scroll
+  useEffect(() => {
+    const y = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${y}px`;
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, y);
+    };
+  }, []);
+
   const { data: assets = [] } = useQuery<
     Array<{ id: string; short_name: string; reg_number: string }>
   >({
@@ -82,13 +96,10 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ background: 'rgba(0,0,0,0.5)', touchAction: 'none' }}
+      style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div
-        className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col"
-        style={{ touchAction: 'none' }}
-      >
+      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col">
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
@@ -109,7 +120,12 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
 
         <div
           className="overflow-y-auto flex-1 min-h-0 p-5 space-y-4"
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } as React.CSSProperties}
+          style={
+            {
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+            } as React.CSSProperties
+          }
         >
           {/* Машина */}
           <div>

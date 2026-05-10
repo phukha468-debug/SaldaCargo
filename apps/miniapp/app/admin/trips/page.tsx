@@ -4,7 +4,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatTime } from '@saldacargo/shared';
 
@@ -237,6 +237,19 @@ function EditModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    const y = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${y}px`;
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, y);
+    };
+  }, []);
+
   const update = (id: string, field: string, value: string) => {
     setOrders((prev: any[]) => prev.map((o: any) => (o.id === id ? { ...o, [field]: value } : o)));
   };
@@ -264,13 +277,10 @@ function EditModal({
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ background: 'rgba(0,0,0,0.5)', touchAction: 'none' }}
+      style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div
-        className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col"
-        style={{ touchAction: 'none' }}
-      >
+      <div className="bg-white rounded-t-3xl shadow-2xl max-h-[90svh] flex flex-col">
         {/* Хэндл */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
@@ -295,7 +305,12 @@ function EditModal({
         {/* Список заказов + кнопки */}
         <div
           className="overflow-y-auto flex-1 min-h-0 p-5 space-y-5"
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } as React.CSSProperties}
+          style={
+            {
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+            } as React.CSSProperties
+          }
         >
           {orders.map((order: any, idx: number) => (
             <div key={order.id} className="space-y-3">
