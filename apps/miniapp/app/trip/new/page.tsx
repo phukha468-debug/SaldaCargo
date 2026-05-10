@@ -8,12 +8,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuid } from 'uuid';
 import { Button } from '@saldacargo/ui';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Выберите машину'),
   trip_type: z.enum(['local', 'intercity', 'moving', 'hourly']),
-  loaders_count: z.coerce.number().min(0).max(2),
   odometer_start: z.coerce.number().min(0, 'Введите одометр'),
 });
 
@@ -28,9 +27,8 @@ const TRIP_TYPES = [
 
 export default function NewTripPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [error, setError] = useState('');
-
-  // ─── Загрузка данных через TanStack Query ───────────────────────────────
 
   const { data: assets = [], isLoading: assetsLoading } = useQuery({
     queryKey: ['driver', 'assets'],
@@ -42,8 +40,6 @@ export default function NewTripPage() {
     queryFn: () => fetch('/api/driver/me').then((r) => (r.ok ? r.json() : null)),
   });
 
-  // ─── Форма ─────────────────────────────────────────────────────────────
-
   const {
     register,
     handleSubmit,
@@ -52,16 +48,12 @@ export default function NewTripPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
-    defaultValues: {
-      trip_type: 'local',
-      loaders_count: 0,
-    },
+    defaultValues: { trip_type: 'local' },
   });
 
   const selectedAssetId = watch('asset_id');
   const selectedAsset = assets.find((a: any) => a.id === selectedAssetId);
 
-  // Подставляем машину из localStorage (выбранную на старте)
   useEffect(() => {
     const savedVehicleId = localStorage.getItem('active_vehicle_id');
     if (savedVehicleId && assets.length > 0) {
@@ -71,30 +63,25 @@ export default function NewTripPage() {
     }
   }, [me, assets, setValue, selectedAssetId]);
 
-  // Подставляем текущий одометр при выборе машины
   useEffect(() => {
     if (selectedAsset) {
       setValue('odometer_start', selectedAsset.odometer_current);
     }
   }, [selectedAsset, setValue]);
 
-  // ─── Создание рейса ────────────────────────────────────────────────────
-
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       const res = await fetch('/api/trips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          idempotency_key: uuid(),
-        }),
+        body: JSON.stringify({ ...data, idempotency_key: uuid() }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Ошибка при создании рейса');
       return result;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
       router.push(`/trip/${data.id}`);
     },
     onError: (err: any) => {
@@ -104,9 +91,7 @@ export default function NewTripPage() {
 
   const onSubmit = (data: FormData) => mutation.mutate(data);
 
-  const isLoading = assetsLoading;
-
-  if (isLoading) {
+  if (assetsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
         <div className="text-zinc-400 font-bold uppercase tracking-widest animate-pulse">
@@ -129,7 +114,7 @@ export default function NewTripPage() {
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
-        {/* Машина (только отображение) */}
+        {/* Машина */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
             Машина
@@ -165,28 +150,6 @@ export default function NewTripPage() {
                 />
                 <div className="border-2 border-zinc-200 rounded-lg p-3 text-center cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:text-orange-700 font-bold text-xs uppercase tracking-wide transition-all active:scale-[0.97]">
                   {t.label}
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Грузчики */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Грузчики
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((n) => (
-              <label key={n} className="relative">
-                <input
-                  type="radio"
-                  value={n}
-                  {...register('loaders_count')}
-                  className="sr-only peer"
-                />
-                <div className="border-2 border-zinc-200 rounded-lg p-3 text-center cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:text-orange-700 font-black text-sm uppercase tracking-wide transition-all active:scale-[0.97]">
-                  {n === 0 ? 'Без' : n === 1 ? '1 грузчик' : '2 грузчика'}
                 </div>
               </label>
             ))}

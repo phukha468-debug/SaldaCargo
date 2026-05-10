@@ -179,7 +179,7 @@ export default function TripDetailPage() {
           <span className="text-xl font-black text-zinc-900 uppercase tracking-tight">
             Рейс №{trip.trip_number}
           </span>
-          {canEdit && (
+          {canEdit && !isActive && (
             <Link
               href={`/trip/${id}/edit`}
               className="text-[10px] font-black text-orange-600 uppercase tracking-wide bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 active:bg-orange-100 transition-colors"

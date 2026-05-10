@@ -11,8 +11,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
 
   if (filter === 'history') {
-    // Полная выборка за дату для режима История
-    let query = supabase
+    let query = (supabase as any)
       .from('trips')
       .select(
         `
@@ -20,7 +19,6 @@ export async function GET(request: Request) {
         trip_type, odometer_start, odometer_end, driver_note,
         driver:users!trips_driver_id_fkey(id, name),
         asset:assets(short_name, reg_number),
-        loader:users!trips_loader_id_fkey(id, name),
         trip_orders(
           id, amount, driver_pay, loader_pay,
           payment_method, settlement_status, lifecycle_status,
@@ -32,8 +30,9 @@ export async function GET(request: Request) {
         )
       `,
       )
+      .neq('lifecycle_status', 'cancelled')
       .order('started_at', { ascending: false })
-      .limit(100) as any;
+      .limit(100);
 
     if (date) {
       const start = `${date}T00:00:00Z`;
@@ -46,13 +45,11 @@ export async function GET(request: Request) {
     return NextResponse.json(data ?? []);
   }
 
-  // Полная выборка для review, лёгкая для active
   const reviewSelect = `
     id, trip_number, status, lifecycle_status, started_at, ended_at,
     trip_type, odometer_start, odometer_end, driver_note,
     driver:users!trips_driver_id_fkey(id, name),
     asset:assets(short_name, reg_number),
-    loader:users!trips_loader_id_fkey(id, name),
     trip_orders(
       id, amount, driver_pay, loader_pay,
       payment_method, settlement_status, lifecycle_status,
@@ -72,16 +69,16 @@ export async function GET(request: Request) {
     trip_expenses(amount)
   `;
 
-  let query = supabase
+  let query = (supabase as any)
     .from('trips')
     .select(filter === 'review' ? reviewSelect : activeSelect)
     .order('started_at', { ascending: false })
-    .limit(50) as any;
+    .limit(50);
 
   if (filter === 'review') {
     query = query.eq('status', 'completed').eq('lifecycle_status', 'draft');
   } else if (filter === 'active') {
-    query = query.eq('status', 'in_progress');
+    query = query.eq('status', 'in_progress').neq('lifecycle_status', 'cancelled');
   }
 
   const { data, error } = await query;
