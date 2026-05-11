@@ -39,6 +39,8 @@ type Asset = {
   current_book_value: string | null;
   remaining_depreciation_months: number | null;
   monthly_fixed_cost: string;
+  insurance_expires_at: string | null;
+  inspection_expires_at: string | null;
   needs_update: boolean;
   notes: string | null;
   asset_type: AssetType | null;
@@ -79,6 +81,8 @@ const emptyForm = {
   current_book_value: '',
   remaining_depreciation_months: '',
   monthly_fixed_cost: '',
+  insurance_expires_at: '',
+  inspection_expires_at: '',
   notes: '',
 };
 
@@ -129,6 +133,8 @@ function AssetModal({
           current_book_value: editAsset.current_book_value ?? '',
           remaining_depreciation_months: editAsset.remaining_depreciation_months?.toString() ?? '',
           monthly_fixed_cost: editAsset.monthly_fixed_cost ?? '',
+          insurance_expires_at: editAsset.insurance_expires_at ?? '',
+          inspection_expires_at: editAsset.inspection_expires_at ?? '',
           notes: editAsset.notes ?? '',
         }
       : emptyForm,
@@ -165,6 +171,8 @@ function AssetModal({
       monthly_fixed_cost: form.monthly_fixed_cost
         ? parseFloat(form.monthly_fixed_cost).toFixed(2)
         : '0.00',
+      insurance_expires_at: form.insurance_expires_at || null,
+      inspection_expires_at: form.inspection_expires_at || null,
       notes: form.notes || null,
       needs_update: false,
     };
@@ -331,6 +339,36 @@ function AssetModal({
             </p>
           </div>
 
+          <div className="border border-amber-200 bg-amber-50 rounded-xl p-3 space-y-3">
+            <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+              Документы — вносить ежегодно
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">
+                  Страховка до
+                </label>
+                <input
+                  className={inputCls}
+                  type="date"
+                  value={form.insurance_expires_at}
+                  onChange={f('insurance_expires_at')}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">
+                  Техосмотр до
+                </label>
+                <input
+                  className={inputCls}
+                  type="date"
+                  value={form.inspection_expires_at}
+                  onChange={f('inspection_expires_at')}
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Примечание</label>
             <textarea
@@ -362,6 +400,45 @@ function AssetModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Doc status helpers ───────────────────────────────────────────────────────
+
+function docStatus(expiresAt: string | null): 'missing' | 'overdue' | 'warning' | 'ok' {
+  if (!expiresAt) return 'missing';
+  const today = new Date().toISOString().slice(0, 10);
+  if (expiresAt < today) return 'overdue';
+  const warn = new Date();
+  warn.setDate(warn.getDate() + 30);
+  if (expiresAt <= warn.toISOString().slice(0, 10)) return 'warning';
+  return 'ok';
+}
+
+const DOC_STYLE: Record<string, string> = {
+  missing: 'bg-rose-100 text-rose-700 border-rose-200',
+  overdue: 'bg-rose-100 text-rose-700 border-rose-200',
+  warning: 'bg-amber-100 text-amber-700 border-amber-200',
+  ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
+
+function DocBadge({ label, expiresAt }: { label: string; expiresAt: string | null }) {
+  const status = docStatus(expiresAt);
+  const text =
+    status === 'missing'
+      ? 'нет данных'
+      : status === 'overdue'
+        ? `просрочена ${expiresAt}`
+        : expiresAt!;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0',
+        DOC_STYLE[status],
+      )}
+    >
+      {label}: {text}
+    </span>
   );
 }
 
@@ -538,6 +615,12 @@ function AssetTile({
             {asset.notes && (
               <span className="text-xs text-slate-400 italic w-full">{asset.notes}</span>
             )}
+          </div>
+
+          {/* Documents */}
+          <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/30 flex flex-wrap gap-1.5">
+            <DocBadge label="Страховка" expiresAt={asset.insurance_expires_at} />
+            <DocBadge label="Техосмотр" expiresAt={asset.inspection_expires_at} />
           </div>
 
           {/* Analytics */}

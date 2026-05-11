@@ -52,7 +52,7 @@ export async function GET(request: Request) {
           `
           id, short_name, reg_number, year, status, odometer_current,
           current_book_value, remaining_depreciation_months,
-          monthly_fixed_cost,
+          monthly_fixed_cost, insurance_expires_at, inspection_expires_at,
           needs_update, notes,
           asset_type:asset_types(id, code, name, capacity_m, has_gps),
           driver:users!assets_assigned_driver_id_fkey(id, name)

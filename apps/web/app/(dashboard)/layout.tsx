@@ -39,14 +39,24 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const activePeriod = (searchParams.get('period') as Period) ?? 'current_month';
 
-  const { data: loanAlerts } = useQuery<{ count: number; items: { overdue: boolean }[] }>({
-    queryKey: ['loan-alerts'],
-    queryFn: () => fetch('/api/loans/alerts').then((r) => r.json()),
+  type AlertsData = {
+    fleet: { overdue: boolean }[];
+    receivables: { id: string }[];
+    loans: { overdue: boolean }[];
+    total: number;
+  };
+  const { data: alerts } = useQuery<AlertsData>({
+    queryKey: ['alerts'],
+    queryFn: () => fetch('/api/alerts').then((r) => r.json()),
     staleTime: 60000,
     refetchInterval: 5 * 60 * 1000,
   });
-  const alertCount = loanAlerts?.count ?? 0;
-  const hasOverdue = loanAlerts?.items.some((i) => i.overdue) ?? false;
+
+  const fleetAlertCount = alerts?.fleet.length ?? 0;
+  const fleetHasOverdue = alerts?.fleet.some((i) => i.overdue) ?? false;
+  const financeAlertCount = (alerts?.receivables.length ?? 0) + (alerts?.loans.length ?? 0);
+  const financeHasOverdue =
+    (alerts?.loans.some((i) => i.overdue) ?? false) || (alerts?.receivables.length ?? 0) > 0;
 
   const setPeriod = (p: Period) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -67,7 +77,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     ? FINANCE_PATHS.some((p) => pathname === p || pathname.startsWith(p))
                     : pathname === item.href ||
                       (item.href !== '/' && pathname.startsWith(item.href));
-                const showAlert = item.href === '/finance' && alertCount > 0;
+                const isFleet = item.href === '/fleet';
+                const isFinance = item.href === '/finance';
+                const badgeCount = isFleet ? fleetAlertCount : isFinance ? financeAlertCount : 0;
+                const badgeOverdue = isFleet
+                  ? fleetHasOverdue
+                  : isFinance
+                    ? financeHasOverdue
+                    : false;
                 return (
                   <Link
                     key={item.href}
@@ -80,14 +97,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     )}
                   >
                     {item.label}
-                    {showAlert && (
+                    {badgeCount > 0 && (
                       <span
                         className={cn(
                           'text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none',
-                          hasOverdue ? 'bg-rose-500 text-white' : 'bg-amber-400 text-white',
+                          badgeOverdue ? 'bg-rose-500 text-white' : 'bg-amber-400 text-white',
                         )}
                       >
-                        {alertCount}
+                        {badgeCount}
                       </span>
                     )}
                   </Link>
