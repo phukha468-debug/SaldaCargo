@@ -48,6 +48,8 @@ export type Database = {
           created_at: string | null;
           current_book_value: number;
           id: string;
+          inspection_expires_at: string | null;
+          insurance_expires_at: string | null;
           legal_entity_id: string | null;
           monthly_fixed_cost: number;
           needs_update: boolean | null;
@@ -69,6 +71,8 @@ export type Database = {
           created_at?: string | null;
           current_book_value?: number;
           id?: string;
+          inspection_expires_at?: string | null;
+          insurance_expires_at?: string | null;
           legal_entity_id?: string | null;
           monthly_fixed_cost?: number;
           needs_update?: boolean | null;
@@ -90,6 +94,8 @@ export type Database = {
           created_at?: string | null;
           current_book_value?: number;
           id?: string;
+          inspection_expires_at?: string | null;
+          insurance_expires_at?: string | null;
           legal_entity_id?: string | null;
           monthly_fixed_cost?: number;
           needs_update?: boolean | null;
@@ -220,6 +226,7 @@ export type Database = {
           is_active: boolean | null;
           name: string;
           notes: string | null;
+          payable_amount: number;
           phone: string | null;
           type: Database['public']['Enums']['counterparty_type'];
           updated_at: string | null;
@@ -231,6 +238,7 @@ export type Database = {
           is_active?: boolean | null;
           name: string;
           notes?: string | null;
+          payable_amount?: number;
           phone?: string | null;
           type?: Database['public']['Enums']['counterparty_type'];
           updated_at?: string | null;
@@ -242,6 +250,7 @@ export type Database = {
           is_active?: boolean | null;
           name?: string;
           notes?: string | null;
+          payable_amount?: number;
           phone?: string | null;
           type?: Database['public']['Enums']['counterparty_type'];
           updated_at?: string | null;
@@ -1264,7 +1273,9 @@ export type Database = {
           id: string;
           idempotency_key: string;
           lifecycle_status: Database['public']['Enums']['lifecycle_status'];
+          loader_id: string | null;
           loader_pay: number;
+          loader2_id: string | null;
           loader2_pay: number;
           payment_method: Database['public']['Enums']['payment_method'];
           settlement_status: Database['public']['Enums']['settlement_status'];
@@ -1281,7 +1292,9 @@ export type Database = {
           id?: string;
           idempotency_key: string;
           lifecycle_status?: Database['public']['Enums']['lifecycle_status'];
+          loader_id?: string | null;
           loader_pay?: number;
+          loader2_id?: string | null;
           loader2_pay?: number;
           payment_method: Database['public']['Enums']['payment_method'];
           settlement_status?: Database['public']['Enums']['settlement_status'];
@@ -1298,7 +1311,9 @@ export type Database = {
           id?: string;
           idempotency_key?: string;
           lifecycle_status?: Database['public']['Enums']['lifecycle_status'];
+          loader_id?: string | null;
           loader_pay?: number;
+          loader2_id?: string | null;
           loader2_pay?: number;
           payment_method?: Database['public']['Enums']['payment_method'];
           settlement_status?: Database['public']['Enums']['settlement_status'];
@@ -1311,6 +1326,20 @@ export type Database = {
             columns: ['counterparty_id'];
             isOneToOne: false;
             referencedRelation: 'counterparties';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'trip_orders_loader_id_fkey';
+            columns: ['loader_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'trip_orders_loader2_id_fkey';
+            columns: ['loader2_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
             referencedColumns: ['id'];
           },
           {
