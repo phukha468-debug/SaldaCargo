@@ -72,6 +72,206 @@ function PaymentPills({ breakdown }: { breakdown: Record<string, number> }) {
   );
 }
 
+function ClientRow({
+  client: c,
+  onEdit,
+  onToggleActive,
+  onDelete,
+}: {
+  client: Client;
+  onEdit: () => void;
+  onToggleActive: () => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const debt = parseFloat(c.outstanding_debt);
+  const limit = parseFloat(c.credit_limit ?? '0');
+  const limitPct = limit > 0 ? Math.min((debt / limit) * 100, 100) : 0;
+  const hasRevenue = parseFloat(c.total_revenue) > 0;
+  const days = daysAgo(c.last_trip_at);
+  const isOverLimit = limit > 0 && limitPct >= 80;
+
+  const avatarColor =
+    days !== null && days <= 7
+      ? 'bg-emerald-100 text-emerald-700'
+      : days !== null && days <= 30
+        ? 'bg-orange-100 text-orange-700'
+        : 'bg-slate-100 text-slate-500';
+
+  return (
+    <div className={!c.is_active ? 'opacity-50' : ''}>
+      {/* Компактная строка */}
+      <div
+        className="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {/* Аватар */}
+        <div
+          className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${avatarColor}`}
+        >
+          {c.name.charAt(0).toUpperCase()}
+        </div>
+
+        {/* Имя */}
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-slate-900 text-sm truncate">{c.name}</p>
+          {c.phone && <p className="text-[10px] text-slate-400 truncate">{c.phone}</p>}
+        </div>
+
+        {/* Правая часть: долг / активность */}
+        <div className="shrink-0 flex items-center gap-3 text-right">
+          {debt > 0 && (
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Долг</p>
+              <p
+                className={`text-sm font-black ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}
+              >
+                <Money amount={c.outstanding_debt} />
+              </p>
+            </div>
+          )}
+          {parseFloat(c.revenue_30d) > 0 && (
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                30 дн.
+              </p>
+              <p className="text-sm font-black text-emerald-600">
+                <Money amount={c.revenue_30d} />
+              </p>
+            </div>
+          )}
+          <LastTripBadge date={c.last_trip_at} />
+          <span
+            className="material-symbols-outlined text-slate-300 text-[20px] shrink-0 transition-transform duration-300"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          >
+            expand_more
+          </span>
+        </div>
+      </div>
+
+      {/* Раскрытая панель */}
+      {expanded && (
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4">
+          {/* Три метрики */}
+          <div className="grid grid-cols-3 gap-0 border border-slate-100 rounded-lg overflow-hidden bg-white">
+            <div className="px-3 py-2.5 text-center">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                Выручка
+              </p>
+              {hasRevenue ? (
+                <Money
+                  amount={c.total_revenue}
+                  className="text-sm font-black text-slate-900 leading-tight"
+                />
+              ) : (
+                <p className="text-sm font-black text-slate-300">—</p>
+              )}
+            </div>
+            <div className="px-3 py-2.5 text-center border-x border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                Рейсов
+              </p>
+              <p className="text-sm font-black text-slate-900 leading-tight">
+                {c.trips_count || '—'}
+              </p>
+            </div>
+            <div className="px-3 py-2.5 text-center">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                Средний
+              </p>
+              {parseFloat(c.avg_order) > 0 ? (
+                <Money
+                  amount={c.avg_order}
+                  className="text-sm font-black text-slate-900 leading-tight"
+                />
+              ) : (
+                <p className="text-sm font-black text-slate-300">—</p>
+              )}
+            </div>
+          </div>
+
+          {/* Долг + кредитный лимит */}
+          {debt > 0 && (
+            <div
+              className={`rounded-lg px-3 py-2 space-y-1.5 ${isOverLimit ? 'bg-rose-50 border border-rose-200' : 'bg-amber-50 border border-amber-200'}`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-xs font-bold ${isOverLimit ? 'text-rose-700' : 'text-amber-700'}`}
+                >
+                  ⚠ Долг
+                </span>
+                <Money
+                  amount={c.outstanding_debt}
+                  className={`text-sm font-black ${isOverLimit ? 'text-rose-700' : 'text-amber-700'}`}
+                />
+              </div>
+              {limit > 0 && (
+                <div>
+                  <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+                    <span>Лимит</span>
+                    <span>
+                      <Money amount={c.outstanding_debt} /> / <Money amount={c.credit_limit!} />
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-white/70 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${limitPct >= 80 ? 'bg-rose-400' : 'bg-amber-400'}`}
+                      style={{ width: `${limitPct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Способы оплаты */}
+          {Object.keys(c.payment_breakdown).length > 0 && (
+            <PaymentPills breakdown={c.payment_breakdown} />
+          )}
+
+          {/* Примечание */}
+          {c.notes && <p className="text-xs text-slate-400 italic leading-tight">{c.notes}</p>}
+
+          {/* Кнопки действий */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="text-xs text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
+            >
+              ✎ Редактировать
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleActive();
+              }}
+              className="text-xs text-slate-400 hover:text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
+            >
+              {c.is_active ? '⊗ В архив' : '↺ Восстановить'}
+            </button>
+            {c.orders_count === 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-xs text-rose-400 hover:text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100 hover:border-rose-300 transition-colors"
+              >
+                🗑 Удалить
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ClientsPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'active' | 'debt'>('all');
@@ -116,6 +316,17 @@ export default function ClientsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !client.is_active }),
     }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
+  };
+
+  const deleteClient = async (client: Client) => {
+    if (!confirm(`Удалить «${client.name}»? Это действие необратимо.`)) return;
+    const res = await fetch(`/api/counterparties/${client.id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json.error ?? 'Ошибка удаления');
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ['clients'] });
   };
 
   const openCreate = () => {
@@ -340,165 +551,18 @@ export default function ClientsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {visible.map((c) => {
-            const debt = parseFloat(c.outstanding_debt);
-            const limit = parseFloat(c.credit_limit ?? '0');
-            const limitPct = limit > 0 ? Math.min((debt / limit) * 100, 100) : 0;
-            const hasRevenue = parseFloat(c.total_revenue) > 0;
-            const days = daysAgo(c.last_trip_at);
-
-            return (
-              <div
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {visible.map((c) => (
+              <ClientRow
                 key={c.id}
-                className={`bg-white border rounded-xl p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow ${
-                  !c.is_active ? 'opacity-50 border-slate-100' : 'border-slate-200'
-                }`}
-              >
-                {/* Шапка карточки */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 ${
-                        days !== null && days <= 7
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : days !== null && days <= 30
-                            ? 'bg-orange-100 text-orange-700'
-                            : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {c.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-900 text-sm leading-tight truncate">
-                        {c.name}
-                      </p>
-                      {c.phone && <p className="text-xs text-slate-500 mt-0.5">{c.phone}</p>}
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <button
-                      onClick={() => openEdit(c)}
-                      className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded border border-slate-200 hover:border-slate-300 transition-colors"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      onClick={() => toggleActive(c)}
-                      className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded border border-slate-200 hover:border-slate-300 transition-colors"
-                      title={c.is_active ? 'В архив' : 'Восстановить'}
-                    >
-                      {c.is_active ? '⊗' : '↺'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Примечание */}
-                {c.notes && (
-                  <p className="text-xs text-slate-400 italic leading-tight">{c.notes}</p>
-                )}
-
-                {/* Три метрики */}
-                <div className="grid grid-cols-3 gap-0 border border-slate-100 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2.5 text-center">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                      Выручка
-                    </p>
-                    {hasRevenue ? (
-                      <Money
-                        amount={c.total_revenue}
-                        className="text-sm font-black text-slate-900 leading-tight"
-                      />
-                    ) : (
-                      <p className="text-sm font-black text-slate-300">—</p>
-                    )}
-                  </div>
-                  <div className="px-3 py-2.5 text-center border-x border-slate-100">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                      Рейсов
-                    </p>
-                    <p className="text-sm font-black text-slate-900 leading-tight">
-                      {c.trips_count || '—'}
-                    </p>
-                  </div>
-                  <div className="px-3 py-2.5 text-center">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                      Средний
-                    </p>
-                    {parseFloat(c.avg_order) > 0 ? (
-                      <Money
-                        amount={c.avg_order}
-                        className="text-sm font-black text-slate-900 leading-tight"
-                      />
-                    ) : (
-                      <p className="text-sm font-black text-slate-300">—</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Активность + динамика */}
-                <div className="flex items-center justify-between">
-                  <LastTripBadge date={c.last_trip_at} />
-                  {parseFloat(c.revenue_30d) > 0 && (
-                    <span className="text-[10px] font-bold text-emerald-600">
-                      +<Money amount={c.revenue_30d} /> за 30 дн.
-                    </span>
-                  )}
-                </div>
-
-                {/* Долг + кредитный лимит */}
-                {debt > 0 && (
-                  <div
-                    className={`rounded-lg px-3 py-2 space-y-1.5 ${
-                      limit > 0 && limitPct >= 80
-                        ? 'bg-rose-50 border border-rose-200'
-                        : 'bg-amber-50 border border-amber-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-xs font-bold ${
-                          limit > 0 && limitPct >= 80 ? 'text-rose-700' : 'text-amber-700'
-                        }`}
-                      >
-                        ⚠ Долг
-                      </span>
-                      <Money
-                        amount={c.outstanding_debt}
-                        className={`text-sm font-black ${
-                          limit > 0 && limitPct >= 80 ? 'text-rose-700' : 'text-amber-700'
-                        }`}
-                      />
-                    </div>
-                    {limit > 0 && (
-                      <div>
-                        <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                          <span>Лимит</span>
-                          <span>
-                            <Money amount={c.outstanding_debt} /> /{' '}
-                            <Money amount={c.credit_limit!} />
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-white/70 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              limitPct >= 80 ? 'bg-rose-400' : 'bg-amber-400'
-                            }`}
-                            style={{ width: `${limitPct}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Способы оплаты */}
-                {Object.keys(c.payment_breakdown).length > 0 && (
-                  <PaymentPills breakdown={c.payment_breakdown} />
-                )}
-              </div>
-            );
-          })}
+                client={c}
+                onEdit={() => openEdit(c)}
+                onToggleActive={() => toggleActive(c)}
+                onDelete={() => deleteClient(c)}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

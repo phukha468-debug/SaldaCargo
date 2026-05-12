@@ -9,7 +9,7 @@ export async function GET() {
     const { data: orders, error } = await (supabase as any)
       .from('trip_orders')
       .select(
-        `id, amount, payment_method, created_at,
+        `id, amount, payment_method, created_at, description,
          counterparty:counterparties(id, name, phone),
          trip:trips!inner(trip_number, started_at, lifecycle_status, driver:users!trips_driver_id_fkey(name))`,
       )
@@ -19,32 +19,40 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Group by counterparty
     const grouped = new Map<string, any>();
 
     for (const order of orders ?? []) {
-      const cpId = order.counterparty?.id ?? '__unknown__';
-      const cpName = order.counterparty?.name ?? 'Без контрагента';
+      const hasDescription = !!order.description?.trim();
+      // Заказы с описанием выносятся в отдельную строку (разовые физ лица)
+      const groupKey = hasDescription
+        ? `__individual__${order.id}`
+        : (order.counterparty?.id ?? '__unknown__');
+      const displayName = hasDescription
+        ? order.description.trim()
+        : (order.counterparty?.name ?? 'Без контрагента');
       const cpPhone = order.counterparty?.phone ?? null;
 
-      if (!grouped.has(cpId)) {
-        grouped.set(cpId, {
-          counterparty_id: cpId,
-          counterparty_name: cpName,
-          counterparty_phone: cpPhone,
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, {
+          counterparty_id: groupKey,
+          counterparty_name: displayName,
+          counterparty_phone: hasDescription ? null : cpPhone,
+          counterparty_subname: hasDescription ? (order.counterparty?.name ?? null) : null,
+          is_individual: hasDescription,
           total: 0,
           orders: [],
           oldest_at: order.created_at,
         });
       }
 
-      const g = grouped.get(cpId)!;
+      const g = grouped.get(groupKey)!;
       g.total += parseFloat(order.amount ?? '0');
       if (order.created_at < g.oldest_at) g.oldest_at = order.created_at;
       g.orders.push({
         id: order.id,
         amount: order.amount,
         payment_method: order.payment_method,
+        description: order.description ?? null,
         created_at: order.created_at,
         trip_number: order.trip?.trip_number,
         started_at: order.trip?.started_at,

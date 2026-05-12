@@ -945,6 +945,7 @@ type ReceivableOrder = {
   id: string;
   amount: string;
   payment_method: string;
+  description: string | null;
   created_at: string;
   trip_number: number | null;
   started_at: string | null;
@@ -954,6 +955,8 @@ type ReceivableOrder = {
 type Debtor = {
   counterparty_id: string;
   counterparty_name: string;
+  counterparty_subname: string | null;
+  is_individual: boolean;
   total: string;
   oldest_at: string;
   orders: ReceivableOrder[];
@@ -1061,7 +1064,14 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                       : 'border-zinc-200 text-zinc-700'
                   }`}
                 >
-                  <span>{d.counterparty_name}</span>
+                  <div className="text-left">
+                    <p>{d.counterparty_name}</p>
+                    {d.is_individual && d.counterparty_subname && (
+                      <p className="text-[9px] text-zinc-400 font-bold uppercase mt-0.5">
+                        {d.counterparty_subname}
+                      </p>
+                    )}
+                  </div>
                   <div className="text-right">
                     <p className="font-black text-xs text-orange-600">
                       {parseFloat(d.total).toLocaleString('ru-RU')} ₽

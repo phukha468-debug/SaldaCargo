@@ -9,6 +9,7 @@ type Order = {
   id: string;
   amount: string;
   payment_method: string;
+  description: string | null;
   created_at: string;
   trip_number: number;
   started_at: string;
@@ -19,6 +20,8 @@ type Debtor = {
   counterparty_id: string;
   counterparty_name: string;
   counterparty_phone: string | null;
+  counterparty_subname: string | null;
+  is_individual: boolean;
   total: string;
   oldest_at: string;
   orders: Order[];
@@ -169,9 +172,16 @@ export default function ReceivablesPage() {
                         {debtor.counterparty_name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-900">
-                          {debtor.counterparty_name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-slate-900">
+                            {debtor.counterparty_name}
+                          </p>
+                          {debtor.is_individual && debtor.counterparty_subname && (
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {debtor.counterparty_subname}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400 mt-0.5">
                           {debtor.orders.length} {debtor.orders.length === 1 ? 'заказ' : 'заказа'} ·{' '}
                           {isOverdue ? (
