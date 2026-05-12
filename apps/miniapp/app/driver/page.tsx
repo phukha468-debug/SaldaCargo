@@ -231,6 +231,8 @@ export default function RootPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showRepairForm, setShowRepairForm] = useState(false);
+  const [startingTrip, setStartingTrip] = useState(false);
+  const [startTripError, setStartTripError] = useState('');
 
   // 1. Проверяем профиль и роли
   const { data: user, isLoading: isUserLoading } = useQuery({
@@ -287,6 +289,43 @@ export default function RootPage() {
     );
   }
 
+  async function handleStartTrip() {
+    if (startingTrip) return;
+    setStartingTrip(true);
+    setStartTripError('');
+    try {
+      type AssetRow = { id: string; odometer_current: number | null };
+      const assets: AssetRow[] = await fetch('/api/driver/assets').then((r) => r.json());
+      const asset = assets.find((a) => a.id === user?.current_asset_id);
+      if (!asset) {
+        setStartTripError('Машина не выбрана — укажи её в профиле.');
+        setStartingTrip(false);
+        return;
+      }
+      const res = await fetch('/api/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_id: asset.id,
+          odometer_start: asset.odometer_current ?? 0,
+          trip_type: 'local',
+          idempotency_key: crypto.randomUUID(),
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setStartTripError(result.error ?? 'Ошибка создания рейса');
+        setStartingTrip(false);
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+      router.push(`/trip/${result.id}`);
+    } catch {
+      setStartTripError('Ошибка сети');
+      setStartingTrip(false);
+    }
+  }
+
   if (!user) return null;
 
   return (
@@ -305,13 +344,14 @@ export default function RootPage() {
       {/* Кнопки действий */}
       <div className="flex gap-3">
         {!data?.activeTrip && (
-          <Link
-            href="/trip/new"
-            className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide"
+          <button
+            onClick={handleStartTrip}
+            disabled={startingTrip}
+            className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
           >
             <span>🚚</span>
-            <span>Начать рейс</span>
-          </Link>
+            <span>{startingTrip ? 'Создаём рейс...' : 'Начать рейс'}</span>
+          </button>
         )}
         <button
           onClick={() => setShowRepairForm(true)}
@@ -324,6 +364,11 @@ export default function RootPage() {
           {data?.activeTrip && <span>Починить</span>}
         </button>
       </div>
+      {startTripError && (
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm font-bold">
+          {startTripError}
+        </div>
+      )}
 
       {showRepairForm && (
         <RepairForm
