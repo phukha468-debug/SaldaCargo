@@ -10,6 +10,7 @@ export async function GET() {
       .from('users')
       .select('id, name')
       .filter('roles', 'cs', '{"loader"}')
+      .eq('is_active', true)
       .order('name');
 
     if (error) {

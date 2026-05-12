@@ -439,6 +439,14 @@ function TripCard({
             <span className="text-sm text-slate-700 font-semibold truncate max-w-[90px]">
               {trip.driver.name.split(' ')[0]}
             </span>
+            {trip.loader && (
+              <>
+                <span className="text-slate-300 text-xs">+</span>
+                <span className="text-sm text-blue-600 font-semibold truncate max-w-[80px]">
+                  {trip.loader.name.split(' ')[0]}
+                </span>
+              </>
+            )}
             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold shrink-0">
               #{trip.trip_number}
             </span>
@@ -599,7 +607,7 @@ function TripCard({
           </div>
 
           {/* Summary bar */}
-          <div className="px-5 py-4 grid grid-cols-5 gap-3 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+          <div className="px-5 py-4 grid grid-cols-6 gap-3 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white">
             {[
               {
                 label: 'Выручка',
@@ -607,13 +615,29 @@ function TripCard({
                 cls: 'text-slate-800 text-base font-black',
               },
               {
-                label: 'ЗП итого',
+                label: `ЗП ${trip.driver.name.split(' ')[0]}`,
                 value: (
                   <>
-                    −<Money amount={(driverPay + loaderPay).toFixed(2)} />
+                    −<Money amount={driverPay.toFixed(2)} />
                   </>
                 ),
-                cls: 'text-rose-600 text-base font-bold',
+                cls: 'text-emerald-700 text-base font-bold',
+              },
+              {
+                label:
+                  loaderPay > 0 ? `ЗП ${trip.loader?.name?.split(' ')[0] ?? 'Груз.'}` : 'ЗП груз.',
+                value:
+                  loaderPay > 0 ? (
+                    <>
+                      −<Money amount={loaderPay.toFixed(2)} />
+                    </>
+                  ) : (
+                    '—'
+                  ),
+                cls:
+                  loaderPay > 0
+                    ? 'text-blue-600 text-base font-bold'
+                    : 'text-slate-300 text-base font-bold',
               },
               {
                 label: 'Расходы',

@@ -104,7 +104,9 @@ export default function AdminTripDetailPage() {
             <span className="text-zinc-400 font-bold">{trip.asset?.reg_number}</span>
           </p>
           <p className="text-sm font-bold text-zinc-500">
-            {trip.driver?.name} · {formatDate(trip.started_at)}
+            {trip.driver?.name}
+            {trip.loader && <span className="text-blue-500"> + {trip.loader.name}</span>} ·{' '}
+            {formatDate(trip.started_at)}
             {trip.ended_at && ` → ${formatDate(trip.ended_at)}`}
           </p>
           {mileage && <p className="text-sm font-bold text-zinc-500">Пробег: {mileage} км</p>}
@@ -119,21 +121,21 @@ export default function AdminTripDetailPage() {
         </section>
 
         {/* Итоги */}
-        <section className={`grid gap-3 ${trip.loader ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        <section className={`grid gap-3 ${loaderPay > 0 ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Выручка</p>
             <Money amount={revenue.toString()} className="text-base font-black text-orange-600" />
           </div>
           <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-              ЗП Водитель
+              ЗП {trip.driver?.name?.split(' ')[0]}
             </p>
             <Money amount={driverPay.toString()} className="text-base font-black text-green-600" />
           </div>
-          {trip.loader && (
+          {loaderPay > 0 && (
             <div className="bg-white rounded-2xl border-2 border-zinc-100 p-3 text-center shadow-sm">
               <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                ЗП Грузчик
+                ЗП {trip.loader?.name?.split(' ')[0] ?? 'Грузчик'}
               </p>
               <Money amount={loaderPay.toString()} className="text-base font-black text-blue-500" />
             </div>
@@ -162,8 +164,14 @@ export default function AdminTripDetailPage() {
                   {order.counterparty?.name ?? order.description ?? 'Без названия'}
                 </p>
                 <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
-                  {PAYMENT_LABELS[order.payment_method] ?? order.payment_method} · ЗП:{' '}
+                  {PAYMENT_LABELS[order.payment_method] ?? order.payment_method} · Вод:{' '}
                   <Money amount={order.driver_pay} />
+                  {parseFloat(order.loader_pay ?? '0') > 0 && (
+                    <>
+                      {' '}
+                      · Груз: <Money amount={order.loader_pay} />
+                    </>
+                  )}
                 </p>
               </div>
               <Money amount={order.amount} className="font-black text-zinc-900" />
