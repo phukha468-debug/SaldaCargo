@@ -962,7 +962,6 @@ type Debtor = {
 function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [selectedDebtorId, setSelectedDebtorId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<ReceivableOrder | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -992,7 +991,6 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: selectedOrder.id,
-          payment_method: paymentMethod,
           note: note || undefined,
         }),
       });
@@ -1013,11 +1011,12 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
   const debtors = data?.debtors ?? [];
   const selectedDebtor = debtors.find((d) => d.counterparty_id === selectedDebtorId) ?? null;
 
-  const DEBT_PAYMENT_METHODS = [
-    { value: 'cash', label: '💵 Нал' },
-    { value: 'bank_transfer', label: '🏦 Безнал' },
-    { value: 'card', label: '💳 Карта' },
-  ];
+  const PAYMENT_METHOD_LABELS: Record<string, string> = {
+    qr: '📱 QR / Р/С',
+    card_driver: '💳 На карту',
+    debt_cash: '⏳ Долг нал',
+    cash: '💵 Нал',
+  };
 
   return (
     <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
@@ -1098,6 +1097,9 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                                 </p>
                               )}
                               <p className="text-[10px] text-zinc-400 uppercase">
+                                {PAYMENT_METHOD_LABELS[order.payment_method] ??
+                                  order.payment_method}
+                                {' · '}
                                 {formatDate(order.created_at)}
                                 {order.driver_name ? ` · ${order.driver_name}` : ''}
                               </p>
@@ -1109,26 +1111,10 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
 
                           {isOrderSelected && (
                             <div className="mt-2 ml-2 p-3 bg-orange-50 rounded-lg border border-orange-200 space-y-3">
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                                  Способ оплаты
-                                </label>
-                                <div className="flex gap-2">
-                                  {DEBT_PAYMENT_METHODS.map((m) => (
-                                    <button
-                                      key={m.value}
-                                      type="button"
-                                      onClick={() => setPaymentMethod(m.value)}
-                                      className={`flex-1 py-2.5 rounded-lg border-2 text-xs font-black transition-all active:scale-[0.97] ${
-                                        paymentMethod === m.value
-                                          ? 'border-orange-500 bg-orange-100 text-orange-700'
-                                          : 'border-zinc-200 bg-white text-zinc-500'
-                                      }`}
-                                    >
-                                      {m.label}
-                                    </button>
-                                  ))}
-                                </div>
+                              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                                {order.payment_method === 'qr' && '→ 🏦 Расчётный счёт'}
+                                {order.payment_method === 'card_driver' && '→ 💳 Карта'}
+                                {order.payment_method === 'debt_cash' && '→ 💵 Сейф (Наличные)'}
                               </div>
                               <input
                                 type="text"

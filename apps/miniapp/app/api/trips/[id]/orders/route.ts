@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const supabase = createAdminClient();
 
   // Определяем settlement_status по способу оплаты
-  const pendingMethods = ['debt_cash'];
+  const pendingMethods = ['debt_cash', 'qr', 'card_driver'];
   const settlementStatus = pendingMethods.includes(body.payment_method) ? 'pending' : 'completed';
 
   const { data, error } = await ((supabase.from('trip_orders') as any)

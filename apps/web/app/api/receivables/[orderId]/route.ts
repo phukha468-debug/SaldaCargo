@@ -4,6 +4,15 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
+const BANK_ID = '10000000-0000-0000-0000-000000000001';
+const CASH_ID = '10000000-0000-0000-0000-000000000002';
+const CARD_ID = '10000000-0000-0000-0000-000000000003';
+
+function walletForPaymentMethod(pm: string): string {
+  if (pm === 'qr') return BANK_ID;
+  if (pm === 'card_driver') return CARD_ID;
+  return CASH_ID;
+}
 
 /** PATCH /api/receivables/[orderId] — отметить заказ как оплаченный + создать доходную транзакцию */
 export async function PATCH(_req: Request, { params }: { params: Promise<{ orderId: string }> }) {
@@ -13,7 +22,7 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ order
 
   const supabase = createAdminClient();
 
-  // Получаем заказ для суммы и контрагента
+  // Получаем заказ — включая payment_method для маршрутизации в кошелёк
   const { data: order, error: orderErr } = await (supabase
     .from('trip_orders')
     .select(
@@ -36,14 +45,17 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ order
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
-  // Создаём доходную транзакцию (как в miniapp)
+  // Создаём доходную транзакцию с маршрутизацией в нужный кошелёк
   const cpName = order.counterparty?.name ?? 'Должник';
+  const toWalletId = walletForPaymentMethod(order.payment_method);
+
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
     amount: order.amount,
     counterparty_id: order.counterparty_id ?? null,
-    description: `Погашение долга: ${cpName}`,
+    to_wallet_id: toWalletId,
+    description: `Погашение: ${cpName}`,
     lifecycle_status: 'approved',
     settlement_status: 'completed',
     created_by: adminId,
