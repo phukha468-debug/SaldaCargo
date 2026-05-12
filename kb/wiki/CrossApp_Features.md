@@ -2,7 +2,7 @@
 
 > **Правило:** При изменении логики в любом из приложений — найди строку в этой таблице и обнови обе стороны.  
 > Этот файл обновляется при каждом изменении API.  
-> Последнее обновление: 10.05.2026
+> Последнее обновление: 12.05.2026
 
 ---
 
@@ -54,9 +54,23 @@
 | Фича             | MiniApp файл                        | WebApp файл                       | Статус | Примечание                                                                 |
 | ---------------- | ----------------------------------- | --------------------------------- | ------ | -------------------------------------------------------------------------- |
 | Список должников | `api/admin/receivables` GET         | `api/receivables` GET             | ✅     | Оба: `settlement=pending + lifecycle=approved`. Web добавляет overdueCount |
-| Погасить долг    | `api/admin/receivables/settle` POST | `api/receivables/[orderId]` PATCH | ✅     | Оба: mark completed + создать income транзакцию                            |
+| Погасить долг    | `api/admin/receivables/settle` POST | `api/receivables/[orderId]` PATCH | ✅     | Оба: mark completed + создать income транзакцию с to_wallet_id             |
 
-> ⚠️ **Важно:** При погашении ОБЯЗАТЕЛЬНО создавать транзакцию direction=income, category=TRIP_REVENUE `74008cf7-0527-4e9f-afd2-d232b8f8125a`, иначе деньги не попадут в P&L.
+**Какие заказы попадают в дебиторку** — `settlement_status = 'pending'` при создании:
+
+- `qr` — QR/Расчётный счёт (физлицо — быстро; юрлицо — после документов, 2–30 дн.)
+- `card_driver` — На карту владельца
+- `debt_cash` — Долг наличными
+
+**`cash` НЕ попадает в дебиторку** — создаётся `completed`, идёт через инкассацию в Сейф.
+
+> ⚠️ **Критично:** При погашении ОБЯЗАТЕЛЬНО:
+>
+> 1. Создать транзакцию `direction=income`, `category=TRIP_REVENUE` (`74008cf7-0527-4e9f-afd2-d232b8f8125a`)
+> 2. Указать `to_wallet_id` по способу оплаты заказа:
+>    - `qr` → Расчётный счёт (`10000000-0000-0000-0000-000000000001`)
+>    - `card_driver` → Карта (`10000000-0000-0000-0000-000000000003`)
+>    - `debt_cash` → Сейф (`10000000-0000-0000-0000-000000000002`)
 
 ---
 
@@ -114,10 +128,11 @@
 
 1. **При апруве рейса** → `trips.lifecycle=approved` + `trip_orders.lifecycle=approved` (оба)
 2. **При возврате рейса** → `trips.lifecycle=returned` + `trip_orders.lifecycle=draft` (оба) + `odometer_end=null` + `ended_at=null`
-3. **При погашении дебиторки** → `trip_orders.settlement=completed` + INSERT транзакция direction=income (оба)
+3. **При погашении дебиторки** → `trip_orders.settlement=completed` + INSERT транзакция direction=income + `to_wallet_id` по payment_method заказа (оба)
 4. **При выплате ЗП** → INSERT транзакция direction=expense, категория PAYROLL\_\* (оба)
 5. **lifecycle_status фильтры** — всегда одинаковые в обоих приложениях для одних и тех же данных
 6. **Cancelled рейсы** — всегда фильтровать через `neq lifecycle_status=cancelled` в списках водителя
+7. **Способы оплаты заказа** — `qr`, `card_driver`, `debt_cash` → `settlement_status=pending`; `cash` → `completed`. `bank_invoice` УДАЛЁН из форм (исторически может встречаться в БД).
 
 ---
 
