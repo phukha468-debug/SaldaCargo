@@ -11,7 +11,7 @@ const orderSchema = z.object({
   amount: z.coerce.number().positive(),
   driver_pay: z.coerce.number().min(0),
   loader_pay: z.coerce.number().min(0),
-  payment_method: z.enum(['cash', 'qr', 'bank_invoice', 'debt_cash', 'card_driver']),
+  payment_method: z.enum(['cash', 'qr', 'debt_cash', 'card_driver']),
   description: z.string().optional(),
 });
 
@@ -33,9 +33,8 @@ type FormData = z.infer<typeof schema>;
 const PAYMENT_METHODS = [
   { value: 'cash', label: '💵 Нал' },
   { value: 'qr', label: '📱 QR' },
-  { value: 'bank_invoice', label: '🏦 Безнал' },
-  { value: 'debt_cash', label: '⏳ Долг' },
   { value: 'card_driver', label: '💳 На карту' },
+  { value: 'debt_cash', label: '⏳ Долг' },
 ] as const;
 
 export default function RetroPage() {
@@ -55,13 +54,13 @@ export default function RetroPage() {
     watch,
     formState: { errors },
   } = useForm<FormData>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(schema as any),
     defaultValues: {
       trip_type: 'local',
       orders: [{ amount: 0, driver_pay: 0, loader_pay: 0, payment_method: 'cash' }],
     },
   });
-
 
   const { fields, append, remove } = useFieldArray({ control, name: 'orders' });
 
@@ -234,7 +233,8 @@ export default function RetroPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-900">Заказы ({fields.length})</h2>
             <div className="text-sm text-slate-500">
-              Итого: <Money amount={totalRevenue.toString()} /> · ЗП: <Money amount={totalDriverPay.toString()} />
+              Итого: <Money amount={totalRevenue.toString()} /> · ЗП:{' '}
+              <Money amount={totalDriverPay.toString()} />
             </div>
           </div>
 

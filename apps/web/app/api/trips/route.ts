@@ -104,9 +104,7 @@ export async function POST(request: Request) {
       driver_pay: o.driver_pay,
       loader_pay: o.loader_pay ?? '0',
       payment_method: o.payment_method,
-      settlement_status: ['bank_invoice', 'debt_cash'].includes(o.payment_method)
-        ? 'pending'
-        : 'completed',
+      settlement_status: ['debt_cash'].includes(o.payment_method) ? 'pending' : 'completed',
       lifecycle_status: 'draft',
       description: o.description ?? null,
       idempotency_key: crypto.randomUUID(),

@@ -56,6 +56,13 @@ const PAYMENT_STYLES: Record<string, string> = {
   card_driver: 'bg-blue-50 text-blue-700 border-blue-200',
 };
 
+const PAYMENT_EDIT_OPTIONS = [
+  { value: 'cash', label: 'Наличные' },
+  { value: 'qr', label: 'QR-код' },
+  { value: 'card_driver', label: 'Карта' },
+  { value: 'debt_cash', label: 'Долг' },
+];
+
 // ── Helpers ────────────────────────────────────────────────
 
 function calcTrip(trip: TripForReview) {
@@ -320,9 +327,9 @@ function EditModal({
                     value={order.payment_method}
                     onChange={(e) => update(order.id, 'payment_method', e.target.value)}
                   >
-                    {Object.entries(PAYMENT_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>
-                        {l}
+                    {PAYMENT_EDIT_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
                       </option>
                     ))}
                   </select>
