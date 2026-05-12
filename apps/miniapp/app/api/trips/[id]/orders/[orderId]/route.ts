@@ -39,7 +39,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Рейс уже одобрен администратором' }, { status: 403 });
     }
 
-    const pendingMethods = ['bank_invoice', 'debt_cash'];
+    const pendingMethods = ['debt_cash'];
     const settlementStatus = pendingMethods.includes(body.payment_method) ? 'pending' : 'completed';
 
     const { error } = await (supabase.from('trip_orders') as any)

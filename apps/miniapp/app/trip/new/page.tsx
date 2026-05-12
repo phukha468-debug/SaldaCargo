@@ -12,18 +12,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const schema = z.object({
   asset_id: z.string().min(1, 'Выберите машину'),
-  trip_type: z.enum(['local', 'intercity', 'moving', 'hourly']),
   odometer_start: z.coerce.number().min(0, 'Введите одометр'),
 });
 
 type FormData = z.infer<typeof schema>;
-
-const TRIP_TYPES = [
-  { value: 'local', label: 'По городу' },
-  { value: 'intercity', label: 'Межгород' },
-  { value: 'moving', label: 'Переезд' },
-  { value: 'hourly', label: 'Почасовой' },
-] as const;
 
 export default function NewTripPage() {
   const router = useRouter();
@@ -48,7 +40,7 @@ export default function NewTripPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
-    defaultValues: { trip_type: 'local' },
+    defaultValues: {},
   });
 
   const selectedAssetId = watch('asset_id');
@@ -74,7 +66,7 @@ export default function NewTripPage() {
       const res = await fetch('/api/trips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, idempotency_key: uuid() }),
+        body: JSON.stringify({ ...data, trip_type: 'local', idempotency_key: uuid() }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Ошибка при создании рейса');
@@ -132,28 +124,6 @@ export default function NewTripPage() {
           <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest pl-1">
             Машина выбрана при входе. Чтобы сменить — перезайдите в приложение.
           </p>
-        </div>
-
-        {/* Тип рейса */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Тип рейса
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {TRIP_TYPES.map((t) => (
-              <label key={t.value} className="relative">
-                <input
-                  type="radio"
-                  value={t.value}
-                  {...register('trip_type')}
-                  className="sr-only peer"
-                />
-                <div className="border-2 border-zinc-200 rounded-lg p-3 text-center cursor-pointer peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:text-orange-700 font-bold text-xs uppercase tracking-wide transition-all active:scale-[0.97]">
-                  {t.label}
-                </div>
-              </label>
-            ))}
-          </div>
         </div>
 
         {/* Одометр */}
