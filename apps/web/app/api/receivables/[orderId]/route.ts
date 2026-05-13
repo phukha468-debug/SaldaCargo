@@ -18,9 +18,20 @@ function walletForPaymentMethod(pm: string): string {
 export async function PATCH(_req: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
   const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value ?? null;
+  let adminId = cookieStore.get('salda_user_id')?.value ?? null;
 
   const supabase = createAdminClient();
+
+  // WebApp может работать без cookie — берём первого admin из БД
+  if (!adminId) {
+    const { data: adminUser } = await (supabase as any)
+      .from('users')
+      .select('id')
+      .contains('roles', ['admin'])
+      .limit(1)
+      .single();
+    adminId = adminUser?.id ?? null;
+  }
 
   // Получаем заказ — включая payment_method для маршрутизации в кошелёк
   const { data: order, error: orderErr } = await (supabase
