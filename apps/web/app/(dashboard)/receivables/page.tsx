@@ -62,11 +62,12 @@ export default function ReceivablesPage() {
     setMarkingId(orderId);
     try {
       const r = await fetch(`/api/receivables/${orderId}`, { method: 'PATCH' });
-      if (!r.ok) throw new Error('Ошибка');
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
       await queryClient.invalidateQueries({ queryKey: ['receivables'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-    } catch {
-      alert('Не удалось отметить оплату');
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setMarkingId(null);
     }
