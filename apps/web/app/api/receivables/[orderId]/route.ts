@@ -29,8 +29,9 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ order
       .select('id')
       .contains('roles', ['admin'])
       .limit(1)
-      .single();
-    adminId = adminUser?.id ?? null;
+      .maybeSingle();
+    // Жёсткий fallback на известный admin UUID чтобы created_by NOT NULL не упал
+    adminId = adminUser?.id ?? 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
   }
 
   // Получаем заказ — включая payment_method для маршрутизации в кошелёк
