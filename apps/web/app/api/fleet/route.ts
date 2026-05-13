@@ -64,12 +64,11 @@ export async function GET(request: Request) {
       // Список типов для формы
       (supabase as any).from('asset_types').select('id, code, name').order('name'),
 
-      // Выручка за период
+      // Выручка за период (approved = работа выполнена, settlement не учитываем для аналитики машин)
       (supabase as any)
         .from('trip_orders')
         .select('amount, trip:trips!inner(asset_id, started_at, lifecycle_status)')
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
         .eq('trips.lifecycle_status', 'approved')
         .gte('trips.started_at', periodStart)
         .lte('trips.started_at', periodEnd),
