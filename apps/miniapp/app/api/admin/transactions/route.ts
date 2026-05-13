@@ -4,21 +4,26 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { v4 as uuid } from 'uuid';
 
-/** GET /api/admin/transactions — последние транзакции */
-export async function GET() {
+/** GET /api/admin/transactions?date=YYYY-MM-DD — транзакции за день */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const date = searchParams.get('date'); // YYYY-MM-DD локальная дата клиента
+
   const supabase = createAdminClient();
 
-  const { data, error } = await (supabase
-    .from('transactions')
+  let q = (supabase.from('transactions') as any)
     .select(
-      `
-      id, amount, direction, description, created_at, lifecycle_status,
-      category:transaction_categories(name, code)
-    `,
+      'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code)',
     )
-    .order('created_at', { ascending: false })
-    .limit(30) as any);
+    .order('created_at', { ascending: false });
 
+  if (date) {
+    q = q.gte('created_at', `${date}T00:00:00.000Z`).lte('created_at', `${date}T23:59:59.999Z`);
+  } else {
+    q = q.limit(50);
+  }
+
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
 }

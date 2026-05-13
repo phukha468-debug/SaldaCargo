@@ -60,16 +60,23 @@ export async function GET(request: Request) {
         .eq('trips.lifecycle_status', 'approved')
         .gte('trips.started_at', sixMonthsAgo),
 
-      // Journal: last N transactions
+      // Journal: по дате или последние N
       (() => {
+        const date = searchParams.get('date'); // YYYY-MM-DD
         let q = (supabase as any)
           .from('transactions')
           .select(
             'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code)',
           )
-          .order('created_at', { ascending: false })
-          .limit(limit);
+          .order('created_at', { ascending: false });
         if (direction) q = q.eq('direction', direction);
+        if (date) {
+          q = q
+            .gte('created_at', `${date}T00:00:00.000Z`)
+            .lte('created_at', `${date}T23:59:59.999Z`);
+        } else {
+          q = q.limit(limit);
+        }
         return q;
       })(),
     ]);

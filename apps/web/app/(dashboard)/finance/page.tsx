@@ -28,16 +28,60 @@ type DriverBalance = {
   balance: string;
 };
 
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function addDays(dateStr: string, n: number) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+function formatNavDate(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
+}
+
+function formatNavMonth(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+}
+
 export default function FinancePage() {
   const [directionFilter, setDirectionFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  const { data, isLoading } = useQuery<{ pnl: PnlMonth[]; transactions: Transaction[] }>({
-    queryKey: ['finance', directionFilter],
+  const isToday = selectedDate === todayStr();
+
+  const goMonth = (n: number) => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setMonth(d.getMonth() + n);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  // P&L — без зависимости от даты
+  const { data: pnlData, isLoading: pnlLoading } = useQuery<{
+    pnl: PnlMonth[];
+    transactions: Transaction[];
+  }>({
+    queryKey: ['finance-pnl'],
+    queryFn: () => fetch('/api/finance').then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  // Журнал — зависит от выбранной даты
+  const { data: journalData, isLoading: journalLoading } = useQuery<{
+    pnl: PnlMonth[];
+    transactions: Transaction[];
+  }>({
+    queryKey: ['finance-journal', selectedDate, directionFilter],
     queryFn: () => {
-      const params = directionFilter !== 'all' ? `?direction=${directionFilter}` : '';
-      return fetch(`/api/finance${params}`).then((r) => r.json());
+      const params = new URLSearchParams({ date: selectedDate });
+      if (directionFilter !== 'all') params.set('direction', directionFilter);
+      return fetch(`/api/finance?${params}`).then((r) => r.json());
     },
-    staleTime: 30000,
+    staleTime: 15000,
   });
 
   const { data: balances = [] } = useQuery<DriverBalance[]>({
@@ -46,12 +90,22 @@ export default function FinancePage() {
     staleTime: 30000,
   });
 
-  const pnl = data?.pnl ?? [];
-  const transactions = data?.transactions ?? [];
+  const pnl = pnlData?.pnl ?? [];
+  const transactions = journalData?.transactions ?? [];
+  const isLoading = pnlLoading;
+  const journalLoading2 = journalLoading;
 
   const maxRevenue = Math.max(...pnl.map((m) => parseFloat(m.revenue)), 1);
 
   const driversWithCash = balances.filter((d) => parseFloat(d.balance) > 0);
+
+  // Итого за день
+  const dayIncome = transactions
+    .filter((t) => t.direction === 'income')
+    .reduce((s, t) => s + parseFloat(t.amount), 0);
+  const dayExpense = transactions
+    .filter((t) => t.direction === 'expense')
+    .reduce((s, t) => s + parseFloat(t.amount), 0);
 
   return (
     <div className="space-y-6 p-4 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -223,16 +277,76 @@ export default function FinancePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Журнал операций */}
         <section className="lg:col-span-2 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">
-              Журнал операций
-            </h2>
-            <div className="flex bg-slate-100 p-0.5 rounded-md">
+          {/* Навигация по месяцу */}
+          <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+            <button
+              onClick={() => goMonth(-1)}
+              className="p-1 rounded hover:bg-slate-200 text-slate-500 transition-colors"
+            >
+              ‹
+            </button>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+              {formatNavMonth(selectedDate)}
+            </span>
+            <button
+              onClick={() => goMonth(1)}
+              disabled={isToday}
+              className="p-1 rounded hover:bg-slate-200 text-slate-500 transition-colors disabled:opacity-30"
+            >
+              ›
+            </button>
+          </div>
+
+          {/* Навигация по дню + фильтры */}
+          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-3">
+            <button
+              onClick={() => setSelectedDate((d) => addDays(d, -1))}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors text-lg leading-none"
+            >
+              ←
+            </button>
+            <div className="flex-1 text-center">
+              <p className="text-sm font-bold text-slate-900">{formatNavDate(selectedDate)}</p>
+              {!journalLoading2 && (
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  {dayIncome > 0 && (
+                    <span className="text-emerald-600 font-bold">
+                      +{dayIncome.toLocaleString('ru-RU')} ₽
+                    </span>
+                  )}
+                  {dayIncome > 0 && dayExpense > 0 && (
+                    <span className="mx-1 text-slate-300">|</span>
+                  )}
+                  {dayExpense > 0 && (
+                    <span className="text-rose-500 font-bold">
+                      −{dayExpense.toLocaleString('ru-RU')} ₽
+                    </span>
+                  )}
+                  {dayIncome === 0 && dayExpense === 0 && 'Нет операций'}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectedDate((d) => addDays(d, 1))}
+              disabled={isToday}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors disabled:opacity-30 text-lg leading-none"
+            >
+              →
+            </button>
+            {!isToday && (
+              <button
+                onClick={() => setSelectedDate(todayStr())}
+                className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 py-1 border border-slate-200 rounded-lg transition-colors"
+              >
+                Сегодня
+              </button>
+            )}
+            <div className="flex bg-slate-100 p-0.5 rounded-md ml-auto">
               {(['all', 'income', 'expense'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setDirectionFilter(f)}
-                  className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide transition-all ${
                     directionFilter === f
                       ? f === 'income'
                         ? 'bg-emerald-500 text-white shadow-sm'
@@ -242,13 +356,13 @@ export default function FinancePage() {
                       : 'text-slate-500'
                   }`}
                 >
-                  {f === 'all' ? 'Все' : f === 'income' ? 'Доходы' : 'Расходы'}
+                  {f === 'all' ? 'Все' : f === 'income' ? '↑' : '↓'}
                 </button>
               ))}
             </div>
           </div>
 
-          {isLoading ? (
+          {journalLoading2 ? (
             <div className="p-4 space-y-2 animate-pulse">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="h-10 bg-slate-100 rounded" />

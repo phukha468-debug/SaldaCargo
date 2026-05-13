@@ -52,9 +52,23 @@ function FinanceContent() {
   );
   const queryClient = useQueryClient();
 
+  const [txDate, setTxDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const isTxToday = txDate === new Date().toISOString().split('T')[0];
+
+  const shiftDay = (n: number) => {
+    const d = new Date(txDate + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    setTxDate(d.toISOString().split('T')[0]);
+  };
+
+  const navDateLabel = (() => {
+    const d = new Date(txDate + 'T12:00:00');
+    return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+  })();
+
   const { data: transactions = [], isLoading } = useQuery<any[]>({
-    queryKey: ['admin-transactions'],
-    queryFn: () => fetch('/api/admin/transactions').then((r) => r.json()),
+    queryKey: ['admin-transactions', txDate],
+    queryFn: () => fetch(`/api/admin/transactions?date=${txDate}`).then((r) => r.json()),
     staleTime: 15000,
   });
 
@@ -232,32 +246,83 @@ function FinanceContent() {
         {/* История */}
         {showForm === null && (
           <section className="space-y-3">
-            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-              Последние операции
-            </h2>
+            {/* Навигация по дням */}
+            <div className="bg-white rounded-2xl border border-zinc-100 px-3 py-2 flex items-center gap-2 shadow-sm">
+              <button
+                onClick={() => shiftDay(-1)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 active:bg-zinc-100 text-lg"
+              >
+                ←
+              </button>
+              <div className="flex-1 text-center">
+                <p className="text-sm font-black text-zinc-900">{navDateLabel}</p>
+                {!isLoading &&
+                  (() => {
+                    const inc = transactions
+                      .filter((t: any) => t.direction === 'income')
+                      .reduce((s: number, t: any) => s + parseFloat(t.amount), 0);
+                    const exp = transactions
+                      .filter((t: any) => t.direction === 'expense')
+                      .reduce((s: number, t: any) => s + parseFloat(t.amount), 0);
+                    return (
+                      <p className="text-[10px] font-bold mt-0.5">
+                        {inc > 0 && (
+                          <span className="text-green-600">+{inc.toLocaleString('ru-RU')} ₽</span>
+                        )}
+                        {inc > 0 && exp > 0 && <span className="text-zinc-300 mx-1">|</span>}
+                        {exp > 0 && (
+                          <span className="text-red-500">−{exp.toLocaleString('ru-RU')} ₽</span>
+                        )}
+                        {inc === 0 && exp === 0 && (
+                          <span className="text-zinc-300">Нет операций</span>
+                        )}
+                      </p>
+                    );
+                  })()}
+              </div>
+              <button
+                onClick={() => shiftDay(1)}
+                disabled={isTxToday}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 active:bg-zinc-100 disabled:opacity-30 text-lg"
+              >
+                →
+              </button>
+            </div>
+            {!isTxToday && (
+              <button
+                onClick={() => setTxDate(new Date().toISOString().split('T')[0])}
+                className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-400 py-1 active:text-zinc-700"
+              >
+                ← вернуться к сегодня
+              </button>
+            )}
+
             {isLoading ? (
               <div className="space-y-2 animate-pulse">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 bg-zinc-200 rounded-xl" />
+                  <div key={i} className="h-14 bg-zinc-200 rounded-xl" />
                 ))}
               </div>
             ) : transactions.length === 0 ? (
-              <p className="text-center py-10 text-zinc-400 font-bold uppercase text-xs">
+              <p className="text-center py-8 text-zinc-300 font-bold uppercase text-xs">
                 Операций нет
               </p>
             ) : (
-              transactions.map((tx) => (
+              transactions.map((tx: any) => (
                 <div
                   key={tx.id}
-                  className="bg-white rounded-xl border border-zinc-100 p-4 flex justify-between items-center shadow-sm"
+                  className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex justify-between items-center shadow-sm"
                 >
                   <div>
                     <p className="font-bold text-zinc-900 text-sm">
                       {tx.category?.name ?? tx.description ?? '—'}
                     </p>
                     <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
-                      {tx.direction === 'income' ? '📈 Доход' : '📉 Расход'} ·{' '}
-                      {formatDate(tx.created_at)}
+                      {tx.direction === 'income' ? '📈' : '📉'}{' '}
+                      {new Date(tx.created_at).toLocaleTimeString('ru-RU', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
                   </div>
                   <Money
