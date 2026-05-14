@@ -5,10 +5,67 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const direction = searchParams.get('direction'); // 'income' | 'expense' | null
+    const direction = searchParams.get('direction');
     const limit = parseInt(searchParams.get('limit') ?? '50');
 
     const supabase = createAdminClient();
+
+    const month = searchParams.get('month');
+    if (month) {
+      const [yearStr, monStr] = month.split('-');
+      const year = parseInt(yearStr);
+      const mon = parseInt(monStr);
+      const monthStart = new Date(year, mon - 1, 1).toISOString();
+      const monthEnd = new Date(year, mon, 0, 23, 59, 59, 999).toISOString();
+
+      const [expRes, payrollRes, revenueRes] = await Promise.all([
+        (supabase as any)
+          .from('transactions')
+          .select(
+            'id, amount, description, created_at, category:transaction_categories(name, code)',
+          )
+          .eq('direction', 'expense')
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed')
+          .gte('created_at', monthStart)
+          .lte('created_at', monthEnd)
+          .order('created_at', { ascending: false }),
+        (supabase as any)
+          .from('trip_orders')
+          .select('driver_pay, loader_pay, loader2_pay, trips!inner(started_at, lifecycle_status)')
+          .eq('lifecycle_status', 'approved')
+          .eq('trips.lifecycle_status', 'approved')
+          .gte('trips.started_at', monthStart)
+          .lte('trips.started_at', monthEnd),
+        (supabase as any)
+          .from('trip_orders')
+          .select('amount, trips!inner(started_at, lifecycle_status)')
+          .eq('lifecycle_status', 'approved')
+          .eq('trips.lifecycle_status', 'approved')
+          .gte('trips.started_at', monthStart)
+          .lte('trips.started_at', monthEnd),
+      ]);
+
+      const payrollTotal = (payrollRes.data ?? []).reduce(
+        (s: number, o: any) =>
+          s +
+          parseFloat(o.driver_pay ?? '0') +
+          parseFloat(o.loader_pay ?? '0') +
+          parseFloat(o.loader2_pay ?? '0'),
+        0,
+      );
+      const revenue = (revenueRes.data ?? []).reduce(
+        (s: number, o: any) => s + parseFloat(o.amount ?? '0'),
+        0,
+      );
+
+      return NextResponse.json({
+        pnl: [],
+        transactions: expRes.data ?? [],
+        payrollTotal: payrollTotal.toFixed(2),
+        revenue: revenue.toFixed(2),
+      });
+    }
 
     const now = new Date();
 

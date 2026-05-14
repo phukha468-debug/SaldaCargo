@@ -1,17 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Suspense } from 'react';
 import { cn } from '@saldacargo/ui';
-
-type Period = 'current_month' | 'last_month' | 'quarter';
-const PERIODS: { value: Period; label: string }[] = [
-  { value: 'current_month', label: 'Текущий месяц' },
-  { value: 'last_month', label: 'Прошлый месяц' },
-  { value: 'quarter', label: 'Квартал' },
-];
 
 const navItems = [
   { href: '/', label: 'Главная' },
@@ -35,9 +28,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const activePeriod = (searchParams.get('period') as Period) ?? 'current_month';
 
   type AlertsData = {
     fleet: { overdue: boolean }[];
@@ -57,12 +47,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const financeAlertCount = (alerts?.receivables.length ?? 0) + (alerts?.loans.length ?? 0);
   const financeHasOverdue =
     (alerts?.loans.some((i) => i.overdue) ?? false) || (alerts?.receivables.length ?? 0) > 0;
-
-  const setPeriod = (p: Period) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('period', p);
-    router.push(`${pathname}?${params.toString()}`);
-  };
 
   return (
     <div className="min-h-screen bg-surface-bright flex flex-col">
@@ -132,31 +116,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-
-      <section className="bg-slate-50 border-b border-slate-200 sticky top-16 z-40">
-        <div className="flex items-center w-full px-6 h-10 max-w-[1920px] mx-auto gap-1">
-          {PERIODS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setPeriod(value)}
-              className={cn(
-                'font-sans text-[10px] uppercase tracking-wider font-bold px-3 h-full transition-colors border-b-2',
-                activePeriod === value
-                  ? 'text-emerald-600 border-emerald-500'
-                  : 'text-slate-500 hover:text-slate-900 border-transparent',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-sans text-[10px] uppercase tracking-wider text-slate-600 font-bold">
-              Online
-            </span>
-          </div>
-        </div>
-      </section>
 
       <main className="flex-1 max-w-[1920px] w-full mx-auto p-6">{children}</main>
 
