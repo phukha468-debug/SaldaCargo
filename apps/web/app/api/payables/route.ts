@@ -12,12 +12,12 @@ const CAT_PARTS = '9d18370d-3228-4f2a-8530-52b168cfa8d7';
 export const SUPPLIERS = [
   {
     id: OPTI24_ID,
-    name: 'Опти24',
+    name: 'Дерябин ГСМ',
     icon: '⛽',
     category: CAT_FUEL,
     debtDays: 15,
     autoAccrue: true,
-    description: 'Топливо по карте · отсрочка 15 дней',
+    description: 'ГСМ · расход по карте → автоматически в долг',
   },
   {
     id: NOVIKOV_ID,
@@ -87,13 +87,16 @@ export async function GET() {
     const opti24Payments = (supplierTxCompleted ?? [])
       .filter((t: any) => t.counterparty_id === OPTI24_ID)
       .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
+    const opti24ManualPending = (supplierTxPending ?? [])
+      .filter((t: any) => t.counterparty_id === OPTI24_ID)
+      .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
 
     const result = SUPPLIERS.map((s) => {
       let debt: number;
 
       if (s.autoAccrue) {
-        // Опти24: долг из trip_expenses минус платежи
-        debt = opti24FuelTotal - opti24Payments;
+        // Дерябин ГСМ: fuel_card расходы + ручные pending − все платежи
+        debt = opti24FuelTotal + opti24ManualPending - opti24Payments;
       } else {
         // Новиков/Ромашин: pending минус completed
         const pending = (supplierTxPending ?? [])

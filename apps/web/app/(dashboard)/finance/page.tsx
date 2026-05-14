@@ -168,7 +168,9 @@ export default function FinancePage() {
           </div>
           <div>
             <p className="font-bold text-slate-900 text-sm">Долги поставщикам</p>
-            <p className="text-xs text-slate-500 mt-0.5">Кредиторка: Опти24, Новиков, Ромашин</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Кредиторка: Дерябин ГСМ, Новиков, Ромашин
+            </p>
           </div>
           <svg
             className="ml-auto w-4 h-4 text-slate-300 group-hover:text-rose-400 transition-colors shrink-0"

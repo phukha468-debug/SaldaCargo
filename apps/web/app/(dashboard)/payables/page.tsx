@@ -49,7 +49,7 @@ export default function PayablesPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Долги поставщикам</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Кредиторская задолженность — Опти24, Новиков, Ромашин
+            Кредиторская задолженность — Дерябин ГСМ, Новиков, Ромашин
           </p>
         </div>
         {!isLoading && totalDebt > 0 && (
@@ -122,7 +122,7 @@ function SupplierCard({
         </div>
 
         {/* Действия */}
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4">
           {hasDebt && (
             <button
               onClick={() => setModal('pay')}
@@ -131,17 +131,15 @@ function SupplierCard({
               Оплатить
             </button>
           )}
-          {!s.autoAccrue && (
-            <button
-              onClick={() => setModal('debt')}
-              className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-200 hover:border-slate-300 text-slate-600 transition-colors"
-            >
-              + Добавить долг
-            </button>
-          )}
+          <button
+            onClick={() => setModal('debt')}
+            className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-200 hover:border-slate-300 text-slate-600 transition-colors"
+          >
+            + Добавить долг
+          </button>
           {s.autoAccrue && (
-            <p className="text-[10px] text-slate-400 flex items-center gap-1">
-              ⚡ Долг накапливается автоматически из расходов по топливной карте
+            <p className="text-[10px] text-slate-400 flex items-center gap-1 w-full mt-1">
+              ⚡ Расходы ГСМ по карте автоматически попадают в долг
             </p>
           )}
         </div>
