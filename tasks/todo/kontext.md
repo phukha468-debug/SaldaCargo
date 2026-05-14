@@ -1,4 +1,4 @@
-# КОНТЕКСТ ПРОЕКТА: SaldaCargo (14.05.2026 — сессия 6)
+# КОНТЕКСТ ПРОЕКТА: SaldaCargo (14.05.2026 — сессия 7)
 
 > Этот файл — точка входа для AI-ассистента. Прочитав его, ты знаешь где мы находимся и что делать дальше.
 > База знаний: `kb/wiki/` — читай соответствующие статьи перед задачами.
@@ -35,7 +35,7 @@ SaldaCargo — ERP-система для транспортной компани
   - Финансы: Доход / Расход / Долги (кредиты + поставщики) / Инкассация / ЗП
   - **Дебиторка:** список должников → заказы → погасить
   - **Журнал транзакций:** навигация по дням (← →) и месяцам, итоги за день
-  - **Долги поставщиков** (`/api/admin/payables`): теперь считает из транзакций (как WebApp), показывает Дерябин ГСМ / Новиков / Ромашин
+  - **Долги поставщиков** (`/api/admin/payables`): считает из транзакций (как WebApp), показывает Дерябин ГСМ / Новиков / Ромашин
 
 ### WebApp (apps/web) — В РАЗРАБОТКЕ 🔨
 
@@ -45,7 +45,7 @@ SaldaCargo — ERP-система для транспортной компани
 - **/review:** одобрение/возврат рейсов + история
 - **/retro:** ручной ввод рейса задним числом
 - **/finance:** P&L за 6 месяцев + журнал с навигацией по дням/месяцам + подотчёт водителей
-- **/receivables:** дебиторка — список должников, кнопка "Оплачено" (исправлена)
+- **/receivables:** дебиторка — список должников, кнопка "Оплачено", **добавление исторических долгов** ✅
 - **/counterparties:** контрагенты — аккордеон-карточки, удаление/архив
 - **/fleet:** автопарк — коллапсируемые плитки, юнит-экономика ✅
 - **/garage:** наряды СТО ✅
@@ -55,27 +55,50 @@ SaldaCargo — ERP-система для транспортной компани
 
 ---
 
-## 3. Важные баги исправленные в сессии 6
+## 3. Важные баги исправленные в сессиях 6–7
 
-### Автопарк — выручка считалась неправильно
+### Автопарк — выручка считалась неправильно (сессия 6)
 
 `/api/fleet/route.ts` — убран фильтр `settlement_status='completed'` из запроса выручки.  
-Выручка теперь = `lifecycle_status='approved'` (работа сделана), независимо от оплаты.  
-**Причина бага:** ЗП и ГСМ считались по всем approved-рейсам, а выручка — только по оплаченным → машина казалась убыточной при отсрочке платежа.
+Выручка теперь = `lifecycle_status='approved'` (работа сделана), независимо от оплаты.
 
-### Дебиторка — кнопка "Оплачено" не работала в WebApp
+### Дебиторка — кнопка "Оплачено" не работала в WebApp (сессия 6)
 
 `/api/receivables/[orderId]/route.ts` — WebApp работает без cookie (`salda_user_id`), из-за чего `created_by=null` падало с NOT NULL constraint.  
 **Фикс:** если нет cookie → берём первого admin из БД. Fallback на hardcoded UUID `e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d` (Шахмаев А.О).
 
-### MiniApp поставщики запчастей не отображались
+### MiniApp поставщики запчастей не отображались (сессия 6)
 
-`/api/admin/payables/route.ts` (MiniApp) — читал `counterparties.payable_amount` (всегда 0 у Новикова/Ромашина).  
-**Фикс:** теперь считает долг из транзакций (pending expense - completed expense), как WebApp.
+`/api/admin/payables/route.ts` — читал `counterparties.payable_amount` (всегда 0 у Новикова/Ромашина).  
+**Фикс:** считает долг из транзакций (pending expense - completed expense).
+
+### Журнал финансов показывал задвоение расходов (сессия 7)
+
+`/api/finance/route.ts` — журнал не фильтровал по `settlement_status`, показывал и pending (долг) и completed (оплата).  
+**Фикс:** добавлены `.eq('lifecycle_status', 'approved').eq('settlement_status', 'completed')` в запрос журнала.  
+Теперь в журнале — только реально прошедшие деньги.
 
 ---
 
-## 4. Архитектура учёта ЗП (важно!)
+## 4. Дебиторка — исторические долги (сессия 7) ✅
+
+Реализован механизм добавления долгов, возникших ДО старта системы.
+
+**Таблица:** `manual_receivables` (counterparty_id, amount, date, description, settled, settled_at)  
+**API:**
+
+- `GET /api/receivables` — объединяет `trip_orders` и `manual_receivables` в один список
+- `POST /api/receivables` — создать ручную запись долга
+- `PATCH /api/receivables/manual/[id]` — погасить (→ settled=true + income-транзакция)
+- `DELETE /api/receivables/manual/[id]` — удалить ошибочно введённую запись
+
+**UI:** кнопка "Добавить долг" в шапке `/receivables`. Ручные записи помечены меткой "Ист. долг" (синяя). Иконка корзины — удалить запись до погашения.
+
+**Важно:** чтобы добавить долг нужно сначала создать контрагента в `/counterparties`, если его ещё нет.
+
+---
+
+## 5. Архитектура учёта ЗП (важно!)
 
 | Источник                              | Что даёт                 | Где используется            |
 | ------------------------------------- | ------------------------ | --------------------------- |
@@ -87,16 +110,17 @@ SaldaCargo — ERP-система для транспортной компани
 
 ---
 
-## 5. Дебиторка — архитектура (важно!)
+## 6. Дебиторка — архитектура (важно!)
 
-- **Источник долга:** `trip_orders` где `settlement_status='pending'` AND `lifecycle_status='approved'`
+- **Источник долга из рейсов:** `trip_orders` где `settlement_status='pending'` AND `lifecycle_status='approved'`
+- **Исторические долги:** `manual_receivables` где `settled=false`
 - **"физ лицо" с описанием** → выносится в отдельную строку должника (по `description` поля заказа)
-- **Погашение:** PATCH `/api/receivables/[orderId]` (WebApp) или POST `/api/admin/receivables/settle` (MiniApp)
-  → `trip_orders.settlement_status='completed'` + INSERT income-транзакция (TRIP_REVENUE)
+- **Погашение trip_order:** PATCH `/api/receivables/[orderId]` → `settlement_status='completed'` + INSERT income-транзакция
+- **Погашение manual:** PATCH `/api/receivables/manual/[id]` → `settled=true` + INSERT income-транзакция
 
 ---
 
-## 6. Долги поставщиков — архитектура
+## 7. Долги поставщиков — архитектура
 
 **Оба приложения** считают долг одинаково из `transactions`:
 
@@ -108,47 +132,39 @@ SaldaCargo — ERP-система для транспортной компани
 1. WebApp → /payables → "+ Добавить долг" → создаёт `expense` транзакцию `settlement='pending'`
 2. После этого появляется в MiniApp в разделе "Долги поставщиков"
 
----
-
-## 7. P&L vs Балансы — что что считает
-
-| Раздел                | Источник выручки                                           | Источник расходов                                                                   |
-| --------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| **P&L (/finance)**    | `trip_orders.amount` (approved)                            | `transactions` (expense, approved, completed) + ЗП из trip_orders                   |
-| **Автопарк (/fleet)** | `trip_orders.amount` (approved)                            | `trip_expenses` + `driver_pay/loader_pay` + `part_movements` + `monthly_fixed_cost` |
-| **Балансы кошельков** | `transactions` (income, approved, completed, to_wallet_id) | `transactions` (expense, approved, completed, from_wallet_id)                       |
-| **Дебиторка**         | `trip_orders` (settlement=pending)                         | —                                                                                   |
-
-> Транзакции "Прочий доход" **не** влияют на P&L. Влияют только на баланс кошельков.
+**Важно:** pending expense-транзакции (долги поставщиков) НЕ показываются в журнале финансов — только completed.
 
 ---
 
-## 8. Следующие шаги (в порядке приоритета)
+## 8. P&L vs Балансы — что что считает
 
-### ШАГ 1 — Исторические долги (дебиторка)
+| Раздел                | Источник выручки                                                          | Источник расходов                                                                   |
+| --------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **P&L (/finance)**    | `trip_orders.amount` (approved)                                           | `transactions` (expense, approved, completed) + ЗП из trip_orders                   |
+| **Автопарк (/fleet)** | `trip_orders.amount` (approved)                                           | `trip_expenses` + `driver_pay/loader_pay` + `part_movements` + `monthly_fixed_cost` |
+| **Балансы кошельков** | `transactions` (income, approved, completed, to_wallet_id)                | `transactions` (expense, approved, completed, from_wallet_id)                       |
+| **Дебиторка**         | `trip_orders` (settlement=pending) + `manual_receivables` (settled=false) | —                                                                                   |
+| **Журнал финансов**   | `transactions` (approved, completed)                                      | `transactions` (approved, completed)                                                |
 
-Есть должники ДО старта системы. Нужен способ добавить их.  
-**Вариант A (рекомендован):** новая таблица `manual_receivables` (counterparty_id, amount, date, description, settled)  
-**Вариант B:** использовать `/retro` для создания фиктивного рейса с нужной суммой  
-Пользователь ещё не выбрал вариант — нужно уточнить.
+> Транзакции "Прочий доход" **не** влияют на P&L. Влияют только на баланс кошельков.  
+> Pending expense-транзакции (долги поставщиков) **не** показываются в журнале.
 
-### ШАГ 2 — Починить переключатель периода (WebApp)
+---
+
+## 9. Следующие шаги (в порядке приоритета)
+
+### ШАГ 1 — Починить переключатель периода (WebApp)
 
 Кнопки периода в layout.tsx пишут `?period=` в URL, но страницы его не всегда читают.  
 Проверить: fleet, главная, finance, staff, receivables.
 
-### ШАГ 3 — Скрывать отменённые транзакции из журнала
-
-Отменённые транзакции (`lifecycle_status='cancelled'`) сейчас видны в журнале финансов.  
-Пользователь хочет их скрыть. Добавить фильтр `.eq('lifecycle_status', 'approved')` в запросы журнала.
-
-### ШАГ 4 — WebApp: активные рейсы могут не отображаться
+### ШАГ 2 — WebApp: активные рейсы могут не отображаться
 
 Рейсы `status='in_progress'` фильтруются по `started_at`, могут пропасть если начались в другой день.
 
 ---
 
-## 9. Ключевые технические факты
+## 10. Ключевые технические факты
 
 - `users.roles` — массив: `.contains('roles', ['driver'])`, НЕ `.eq('role', ...)`
 - Все API-роуты: `createAdminClient()` + `(supabase.from('table') as any)`
@@ -160,6 +176,7 @@ SaldaCargo — ERP-система для транспортной компани
 - Bottom-sheet в MAX WebView: `position:fixed` на body + `paddingBottom: calc(env(safe-area-inset-bottom,0px) + 56px)`
 - Контрагент при редактировании: find-or-create через `.ilike('name', name).maybeSingle()`
 - Двухшаговое удаление: boolean state + useRef таймер 4 сек авто-сброс
+- Новые таблицы в Supabase требуют явного `GRANT ALL ON TABLE ... TO postgres, anon, authenticated, service_role`
 
 ### ID кошельков:
 
@@ -197,4 +214,4 @@ df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30 — OTHER_EXPENSE
 
 ---
 
-_Обновлён: 14.05.2026 (сессия 6). Исправлены: аналитика автопарка, кнопка "Оплачено" в дебиторке, поставщики в MiniApp._
+_Обновлён: 14.05.2026 (сессия 7). Добавлено: исторические долги (manual_receivables), фикс журнала финансов (задвоение расходов)._
