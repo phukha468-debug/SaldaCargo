@@ -108,9 +108,7 @@ export default function FinancePage() {
     .reduce((s, t) => s + parseFloat(t.amount), 0);
 
   return (
-    <div className="space-y-6 p-4 max-w-7xl mx-auto animate-in fade-in duration-500">
-      <h1 className="text-2xl font-bold text-slate-900">Финансы</h1>
-
+    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* Навигация по разделам */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <a
