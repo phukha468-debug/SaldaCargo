@@ -113,16 +113,20 @@ export default function AddOrderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newClientName, type: 'client' }),
       });
+      const json = await res.json();
       if (res.ok) {
-        const newClient = await res.json();
         queryClient.invalidateQueries({ queryKey: ['driver', 'counterparties'] });
-        setValue('counterparty_id', newClient.id);
+        setValue('counterparty_id', json.id);
         setShowNewClient(false);
         setNewClientName('');
         setSearchTerm('');
+      } else if (res.status === 409 && json.existing?.length > 0) {
+        // Duplicate found — show existing clients for selection
+        setShowNewClient(false);
+        setSearchTerm(newClientName);
+        setError(`Клиент «${json.existing[0].name}» уже есть — выберите его из списка`);
       } else {
-        const err = await res.json();
-        setError(err.error || 'Ошибка при добавлении клиента');
+        setError(json.error || 'Ошибка при добавлении клиента');
       }
     } catch {
       setError('Ошибка сети');
@@ -241,32 +245,31 @@ export default function AddOrderPage() {
                       onClick={() => {
                         setValue('counterparty_id', c.id);
                         setSearchTerm('');
+                        setError('');
                       }}
                       className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0"
                     >
                       {c.name}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewClientName(searchTerm);
-                      setShowNewClient(true);
-                    }}
-                    className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
-                  >
-                    + Новый клиент &quot;{searchTerm}&quot;
-                  </button>
+                  {filteredCounterparties.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewClientName(searchTerm);
+                        setShowNewClient(true);
+                      }}
+                      className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
+                    >
+                      + Создать нового клиента &quot;{searchTerm}&quot;
+                    </button>
+                  )}
+                  {filteredCounterparties.length > 0 && (
+                    <p className="px-4 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                      Выберите из списка или уточните поиск
+                    </p>
+                  )}
                 </div>
-              )}
-              {searchTerm.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowNewClient(true)}
-                  className="w-full text-left px-4 h-14 border-2 border-dashed border-zinc-300 rounded-lg text-zinc-400 font-bold mt-2"
-                >
-                  + Новый клиент
-                </button>
               )}
             </div>
           )}
