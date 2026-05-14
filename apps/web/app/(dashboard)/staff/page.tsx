@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef } from 'react';
 import { Money } from '@saldacargo/ui';
+import { formatPhone } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -604,7 +605,9 @@ function PayrollRow({
           ) : (
             <span className="text-xs text-rose-400 font-medium">MAX не привязан</span>
           )}
-          {user.phone && <span className="text-xs text-slate-500">📞 {user.phone}</span>}
+          {user.phone && (
+            <span className="text-xs text-slate-500 font-mono">📞 {formatPhone(user.phone)}</span>
+          )}
           {user.notes && <span className="text-xs text-slate-400 italic">{user.notes}</span>}
 
           <div className="ml-auto flex items-center gap-2">

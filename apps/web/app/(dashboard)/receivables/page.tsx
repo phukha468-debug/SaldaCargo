@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
-import { formatDate } from '@saldacargo/shared';
+import { formatDate, formatPhone } from '@saldacargo/shared';
 
 type FollowUp = {
   status: 'active' | 'promised' | 'disputed' | 'bad_debt';
@@ -613,7 +613,9 @@ export default function ReceivablesPage() {
                                 className="text-[10px] text-blue-500 font-bold hover:text-blue-700 flex items-center gap-0.5"
                               >
                                 <span className="material-symbols-outlined text-xs">call</span>
-                                {debtor.counterparty_phone}
+                                <span className="font-mono">
+                                  {formatPhone(debtor.counterparty_phone)}
+                                </span>
                               </a>
                             )}
                             <PromiseDateBadge follow_up={fu} />

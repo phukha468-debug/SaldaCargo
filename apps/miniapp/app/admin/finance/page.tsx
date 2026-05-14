@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
-import { formatDate } from '@saldacargo/shared';
+import { formatDate, formatPhone } from '@saldacargo/shared';
 
 export default function AdminFinancePage() {
   return (
@@ -1392,7 +1392,7 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                         href={`tel:${d.counterparty_phone}`}
                         className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-zinc-200 text-zinc-700 text-xs font-black uppercase tracking-wide active:scale-[0.97]"
                       >
-                        📲 Позвонить {d.counterparty_phone}
+                        📲 Позвонить {formatPhone(d.counterparty_phone)}
                       </a>
                     )}
 

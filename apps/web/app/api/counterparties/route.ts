@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     // Только клиенты (не поставщики)
     let q = (supabase as any)
       .from('counterparties')
-      .select('id, name, phone, credit_limit, notes, is_active')
+      .select('id, name, phone, credit_limit, notes, is_active, is_regular')
       .in('type', ['client', 'both'])
       .order('name');
 
@@ -112,6 +112,7 @@ export async function GET(request: Request) {
         notes: cp.notes ?? null,
         credit_limit: cp.credit_limit ?? null,
         is_active: cp.is_active,
+        is_regular: cp.is_regular ?? false,
         // аналитика
         total_revenue: s.total_revenue.toFixed(2),
         revenue_30d: s.revenue_30d.toFixed(2),

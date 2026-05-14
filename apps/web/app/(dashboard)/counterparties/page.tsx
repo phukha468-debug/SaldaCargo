@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
+import { formatPhone } from '@saldacargo/shared';
 
 type Client = {
   id: string;
@@ -11,6 +12,7 @@ type Client = {
   notes: string | null;
   credit_limit: string | null;
   is_active: boolean;
+  is_regular: boolean;
   total_revenue: string;
   revenue_30d: string;
   trips_count: number;
@@ -23,10 +25,11 @@ type Client = {
 };
 
 const PAYMENT_LABEL: Record<string, string> = {
-  cash: '💵 Нал',
-  qr: '📱 QR',
-  card_driver: '💳 Карта',
-  debt_cash: '⏳ Долг',
+  cash: 'Нал',
+  qr: 'QR',
+  card_driver: 'Карта',
+  debt_cash: 'Долг',
+  bank_invoice: 'Безнал',
 };
 
 const emptyForm = { name: '', phone: '', credit_limit: '', notes: '' };
@@ -36,216 +39,155 @@ function daysAgo(dateStr: string | null): number | null {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-function LastTripBadge({ date }: { date: string | null }) {
+function LastTripLabel({ date }: { date: string | null }) {
   const days = daysAgo(date);
-  if (days === null)
-    return <span className="text-[10px] font-bold text-slate-300 uppercase">Рейсов нет</span>;
-  if (days === 0)
-    return <span className="text-[10px] font-bold text-emerald-600 uppercase">Сегодня</span>;
-  if (days <= 7)
-    return (
-      <span className="text-[10px] font-bold text-emerald-500 uppercase">{days} дн. назад</span>
-    );
-  if (days <= 30)
-    return <span className="text-[10px] font-bold text-slate-400 uppercase">{days} дн. назад</span>;
-  if (days <= 90)
-    return <span className="text-[10px] font-bold text-amber-500 uppercase">{days} дн. назад</span>;
-  return <span className="text-[10px] font-bold text-rose-400 uppercase">{days} дн. назад</span>;
-}
-
-function PaymentPills({ breakdown }: { breakdown: Record<string, number> }) {
-  const entries = Object.entries(breakdown)
-    .filter(([, pct]) => pct > 0)
-    .sort(([, a], [, b]) => b - a);
-  if (entries.length === 0) return null;
-  return (
-    <div className="flex gap-1.5 flex-wrap">
-      {entries.map(([pm, pct]) => (
-        <span
-          key={pm}
-          className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500"
-        >
-          {PAYMENT_LABEL[pm] ?? pm} {pct}%
-        </span>
-      ))}
-    </div>
-  );
+  if (days === null) return <span className="text-slate-300">нет рейсов</span>;
+  if (days === 0) return <span className="text-emerald-600 font-bold">сегодня</span>;
+  if (days <= 7) return <span className="text-emerald-500 font-bold">{days} дн. назад</span>;
+  if (days <= 30) return <span className="text-slate-400">{days} дн. назад</span>;
+  if (days <= 90) return <span className="text-amber-500">{days} дн. назад</span>;
+  return <span className="text-rose-400">{days} дн. назад</span>;
 }
 
 function ClientRow({
   client: c,
+  mergeMode,
+  mergeSelected,
+  onMergeToggle,
   onEdit,
   onToggleActive,
+  onPromote,
   onDelete,
 }: {
   client: Client;
+  mergeMode: boolean;
+  mergeSelected: boolean;
+  onMergeToggle: () => void;
   onEdit: () => void;
   onToggleActive: () => void;
+  onPromote: () => void;
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const expandedRef = useRef<HTMLDivElement>(null);
+  const hasRevenue = parseFloat(c.total_revenue) > 0;
 
   useEffect(() => {
     if (expanded && expandedRef.current) {
       expandedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [expanded]);
-  const debt = parseFloat(c.outstanding_debt);
-  const limit = parseFloat(c.credit_limit ?? '0');
-  const limitPct = limit > 0 ? Math.min((debt / limit) * 100, 100) : 0;
-  const hasRevenue = parseFloat(c.total_revenue) > 0;
-  const days = daysAgo(c.last_trip_at);
-  const isOverLimit = limit > 0 && limitPct >= 80;
 
   const avatarColor =
-    days !== null && days <= 7
+    daysAgo(c.last_trip_at) !== null && daysAgo(c.last_trip_at)! <= 7
       ? 'bg-emerald-100 text-emerald-700'
-      : days !== null && days <= 30
+      : daysAgo(c.last_trip_at) !== null && daysAgo(c.last_trip_at)! <= 30
         ? 'bg-orange-100 text-orange-700'
         : 'bg-slate-100 text-slate-500';
 
   return (
-    <div className={!c.is_active ? 'opacity-50' : ''}>
-      {/* Компактная строка */}
+    <div
+      className={[
+        !c.is_active ? 'opacity-50' : '',
+        mergeMode && mergeSelected ? 'ring-2 ring-inset ring-blue-500 bg-blue-50' : '',
+      ].join(' ')}
+    >
+      {/* Compact row */}
       <div
         className="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => {
+          if (mergeMode) {
+            onMergeToggle();
+          } else {
+            setExpanded((v) => !v);
+          }
+        }}
       >
-        {/* Аватар */}
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${avatarColor}`}
-        >
-          {c.name.charAt(0).toUpperCase()}
-        </div>
+        {mergeMode ? (
+          <div
+            className={`w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center ${mergeSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}
+          >
+            {mergeSelected && <span className="text-white text-xs font-black">✓</span>}
+          </div>
+        ) : (
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${avatarColor}`}
+          >
+            {c.name.charAt(0).toUpperCase()}
+          </div>
+        )}
 
-        {/* Имя */}
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-900 text-sm truncate">{c.name}</p>
-          {c.phone && <p className="text-[10px] text-slate-400 truncate">{c.phone}</p>}
-        </div>
-
-        {/* Правая часть: долг / активность */}
-        <div className="shrink-0 flex items-center gap-3 text-right">
-          {debt > 0 && (
-            <div>
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Долг</p>
-              <p
-                className={`text-sm font-black ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}
-              >
-                <Money amount={c.outstanding_debt} />
-              </p>
-            </div>
+        {/* Name + phone + stats — all in one line */}
+        <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+          <p className="font-bold text-slate-900 text-sm truncate max-w-[180px]">{c.name}</p>
+          {c.phone && (
+            <a
+              href={`tel:${c.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[11px] text-blue-500 hover:text-blue-700 font-mono shrink-0"
+            >
+              {formatPhone(c.phone)}
+            </a>
+          )}
+          <span className="text-[10px] text-slate-400 shrink-0">
+            <LastTripLabel date={c.last_trip_at} />
+          </span>
+          {c.trips_count > 0 && (
+            <span className="text-[10px] text-slate-400 shrink-0">{c.trips_count} рейс.</span>
           )}
           {parseFloat(c.revenue_30d) > 0 && (
-            <div>
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                30 дн.
-              </p>
-              <p className="text-sm font-black text-emerald-600">
-                <Money amount={c.revenue_30d} />
-              </p>
-            </div>
+            <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+              <Money amount={c.revenue_30d} /> за 30 дн.
+            </span>
           )}
-          <LastTripBadge date={c.last_trip_at} />
+        </div>
+
+        {!mergeMode && (
           <span
-            className="material-symbols-outlined text-slate-300 text-[20px] shrink-0 transition-transform duration-300"
+            className="material-symbols-outlined text-slate-300 text-[18px] shrink-0 transition-transform duration-200"
             style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
           >
             expand_more
           </span>
-        </div>
+        )}
       </div>
 
-      {/* Раскрытая панель */}
-      {expanded && (
+      {/* Expanded panel */}
+      {expanded && !mergeMode && (
         <div
           ref={expandedRef}
-          className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4"
+          className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 space-y-3"
         >
-          {/* Три метрики */}
-          <div className="grid grid-cols-3 gap-0 border border-slate-100 rounded-lg overflow-hidden bg-white">
-            <div className="px-3 py-2.5 text-center">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                Выручка
-              </p>
-              {hasRevenue ? (
-                <Money
-                  amount={c.total_revenue}
-                  className="text-sm font-black text-slate-900 leading-tight"
-                />
-              ) : (
-                <p className="text-sm font-black text-slate-300">—</p>
-              )}
-            </div>
-            <div className="px-3 py-2.5 text-center border-x border-slate-100">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                Рейсов
-              </p>
-              <p className="text-sm font-black text-slate-900 leading-tight">
-                {c.trips_count || '—'}
-              </p>
-            </div>
-            <div className="px-3 py-2.5 text-center">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                Средний
-              </p>
-              {parseFloat(c.avg_order) > 0 ? (
-                <Money
-                  amount={c.avg_order}
-                  className="text-sm font-black text-slate-900 leading-tight"
-                />
-              ) : (
-                <p className="text-sm font-black text-slate-300">—</p>
-              )}
-            </div>
-          </div>
-
-          {/* Долг + кредитный лимит */}
-          {debt > 0 && (
-            <div
-              className={`rounded-lg px-3 py-2 space-y-1.5 ${isOverLimit ? 'bg-rose-50 border border-rose-200' : 'bg-amber-50 border border-amber-200'}`}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={`text-xs font-bold ${isOverLimit ? 'text-rose-700' : 'text-amber-700'}`}
-                >
-                  ⚠ Долг
-                </span>
-                <Money
-                  amount={c.outstanding_debt}
-                  className={`text-sm font-black ${isOverLimit ? 'text-rose-700' : 'text-amber-700'}`}
-                />
-              </div>
-              {limit > 0 && (
-                <div>
-                  <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                    <span>Лимит</span>
-                    <span>
-                      <Money amount={c.outstanding_debt} /> / <Money amount={c.credit_limit!} />
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-white/70 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${limitPct >= 80 ? 'bg-rose-400' : 'bg-amber-400'}`}
-                      style={{ width: `${limitPct}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+          {/* Revenue stats — one line */}
+          {hasRevenue && (
+            <div className="flex items-center gap-4 text-xs text-slate-600">
+              <span>
+                Выручка:{' '}
+                <strong className="text-slate-900">
+                  <Money amount={c.total_revenue} />
+                </strong>
+              </span>
+              <span>
+                Средний:{' '}
+                <strong className="text-slate-900">
+                  <Money amount={c.avg_order} />
+                </strong>
+              </span>
+              {Object.entries(c.payment_breakdown)
+                .filter(([, pct]) => pct > 0)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 2)
+                .map(([pm, pct]) => (
+                  <span key={pm} className="text-slate-400">
+                    {PAYMENT_LABEL[pm] ?? pm} {pct}%
+                  </span>
+                ))}
             </div>
           )}
+          {c.notes && <p className="text-xs text-slate-400 italic">{c.notes}</p>}
 
-          {/* Способы оплаты */}
-          {Object.keys(c.payment_breakdown).length > 0 && (
-            <PaymentPills breakdown={c.payment_breakdown} />
-          )}
-
-          {/* Примечание */}
-          {c.notes && <p className="text-xs text-slate-400 italic leading-tight">{c.notes}</p>}
-
-          {/* Кнопки действий */}
-          <div className="flex gap-2 pt-1">
+          {/* Actions */}
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -255,6 +197,28 @@ function ClientRow({
             >
               ✎ Редактировать
             </button>
+            {!c.is_regular && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPromote();
+                }}
+                className="text-xs text-emerald-600 hover:text-emerald-800 px-3 py-1.5 rounded-lg border border-emerald-200 hover:border-emerald-300 transition-colors"
+              >
+                ★ В постоянные
+              </button>
+            )}
+            {c.is_regular && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPromote();
+                }}
+                className="text-xs text-slate-400 hover:text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
+              >
+                ↓ В новые
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -282,15 +246,69 @@ function ClientRow({
   );
 }
 
+function ClientList({
+  title,
+  clients,
+  badge,
+  mergeMode,
+  mergeSelected,
+  onMergeToggle,
+  onEdit,
+  onToggleActive,
+  onPromote,
+  onDelete,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  clients: Client[];
+  mergeMode: boolean;
+  mergeSelected: Set<string>;
+  onMergeToggle: (id: string) => void;
+  onEdit: (c: Client) => void;
+  onToggleActive: (c: Client) => void;
+  onPromote: (c: Client) => void;
+  onDelete: (c: Client) => void;
+}) {
+  if (clients.length === 0) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 flex items-center gap-2">
+        <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">{title}</h2>
+        {badge}
+        <span className="ml-auto text-xs text-slate-400">{clients.length}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {clients.map((c) => (
+          <ClientRow
+            key={c.id}
+            client={c}
+            mergeMode={mergeMode}
+            mergeSelected={mergeSelected.has(c.id)}
+            onMergeToggle={() => onMergeToggle(c.id)}
+            onEdit={() => onEdit(c)}
+            onToggleActive={() => onToggleActive(c)}
+            onPromote={() => onPromote(c)}
+            onDelete={() => onDelete(c)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ClientsPage() {
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<'all' | 'active' | 'debt'>('all');
   const [showInactive, setShowInactive] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Merge mode
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
+  const [mergeError, setMergeError] = useState('');
 
   useEffect(() => {
     if (showForm && formRef.current) {
@@ -327,11 +345,39 @@ export default function ClientsPage() {
     onError: (e: Error) => setFormError(e.message),
   });
 
+  const mergeMutation = useMutation({
+    mutationFn: ({ source_id, target_id }: { source_id: string; target_id: string }) =>
+      fetch('/api/counterparties/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_id, target_id }),
+      }).then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Ошибка объединения');
+        return json;
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      setMergeMode(false);
+      setMergeSelected(new Set());
+      setMergeError('');
+    },
+    onError: (e: Error) => setMergeError(e.message),
+  });
+
   const toggleActive = (client: Client) => {
     fetch(`/api/counterparties/${client.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !client.is_active }),
+    }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
+  };
+
+  const promoteClient = (client: Client) => {
+    fetch(`/api/counterparties/${client.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_regular: !client.is_regular }),
     }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
   };
 
@@ -365,94 +411,138 @@ export default function ClientsPage() {
     setShowForm(true);
   };
 
-  const handleSubmit = () => {
-    if (!form.name.trim()) {
-      setFormError('Введите название');
-      return;
-    }
-    saveMutation.mutate(form);
+  const handleMergeToggle = (id: string) => {
+    setMergeSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < 2) {
+        next.add(id);
+      }
+      return next;
+    });
+    setMergeError('');
   };
 
-  // Фильтрация
-  const visible = clients.filter((c) => {
-    if (!showInactive && !c.is_active) return false;
-    if (filter === 'active') return parseFloat(c.revenue_30d) > 0;
-    if (filter === 'debt') return parseFloat(c.outstanding_debt) > 0;
-    return true;
-  });
+  const handleMergeConfirm = () => {
+    const [a, b] = Array.from(mergeSelected);
+    if (!a || !b) return;
+    const ca = clients.find((c) => c.id === a)!;
+    const cb = clients.find((c) => c.id === b)!;
+    // The one with more trips/revenue is target
+    const targetId = parseFloat(ca.total_revenue) >= parseFloat(cb.total_revenue) ? a : b;
+    const sourceId = targetId === a ? b : a;
+    const target = clients.find((c) => c.id === targetId)!;
+    const source = clients.find((c) => c.id === sourceId)!;
+    if (
+      !confirm(
+        `Объединить «${source.name}» → «${target.name}»?\n\nВсе записи «${source.name}» перейдут к «${target.name}», затем «${source.name}» будет деактивирован.`,
+      )
+    )
+      return;
+    mergeMutation.mutate({ source_id: sourceId, target_id: targetId });
+  };
+
+  // Split lists
+  const active = clients.filter((c) => c.is_active || showInactive);
+  const regular = active.filter((c) => c.is_regular);
+  const newClients = active.filter((c) => !c.is_regular);
 
   // KPI
-  const activeCount = clients.filter((c) => c.is_active && parseFloat(c.revenue_30d) > 0).length;
   const totalRevenue = clients
     .filter((c) => c.is_active)
     .reduce((s, c) => s + parseFloat(c.total_revenue), 0);
-  const totalDebt = clients
-    .filter((c) => c.is_active)
-    .reduce((s, c) => s + parseFloat(c.outstanding_debt), 0);
+  const activeCount = clients.filter((c) => c.is_active && parseFloat(c.revenue_30d) > 0).length;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Заголовок */}
+    <div className="space-y-5 max-w-7xl mx-auto animate-in fade-in duration-500">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Постоянные клиенты</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Аналитика по клиентам с историей заказов</p>
+          <h1 className="text-2xl font-bold text-slate-900">Клиенты</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Управление клиентской базой</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
-        >
-          + Добавить
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setMergeMode((v) => !v);
+              setMergeSelected(new Set());
+              setMergeError('');
+            }}
+            className={`text-sm font-medium px-3 py-2 rounded-lg border transition-colors ${mergeMode ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+          >
+            {mergeMode ? '✕ Отмена' : '⇋ Объединить'}
+          </button>
+          <button
+            onClick={openCreate}
+            className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            + Добавить
+          </button>
+        </div>
       </div>
 
-      {/* KPI полоса */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          {
-            label: 'Всего клиентов',
-            value: clients.filter((c) => c.is_active).length,
-            sub: null,
-            color: 'text-slate-900',
-          },
-          {
-            label: 'Активны (30 дн.)',
-            value: activeCount,
-            sub: null,
-            color: 'text-emerald-600',
-          },
-          {
-            label: 'Выручка (всего)',
-            value: <Money amount={totalRevenue.toFixed(2)} />,
-            sub: null,
-            color: 'text-orange-600',
-          },
-          {
-            label: 'Долгов',
-            value: <Money amount={totalDebt.toFixed(2)} />,
-            sub: null,
-            color: totalDebt > 0 ? 'text-amber-600' : 'text-slate-300',
-          },
-        ].map((kpi, i) => (
-          <div key={i} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {kpi.label}
-            </p>
-            <p className={`text-xl font-black mt-1 ${kpi.color}`}>{kpi.value}</p>
-          </div>
-        ))}
+      {/* KPI */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Всего</p>
+          <p className="text-xl font-black text-slate-900 mt-0.5">
+            {clients.filter((c) => c.is_active).length}
+          </p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            Активны (30 дн.)
+          </p>
+          <p className="text-xl font-black text-emerald-600 mt-0.5">{activeCount}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Выручка</p>
+          <p className="text-xl font-black text-orange-600 mt-0.5">
+            <Money amount={totalRevenue.toFixed(2)} />
+          </p>
+        </div>
       </div>
 
-      {/* Форма */}
+      {/* Merge instructions */}
+      {mergeMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-bold text-blue-800">
+            Выберите двух клиентов для объединения — все записи перейдут к тому, у кого больше
+            выручки.
+          </p>
+          {mergeSelected.size === 2 && (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-blue-700">
+                {clients.find((c) => c.id === Array.from(mergeSelected)[0])?.name} ⇋{' '}
+                {clients.find((c) => c.id === Array.from(mergeSelected)[1])?.name}
+              </p>
+              <button
+                onClick={handleMergeConfirm}
+                disabled={mergeMutation.isPending}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {mergeMutation.isPending ? 'Объединяю...' : 'Объединить'}
+              </button>
+            </div>
+          )}
+          {mergeSelected.size < 2 && (
+            <p className="text-xs text-blue-600">Выбрано: {mergeSelected.size} / 2</p>
+          )}
+          {mergeError && <p className="text-xs text-rose-600 font-semibold">{mergeError}</p>}
+        </div>
+      )}
+
+      {/* Edit/Create form */}
       {showForm && (
         <div
           ref={formRef}
-          className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4"
+          className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-4"
         >
           <h2 className="text-sm font-bold text-slate-700">
-            {editId ? 'Редактировать клиента' : 'Новый постоянный клиент'}
+            {editId ? 'Редактировать клиента' : 'Новый клиент'}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">
                 Название / Имя *
@@ -479,18 +569,17 @@ export default function ClientsPage() {
               </label>
               <input
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-                placeholder="50 000"
+                placeholder="50000"
                 type="number"
                 value={form.credit_limit}
                 onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
               />
-              <p className="text-[10px] text-slate-400 mt-0.5">Максимальный допустимый долг</p>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">Примечание</label>
               <input
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-                placeholder="Постоянный с 2024, возит строй. материалы"
+                placeholder="Постоянный с 2024"
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
@@ -499,7 +588,7 @@ export default function ClientsPage() {
           {formError && <p className="text-xs text-rose-600 font-medium">{formError}</p>}
           <div className="flex gap-3">
             <button
-              onClick={handleSubmit}
+              onClick={() => saveMutation.mutate(form)}
               disabled={saveMutation.isPending}
               className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors"
             >
@@ -519,71 +608,59 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {/* Фильтры */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {(
-          [
-            { key: 'all', label: 'Все' },
-            { key: 'active', label: 'Активны (30 дн.)' },
-            { key: 'debt', label: 'С долгом' },
-          ] as const
-        ).map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full transition-colors ${
-              filter === f.key
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(e) => setShowInactive(e.target.checked)}
-            className="accent-slate-700"
-          />
-          Показать архивных
-        </label>
-      </div>
+      {/* Show inactive toggle */}
+      <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer w-fit">
+        <input
+          type="checkbox"
+          checked={showInactive}
+          onChange={(e) => setShowInactive(e.target.checked)}
+          className="accent-slate-700"
+        />
+        Показать архивных
+      </label>
 
-      {/* Карточки */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-64 bg-slate-100 rounded-xl animate-pulse" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-11 bg-slate-100 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : visible.length === 0 ? (
+      ) : clients.length === 0 ? (
         <div className="py-20 text-center">
           <p className="text-5xl mb-3">🏢</p>
-          <p className="font-semibold text-slate-500">
-            {filter !== 'all' ? 'Нет клиентов по этому фильтру' : 'Клиентов нет'}
-          </p>
-          {filter === 'all' && (
-            <p className="text-sm text-slate-400 mt-1">
-              Нажмите «+ Добавить» чтобы создать карточку
-            </p>
-          )}
+          <p className="font-semibold text-slate-500">Клиентов нет</p>
+          <p className="text-sm text-slate-400 mt-1">Нажмите «+ Добавить» чтобы создать карточку</p>
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="divide-y divide-slate-100">
-            {visible.map((c) => (
-              <ClientRow
-                key={c.id}
-                client={c}
-                onEdit={() => openEdit(c)}
-                onToggleActive={() => toggleActive(c)}
-                onDelete={() => deleteClient(c)}
-              />
-            ))}
-          </div>
-        </div>
+        <>
+          <ClientList
+            title="Постоянные клиенты"
+            badge={
+              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded uppercase tracking-wide">
+                Проверенные
+              </span>
+            }
+            clients={regular}
+            mergeMode={mergeMode}
+            mergeSelected={mergeSelected}
+            onMergeToggle={handleMergeToggle}
+            onEdit={openEdit}
+            onToggleActive={toggleActive}
+            onPromote={promoteClient}
+            onDelete={deleteClient}
+          />
+          <ClientList
+            title="Новые клиенты"
+            clients={newClients}
+            mergeMode={mergeMode}
+            mergeSelected={mergeSelected}
+            onMergeToggle={handleMergeToggle}
+            onEdit={openEdit}
+            onToggleActive={toggleActive}
+            onPromote={promoteClient}
+            onDelete={deleteClient}
+          />
+        </>
       )}
     </div>
   );

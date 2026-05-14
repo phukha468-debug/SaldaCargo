@@ -69,6 +69,24 @@ export function formatDuration(minutes: number): string {
 }
 
 /**
+ * Форматирует российский номер телефона для отображения.
+ * "+79991234567" → "+7 (999) 123-45-67"
+ * Работает с 10- и 11-значными номерами.
+ */
+export function formatPhone(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+    const d = digits.slice(1);
+    return `+7 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 8)}-${d.slice(8, 10)}`;
+  }
+  if (digits.length === 10) {
+    return `+7 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 10)}`;
+  }
+  return raw;
+}
+
+/**
  * Складывает денежные строки. Никогда не используй обычный +.
  * Пример: addMoney("100.50", "200.00") → "300.50"
  */
