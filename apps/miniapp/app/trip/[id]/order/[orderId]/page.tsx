@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -72,11 +72,13 @@ export default function EditOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [initialized, setInitialized] = useState(false);
   const [loaders, setLoaders] = useState<SelectedLoader[]>([]);
   const [showLoaderPicker, setShowLoaderPicker] = useState(false);
+  const searchBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: trip, isLoading } = useQuery<Trip>({
     queryKey: ['trip', tripId],
@@ -151,7 +153,7 @@ export default function EditOrderPage() {
   const filteredCounterparties =
     searchTerm.length > 0
       ? counterparties.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      : [];
+      : counterparties;
 
   const availableLoaders = allLoaders.filter((l) => !loaders.find((s) => s.id === l.id));
 
@@ -346,16 +348,25 @@ export default function EditOrderPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Поиск клиента..."
                 className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-zinc-900 font-bold focus:border-orange-500 focus:outline-none transition-colors"
+                onFocus={() => {
+                  if (searchBlurTimer.current) clearTimeout(searchBlurTimer.current);
+                  setSearchFocused(true);
+                }}
+                onBlur={() => {
+                  searchBlurTimer.current = setTimeout(() => setSearchFocused(false), 150);
+                }}
               />
-              {searchTerm.length > 0 && (
+              {searchFocused && (
                 <div className="absolute top-full left-0 right-0 bg-white border-2 border-zinc-200 rounded-lg mt-1 shadow-xl z-10 max-h-60 overflow-y-auto">
                   {filteredCounterparties.map((c) => (
                     <button
                       key={c.id}
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setValue('counterparty_id', c.id);
                         setSearchTerm('');
+                        setSearchFocused(false);
                       }}
                       className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0"
                     >
@@ -364,24 +375,17 @@ export default function EditOrderPage() {
                   ))}
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setNewClientName(searchTerm);
                       setShowNewClient(true);
+                      setSearchFocused(false);
                     }}
                     className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
                   >
-                    + Новый клиент &quot;{searchTerm}&quot;
+                    + Новый клиент{searchTerm ? ` "${searchTerm}"` : ''}
                   </button>
                 </div>
-              )}
-              {searchTerm.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowNewClient(true)}
-                  className="w-full text-left px-4 h-14 border-2 border-dashed border-zinc-300 rounded-lg text-zinc-400 font-bold mt-2"
-                >
-                  + Новый клиент
-                </button>
               )}
             </div>
           )}
