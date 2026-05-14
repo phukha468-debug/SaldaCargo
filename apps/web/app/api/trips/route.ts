@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const lifecycle = searchParams.get('lifecycle') ?? 'draft';
   const status = searchParams.get('status');
   const date = searchParams.get('date'); // YYYY-MM-DD
+  const month = searchParams.get('month'); // YYYY-MM
 
   const supabase = createAdminClient();
 
@@ -41,7 +42,14 @@ export async function GET(request: Request) {
     query = query.eq('status', status);
   }
 
-  if (date) {
+  if (month) {
+    const parts = month.split('-');
+    const y = parseInt(parts[0]!, 10);
+    const m = parseInt(parts[1]!, 10);
+    const start = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    const end = new Date(Date.UTC(y, m, 1)).toISOString();
+    query = query.gte('started_at', start).lt('started_at', end);
+  } else if (date) {
     const start = `${date}T00:00:00Z`;
     const end = `${date}T23:59:59Z`;
     query = query.gte('started_at', start).lte('started_at', end);

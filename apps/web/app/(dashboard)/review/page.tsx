@@ -770,6 +770,24 @@ export default function ReviewPage() {
     },
   });
 
+  const monthKey = selectedDate.slice(0, 7); // YYYY-MM
+  const { data: monthTrips = [] } = useQuery<TripForReview[]>({
+    queryKey: ['trips-month', monthKey],
+    enabled: mode === 'history',
+    queryFn: async () => {
+      const res = await fetch(`/api/trips?lifecycle=approved&month=${monthKey}`);
+      if (!res.ok) throw new Error('Ошибка загрузки');
+      return res.json();
+    },
+  });
+
+  const monthRevenue = monthTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
+  const monthCosts = monthTrips.reduce((s, t) => {
+    const c = calcTrip(t);
+    return s + c.driverPay + c.loaderPay + c.totalExpenses;
+  }, 0);
+  const monthProfit = monthTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
+
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -1029,6 +1047,67 @@ export default function ReviewPage() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Monthly totals strip — history mode only */}
+      {mode === 'history' && monthTrips.length > 0 && (
+        <div className="rounded-2xl overflow-hidden border border-sky-900/40 shadow-sm bg-sky-950 text-white">
+          <div className="px-4 py-2 border-b border-sky-900/60 flex items-center gap-2">
+            <span className="material-symbols-outlined text-sky-600 text-[16px]">
+              calendar_month
+            </span>
+            <span className="text-[10px] font-bold text-sky-700 uppercase tracking-widest">
+              Итого за месяц · {monthTrips.length} рейс
+              {monthTrips.length === 1 ? '' : monthTrips.length < 5 ? 'а' : 'ов'} ·{' '}
+              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ru-RU', {
+                month: 'long',
+                year: 'numeric',
+              })}
+            </span>
+          </div>
+          <div className="flex items-center px-4 py-3">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center">
+                <div className="w-[100px] text-center">
+                  <span className="text-[8px] font-bold text-sky-800 uppercase tracking-widest block">
+                    Выручка
+                  </span>
+                  <span className="text-base font-black text-white">
+                    <Money amount={monthRevenue.toFixed(2)} />
+                  </span>
+                </div>
+                <span className="w-5 text-center text-sky-900 text-sm">−</span>
+                <div className="w-[100px] text-center">
+                  <span className="text-[8px] font-bold text-sky-800 uppercase tracking-widest block">
+                    Расходы
+                  </span>
+                  <span className="text-base font-black text-rose-400">
+                    <Money amount={monthCosts.toFixed(2)} />
+                  </span>
+                </div>
+                <span className="w-5 text-center text-sky-900 text-sm">=</span>
+                <div className="w-[100px] text-center">
+                  <span className="text-[8px] font-bold text-sky-800 uppercase tracking-widest block">
+                    Прибыль
+                  </span>
+                  <span
+                    className={cn(
+                      'text-lg font-black',
+                      monthProfit > 0
+                        ? 'text-emerald-400'
+                        : monthProfit < 0
+                          ? 'text-rose-400'
+                          : 'text-sky-500',
+                    )}
+                  >
+                    {monthProfit < 0 ? '−' : ''}
+                    <Money amount={Math.abs(monthProfit).toFixed(2)} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
