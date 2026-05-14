@@ -7,6 +7,16 @@ import Link from 'next/link';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatDuration } from '@saldacargo/shared';
 
+type TripCard = {
+  id: string;
+  trip_number: number;
+  status: string;
+  lifecycle_status: string;
+  started_at: string;
+  asset: { short_name: string };
+  trip_orders: Array<{ amount: string; driver_pay: string; lifecycle_status: string }>;
+};
+
 // Тип ответа API
 interface DriverSummary {
   activeTrip: {
@@ -17,15 +27,8 @@ interface DriverSummary {
     asset: { short_name: string; reg_number: string };
     loader: { name: string } | null;
   } | null;
-  recentTrips: Array<{
-    id: string;
-    trip_number: number;
-    status: string;
-    lifecycle_status: string;
-    started_at: string;
-    asset: { short_name: string };
-    trip_orders: Array<{ amount: string; driver_pay: string; lifecycle_status: string }>;
-  }>;
+  reviewTrips: TripCard[];
+  recentTrips: TripCard[];
   accountableBalance: string;
   monthPayApproved: string;
   monthPayDraft: string;
@@ -343,7 +346,7 @@ export default function RootPage() {
 
       {/* Кнопки действий */}
       <div className="flex gap-3">
-        {!data?.activeTrip && (
+        {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
           <button
             onClick={handleStartTrip}
             disabled={startingTrip}
@@ -357,11 +360,11 @@ export default function RootPage() {
           onClick={() => setShowRepairForm(true)}
           className={cn(
             'flex items-center justify-center gap-2 bg-zinc-800 text-white rounded-lg py-5 font-black shadow-lg active:bg-zinc-700 active:scale-[0.98] transition-all uppercase tracking-wide text-base',
-            data?.activeTrip ? 'flex-1' : 'px-5',
+            data?.activeTrip || (data?.reviewTrips ?? []).length > 0 ? 'flex-1' : 'px-5',
           )}
         >
           <span>🔧</span>
-          {data?.activeTrip && <span>Починить</span>}
+          {(data?.activeTrip || (data?.reviewTrips ?? []).length > 0) && <span>Починить</span>}
         </button>
       </div>
       {startTripError && (
@@ -382,6 +385,20 @@ export default function RootPage() {
 
       {/* Активный рейс */}
       {data?.activeTrip && <ActiveTripCard trip={data.activeTrip} />}
+
+      {/* Рейсы на ревью (завершены, ожидают апрува) */}
+      {(data?.reviewTrips ?? []).length > 0 && (
+        <section className="pt-2">
+          <h2 className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-3">
+            На проверке у администратора
+          </h2>
+          <div className="space-y-3">
+            {data?.reviewTrips.map((trip) => (
+              <ReviewTripCard key={trip.id} trip={trip} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Последние рейсы */}
       {(data?.recentTrips ?? []).length > 0 && (
@@ -477,18 +494,45 @@ function ActiveTripCard({
   );
 }
 
-function RecentTripCard({
-  trip,
-}: {
-  trip: {
-    id: string;
-    trip_number: number;
-    lifecycle_status: string;
-    started_at: string;
-    asset: { short_name: string };
-    trip_orders: Array<{ amount: string; driver_pay: string; lifecycle_status: string }>;
-  };
-}) {
+function ReviewTripCard({ trip }: { trip: TripCard }) {
+  const revenue = trip.trip_orders
+    .filter((o) => o.lifecycle_status !== 'cancelled')
+    .reduce((s, o) => s + parseFloat(o.amount), 0);
+
+  const driverPay = trip.trip_orders
+    .filter((o) => o.lifecycle_status !== 'cancelled')
+    .reduce((s, o) => s + parseFloat(o.driver_pay), 0);
+
+  return (
+    <Link href={`/trip/${trip.id}`}>
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 active:bg-amber-100 transition-colors relative overflow-hidden">
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+            Ждёт проверки
+          </span>
+          <span className="text-[10px] font-bold text-amber-600">
+            {formatDate(trip.started_at)}
+          </span>
+        </div>
+        <p className="font-black text-zinc-900 text-base">
+          Рейс №{trip.trip_number} · {trip.asset.short_name}
+        </p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-amber-700 font-bold">Администратор ещё не проверил</p>
+          <div className="text-right">
+            <Money amount={revenue.toString()} className="text-sm font-black text-zinc-900" />
+            <div className="text-xs text-green-600 font-bold">
+              ЗП: <Money amount={driverPay.toString()} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function RecentTripCard({ trip }: { trip: TripCard }) {
   const revenue = trip.trip_orders
     .filter((o) => o.lifecycle_status !== 'cancelled')
     .reduce((s, o) => s + parseFloat(o.amount), 0);

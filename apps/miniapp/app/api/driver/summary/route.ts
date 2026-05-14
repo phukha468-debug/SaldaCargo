@@ -31,6 +31,21 @@ export async function GET() {
     .neq('lifecycle_status', 'cancelled')
     .maybeSingle() as any);
 
+  // Рейсы на ревью (завершены водителем, ожидают апрува админа)
+  const { data: reviewTrips } = await (supabase
+    .from('trips')
+    .select(
+      `
+      id, trip_number, status, lifecycle_status, started_at, ended_at,
+      asset:assets(short_name),
+      trip_orders(amount, driver_pay, lifecycle_status)
+    `,
+    )
+    .eq('driver_id', driverId)
+    .eq('status', 'completed')
+    .eq('lifecycle_status', 'draft')
+    .order('started_at', { ascending: false }) as any);
+
   // Последние 3 рейса (не активные)
   const { data: recentTrips } = await (supabase
     .from('trips')
@@ -96,6 +111,7 @@ export async function GET() {
 
   return NextResponse.json({
     activeTrip,
+    reviewTrips: reviewTrips ?? [],
     recentTrips: recentTrips ?? [],
     accountableBalance,
     monthPayApproved: approvedPay.toFixed(2),
