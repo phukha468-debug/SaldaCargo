@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const supabase = createAdminClient();
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0]!;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
     const [ordersRes, manualsRes, followUpsRes] = await Promise.all([

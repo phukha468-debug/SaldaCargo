@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
 
 type Client = {
@@ -84,6 +84,13 @@ function ClientRow({
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const expandedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (expanded && expandedRef.current) {
+      expandedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [expanded]);
   const debt = parseFloat(c.outstanding_debt);
   const limit = parseFloat(c.credit_limit ?? '0');
   const limitPct = limit > 0 ? Math.min((debt / limit) * 100, 100) : 0;
@@ -152,7 +159,10 @@ function ClientRow({
 
       {/* Раскрытая панель */}
       {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4">
+        <div
+          ref={expandedRef}
+          className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4"
+        >
           {/* Три метрики */}
           <div className="grid grid-cols-3 gap-0 border border-slate-100 rounded-lg overflow-hidden bg-white">
             <div className="px-3 py-2.5 text-center">
@@ -280,6 +290,13 @@ export default function ClientsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showForm && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showForm]);
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
@@ -428,7 +445,10 @@ export default function ClientsPage() {
 
       {/* Форма */}
       {showForm && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
+        <div
+          ref={formRef}
+          className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4"
+        >
           <h2 className="text-sm font-bold text-slate-700">
             {editId ? 'Редактировать клиента' : 'Новый постоянный клиент'}
           </h2>

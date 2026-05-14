@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
@@ -76,7 +76,7 @@ function passesAgingFilter(debtor: Debtor, filter: AgingFilter): boolean {
 
 function PromiseDateBadge({ follow_up }: { follow_up: FollowUp | null }) {
   if (!follow_up?.promise_date) return null;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0]!;
   const diff = Math.floor((new Date(follow_up.promise_date).getTime() - Date.now()) / 86400000);
   const isOverdue = follow_up.promise_date < today;
   return (
@@ -351,6 +351,18 @@ export default function ReceivablesPage() {
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [agingFilter, setAgingFilter] = useState<AgingFilter>('all');
 
+  useEffect(() => {
+    if (!expandedId) return;
+    const el = document.querySelector(`[data-debtor-id="${expandedId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [expandedId]);
+
+  useEffect(() => {
+    if (!editingFollowUpId) return;
+    const el = document.querySelector(`[data-followup-id="${editingFollowUpId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [editingFollowUpId]);
+
   const { data, isLoading, isError } = useQuery<ReceivablesData>({
     queryKey: ['receivables'],
     queryFn: () => fetch('/api/receivables').then((r) => r.json()),
@@ -548,7 +560,7 @@ export default function ReceivablesPage() {
                 const statusCfg = fu ? STATUS_CONFIG[fu.status] : null;
 
                 return (
-                  <div key={debtor.counterparty_id}>
+                  <div key={debtor.counterparty_id} data-debtor-id={debtor.counterparty_id}>
                     {/* Debtor header row */}
                     <div
                       className={`px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-slate-50' : ''}`}
@@ -707,12 +719,14 @@ export default function ReceivablesPage() {
 
                         {/* Inline follow-up form */}
                         {isReal && editingFollowUpId === debtor.counterparty_id && (
-                          <FollowUpForm
-                            counterpartyId={debtor.counterparty_id}
-                            current={debtor.follow_up}
-                            onClose={() => setEditingFollowUpId(null)}
-                            onSaved={handleFollowUpSaved}
-                          />
+                          <div data-followup-id={debtor.counterparty_id}>
+                            <FollowUpForm
+                              counterpartyId={debtor.counterparty_id}
+                              current={debtor.follow_up}
+                              onClose={() => setEditingFollowUpId(null)}
+                              onSaved={handleFollowUpSaved}
+                            />
+                          </div>
                         )}
 
                         {/* Orders table */}

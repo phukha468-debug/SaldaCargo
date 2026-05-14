@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
@@ -1146,6 +1146,18 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
     setShowFollowUpId(debtor.counterparty_id);
   }
 
+  useEffect(() => {
+    if (!selectedDebtorId) return;
+    const el = document.querySelector(`[data-debtor-id="${selectedDebtorId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedDebtorId]);
+
+  useEffect(() => {
+    if (!showFollowUpId) return;
+    const el = document.querySelector(`[data-followup-id="${showFollowUpId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [showFollowUpId]);
+
   const debtors = data?.debtors ?? [];
   const selectedDebtor = debtors.find((d) => d.counterparty_id === selectedDebtorId) ?? null;
 
@@ -1186,11 +1198,11 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
             const isSelected = selectedDebtorId === d.counterparty_id;
             const fu = d.follow_up;
             const isReal = !d.is_individual && !String(d.counterparty_id).startsWith('__');
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toISOString().split('T')[0]!;
             const promiseOverdue = fu?.promise_date && fu.promise_date < today;
 
             return (
-              <div key={d.counterparty_id}>
+              <div key={d.counterparty_id} data-debtor-id={d.counterparty_id}>
                 {/* Debtor header */}
                 <button
                   type="button"
@@ -1243,7 +1255,10 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                       <div>
                         {showFollowUpId === d.counterparty_id ? (
                           /* Follow-up form */
-                          <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 space-y-3">
+                          <div
+                            data-followup-id={d.counterparty_id}
+                            className="p-3 bg-blue-50 rounded-xl border border-blue-200 space-y-3"
+                          >
                             <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
                               📞 Фиксация звонка
                             </p>
