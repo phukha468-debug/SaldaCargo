@@ -31,7 +31,3 @@ CREATE POLICY "Service role full access on receivable_follow_ups"
   WITH CHECK (true);
 
 GRANT ALL ON TABLE receivable_follow_ups TO postgres, anon, authenticated, service_role;
-
-CREATE TRIGGER trg_receivable_follow_ups_updated_at
-  BEFORE UPDATE ON receivable_follow_ups
-  FOR EACH ROW EXECUTE FUNCTION moddatetime(updated_at);

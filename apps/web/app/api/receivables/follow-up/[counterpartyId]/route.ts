@@ -29,6 +29,7 @@ export async function PATCH(
   const payload: Record<string, any> = {
     counterparty_id: counterpartyId,
     last_contact_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     updated_by: userId,
   };
 
