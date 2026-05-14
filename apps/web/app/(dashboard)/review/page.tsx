@@ -6,6 +6,11 @@ import { Money } from '@saldacargo/ui';
 import { formatTime } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
+interface Counterparty {
+  id: string;
+  name: string;
+}
+
 interface TripOrder {
   id: string;
   amount: string;
@@ -14,6 +19,7 @@ interface TripOrder {
   payment_method: string;
   settlement_status: string;
   lifecycle_status: string;
+  counterparty_id: string | null;
   counterparty: { name: string } | null;
 }
 
@@ -194,7 +200,107 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
 
 // ── Edit Modal ──────────────────────────────────────────────
 
-type EditableOrder = TripOrder & { counterparty_name: string };
+type EditableOrder = TripOrder & {
+  _selectedId: string | null;
+  _inputValue: string;
+};
+
+function CounterpartySelect({
+  value,
+  inputValue,
+  counterparties,
+  onChange,
+}: {
+  value: string | null;
+  inputValue: string;
+  counterparties: Counterparty[];
+  onChange: (id: string | null, name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(inputValue);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setQuery(inputValue);
+  }, [inputValue]);
+
+  const filtered = query.trim()
+    ? counterparties.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
+    : counterparties;
+
+  const handleSelect = (cp: Counterparty) => {
+    setQuery(cp.name);
+    setOpen(false);
+    onChange(cp.id, cp.name);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    setOpen(false);
+    onChange(null, '');
+  };
+
+  const handleBlur = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  };
+
+  const handleFocus = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+
+  const inputCls =
+    'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition-all';
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          className={inputCls}
+          value={query}
+          placeholder="Поиск клиента..."
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (!e.target.value.trim()) onChange(null, '');
+          }}
+        />
+        {value && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-500 text-xs font-bold transition-colors"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.slice(0, 20).map((cp) => (
+            <li key={cp.id}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(cp)}
+                className={cn(
+                  'w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors',
+                  cp.id === value ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-700',
+                )}
+              >
+                {cp.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function EditModal({
   trip,
@@ -207,21 +313,49 @@ function EditModal({
 }) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
   const [orders, setOrders] = useState<EditableOrder[]>(
-    activeOrders.map((o) => ({ ...o, counterparty_name: o.counterparty?.name ?? '' })),
+    activeOrders.map((o) => ({
+      ...o,
+      _selectedId: o.counterparty_id,
+      _inputValue: o.counterparty?.name ?? '',
+    })),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const { data: counterparties = [] } = useQuery<Counterparty[]>({
+    queryKey: ['counterparties-list'],
+    queryFn: () =>
+      fetch('/api/counterparties?active=1')
+        .then((r) => r.json())
+        .then((d) =>
+          Array.isArray(d) ? d.map((c: Counterparty) => ({ id: c.id, name: c.name })) : [],
+        ),
+    staleTime: 60000,
+  });
 
   const update = (id: string, field: keyof EditableOrder, value: string) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [field]: value } : o)));
   };
 
+  const updateCounterparty = (orderId: string, cpId: string | null, cpName: string) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, _selectedId: cpId, _inputValue: cpName } : o)),
+    );
+  };
+
   const save = async () => {
     setSaving(true);
     setError('');
-    const payload = orders.map(({ counterparty_name, ...rest }) => ({
-      ...rest,
-      counterparty_name,
+    const payload = orders.map((o) => ({
+      id: o.id,
+      amount: o.amount,
+      driver_pay: o.driver_pay,
+      loader_pay: o.loader_pay,
+      payment_method: o.payment_method,
+      counterparty_id: o._selectedId,
+      ...(o._selectedId === null && o._inputValue.trim()
+        ? { counterparty_name: o._inputValue.trim() }
+        : {}),
     }));
     const res = await fetch(`/api/trips/${trip.id}`, {
       method: 'PATCH',
@@ -276,12 +410,11 @@ function EditModal({
                 <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
                   Клиент
                 </label>
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={order.counterparty_name}
-                  placeholder="Название клиента"
-                  onChange={(e) => update(order.id, 'counterparty_name', e.target.value)}
+                <CounterpartySelect
+                  value={order._selectedId}
+                  inputValue={order._inputValue}
+                  counterparties={counterparties}
+                  onChange={(id, name) => updateCounterparty(order.id, id, name)}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

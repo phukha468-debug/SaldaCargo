@@ -14,6 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         loader_pay?: string;
         description?: string;
         payment_method?: string;
+        counterparty_id?: string | null;
         counterparty_name?: string;
       }>;
     };
@@ -32,7 +33,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (fields.description !== undefined)
           update.description = fields.description?.trim() || null;
         if (fields.payment_method !== undefined) update.payment_method = fields.payment_method;
-        if (fields.counterparty_name !== undefined) {
+        if (fields.counterparty_id !== undefined) {
+          update.counterparty_id = fields.counterparty_id ?? null;
+        } else if (fields.counterparty_name !== undefined) {
           const name = fields.counterparty_name.trim();
           if (name) {
             const { data: found } = await (supabase.from('counterparties') as any)

@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       trip_orders(
         id, amount, driver_pay, loader_pay,
         payment_method, settlement_status, lifecycle_status,
+        counterparty_id,
         counterparty:counterparties(name)
       ),
       trip_expenses(
