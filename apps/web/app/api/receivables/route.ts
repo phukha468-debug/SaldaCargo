@@ -102,9 +102,30 @@ export async function GET() {
       });
     }
 
-    const result = Array.from(grouped.values())
+    const partialResult = Array.from(grouped.values())
       .map((g) => ({ ...g, total: g.total.toFixed(2) }))
       .sort((a, b) => parseFloat(b.total) - parseFloat(a.total));
+
+    // Attach follow-up data for real counterparty groups
+    const realCpIds = partialResult
+      .filter((g) => !g.is_individual && !String(g.counterparty_id).startsWith('__'))
+      .map((g) => g.counterparty_id);
+
+    let followUpMap = new Map<string, any>();
+    if (realCpIds.length > 0) {
+      const { data: followUps } = await (supabase as any)
+        .from('receivable_follow_ups')
+        .select(
+          'counterparty_id, status, promise_date, last_contact_at, next_contact_at, notes, updated_at',
+        )
+        .in('counterparty_id', realCpIds);
+      followUpMap = new Map((followUps ?? []).map((f: any) => [f.counterparty_id, f]));
+    }
+
+    const result = partialResult.map((g) => ({
+      ...g,
+      follow_up: followUpMap.get(g.counterparty_id) ?? null,
+    }));
 
     const totalAmount = result.reduce((s, g) => s + parseFloat(g.total), 0).toFixed(2);
     const overdueCount = result.filter((g) => {

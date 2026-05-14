@@ -1008,8 +1008,9 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
 
 type ReceivableOrder = {
   id: string;
+  type: 'trip_order' | 'manual';
   amount: string;
-  payment_method: string;
+  payment_method: string | null;
   description: string | null;
   created_at: string;
   trip_number: number | null;
@@ -1017,21 +1018,54 @@ type ReceivableOrder = {
   driver_name: string | null;
 };
 
+type FollowUp = {
+  status: 'active' | 'promised' | 'disputed' | 'bad_debt';
+  promise_date: string | null;
+  last_contact_at: string | null;
+  next_contact_at: string | null;
+  notes: string | null;
+};
+
 type Debtor = {
   counterparty_id: string;
   counterparty_name: string;
+  counterparty_phone: string | null;
   counterparty_subname: string | null;
   is_individual: boolean;
   total: string;
   oldest_at: string;
   orders: ReceivableOrder[];
+  follow_up: FollowUp | null;
+};
+
+const FOLLOW_UP_STATUS_LABELS: Record<string, string> = {
+  active: 'В работе',
+  promised: 'Обещание',
+  disputed: 'Оспаривает',
+  bad_debt: 'Безнадёжный',
+};
+
+const FOLLOW_UP_STATUS_COLORS: Record<string, string> = {
+  active: 'border-amber-400 bg-amber-50 text-amber-800',
+  promised: 'border-blue-400 bg-blue-50 text-blue-800',
+  disputed: 'border-zinc-300 bg-zinc-50 text-zinc-600',
+  bad_debt: 'border-red-400 bg-red-50 text-red-700',
 };
 
 function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [selectedDebtorId, setSelectedDebtorId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<ReceivableOrder | null>(null);
+  const [showFollowUpId, setShowFollowUpId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+
+  // Follow-up form state
+  const [fuStatus, setFuStatus] = useState<string>('active');
+  const [fuPromiseDate, setFuPromiseDate] = useState('');
+  const [fuNextContact, setFuNextContact] = useState('');
+  const [fuNotes, setFuNotes] = useState('');
+  const [fuSaving, setFuSaving] = useState(false);
+  const [fuError, setFuError] = useState('');
 
   const {
     data,
@@ -1058,7 +1092,8 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          order_id: selectedOrder.id,
+          id: selectedOrder.id,
+          type: selectedOrder.type,
           note: note || undefined,
         }),
       });
@@ -1075,6 +1110,41 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
     },
     onError: (e: Error) => setError(e.message),
   });
+
+  async function handleFollowUpSave(counterpartyId: string) {
+    setFuSaving(true);
+    setFuError('');
+    try {
+      const r = await fetch(`/api/admin/receivables/follow-up/${counterpartyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: fuStatus,
+          promise_date: fuPromiseDate || null,
+          next_contact_at: fuNextContact || null,
+          notes: fuNotes || null,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
+      setShowFollowUpId(null);
+    } catch (e: unknown) {
+      setFuError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFuSaving(false);
+    }
+  }
+
+  function openFollowUp(debtor: Debtor) {
+    const fu = debtor.follow_up;
+    setFuStatus(fu?.status ?? 'active');
+    setFuPromiseDate(fu?.promise_date ?? '');
+    setFuNextContact(fu?.next_contact_at ?? '');
+    setFuNotes(fu?.notes ?? '');
+    setFuError('');
+    setShowFollowUpId(debtor.counterparty_id);
+  }
 
   const debtors = data?.debtors ?? [];
   const selectedDebtor = debtors.find((d) => d.counterparty_id === selectedDebtorId) ?? null;
@@ -1114,16 +1184,23 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
           </label>
           {debtors.map((d) => {
             const isSelected = selectedDebtorId === d.counterparty_id;
+            const fu = d.follow_up;
+            const isReal = !d.is_individual && !String(d.counterparty_id).startsWith('__');
+            const today = new Date().toISOString().split('T')[0];
+            const promiseOverdue = fu?.promise_date && fu.promise_date < today;
+
             return (
               <div key={d.counterparty_id}>
+                {/* Debtor header */}
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedDebtorId(isSelected ? null : d.counterparty_id);
                     setSelectedOrder(null);
+                    setShowFollowUpId(null);
                     setError('');
                   }}
-                  className={`w-full p-3 rounded-xl border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.98] ${
+                  className={`w-full p-3 rounded-xl border-2 flex justify-between items-start text-sm font-bold transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'border-orange-500 bg-orange-50 text-orange-900'
                       : 'border-zinc-200 text-zinc-700'
@@ -1136,19 +1213,175 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                         {d.counterparty_subname}
                       </p>
                     )}
+                    {fu && (
+                      <p
+                        className={`text-[9px] font-bold uppercase mt-0.5 ${promiseOverdue ? 'text-red-500' : 'text-zinc-400'}`}
+                      >
+                        {promiseOverdue
+                          ? `⚠ Обещание просрочено`
+                          : FOLLOW_UP_STATUS_LABELS[fu.status]}
+                        {fu.promise_date &&
+                          !promiseOverdue &&
+                          ` · ${new Date(fu.promise_date + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-black text-xs text-orange-600">
                       {parseFloat(d.total).toLocaleString('ru-RU')} ₽
                     </p>
                     <p className="text-[9px] text-zinc-400 font-bold uppercase">
-                      {d.orders.length} заказ{d.orders.length > 1 ? 'а' : ''}
+                      {d.orders.length} {d.orders.length === 1 ? 'запись' : 'записи'}
                     </p>
                   </div>
                 </button>
 
                 {isSelected && (
-                  <div className="mt-1 ml-2 space-y-1">
+                  <div className="mt-1 ml-2 space-y-2">
+                    {/* Follow-up controls — only for real counterparties */}
+                    {isReal && (
+                      <div>
+                        {showFollowUpId === d.counterparty_id ? (
+                          /* Follow-up form */
+                          <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 space-y-3">
+                            <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
+                              📞 Фиксация звонка
+                            </p>
+
+                            {/* Status buttons */}
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {Object.entries(FOLLOW_UP_STATUS_LABELS).map(([key, label]) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => setFuStatus(key)}
+                                  className={`py-2 rounded-lg border-2 text-[10px] font-black uppercase tracking-wide transition-all active:scale-[0.97] ${
+                                    fuStatus === key
+                                      ? FOLLOW_UP_STATUS_COLORS[key]
+                                      : 'border-zinc-200 text-zinc-500 bg-white'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Promise date — only when promised */}
+                            {fuStatus === 'promised' && (
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                                  Обещает оплатить
+                                </label>
+                                <input
+                                  type="date"
+                                  value={fuPromiseDate}
+                                  onChange={(e) => setFuPromiseDate(e.target.value)}
+                                  className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
+                                />
+                              </div>
+                            )}
+
+                            {/* Next contact */}
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                                Следующий звонок
+                              </label>
+                              <input
+                                type="date"
+                                value={fuNextContact}
+                                onChange={(e) => setFuNextContact(e.target.value)}
+                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Notes */}
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                                Заметка
+                              </label>
+                              <input
+                                type="text"
+                                value={fuNotes}
+                                onChange={(e) => setFuNotes(e.target.value)}
+                                placeholder="Итог разговора..."
+                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+
+                            {fuError && <p className="text-red-600 text-xs font-bold">{fuError}</p>}
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowFollowUpId(null)}
+                                className="flex-1 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 border-zinc-200 text-zinc-500 active:scale-[0.97]"
+                              >
+                                Отмена
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleFollowUpSave(d.counterparty_id)}
+                                disabled={fuSaving}
+                                className="flex-1 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest text-white bg-blue-600 active:scale-[0.97] disabled:opacity-50"
+                              >
+                                {fuSaving ? '...' : '✓ Сохранить'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Follow-up summary + open button */
+                          <div className="flex items-center justify-between px-1 py-1.5">
+                            <div>
+                              {fu ? (
+                                <div>
+                                  <p
+                                    className={`text-[10px] font-black uppercase ${promiseOverdue ? 'text-red-500' : 'text-zinc-400'}`}
+                                  >
+                                    {FOLLOW_UP_STATUS_LABELS[fu.status]}
+                                    {fu.notes &&
+                                      ` · «${fu.notes.slice(0, 30)}${fu.notes.length > 30 ? '…' : ''}»`}
+                                  </p>
+                                  {fu.next_contact_at && (
+                                    <p className="text-[9px] text-blue-500 font-bold">
+                                      Позвонить:{' '}
+                                      {new Date(
+                                        fu.next_contact_at + 'T12:00:00',
+                                      ).toLocaleDateString('ru-RU', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-[10px] text-zinc-300 font-bold uppercase">
+                                  Звонки не фиксировались
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => openFollowUp(d)}
+                              className="px-3 py-2 rounded-lg border-2 border-blue-200 text-blue-600 text-[10px] font-black uppercase tracking-wide active:scale-[0.97] bg-blue-50"
+                            >
+                              📞 Звонок
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Phone button */}
+                    {d.counterparty_phone && (
+                      <a
+                        href={`tel:${d.counterparty_phone}`}
+                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-zinc-200 text-zinc-700 text-xs font-black uppercase tracking-wide active:scale-[0.97]"
+                      >
+                        📲 Позвонить {d.counterparty_phone}
+                      </a>
+                    )}
+
+                    {/* Orders list */}
                     {selectedDebtor?.orders.map((order) => {
                       const isOrderSelected = selectedOrder?.id === order.id;
                       return (
@@ -1166,18 +1399,27 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                             }`}
                           >
                             <div className="text-left">
-                              {order.trip_number && (
+                              {order.type === 'manual' ? (
+                                <p className="font-black text-blue-600">Ист. долг</p>
+                              ) : order.trip_number ? (
                                 <p className="font-black text-zinc-700">
                                   Рейс №{order.trip_number}
                                 </p>
-                              )}
+                              ) : null}
                               <p className="text-[10px] text-zinc-400 uppercase">
-                                {PAYMENT_METHOD_LABELS[order.payment_method] ??
-                                  order.payment_method}
+                                {order.payment_method
+                                  ? (PAYMENT_METHOD_LABELS[order.payment_method] ??
+                                    order.payment_method)
+                                  : 'Ручная запись'}
                                 {' · '}
                                 {formatDate(order.created_at)}
                                 {order.driver_name ? ` · ${order.driver_name}` : ''}
                               </p>
+                              {order.description && (
+                                <p className="text-[9px] text-zinc-400 mt-0.5">
+                                  {order.description}
+                                </p>
+                              )}
                             </div>
                             <p className="font-black text-orange-600">
                               {parseFloat(order.amount).toLocaleString('ru-RU')} ₽
@@ -1186,11 +1428,18 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
 
                           {isOrderSelected && (
                             <div className="mt-2 ml-2 p-3 bg-orange-50 rounded-lg border border-orange-200 space-y-3">
-                              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                {order.payment_method === 'qr' && '→ 🏦 Расчётный счёт'}
-                                {order.payment_method === 'card_driver' && '→ 💳 Карта'}
-                                {order.payment_method === 'debt_cash' && '→ 💵 Сейф (Наличные)'}
-                              </div>
+                              {order.type !== 'manual' && (
+                                <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                                  {order.payment_method === 'qr' && '→ 🏦 Расчётный счёт'}
+                                  {order.payment_method === 'card_driver' && '→ 💳 Карта'}
+                                  {order.payment_method === 'debt_cash' && '→ 💵 Сейф (Наличные)'}
+                                </div>
+                              )}
+                              {order.type === 'manual' && (
+                                <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                                  → 💵 Сейф (Наличные)
+                                </div>
+                              )}
                               <input
                                 type="text"
                                 value={note}

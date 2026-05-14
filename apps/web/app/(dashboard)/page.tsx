@@ -215,12 +215,7 @@ export default function DashboardHome() {
               description="Требуется подтверждение"
               icon="pending_actions"
             />
-            <Alert
-              type="info"
-              title="Дебиторка"
-              description="Данные появятся в следующем модуле"
-              icon="request_quote"
-            />
+            <ReceivablesAlert />
             <Alert
               type="info"
               title="Кредиты"
@@ -332,6 +327,78 @@ function KPICard({
       )}
       {sub && !isLoading && <p className="text-[10px] text-slate-400 mt-1">{sub}</p>}
     </div>
+  );
+}
+
+type ReceivablesSummary = {
+  total: string;
+  count: number;
+  overdueCount: number;
+  promisedCount: number;
+  urgentToday: number;
+};
+
+function ReceivablesAlert() {
+  const { data, isLoading } = useQuery<ReceivablesSummary>({
+    queryKey: ['receivables-summary'],
+    queryFn: () => fetch('/api/receivables/summary').then((r) => r.json()),
+    staleTime: 60000,
+    refetchInterval: 120000,
+  });
+
+  if (isLoading) {
+    return <div className="h-16 bg-slate-200 rounded-lg animate-pulse" />;
+  }
+
+  const total = parseFloat(data?.total ?? '0');
+  const hasOverdue = (data?.overdueCount ?? 0) > 0;
+  const hasUrgent = (data?.urgentToday ?? 0) > 0;
+  const type = hasOverdue ? 'warning' : total > 0 ? 'info' : 'info';
+
+  const styles = {
+    warning: 'bg-amber-50/80 border-amber-100 text-amber-900',
+    info:
+      total > 0
+        ? 'bg-orange-50/80 border-orange-100 text-orange-900'
+        : 'bg-sky-50/80 border-sky-100 text-sky-900',
+  };
+  const iconStyles = {
+    warning: 'bg-amber-200 text-amber-700',
+    info: total > 0 ? 'bg-orange-200 text-orange-700' : 'bg-sky-200 text-sky-700',
+  };
+
+  const descParts: string[] = [];
+  if ((data?.count ?? 0) > 0) descParts.push(`${data!.count} должн.`);
+  if (hasOverdue) descParts.push(`${data!.overdueCount} просрочено`);
+  if (hasUrgent) descParts.push(`${data!.urgentToday} ждут сегодня`);
+  if ((data?.promisedCount ?? 0) > 0 && !hasUrgent)
+    descParts.push(`${data!.promisedCount} обещали`);
+
+  return (
+    <a
+      href="/receivables"
+      className={`border p-3 rounded-lg flex gap-3 items-center shadow-sm hover:opacity-90 transition-opacity cursor-pointer ${styles[type]}`}
+    >
+      <div
+        className={`w-8 h-8 flex items-center justify-center rounded-lg shrink-0 ${iconStyles[type]}`}
+      >
+        <span className="material-symbols-outlined !text-[20px]">request_quote</span>
+      </div>
+      <div className="min-w-0">
+        <h4 className="font-bold text-xs leading-tight">
+          {total > 0 ? (
+            <>
+              Дебиторка: <Money amount={data!.total} />
+            </>
+          ) : (
+            'Дебиторки нет'
+          )}
+        </h4>
+        <p className="text-[10px] mt-0.5 opacity-70 truncate">
+          {descParts.length > 0 ? descParts.join(' · ') : 'Все оплачено'}
+        </p>
+      </div>
+    </a>
   );
 }
 
