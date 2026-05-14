@@ -9,6 +9,7 @@ type Client = {
   id: string;
   name: string;
   phone: string | null;
+  email: string | null;
   notes: string | null;
   credit_limit: string | null;
   is_active: boolean;
@@ -32,7 +33,7 @@ const PAYMENT_LABEL: Record<string, string> = {
   bank_invoice: 'Безнал',
 };
 
-const emptyForm = { name: '', phone: '', credit_limit: '', notes: '' };
+const emptyForm = { name: '', phone: '', email: '', credit_limit: '', notes: '' };
 
 function daysAgo(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -404,6 +405,7 @@ export default function ClientsPage() {
     setForm({
       name: c.name,
       phone: c.phone ?? '',
+      email: c.email ?? '',
       credit_limit: c.credit_limit ?? '',
       notes: c.notes ?? '',
     });
@@ -636,6 +638,16 @@ export default function ClientsPage() {
                 placeholder="+7 999 123-45-67"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 block mb-1">E-mail</label>
+              <input
+                type="email"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                placeholder="client@company.ru"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             </div>
             <div>

@@ -12,7 +12,7 @@ export async function GET() {
         .from('trip_orders')
         .select(
           `id, amount, payment_method, created_at, description,
-           counterparty:counterparties(id, name, phone),
+           counterparty:counterparties(id, name, phone, email),
            trip:trips!inner(trip_number, started_at, lifecycle_status, driver:users!trips_driver_id_fkey(name))`,
         )
         .eq('settlement_status', 'pending')
@@ -21,7 +21,9 @@ export async function GET() {
 
       (supabase as any)
         .from('manual_receivables')
-        .select('id, amount, date, description, counterparty:counterparties(id, name, phone)')
+        .select(
+          'id, amount, date, description, counterparty:counterparties(id, name, phone, email)',
+        )
         .eq('settled', false)
         .order('date', { ascending: true }),
     ]);
@@ -45,6 +47,7 @@ export async function GET() {
           counterparty_id: groupKey,
           counterparty_name: displayName,
           counterparty_phone: hasDescription ? null : (order.counterparty?.phone ?? null),
+          counterparty_email: hasDescription ? null : (order.counterparty?.email ?? null),
           counterparty_subname: hasDescription ? (order.counterparty?.name ?? null) : null,
           is_individual: hasDescription,
           total: 0,
@@ -78,6 +81,7 @@ export async function GET() {
           counterparty_id: groupKey,
           counterparty_name: displayName,
           counterparty_phone: m.counterparty?.phone ?? null,
+          counterparty_email: m.counterparty?.email ?? null,
           counterparty_subname: null,
           is_individual: false,
           total: 0,

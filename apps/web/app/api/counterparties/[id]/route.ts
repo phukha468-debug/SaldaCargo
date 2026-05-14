@@ -10,6 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       name?: string;
       type?: string;
       phone?: string | null;
+      email?: string | null;
       credit_limit?: string | null;
       notes?: string | null;
       is_active?: boolean;
@@ -23,6 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.name !== undefined) update.name = body.name.trim();
     if (body.type !== undefined) update.type = body.type;
     if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
+    if (body.email !== undefined) update.email = body.email?.trim() || null;
     if (body.credit_limit !== undefined) update.credit_limit = body.credit_limit || null;
     if (body.notes !== undefined) update.notes = body.notes?.trim() || null;
     if (body.is_active !== undefined) update.is_active = body.is_active;

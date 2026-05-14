@@ -30,6 +30,7 @@ type Debtor = {
   counterparty_id: string;
   counterparty_name: string;
   counterparty_phone: string | null;
+  counterparty_email: string | null;
   counterparty_subname: string | null;
   is_individual: boolean;
   total: string;
@@ -72,6 +73,30 @@ function passesAgingFilter(debtor: Debtor, filter: AgingFilter): boolean {
   if (filter === '31-60') return days > 30 && days <= 60;
   if (filter === '60+') return days > 60;
   return true;
+}
+
+function EmailCopyButton({ email }: { email: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(email).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="text-[10px] text-slate-500 font-bold hover:text-slate-700 flex items-center gap-0.5 transition-colors"
+      title="Скопировать e-mail"
+    >
+      <span className="material-symbols-outlined text-xs">{copied ? 'check_circle' : 'mail'}</span>
+      <span className={copied ? 'text-green-600' : ''}>{copied ? 'Скопировано' : email}</span>
+    </button>
+  );
 }
 
 function PromiseDateBadge({ follow_up }: { follow_up: FollowUp | null }) {
@@ -617,6 +642,9 @@ export default function ReceivablesPage() {
                                   {formatPhone(debtor.counterparty_phone)}
                                 </span>
                               </a>
+                            )}
+                            {debtor.counterparty_email && (
+                              <EmailCopyButton email={debtor.counterparty_email} />
                             )}
                             <PromiseDateBadge follow_up={fu} />
                           </div>
