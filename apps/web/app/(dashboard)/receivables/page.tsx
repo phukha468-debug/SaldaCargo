@@ -190,6 +190,7 @@ export default function ReceivablesPage() {
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
 
   const { data, isLoading, isError } = useQuery<ReceivablesData>({
@@ -216,6 +217,21 @@ export default function ReceivablesPage() {
       alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setMarkingId(null);
+    }
+  }
+
+  async function handleDeleteManual(orderId: string) {
+    if (!confirm('Удалить эту запись?')) return;
+    setDeletingId(orderId);
+    try {
+      const r = await fetch(`/api/receivables/manual/${orderId}`, { method: 'DELETE' });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -439,13 +455,27 @@ export default function ReceivablesPage() {
                                   <Money amount={order.amount} />
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  <button
-                                    onClick={() => handleMarkPaid(order)}
-                                    disabled={markingId === order.id}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded uppercase tracking-wide transition-colors disabled:opacity-50"
-                                  >
-                                    {markingId === order.id ? '...' : '✓ Оплачено'}
-                                  </button>
+                                  <div className="flex items-center justify-end gap-2">
+                                    {order.type === 'manual' && (
+                                      <button
+                                        onClick={() => handleDeleteManual(order.id)}
+                                        disabled={deletingId === order.id}
+                                        className="px-2 py-1.5 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                                        title="Удалить запись"
+                                      >
+                                        <span className="material-symbols-outlined text-base">
+                                          delete
+                                        </span>
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleMarkPaid(order)}
+                                      disabled={markingId === order.id}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded uppercase tracking-wide transition-colors disabled:opacity-50"
+                                    >
+                                      {markingId === order.id ? '...' : '✓ Оплачено'}
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
