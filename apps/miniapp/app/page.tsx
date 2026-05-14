@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type Step = 'restoring' | 'role' | 'user' | 'vehicle';
+type Step = 'restoring' | 'role' | 'user' | 'vehicle' | 'pin';
 
 interface User {
   id: string;
   name: string;
   roles: string[];
+  has_pin?: boolean;
 }
 
 interface Vehicle {
@@ -28,6 +29,10 @@ export default function RootDispatcher() {
   const [users, setUsers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pendingUser, setPendingUser] = useState<User | null>(null);
+  const [pinValue, setPinValue] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
   const router = useRouter();
 
   // При монтировании: проверяем сохранённую сессию
@@ -73,8 +78,58 @@ export default function RootDispatcher() {
     }
   };
 
-  const handleUserSelect = async (user: User) => {
+  const finishLogin = (user: User) => {
     document.cookie = `salda_user_id=${user.id}; path=/; max-age=${60 * 60 * 24 * 7}`;
+    localStorage.setItem('selected_role', selectedRole ?? '');
+  };
+
+  const handlePinDigit = (digit: string) => {
+    if (pinLoading) return;
+    setPinError('');
+    setPinValue((prev) => {
+      const next = prev + digit;
+      if (next.length === 4) {
+        verifyPin(next);
+      }
+      return next.length <= 4 ? next : prev;
+    });
+  };
+
+  const verifyPin = async (pin: string) => {
+    if (!pendingUser) return;
+    setPinLoading(true);
+    setPinError('');
+    try {
+      const res = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: pendingUser.id, pin }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setPinError('Неверный PIN-код');
+        setPinValue('');
+        return;
+      }
+      finishLogin(pendingUser);
+      router.push('/admin');
+    } catch {
+      setPinError('Ошибка соединения');
+      setPinValue('');
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
+  const handleUserSelect = async (user: User) => {
+    if ((selectedRole === 'admin' || selectedRole === 'owner') && user.has_pin) {
+      setPendingUser(user);
+      setPinValue('');
+      setPinError('');
+      setStep('pin');
+      return;
+    }
+    finishLogin(user);
     localStorage.setItem('selected_role', selectedRole ?? '');
 
     if (selectedRole === 'driver') {
@@ -224,6 +279,88 @@ export default function RootDispatcher() {
                 Пропустить выбор машины
               </button>
             </div>
+          </div>
+        );
+
+      case 'pin':
+        return (
+          <div className="w-full max-w-xs space-y-8">
+            <div className="text-center">
+              <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
+                Salda<span className="text-orange-600">Cargo</span>
+              </h1>
+              <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-2">
+                {pendingUser?.name}
+              </p>
+            </div>
+
+            {/* Dots */}
+            <div className="flex justify-center gap-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full border-2 transition-all ${
+                    i < pinValue.length
+                      ? 'bg-orange-500 border-orange-500'
+                      : 'bg-transparent border-zinc-300'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {pinError && (
+              <p className="text-center text-xs font-black text-rose-600 uppercase tracking-widest -mt-4">
+                {pinError}
+              </p>
+            )}
+
+            {/* Keypad */}
+            <div className="grid grid-cols-3 gap-3">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => handlePinDigit(d)}
+                  disabled={pinLoading || pinValue.length >= 4}
+                  className="p-5 bg-white border border-zinc-200 rounded-2xl text-xl font-black text-zinc-800 active:scale-95 active:bg-zinc-100 transition-all disabled:opacity-40"
+                >
+                  {d}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  setPinValue('');
+                  setPinError('');
+                }}
+                disabled={pinLoading}
+                className="p-5 bg-white border border-zinc-200 rounded-2xl text-sm font-black text-zinc-400 active:scale-95 active:bg-zinc-100 transition-all disabled:opacity-40"
+              >
+                C
+              </button>
+              <button
+                onClick={() => handlePinDigit('0')}
+                disabled={pinLoading || pinValue.length >= 4}
+                className="p-5 bg-white border border-zinc-200 rounded-2xl text-xl font-black text-zinc-800 active:scale-95 active:bg-zinc-100 transition-all disabled:opacity-40"
+              >
+                0
+              </button>
+              <button
+                onClick={() => setPinValue((p) => p.slice(0, -1))}
+                disabled={pinLoading}
+                className="p-5 bg-white border border-zinc-200 rounded-2xl text-xl font-black text-zinc-500 active:scale-95 active:bg-zinc-100 transition-all disabled:opacity-40"
+              >
+                ⌫
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                setPendingUser(null);
+                setStep('user');
+              }}
+              className="w-full text-center text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 hover:text-zinc-500 transition-colors"
+            >
+              ← Назад
+            </button>
           </div>
         );
     }

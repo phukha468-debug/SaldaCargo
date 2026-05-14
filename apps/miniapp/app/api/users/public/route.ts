@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
 
-    let query = supabase.from('users').select('id, name, roles').order('name');
+    let query = supabase.from('users').select('id, name, roles, pin_code').order('name');
 
     const { data: users, error } = await query;
 
@@ -33,7 +33,13 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json(filteredUsers);
+    // Expose has_pin flag (not the pin itself)
+    const safeUsers = filteredUsers.map(({ pin_code, ...u }: any) => ({
+      ...u,
+      has_pin: Boolean(pin_code),
+    }));
+
+    return NextResponse.json(safeUsers);
   } catch (err: any) {
     console.error('[API Users Public] Fatal Error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
