@@ -68,6 +68,8 @@ export async function GET(request: Request) {
           .select(
             'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code)',
           )
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed')
           .order('created_at', { ascending: false });
         if (direction) q = q.eq('direction', direction);
         if (date) {
