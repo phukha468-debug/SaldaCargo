@@ -424,23 +424,34 @@ export default function ClientsPage() {
     setMergeError('');
   };
 
-  const handleMergeConfirm = () => {
+  const getMergePreview = () => {
     const [a, b] = Array.from(mergeSelected);
-    if (!a || !b) return;
+    if (!a || !b) return null;
     const ca = clients.find((c) => c.id === a)!;
     const cb = clients.find((c) => c.id === b)!;
-    // The one with more trips/revenue is target
     const targetId = parseFloat(ca.total_revenue) >= parseFloat(cb.total_revenue) ? a : b;
     const sourceId = targetId === a ? b : a;
     const target = clients.find((c) => c.id === targetId)!;
     const source = clients.find((c) => c.id === sourceId)!;
-    if (
-      !confirm(
-        `Объединить «${source.name}» → «${target.name}»?\n\nВсе записи «${source.name}» перейдут к «${target.name}», затем «${source.name}» будет деактивирован.`,
-      )
-    )
-      return;
-    mergeMutation.mutate({ source_id: sourceId, target_id: targetId });
+    return {
+      source,
+      target,
+      sourceId,
+      targetId,
+      mergedTrips: source.trips_count + target.trips_count,
+      mergedRevenue: (parseFloat(source.total_revenue) + parseFloat(target.total_revenue)).toFixed(
+        2,
+      ),
+      mergedRevenue30d: (parseFloat(source.revenue_30d) + parseFloat(target.revenue_30d)).toFixed(
+        2,
+      ),
+    };
+  };
+
+  const handleMergeConfirm = () => {
+    const preview = getMergePreview();
+    if (!preview) return;
+    mergeMutation.mutate({ source_id: preview.sourceId, target_id: preview.targetId });
   };
 
   // Split lists
@@ -504,34 +515,98 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Merge instructions */}
-      {mergeMode && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-bold text-blue-800">
-            Выберите двух клиентов для объединения — все записи перейдут к тому, у кого больше
-            выручки.
-          </p>
-          {mergeSelected.size === 2 && (
-            <div className="flex items-center gap-3">
-              <p className="text-xs text-blue-700">
-                {clients.find((c) => c.id === Array.from(mergeSelected)[0])?.name} ⇋{' '}
-                {clients.find((c) => c.id === Array.from(mergeSelected)[1])?.name}
+      {/* Merge panel */}
+      {mergeMode &&
+        (() => {
+          const preview = getMergePreview();
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-widest">
+                Режим объединения — выберите двух клиентов
               </p>
-              <button
-                onClick={handleMergeConfirm}
-                disabled={mergeMutation.isPending}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
-              >
-                {mergeMutation.isPending ? 'Объединяю...' : 'Объединить'}
-              </button>
+
+              {mergeSelected.size < 2 && (
+                <p className="text-sm text-blue-600">Выбрано: {mergeSelected.size} / 2</p>
+              )}
+
+              {preview && (
+                <div className="space-y-3">
+                  {/* Before: two clients side by side */}
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                    <div className="bg-white rounded-lg border border-rose-200 px-3 py-2.5 space-y-1">
+                      <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest">
+                        Будет деактивирован
+                      </p>
+                      <p className="text-sm font-bold text-slate-800 truncate">
+                        {preview.source.name}
+                      </p>
+                      <p className="text-xs text-slate-500">{preview.source.trips_count} рейс.</p>
+                      <p className="text-xs font-bold text-slate-700">
+                        <Money amount={preview.source.total_revenue} />
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-lg text-blue-400 font-black">+</span>
+                    </div>
+                    <div className="bg-white rounded-lg border border-emerald-200 px-3 py-2.5 space-y-1">
+                      <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">
+                        Останется
+                      </p>
+                      <p className="text-sm font-bold text-slate-800 truncate">
+                        {preview.target.name}
+                      </p>
+                      <p className="text-xs text-slate-500">{preview.target.trips_count} рейс.</p>
+                      <p className="text-xs font-bold text-slate-700">
+                        <Money amount={preview.target.total_revenue} />
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex justify-center">
+                    <span className="text-blue-400 text-sm">↓ Результат объединения</span>
+                  </div>
+
+                  {/* After: merged result */}
+                  <div className="bg-white rounded-lg border-2 border-blue-300 px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{preview.target.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {preview.source.trips_count} + {preview.target.trips_count} ={' '}
+                        <strong className="text-slate-800">{preview.mergedTrips} рейсов</strong>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Итого выручка</p>
+                      <p className="text-base font-black text-slate-900">
+                        <Money amount={preview.mergedRevenue} />
+                      </p>
+                      {parseFloat(preview.mergedRevenue30d) > 0 && (
+                        <p className="text-[10px] text-emerald-600 font-bold">
+                          <Money amount={preview.mergedRevenue30d} /> за 30 дн.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {mergeError && (
+                    <p className="text-xs text-rose-600 font-semibold">{mergeError}</p>
+                  )}
+
+                  <button
+                    onClick={handleMergeConfirm}
+                    disabled={mergeMutation.isPending}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {mergeMutation.isPending
+                      ? 'Объединяю...'
+                      : `Объединить → ${preview.target.name}`}
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-          {mergeSelected.size < 2 && (
-            <p className="text-xs text-blue-600">Выбрано: {mergeSelected.size} / 2</p>
-          )}
-          {mergeError && <p className="text-xs text-rose-600 font-semibold">{mergeError}</p>}
-        </div>
-      )}
+          );
+        })()}
 
       {/* Edit/Create form */}
       {showForm && (
