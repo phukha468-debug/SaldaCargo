@@ -21,7 +21,6 @@ type Client = {
   orders_count: number;
   avg_order: string;
   last_trip_at: string | null;
-  outstanding_debt: string;
   preferred_payment: string | null;
   payment_breakdown: Record<string, number>;
 };
@@ -99,8 +98,6 @@ function ClientRow({
   onMergeToggle: () => void;
 }) {
   const days = daysAgo(c.last_trip_at);
-  const hasDebt = parseFloat(c.outstanding_debt) > 0;
-
   return (
     <div
       onClick={mergeMode ? onMergeToggle : onSelect}
@@ -146,13 +143,6 @@ function ClientRow({
               <Money amount={c.revenue_30d} />
             </span>
           )}
-          {hasDebt && (
-            <span
-              className={`text-[10px] font-bold ${selected && !mergeMode ? 'text-rose-300' : 'text-rose-500'}`}
-            >
-              долг
-            </span>
-          )}
         </div>
       </div>
 
@@ -180,7 +170,6 @@ function DetailPanel({
 }) {
   const days = daysAgo(c.last_trip_at);
   const netProfit = parseFloat(c.net_profit);
-  const hasDebt = parseFloat(c.outstanding_debt) > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -254,14 +243,6 @@ function DetailPanel({
             </p>
           )}
         </div>
-        {hasDebt && (
-          <div className="col-span-2 bg-rose-50 border border-rose-200 rounded-lg p-3">
-            <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest">Долг</p>
-            <p className="text-base font-black text-rose-600 mt-1">
-              <Money amount={c.outstanding_debt} />
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Contacts */}
@@ -705,10 +686,6 @@ export default function ClientsPage() {
     .filter((c) => c.is_active)
     .reduce((s, c) => s + parseFloat(c.total_revenue), 0);
   const activeCount = clients.filter((c) => c.is_active && parseFloat(c.revenue_30d) > 0).length;
-  const totalDebt = clients
-    .filter((c) => c.is_active)
-    .reduce((s, c) => s + parseFloat(c.outstanding_debt), 0);
-
   return (
     <div className="flex flex-col gap-4 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
@@ -740,7 +717,7 @@ export default function ClientsPage() {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Всего</p>
           <p className="text-xl font-black text-slate-900 mt-1">
@@ -757,14 +734,6 @@ export default function ClientsPage() {
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Выручка</p>
           <p className="text-xl font-black text-orange-600 mt-1">
             <Money amount={totalRevenue.toFixed(2)} />
-          </p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Дебиторка</p>
-          <p
-            className={`text-xl font-black mt-1 ${totalDebt > 0 ? 'text-rose-500' : 'text-slate-300'}`}
-          >
-            {totalDebt > 0 ? <Money amount={totalDebt.toFixed(2)} /> : '—'}
           </p>
         </div>
       </div>

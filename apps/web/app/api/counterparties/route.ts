@@ -87,7 +87,6 @@ export async function GET(request: Request) {
       trip_ids: Set<string>;
       trip_client_revenue: Map<string, number>;
       last_trip_at: string | null;
-      outstanding: number;
       payments: Record<string, number>;
     };
 
@@ -101,7 +100,6 @@ export async function GET(request: Request) {
         trip_ids: new Set(),
         trip_client_revenue: new Map(),
         last_trip_at: null,
-        outstanding: 0,
         payments: {},
       });
     }
@@ -127,10 +125,6 @@ export async function GET(request: Request) {
           s.revenue_30d += amount;
         }
         s.payments[o.payment_method] = (s.payments[o.payment_method] ?? 0) + amount;
-      }
-
-      if (o.lifecycle_status === 'approved' && o.settlement_status === 'pending') {
-        s.outstanding += amount;
       }
     }
 
@@ -176,7 +170,6 @@ export async function GET(request: Request) {
         orders_count: s.revenue_orders,
         avg_order: s.revenue_orders > 0 ? (s.total_revenue / s.revenue_orders).toFixed(2) : '0.00',
         last_trip_at: s.last_trip_at,
-        outstanding_debt: s.outstanding.toFixed(2),
         preferred_payment: preferredPayment,
         payment_breakdown: paymentBreakdown,
       };
