@@ -1,4 +1,4 @@
-# КОНТЕКСТ ПРОЕКТА: SaldaCargo (10.05.2026 — сессия 5)
+# КОНТЕКСТ ПРОЕКТА: SaldaCargo (14.05.2026 — сессия 6)
 
 > Этот файл — точка входа для AI-ассистента. Прочитав его, ты знаешь где мы находимся и что делать дальше.
 > База знаний: `kb/wiki/` — читай соответствующие статьи перед задачами.
@@ -17,7 +17,7 @@ SaldaCargo — ERP-система для транспортной компани
 
 **Стек:** Next.js 15, React 19, TypeScript, Supabase (PostgreSQL), TanStack Query, Tailwind CSS 4  
 **Auth:** кастомная cookie-схема (`salda_user_id`), НЕ Supabase Auth  
-**Деплой:** Vercel (miniapp и webapp — оба задеплоены, автодеплой из `main`)
+**Деплой:** Vercel (miniapp и webapp — оба задеплоены, автодеплой из `main`) — **всегда пушить после коммита**
 
 ---
 
@@ -26,130 +26,142 @@ SaldaCargo — ERP-система для транспортной компани
 ### MiniApp (apps/miniapp) — ГОТОВО ✅
 
 - Авторизация водителей/механиков/админа через MAX и PIN
-- **Водитель:** создание рейса, заказы (способы оплаты: cash/qr/bank_invoice/debt_cash/card_driver), расходы, завершение с одометром. Обязательное поле клиента при добавлении заказа. Кнопка **🔧 Починить** → форма заявки на ремонт своего авто (`lifecycle_status='draft'`).
-- **Механик:** наряды, запчасти, статусы. Видит **только** наряды с `lifecycle_status='approved'` — пока админ не одобрил, наряд механику недоступен.
+- **Водитель:** создание рейса, заказы, расходы, завершение с одометром, заявка на ремонт
+- **Механик:** наряды, запчасти, статусы. Видит только `lifecycle_status='approved'`
 - **Админ (мобильный):**
-  - Дашборд с KPI (summary)
-  - **Рейсы** — три вкладки:
-    - 📋 **На ревью** — раскрываемые карточки с полными данными, кнопки ✏️ Изменить / ↩ Вернуть / ✓ Одобрить прямо в карточке
-    - 🚛 **Активные** — простые ссылки-карточки
-    - 📅 **История** — навигация по датам (← →), раскрываемые карточки, редактирование, апрув/возврат, итоги за день
-  - **Редактирование заявок** (EditModal): клиент, сумма, ЗП водителя/грузчика, способ оплаты.
-  - **Наряды** (`/admin/orders`) — три вкладки: На ревью / Активные / История.
-    - На ревью: `lifecycle_status='draft'`
-    - Активные: `lifecycle_status='approved'` + `status IN ('created','in_progress')`
-    - История: `(lifecycle_status='approved' AND status='completed') OR lifecycle_status IN ('cancelled','returned')`
-    - Раскрываемые карточки с апрувом/возвратом, кнопка "Отменить" (двойное подтверждение). API: `/api/admin/service-orders`.
-  - **Финансы:**
-    - Доход / Расход / Долги (кредиты + поставщики) / Инкассация
-    - ЗП сотрудников (`/api/admin/staff-settle`)
-    - **Дебиторка** (`/api/admin/receivables` + `/api/admin/receivables/settle`): список должников → заказы → погасить (обновляет trip_orders + создаёт income-транзакцию)
+  - Дашборд KPI
+  - Рейсы: На ревью / Активные / История (навигация по датам)
+  - Наряды: На ревью / Активные / История
+  - Финансы: Доход / Расход / Долги (кредиты + поставщики) / Инкассация / ЗП
+  - **Дебиторка:** список должников → заказы → погасить
+  - **Журнал транзакций:** навигация по дням (← →) и месяцам, итоги за день
+  - **Долги поставщиков** (`/api/admin/payables`): теперь считает из транзакций (как WebApp), показывает Дерябин ГСМ / Новиков / Ромашин
 
 ### WebApp (apps/web) — В РАЗРАБОТКЕ 🔨
 
-- Авторизация (PIN, middleware настроен, для локального тестирования — отключена)
-- **Главная (/):** KPI за месяц из БД
-- **Ревью (/review):** одобрение/возврат + История по датам. Редактирование заявок включает поле **Клиент** (find-or-create в counterparties)
-- **Ретро (/retro):** ручной ввод рейса задним числом
-- **Финансы (/finance):** P&L за 6 месяцев, журнал транзакций, подотчёт водителей
-- **Дебиторка (/receivables):** список должников, просрочка, отметить оплаченным
-- **Автопарк (/fleet):** ✅ ГОТОВО — коллапсируемые плитки, юнит-экономика, monthly_fixed_cost
-- **Гараж (/garage):** ✅ ГОТОВО — наряды СТО: На ревью / Активные / История. Апрув/возврат/отмена, hard DELETE с двойным подтверждением. API: `/api/garage/orders`. Те же фильтры что и в MiniApp нарядах.
-- **Персонал (/staff):** ✅ ГОТОВО — таблица по группам, переключатель месяцев, заработано/выплачено/долг, Рассчитаться, CRUD сотрудников
+Все разделы существуют и работают:
+
+- **/ (главная):** KPI за месяц
+- **/review:** одобрение/возврат рейсов + история
+- **/retro:** ручной ввод рейса задним числом
+- **/finance:** P&L за 6 месяцев + журнал с навигацией по дням/месяцам + подотчёт водителей
+- **/receivables:** дебиторка — список должников, кнопка "Оплачено" (исправлена)
+- **/counterparties:** контрагенты — аккордеон-карточки, удаление/архив
+- **/fleet:** автопарк — коллапсируемые плитки, юнит-экономика ✅
+- **/garage:** наряды СТО ✅
+- **/staff:** персонал — выплаты ЗП, CRUD ✅
+- **/loans:** кредиты и займы ✅
+- **/payables:** долги поставщикам — Дерябин ГСМ / Новиков / Ромашин ✅
 
 ---
 
-## 3. Архитектура учёта ЗП (важно!)
+## 3. Важные баги исправленные в сессии 6
 
-ЗП — **два разных источника**, не смешивать:
+### Автопарк — выручка считалась неправильно
 
-| Источник                              | Что даёт                 | Где используется                                   |
-| ------------------------------------- | ------------------------ | -------------------------------------------------- |
-| `trip_orders.driver_pay / loader_pay` | Начисленная ЗП из рейсов | P&L, плитка ЗП на дашборде, "заработано" на /staff |
-| `transactions` (category PAYROLL\_\*) | Факт выплаты денег       | "выплачено" на /staff, debt tracking               |
+`/api/fleet/route.ts` — убран фильтр `settlement_status='completed'` из запроса выручки.  
+Выручка теперь = `lifecycle_status='approved'` (работа сделана), независимо от оплаты.  
+**Причина бага:** ЗП и ГСМ считались по всем approved-рейсам, а выручка — только по оплаченным → машина казалась убыточной при отсрочке платежа.
 
-**Правило:** PAYROLL-транзакции **исключены** из P&L (`expenses`), чтобы не задваивать с `payrollFromOrders`.  
-**Расчёт долга:** `debt = MAX(earned - paid, 0)`. Если `auto_settle = true` → `debt = 0` всегда.
+### Дебиторка — кнопка "Оплачено" не работала в WebApp
+
+`/api/receivables/[orderId]/route.ts` — WebApp работает без cookie (`salda_user_id`), из-за чего `created_by=null` падало с NOT NULL constraint.  
+**Фикс:** если нет cookie → берём первого admin из БД. Fallback на hardcoded UUID `e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d` (Шахмаев А.О).
+
+### MiniApp поставщики запчастей не отображались
+
+`/api/admin/payables/route.ts` (MiniApp) — читал `counterparties.payable_amount` (всегда 0 у Новикова/Ромашина).  
+**Фикс:** теперь считает долг из транзакций (pending expense - completed expense), как WebApp.
 
 ---
 
-## 4. Дебиторка — архитектура (важно!)
+## 4. Архитектура учёта ЗП (важно!)
+
+| Источник                              | Что даёт                 | Где используется            |
+| ------------------------------------- | ------------------------ | --------------------------- |
+| `trip_orders.driver_pay / loader_pay` | Начисленная ЗП из рейсов | P&L, "заработано" на /staff |
+| `transactions` (category PAYROLL\_\*) | Факт выплаты денег       | "выплачено" на /staff, debt |
+
+**PAYROLL-транзакции исключены из P&L** чтобы не задваивать.  
+**Расчёт долга:** `debt = MAX(earned - paid, 0)`. `auto_settle=true` → `debt=0` всегда.
+
+---
+
+## 5. Дебиторка — архитектура (важно!)
 
 - **Источник долга:** `trip_orders` где `settlement_status='pending'` AND `lifecycle_status='approved'`
-- **Погашение:** POST `/api/admin/receivables/settle` → `trip_orders.settlement_status='completed'` + INSERT в `transactions` (direction='income', category=TRIP_REVENUE `74008cf7-...`)
-- После погашения долг исчезает из дебиторки в WebApp и MiniApp одновременно (одна БД)
+- **"физ лицо" с описанием** → выносится в отдельную строку должника (по `description` поля заказа)
+- **Погашение:** PATCH `/api/receivables/[orderId]` (WebApp) или POST `/api/admin/receivables/settle` (MiniApp)
+  → `trip_orders.settlement_status='completed'` + INSERT income-транзакция (TRIP_REVENUE)
 
 ---
 
-## 5. Workflow нарядов (важно!)
+## 6. Долги поставщиков — архитектура
 
-```
-Водитель → создаёт заявку (lifecycle_status='draft')
-              ↓
-Админ → видит на ревью → Одобрить / Вернуть / Отменить
-              ↓ (approve)
-Механик → видит наряд → берёт в работу → завершает (status='completed')
-              ↓
-История: lifecycle_status='approved' + status='completed'
-```
+**Оба приложения** считают долг одинаково из `transactions`:
 
-**Правило:** механик видит ТОЛЬКО `lifecycle_status='approved'`. Черновики (`draft`) ему недоступны.  
-**API механика:** `GET /api/mechanic/orders?mechanic_id=...` → фильтр `lifecycle_status='approved' AND status IN ('created','in_progress')` в `getMechanicOrders()` из `@saldacargo/domain-service`.  
-**API водителя:** `POST /api/driver/service-orders` → всегда создаёт `lifecycle_status='draft'`.
+- Долг = SUM(expense, pending, approved) - SUM(expense, completed, approved) по `counterparty_id`
+- Опти24 (Дерябин ГСМ) — автоматически из `trip_expenses` (fuel_card) минус платежи
+
+**Чтобы добавить долг** (Новиков/Ромашин):
+
+1. WebApp → /payables → "+ Добавить долг" → создаёт `expense` транзакцию `settlement='pending'`
+2. После этого появляется в MiniApp в разделе "Долги поставщиков"
 
 ---
 
-## 6. Следующие шаги (в порядке выполнения)
+## 7. P&L vs Балансы — что что считает
 
-> Статус на 10.05.2026 (сессия 5): Баги нарядов исправлены. Bottom-sheet модалки работают.
-> Фильтры истории нарядов починены (только завершённые/отменённые). price_per_unit → unit_price.
+| Раздел                | Источник выручки                                           | Источник расходов                                                                   |
+| --------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **P&L (/finance)**    | `trip_orders.amount` (approved)                            | `transactions` (expense, approved, completed) + ЗП из trip_orders                   |
+| **Автопарк (/fleet)** | `trip_orders.amount` (approved)                            | `trip_expenses` + `driver_pay/loader_pay` + `part_movements` + `monthly_fixed_cost` |
+| **Балансы кошельков** | `transactions` (income, approved, completed, to_wallet_id) | `transactions` (expense, approved, completed, from_wallet_id)                       |
+| **Дебиторка**         | `trip_orders` (settlement=pending)                         | —                                                                                   |
 
-### ШАГ 1 — Долги поставщикам: migration + API + WebApp + MiniApp
+> Транзакции "Прочий доход" **не** влияют на P&L. Влияют только на баланс кошельков.
 
-**Миграция:** добавить `payable_amount DECIMAL(12,2) DEFAULT 0` в `counterparties`  
-**WebApp /counterparties:** поле "Мы должны: X ₽" на карточке поставщика  
-**API PATCH /api/counterparties/[id]:** принимать `payable_amount`  
-**MiniApp /api/admin/payables:** заменить хардкод — брать из `counterparties.payable_amount > 0`
+---
+
+## 8. Следующие шаги (в порядке приоритета)
+
+### ШАГ 1 — Исторические долги (дебиторка)
+
+Есть должники ДО старта системы. Нужен способ добавить их.  
+**Вариант A (рекомендован):** новая таблица `manual_receivables` (counterparty_id, amount, date, description, settled)  
+**Вариант B:** использовать `/retro` для создания фиктивного рейса с нужной суммой  
+Пользователь ещё не выбрал вариант — нужно уточнить.
 
 ### ШАГ 2 — Починить переключатель периода (WebApp)
 
-Переключатель есть в layout.tsx (sticky под хэдером), кнопки пишут `?period=` в URL.  
-Проблема: отдельные страницы не передают `period` в запросы к API или API его игнорирует.  
+Кнопки периода в layout.tsx пишут `?period=` в URL, но страницы его не всегда читают.  
 Проверить: fleet, главная, finance, staff, receivables.
 
-### ШАГ 3 — WebApp: активные/апрувнутые рейсы не отображаются
+### ШАГ 3 — Скрывать отменённые транзакции из журнала
 
-На странице `/review` (история) рейсы с `lifecycle_status='approved'` фильтруются по дате `started_at`.  
-Активные рейсы (`status='in_progress'`) могут не показываться если начались в другой день.  
-Нужно добавить вкладку "Активные" без фильтра по дате, либо убрать date-фильтр для `in_progress`.
+Отменённые транзакции (`lifecycle_status='cancelled'`) сейчас видны в журнале финансов.  
+Пользователь хочет их скрыть. Добавить фильтр `.eq('lifecycle_status', 'approved')` в запросы журнала.
 
-### ШАГ 4 — MiniApp: реструктуризация кнопок финансов
+### ШАГ 4 — WebApp: активные рейсы могут не отображаться
 
-**Файл:** `apps/miniapp/app/admin/finance/page.tsx`  
-Новая двухуровневая структура: [Доход] [Расход] → подменю с вариантами.  
-Из expense form убрать: Аренда, Амортизация, Списание актива, PAYROLL\_\*.
+Рейсы `status='in_progress'` фильтруются по `started_at`, могут пропасть если начались в другой день.
 
 ---
 
-## 7. Ключевые технические факты
+## 9. Ключевые технические факты
 
-- `users.roles` — массив, фильтровать через `.contains('roles', ['driver'])`, НЕ `.eq('role', ...)`
-- Все API-роуты используют `createAdminClient()` с `(supabase.from('table') as any)`
+- `users.roles` — массив: `.contains('roles', ['driver'])`, НЕ `.eq('role', ...)`
+- Все API-роуты: `createAdminClient()` + `(supabase.from('table') as any)`
 - Деньги — только строкой: `"5000.00"`, компонент `<Money amount="5000.00" />`
 - `crypto.randomUUID()` для idempotency_key в webapp (НЕ пакет `uuid`)
-- `useSearchParams()` в Next.js 15 — обязательно в `<Suspense>` иначе падает сборка
-- Скроллируемый flex-child — обязательно `min-h-0` + `overflow-y-auto`, иначе кнопки за экраном
-- **Bottom-sheet в MAX WebView:** НЕ использовать `overflow:hidden` на body (ломает скролл внутри), НЕ использовать `touchAction:none` (ломает pan-y у детей). Использовать `position:fixed` на body при монтировании + `paddingBottom: calc(env(safe-area-inset-bottom,0px) + 56px)` на оверлее
-- Скролл в модалке: `overflowY:auto` + `WebkitOverflowScrolling:touch` на самом белом листе (не на вложенном div), `maxHeight: 'calc(100vh - 80px)'`
-- Контрагент (клиент) при редактировании заявки — find-or-create: `.ilike('name', name).maybeSingle()` → если нет → insert
-- `shrink-0` на метриках + `flex-1 min-w-0` на идентификаторе — выравнивание колонок
-- Двухшаговое удаление: `boolean state` + `useRef` таймер 4 сек авто-сброс
-- Деплой: Vercel автодеплой из `main` для обоих приложений — **всегда делать `git push` после коммита**
-- Генерация типов: `npx supabase gen types typescript --project-id dzwuvbhfqnsxbfbynmgz > packages/shared-types/src/database.types.ts`
-- `service_order_parts` — колонка называется `unit_price` (НЕ `price_per_unit`)
-- История нарядов: фильтровать `.or('lifecycle_status.in.(cancelled,returned),and(lifecycle_status.eq.approved,status.eq.completed)')` — НЕ тянуть все записи без фильтра
+- `useSearchParams()` в Next.js 15 — обязательно в `<Suspense>`
+- WebApp работает **без cookie** (auth отключена локально) → API не должны требовать cookie для базовых операций
+- Скроллируемый flex-child: обязательно `min-h-0` + `overflow-y-auto`
+- Bottom-sheet в MAX WebView: `position:fixed` на body + `paddingBottom: calc(env(safe-area-inset-bottom,0px) + 56px)`
+- Контрагент при редактировании: find-or-create через `.ilike('name', name).maybeSingle()`
+- Двухшаговое удаление: boolean state + useRef таймер 4 сек авто-сброс
 
-### ID кошельков (hardcoded):
+### ID кошельков:
 
 ```
 10000000-0000-0000-0000-000000000001 — Расчётный счёт
@@ -157,13 +169,26 @@ SaldaCargo — ERP-система для транспортной компани
 10000000-0000-0000-0000-000000000003 — Карта
 ```
 
-### ID категорий (hardcoded):
+### ID поставщиков:
 
 ```
-74008cf7-0527-4e9f-afd2-d232b8f8125a — TRIP_REVENUE (выручка с рейса)
+20000000-0000-0000-0000-000000000001 — Дерябин ГСМ (Опти24, autoAccrue)
+20000000-0000-0000-0000-000000000002 — Новиков А.В. Запчасти
+20000000-0000-0000-0000-000000000003 — Ромашин Запчасти
+```
+
+### ID категорий транзакций:
+
+```
+74008cf7-0527-4e9f-afd2-d232b8f8125a — TRIP_REVENUE
+600e7f70-2797-474d-948b-432230036d67 — SERVICE_REVENUE
+9d18370d-3228-4f2a-8530-52b168cfa8d7 — REPAIR_PARTS
+62cebf3f-9982-4cc6-904b-48c6169cf5e4 — FUEL
 d79213ee-3bc6-4433-b58a-ca7ea1040d00 — PAYROLL_DRIVER
 18792fa8-fda8-472d-8e04-e19d2c6c053c — PAYROLL_LOADER
 3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6 — PAYROLL_MECHANIC
+68225ea2-d7de-4442-8ed8-ce2366b5d369 — OTHER_INCOME
+df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30 — OTHER_EXPENSE
 ```
 
 → Полная схема БД: [`kb/wiki/Справочник_таблиц_БД.md`](../../kb/wiki/Справочник_таблиц_БД.md)  
@@ -172,4 +197,4 @@ d79213ee-3bc6-4433-b58a-ca7ea1040d00 — PAYROLL_DRIVER
 
 ---
 
-_Обновлён: 10.05.2026 (сессия 5). Наряды работают корректно. Bottom-sheet модалки исправлены._
+_Обновлён: 14.05.2026 (сессия 6). Исправлены: аналитика автопарка, кнопка "Оплачено" в дебиторке, поставщики в MiniApp._
