@@ -246,7 +246,7 @@ export async function GET(request: Request) {
     const assetIds = [
       ...new Set(((users as any[]) ?? []).map((u: any) => u.current_asset_id).filter(Boolean)),
     ];
-    let assetMap: Record<string, { short_name: string; reg_number: string }> = {};
+    const assetMap: Record<string, { short_name: string; reg_number: string }> = {};
     if (assetIds.length > 0) {
       const { data: assets } = await (supabase as any)
         .from('assets')

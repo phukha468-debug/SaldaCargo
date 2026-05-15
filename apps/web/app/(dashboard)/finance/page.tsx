@@ -1303,6 +1303,10 @@ function ReceivablesPanel() {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [partialOrder, setPartialOrder] = useState<RecvOrder | null>(null);
+  const [partialAmount, setPartialAmount] = useState('');
+  const [partialWallet, setPartialWallet] = useState<'bank' | 'cash' | 'card'>('bank');
+  const [partialSaving, setPartialSaving] = useState(false);
 
   const { data, isLoading } = useQuery<ReceivablesData>({
     queryKey: ['receivables'],
@@ -1372,6 +1376,45 @@ function ReceivablesPanel() {
     }
   }
 
+  async function handlePartialPay() {
+    if (!partialOrder) return;
+    const amt = parseFloat(partialAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert('Введите корректную сумму');
+      return;
+    }
+    if (amt >= parseFloat(partialOrder.amount)) {
+      alert('Сумма должна быть меньше долга');
+      return;
+    }
+    setPartialSaving(true);
+    const WALLET_IDS = {
+      bank: '10000000-0000-0000-0000-000000000001',
+      cash: '10000000-0000-0000-0000-000000000002',
+      card: '10000000-0000-0000-0000-000000000003',
+    };
+    try {
+      const r = await fetch(`/api/receivables/manual/${partialOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partial_amount: amt.toFixed(2),
+          to_wallet_id: WALLET_IDS[partialWallet],
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
+      setPartialOrder(null);
+      setPartialAmount('');
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      await queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPartialSaving(false);
+    }
+  }
+
   function handleAddSuccess() {
     setShowAddForm(false);
     queryClient.invalidateQueries({ queryKey: ['receivables'] });
@@ -1411,6 +1454,109 @@ function ReceivablesPanel() {
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
       {showAddForm && (
         <AddDebtModal onClose={() => setShowAddForm(false)} onSuccess={handleAddSuccess} />
+      )}
+
+      {partialOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setPartialOrder(null)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              borderRadius: 16,
+              padding: 24,
+              width: 340,
+              color: '#f1f5f9',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Частичная оплата</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>
+              Долг: <Money amount={partialOrder.amount} /> — {partialOrder.description ?? ''}
+            </div>
+            <label style={{ fontSize: 12, color: '#94a3b8' }}>Сумма оплаты (₽)</label>
+            <input
+              type="number"
+              value={partialAmount}
+              onChange={(e) => setPartialAmount(e.target.value)}
+              placeholder="например 30000"
+              style={{
+                width: '100%',
+                marginTop: 4,
+                marginBottom: 12,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid #334155',
+                background: '#0f172a',
+                color: '#f1f5f9',
+                fontSize: 14,
+              }}
+            />
+            <label style={{ fontSize: 12, color: '#94a3b8' }}>Зачислить на счёт</label>
+            <select
+              value={partialWallet}
+              onChange={(e) => setPartialWallet(e.target.value as 'bank' | 'cash' | 'card')}
+              style={{
+                width: '100%',
+                marginTop: 4,
+                marginBottom: 20,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid #334155',
+                background: '#0f172a',
+                color: '#f1f5f9',
+                fontSize: 14,
+              }}
+            >
+              <option value="bank">Банк (р/с)</option>
+              <option value="cash">Наличные</option>
+              <option value="card">Карта</option>
+            </select>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setPartialOrder(null)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: '1px solid #334155',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handlePartialPay}
+                disabled={partialSaving}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  opacity: partialSaving ? 0.5 : 1,
+                }}
+              >
+                {partialSaving ? '...' : 'Зачислить'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Chips + Add button */}
@@ -1829,21 +1975,43 @@ function ReceivablesPanel() {
                                     }}
                                   >
                                     {order.type === 'manual' && (
-                                      <button
-                                        onClick={() => handleDeleteManual(order.id)}
-                                        disabled={deletingId === order.id}
-                                        style={{
-                                          background: 'none',
-                                          border: 'none',
-                                          cursor: 'pointer',
-                                          color: '#ef4444',
-                                          fontSize: 14,
-                                          opacity: deletingId === order.id ? 0.4 : 1,
-                                        }}
-                                        title="Удалить"
-                                      >
-                                        🗑
-                                      </button>
+                                      <>
+                                        <button
+                                          onClick={() => {
+                                            setPartialOrder(order);
+                                            setPartialAmount('');
+                                            setPartialWallet('bank');
+                                          }}
+                                          style={{
+                                            padding: '4px 8px',
+                                            background: '#2563eb',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: 6,
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                          }}
+                                          title="Частичная оплата"
+                                        >
+                                          Частично
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteManual(order.id)}
+                                          disabled={deletingId === order.id}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#ef4444',
+                                            fontSize: 14,
+                                            opacity: deletingId === order.id ? 0.4 : 1,
+                                          }}
+                                          title="Удалить"
+                                        >
+                                          🗑
+                                        </button>
+                                      </>
                                     )}
                                     <button
                                       onClick={() => handleMarkPaid(order)}
