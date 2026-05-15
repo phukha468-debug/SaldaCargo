@@ -568,7 +568,7 @@ function ExpensesPanel() {
   const { data, isLoading } = useQuery<ExpenseMonthData>({
     queryKey: ['finance-month', selectedMonth],
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const txList = data?.transactions ?? [];
@@ -1311,7 +1311,7 @@ function ReceivablesPanel() {
   const { data, isLoading } = useQuery<ReceivablesData>({
     queryKey: ['receivables'],
     queryFn: () => fetch('/api/receivables').then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -2057,7 +2057,7 @@ function LoansPanel() {
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
     queryKey: ['loans-all'],
     queryFn: () => fetch('/api/loans').then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const filtered = loans.filter((l) => {
@@ -2507,7 +2507,7 @@ function PayablesPanel() {
   const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
     queryKey: ['payables-all'],
     queryFn: () => fetch('/api/payables').then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const totalDebt = suppliers.reduce((s, sup) => s + n(sup.debt), 0);
@@ -2771,22 +2771,22 @@ export default function FinancePage() {
   const { data: recvSummary } = useQuery<{ total: string }>({
     queryKey: ['recv-summary'],
     queryFn: () => fetch('/api/receivables/summary').then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
   const { data: loans = [] } = useQuery<Loan[]>({
     queryKey: ['loans-all'],
     queryFn: () => fetch('/api/loans').then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ['payables-all'],
     queryFn: () => fetch('/api/payables').then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
   const { data: expSummary } = useQuery<ExpenseMonthData>({
     queryKey: ['finance-month', currentMonth],
     queryFn: () => fetch(`/api/finance?month=${currentMonth}`).then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const expTotal = (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0);
