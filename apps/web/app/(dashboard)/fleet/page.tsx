@@ -848,7 +848,7 @@ export default function FleetPage() {
   const { data, isLoading, isError } = useQuery<FleetResponse>({
     queryKey: ['fleet', period],
     queryFn: () => fetch(`/api/fleet?period=${period}`).then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: drivers = [] } = useQuery<Driver[]>({

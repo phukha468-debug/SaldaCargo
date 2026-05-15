@@ -548,7 +548,7 @@ export default function ClientsPage() {
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
     queryFn: () => fetch('/api/counterparties').then((r) => r.json()),
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const selectedClient = clients.find((c) => c.id === selectedId) ?? null;
