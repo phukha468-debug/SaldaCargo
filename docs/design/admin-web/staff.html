@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<title>Персонал — варианты дизайна</title>
+<style>
+  body { font-family: 'Inter', sans-serif; background: #f1f5f9; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; line-height: 1; }
+  .design-panel { display: none; }
+  .design-panel.active { display: block; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body class="min-h-screen pb-20">
+
+<!-- ═══ STICKY DESIGN SWITCHER ═══ -->
+<div class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+  <div class="max-w-5xl mx-auto px-6 py-2.5 flex items-center gap-4">
+    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">Вариант:</span>
+    <div class="flex gap-1 p-1 bg-slate-100 rounded-xl">
+      <button onclick="setDesign(1)" id="dbtn1"
+        class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all bg-slate-900 text-white shadow-sm">
+        1 · Линейная
+      </button>
+      <button onclick="setDesign(2)" id="dbtn2"
+        class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700">
+        2 · Акцентная
+      </button>
+      <button onclick="setDesign(3)" id="dbtn3"
+        class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700">
+        3 · Тёмная
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     ВАРИАНТ 1: ЛИНЕЙНАЯ — белые карточки, нейтральная палитра
+     Акцент только в нижней черте активного таба
+════════════════════════════════════════════════════════════ -->
+<div id="design1" class="design-panel active max-w-5xl mx-auto px-6 py-6 space-y-5">
+
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-slate-900">Персонал</h1>
+    <button class="bg-slate-900 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors">
+      + Добавить сотрудника
+    </button>
+  </div>
+
+  <!-- Month bar — аналог финансов -->
+  <div class="bg-slate-800 rounded-2xl overflow-hidden shadow-sm">
+    <div class="flex items-stretch h-14">
+      <button class="flex items-center justify-center w-16 bg-sky-500 hover:bg-sky-400 transition-colors">
+        <span class="text-2xl font-black text-white">←</span>
+      </button>
+      <div class="flex-1 flex items-center justify-center">
+        <span class="text-xl font-black text-white">Май 2026</span>
+      </div>
+      <button class="flex items-center justify-center w-16 bg-slate-700 opacity-40 cursor-not-allowed">
+        <span class="text-2xl font-black text-white">→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="grid grid-cols-4 gap-3">
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Сотрудников</p>
+      <p class="text-2xl font-black text-slate-900">12</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Фонд ЗП</p>
+      <p class="text-2xl font-black text-slate-800">445 900 ₽</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Выплачено</p>
+      <p class="text-2xl font-black text-emerald-600">401 900 ₽</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Долг по ЗП</p>
+      <p class="text-2xl font-black text-amber-600">44 000 ₽</p>
+    </div>
+  </div>
+
+  <!-- Main card with tabs -->
+  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <!-- Tab bar -->
+    <div class="flex border-b border-slate-200">
+      <button onclick="setTab('v1','drivers')" id="v1-tab-drivers"
+        class="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-bold transition-all border-b-2 border-emerald-600 text-emerald-700 bg-emerald-50/40">
+        Водители
+        <span class="text-[10px] bg-emerald-100 text-emerald-700 font-black px-1.5 py-0.5 rounded-full">3</span>
+      </button>
+      <button onclick="setTab('v1','loaders')" id="v1-tab-loaders"
+        class="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-bold transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        Грузчики
+        <span class="text-[10px] bg-slate-100 text-slate-500 font-black px-1.5 py-0.5 rounded-full">4</span>
+      </button>
+      <button onclick="setTab('v1','workshop')" id="v1-tab-workshop"
+        class="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-bold transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        Цех
+        <span class="text-[10px] bg-slate-100 text-slate-500 font-black px-1.5 py-0.5 rounded-full">5</span>
+      </button>
+    </div>
+
+    <!-- Column headers -->
+    <div class="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-100">
+      <div class="w-48 shrink-0"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Сотрудник</span></div>
+      <div class="w-14 shrink-0 text-center"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Смен</span></div>
+      <div class="w-28 shrink-0 text-right"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Заработал</span></div>
+      <div class="w-28 shrink-0 text-right"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Выплачено</span></div>
+      <div class="w-28 shrink-0 text-right"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Долг / Аванс</span></div>
+      <div class="flex-1"></div>
+    </div>
+
+    <!-- DRIVERS -->
+    <div id="v1-drivers" class="tab-content active">
+      <!-- row: debt -->
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 bg-amber-50/30 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Семёнов Игорь</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">18</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">54 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">48 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">6 000 ₽</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <!-- row: settled -->
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Мишин Павел</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">22</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">66 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">66 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <!-- row: debt + advance -->
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 bg-violet-50/30 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Козлов Дмитрий</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">15</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">45 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">30 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right">
+          <p class="text-sm font-black text-violet-600">10 000 ₽</p>
+          <p class="text-[9px] text-violet-400">аванс</p>
+        </div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <!-- summary -->
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-200">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 3 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-xs font-black text-slate-600">55</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-slate-700">165 000 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-emerald-600">144 000 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-amber-600">6 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+
+    <!-- LOADERS -->
+    <div id="v1-loaders" class="tab-content">
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Ахметов Рустам</span>
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">день</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">8</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">12 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">12 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 bg-amber-50/30 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Иванов Сергей</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">12</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">18 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">15 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">3 000 ₽</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Петров Алексей</span>
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">день</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">5</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">7 500 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">7 500 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 bg-amber-50/30 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Ломов Виктор</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">10</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">15 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">10 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">5 000 ₽</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-200">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 4 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-xs font-black text-slate-600">35</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-slate-700">52 500 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-emerald-600">44 500 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-amber-600">8 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+
+    <!-- WORKSHOP -->
+    <div id="v1-workshop" class="tab-content">
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 shrink-0">Ст. механик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Воронин Николай</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">21</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">63 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">63 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 bg-amber-50/30 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">Механик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Белов Андрей</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">20</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">52 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">45 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">7 000 ₽</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">Разнорабочий</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Зубов Тимур</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">18</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">27 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">27 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 bg-amber-50/30 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0">Автомаляр</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Соловьёв Роман</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">20</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">48 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">40 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">8 000 ₽</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">Сварщик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Кузнецов Вячеслав</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-xs font-black text-slate-700">16</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">38 400 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">38 400 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+          <span class="material-symbols-outlined text-slate-300 text-[18px]">expand_more</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-200">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 5 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-xs font-black text-slate-600">95</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-slate-700">228 400 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-emerald-600">213 400 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-xs font-black text-amber-600">15 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     ВАРИАНТ 2: АКЦЕНТНАЯ — каждая группа имеет свой цвет.
+     Цветная шапка карточки, левая полоска статуса у строк
+════════════════════════════════════════════════════════════ -->
+<div id="design2" class="design-panel max-w-5xl mx-auto px-6 py-4 space-y-3">
+
+  <!-- Month bar — compact -->
+  <div class="bg-slate-800 rounded-2xl overflow-hidden shadow-sm">
+    <div class="flex items-stretch h-11">
+      <button class="flex items-center justify-center w-14 bg-sky-500 hover:bg-sky-400 transition-colors">
+        <span class="text-lg font-black text-white">←</span>
+      </button>
+      <div class="flex-1 flex items-center justify-center">
+        <span class="text-base font-black text-white tracking-wide">Май 2026</span>
+      </div>
+      <button class="flex items-center justify-center w-14 bg-slate-700 opacity-40 cursor-not-allowed">
+        <span class="text-lg font-black text-white">→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="grid grid-cols-4 gap-3">
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Сотрудников</p>
+      <p class="text-xl font-black text-slate-900">12</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Фонд ЗП</p>
+      <p class="text-xl font-black text-slate-800">445 900 ₽</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Выплачено</p>
+      <p class="text-xl font-black text-emerald-600">401 900 ₽</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Долг по ЗП</p>
+      <p class="text-xl font-black text-amber-600">44 000 ₽</p>
+    </div>
+  </div>
+
+  <!-- Pill tab switcher + Add button -->
+  <div class="flex items-center justify-between gap-3">
+    <div class="flex gap-2">
+      <button onclick="setTab('v2','drivers')" id="v2-tab-drivers"
+        class="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all bg-emerald-600 text-white shadow-sm">
+        <span class="material-symbols-outlined text-[16px]">local_shipping</span>
+        Водители
+        <span class="bg-white/20 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">3</span>
+      </button>
+      <button onclick="setTab('v2','loaders')" id="v2-tab-loaders"
+        class="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all bg-white border border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-700 shadow-sm">
+        <span class="material-symbols-outlined text-[16px]">forklift</span>
+        Грузчики
+        <span class="bg-slate-100 text-slate-500 text-[10px] font-black px-1.5 py-0.5 rounded-full">4</span>
+      </button>
+      <button onclick="setTab('v2','workshop')" id="v2-tab-workshop"
+        class="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700 shadow-sm">
+        <span class="material-symbols-outlined text-[16px]">construction</span>
+        Цех
+        <span class="bg-slate-100 text-slate-500 text-[10px] font-black px-1.5 py-0.5 rounded-full">5</span>
+      </button>
+    </div>
+    <button class="bg-slate-900 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors shrink-0">
+      + Добавить сотрудника
+    </button>
+  </div>
+
+  <!-- Table card -->
+  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <!-- Column headers -->
+    <div class="flex items-center gap-3 px-4 py-2.5 bg-emerald-600" id="v2-header">
+      <div class="w-48 shrink-0"><span class="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Сотрудник</span></div>
+      <div class="w-14 shrink-0 text-center"><span class="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Смен</span></div>
+      <div class="w-28 shrink-0 text-right"><span class="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Заработал</span></div>
+      <div class="w-28 shrink-0 text-right"><span class="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Выплачено</span></div>
+      <div class="w-28 shrink-0 text-right"><span class="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Долг / Аванс</span></div>
+      <div class="flex-1 text-right">
+        <span class="text-xs font-black text-white">Долг: 6 000 ₽</span>
+      </div>
+    </div>
+
+    <!-- DRIVERS V2 -->
+    <div id="v2-drivers" class="tab-content active divide-y divide-slate-100">
+      <!-- Row with debt — amber left border -->
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer transition-colors border-l-4 border-amber-400 bg-amber-50/20">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Семёнов Игорь</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">18</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">54 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">48 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">6 000 ₽</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+        </div>
+      </div>
+      <!-- Row settled — emerald left border -->
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer transition-colors border-l-4 border-emerald-400">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Мишин Павел</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">22</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">66 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">66 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+        </div>
+      </div>
+      <!-- Row advance — violet left border -->
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer transition-colors border-l-4 border-violet-400 bg-violet-50/20">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Козлов Дмитрий</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">15</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">45 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">30 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right">
+          <p class="text-sm font-black text-violet-600">10 000 ₽</p>
+          <p class="text-[9px] text-violet-400">аванс</p>
+        </div>
+        <div class="flex-1 flex items-center justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 transition-colors shrink-0">Аванс</button>
+        </div>
+      </div>
+      <!-- Summary -->
+      <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border-l-4 border-transparent">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 3 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-sm font-black text-slate-700">55</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-slate-700">165 000 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-emerald-600">144 000 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-amber-600">6 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+
+    <!-- LOADERS V2 -->
+    <div id="v2-loaders" class="tab-content divide-y divide-slate-100">
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-emerald-400 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Ахметов Рустам</span>
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">день</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">8</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">12 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">12 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-amber-400 bg-amber-50/20 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Иванов Сергей</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">12</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">18 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">15 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">3 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-emerald-400 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Петров Алексей</span>
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">день</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">5</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">7 500 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">7 500 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-amber-400 bg-amber-50/20 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Ломов Виктор</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">10</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">15 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">10 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">5 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border-l-4 border-transparent">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 4 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-sm font-black text-slate-700">35</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-slate-700">52 500 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-emerald-600">44 500 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-amber-600">8 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+
+    <!-- WORKSHOP V2 -->
+    <div id="v2-workshop" class="tab-content divide-y divide-slate-100">
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-emerald-400 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 shrink-0">Ст. механик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Воронин Николай</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">21</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">63 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">63 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-amber-400 bg-amber-50/20 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">Механик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Белов Андрей</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">20</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">52 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">45 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">7 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-emerald-400 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">Разнорабочий</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Зубов Тимур</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">18</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">27 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">27 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-amber-400 bg-amber-50/20 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0">Автомаляр</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Соловьёв Роман</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">20</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">48 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">40 000 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-black text-amber-600">8 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 cursor-pointer border-l-4 border-emerald-400 transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">Сварщик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Кузнецов Вячеслав</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-700">16</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-slate-700">38 400 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-sm font-semibold text-emerald-600">38 400 ₽</p></div>
+        <div class="w-28 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓ выплачено</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border-l-4 border-transparent">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 5 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-sm font-black text-slate-700">95</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-slate-700">228 400 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-emerald-600">213 400 ₽</span></div>
+        <div class="w-28 shrink-0 text-right"><span class="text-sm font-black text-amber-600">15 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     ВАРИАНТ 3: ТЁМНАЯ — slate-900 шапка, монохромная таблица
+     Табы — сегментированный контрол, прогресс-бар выплат
+════════════════════════════════════════════════════════════ -->
+<div id="design3" class="design-panel max-w-5xl mx-auto px-6 py-6 space-y-0">
+
+  <!-- Dark header block -->
+  <div class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl">
+    <!-- Title row -->
+    <div class="flex items-center justify-between px-6 pt-5 pb-4">
+      <h1 class="text-2xl font-bold text-white">Персонал</h1>
+      <button class="bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors border border-white/20">
+        + Добавить
+      </button>
+    </div>
+
+    <!-- Month nav -->
+    <div class="flex items-stretch mx-6 mb-5 rounded-xl overflow-hidden border border-white/10">
+      <button class="flex items-center justify-center w-14 bg-sky-500 hover:bg-sky-400 transition-colors">
+        <span class="text-xl font-black text-white">←</span>
+      </button>
+      <div class="flex-1 flex items-center justify-center bg-white/5">
+        <span class="text-lg font-black text-white">Май 2026</span>
+      </div>
+      <button class="flex items-center justify-center w-14 bg-white/5 opacity-30 cursor-not-allowed">
+        <span class="text-xl font-black text-white">→</span>
+      </button>
+    </div>
+
+    <!-- KPI row -->
+    <div class="grid grid-cols-4 gap-px bg-white/10 border-t border-white/10">
+      <div class="bg-slate-900 px-5 py-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Сотрудников</p>
+        <p class="text-2xl font-black text-white">12</p>
+      </div>
+      <div class="bg-slate-900 px-5 py-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Фонд ЗП</p>
+        <p class="text-2xl font-black text-white">445 900 ₽</p>
+      </div>
+      <div class="bg-slate-900 px-5 py-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Выплачено</p>
+        <p class="text-2xl font-black text-emerald-400">401 900 ₽</p>
+      </div>
+      <div class="bg-slate-900 px-5 py-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Долг</p>
+        <p class="text-2xl font-black text-amber-400">44 000 ₽</p>
+      </div>
+    </div>
+
+    <!-- Segmented tab control -->
+    <div class="px-6 pb-5 pt-4">
+      <div class="flex p-1 bg-white/10 rounded-xl gap-1">
+        <button onclick="setTab('v3','drivers')" id="v3-tab-drivers"
+          class="flex-1 py-2 rounded-lg text-sm font-bold transition-all bg-white text-slate-900 shadow-sm">
+          Водители &nbsp;<span class="text-[10px] bg-emerald-100 text-emerald-700 font-black px-1.5 py-0.5 rounded-full">3</span>
+        </button>
+        <button onclick="setTab('v3','loaders')" id="v3-tab-loaders"
+          class="flex-1 py-2 rounded-lg text-sm font-bold transition-all text-slate-300 hover:text-white">
+          Грузчики &nbsp;<span class="text-[10px] bg-white/10 text-slate-400 font-black px-1.5 py-0.5 rounded-full">4</span>
+        </button>
+        <button onclick="setTab('v3','workshop')" id="v3-tab-workshop"
+          class="flex-1 py-2 rounded-lg text-sm font-bold transition-all text-slate-300 hover:text-white">
+          Цех &nbsp;<span class="text-[10px] bg-white/10 text-slate-400 font-black px-1.5 py-0.5 rounded-full">5</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- White table below dark header, seamlessly connected -->
+  <div class="bg-white border border-slate-200 rounded-b-2xl shadow-sm overflow-hidden -mt-3 pt-3">
+    <!-- Column headers -->
+    <div class="flex items-center gap-3 px-4 py-2 border-b border-slate-100">
+      <div class="w-48 shrink-0"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Сотрудник</span></div>
+      <div class="w-14 shrink-0 text-center"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Смен</span></div>
+      <div class="w-32 shrink-0"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Прогресс выплат</span></div>
+      <div class="w-24 shrink-0 text-right"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Заработал</span></div>
+      <div class="w-24 shrink-0 text-right"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Выплачено</span></div>
+      <div class="w-24 shrink-0 text-right"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Долг</span></div>
+      <div class="flex-1"></div>
+    </div>
+
+    <!-- DRIVERS V3 -->
+    <div id="v3-drivers" class="tab-content active divide-y divide-slate-100">
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Семёнов Игорь</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">18</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full bg-emerald-500 rounded-full" style="width:88%"></div>
+          </div>
+          <p class="text-[9px] text-slate-400 mt-0.5">88% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">54 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">48 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-black text-amber-600">6 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Мишин Павел</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">22</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full bg-emerald-500 rounded-full" style="width:100%"></div>
+          </div>
+          <p class="text-[9px] text-slate-400 mt-0.5">100% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">66 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">66 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">Водитель</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Козлов Дмитрий</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">15</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full bg-violet-500 rounded-full" style="width:67%"></div>
+          </div>
+          <p class="text-[9px] text-violet-400 mt-0.5">аванс 10 000 ₽</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">45 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">30 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-black text-violet-600">аванс</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-50">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 3 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-sm font-black text-slate-900">55</span></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+            <div class="h-full bg-emerald-500 rounded-full" style="width:87%"></div>
+          </div>
+        </div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-slate-700">165 000 ₽</span></div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-emerald-600">144 000 ₽</span></div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-amber-600">6 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+
+    <!-- LOADERS V3 -->
+    <div id="v3-loaders" class="tab-content divide-y divide-slate-100">
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Ахметов Рустам</span>
+          <span class="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded-full shrink-0">день</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">8</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:100%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">100% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">12 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">12 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Иванов Сергей</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">12</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width:83%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">83% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">18 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">15 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-black text-amber-600">3 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-900 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Петров Алексей</span>
+          <span class="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded-full shrink-0">день</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">5</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:100%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">100% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">7 500 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">7 500 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Грузчик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Ломов Виктор</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">10</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width:67%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">67% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">15 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">10 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-black text-amber-600">5 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-900 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-50">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 4 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-sm font-black text-slate-900">35</span></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:85%"></div></div>
+        </div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-slate-700">52 500 ₽</span></div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-emerald-600">44 500 ₽</span></div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-amber-600">8 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+
+    <!-- WORKSHOP V3 -->
+    <div id="v3-workshop" class="tab-content divide-y divide-slate-100">
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 shrink-0">Ст. механик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Воронин Николай</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">21</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:100%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">100% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">63 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">63 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">Механик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Белов Андрей</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">20</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width:87%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">87% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">52 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">45 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-black text-amber-600">7 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-900 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">Разнорабочий</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Зубов Тимур</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">18</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:100%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">100% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">27 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">27 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0">Автомаляр</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Соловьёв Роман</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">20</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width:83%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">83% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">48 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">40 000 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-black text-amber-600">8 000 ₽</p></div>
+        <div class="flex-1 flex justify-end gap-1.5">
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-900 text-white shrink-0">Рассчитаться</button>
+          <button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50 cursor-pointer transition-colors">
+        <div class="flex items-center gap-2 w-48 shrink-0 min-w-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">Сварщик</span>
+          <span class="font-bold text-slate-900 text-sm truncate">Кузнецов Вячеслав</span>
+        </div>
+        <div class="w-14 shrink-0 text-center"><p class="text-sm font-black text-slate-900">16</p></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:100%"></div></div>
+          <p class="text-[9px] text-slate-400 mt-0.5">100% выплачено</p>
+        </div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-slate-700">38 400 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-sm font-bold text-emerald-600">38 400 ₽</p></div>
+        <div class="w-24 shrink-0 text-right"><p class="text-xs font-bold text-emerald-500">✓</p></div>
+        <div class="flex-1 flex justify-end"><button class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">Аванс</button></div>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-50">
+        <div class="w-48 shrink-0"><span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Итого: 5 чел.</span></div>
+        <div class="w-14 shrink-0 text-center"><span class="text-sm font-black text-slate-900">95</span></div>
+        <div class="w-32 shrink-0">
+          <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:93%"></div></div>
+        </div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-slate-700">228 400 ₽</span></div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-emerald-600">213 400 ₽</span></div>
+        <div class="w-24 shrink-0 text-right"><span class="text-sm font-black text-amber-600">15 000 ₽</span></div>
+        <div class="flex-1"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  // ─── state ───────────────────────────────────────────────
+  const tabColors = {
+    drivers: { bg: 'bg-emerald-600', border: 'border-emerald-600', text: 'text-emerald-700', light: 'bg-emerald-50/40', count: 'bg-emerald-100 text-emerald-700', headerBg: 'bg-emerald-600', headerCount: 'Долг: 6 000 ₽' },
+    loaders:  { bg: 'bg-orange-500',  border: 'border-orange-500',  text: 'text-orange-700',  light: 'bg-orange-50/40',  count: 'bg-orange-100 text-orange-700',  headerBg: 'bg-orange-500',  headerCount: 'Долг: 8 000 ₽' },
+    workshop: { bg: 'bg-indigo-600',  border: 'border-indigo-600',  text: 'text-indigo-700',  light: 'bg-indigo-50/40',  count: 'bg-indigo-100 text-indigo-700',  headerBg: 'bg-indigo-600',  headerCount: 'Долг: 15 000 ₽' },
+  };
+  const tabIcons = { drivers: 'local_shipping', loaders: 'forklift', workshop: 'construction' };
+  const tabLabels = { drivers: 'Водители', loaders: 'Грузчики', workshop: 'Цех' };
+  const tabCounts = { drivers: '3', loaders: '4', workshop: '5' };
+
+  // ─── design switcher ─────────────────────────────────────
+  function setDesign(n) {
+    [1,2,3].forEach(i => {
+      document.getElementById('design'+i).classList.toggle('active', i===n);
+      const btn = document.getElementById('dbtn'+i);
+      if(i===n) { btn.classList.add('bg-slate-900','text-white','shadow-sm'); btn.classList.remove('text-slate-500'); }
+      else       { btn.classList.remove('bg-slate-900','text-white','shadow-sm'); btn.classList.add('text-slate-500'); }
+    });
+  }
+
+  // ─── tab switcher ─────────────────────────────────────────
+  function setTab(variant, tab) {
+    ['drivers','loaders','workshop'].forEach(t => {
+      // hide content
+      const el = document.getElementById(variant+'-'+t);
+      if(el) el.classList.toggle('active', t===tab);
+    });
+
+    if(variant === 'v1') {
+      ['drivers','loaders','workshop'].forEach(t => {
+        const btn = document.getElementById('v1-tab-'+t);
+        if(!btn) return;
+        const c = tabColors[t];
+        if(t===tab) {
+          btn.className = `flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-bold transition-all border-b-2 ${c.border} ${c.text} ${c.light}`;
+          btn.querySelector('span').className = `text-[10px] ${c.count} font-black px-1.5 py-0.5 rounded-full`;
+        } else {
+          btn.className = 'flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-bold transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-800';
+          btn.querySelector('span').className = 'text-[10px] bg-slate-100 text-slate-500 font-black px-1.5 py-0.5 rounded-full';
+        }
+      });
+    }
+
+    if(variant === 'v2') {
+      // Update pill tabs
+      ['drivers','loaders','workshop'].forEach(t => {
+        const btn = document.getElementById('v2-tab-'+t);
+        if(!btn) return;
+        const c = tabColors[t];
+        if(t===tab) {
+          btn.className = `flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${c.bg} text-white shadow-sm`;
+          btn.querySelector('span.count-badge').className = `count-badge bg-white/20 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full`;
+        } else {
+          btn.className = 'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-white border border-slate-200 text-slate-600 hover:text-slate-800 shadow-sm';
+          btn.querySelector('span.count-badge').className = `count-badge bg-slate-100 text-slate-500 text-[10px] font-black px-1.5 py-0.5 rounded-full`;
+        }
+      });
+      // Update header color
+      const header = document.getElementById('v2-header');
+      if(header) {
+        const c = tabColors[tab];
+        header.className = `flex items-center gap-3 px-4 py-2.5 ${c.headerBg}`;
+        header.querySelector('span.debt-summary').textContent = c.headerCount;
+      }
+    }
+
+    if(variant === 'v3') {
+      ['drivers','loaders','workshop'].forEach(t => {
+        const btn = document.getElementById('v3-tab-'+t);
+        if(!btn) return;
+        if(t===tab) {
+          btn.className = 'flex-1 py-2 rounded-lg text-sm font-bold transition-all bg-white text-slate-900 shadow-sm';
+        } else {
+          btn.className = 'flex-1 py-2 rounded-lg text-sm font-bold transition-all text-slate-300 hover:text-white';
+        }
+      });
+    }
+  }
+
+  // Fix v2 header on load — add debt-summary span
+  document.addEventListener('DOMContentLoaded', () => {
+    const h = document.getElementById('v2-header');
+    if(h) {
+      const last = h.querySelector('.flex-1');
+      if(last) last.innerHTML = '<span class="debt-summary text-xs font-black text-white">Долг: 6 000 ₽</span>';
+    }
+    // Add count-badge class to v2 tab badges
+    ['drivers','loaders','workshop'].forEach(t => {
+      const btn = document.getElementById('v2-tab-'+t);
+      if(btn) {
+        const spans = btn.querySelectorAll('span');
+        spans.forEach(s => { if(s.textContent.match(/^\d+$/)) s.classList.add('count-badge'); });
+      }
+    });
+  });
+</script>
+</body>
+</html>

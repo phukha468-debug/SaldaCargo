@@ -505,7 +505,16 @@ function PayrollRow({
     user.roles[0];
 
   return (
-    <div className={cn('border-b border-slate-100 last:border-0', hasDebt && 'bg-amber-50/30')}>
+    <div
+      className={cn(
+        'border-b border-slate-100 last:border-0 border-l-4',
+        hasAdvance
+          ? 'border-l-violet-400 bg-violet-50/20'
+          : hasDebt
+            ? 'border-l-amber-400 bg-amber-50/20'
+            : 'border-l-emerald-300',
+      )}
+    >
       {/* Main row */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
@@ -698,8 +707,9 @@ function PayrollRow({
 // ─── Section ──────────────────────────────────────────────────────────────────
 
 function PayrollSection({
-  title,
   users,
+  headerBg,
+  headerTextColor,
   onSettle,
   onEdit,
   onDeactivate,
@@ -707,8 +717,9 @@ function PayrollSection({
   accountableMap,
   onCollect,
 }: {
-  title: string;
   users: PayrollUser[];
+  headerBg: string;
+  headerTextColor: string;
   onSettle: (u: PayrollUser) => void;
   onEdit: (u: PayrollUser) => void;
   onDeactivate: (u: PayrollUser) => void;
@@ -716,68 +727,66 @@ function PayrollSection({
   accountableMap?: Record<string, string>;
   onCollect?: (u: PayrollUser) => void;
 }) {
-  if (users.length === 0) return null;
+  if (users.length === 0)
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm px-6 py-10 text-center">
+        <p className="text-sm text-slate-400 font-medium">Нет сотрудников в этой группе</p>
+      </div>
+    );
 
   const totalDebt = users.reduce((s, u) => s + parseFloat(u.debt), 0);
   const totalAdvance = users.reduce((s, u) => s + parseFloat(u.advance_outstanding ?? '0'), 0);
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      {/* Section header */}
-      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-        <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">{title}</h3>
-        <div className="flex items-center gap-4">
-          <span className="text-[10px] text-slate-400 font-bold uppercase">
-            {users.length} чел.
-          </span>
-          {totalDebt > 0 && (
-            <span className="text-xs font-black text-amber-600">
-              Долг: <Money amount={totalDebt.toFixed(2)} />
-            </span>
-          )}
-          {totalAdvance > 0 && (
-            <span className="text-xs font-black text-violet-600">
-              Авансы: <Money amount={totalAdvance.toFixed(2)} />
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Column headers */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      {/* Coloured column headers */}
+      <div className={cn('flex items-center gap-3 px-4 py-2.5', headerBg)}>
         <div className="w-44 shrink-0">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
             Сотрудник
           </span>
         </div>
         <div className="w-16 shrink-0 text-center">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
             Смен
           </span>
         </div>
         <div className="w-28 shrink-0 text-right">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
             Заработал
           </span>
         </div>
         <div className="w-28 shrink-0 text-right">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
             Выплачено
           </span>
         </div>
         <div className="w-28 shrink-0 text-right">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            Долг
+          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
+            Долг / Аванс
           </span>
         </div>
         {accountableMap && (
           <div className="w-36 shrink-0 text-right">
-            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+            <span
+              className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
+            >
               Подотчёт
             </span>
           </div>
         )}
-        <div className="flex-1" />
+        <div className="flex-1 text-right">
+          {totalDebt > 0 && (
+            <span className="text-xs font-black text-white">
+              Долг: <Money amount={totalDebt.toFixed(2)} />
+            </span>
+          )}
+          {totalDebt === 0 && totalAdvance > 0 && (
+            <span className="text-xs font-black text-white/80">
+              Авансы: <Money amount={totalAdvance.toFixed(2)} />
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Rows */}
@@ -1019,6 +1028,62 @@ function AdvanceModal({
   );
 }
 
+// ─── Group config ─────────────────────────────────────────────────────────────
+
+type GroupKey = 'drivers' | 'loaders' | 'workshop';
+
+const GROUP_CONFIG: Record<
+  GroupKey,
+  {
+    label: string;
+    headerBg: string;
+    headerTextColor: string;
+    tabActive: string;
+    tabInactive: string;
+    countActive: string;
+    countInactive: string;
+    getUsers: (p: PayrollResponse) => PayrollUser[];
+    getCount: (p: PayrollResponse) => number;
+  }
+> = {
+  drivers: {
+    label: 'Водители',
+    headerBg: 'bg-emerald-600',
+    headerTextColor: 'text-emerald-100',
+    tabActive: 'bg-emerald-600 text-white shadow-sm',
+    tabInactive:
+      'bg-white border border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-700',
+    countActive: 'bg-white/25 text-white',
+    countInactive: 'bg-slate-100 text-slate-500',
+    getUsers: (p) => p.drivers,
+    getCount: (p) => p.drivers.length,
+  },
+  loaders: {
+    label: 'Грузчики',
+    headerBg: 'bg-orange-500',
+    headerTextColor: 'text-orange-100',
+    tabActive: 'bg-orange-500 text-white shadow-sm',
+    tabInactive:
+      'bg-white border border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-700',
+    countActive: 'bg-white/25 text-white',
+    countInactive: 'bg-slate-100 text-slate-500',
+    getUsers: (p) => p.loaders,
+    getCount: (p) => p.loaders.length,
+  },
+  workshop: {
+    label: 'Цех',
+    headerBg: 'bg-indigo-600',
+    headerTextColor: 'text-indigo-100',
+    tabActive: 'bg-indigo-600 text-white shadow-sm',
+    tabInactive:
+      'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700',
+    countActive: 'bg-white/25 text-white',
+    countInactive: 'bg-slate-100 text-slate-500',
+    getUsers: (p) => [...p.mechanics, ...p.office],
+    getCount: (p) => p.mechanics.length + p.office.length,
+  },
+};
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function StaffPage() {
@@ -1026,6 +1091,7 @@ export default function StaffPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [activeGroup, setActiveGroup] = useState<GroupKey>('drivers');
   const [settleUser, setSettleUser] = useState<PayrollUser | null>(null);
   const [advanceUser, setAdvanceUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
@@ -1104,30 +1170,28 @@ export default function StaffPage() {
     (payroll?.mechanics.length ?? 0) +
     (payroll?.office.length ?? 0);
 
-  return (
-    <div className="space-y-5 max-w-5xl animate-in fade-in duration-500">
-      {/* Заголовок */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Персонал</h1>
-        <button
-          onClick={() => setEditUser('new')}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors"
-        >
-          + Добавить сотрудника
-        </button>
-      </div>
+  const allUsers = payroll
+    ? [...payroll.drivers, ...payroll.loaders, ...payroll.mechanics, ...payroll.office]
+    : [];
+  const totalEarned = allUsers.reduce((s, u) => s + parseFloat(u.earned), 0);
+  const totalPaid = allUsers.reduce((s, u) => s + parseFloat(u.paid), 0);
 
-      {/* Переключатель месяца */}
+  const cfg = GROUP_CONFIG[activeGroup];
+  const activeUsers = payroll ? cfg.getUsers(payroll) : [];
+
+  return (
+    <div className="space-y-3 max-w-5xl animate-in fade-in duration-500">
+      {/* Переключатель месяца — компактный */}
       <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-stretch h-14">
+        <div className="flex items-stretch h-11">
           <button
             onClick={() => shiftMonth(-1)}
-            className="flex items-center justify-center w-16 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors shrink-0"
+            className="flex items-center justify-center w-14 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors shrink-0"
           >
-            <span className="text-2xl font-black text-white">←</span>
+            <span className="text-xl font-black text-white">←</span>
           </button>
           <div className="flex-1 flex items-center justify-center gap-3 px-4">
-            <span className="text-xl font-black text-white">
+            <span className="text-base font-black text-white tracking-wide">
               {MONTH_NAMES[month - 1]} {year}
             </span>
             {!isCurrentMonth && (
@@ -1145,93 +1209,106 @@ export default function StaffPage() {
           <button
             onClick={() => shiftMonth(1)}
             disabled={isCurrentMonth}
-            className="flex items-center justify-center w-16 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="flex items-center justify-center w-14 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors shrink-0"
           >
-            <span className="text-2xl font-black text-white">→</span>
+            <span className="text-xl font-black text-white">→</span>
           </button>
         </div>
       </div>
 
-      {/* Сводка */}
-      {!isLoading && payroll && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'Сотрудников', value: totalStaff, color: 'text-slate-900' },
-            {
-              label: 'Водителей',
-              value: payroll.drivers.length,
-              color: 'text-emerald-600',
-            },
-            {
-              label: 'Механиков',
-              value: payroll.mechanics.length,
-              color: 'text-amber-600',
-            },
-            {
-              label: 'Долг по ЗП',
-              value: <Money amount={totalDebt.toFixed(2)} />,
-              color: totalDebt > 0 ? 'text-amber-600' : 'text-slate-400',
-            },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                {label}
-              </p>
-              <p className={cn('text-2xl font-black', color)}>{value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Сводка — компактная */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'Сотрудников', value: totalStaff, color: 'text-slate-900' },
+          {
+            label: 'Фонд ЗП',
+            value: isLoading ? '—' : <Money amount={totalEarned.toFixed(2)} />,
+            color: 'text-slate-800',
+          },
+          {
+            label: 'Выплачено',
+            value: isLoading ? '—' : <Money amount={totalPaid.toFixed(2)} />,
+            color: 'text-emerald-600',
+          },
+          {
+            label: 'Долг по ЗП',
+            value: isLoading ? '—' : <Money amount={totalDebt.toFixed(2)} />,
+            color: totalDebt > 0 ? 'text-amber-600' : 'text-slate-400',
+          },
+        ].map(({ label, value, color }) => (
+          <div
+            key={label}
+            className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm"
+          >
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+              {label}
+            </p>
+            <p className={cn('text-xl font-black', color)}>{value}</p>
+          </div>
+        ))}
+      </div>
 
+      {/* Табы + кнопка добавить */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-2">
+          {(Object.keys(GROUP_CONFIG) as GroupKey[]).map((key) => {
+            const g = GROUP_CONFIG[key];
+            const isActive = activeGroup === key;
+            const count = payroll ? g.getCount(payroll) : 0;
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveGroup(key)}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all',
+                  isActive ? g.tabActive : g.tabInactive,
+                )}
+              >
+                {g.label}
+                <span
+                  className={cn(
+                    'text-[10px] font-black px-1.5 py-0.5 rounded-full',
+                    isActive ? g.countActive : g.countInactive,
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setEditUser('new')}
+          className="bg-slate-900 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors shrink-0"
+        >
+          + Добавить сотрудника
+        </button>
+      </div>
+
+      {/* Таблица активной группы */}
       {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-slate-100 rounded-2xl animate-pulse" />
-          ))}
-        </div>
+        <div className="h-48 bg-slate-100 rounded-2xl animate-pulse" />
       ) : (
-        <div className="space-y-4">
-          <PayrollSection
-            title="Водители"
-            users={payroll?.drivers ?? []}
-            onSettle={setSettleUser}
-            onEdit={handleEdit}
-            onDeactivate={handleDeactivate}
-            onAdvance={setAdvanceUser}
-            accountableMap={accountableMap}
-            onCollect={(u) =>
-              setCollectDriver({
-                driver_id: u.id,
-                driver_name: u.name,
-                balance: accountableMap[u.id] ?? '0',
-              })
-            }
-          />
-          <PayrollSection
-            title="Грузчики"
-            users={payroll?.loaders ?? []}
-            onSettle={setSettleUser}
-            onEdit={handleEdit}
-            onDeactivate={handleDeactivate}
-            onAdvance={setAdvanceUser}
-          />
-          <PayrollSection
-            title="Механики"
-            users={payroll?.mechanics ?? []}
-            onSettle={setSettleUser}
-            onEdit={handleEdit}
-            onDeactivate={handleDeactivate}
-            onAdvance={setAdvanceUser}
-          />
-          <PayrollSection
-            title="Офис / Прочие"
-            users={payroll?.office ?? []}
-            onSettle={setSettleUser}
-            onEdit={handleEdit}
-            onDeactivate={handleDeactivate}
-            onAdvance={setAdvanceUser}
-          />
-        </div>
+        <PayrollSection
+          users={activeUsers}
+          headerBg={cfg.headerBg}
+          headerTextColor={cfg.headerTextColor}
+          onSettle={setSettleUser}
+          onEdit={handleEdit}
+          onDeactivate={handleDeactivate}
+          onAdvance={setAdvanceUser}
+          accountableMap={activeGroup === 'drivers' ? accountableMap : undefined}
+          onCollect={
+            activeGroup === 'drivers'
+              ? (u) =>
+                  setCollectDriver({
+                    driver_id: u.id,
+                    driver_name: u.name,
+                    balance: accountableMap[u.id] ?? '0',
+                  })
+              : undefined
+          }
+        />
       )}
 
       {/* Модал выплаты */}
