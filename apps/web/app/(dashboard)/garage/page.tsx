@@ -1068,7 +1068,7 @@ export default function GaragePage() {
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : []));
     },
-    staleTime: 30000,
+    staleTime: 120000,
   });
 
   const { data: mechanics = [] } = useQuery<Mechanic[]>({

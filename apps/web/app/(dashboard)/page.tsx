@@ -77,15 +77,15 @@ export default function DashboardHome() {
   const { data, isLoading, isError } = useQuery<Summary>({
     queryKey: ['dashboard-summary'],
     queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
+    staleTime: 120000,
+    refetchInterval: 3 * 60 * 1000,
   });
 
   const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
+    staleTime: 120000,
+    refetchInterval: 3 * 60 * 1000,
   });
 
   const { data: driverAccountable } = useQuery<
@@ -93,29 +93,29 @@ export default function DashboardHome() {
   >({
     queryKey: ['driver-accountable'],
     queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
+    staleTime: 120000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const { data: activeTrips } = useQuery<ActiveTrips>({
     queryKey: ['active-trips'],
     queryFn: () => fetch('/api/trips?status=in_progress&lifecycle=draft').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
+    staleTime: 120000,
+    refetchInterval: 3 * 60 * 1000,
   });
 
   const { data: alertsData } = useQuery<AlertsData>({
     queryKey: ['alerts'],
     queryFn: () => fetch('/api/alerts').then((r) => r.json()),
-    staleTime: 60000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
   });
 
   const { data: receivablesSummary } = useQuery<ReceivablesSummary>({
     queryKey: ['receivables-summary'],
     queryFn: () => fetch('/api/receivables/summary').then((r) => r.json()),
-    staleTime: 60000,
-    refetchInterval: 120000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const [drawerWallet, setDrawerWallet] = useState<WalletKey | null>(null);

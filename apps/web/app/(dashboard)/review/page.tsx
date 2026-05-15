@@ -897,6 +897,7 @@ export default function ReviewPage() {
 
   const { data: trips = [], isLoading } = useQuery<TripForReview[]>({
     queryKey: ['trips-review', selectedDate, mode],
+    staleTime: 60000,
     queryFn: async () => {
       if (mode === 'active') {
         const res = await fetch('/api/trips?status=in_progress&lifecycle=draft');
@@ -918,6 +919,7 @@ export default function ReviewPage() {
   const { data: monthTrips = [] } = useQuery<TripForReview[]>({
     queryKey: ['trips-month', monthKey],
     enabled: mode === 'history',
+    staleTime: 120000,
     queryFn: async () => {
       const res = await fetch(`/api/trips?lifecycle=approved&month=${monthKey}`);
       if (!res.ok) throw new Error('Ошибка загрузки');

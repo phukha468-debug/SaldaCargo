@@ -1048,7 +1048,7 @@ export default function StaffPage() {
   >({
     queryKey: ['driver-accountable'],
     queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 120000,
   });
   const accountableMap = Object.fromEntries(
     (accountableList ?? []).map((d) => [d.driver_id, d.balance]),
@@ -1057,7 +1057,7 @@ export default function StaffPage() {
   const { data: payroll, isLoading } = useQuery<PayrollResponse>({
     queryKey: ['staff-payroll', year, month],
     queryFn: () => fetch(`/api/staff/payroll?year=${year}&month=${month}`).then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 120000,
   });
 
   const { data: assets = [] } = useQuery<Asset[]>({
