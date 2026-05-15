@@ -23,36 +23,48 @@ export async function GET() {
     in7days.setDate(in7days.getDate() + 7);
     const in7Str = in7days.toISOString().slice(0, 10);
 
-    const [{ data: assets }, { data: receivables }, { data: loans }] = await Promise.all([
-      // Fleet: docs missing or expiring within 30 days (exclude sold/written_off)
-      (supabase.from('assets') as any)
-        .select('id, short_name, reg_number, insurance_expires_at, inspection_expires_at, status')
-        .not('status', 'in', '("sold","written_off")')
-        .or(
-          [
-            'insurance_expires_at.is.null',
-            `insurance_expires_at.lte.${warnDateStr}`,
-            'inspection_expires_at.is.null',
-            `inspection_expires_at.lte.${warnDateStr}`,
-          ].join(','),
-        ),
+    const [{ data: assets }, { data: receivables }, { data: loans }, { data: serviceOrders }] =
+      await Promise.all([
+        // Fleet: docs missing or expiring within 30 days (exclude sold/written_off)
+        (supabase.from('assets') as any)
+          .select('id, short_name, reg_number, insurance_expires_at, inspection_expires_at, status')
+          .not('status', 'in', '("sold","written_off")')
+          .or(
+            [
+              'insurance_expires_at.is.null',
+              `insurance_expires_at.lte.${warnDateStr}`,
+              'inspection_expires_at.is.null',
+              `inspection_expires_at.lte.${warnDateStr}`,
+            ].join(','),
+          ),
 
-      // Receivables: approved+pending older than 14 days
-      (supabase.from('trip_orders') as any)
-        .select(
-          'id, amount, created_at, counterparty:counterparties(name), trip:trips!inner(asset_id)',
-        )
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'pending')
-        .lt('created_at', overdueSinceStr),
+        // Receivables: approved+pending older than 14 days
+        (supabase.from('trip_orders') as any)
+          .select(
+            'id, amount, created_at, counterparty:counterparties(name), trip:trips!inner(asset_id)',
+          )
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'pending')
+          .lt('created_at', overdueSinceStr),
 
-      // Loans: payment due within 7 days (including overdue)
-      (supabase.from('loans') as any)
-        .select('id, lender_name, next_payment_date, monthly_payment')
-        .eq('is_active', true)
-        .not('next_payment_date', 'is', null)
-        .lte('next_payment_date', in7Str),
-    ]);
+        // Loans: payment due within 7 days (including overdue)
+        (supabase.from('loans') as any)
+          .select('id, lender_name, next_payment_date, monthly_payment')
+          .eq('is_active', true)
+          .not('next_payment_date', 'is', null)
+          .lte('next_payment_date', in7Str),
+
+        // Service orders: draft (ревью) + active (approved + in progress)
+        (supabase.from('service_orders') as any)
+          .select(
+            'id, order_number, problem_description, status, lifecycle_status, machine_type, asset:assets(short_name), client_vehicle_brand, client_vehicle_reg, mechanic:users!service_orders_assigned_mechanic_id_fkey(name), created_at',
+          )
+          .or(
+            'lifecycle_status.eq.draft,and(lifecycle_status.eq.approved,status.in.(created,in_progress))',
+          )
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ]);
 
     // ── Fleet alerts ──────────────────────────────────────────────────────────
 
@@ -123,11 +135,42 @@ export async function GET() {
       overdue: l.next_payment_date < todayStr,
     }));
 
+    // ── Service order alerts ──────────────────────────────────────────────────
+
+    type ServiceAlert = {
+      id: string;
+      order_number: number | null;
+      description: string;
+      vehicle: string;
+      mechanic: string | null;
+      status: string;
+      lifecycle_status: string;
+    };
+
+    const serviceAlerts: ServiceAlert[] = ((serviceOrders as any[]) ?? []).map((o: any) => {
+      const vehicle =
+        o.machine_type === 'own'
+          ? (o.asset?.short_name ?? 'Своя машина')
+          : [o.client_vehicle_brand, o.client_vehicle_reg].filter(Boolean).join(' ') ||
+            'Клиент. авто';
+      return {
+        id: o.id,
+        order_number: o.order_number ?? null,
+        description: o.problem_description ?? '',
+        vehicle,
+        mechanic: o.mechanic?.name ?? null,
+        status: o.status,
+        lifecycle_status: o.lifecycle_status,
+      };
+    });
+
     return NextResponse.json({
       fleet: fleetAlerts,
       receivables: receivableAlerts,
       loans: loanAlerts,
-      total: fleetAlerts.length + receivableAlerts.length + loanAlerts.length,
+      service: serviceAlerts,
+      total:
+        fleetAlerts.length + receivableAlerts.length + loanAlerts.length + serviceAlerts.length,
     });
   } catch (err: any) {
     return NextResponse.json(

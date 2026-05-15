@@ -465,11 +465,15 @@ function PayrollRow({
   onSettle,
   onEdit,
   onDeactivate,
+  accountable,
+  onCollect,
 }: {
   user: PayrollUser;
   onSettle: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
+  accountable?: string;
+  onCollect?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
@@ -566,6 +570,32 @@ function PayrollRow({
           <p className="text-[9px] text-slate-400">долг</p>
         </div>
 
+        {/* Подотчёт — только если передан */}
+        {accountable !== undefined && (
+          <div className="w-36 shrink-0 text-right flex items-center justify-end gap-2">
+            {parseFloat(accountable) > 0 ? (
+              <>
+                <span className="text-sm font-black text-amber-600">
+                  <Money amount={accountable} />
+                </span>
+                {onCollect && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCollect();
+                    }}
+                    className="text-[11px] font-black px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors shrink-0"
+                  >
+                    Снять
+                  </button>
+                )}
+              </>
+            ) : (
+              <span className="text-xs font-bold text-emerald-500">✓ сдал</span>
+            )}
+          </div>
+        )}
+
         {/* Action */}
         <div className="flex-1 flex justify-end">
           {hasDebt && !user.auto_settle ? (
@@ -646,12 +676,16 @@ function PayrollSection({
   onSettle,
   onEdit,
   onDeactivate,
+  accountableMap,
+  onCollect,
 }: {
   title: string;
   users: PayrollUser[];
   onSettle: (u: PayrollUser) => void;
   onEdit: (u: PayrollUser) => void;
   onDeactivate: (u: PayrollUser) => void;
+  accountableMap?: Record<string, string>;
+  onCollect?: (u: PayrollUser) => void;
 }) {
   if (users.length === 0) return null;
 
@@ -701,6 +735,13 @@ function PayrollSection({
             Долг
           </span>
         </div>
+        {accountableMap && (
+          <div className="w-36 shrink-0 text-right">
+            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+              Подотчёт
+            </span>
+          </div>
+        )}
         <div className="flex-1" />
       </div>
 
@@ -712,11 +753,93 @@ function PayrollSection({
           onSettle={() => onSettle(u)}
           onEdit={() => onEdit(u)}
           onDeactivate={() => onDeactivate(u)}
+          accountable={accountableMap ? (accountableMap[u.id] ?? '0') : undefined}
+          onCollect={onCollect ? () => onCollect(u) : undefined}
         />
       ))}
     </div>
   );
 }
+
+// ─── CollectModal ─────────────────────────────────────────────────────────────
+
+function CollectModal({
+  driver,
+  onClose,
+  onSuccess,
+}: {
+  driver: { driver_id: string; driver_name: string; balance: string };
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [error, setError] = useState('');
+  const mutation = useMutation({
+    mutationFn: () =>
+      fetch('/api/admin/cash-collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driver_id: driver.driver_id,
+          amount: driver.balance,
+          driver_name: driver.driver_name,
+        }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-slate-900">Снять подотчёт</h2>
+            <p className="text-sm text-slate-500">{driver.driver_name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex justify-between items-center">
+            <span className="text-sm font-bold text-amber-700">Подотчётная сумма</span>
+            <span className="text-xl font-black text-amber-700">
+              <Money amount={driver.balance} />
+            </span>
+          </div>
+          <p className="text-sm text-slate-500">
+            Будет создана инкассация на полную сумму подотчёта. Деньги поступят в кассу.
+          </p>
+          {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {mutation.isPending ? 'Проводим...' : '✓ Снять подотчёт'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-sm text-slate-500 px-4 py-3 rounded-xl border border-slate-200"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AccountableSection ───────────────────────────────────────────────────────
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -727,6 +850,11 @@ export default function StaffPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [settleUser, setSettleUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
+  const [collectDriver, setCollectDriver] = useState<{
+    driver_id: string;
+    driver_name: string;
+    balance: string;
+  } | null>(null);
 
   const shiftMonth = (delta: number) => {
     const d = new Date(year, month - 1 + delta, 1);
@@ -735,6 +863,17 @@ export default function StaffPage() {
   };
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+
+  const { data: accountableList } = useQuery<
+    { driver_id: string; driver_name: string; balance: string }[]
+  >({
+    queryKey: ['driver-accountable'],
+    queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
+    staleTime: 30000,
+  });
+  const accountableMap = Object.fromEntries(
+    (accountableList ?? []).map((d) => [d.driver_id, d.balance]),
+  );
 
   const { data: payroll, isLoading } = useQuery<PayrollResponse>({
     queryKey: ['staff-payroll', year, month],
@@ -879,6 +1018,14 @@ export default function StaffPage() {
             onSettle={setSettleUser}
             onEdit={handleEdit}
             onDeactivate={handleDeactivate}
+            accountableMap={accountableMap}
+            onCollect={(u) =>
+              setCollectDriver({
+                driver_id: u.id,
+                driver_name: u.name,
+                balance: accountableMap[u.id] ?? '0',
+              })
+            }
           />
           <PayrollSection
             title="Грузчики"
@@ -912,6 +1059,19 @@ export default function StaffPage() {
           onSuccess={() => {
             setSettleUser(null);
             qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+          }}
+        />
+      )}
+
+      {/* Модал снятия подотчёта */}
+      {collectDriver && (
+        <CollectModal
+          driver={collectDriver}
+          onClose={() => setCollectDriver(null)}
+          onSuccess={() => {
+            setCollectDriver(null);
+            qc.invalidateQueries({ queryKey: ['driver-accountable'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
           }}
         />
       )}

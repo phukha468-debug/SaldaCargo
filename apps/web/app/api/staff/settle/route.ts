@@ -81,6 +81,40 @@ export async function POST(request: Request) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Для водителей — автоматически закрыть подотчёт (создать инкассацию на текущий остаток)
+    if ((user.roles as string[]).includes('driver')) {
+      const [{ data: driverOrders }, { data: driverCollections }] = await Promise.all([
+        (supabase as any)
+          .from('trip_orders')
+          .select('trips!inner(driver_id), amount')
+          .eq('trips.driver_id', body.user_id)
+          .in('payment_method', ['cash', 'card_driver'])
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed'),
+        (supabase as any).from('cash_collections').select('amount').eq('driver_id', body.user_id),
+      ]);
+
+      const cashIn = ((driverOrders as any[]) ?? []).reduce(
+        (s: number, r: any) => s + parseFloat(r.amount ?? '0'),
+        0,
+      );
+      const cashOut = ((driverCollections as any[]) ?? []).reduce(
+        (s: number, r: any) => s + parseFloat(r.amount ?? '0'),
+        0,
+      );
+      const accountable = cashIn - cashOut;
+
+      if (accountable > 0) {
+        await (supabase as any).from('cash_collections').insert({
+          driver_id: body.user_id,
+          amount: accountable.toFixed(2),
+          collected_by: adminId,
+          note: `Закрытие подотчёта при выплате ЗП (${description})`,
+        });
+      }
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

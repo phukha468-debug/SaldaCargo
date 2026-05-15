@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 import { formatTime } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
@@ -882,7 +883,12 @@ function TripCard({
 export default function ReviewPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [mode, setMode] = useState<'review' | 'history'>('review');
+  const searchParams = useSearchParams();
+  const modeFromUrl = searchParams.get('mode') as 'review' | 'active' | 'history' | null;
+  const VALID_MODES: Array<'review' | 'active' | 'history'> = ['review', 'active', 'history'];
+  const [mode, setMode] = useState<'review' | 'active' | 'history'>(
+    modeFromUrl && VALID_MODES.includes(modeFromUrl) ? modeFromUrl : 'review',
+  );
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -892,6 +898,11 @@ export default function ReviewPage() {
   const { data: trips = [], isLoading } = useQuery<TripForReview[]>({
     queryKey: ['trips-review', selectedDate, mode],
     queryFn: async () => {
+      if (mode === 'active') {
+        const res = await fetch('/api/trips?status=in_progress&lifecycle=draft');
+        if (!res.ok) throw new Error('Ошибка загрузки');
+        return res.json();
+      }
       const lifecycle = mode === 'review' ? 'draft' : 'approved';
       const url =
         mode === 'review'
@@ -1026,6 +1037,17 @@ export default function ReviewPage() {
               На ревью{trips.length > 0 && mode === 'review' ? ` (${trips.length})` : ''}
             </button>
             <button
+              onClick={() => setMode('active')}
+              className={cn(
+                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all',
+                mode === 'active'
+                  ? 'bg-blue-500 text-white shadow-sm shadow-blue-200'
+                  : 'text-slate-500 hover:text-slate-700',
+              )}
+            >
+              Активные{trips.length > 0 && mode === 'active' ? ` (${trips.length})` : ''}
+            </button>
+            <button
               onClick={() => setMode('history')}
               className={cn(
                 'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all',
@@ -1047,7 +1069,12 @@ export default function ReviewPage() {
       {!isLoading && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            {mode === 'history' ? (
+            {mode === 'active' ? (
+              <span className="font-semibold text-slate-700">
+                {trips.length} активных рейс
+                {trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}
+              </span>
+            ) : mode === 'history' ? (
               <>
                 <span className="font-semibold text-slate-700">
                   {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ru-RU', {
@@ -1097,10 +1124,18 @@ export default function ReviewPage() {
           {trips.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
               <span className="material-symbols-outlined text-slate-200 text-[72px] mb-4 block">
-                {mode === 'review' ? 'check_circle' : 'search'}
+                {mode === 'review'
+                  ? 'check_circle'
+                  : mode === 'active'
+                    ? 'local_shipping'
+                    : 'search'}
               </span>
               <p className="text-slate-500 font-semibold text-lg">
-                {mode === 'review' ? 'Всё проверено' : 'Нет рейсов за эту дату'}
+                {mode === 'review'
+                  ? 'Всё проверено'
+                  : mode === 'active'
+                    ? 'Нет активных рейсов'
+                    : 'Нет рейсов за эту дату'}
               </p>
               {mode === 'review' && (
                 <p className="text-slate-400 text-sm mt-1">Новые рейсы появятся здесь</p>

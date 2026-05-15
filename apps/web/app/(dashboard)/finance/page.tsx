@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 import { formatDate, formatPhone } from '@saldacargo/shared';
 
@@ -19,7 +20,6 @@ type ExpenseTx = {
 
 type ExpenseMonthData = {
   transactions: ExpenseTx[];
-  payrollTotal: string;
   revenue: string;
   pnl: unknown[];
 };
@@ -489,9 +489,7 @@ const EXPENSE_CHIPS: {
     id: 'salary',
     label: '👷 Зарплаты',
     color: '#3b82f6',
-    match: (tx) =>
-      tx.id === '__payroll__' ||
-      ['зарплат', 'фот', 'payroll'].some((kw) => txText(tx).includes(kw)),
+    match: (tx) => ['зарплат', 'фот', 'payroll'].some((kw) => txText(tx).includes(kw)),
   },
   {
     id: 'credit',
@@ -574,25 +572,9 @@ function ExpensesPanel() {
   });
 
   const txList = data?.transactions ?? [];
-  const payroll = n(data?.payrollTotal);
   const revenue = n(data?.revenue);
 
-  const syntheticPayroll =
-    payroll > 0
-      ? {
-          id: '__payroll__',
-          amount: payroll.toFixed(2),
-          description: 'Зарплаты (водители)',
-          created_at: new Date(
-            parseInt(selectedMonth.split('-')[0]),
-            parseInt(selectedMonth.split('-')[1]) - 1,
-            10,
-          ).toISOString(),
-          category: { name: 'ФОТ', code: 'payroll' },
-        }
-      : null;
-
-  const allTimeline = [...(syntheticPayroll ? [syntheticPayroll] : []), ...txList];
+  const allTimeline = [...txList];
 
   // Filter by period first (so summary cards reflect the selected period)
   const periodItems = allTimeline.filter((tx) => {
@@ -2610,7 +2592,12 @@ const TAB_GRADIENTS: Record<Tab, string> = {
 };
 
 export default function FinancePage() {
-  const [activeTab, setActiveTab] = useState<Tab>('expenses');
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') as Tab | null;
+  const VALID_TABS: Tab[] = ['expenses', 'recv', 'loans', 'payables'];
+  const [activeTab, setActiveTab] = useState<Tab>(
+    tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'expenses',
+  );
   const currentMonth = todayMonth();
 
   const { data: recvSummary } = useQuery<{ total: string }>({
@@ -2634,9 +2621,7 @@ export default function FinancePage() {
     staleTime: 60000,
   });
 
-  const expTotal =
-    (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0) +
-    n(expSummary?.payrollTotal);
+  const expTotal = (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0);
   const loansTotal = loans.reduce((s, l) => s + n(l.remaining_amount), 0);
   const payablesTotal = suppliers.reduce((s, sup) => s + n(sup.debt), 0);
 

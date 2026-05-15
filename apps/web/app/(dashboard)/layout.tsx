@@ -51,8 +51,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-surface-bright flex flex-col">
       <header className="bg-white sticky top-0 z-50 border-b border-slate-200">
-        <div className="flex justify-between items-center w-full px-6 h-16 max-w-[1920px] mx-auto">
-          <div className="flex items-center gap-8">
+        <div className="flex items-center w-full px-6 h-16 max-w-[1920px] mx-auto">
+          <div className="flex items-center gap-8 flex-1">
             <span className="text-xl font-bold tracking-tight text-slate-900">SaldaCargo</span>
             <nav className="hidden md:flex gap-6 h-16 items-center">
               {navItems.map((item) => {
@@ -96,14 +96,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               })}
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <input
-                className="bg-slate-50 border-slate-200 rounded text-sm px-4 py-2 w-64 focus:ring-1 focus:ring-primary focus:outline-none"
-                placeholder="Поиск по системе..."
-                type="text"
-              />
-            </div>
+          <div className="flex items-center gap-4 flex-1 justify-end">
+            <TodayDate />
             <button className="p-2 hover:bg-slate-50 rounded-full transition-colors flex items-center">
               <span className="material-symbols-outlined text-slate-600">notifications</span>
             </button>
@@ -117,11 +111,31 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1920px] w-full mx-auto p-6">{children}</main>
+      <main className="flex-1 max-w-[1920px] w-full mx-auto px-6 pt-4 pb-8">{children}</main>
 
       <footer className="mt-auto py-8 px-6 text-center">
         <p className="text-xs text-slate-400">© 2026 SaldaCargo ERP.</p>
       </footer>
+    </div>
+  );
+}
+
+function TodayDate() {
+  const now = new Date();
+  const day = now.toLocaleDateString('ru-RU', { day: 'numeric' });
+  const month = now.toLocaleDateString('ru-RU', { month: 'long' });
+  const weekday = now.toLocaleDateString('ru-RU', { weekday: 'long' });
+  return (
+    <div className="select-none whitespace-nowrap flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2">
+      <span className="text-[18px] font-black text-slate-800 leading-none tracking-tight">
+        {day}
+      </span>
+      <span className="text-[13px] font-semibold text-slate-700 capitalize leading-none">
+        {month}
+      </span>
+      <span className="text-[11px] text-slate-400 font-medium capitalize leading-none">
+        {weekday}
+      </span>
     </div>
   );
 }

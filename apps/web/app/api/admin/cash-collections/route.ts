@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         settlement_status: 'completed',
         description: `ЗП ${driver_name ?? 'водителя'} (закрытие подотчёта)`,
         created_by: adminUser.id,
-        approved_by: adminUser.id,
+        idempotency_key: crypto.randomUUID(),
       });
       if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
     }
