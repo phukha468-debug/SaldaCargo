@@ -119,44 +119,95 @@ function rub(amount: number) {
 
 // ── Category colours ────────────────────────────────────────────────────────
 
-const CAT_COLOR_MAP: [string, string][] = [
-  ['ГСМ', '#10b981'],
-  ['Дерябин', '#10b981'],
-  ['Опти', '#10b981'],
-  ['топлив', '#10b981'],
-  ['Зарплат', '#3b82f6'],
-  ['ФОТ', '#3b82f6'],
-  ['Кредит', '#8b5cf6'],
-  ['лизинг', '#8b5cf6'],
-  ['Лизинг', '#8b5cf6'],
-  ['Ремонт', '#ef4444'],
-  ['ремонт', '#ef4444'],
-  ['Ромашин', '#f59e0b'],
-  ['Новиков', '#ec4899'],
-  ['Налог', '#14b8a6'],
-  ['Реклам', '#64748b'],
-];
-const PALETTE = [
-  '#10b981',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ef4444',
-  '#f59e0b',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#64748b',
+type ExpenseGroup = {
+  id: string;
+  name: string;
+  color: string;
+  fixed: boolean;
+  match: (tx: {
+    category?: { name: string; code: string } | null;
+    description?: string | null;
+  }) => boolean;
+};
+
+const EXPENSE_GROUPS: ExpenseGroup[] = [
+  {
+    id: 'salary',
+    name: 'Зарплата',
+    color: '#3b82f6',
+    fixed: true,
+    match: (tx) =>
+      ['зарплат', 'фот', 'аванс', 'payroll', 'зп ', 'оплата труд'].some((kw) =>
+        `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase().includes(kw),
+      ),
+  },
+  {
+    id: 'fuel',
+    name: 'ГСМ',
+    color: '#10b981',
+    fixed: true,
+    match: (tx) =>
+      ['гсм', 'дерябин', 'опти', 'топлив', 'бензин', 'дизель'].some((kw) =>
+        `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase().includes(kw),
+      ),
+  },
+  {
+    id: 'parts',
+    name: 'Запчасти',
+    color: '#f59e0b',
+    fixed: true,
+    match: (tx) =>
+      ['запчаст', 'ромашин', 'новиков', 'деталь', 'фильтр', 'масл'].some((kw) =>
+        `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase().includes(kw),
+      ),
+  },
+  {
+    id: 'repair',
+    name: 'Ремонт',
+    color: '#ef4444',
+    fixed: false,
+    match: (tx) =>
+      ['ремонт'].some((kw) =>
+        `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase().includes(kw),
+      ),
+  },
+  {
+    id: 'credit',
+    name: 'Кредиты / Лизинг',
+    color: '#8b5cf6',
+    fixed: true,
+    match: (tx) =>
+      ['кредит', 'лизинг'].some((kw) =>
+        `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase().includes(kw),
+      ),
+  },
+  {
+    id: 'tax',
+    name: 'Налоги',
+    color: '#14b8a6',
+    fixed: true,
+    match: (tx) =>
+      ['налог', 'страхов'].some((kw) =>
+        `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase().includes(kw),
+      ),
+  },
+  {
+    id: 'other',
+    name: 'Прочие расходы',
+    color: '#64748b',
+    fixed: false,
+    match: () => true,
+  },
 ];
 
-function catColor(name: string, idx: number) {
-  for (const [kw, c] of CAT_COLOR_MAP) {
-    if (name.includes(kw)) return c;
+function getExpenseGroup(tx: {
+  category?: { name: string; code: string } | null;
+  description?: string | null;
+}): ExpenseGroup {
+  for (const group of EXPENSE_GROUPS) {
+    if (group.id !== 'other' && group.match(tx)) return group;
   }
-  return PALETTE[idx % PALETTE.length];
-}
-function isVariable(name: string | null) {
-  if (!name) return false;
-  return ['ремонт', 'Ремонт', 'прочи', 'Прочи'].some((kw) => name.includes(kw));
+  return EXPENSE_GROUPS.find((g) => g.id === 'other')!;
 }
 
 // ── Shared visual atoms ────────────────────────────────────────────────────
@@ -285,16 +336,47 @@ function LegendRow({
   name,
   pct,
   amount,
+  active,
+  onClick,
 }: {
   color: string;
   name: string;
   pct: number;
   amount: number;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '4px 8px',
+        borderRadius: 8,
+        cursor: onClick ? 'pointer' : 'default',
+        background: active ? `${color}18` : 'transparent',
+        border: active ? `1.5px solid ${color}55` : '1.5px solid transparent',
+        transition: 'background .12s, border .12s',
+      }}
+      onMouseOver={(e) => {
+        if (onClick && !active) e.currentTarget.style.background = '#f8fafc';
+      }}
+      onMouseOut={(e) => {
+        if (!active) e.currentTarget.style.background = 'transparent';
+      }}
+    >
       <div style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
-      <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', flex: 1, minWidth: 0 }}>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: active ? '#1e293b' : '#374151',
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
         {name}
       </span>
       <div style={{ width: 64, flexShrink: 0 }}>
@@ -456,10 +538,6 @@ type TxLike = {
   description?: string | null;
 };
 
-function txText(tx: TxLike) {
-  return `${tx.category?.name ?? ''} ${tx.description ?? ''}`.toLowerCase();
-}
-
 const EXPENSE_CHIPS: {
   id: string;
   label: string;
@@ -471,43 +549,13 @@ const EXPENSE_CHIPS: {
     id: 'fixed',
     label: '📌 Постоянные',
     color: '#6366f1',
-    match: (tx) => !isVariable(tx.category?.name ?? null),
+    match: (tx) => getExpenseGroup(tx).fixed,
   },
   {
     id: 'variable',
     label: '⚡ Переменные',
     color: '#f97316',
-    match: (tx) => isVariable(tx.category?.name ?? null),
-  },
-  {
-    id: 'fuel',
-    label: '⛽ ГСМ',
-    color: '#10b981',
-    match: (tx) => ['гсм', 'дерябин', 'опти', 'топлив'].some((kw) => txText(tx).includes(kw)),
-  },
-  {
-    id: 'salary',
-    label: '👷 Зарплаты',
-    color: '#3b82f6',
-    match: (tx) => ['зарплат', 'фот', 'payroll'].some((kw) => txText(tx).includes(kw)),
-  },
-  {
-    id: 'credit',
-    label: '🏦 Кредиты',
-    color: '#8b5cf6',
-    match: (tx) => ['кредит', 'лизинг'].some((kw) => txText(tx).includes(kw)),
-  },
-  {
-    id: 'repair',
-    label: '🔨 Ремонты',
-    color: '#ef4444',
-    match: (tx) => ['ремонт'].some((kw) => txText(tx).includes(kw)),
-  },
-  {
-    id: 'parts',
-    label: '🔩 Запчасти',
-    color: '#f59e0b',
-    match: (tx) => ['ромашин', 'новиков', 'запчаст'].some((kw) => txText(tx).includes(kw)),
+    match: (tx) => !getExpenseGroup(tx).fixed,
   },
 ];
 
@@ -529,6 +577,7 @@ function ExpensesPanel() {
   const [anchorDate, setAnchorDate] = useState(todayStr);
   const [activeChip, setActiveChip] = useState('all');
   const [timePeriod, setTimePeriod] = useState<'day' | 'week' | 'month'>('month');
+  const [activeCatFilter, setActiveCatFilter] = useState<string | null>(null);
 
   const selectedMonth = anchorDate.slice(0, 7);
 
@@ -587,29 +636,34 @@ function ExpensesPanel() {
     return true;
   });
 
-  // Build category map from period items
-  type CatEntry = { name: string; total: number; color: string; variable: boolean };
-  const catMap = new Map<string, CatEntry>();
-  periodItems.forEach((tx, idx) => {
-    const key = tx.category?.name ?? '__other__';
-    const name = tx.category?.name ?? 'Прочие';
-    if (!catMap.has(key)) {
-      catMap.set(key, { name, total: 0, color: catColor(name, idx), variable: isVariable(name) });
-    }
-    catMap.get(key)!.total += n(tx.amount);
+  // Build expense structure using predefined groups
+  const groupMap = new Map<string, { group: ExpenseGroup; total: number }>();
+  periodItems.forEach((tx) => {
+    const group = getExpenseGroup(tx);
+    if (!groupMap.has(group.id)) groupMap.set(group.id, { group, total: 0 });
+    groupMap.get(group.id)!.total += n(tx.amount);
   });
-
-  const categories = Array.from(catMap.values()).sort((a, b) => b.total - a.total);
-  const txFixed = categories.filter((c) => !c.variable).reduce((s, c) => s + c.total, 0);
-  const txVariable = categories.filter((c) => c.variable).reduce((s, c) => s + c.total, 0);
+  const groupedCategories = Array.from(groupMap.values())
+    .filter((g) => g.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const txFixed = groupedCategories.filter((g) => g.group.fixed).reduce((s, g) => s + g.total, 0);
+  const txVariable = groupedCategories
+    .filter((g) => !g.group.fixed)
+    .reduce((s, g) => s + g.total, 0);
   const totalExp = txFixed + txVariable;
   const periodRevenue = timePeriod === 'month' ? revenue : 0;
   const profit = periodRevenue - totalExp;
   const margin = periodRevenue > 0 ? Math.round((profit / periodRevenue) * 100) : 0;
 
-  // Apply chip filter to get timeline
+  // Apply chip + group filters to get timeline
   const activeChipDef = EXPENSE_CHIPS.find((c) => c.id === activeChip);
-  const filteredTimeline = periodItems.filter((tx) => activeChipDef?.match(tx) ?? true);
+  const chipFiltered = periodItems.filter((tx) => activeChipDef?.match(tx) ?? true);
+  const activeGroupFilter = activeCatFilter
+    ? (EXPENSE_GROUPS.find((g) => g.id === activeCatFilter) ?? null)
+    : null;
+  const filteredTimeline = activeGroupFilter
+    ? chipFiltered.filter((tx) => getExpenseGroup(tx).id === activeGroupFilter.id)
+    : chipFiltered;
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
@@ -619,11 +673,22 @@ function ExpensesPanel() {
           <Chip
             key={c.id}
             label={c.label}
-            active={activeChip === c.id}
+            active={activeChip === c.id && !activeCatFilter}
             color={c.color}
-            onClick={() => setActiveChip(c.id)}
+            onClick={() => {
+              setActiveChip(c.id);
+              setActiveCatFilter(null);
+            }}
           />
         ))}
+        {activeGroupFilter && (
+          <Chip
+            label={`📂 ${activeGroupFilter.name} ×`}
+            active={true}
+            color={activeGroupFilter.color}
+            onClick={() => setActiveCatFilter(null)}
+          />
+        )}
       </div>
 
       {/* Summary cards */}
@@ -634,7 +699,7 @@ function ExpensesPanel() {
           gradient="linear-gradient(135deg,#6366f1,#8b5cf6)"
           label="Постоянные"
           value={rub(txFixed)}
-          sub={`${categories.filter((c) => !c.variable).length} статей · ${totalExp > 0 ? Math.round((txFixed / totalExp) * 100) : 0}% расходов`}
+          sub={`${groupedCategories.filter((g) => g.group.fixed).length} статей · ${totalExp > 0 ? Math.round((txFixed / totalExp) * 100) : 0}% расходов`}
         />
         <SumCard
           gradient="linear-gradient(135deg,#f97316,#ef4444)"
@@ -661,7 +726,11 @@ function ExpensesPanel() {
         {/* Timeline */}
         <Card>
           <CardHead
-            title={`Расходы — ${periodLabel()}`}
+            title={
+              activeGroupFilter
+                ? `${activeGroupFilter.name} — ${periodLabel()}`
+                : `Расходы — ${periodLabel()}`
+            }
             right={
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
@@ -732,8 +801,8 @@ function ExpensesPanel() {
               {filteredTimeline.map((tx) => {
                 const name = tx.description || tx.category?.name || 'Без категории';
                 const catName = tx.category?.name ?? null;
-                const variable = isVariable(catName);
-                const color = catColor(catName ?? name, 0);
+                const group = getExpenseGroup(tx);
+                const color = group.color;
                 return (
                   <div
                     key={tx.id}
@@ -782,11 +851,11 @@ function ExpensesPanel() {
                         fontSize: 9,
                         fontWeight: 800,
                         flexShrink: 0,
-                        background: variable ? '#fee2e2' : '#dbeafe',
-                        color: variable ? '#b91c1c' : '#1d4ed8',
+                        background: !group.fixed ? '#fee2e2' : '#dbeafe',
+                        color: !group.fixed ? '#b91c1c' : '#1d4ed8',
                       }}
                     >
-                      {variable ? 'перем.' : 'пост.'}
+                      {!group.fixed ? 'перем.' : 'пост.'}
                     </span>
                     <span
                       style={{
@@ -824,23 +893,25 @@ function ExpensesPanel() {
             <CardHead title="Структура расходов" />
             <div style={{ padding: '14px 16px' }}>
               <StackBar
-                segments={categories.map((c) => ({
-                  flex: c.total,
-                  color: c.color,
-                  label: `${c.name} ${Math.round(totalExp > 0 ? (c.total / totalExp) * 100 : 0)}%`,
+                segments={groupedCategories.map(({ group, total }) => ({
+                  flex: total,
+                  color: group.color,
+                  label: `${group.name} ${Math.round(totalExp > 0 ? (total / totalExp) * 100 : 0)}%`,
                 }))}
               />
             </div>
             <div
-              style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px 12px' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 8px 12px' }}
             >
-              {categories.map((c) => (
+              {groupedCategories.map(({ group, total }) => (
                 <LegendRow
-                  key={c.name}
-                  color={c.color}
-                  name={c.name}
-                  pct={totalExp > 0 ? Math.round((c.total / totalExp) * 100) : 0}
-                  amount={c.total}
+                  key={group.id}
+                  color={group.color}
+                  name={group.name}
+                  pct={totalExp > 0 ? Math.round((total / totalExp) * 100) : 0}
+                  amount={total}
+                  active={activeCatFilter === group.id}
+                  onClick={() => setActiveCatFilter(activeCatFilter === group.id ? null : group.id)}
                 />
               ))}
             </div>
