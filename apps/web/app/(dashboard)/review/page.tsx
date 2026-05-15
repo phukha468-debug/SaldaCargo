@@ -387,7 +387,7 @@ function EditModal({
               Редактирование · Смена #{trip.trip_number}
             </h2>
             <p className="text-sm text-slate-500 mt-0.5">
-              {trip.asset.short_name} · {trip.driver.name}
+              {trip.asset.short_name} ({trip.asset.reg_number}) · {trip.driver.name}
             </p>
           </div>
           <button
@@ -568,6 +568,9 @@ function TripCard({
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <span className="font-black text-slate-900 text-sm whitespace-nowrap">
               🚚 {trip.asset.short_name}
+            </span>
+            <span className="text-[11px] text-slate-400 font-mono whitespace-nowrap">
+              {trip.asset.reg_number}
             </span>
             <span className="text-slate-300 text-xs">·</span>
             <span className="text-sm text-slate-700 font-semibold truncate max-w-[90px]">

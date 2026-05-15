@@ -65,6 +65,7 @@ export async function GET() {
     )
     .eq('driver_id', driverId)
     .gte('started_at', monthStart)
+    .neq('lifecycle_status', 'cancelled')
     .order('started_at', { ascending: false }) as any);
 
   return NextResponse.json({

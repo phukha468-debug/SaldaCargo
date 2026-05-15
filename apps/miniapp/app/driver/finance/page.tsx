@@ -20,7 +20,7 @@ function FinanceContent() {
   const initialTab = searchParams.get('tab') === 'pay' ? 'pay' : 'accountable';
   const [activeTab, setActiveTab] = useState<'accountable' | 'pay'>(initialTab);
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: ['driver-finance'],
     queryFn: async () => {
       const res = await fetch('/api/driver/finance');
@@ -31,6 +31,17 @@ function FinanceContent() {
   });
 
   if (isLoading) return <Skeleton />;
+
+  if (isError)
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-6 text-center">
+        <div>
+          <p className="text-3xl mb-3">⚠️</p>
+          <p className="font-bold text-zinc-600 text-sm">Не удалось загрузить данные</p>
+          <p className="text-xs text-zinc-400 mt-1">Попробуйте обновить страницу</p>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-zinc-50">

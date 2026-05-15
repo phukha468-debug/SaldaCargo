@@ -107,7 +107,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (body.action === 'return') {
     const { error } = await (supabase.from('trips') as any)
-      .update({ lifecycle_status: 'returned', driver_note: body.note ?? null })
+      .update({
+        status: 'in_progress',
+        lifecycle_status: 'returned',
+        odometer_end: null,
+        ended_at: null,
+        driver_note: body.note ?? null,
+      })
       .eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

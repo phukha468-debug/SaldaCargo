@@ -97,9 +97,10 @@ export async function GET() {
 
   const { data: monthOrders } = await (supabase
     .from('trip_orders')
-    .select('driver_pay, lifecycle_status, trips!inner(driver_id, started_at)')
+    .select('driver_pay, lifecycle_status, trips!inner(driver_id, started_at, lifecycle_status)')
     .eq('trips.driver_id', driverId)
-    .gte('trips.started_at', monthStart) as any);
+    .gte('trips.started_at', monthStart)
+    .neq('trips.lifecycle_status', 'cancelled') as any);
 
   const approvedPay = (monthOrders ?? [])
     .filter((o: any) => o.lifecycle_status === 'approved')
