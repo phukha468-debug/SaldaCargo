@@ -1180,7 +1180,7 @@ export default function StaffPage() {
   const activeUsers = payroll ? cfg.getUsers(payroll) : [];
 
   return (
-    <div className="space-y-3 max-w-5xl animate-in fade-in duration-500">
+    <div className="space-y-3 max-w-5xl mx-auto animate-in fade-in duration-500">
       {/* Переключатель месяца — компактный */}
       <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <div className="flex items-stretch h-11">
