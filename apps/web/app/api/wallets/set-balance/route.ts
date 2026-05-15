@@ -42,9 +42,9 @@ export async function POST(request: Request) {
     if (!adminUser) return NextResponse.json({ error: 'Администратор не найден' }, { status: 500 });
 
     // Считаем текущий баланс кошелька
-    const BANK_ID = WALLET_IDS.bank;
-    const CASH_ID = WALLET_IDS.cash;
-    const CARD_ID = WALLET_IDS.card;
+    const BANK_ID = WALLET_IDS.bank!;
+    const CASH_ID = WALLET_IDS.cash!;
+    const CARD_ID = WALLET_IDS.card!;
 
     const [
       { data: bankOrders },
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         sumWhere(txOut ?? [], 'from_wallet_id', CARD_ID),
     };
 
-    const current = currentBalances[wallet];
+    const current = currentBalances[wallet] ?? 0;
     const delta = target - current;
 
     if (Math.abs(delta) < 0.01) {

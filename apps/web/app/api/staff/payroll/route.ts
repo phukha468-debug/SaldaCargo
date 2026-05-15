@@ -2,12 +2,13 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-// PAYROLL category IDs (from transaction_categories seed)
 const PAYROLL_CATEGORY_IDS = [
   'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
   '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
 ];
+
+const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
 export async function GET(request: Request) {
   try {
@@ -26,6 +27,12 @@ export async function GET(request: Request) {
       { data: loaderTrips },
       { data: mechanicOrders },
       { data: paidRows },
+      // All-time data for advance balance
+      { data: allTimeDriverTrips },
+      { data: allTimeLoaderTrips },
+      { data: allTimeMechanicOrders },
+      { data: allTimePaid },
+      { data: allTimeAdvances },
     ] = await Promise.all([
       // Все активные сотрудники
       (supabase as any)
@@ -36,7 +43,7 @@ export async function GET(request: Request) {
         .eq('is_active', true)
         .order('name'),
 
-      // ЗП водителей (driver_pay из одобренных рейсов)
+      // ЗП водителей (driver_pay из одобренных рейсов — этот месяц)
       (supabase as any)
         .from('trips')
         .select('driver_id, trip_orders(driver_pay, lifecycle_status)')
@@ -44,7 +51,7 @@ export async function GET(request: Request) {
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
 
-      // ЗП грузчиков (loader_id/loader2_id теперь в заказах)
+      // ЗП грузчиков (этот месяц)
       (supabase as any)
         .from('trips')
         .select('trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)')
@@ -52,7 +59,7 @@ export async function GET(request: Request) {
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
 
-      // ЗП механиков (mechanic_pay из завершённых нарядов)
+      // ЗП механиков (этот месяц)
       (supabase as any)
         .from('service_orders')
         .select('assigned_mechanic_id, mechanic_pay')
@@ -62,7 +69,7 @@ export async function GET(request: Request) {
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 
-      // Уже выплаченные ЗП за месяц
+      // Выплаченная ЗП (этот месяц)
       (supabase as any)
         .from('transactions')
         .select('related_user_id, amount')
@@ -72,9 +79,47 @@ export async function GET(request: Request) {
         .not('related_user_id', 'is', null)
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
+
+      // All-time: заработок водителей (для баланса)
+      (supabase as any)
+        .from('trips')
+        .select('driver_id, trip_orders(driver_pay, lifecycle_status)')
+        .eq('lifecycle_status', 'approved'),
+
+      // All-time: заработок грузчиков
+      (supabase as any)
+        .from('trips')
+        .select('trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)')
+        .eq('lifecycle_status', 'approved'),
+
+      // All-time: заработок механиков
+      (supabase as any)
+        .from('service_orders')
+        .select('assigned_mechanic_id, mechanic_pay')
+        .eq('status', 'completed')
+        .not('assigned_mechanic_id', 'is', null)
+        .not('mechanic_pay', 'is', null),
+
+      // All-time: выплаченная ЗП
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .in('category_id', PAYROLL_CATEGORY_IDS)
+        .not('related_user_id', 'is', null),
+
+      // All-time: авансы
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .not('related_user_id', 'is', null),
     ]);
 
-    // ── Агрегация earned по user_id ──────────────────────────────────────────
+    // ── Агрегация earned (этот месяц) ───────────────────────────────────────
 
     const earnedMap = new Map<string, number>();
 
@@ -111,7 +156,7 @@ export async function GET(request: Request) {
       earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + parseFloat(order.mechanic_pay ?? '0'));
     }
 
-    // ── Агрегация paid по user_id ────────────────────────────────────────────
+    // ── Агрегация paid (этот месяц) ─────────────────────────────────────────
 
     const paidMap = new Map<string, number>();
     for (const tx of (paidRows as any[]) ?? []) {
@@ -119,7 +164,57 @@ export async function GET(request: Request) {
       if (uid) paidMap.set(uid, (paidMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
     }
 
-    // ── Подсчёт workCount ────────────────────────────────────────────────────
+    // ── All-time баланс (заработок − выплаты − авансы) ──────────────────────
+
+    const allEarnedMap = new Map<string, number>();
+
+    for (const trip of (allTimeDriverTrips as any[]) ?? []) {
+      const uid = trip.driver_id;
+      if (!uid) continue;
+      const pay = ((trip.trip_orders as any[]) ?? [])
+        .filter((o: any) => o.lifecycle_status !== 'cancelled')
+        .reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
+      allEarnedMap.set(uid, (allEarnedMap.get(uid) ?? 0) + pay);
+    }
+
+    for (const trip of (allTimeLoaderTrips as any[]) ?? []) {
+      for (const order of (trip.trip_orders as any[]) ?? []) {
+        if (order.lifecycle_status === 'cancelled') continue;
+        if (order.loader_id) {
+          allEarnedMap.set(
+            order.loader_id,
+            (allEarnedMap.get(order.loader_id) ?? 0) + parseFloat(order.loader_pay ?? '0'),
+          );
+        }
+        if (order.loader2_id) {
+          allEarnedMap.set(
+            order.loader2_id,
+            (allEarnedMap.get(order.loader2_id) ?? 0) + parseFloat(order.loader2_pay ?? '0'),
+          );
+        }
+      }
+    }
+
+    for (const order of (allTimeMechanicOrders as any[]) ?? []) {
+      const uid = order.assigned_mechanic_id;
+      if (!uid) continue;
+      allEarnedMap.set(uid, (allEarnedMap.get(uid) ?? 0) + parseFloat(order.mechanic_pay ?? '0'));
+    }
+
+    const allPaidMap = new Map<string, number>();
+    for (const tx of (allTimePaid as any[]) ?? []) {
+      const uid = tx.related_user_id;
+      if (uid) allPaidMap.set(uid, (allPaidMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
+    }
+
+    const allAdvancesMap = new Map<string, number>();
+    for (const tx of (allTimeAdvances as any[]) ?? []) {
+      const uid = tx.related_user_id;
+      if (uid)
+        allAdvancesMap.set(uid, (allAdvancesMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
+    }
+
+    // ── workCount ────────────────────────────────────────────────────────────
 
     const tripCountMap = new Map<string, number>();
     for (const trip of (driverTrips as any[]) ?? []) {
@@ -146,7 +241,7 @@ export async function GET(request: Request) {
         );
     }
 
-    // ── Получить машины для отображения ─────────────────────────────────────
+    // ── Машины ──────────────────────────────────────────────────────────────
 
     const assetIds = [
       ...new Set(((users as any[]) ?? []).map((u: any) => u.current_asset_id).filter(Boolean)),
@@ -165,8 +260,22 @@ export async function GET(request: Request) {
     const buildUser = (u: any) => {
       const earned = earnedMap.get(u.id) ?? 0;
       const paid = paidMap.get(u.id) ?? 0;
+
+      // All-time balance: earned − salary_paid − advances
+      const allEarned = allEarnedMap.get(u.id) ?? 0;
+      const allPaid = allPaidMap.get(u.id) ?? 0;
+      const allAdvances = allAdvancesMap.get(u.id) ?? 0;
+      const allTimeBalance = allEarned - allPaid - allAdvances;
+
+      // Долг к выплате с учётом аванса:
+      // Если allTimeBalance > 0 → должны ему (берём min с текущим earned−paid)
+      // Если allTimeBalance ≤ 0 → аванс ещё не покрыт, к выплате = 0
+      const debt = allTimeBalance > 0 ? Math.max(earned - paid, 0) : 0;
+      const advanceOutstanding = allTimeBalance < 0 ? Math.abs(allTimeBalance) : 0;
+
       const isDriver = u.roles.includes('driver');
       const workCount = isDriver ? (tripCountMap.get(u.id) ?? 0) : (orderCountMap.get(u.id) ?? 0);
+
       return {
         id: u.id,
         name: u.name,
@@ -178,7 +287,8 @@ export async function GET(request: Request) {
         asset: u.current_asset_id ? (assetMap[u.current_asset_id] ?? null) : null,
         earned: earned.toFixed(2),
         paid: paid.toFixed(2),
-        debt: Math.max(earned - paid, 0).toFixed(2),
+        debt: debt.toFixed(2),
+        advance_outstanding: advanceOutstanding.toFixed(2),
         work_count: workCount,
       };
     };

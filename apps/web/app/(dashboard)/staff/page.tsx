@@ -29,6 +29,7 @@ type PayrollUser = {
   earned: string;
   paid: string;
   debt: string;
+  advance_outstanding: string;
   work_count: number;
 };
 
@@ -465,6 +466,7 @@ function PayrollRow({
   onSettle,
   onEdit,
   onDeactivate,
+  onAdvance,
   accountable,
   onCollect,
 }: {
@@ -472,6 +474,7 @@ function PayrollRow({
   onSettle: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
+  onAdvance: () => void;
   accountable?: string;
   onCollect?: () => void;
 }) {
@@ -481,7 +484,9 @@ function PayrollRow({
 
   const debt = parseFloat(user.debt);
   const earned = parseFloat(user.earned);
+  const advanceOutstanding = parseFloat(user.advance_outstanding ?? '0');
   const hasDebt = debt > 0;
+  const hasAdvance = advanceOutstanding > 0;
 
   const handleDeactivate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -556,18 +561,30 @@ function PayrollRow({
           <p className="text-[9px] text-slate-400">выплачено</p>
         </div>
 
-        {/* Debt */}
+        {/* Debt / Advance */}
         <div className="w-28 shrink-0 text-right">
-          {hasDebt ? (
-            <p className="text-sm font-black text-amber-600">
-              <Money amount={user.debt} />
-            </p>
+          {hasAdvance ? (
+            <>
+              <p className="text-sm font-black text-violet-600">
+                <Money amount={user.advance_outstanding} />
+              </p>
+              <p className="text-[9px] text-violet-400">аванс</p>
+            </>
+          ) : hasDebt ? (
+            <>
+              <p className="text-sm font-black text-amber-600">
+                <Money amount={user.debt} />
+              </p>
+              <p className="text-[9px] text-slate-400">долг</p>
+            </>
           ) : earned > 0 ? (
-            <p className="text-xs font-bold text-emerald-500">✓ выплачено</p>
+            <>
+              <p className="text-xs font-bold text-emerald-500">✓ выплачено</p>
+              <p className="text-[9px] text-slate-400">долг</p>
+            </>
           ) : (
             <p className="text-xs text-slate-300">—</p>
           )}
-          <p className="text-[9px] text-slate-400">долг</p>
         </div>
 
         {/* Подотчёт — только если передан */}
@@ -597,7 +614,7 @@ function PayrollRow({
         )}
 
         {/* Action */}
-        <div className="flex-1 flex justify-end">
+        <div className="flex-1 flex items-center justify-end gap-1.5">
           {hasDebt && !user.auto_settle ? (
             <button
               onClick={(e) => {
@@ -609,9 +626,19 @@ function PayrollRow({
               Рассчитаться
             </button>
           ) : null}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdvance();
+            }}
+            className="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0"
+            title="Выдать аванс"
+          >
+            Аванс
+          </button>
           <span
             className={cn(
-              'material-symbols-outlined text-slate-300 text-[18px] shrink-0 ml-2 transition-transform duration-200',
+              'material-symbols-outlined text-slate-300 text-[18px] shrink-0 transition-transform duration-200',
               expanded && 'rotate-180',
             )}
           >
@@ -676,6 +703,7 @@ function PayrollSection({
   onSettle,
   onEdit,
   onDeactivate,
+  onAdvance,
   accountableMap,
   onCollect,
 }: {
@@ -684,12 +712,14 @@ function PayrollSection({
   onSettle: (u: PayrollUser) => void;
   onEdit: (u: PayrollUser) => void;
   onDeactivate: (u: PayrollUser) => void;
+  onAdvance: (u: PayrollUser) => void;
   accountableMap?: Record<string, string>;
   onCollect?: (u: PayrollUser) => void;
 }) {
   if (users.length === 0) return null;
 
   const totalDebt = users.reduce((s, u) => s + parseFloat(u.debt), 0);
+  const totalAdvance = users.reduce((s, u) => s + parseFloat(u.advance_outstanding ?? '0'), 0);
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -703,6 +733,11 @@ function PayrollSection({
           {totalDebt > 0 && (
             <span className="text-xs font-black text-amber-600">
               Долг: <Money amount={totalDebt.toFixed(2)} />
+            </span>
+          )}
+          {totalAdvance > 0 && (
+            <span className="text-xs font-black text-violet-600">
+              Авансы: <Money amount={totalAdvance.toFixed(2)} />
             </span>
           )}
         </div>
@@ -753,6 +788,7 @@ function PayrollSection({
           onSettle={() => onSettle(u)}
           onEdit={() => onEdit(u)}
           onDeactivate={() => onDeactivate(u)}
+          onAdvance={() => onAdvance(u)}
           accountable={accountableMap ? (accountableMap[u.id] ?? '0') : undefined}
           onCollect={onCollect ? () => onCollect(u) : undefined}
         />
@@ -839,7 +875,149 @@ function CollectModal({
   );
 }
 
-// ─── AccountableSection ───────────────────────────────────────────────────────
+// ─── AdvanceModal ─────────────────────────────────────────────────────────────
+
+function AdvanceModal({
+  user,
+  onClose,
+  onSuccess,
+}: {
+  user: PayrollUser;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState('');
+  const [walletId, setWalletId] = useState(WALLETS[0]!.id);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      fetch('/api/staff/advance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          amount: parseFloat(amount.replace(',', '.')).toFixed(2),
+          from_wallet_id: walletId,
+          note: note.trim() || undefined,
+        }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const advanceOutstanding = parseFloat(user.advance_outstanding ?? '0');
+
+  const handleSubmit = () => {
+    const val = parseFloat(amount.replace(',', '.'));
+    if (isNaN(val) || val <= 0) {
+      setError('Введите сумму');
+      return;
+    }
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-slate-900">Выдать аванс</h2>
+            <p className="text-sm text-slate-500">{user.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          {advanceOutstanding > 0 && (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 flex justify-between items-center">
+              <span className="text-sm font-bold text-violet-700">Текущий аванс</span>
+              <span className="text-lg font-black text-violet-700">
+                <Money amount={user.advance_outstanding} />
+              </span>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Сумма аванса *</label>
+            <input
+              autoFocus
+              type="number"
+              min="1"
+              step="500"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setError('');
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              placeholder="0"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">
+              Из кассы / счёта
+            </label>
+            <select
+              value={walletId}
+              onChange={(e) => setWalletId(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+            >
+              {WALLETS.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Комментарий</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Необязательно"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+            />
+          </div>
+
+          <p className="text-xs text-slate-400">
+            Аванс будет вычтен из будущих выплат. Сотрудник работает в счёт выданной суммы.
+          </p>
+          {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className="flex-1 bg-violet-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors"
+          >
+            {mutation.isPending ? 'Проводим...' : '✓ Выдать аванс'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-sm text-slate-500 px-4 py-3 rounded-xl border border-slate-200"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -849,6 +1027,7 @@ export default function StaffPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [settleUser, setSettleUser] = useState<PayrollUser | null>(null);
+  const [advanceUser, setAdvanceUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
   const [collectDriver, setCollectDriver] = useState<{
     driver_id: string;
@@ -1018,6 +1197,7 @@ export default function StaffPage() {
             onSettle={setSettleUser}
             onEdit={handleEdit}
             onDeactivate={handleDeactivate}
+            onAdvance={setAdvanceUser}
             accountableMap={accountableMap}
             onCollect={(u) =>
               setCollectDriver({
@@ -1033,6 +1213,7 @@ export default function StaffPage() {
             onSettle={setSettleUser}
             onEdit={handleEdit}
             onDeactivate={handleDeactivate}
+            onAdvance={setAdvanceUser}
           />
           <PayrollSection
             title="Механики"
@@ -1040,6 +1221,7 @@ export default function StaffPage() {
             onSettle={setSettleUser}
             onEdit={handleEdit}
             onDeactivate={handleDeactivate}
+            onAdvance={setAdvanceUser}
           />
           <PayrollSection
             title="Офис / Прочие"
@@ -1047,6 +1229,7 @@ export default function StaffPage() {
             onSettle={setSettleUser}
             onEdit={handleEdit}
             onDeactivate={handleDeactivate}
+            onAdvance={setAdvanceUser}
           />
         </div>
       )}
@@ -1071,6 +1254,19 @@ export default function StaffPage() {
           onSuccess={() => {
             setCollectDriver(null);
             qc.invalidateQueries({ queryKey: ['driver-accountable'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
+          }}
+        />
+      )}
+
+      {/* Модал аванса */}
+      {advanceUser && (
+        <AdvanceModal
+          user={advanceUser}
+          onClose={() => setAdvanceUser(null)}
+          onSuccess={() => {
+            setAdvanceUser(null);
+            qc.invalidateQueries({ queryKey: ['staff-payroll'] });
             qc.invalidateQueries({ queryKey: ['wallets'] });
           }}
         />
