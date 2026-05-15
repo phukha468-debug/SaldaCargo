@@ -665,6 +665,12 @@ function ExpensesPanel() {
     ? chipFiltered.filter((tx) => getExpenseGroup(tx).id === activeGroupFilter.id)
     : chipFiltered;
 
+  // When chip = fixed/variable and no group filter: show group summaries instead of individual rows
+  const showGrouped = activeChip !== 'all' && activeCatFilter === null;
+  const visibleGroupsWhenGrouped = groupedCategories.filter(({ group }) =>
+    activeChip === 'fixed' ? group.fixed : !group.fixed,
+  );
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
       {/* Chips */}
@@ -791,6 +797,83 @@ function ExpensesPanel() {
                   style={{ height: 30, background: '#f1f5f9', borderRadius: 4, marginBottom: 2 }}
                 />
               ))}
+            </div>
+          ) : showGrouped && visibleGroupsWhenGrouped.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>
+              Нет расходов
+            </p>
+          ) : showGrouped ? (
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  color: '#94a3b8',
+                  fontWeight: 700,
+                  padding: '8px 14px 4px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '.06em',
+                }}
+              >
+                Нажмите на статью, чтобы увидеть детали
+              </p>
+              {visibleGroupsWhenGrouped.map(({ group, total }) => {
+                const count = chipFiltered.filter(
+                  (tx) => getExpenseGroup(tx).id === group.id,
+                ).length;
+                return (
+                  <div
+                    key={group.id}
+                    onClick={() => setActiveCatFilter(group.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '9px 14px',
+                      borderBottom: '1px solid #f8fafc',
+                      cursor: 'pointer',
+                      transition: 'background .1s',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseOut={(e) => (e.currentTarget.style.background = '')}
+                  >
+                    <div
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: group.color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#1e293b',
+                        flex: 1,
+                      }}
+                    >
+                      {group.name}
+                    </p>
+                    <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
+                      {count} оп.
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: group.color,
+                        flexShrink: 0,
+                        minWidth: 90,
+                        textAlign: 'right',
+                      }}
+                    >
+                      {rub(total)}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#cbd5e1', flexShrink: 0 }}>›</span>
+                  </div>
+                );
+              })}
             </div>
           ) : filteredTimeline.length === 0 ? (
             <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>

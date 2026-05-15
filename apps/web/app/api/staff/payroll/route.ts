@@ -2,13 +2,13 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+// Includes advances so "paid" matches what Finance shows as "Зарплата"
 const PAYROLL_CATEGORY_IDS = [
   'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
   '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
+  'a0000000-0000-0000-0000-000000000001', // ADVANCE_PAYMENT
 ];
-
-const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
 export async function GET(request: Request) {
   try {
@@ -27,12 +27,11 @@ export async function GET(request: Request) {
       { data: loaderTrips },
       { data: mechanicOrders },
       { data: paidRows },
-      // All-time data for advance balance
+      // All-time data for balance calculation
       { data: allTimeDriverTrips },
       { data: allTimeLoaderTrips },
       { data: allTimeMechanicOrders },
       { data: allTimePaid },
-      { data: allTimeAdvances },
     ] = await Promise.all([
       // Все активные сотрудники
       (supabase as any)
@@ -69,7 +68,7 @@ export async function GET(request: Request) {
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 
-      // Выплаченная ЗП (этот месяц)
+      // Выплаченная ЗП + авансы за этот месяц (совпадает с группой "Зарплата" в финансах)
       (supabase as any)
         .from('transactions')
         .select('related_user_id, amount')
@@ -100,22 +99,13 @@ export async function GET(request: Request) {
         .not('assigned_mechanic_id', 'is', null)
         .not('mechanic_pay', 'is', null),
 
-      // All-time: выплаченная ЗП
+      // All-time: ЗП + авансы (для расчёта allTimeBalance)
       (supabase as any)
         .from('transactions')
         .select('related_user_id, amount')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .in('category_id', PAYROLL_CATEGORY_IDS)
-        .not('related_user_id', 'is', null),
-
-      // All-time: авансы
-      (supabase as any)
-        .from('transactions')
-        .select('related_user_id, amount')
-        .eq('direction', 'expense')
-        .eq('lifecycle_status', 'approved')
-        .eq('category_id', ADVANCE_CATEGORY_ID)
         .not('related_user_id', 'is', null),
     ]);
 
@@ -207,13 +197,6 @@ export async function GET(request: Request) {
       if (uid) allPaidMap.set(uid, (allPaidMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
     }
 
-    const allAdvancesMap = new Map<string, number>();
-    for (const tx of (allTimeAdvances as any[]) ?? []) {
-      const uid = tx.related_user_id;
-      if (uid)
-        allAdvancesMap.set(uid, (allAdvancesMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
-    }
-
     // ── workCount ────────────────────────────────────────────────────────────
 
     const tripCountMap = new Map<string, number>();
@@ -264,8 +247,7 @@ export async function GET(request: Request) {
       // All-time balance: earned − salary_paid − advances
       const allEarned = allEarnedMap.get(u.id) ?? 0;
       const allPaid = allPaidMap.get(u.id) ?? 0;
-      const allAdvances = allAdvancesMap.get(u.id) ?? 0;
-      const allTimeBalance = allEarned - allPaid - allAdvances;
+      const allTimeBalance = allEarned - allPaid;
 
       // Долг к выплате с учётом аванса:
       // Если allTimeBalance > 0 → должны ему (берём min с текущим earned−paid)
