@@ -109,14 +109,15 @@ export async function GET(request: Request) {
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null),
 
-      // All-time: только авансы (отдельно для расчёта advance_outstanding)
+      // All-time: только авансы с датами (для расчёта и отображения)
       (supabase as any)
         .from('transactions')
-        .select('related_user_id, amount')
+        .select('related_user_id, amount, created_at')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .eq('category_id', ADVANCE_CATEGORY_ID)
-        .not('related_user_id', 'is', null),
+        .not('related_user_id', 'is', null)
+        .order('created_at', { ascending: false }),
     ]);
 
     // ── Агрегация earned (этот месяц) ───────────────────────────────────────
@@ -208,9 +209,14 @@ export async function GET(request: Request) {
     }
 
     const allAdvanceMap = new Map<string, number>();
+    const allAdvanceListMap = new Map<string, { amount: string; date: string }[]>();
     for (const tx of (allTimeAdvances as any[]) ?? []) {
       const uid = tx.related_user_id;
-      if (uid) allAdvanceMap.set(uid, (allAdvanceMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
+      if (!uid) continue;
+      allAdvanceMap.set(uid, (allAdvanceMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
+      const list = allAdvanceListMap.get(uid) ?? [];
+      list.push({ amount: parseFloat(tx.amount).toFixed(2), date: tx.created_at });
+      allAdvanceListMap.set(uid, list);
     }
 
     // ── workCount ────────────────────────────────────────────────────────────
@@ -288,6 +294,7 @@ export async function GET(request: Request) {
         paid: paid.toFixed(2),
         debt: debt.toFixed(2),
         advance_outstanding: advanceOutstanding.toFixed(2),
+        advances: allAdvanceListMap.get(u.id) ?? [],
         work_count: workCount,
       };
     };

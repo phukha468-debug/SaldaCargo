@@ -34,6 +34,7 @@ type PayrollUser = {
   paid: string;
   debt: string;
   advance_outstanding: string;
+  advances: { amount: string; date: string }[];
   work_count: number;
 };
 
@@ -603,7 +604,16 @@ function PayrollRow({
               <p className="text-sm font-black text-violet-600">
                 <Money amount={user.advance_outstanding} />
               </p>
-              <p className="text-[9px] text-violet-400">аванс</p>
+              {(user.advances ?? []).slice(0, 1).map((adv, i) => (
+                <p key={i} className="text-[9px] text-violet-400">
+                  аванс{' '}
+                  {new Date(adv.date).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </p>
+              ))}
+              {!(user.advances ?? []).length && <p className="text-[9px] text-violet-400">аванс</p>}
             </>
           ) : hasDebt ? (
             <>
@@ -975,11 +985,25 @@ function AdvanceModal({
         </div>
         <div className="p-6 space-y-4">
           {advanceOutstanding > 0 && (
-            <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 flex justify-between items-center">
-              <span className="text-sm font-bold text-violet-700">Текущий аванс</span>
-              <span className="text-lg font-black text-violet-700">
-                <Money amount={user.advance_outstanding} />
-              </span>
+            <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-bold text-violet-700">Текущий аванс</span>
+                <span className="text-lg font-black text-violet-700">
+                  <Money amount={user.advance_outstanding} />
+                </span>
+              </div>
+              {(user.advances ?? []).map((adv, i) => (
+                <div key={i} className="flex justify-between text-xs text-violet-500">
+                  <span>
+                    {new Date(adv.date).toLocaleDateString('ru-RU', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </span>
+                  <Money amount={adv.amount} />
+                </div>
+              ))}
             </div>
           )}
 
