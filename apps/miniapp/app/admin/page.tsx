@@ -101,14 +101,14 @@ export default function AdminDashboard() {
         </h2>
         <div className="grid grid-cols-2 gap-3">
           <Link
-            href="/admin/finance?action=income"
+            href="/admin/finance?action=income_menu"
             className="bg-green-600 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
           >
             <span className="text-2xl">➕</span>
             <span className="text-xs font-black uppercase tracking-widest">Доход</span>
           </Link>
           <Link
-            href="/admin/finance?action=expense"
+            href="/admin/finance?action=expense_menu"
             className="bg-zinc-800 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
           >
             <span className="text-2xl">➖</span>

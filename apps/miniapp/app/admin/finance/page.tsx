@@ -37,21 +37,25 @@ function FinanceContent() {
     | 'receivables'
     | null
   >(
-    initialAction === 'income'
-      ? 'income'
-      : initialAction === 'expense'
-        ? 'expense'
-        : initialAction === 'collection'
-          ? 'collection'
-          : initialAction === 'debts'
-            ? 'debts'
-            : initialAction === 'supplier_debt'
-              ? 'supplier_debt'
-              : initialAction === 'salary'
-                ? 'salary'
-                : initialAction === 'receivables'
-                  ? 'receivables'
-                  : null,
+    initialAction === 'income_menu'
+      ? 'income_menu'
+      : initialAction === 'expense_menu'
+        ? 'expense_menu'
+        : initialAction === 'income'
+          ? 'income_menu'
+          : initialAction === 'expense'
+            ? 'expense_menu'
+            : initialAction === 'collection'
+              ? 'collection'
+              : initialAction === 'debts'
+                ? 'debts'
+                : initialAction === 'supplier_debt'
+                  ? 'supplier_debt'
+                  : initialAction === 'salary'
+                    ? 'salary'
+                    : initialAction === 'receivables'
+                      ? 'receivables'
+                      : null,
   );
   const queryClient = useQueryClient();
 
@@ -82,26 +86,6 @@ function FinanceContent() {
       </header>
 
       <div className="p-4 space-y-4">
-        {/* Главный экран — 2 кнопки */}
-        {!showForm && (
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setShowForm('income_menu')}
-              className="bg-green-600 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-            >
-              <span className="text-2xl">➕</span>
-              <span className="text-[11px] font-black uppercase tracking-widest">Доход</span>
-            </button>
-            <button
-              onClick={() => setShowForm('expense_menu')}
-              className="bg-zinc-800 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-            >
-              <span className="text-2xl">➖</span>
-              <span className="text-[11px] font-black uppercase tracking-widest">Расход</span>
-            </button>
-          </div>
-        )}
-
         {/* Подменю ДОХОД */}
         {showForm === 'income_menu' && (
           <div className="space-y-3">
