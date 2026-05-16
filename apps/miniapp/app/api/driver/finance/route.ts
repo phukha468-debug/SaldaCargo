@@ -22,8 +22,7 @@ export async function GET() {
     .select(
       `id, trip_number, started_at, ended_at, status,
        asset:assets(short_name),
-       trip_orders(id, amount, payment_method, lifecycle_status, created_at),
-       trip_expenses(id, amount, payment_method)`,
+       trip_orders(id, amount, payment_method, lifecycle_status, created_at)`,
     )
     .eq('driver_id', driverId)
     .neq('lifecycle_status', 'cancelled')
@@ -41,12 +40,6 @@ export async function GET() {
 
   const cashIn = cashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0);
 
-  // Наличные расходы водителя (потрачено из подотчёта)
-  const cashSpent = (cashTrips ?? [])
-    .flatMap((trip: any) => (trip.trip_expenses as any[]) ?? [])
-    .filter((e: any) => CASH_METHODS.includes(e.payment_method))
-    .reduce((sum: number, e: any) => sum + parseFloat(e.amount ?? '0'), 0);
-
   // Subtract cash collected by admin (инкассации)
   const { data: collections } = await (supabase
     .from('cash_collections')
@@ -58,7 +51,7 @@ export async function GET() {
     0,
   );
 
-  const cashBalance = Math.max(0, cashIn - cashSpent - cashOut).toFixed(2);
+  const cashBalance = Math.max(0, cashIn - cashOut).toFixed(2);
 
   // 2. ЗП по рейсам (текущий месяц)
   const now = new Date();

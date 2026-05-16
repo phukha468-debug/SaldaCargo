@@ -98,9 +98,7 @@ export async function GET() {
         .eq('is_active', true) as any,
       supabase
         .from('trips')
-        .select(
-          'driver_id, trip_orders(amount, payment_method, lifecycle_status), trip_expenses(amount, payment_method)',
-        )
+        .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)')
         .neq('lifecycle_status', 'cancelled') as any,
       supabase.from('cash_collections').select('driver_id, amount') as any,
     ]);
@@ -111,19 +109,13 @@ export async function GET() {
       return NextResponse.json({ error: collectionsError.message }, { status: 500 });
 
     const result = ((drivers as any[]) ?? []).map((driver: any) => {
-      const driverTrips = ((trips as any[]) ?? []).filter((t: any) => t.driver_id === driver.id);
-
-      const cashIn = driverTrips
+      const cashIn = ((trips as any[]) ?? [])
+        .filter((t: any) => t.driver_id === driver.id)
         .flatMap((t: any) => (t.trip_orders as any[]) ?? [])
         .filter(
           (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
         )
         .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
-
-      const cashSpent = driverTrips
-        .flatMap((t: any) => (t.trip_expenses as any[]) ?? [])
-        .filter((e: any) => CASH_METHODS.includes(e.payment_method))
-        .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
 
       const cashOut = ((collections as any[]) ?? [])
         .filter((c: any) => c.driver_id === driver.id)
@@ -132,7 +124,7 @@ export async function GET() {
       return {
         driver_id: driver.id,
         driver_name: driver.name,
-        balance: (cashIn - cashSpent - cashOut).toFixed(2),
+        balance: (cashIn - cashOut).toFixed(2),
       };
     });
 
