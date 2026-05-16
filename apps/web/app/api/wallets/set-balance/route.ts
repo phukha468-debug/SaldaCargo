@@ -103,9 +103,13 @@ export async function POST(request: Request) {
     const isIncome = delta > 0;
     const adjustmentAmount = Math.abs(delta).toFixed(2);
 
+    const CAT_OTHER_INCOME = '68225ea2-d7de-4442-8ed8-ce2366b5d369';
+    const CAT_OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
+
     const { error: txErr } = await (supabase.from('transactions') as any).insert({
       direction: isIncome ? 'income' : 'expense',
       amount: adjustmentAmount,
+      category_id: isIncome ? CAT_OTHER_INCOME : CAT_OTHER_EXPENSE,
       ...(isIncome ? { to_wallet_id: walletId } : { from_wallet_id: walletId }),
       lifecycle_status: 'approved',
       settlement_status: 'completed',
