@@ -21,7 +21,8 @@ export async function GET() {
 
     const { data: trips, error: tripsError } = await (supabase
       .from('trips')
-      .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)') as any);
+      .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)')
+      .neq('lifecycle_status', 'cancelled') as any);
 
     if (tripsError) return NextResponse.json({ error: tripsError.message }, { status: 500 });
 

@@ -97,7 +97,8 @@ export async function GET() {
         .eq('is_active', true) as any,
       supabase
         .from('trips')
-        .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)') as any,
+        .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)')
+        .neq('lifecycle_status', 'cancelled') as any,
       supabase.from('cash_collections').select('driver_id, amount') as any,
     ]);
 

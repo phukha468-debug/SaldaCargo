@@ -1166,7 +1166,8 @@ export default function StaffPage() {
   >({
     queryKey: ['driver-accountable'],
     queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
-    staleTime: 120000,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
   const accountableMap = Object.fromEntries(
     (accountableList ?? []).map((d) => [d.driver_id, d.balance]),

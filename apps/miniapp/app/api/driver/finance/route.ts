@@ -25,6 +25,7 @@ export async function GET() {
        trip_orders(id, amount, payment_method, lifecycle_status, created_at)`,
     )
     .eq('driver_id', driverId)
+    .neq('lifecycle_status', 'cancelled')
     .order('started_at', { ascending: false })
     .limit(60) as any);
 

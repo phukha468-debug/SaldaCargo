@@ -946,7 +946,10 @@ export default function ReviewPage() {
     });
   };
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['trips-review'] });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['trips-review'] });
+    queryClient.invalidateQueries({ queryKey: ['driver-accountable'] });
+  };
 
   async function handleApprove(tripId: string) {
     setApprovingId(tripId);
