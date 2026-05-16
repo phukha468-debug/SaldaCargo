@@ -361,9 +361,9 @@ function ClientDetail({
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
           Выручка по месяцам
         </div>
-        <div className="flex items-end gap-2 h-28">
+        <div className="flex items-end gap-2 h-20">
           {monthly.map((v, i) => {
-            const h = v > 0 ? Math.max(Math.round((v / maxBar) * 100), 4) : 0;
+            const h = v > 0 ? Math.max(Math.round((v / maxBar) * 72), 4) : 0;
             const isLast = i === monthly.length - 1;
             return (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -718,6 +718,234 @@ function ClientModal({
   );
 }
 
+// ── Oneoff aggregate tab ───────────────────────────────────────────────────
+
+function OneoffAggregateTab({ irregular, regular }: { irregular: Client[]; regular: Client[] }) {
+  const overhead_pct = irregular[0]?.overhead_pct ?? regular[0]?.overhead_pct ?? 0;
+
+  const totalRevIrreg = irregular.reduce((s, c) => s + parseFloat(c.total_revenue), 0);
+  const totalRevReg = regular.reduce((s, c) => s + parseFloat(c.total_revenue), 0);
+  const totalRevAll = totalRevIrreg + totalRevReg;
+
+  const totalNetIrreg = irregular.reduce((s, c) => s + parseFloat(c.net_profit), 0);
+  const totalNetReg = regular.reduce((s, c) => s + parseFloat(c.net_profit), 0);
+  const totalNetAll = totalNetIrreg + totalNetReg;
+
+  const totalGrossIrreg = totalNetIrreg + totalRevIrreg * overhead_pct;
+  const totalGrossReg = totalNetReg + totalRevReg * overhead_pct;
+  const totalGrossAll = totalGrossIrreg + totalGrossReg;
+
+  const tripsIrreg = irregular.reduce((s, c) => s + c.trips_count, 0);
+  const tripsReg = regular.reduce((s, c) => s + c.trips_count, 0);
+
+  const avgRevIrreg = tripsIrreg > 0 ? totalRevIrreg / tripsIrreg : 0;
+  const avgRevReg = tripsReg > 0 ? totalRevReg / tripsReg : 0;
+  const avgNetIrreg = tripsIrreg > 0 ? totalNetIrreg / tripsIrreg : 0;
+  const avgNetReg = tripsReg > 0 ? totalNetReg / tripsReg : 0;
+  const marginIrreg = totalRevIrreg > 0 ? (totalNetIrreg / totalRevIrreg) * 100 : 0;
+  const marginReg = totalRevReg > 0 ? (totalNetReg / totalRevReg) * 100 : 0;
+
+  const revShareIrreg = totalRevAll > 0 ? Math.round((totalRevIrreg / totalRevAll) * 100) : 0;
+  const grossShareIrreg =
+    totalGrossAll > 0 ? Math.round((totalGrossIrreg / totalGrossAll) * 100) : 0;
+  const netShareIrreg =
+    totalNetAll !== 0 ? Math.round((totalNetIrreg / Math.abs(totalNetAll)) * 100) : 0;
+
+  const monthlyData =
+    irregular.length > 0
+      ? irregular[0].monthly.map((_, i) =>
+          irregular.reduce((s, c) => s + parseFloat(c.monthly[i] ?? '0'), 0),
+        )
+      : Array(6).fill(0);
+  const monthLabels = irregular[0]?.month_labels ?? [];
+  const maxMonthly = Math.max(...monthlyData, 1);
+
+  return (
+    <div className="space-y-4">
+      {/* KPI — 4 плитки */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 p-3">
+          <div className="text-[11px] text-slate-400 mb-1">Разовых клиентов</div>
+          <div className="text-xl font-bold text-slate-900">{irregular.length}</div>
+          <div className="text-[11px] text-amber-600 mt-1">{tripsIrreg} рейсов всего</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-3">
+          <div className="text-[11px] text-slate-400 mb-1">Выручка разовых</div>
+          <div className="text-xl font-bold text-slate-900">
+            {totalRevIrreg > 0 ? <Money amount={totalRevIrreg.toFixed(2)} /> : '—'}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">{revShareIrreg}% от общей выручки</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-3">
+          <div className="text-[11px] text-slate-400 mb-1">Валовая прибыль</div>
+          <div className="text-xl font-bold text-slate-900">
+            {totalGrossIrreg > 0 ? <Money amount={totalGrossIrreg.toFixed(2)} /> : '—'}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">{grossShareIrreg}% от общей вал.п.</div>
+        </div>
+        <div
+          className={`rounded-2xl border p-3 ${totalNetIrreg >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}
+        >
+          <div
+            className={`text-[11px] mb-1 ${totalNetIrreg >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+          >
+            Чистая прибыль
+          </div>
+          <div
+            className={`text-xl font-bold ${totalNetIrreg >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}
+          >
+            {totalRevIrreg > 0 ? <Money amount={totalNetIrreg.toFixed(2)} /> : '—'}
+          </div>
+          <div
+            className={`text-[11px] mt-1 ${totalNetIrreg >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+          >
+            {netShareIrreg}% от общей ЧП
+          </div>
+        </div>
+      </div>
+
+      {/* Сетка 2×1 */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Сравнение с постоянными */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="text-sm font-semibold text-slate-800 mb-4">
+            Разовые vs Постоянные клиенты
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[11px] text-slate-400 uppercase tracking-wide">
+                <th className="text-left pb-2 font-semibold">Метрика</th>
+                <th className="text-right pb-2 font-semibold text-slate-600">Пост.</th>
+                <th className="text-right pb-2 font-semibold text-amber-600">Разовые</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              <tr>
+                <td className="py-2.5 text-slate-500 text-xs">Рейсов</td>
+                <td className="py-2.5 text-right font-semibold text-slate-700">{tripsReg}</td>
+                <td className="py-2.5 text-right font-semibold text-amber-700">{tripsIrreg}</td>
+              </tr>
+              <tr>
+                <td className="py-2.5 text-slate-500 text-xs">Ср. выручка / рейс</td>
+                <td className="py-2.5 text-right font-semibold text-slate-700">
+                  {avgRevReg > 0 ? <Money amount={avgRevReg.toFixed(2)} /> : '—'}
+                </td>
+                <td className="py-2.5 text-right font-semibold text-amber-700">
+                  {avgRevIrreg > 0 ? <Money amount={avgRevIrreg.toFixed(2)} /> : '—'}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2.5 text-slate-500 text-xs">Ср. ЧП / рейс</td>
+                <td className="py-2.5 text-right font-semibold text-slate-700">
+                  {avgNetReg !== 0 ? <Money amount={avgNetReg.toFixed(2)} /> : '—'}
+                </td>
+                <td className="py-2.5 text-right font-semibold text-amber-700">
+                  {avgNetIrreg !== 0 ? <Money amount={avgNetIrreg.toFixed(2)} /> : '—'}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2.5 text-slate-500 text-xs">Маржинальность</td>
+                <td className="py-2.5 text-right">
+                  <span
+                    className={`font-bold text-sm ${marginReg >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                  >
+                    {marginReg.toFixed(1)}%
+                  </span>
+                </td>
+                <td className="py-2.5 text-right">
+                  <span
+                    className={`font-bold text-sm ${marginIrreg >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                  >
+                    {marginIrreg.toFixed(1)}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Доля в структуре */}
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2.5">
+              Доля в общей прибыли
+            </div>
+            {[
+              { label: 'Выручка', val: revShareIrreg },
+              { label: 'Вал. прибыль', val: grossShareIrreg },
+              { label: 'Чист. прибыль', val: netShareIrreg },
+            ].map(({ label, val }) => (
+              <div key={label} className="flex items-center gap-2 mb-1.5">
+                <span className="text-[11px] text-slate-500 w-24 shrink-0">{label}</span>
+                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-400 h-full rounded-full"
+                    style={{ width: `${Math.max(0, val)}%` }}
+                  />
+                </div>
+                <span className="text-[11px] font-bold text-amber-700 w-8 text-right">{val}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Динамика */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="text-sm font-semibold text-slate-800 mb-4">Динамика выручки</div>
+          {monthlyData.some((v) => v > 0) ? (
+            <>
+              <div className="flex items-end gap-2 h-36">
+                {monthlyData.map((v, i) => {
+                  const h = v > 0 ? Math.max(Math.round((v / maxMonthly) * 130), 4) : 0;
+                  const isLast = i === monthlyData.length - 1;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="text-[10px] text-slate-400">{v > 0 ? rubShort(v) : ''}</div>
+                      <div
+                        className={`w-full rounded-t-lg ${isLast ? 'bg-amber-500' : 'bg-amber-200'}`}
+                        style={{ height: `${h}px`, minHeight: v > 0 ? '4px' : '0' }}
+                      />
+                      <div className="text-[10px] text-slate-400">{monthLabels[i]}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-300 text-center py-10">Нет данных за 6 месяцев</p>
+          )}
+
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">
+              Вывод
+            </div>
+            {totalRevIrreg > 0 ? (
+              <div className="text-sm text-slate-600 leading-relaxed">
+                {marginIrreg > marginReg ? (
+                  <span>
+                    Разовые клиенты <strong className="text-emerald-700">выгоднее</strong>{' '}
+                    постоянных по маржинальности: {marginIrreg.toFixed(1)}% vs{' '}
+                    {marginReg.toFixed(1)}%.
+                  </span>
+                ) : marginIrreg > 0 ? (
+                  <span>
+                    Постоянные клиенты выгоднее: маржа {marginReg.toFixed(1)}% vs{' '}
+                    {marginIrreg.toFixed(1)}% у разовых.
+                  </span>
+                ) : (
+                  <span className="text-rose-600">
+                    Разовые клиенты убыточны при текущих расходах.
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">Нет завершённых рейсов</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Client list panel (shared by both tabs) ────────────────────────────────
 
 function ClientListPanel({
@@ -733,7 +961,6 @@ function ClientListPanel({
   onSelect,
   onMergeToggle,
   onToggleInactive,
-  onOpenCreate,
   onToggleMerge,
 }: {
   list: Client[];
@@ -748,7 +975,6 @@ function ClientListPanel({
   onSelect: (id: string) => void;
   onMergeToggle: (id: string) => void;
   onToggleInactive: () => void;
-  onOpenCreate: () => void;
   onToggleMerge: () => void;
 }) {
   return (
@@ -790,21 +1016,7 @@ function ClientListPanel({
           )}
         </div>
 
-        <div className="p-3 border-t border-slate-100 space-y-2">
-          <button
-            onClick={onOpenCreate}
-            className="w-full flex items-center justify-center gap-2 py-2 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Добавить клиента
-          </button>
+        <div className="p-3 border-t border-slate-100">
           <div className="flex items-center gap-2">
             <button
               onClick={onToggleMerge}
@@ -905,12 +1117,13 @@ export default function ClientsPage() {
       .sort((a, b) => parseFloat(b.total_revenue) - parseFloat(a.total_revenue));
   }
 
-  const currentList = tab === 'regular' ? getList(true) : getList(false);
+  const regularList = getList(true);
+  const currentList = tab === 'regular' ? regularList : getList(false);
   const selectedClient = clients.find((c) => c.id === selectedId) ?? null;
 
-  // Auto-select first in list
-  const firstId = currentList[0]?.id;
-  if (!selectedId && firstId) setSelectedId(firstId);
+  // Auto-select first in regular list
+  const firstId = regularList[0]?.id;
+  if (tab === 'regular' && !selectedId && firstId) setSelectedId(firstId);
 
   // ── Mutations ──
 
@@ -1038,71 +1251,82 @@ export default function ClientsPage() {
       `}</style>
 
       <div className="flex flex-col max-w-7xl mx-auto animate-in fade-in duration-300">
-        {/* ── Заголовок ── */}
-        <div className="pt-2 pb-3">
-          <h1 className="text-2xl font-bold text-slate-900">Контрагенты</h1>
-        </div>
-
         {/* ── KPI плитки — grid 5 колонок ── */}
-        <div className="grid grid-cols-5 gap-3 mb-5">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4">
-            <div className="text-xs text-slate-400 mb-1">Постоянных клиентов</div>
-            <div className="text-2xl font-bold text-slate-900">{regular.length}</div>
-            <div className="text-xs text-emerald-600 mt-1">
+        <div className="grid grid-cols-5 gap-3 mb-4 pt-2">
+          <div className="bg-white rounded-2xl border border-slate-200 p-3">
+            <div className="text-[11px] text-slate-400 mb-0.5">Постоянных клиентов</div>
+            <div className="text-xl font-bold text-slate-900">{regular.length}</div>
+            <div className="text-[11px] text-emerald-600 mt-0.5">
               {irregular.length > 0 ? `+ ${irregular.length} разовых` : 'все активны'}
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4">
-            <div className="text-xs text-slate-400 mb-1">Выручка постоянных</div>
-            <div className="text-2xl font-bold text-slate-900">
+          <div className="bg-white rounded-2xl border border-slate-200 p-3">
+            <div className="text-[11px] text-slate-400 mb-0.5">Выручка постоянных</div>
+            <div className="text-xl font-bold text-slate-900">
               {totalRevReg > 0 ? <Money amount={totalRevReg.toFixed(2)} /> : '—'}
             </div>
-            <div className="text-xs text-slate-400 mt-1">
+            <div className="text-[11px] text-slate-400 mt-0.5">
               {revPctReg > 0 ? `${revPctReg}% от общей` : '—'}
             </div>
           </div>
-          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">
-            <div className="text-xs text-amber-600 mb-1">Разовых рейсов</div>
-            <div className="text-2xl font-bold text-amber-700">{totalTripsIrreg}</div>
-            <div className="text-xs text-amber-500 mt-1">за всё время</div>
+          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3">
+            <div className="text-[11px] text-amber-600 mb-0.5">Разовых рейсов</div>
+            <div className="text-xl font-bold text-amber-700">{totalTripsIrreg}</div>
+            <div className="text-[11px] text-amber-500 mt-0.5">за всё время</div>
           </div>
-          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">
-            <div className="text-xs text-amber-600 mb-1">Выручка разовых</div>
-            <div className="text-2xl font-bold text-amber-700">
+          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3">
+            <div className="text-[11px] text-amber-600 mb-0.5">Выручка разовых</div>
+            <div className="text-xl font-bold text-amber-700">
               {totalRevIrreg > 0 ? <Money amount={totalRevIrreg.toFixed(2)} /> : '—'}
             </div>
-            <div className="text-xs text-amber-500 mt-1">
+            <div className="text-[11px] text-amber-500 mt-0.5">
               {revPctIrreg > 0 ? `${revPctIrreg}% от общей` : '—'}
             </div>
           </div>
-          <div className="bg-slate-900 rounded-2xl p-4 text-white">
-            <div className="text-xs text-slate-400 mb-1">Всего выручки</div>
-            <div className="text-2xl font-bold">
+          <div className="bg-slate-900 rounded-2xl p-3 text-white">
+            <div className="text-[11px] text-slate-400 mb-0.5">Всего выручки</div>
+            <div className="text-xl font-bold">
               {totalRevAll > 0 ? <Money amount={totalRevAll.toFixed(2)} /> : '—'}
             </div>
-            <div className="text-xs text-slate-400 mt-1">все клиенты</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">все клиенты</div>
           </div>
         </div>
 
-        {/* ── Табы ── */}
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit mb-4">
+        {/* ── Табы + кнопка ── */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+            <button
+              onClick={() => switchTab('regular')}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === 'regular' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+            >
+              Постоянные клиенты
+              <span className="ml-1.5 text-xs bg-white text-slate-600 px-1.5 py-0.5 rounded-md font-semibold">
+                {regular.length}
+              </span>
+            </button>
+            <button
+              onClick={() => switchTab('oneoff')}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === 'oneoff' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+            >
+              Разовые клиенты
+              <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-semibold">
+                {irregular.length}
+              </span>
+            </button>
+          </div>
           <button
-            onClick={() => switchTab('regular')}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === 'regular' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+            onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"
           >
-            Постоянные клиенты
-            <span className="ml-1.5 text-xs bg-white text-slate-600 px-1.5 py-0.5 rounded-md font-semibold">
-              {regular.length}
-            </span>
-          </button>
-          <button
-            onClick={() => switchTab('oneoff')}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === 'oneoff' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
-          >
-            Разовые клиенты
-            <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-semibold">
-              {irregular.length}
-            </span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Добавить клиента
           </button>
         </div>
 
@@ -1119,51 +1343,55 @@ export default function ClientsPage() {
           </div>
         )}
 
-        {/* ══ Список + Детали (оба таба) ══ */}
-        <div className="flex gap-4">
-          <ClientListPanel
-            list={currentList}
-            isLoading={isLoading}
-            selectedId={selectedId}
-            debtMap={debtMap}
-            mergeMode={mergeMode}
-            mergeSelected={mergeSelected}
-            showInactive={showInactive}
-            search={search}
-            onSearch={setSearch}
-            onSelect={setSelectedId}
-            onMergeToggle={handleMergeToggle}
-            onToggleInactive={() => setShowInactive((v) => !v)}
-            onOpenCreate={openCreate}
-            onToggleMerge={() => {
-              setMergeMode((v) => !v);
-              setMergeSelected(new Set());
-              setMergeError('');
-            }}
-          />
+        {/* ══ Таб 1: Постоянные — список + детали ══ */}
+        {tab === 'regular' && (
+          <div className="flex gap-4">
+            <ClientListPanel
+              list={currentList}
+              isLoading={isLoading}
+              selectedId={selectedId}
+              debtMap={debtMap}
+              mergeMode={mergeMode}
+              mergeSelected={mergeSelected}
+              showInactive={showInactive}
+              search={search}
+              onSearch={setSearch}
+              onSelect={setSelectedId}
+              onMergeToggle={handleMergeToggle}
+              onToggleInactive={() => setShowInactive((v) => !v)}
+              onToggleMerge={() => {
+                setMergeMode((v) => !v);
+                setMergeSelected(new Set());
+                setMergeError('');
+              }}
+            />
 
-          <div className="flex-1 min-w-0">
-            <div className="bg-white rounded-2xl border border-slate-200">
-              {selectedClient ? (
-                <ClientDetail
-                  client={selectedClient}
-                  debt={debtMap.get(selectedClient.id) ?? 0}
-                  tripHistory={tripHistory}
-                  onEdit={() => openEdit(selectedClient)}
-                  onToggleActive={() => toggleActive(selectedClient)}
-                  onPromote={() => promoteClient(selectedClient)}
-                  onDelete={() => deleteClient(selectedClient)}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                  <p className="text-3xl mb-3">👈</p>
-                  <p className="text-sm font-bold text-slate-400">Выберите клиента</p>
-                  <p className="text-xs text-slate-300 mt-1">Детали появятся здесь</p>
-                </div>
-              )}
+            <div className="flex-1 min-w-0">
+              <div className="bg-white rounded-2xl border border-slate-200">
+                {selectedClient ? (
+                  <ClientDetail
+                    client={selectedClient}
+                    debt={debtMap.get(selectedClient.id) ?? 0}
+                    tripHistory={tripHistory}
+                    onEdit={() => openEdit(selectedClient)}
+                    onToggleActive={() => toggleActive(selectedClient)}
+                    onPromote={() => promoteClient(selectedClient)}
+                    onDelete={() => deleteClient(selectedClient)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                    <p className="text-3xl mb-3">👈</p>
+                    <p className="text-sm font-bold text-slate-400">Выберите клиента</p>
+                    <p className="text-xs text-slate-300 mt-1">Детали появятся здесь</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ══ Таб 2: Разовые — агрегированная аналитика ══ */}
+        {tab === 'oneoff' && <OneoffAggregateTab irregular={irregular} regular={regular} />}
       </div>
 
       {/* ── Модалка ── */}
