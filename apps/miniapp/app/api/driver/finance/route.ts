@@ -14,8 +14,8 @@ export async function GET() {
 
   // 1. Подотчёт: нал на руках у водителя
   // Считаем напрямую из заказов — нал получен сразу, не ждём ревью от админа.
-  // cash = наличные заказы, card_driver = оплата на карту водителя (тоже у него)
-  const CASH_METHODS = ['cash', 'card_driver'];
+  // cash = наличные заказы; card_driver не считается — деньги не проходят через руки водителя
+  const CASH_METHODS = ['cash'];
 
   const { data: cashTrips } = await (supabase
     .from('trips')

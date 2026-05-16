@@ -2,7 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-const CASH_METHODS = ['cash', 'card_driver'];
+const CASH_METHODS = ['cash'];
 
 const CAT_PAYROLL_DRIVER = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
 

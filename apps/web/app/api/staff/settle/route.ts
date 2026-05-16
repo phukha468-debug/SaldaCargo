@@ -89,7 +89,7 @@ export async function POST(request: Request) {
           .from('trip_orders')
           .select('trips!inner(driver_id), amount')
           .eq('trips.driver_id', body.user_id)
-          .in('payment_method', ['cash', 'card_driver'])
+          .in('payment_method', ['cash'])
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed'),
         (supabase as any).from('cash_collections').select('amount').eq('driver_id', body.user_id),
