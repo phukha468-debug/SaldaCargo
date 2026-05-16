@@ -421,7 +421,7 @@ export default function RootPage() {
 
 function AccountableCard({ balance }: { balance: string }) {
   return (
-    <Link href="/finance?tab=accountable">
+    <Link href="/driver/finance?tab=accountable">
       <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 active:bg-zinc-50 transition-colors">
         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">На руках</p>
         <Money amount={balance} className="text-2xl font-black text-zinc-900 mt-1" />
@@ -434,7 +434,7 @@ function AccountableCard({ balance }: { balance: string }) {
 function PayCard({ approved, draft }: { approved: string; draft: string }) {
   const hasDraft = parseFloat(draft) > 0;
   return (
-    <Link href="/finance?tab=pay">
+    <Link href="/driver/finance?tab=pay">
       <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 active:bg-zinc-50 transition-colors">
         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">ЗП за месяц</p>
         <Money amount={approved} className="text-2xl font-black text-green-600 mt-1" />

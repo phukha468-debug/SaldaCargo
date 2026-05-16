@@ -801,6 +801,10 @@ const ROLE_LABELS: Record<string, string> = {
   loader: 'Грузчик',
   mechanic: 'Механик',
   mechanic_lead: 'Ст.механик',
+  welder: 'Сварщик',
+  painter: 'Маляр',
+  electrician: 'Электрик',
+  handyman: 'Разнорабочий',
 };
 
 function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {

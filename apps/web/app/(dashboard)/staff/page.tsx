@@ -15,7 +15,11 @@ type UserRole =
   | 'loader'
   | 'mechanic'
   | 'mechanic_lead'
-  | 'accountant';
+  | 'accountant'
+  | 'welder'
+  | 'painter'
+  | 'electrician'
+  | 'handyman';
 
 type PayrollUser = {
   id: string;
@@ -65,6 +69,10 @@ const ROLE_LABEL: Record<UserRole, string> = {
   mechanic: 'Механик',
   mechanic_lead: 'Ст. механик',
   accountant: 'Бухгалтер',
+  welder: 'Сварщик',
+  painter: 'Маляр',
+  electrician: 'Электрик',
+  handyman: 'Разнорабочий',
 };
 
 const ROLE_COLOR: Record<UserRole, string> = {
@@ -75,6 +83,10 @@ const ROLE_COLOR: Record<UserRole, string> = {
   mechanic: 'bg-amber-100 text-amber-700',
   mechanic_lead: 'bg-amber-200 text-amber-800',
   accountant: 'bg-slate-100 text-slate-600',
+  welder: 'bg-cyan-100 text-cyan-700',
+  painter: 'bg-pink-100 text-pink-700',
+  electrician: 'bg-yellow-100 text-yellow-700',
+  handyman: 'bg-stone-100 text-stone-600',
 };
 
 const ALL_ROLES: UserRole[] = [
@@ -82,6 +94,10 @@ const ALL_ROLES: UserRole[] = [
   'mechanic',
   'mechanic_lead',
   'loader',
+  'welder',
+  'painter',
+  'electrician',
+  'handyman',
   'admin',
   'owner',
   'accountant',
@@ -501,8 +517,18 @@ function PayrollRow({
   };
 
   const primaryRole =
-    user.roles.find((r) => ['driver', 'loader', 'mechanic', 'mechanic_lead'].includes(r)) ??
-    user.roles[0];
+    user.roles.find((r) =>
+      [
+        'driver',
+        'loader',
+        'mechanic',
+        'mechanic_lead',
+        'welder',
+        'painter',
+        'electrician',
+        'handyman',
+      ].includes(r),
+    ) ?? user.roles[0];
 
   return (
     <div
