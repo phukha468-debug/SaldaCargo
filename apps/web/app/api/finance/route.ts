@@ -70,12 +70,13 @@ export async function GET(request: Request) {
 
     const [{ data: allOrders }, { data: allExpenseTx }, { data: transactions }] = await Promise.all(
       [
-        // Revenue: cash-basis — только settled trip_orders
+        // Revenue: cash-basis — только settled trip_orders одобренных рейсов
         (supabase as any)
           .from('trip_orders')
           .select('amount, trips!inner(started_at, lifecycle_status)')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
+          .eq('trips.lifecycle_status', 'approved')
           .gte('trips.started_at', sixMonthsAgo),
 
         // Expenses: все approved транзакции включая ФОТ

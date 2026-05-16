@@ -62,9 +62,10 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: [] }),
       (supabase as any)
         .from('trip_orders')
-        .select('amount')
+        .select('amount, trips!inner(lifecycle_status)')
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
+        .eq('settlement_status', 'completed')
+        .eq('trips.lifecycle_status', 'approved'),
     ]);
 
     const totalOverhead = [
@@ -77,14 +78,16 @@ export async function GET(request: Request) {
     );
     const overhead_pct = totalCompanyRevenue > 0 ? totalOverhead / totalCompanyRevenue : 0;
 
-    // Заказы клиентов с ЗП
+    // Заказы клиентов — те же фильтры, что в /api/finance
     const { data: orders } = await (supabase as any)
       .from('trip_orders')
       .select(
-        'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips(started_at)',
+        'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
       )
       .in('counterparty_id', cpIds)
-      .neq('lifecycle_status', 'cancelled');
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed')
+      .eq('trips.lifecycle_status', 'approved');
 
     // Все уникальные trip_id клиентских заказов
     const allTripIds = [
@@ -168,19 +171,17 @@ export async function GET(request: Request) {
         s.last_trip_at = startedAt;
       }
 
-      if (o.lifecycle_status === 'approved' && o.settlement_status === 'completed') {
-        s.total_revenue += amount;
-        s.revenue_orders++;
-        s.driver_costs += parseFloat(o.driver_pay ?? '0') + parseFloat(o.loader_pay ?? '0');
-        s.trip_client_revenue.set(o.trip_id, (s.trip_client_revenue.get(o.trip_id) ?? 0) + amount);
-        if (startedAt && now - new Date(startedAt).getTime() <= THIRTY_DAYS) {
-          s.revenue_30d += amount;
-        }
-        s.payments[o.payment_method] = (s.payments[o.payment_method] ?? 0) + amount;
-        const mk = startedAt ? startedAt.slice(0, 7) : null;
-        if (mk && monthKeys.includes(mk)) {
-          s.monthly[mk] = (s.monthly[mk] ?? 0) + amount;
-        }
+      s.total_revenue += amount;
+      s.revenue_orders++;
+      s.driver_costs += parseFloat(o.driver_pay ?? '0') + parseFloat(o.loader_pay ?? '0');
+      s.trip_client_revenue.set(o.trip_id, (s.trip_client_revenue.get(o.trip_id) ?? 0) + amount);
+      if (startedAt && now - new Date(startedAt).getTime() <= THIRTY_DAYS) {
+        s.revenue_30d += amount;
+      }
+      s.payments[o.payment_method] = (s.payments[o.payment_method] ?? 0) + amount;
+      const mk = startedAt ? startedAt.slice(0, 7) : null;
+      if (mk && monthKeys.includes(mk)) {
+        s.monthly[mk] = (s.monthly[mk] ?? 0) + amount;
       }
     }
 
