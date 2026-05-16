@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const FUEL_CATEGORY_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+const OVERHEAD_CODES = ['REPAIR_PARTS', 'REPAIR_EXTERNAL', 'TAX', 'INSURANCE'];
 
 function last6MonthKeys(): string[] {
   const now = new Date();
@@ -37,6 +38,44 @@ export async function GET(request: Request) {
 
     const cpIds = (counterparties ?? []).map((c: any) => c.id);
     if (cpIds.length === 0) return NextResponse.json([]);
+
+    // Коэффициент накладных расходов (налоги, запчасти, ремонты)
+    const { data: overheadCategories } = await (supabase as any)
+      .from('transaction_categories')
+      .select('id')
+      .in('code', OVERHEAD_CODES);
+
+    const overheadCatIds = (overheadCategories ?? []).map((c: any) => c.id);
+
+    const [overheadTxRes, overheadTripExpRes, totalRevRes] = await Promise.all([
+      overheadCatIds.length > 0
+        ? (supabase as any)
+            .from('transactions')
+            .select('amount')
+            .in('category_id', overheadCatIds)
+            .eq('direction', 'expense')
+            .eq('lifecycle_status', 'approved')
+            .eq('settlement_status', 'completed')
+        : Promise.resolve({ data: [] }),
+      overheadCatIds.length > 0
+        ? (supabase as any).from('trip_expenses').select('amount').in('category_id', overheadCatIds)
+        : Promise.resolve({ data: [] }),
+      (supabase as any)
+        .from('trip_orders')
+        .select('amount')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+    ]);
+
+    const totalOverhead = [
+      ...(overheadTxRes.data ?? []),
+      ...(overheadTripExpRes.data ?? []),
+    ].reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+    const totalCompanyRevenue = (totalRevRes.data ?? []).reduce(
+      (s: number, o: any) => s + parseFloat(o.amount ?? '0'),
+      0,
+    );
+    const overhead_pct = totalCompanyRevenue > 0 ? totalOverhead / totalCompanyRevenue : 0;
 
     // Заказы клиентов с ЗП
     const { data: orders } = await (supabase as any)
@@ -158,7 +197,8 @@ export async function GET(request: Request) {
         }
       }
 
-      const netProfit = s.total_revenue - s.driver_costs - fuelAllocated;
+      const netProfit =
+        s.total_revenue - s.driver_costs - fuelAllocated - s.total_revenue * overhead_pct;
 
       const preferredPayment =
         Object.entries(s.payments)
@@ -183,6 +223,7 @@ export async function GET(request: Request) {
         total_revenue: s.total_revenue.toFixed(2),
         revenue_30d: s.revenue_30d.toFixed(2),
         net_profit: netProfit.toFixed(2),
+        overhead_pct: Math.round(overhead_pct * 10000) / 10000,
         trips_count: s.trip_ids.size,
         orders_count: s.revenue_orders,
         avg_order: s.revenue_orders > 0 ? (s.total_revenue / s.revenue_orders).toFixed(2) : '0.00',
