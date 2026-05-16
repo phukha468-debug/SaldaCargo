@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@saldacargo/shared-types';
 
-type Client = SupabaseClient<Database>;
+type Client = SupabaseClient<any>;
 
 /**
  * Получает сводку для главного экрана механика.
