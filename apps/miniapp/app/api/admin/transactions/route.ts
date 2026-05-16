@@ -53,6 +53,13 @@ export async function POST(request: Request) {
     payment_method: string;
   };
 
+  if (!body.category_id) {
+    return NextResponse.json({ error: 'Выберите категорию' }, { status: 400 });
+  }
+  if (!body.amount || parseFloat(body.amount) <= 0) {
+    return NextResponse.json({ error: 'Введите корректную сумму' }, { status: 400 });
+  }
+
   const walletId = walletIdByMethod(body.payment_method);
   const supabase = createAdminClient();
 
