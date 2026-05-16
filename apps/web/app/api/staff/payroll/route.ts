@@ -296,6 +296,8 @@ export async function GET(request: Request) {
         advance_outstanding: advanceOutstanding.toFixed(2),
         advances: allAdvanceListMap.get(u.id) ?? [],
         work_count: workCount,
+        all_time_earned: allEarned.toFixed(2),
+        all_time_paid: (allPaidSalary + allPaidAdvance).toFixed(2),
       };
     };
 
@@ -314,6 +316,10 @@ export async function GET(request: Request) {
       ),
       office,
       total_debt: all.reduce((s, u) => s + parseFloat(u.debt), 0).toFixed(2),
+      total_fund: all.reduce((s, u) => s + parseFloat((u as any).all_time_earned), 0).toFixed(2),
+      total_paid_alltime: all
+        .reduce((s, u) => s + parseFloat((u as any).all_time_paid), 0)
+        .toFixed(2),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

@@ -44,6 +44,8 @@ type PayrollResponse = {
   mechanics: PayrollUser[];
   office: PayrollUser[];
   total_debt: string;
+  total_fund: string;
+  total_paid_alltime: string;
 };
 
 type StaffUser = {
@@ -1220,11 +1222,8 @@ export default function StaffPage() {
     (payroll?.mechanics.length ?? 0) +
     (payroll?.office.length ?? 0);
 
-  const allUsers = payroll
-    ? [...payroll.drivers, ...payroll.loaders, ...payroll.mechanics, ...payroll.office]
-    : [];
-  const totalEarned = allUsers.reduce((s, u) => s + parseFloat(u.earned), 0);
-  const totalPaid = allUsers.reduce((s, u) => s + parseFloat(u.paid), 0);
+  const totalFund = payroll ? parseFloat(payroll.total_fund ?? '0') : 0;
+  const totalPaidAllTime = payroll ? parseFloat(payroll.total_paid_alltime ?? '0') : 0;
 
   const cfg = GROUP_CONFIG[activeGroup];
   const activeUsers = payroll ? cfg.getUsers(payroll) : [];
@@ -1272,12 +1271,12 @@ export default function StaffPage() {
           { label: 'Сотрудников', value: totalStaff, color: 'text-slate-900' },
           {
             label: 'Фонд ЗП',
-            value: isLoading ? '—' : <Money amount={totalEarned.toFixed(2)} />,
+            value: isLoading ? '—' : <Money amount={totalFund.toFixed(2)} />,
             color: 'text-slate-800',
           },
           {
             label: 'Выплачено',
-            value: isLoading ? '—' : <Money amount={totalPaid.toFixed(2)} />,
+            value: isLoading ? '—' : <Money amount={totalPaidAllTime.toFixed(2)} />,
             color: 'text-emerald-600',
           },
           {
