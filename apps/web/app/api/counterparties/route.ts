@@ -5,6 +5,16 @@ import { NextResponse } from 'next/server';
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const FUEL_CATEGORY_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 
+function last6MonthKeys(): string[] {
+  const now = new Date();
+  const keys: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return keys;
+}
+
 /** GET /api/counterparties — список клиентов с аналитикой */
 export async function GET(request: Request) {
   try {
@@ -12,6 +22,7 @@ export async function GET(request: Request) {
     const onlyActive = searchParams.get('active') === '1';
 
     const supabase = createAdminClient();
+    const monthKeys = last6MonthKeys();
 
     let q = (supabase as any)
       .from('counterparties')
@@ -88,6 +99,7 @@ export async function GET(request: Request) {
       trip_client_revenue: Map<string, number>;
       last_trip_at: string | null;
       payments: Record<string, number>;
+      monthly: Record<string, number>;
     };
 
     const statsMap = new Map<string, Stats>();
@@ -101,6 +113,7 @@ export async function GET(request: Request) {
         trip_client_revenue: new Map(),
         last_trip_at: null,
         payments: {},
+        monthly: {},
       });
     }
 
@@ -125,6 +138,10 @@ export async function GET(request: Request) {
           s.revenue_30d += amount;
         }
         s.payments[o.payment_method] = (s.payments[o.payment_method] ?? 0) + amount;
+        const mk = startedAt ? startedAt.slice(0, 7) : null;
+        if (mk && monthKeys.includes(mk)) {
+          s.monthly[mk] = (s.monthly[mk] ?? 0) + amount;
+        }
       }
     }
 
@@ -172,6 +189,11 @@ export async function GET(request: Request) {
         last_trip_at: s.last_trip_at,
         preferred_payment: preferredPayment,
         payment_breakdown: paymentBreakdown,
+        monthly: monthKeys.map((k) => (s.monthly[k] ?? 0).toFixed(2)),
+        month_labels: monthKeys.map((k) => {
+          const [y, m] = k.split('-').map(Number);
+          return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'short' });
+        }),
       };
     });
 
