@@ -1,7 +1,7 @@
 # MiniApp — Справочник API
 
 **Теги:** #api #miniapp #разработка
-**Обновлено:** 2026-05-07
+**Обновлено:** 2026-05-16
 
 Полный перечень API-эндпоинтов `apps/miniapp`. Все роуты используют `createAdminClient()`.
 
@@ -67,7 +67,8 @@
 }
 ```
 
-> Подотчёт считается из `trip_orders` с `payment_method IN ('cash', 'card_driver')` и `lifecycle_status != 'cancelled'`.
+> Подотчёт считается из `trip_orders` с `payment_method = 'cash'` и `lifecycle_status != 'cancelled'`.
+> `card_driver` — корпоративная карта, НЕ входит в подотчёт (деньги не проходят через руки водителя).
 > Не ждёт одобрения от админа — данные сразу видны.
 
 ---
@@ -168,14 +169,25 @@ Body: { "action": "cancel" }
 
 ## Админ (`/api/admin/`)
 
-| Метод | Путь                                          | Описание                                        |
-| ----- | --------------------------------------------- | ----------------------------------------------- |
-| GET   | `/api/admin/summary`                          | Дашборд: активные рейсы, ревью, выручка сегодня |
-| GET   | `/api/admin/trips?filter=review\|active\|all` | Список рейсов с фильтрацией                     |
-| GET   | `/api/admin/trips/{id}`                       | Полные детали рейса для ревью                   |
-| PATCH | `/api/admin/trips/{id}`                       | Одобрить или вернуть рейс                       |
-| GET   | `/api/admin/transactions`                     | История последних 30 транзакций                 |
-| POST  | `/api/admin/transactions`                     | Добавить доход/расход вручную                   |
+| Метод | Путь                                          | Описание                                                   |
+| ----- | --------------------------------------------- | ---------------------------------------------------------- |
+| GET   | `/api/admin/summary`                          | Дашборд: активные рейсы, ревью, выручка сегодня            |
+| GET   | `/api/admin/trips?filter=review\|active\|all` | Список рейсов с фильтрацией                                |
+| GET   | `/api/admin/trips/{id}`                       | Полные детали рейса для ревью                              |
+| PATCH | `/api/admin/trips/{id}`                       | Одобрить или вернуть рейс                                  |
+| GET   | `/api/admin/transactions`                     | История последних 30 транзакций                            |
+| POST  | `/api/admin/transactions`                     | Добавить доход/расход вручную                              |
+| GET   | `/api/admin/payables`                         | Долги поставщикам (Дерябин ГСМ, Новиков, Ромашин)          |
+| POST  | `/api/admin/payable-debt`                     | Зарегистрировать новый долг поставщику (запчасти в кредит) |
+| POST  | `/api/admin/supplier-payment`                 | Оплатить долг поставщику                                   |
+| GET   | `/api/admin/loans`                            | Список активных кредитов и займов                          |
+| POST  | `/api/admin/loan-payment`                     | Оплатить кредит                                            |
+| GET   | `/api/admin/cash-collections`                 | Подотчёт водителей (только cash)                           |
+| POST  | `/api/admin/cash-collections`                 | Провести инкассацию                                        |
+| GET   | `/api/admin/payroll?year=&month=`             | ЗП сотрудников за месяц                                    |
+| POST  | `/api/admin/staff-settle`                     | Выплатить ЗП сотруднику                                    |
+| GET   | `/api/admin/receivables`                      | Список должников (дебиторка)                               |
+| POST  | `/api/admin/receivables/settle`               | Погасить долг клиента                                      |
 
 ### `GET /api/admin/summary`
 
@@ -212,7 +224,7 @@ Body: { "action": "cancel" }
 ```json
 Body: {
   "direction": "income | expense",
-  "category_id": "uuid",
+  "category_id": "uuid",      // обязательно — пустая строка вызовет NOT NULL ошибку
   "amount": "1000.00",
   "payment_method": "cash | bank_transfer | card",
   "description": "Необязательно"
@@ -220,6 +232,19 @@ Body: {
 ```
 
 Создаётся с `lifecycle_status='approved'`, `settlement_status='completed'` — сразу учитывается в балансах.
+
+### `POST /api/admin/payable-debt`
+
+```json
+Body: {
+  "supplier_id": "20000000-0000-0000-0000-000000000002 | ...003",
+  "amount": "1240.00",
+  "description": "Необязательно (по умолчанию: 'Запчасти в кредит: [имя]')"
+}
+```
+
+Создаёт `direction=expense, lifecycle=approved, settlement=pending` — долг появляется в кредиторке.
+Только для Новиков А.В. и Ромашин (не для Дерябин ГСМ — у него autoAccrue).
 
 ---
 
