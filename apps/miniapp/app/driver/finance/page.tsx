@@ -137,12 +137,14 @@ function AccountableTab({ data }: { data: any }) {
 }
 
 function SalaryTab({ trips }: { trips: any[] }) {
-  const allOrders = (trips ?? []).flatMap((t: any) => t.trip_orders ?? []);
+  const allOrders = (trips ?? []).flatMap((t: any) =>
+    (t.trip_orders ?? []).map((o: any) => ({ ...o, _tripLifecycle: t.lifecycle_status })),
+  );
   const approved = allOrders
     .filter((o: any) => o.lifecycle_status === 'approved')
     .reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
   const draft = allOrders
-    .filter((o: any) => o.lifecycle_status === 'draft')
+    .filter((o: any) => o.lifecycle_status === 'draft' && o._tripLifecycle !== 'approved')
     .reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
 
   return (
