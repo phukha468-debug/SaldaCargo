@@ -32,6 +32,7 @@ function FinanceContent() {
     | 'expense'
     | 'collection'
     | 'debts'
+    | 'supplier_debt'
     | 'salary'
     | 'receivables'
     | null
@@ -44,11 +45,13 @@ function FinanceContent() {
           ? 'collection'
           : initialAction === 'debts'
             ? 'debts'
-            : initialAction === 'salary'
-              ? 'salary'
-              : initialAction === 'receivables'
-                ? 'receivables'
-                : null,
+            : initialAction === 'supplier_debt'
+              ? 'supplier_debt'
+              : initialAction === 'salary'
+                ? 'salary'
+                : initialAction === 'receivables'
+                  ? 'receivables'
+                  : null,
   );
   const queryClient = useQueryClient();
 
@@ -166,6 +169,15 @@ function FinanceContent() {
                 </span>
               </button>
               <button
+                onClick={() => setShowForm('supplier_debt')}
+                className="bg-amber-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">🧾</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  Долг поставщику
+                </span>
+              </button>
+              <button
                 onClick={() => setShowForm('debts')}
                 className="bg-rose-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
               >
@@ -174,7 +186,7 @@ function FinanceContent() {
               </button>
               <button
                 onClick={() => setShowForm('salary')}
-                className="col-span-2 bg-violet-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+                className="bg-violet-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
               >
                 <span className="text-xl">💰</span>
                 <span className="text-[10px] font-black uppercase tracking-widest">
@@ -191,6 +203,18 @@ function FinanceContent() {
             direction={showForm}
             onClose={() => setShowForm(showForm === 'income' ? 'income_menu' : 'expense_menu')}
             onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              setShowForm(null);
+            }}
+          />
+        )}
+
+        {/* Форма записи долга поставщику */}
+        {showForm === 'supplier_debt' && (
+          <SupplierDebtForm
+            onClose={() => setShowForm('expense_menu')}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin-payables'] });
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
               setShowForm(null);
             }}
@@ -508,6 +532,125 @@ const WALLET_OPTIONS = [
   { id: '10000000-0000-0000-0000-000000000002', label: '💵 Сейф (Наличные)' },
   { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
 ];
+
+const DEBT_SUPPLIERS = [
+  { id: '20000000-0000-0000-0000-000000000002', name: 'Новиков А.В.', icon: '🔧' },
+  { id: '20000000-0000-0000-0000-000000000003', name: 'Ромашин', icon: '🔧' },
+];
+
+function SupplierDebtForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [supplierId, setSupplierId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch('/api/admin/payable-debt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_id: supplierId,
+          amount,
+          description: description || undefined,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      return json;
+    },
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const handleSubmit = () => {
+    if (!supplierId) return setError('Выберите поставщика');
+    if (!amount || parseFloat(amount) <= 0) return setError('Введите сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black uppercase text-sm text-amber-600">🧾 Долг поставщику</h2>
+        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+          ✕
+        </button>
+      </div>
+
+      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">
+        Взяли запчасти в кредит — деньги ещё не заплачены
+      </p>
+
+      {/* Выбор поставщика */}
+      <div className="space-y-2">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Поставщик
+        </label>
+        <div className="space-y-2">
+          {DEBT_SUPPLIERS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSupplierId(s.id)}
+              className={`w-full p-3 rounded-xl border-2 flex items-center gap-3 text-sm font-bold transition-all active:scale-[0.98] ${
+                supplierId === s.id
+                  ? 'border-amber-500 bg-amber-50 text-amber-900'
+                  : 'border-zinc-200 text-zinc-700'
+              }`}
+            >
+              <span className="text-lg">{s.icon}</span>
+              <span>{s.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Сумма */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Сумма долга, ₽
+        </label>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0"
+          className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none"
+          onFocus={(e) =>
+            setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+          }
+        />
+      </div>
+
+      {/* Описание */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Что взяли (необязательно)
+        </label>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Тормозные колодки, масло фильтр..."
+          className="w-full rounded-lg border-2 border-zinc-200 px-4 h-12 text-sm font-bold text-zinc-900 focus:border-amber-500 focus:outline-none"
+        />
+      </div>
+
+      {error && <p className="text-red-600 text-xs font-bold uppercase">{error}</p>}
+
+      <button
+        onClick={handleSubmit}
+        disabled={mutation.isPending}
+        className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-amber-600 active:scale-[0.97] transition-all disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Записываем...' : '✓ Записать долг'}
+      </button>
+    </div>
+  );
+}
 
 type DebtItem =
   | {

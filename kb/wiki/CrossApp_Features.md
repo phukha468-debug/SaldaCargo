@@ -82,11 +82,11 @@
 
 ## 4. КРЕДИТОРКА — ДОЛГИ ПОСТАВЩИКАМ (PAYABLES)
 
-| Фича                  | MiniApp файл                      | WebApp файл                 | Статус | Примечание                                    |
-| --------------------- | --------------------------------- | --------------------------- | ------ | --------------------------------------------- |
-| Список долгов         | `api/admin/payables` GET          | `api/payables` GET          | ✅     | Web добавляет history последних транзакций    |
-| Оплатить долг         | `api/admin/supplier-payment` POST | `api/payables/payment` POST | ✅     | Оба создают expense транзакцию                |
-| Зарегистрировать долг | —                                 | `api/payables/debt` POST    | ⚠️     | Только в WebApp, miniapp через payable_amount |
+| Фича                  | MiniApp файл                      | WebApp файл                 | Статус | Примечание                                  |
+| --------------------- | --------------------------------- | --------------------------- | ------ | ------------------------------------------- |
+| Список долгов         | `api/admin/payables` GET          | `api/payables` GET          | ✅     | Web добавляет history последних транзакций  |
+| Оплатить долг         | `api/admin/supplier-payment` POST | `api/payables/payment` POST | ✅     | Оба создают expense транзакцию              |
+| Зарегистрировать долг | `api/admin/payable-debt` POST     | `api/payables/debt` POST    | ✅     | MiniApp: Финансы → Расход → Долг поставщику |
 
 ---
 
