@@ -108,8 +108,7 @@ export async function GET() {
 
   const draftPay = (monthOrders ?? [])
     .filter(
-      (o: any) =>
-        o.lifecycle_status === 'draft' && (o.trips as any)?.lifecycle_status !== 'approved',
+      (o: any) => o.lifecycle_status === 'draft' && (o.trips as any)?.lifecycle_status === 'draft',
     )
     .reduce((sum: number, o: any) => sum + parseFloat(o.driver_pay), 0);
 

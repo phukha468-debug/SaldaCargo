@@ -144,7 +144,7 @@ function SalaryTab({ trips }: { trips: any[] }) {
     .filter((o: any) => o.lifecycle_status === 'approved')
     .reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
   const draft = allOrders
-    .filter((o: any) => o.lifecycle_status === 'draft' && o._tripLifecycle !== 'approved')
+    .filter((o: any) => o.lifecycle_status === 'draft' && o._tripLifecycle === 'draft')
     .reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
 
   return (
