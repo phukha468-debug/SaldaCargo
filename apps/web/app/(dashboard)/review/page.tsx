@@ -17,6 +17,11 @@ interface TripOrder {
   amount: string;
   driver_pay: string;
   loader_pay: string;
+  loader2_pay: string;
+  loader_id: string | null;
+  loader2_id: string | null;
+  loader: { id: string; name: string } | null;
+  loader2: { id: string; name: string } | null;
   payment_method: string;
   settlement_status: string;
   lifecycle_status: string;
@@ -77,7 +82,10 @@ function calcTrip(trip: TripForReview) {
   const expenses = trip.trip_expenses ?? [];
   const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
   const driverPay = activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0);
-  const loaderPay = activeOrders.reduce((s, o) => s + parseFloat(o.loader_pay), 0);
+  const loaderPay = activeOrders.reduce(
+    (s, o) => s + parseFloat(o.loader_pay) + parseFloat(o.loader2_pay ?? '0'),
+    0,
+  );
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
   const mileage = trip.odometer_end ? trip.odometer_end - trip.odometer_start : 0;
   const profit = revenue - driverPay - loaderPay - totalExpenses;
@@ -527,6 +535,15 @@ function TripCard({
   const { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit } =
     calcTrip(trip);
   const totalCosts = driverPay + loaderPay + totalExpenses;
+
+  const loaderNames = [
+    ...new Set(
+      activeOrders.flatMap((o) => [
+        o.loader && parseFloat(o.loader_pay) > 0 ? o.loader.name.split(' ')[0] : null,
+        o.loader2 && parseFloat(o.loader2_pay ?? '0') > 0 ? o.loader2.name.split(' ')[0] : null,
+      ]),
+    ),
+  ].filter(Boolean) as string[];
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -703,7 +720,29 @@ function TripCard({
                         </span>
                       </td>
                       <td className="px-5 py-3 text-sm text-right font-medium text-slate-600">
-                        <Money amount={order.loader_pay} />
+                        {parseFloat(order.loader_pay) > 0 ||
+                        parseFloat(order.loader2_pay ?? '0') > 0 ? (
+                          <div className="space-y-0.5">
+                            {order.loader && parseFloat(order.loader_pay) > 0 && (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {order.loader.name.split(' ')[0]}
+                                </span>
+                                <Money amount={order.loader_pay} />
+                              </div>
+                            )}
+                            {order.loader2 && parseFloat(order.loader2_pay ?? '0') > 0 && (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {order.loader2.name.split(' ')[0]}
+                                </span>
+                                <Money amount={order.loader2_pay} />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
                       </td>
                       <td className="px-5 py-3">
                         <span
@@ -761,8 +800,7 @@ function TripCard({
                 cls: 'text-emerald-700 text-base font-bold',
               },
               {
-                label:
-                  loaderPay > 0 ? `ЗП ${trip.loader?.name?.split(' ')[0] ?? 'Груз.'}` : 'ЗП груз.',
+                label: loaderNames.length > 0 ? `ЗП ${loaderNames.join(', ')}` : 'ЗП груз.',
                 value:
                   loaderPay > 0 ? (
                     <>

@@ -22,7 +22,10 @@ export async function GET(request: Request) {
       driver:users!trips_driver_id_fkey(id, name),
       loader:users!trips_loader_id_fkey(id, name),
       trip_orders(
-        id, amount, driver_pay, loader_pay,
+        id, amount, driver_pay, loader_pay, loader2_pay,
+        loader_id, loader2_id,
+        loader:users!trip_orders_loader_id_fkey(id, name),
+        loader2:users!trip_orders_loader2_id_fkey(id, name),
         payment_method, settlement_status, lifecycle_status,
         counterparty_id,
         counterparty:counterparties(name)
