@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     .select(
       'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code)',
     )
+    .neq('description', 'Корректировка остатка')
     .order('created_at', { ascending: false });
 
   if (date) {

@@ -27,6 +27,7 @@ export async function GET(request: Request) {
           .eq('direction', 'expense')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
+          .neq('description', 'Корректировка остатка')
           .gte('created_at', monthStart)
           .lte('created_at', monthEnd)
           .order('created_at', { ascending: false }),
@@ -79,13 +80,14 @@ export async function GET(request: Request) {
           .eq('trips.lifecycle_status', 'approved')
           .gte('trips.started_at', sixMonthsAgo),
 
-        // Expenses: все approved транзакции включая ФОТ
+        // Expenses: все approved транзакции включая ФОТ (без корректировок остатков)
         (supabase as any)
           .from('transactions')
           .select('amount, created_at')
           .eq('direction', 'expense')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
+          .neq('description', 'Корректировка остатка')
           .gte('created_at', sixMonthsAgo),
 
         // Journal: по дате или последние N
@@ -98,6 +100,7 @@ export async function GET(request: Request) {
             )
             .eq('lifecycle_status', 'approved')
             .eq('settlement_status', 'completed')
+            .neq('description', 'Корректировка остатка')
             .order('created_at', { ascending: false });
           if (direction) q = q.eq('direction', direction);
           if (date) {

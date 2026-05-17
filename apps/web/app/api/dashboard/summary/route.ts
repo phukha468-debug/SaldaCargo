@@ -37,13 +37,14 @@ export async function GET() {
         .gte('trips.started_at', monthStart)
         .lte('trips.started_at', monthEnd),
 
-      // Расходы за месяц: прямые транзакции (без PAYROLL — они считаются через trip_orders)
+      // Расходы за месяц: прямые транзакции (без PAYROLL и без корректировок остатков)
       (supabase as any)
         .from('transactions')
         .select('amount')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .not('category_id', 'in', `(${CAT_PAYROLL.join(',')})`)
+        .neq('description', 'Корректировка остатка')
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 
