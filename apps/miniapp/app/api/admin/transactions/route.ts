@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   let q = (supabase.from('transactions') as any)
     .select(
-      'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code)',
+      'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code), to_wallet:wallets!to_wallet_id(name), from_wallet:wallets!from_wallet_id(name), counterparty:counterparties(name)',
     )
     .neq('description', 'Корректировка остатка')
     .order('created_at', { ascending: false });

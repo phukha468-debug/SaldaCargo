@@ -584,10 +584,10 @@ function WalletDrawer({
   const items = data?.items ?? [];
 
   const inTotal = items
-    .filter((i) => i.direction === 'in')
+    .filter((i) => i.direction === 'in' && i.description !== 'Корректировка остатка')
     .reduce((s, i) => s + parseFloat(i.amount), 0);
   const outTotal = items
-    .filter((i) => i.direction === 'out')
+    .filter((i) => i.direction === 'out' && i.description !== 'Корректировка остатка')
     .reduce((s, i) => s + parseFloat(i.amount), 0);
 
   const doTransfer = async (targetWallet: WalletKey) => {

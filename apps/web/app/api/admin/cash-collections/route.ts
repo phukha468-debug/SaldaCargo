@@ -4,16 +4,13 @@ import { NextResponse } from 'next/server';
 
 const CASH_METHODS = ['cash'];
 
-const CAT_PAYROLL_DRIVER = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
-
 /**
- * POST /api/admin/cash-collections — закрыть подотчёт водителя:
- *   1. Инкассация на полную сумму подотчёта
- *   2. Расход «ЗП водителя» на сумму driver_pay с кассовых рейсов
+ * POST /api/admin/cash-collections — инкассация: забрать наличные у водителя в кассу.
+ * Создаёт только запись в cash_collections (НЕ транзакцию — это не расход, а перемещение денег).
  */
 export async function POST(request: Request) {
   try {
-    const { driver_id, amount, driver_name } = (await request.json()) as {
+    const { driver_id, amount } = (await request.json()) as {
       driver_id: string;
       amount: string;
       driver_name?: string;
@@ -34,20 +31,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Администратор не найден' }, { status: 500 });
     }
 
-    // Считаем ЗП водителя по кассовым рейсам (driver_pay ещё не выплачена как транзакция)
-    const { data: cashOrders } = await (supabase.from('trips') as any)
-      .select('trip_orders(driver_pay, payment_method, lifecycle_status)')
-      .eq('driver_id', driver_id)
-      .neq('lifecycle_status', 'cancelled');
-
-    const driverPay = ((cashOrders as any[]) ?? [])
-      .flatMap((t: any) => (t.trip_orders as any[]) ?? [])
-      .filter(
-        (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
-      )
-      .reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
-
-    // 1. Инкассация — полный подотчёт
     const { error: collErr } = await (supabase.from('cash_collections') as any).insert({
       driver_id,
       amount,
@@ -56,96 +39,79 @@ export async function POST(request: Request) {
     });
     if (collErr) return NextResponse.json({ error: collErr.message }, { status: 500 });
 
-    // 2. Расход ЗП — если есть что записать
-    if (driverPay > 0) {
-      const { error: txErr } = await (supabase.from('transactions') as any).insert({
-        direction: 'expense',
-        amount: driverPay.toFixed(2),
-        category_id: CAT_PAYROLL_DRIVER,
-        lifecycle_status: 'approved',
-        settlement_status: 'completed',
-        description: `ЗП ${driver_name ?? 'водителя'} (закрытие подотчёта)`,
-        created_by: adminUser.id,
-        idempotency_key: crypto.randomUUID(),
-      });
-      if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      collection_amount: amount,
-      payroll_amount: driverPay.toFixed(2),
-    });
+    return NextResponse.json({ ok: true, collection_amount: amount });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }
 
-/** GET /api/admin/cash-collections — текущий подотчёт наличных по каждому водителю */
+/**
+ * GET /api/admin/cash-collections — текущий подотчёт наличных по каждому водителю.
+ * Формула: cash-заказы − cash-расходы − инкассации (единая с MiniApp).
+ */
 export async function GET() {
   try {
     const supabase = createAdminClient();
 
-    const [
-      { data: drivers, error: driversError },
-      { data: trips, error: tripsError },
-      { data: collections, error: collectionsError },
-    ] = await Promise.all([
-      supabase
-        .from('users')
-        .select('id, name')
-        .contains('roles', ['driver'])
-        .eq('is_active', true) as any,
-      supabase
-        .from('trips')
-        .select(
-          'driver_id, started_at, trip_orders(amount, payment_method, lifecycle_status), trip_expenses(amount, payment_method)',
-        )
-        .neq('lifecycle_status', 'cancelled') as any,
-      supabase.from('cash_collections').select('driver_id, amount, created_at') as any,
-    ]);
+    const { data: drivers, error: driversError } = await (supabase
+      .from('users')
+      .select('id, name')
+      .contains('roles', ['driver'])
+      .eq('is_active', true) as any);
 
     if (driversError) return NextResponse.json({ error: driversError.message }, { status: 500 });
+    if (!drivers || drivers.length === 0) return NextResponse.json([]);
+
+    const { data: trips, error: tripsError } = await (supabase
+      .from('trips')
+      .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)')
+      .neq('lifecycle_status', 'cancelled') as any);
+
     if (tripsError) return NextResponse.json({ error: tripsError.message }, { status: 500 });
+
+    const { data: expenses, error: expensesError } = await (supabase
+      .from('trip_expenses')
+      .select('amount, payment_method, trips!inner(driver_id, lifecycle_status)')
+      .neq('trips.lifecycle_status', 'cancelled') as any);
+
+    if (expensesError) return NextResponse.json({ error: expensesError.message }, { status: 500 });
+
+    const { data: collections, error: collectionsError } = await (supabase
+      .from('cash_collections')
+      .select('driver_id, amount') as any);
+
     if (collectionsError)
       return NextResponse.json({ error: collectionsError.message }, { status: 500 });
 
     const result = ((drivers as any[]) ?? []).map((driver: any) => {
       const driverTrips = ((trips as any[]) ?? []).filter((t: any) => t.driver_id === driver.id);
 
-      // Дата последней инкассации — считаем только рейсы ПОСЛЕ неё
-      const driverCollections = ((collections as any[]) ?? []).filter(
-        (c: any) => c.driver_id === driver.id,
-      );
-      const lastCollectedAt =
-        driverCollections.length > 0
-          ? Math.max(...driverCollections.map((c: any) => new Date(c.created_at).getTime()))
-          : null;
-
-      const freshTrips = lastCollectedAt
-        ? driverTrips.filter(
-            (t: any) => new Date(t.started_at ?? t.created_at).getTime() > lastCollectedAt,
-          )
-        : driverTrips;
-
-      // Наличные полученные от клиентов (только свежие рейсы)
-      const cashIn = freshTrips
+      const cashIn = driverTrips
         .flatMap((t: any) => (t.trip_orders as any[]) ?? [])
         .filter(
           (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
         )
         .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
-      // Наличные потраченные водителем (ГСМ, прочее) — только свежие рейсы
-      const cashSpent = freshTrips
-        .flatMap((t: any) => (t.trip_expenses as any[]) ?? [])
+      const driverExpenses = ((expenses as any[]) ?? []).filter(
+        (e: any) => e.trips?.driver_id === driver.id,
+      );
+      const cashSpent = driverExpenses
         .filter((e: any) => CASH_METHODS.includes(e.payment_method))
         .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+
+      const driverCollections = ((collections as any[]) ?? []).filter(
+        (c: any) => c.driver_id === driver.id,
+      );
+      const cashCollected = driverCollections.reduce(
+        (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
+        0,
+      );
 
       return {
         driver_id: driver.id,
         driver_name: driver.name,
-        balance: Math.max(0, cashIn - cashSpent).toFixed(2),
+        balance: Math.max(0, cashIn - cashSpent - cashCollected).toFixed(2),
       };
     });
 

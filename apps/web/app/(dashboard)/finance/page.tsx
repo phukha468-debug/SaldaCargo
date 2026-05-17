@@ -8,7 +8,7 @@ import { formatDate, formatPhone } from '@saldacargo/shared';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'expenses' | 'recv' | 'loans' | 'payables';
+type Tab = 'expenses' | 'income' | 'recv' | 'loans' | 'payables';
 
 type ExpenseTx = {
   id: string;
@@ -18,8 +18,19 @@ type ExpenseTx = {
   category: { name: string; code: string } | null;
 };
 
+type IncomeTx = {
+  id: string;
+  amount: string;
+  description: string | null;
+  created_at: string;
+  category: { name: string; code: string } | null;
+  counterparty: { name: string } | null;
+  to_wallet: { name: string } | null;
+};
+
 type ExpenseMonthData = {
   transactions: ExpenseTx[];
+  income_transactions: IncomeTx[];
   revenue: string;
   pnl: unknown[];
 };
@@ -2894,6 +2905,214 @@ function PayablesPanel() {
   );
 }
 
+// ── Panel: Доходы ──────────────────────────────────────────────────────────
+
+function IncomePanel() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7));
+
+  function navigate(dir: 1 | -1) {
+    setSelectedMonth((prev) => {
+      const [y, m] = prev.split('-').map(Number);
+      const d = new Date(y, m - 1 + dir, 1);
+      return d.toISOString().slice(0, 7);
+    });
+  }
+
+  const isCurrent = selectedMonth >= todayStr.slice(0, 7);
+
+  const { data, isLoading } = useQuery<ExpenseMonthData>({
+    queryKey: ['finance-month', selectedMonth],
+    queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const incomeTxs = data?.income_transactions ?? [];
+  const revenue = n(data?.revenue);
+  const txTotal = incomeTxs.reduce((s, t) => s + n(t.amount), 0);
+  const grandTotal = txTotal + revenue;
+
+  const PAYMENT_LABELS: Record<string, string> = {
+    cash: 'Нал',
+    qr: 'QR / Р/С',
+    bank_invoice: 'Р/С (договор)',
+    card_driver: 'Карта',
+    debt_cash: 'Долг нал',
+  };
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+      {/* Summary cards */}
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}
+      >
+        <SumCard
+          gradient="linear-gradient(135deg,#10b981,#059669)"
+          label="Выручка с рейсов"
+          value={rub(revenue)}
+          sub="оплаченные заказы"
+        />
+        <SumCard
+          gradient="linear-gradient(135deg,#0891b2,#3b82f6)"
+          label="Прочие поступления"
+          value={rub(txTotal)}
+          sub={`${incomeTxs.length} транзакц.`}
+        />
+        <SumCard
+          gradient="linear-gradient(135deg,#6366f1,#8b5cf6)"
+          label={`Итого — ${formatMonthLabel(selectedMonth)}`}
+          value={rub(grandTotal)}
+          sub="все поступления"
+        />
+      </div>
+
+      {/* Timeline + navigation */}
+      <Card>
+        <CardHead
+          title={`Доходы — ${formatMonthLabel(selectedMonth)}`}
+          right={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={() => navigate(-1)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  border: '1px solid #e2e8f0',
+                  background: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                ‹
+              </button>
+              <button
+                disabled={isCurrent}
+                onClick={() => navigate(1)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  border: '1px solid #e2e8f0',
+                  background: '#fff',
+                  cursor: isCurrent ? 'default' : 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: isCurrent ? 0.3 : 1,
+                }}
+              >
+                ›
+              </button>
+            </div>
+          }
+        />
+
+        {isLoading ? (
+          <div style={{ padding: 16 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                style={{ height: 48, background: '#f1f5f9', borderRadius: 6, marginBottom: 6 }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div>
+            {/* Revenue from trips row */}
+            {revenue > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 16px',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: '#f0fdf4',
+                }}
+              >
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>
+                    Выручка с рейсов
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      color: '#6b7280',
+                      fontWeight: 600,
+                      marginTop: 2,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {Object.entries((data as any)?.revenue_breakdown ?? {})
+                      .filter(([, v]) => (v as number) > 0)
+                      .map(([k, v]) => `${PAYMENT_LABELS[k] ?? k}: ${rub(n(String(v)))}`)
+                      .join(' · ')}
+                  </p>
+                </div>
+                <p style={{ fontWeight: 900, fontSize: 14, color: '#166534' }}>{rub(revenue)}</p>
+              </div>
+            )}
+
+            {/* Manual income transactions */}
+            {incomeTxs.length === 0 && revenue === 0 ? (
+              <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>
+                Поступлений нет
+              </p>
+            ) : incomeTxs.length === 0 ? null : (
+              incomeTxs.map((tx) => (
+                <div
+                  key={tx.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 16px',
+                    borderBottom: '1px solid #f8fafc',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                      {tx.category?.name ?? tx.description ?? '—'}
+                    </p>
+                    {tx.counterparty?.name && (
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#2563eb', marginTop: 2 }}>
+                        от: {tx.counterparty.name}
+                      </p>
+                    )}
+                    <p
+                      style={{
+                        fontSize: 10,
+                        color: '#94a3b8',
+                        fontWeight: 600,
+                        marginTop: 2,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {shortDate(tx.created_at)}
+                      {tx.to_wallet?.name ? ` · ${tx.to_wallet.name}` : ''}
+                      {tx.description && tx.category ? ` · ${tx.description}` : ''}
+                    </p>
+                  </div>
+                  <p style={{ fontWeight: 900, fontSize: 14, color: '#059669', flexShrink: 0 }}>
+                    +{rub(n(tx.amount))}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Tab amount helpers ─────────────────────────────────────────────────────
 
 function TabAmount({ children }: { children: React.ReactNode }) {
@@ -2908,6 +3127,7 @@ function TabAmount({ children }: { children: React.ReactNode }) {
 
 const TAB_GRADIENTS: Record<Tab, string> = {
   expenses: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+  income: 'linear-gradient(135deg,#10b981,#0891b2)',
   recv: 'linear-gradient(135deg,#f59e0b,#f97316)',
   loans: 'linear-gradient(135deg,#3b82f6,#0891b2)',
   payables: 'linear-gradient(135deg,#ef4444,#e11d48)',
@@ -2916,7 +3136,7 @@ const TAB_GRADIENTS: Record<Tab, string> = {
 export default function FinancePage() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab') as Tab | null;
-  const VALID_TABS: Tab[] = ['expenses', 'recv', 'loans', 'payables'];
+  const VALID_TABS: Tab[] = ['expenses', 'income', 'recv', 'loans', 'payables'];
   const [activeTab, setActiveTab] = useState<Tab>(
     tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'expenses',
   );
@@ -2944,6 +3164,9 @@ export default function FinancePage() {
   });
 
   const expTotal = (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0);
+  const incTotal =
+    (expSummary?.income_transactions ?? []).reduce((s, t) => s + n(t.amount), 0) +
+    n(expSummary?.revenue);
   const loansTotal = loans.reduce((s, l) => s + n(l.remaining_amount), 0);
   const payablesTotal = suppliers.reduce((s, sup) => s + n(sup.debt), 0);
 
@@ -2954,6 +3177,13 @@ export default function FinancePage() {
       label: 'Расходы',
       sub: 'структура и аналитика',
       amount: rub(expTotal),
+    },
+    {
+      id: 'income',
+      icon: '📈',
+      label: 'Доходы',
+      sub: 'поступления за месяц',
+      amount: rub(incTotal),
     },
     {
       id: 'recv',
@@ -3023,6 +3253,7 @@ export default function FinancePage() {
       {/* Active panel */}
       <div key={activeTab}>
         {activeTab === 'expenses' && <ExpensesPanel />}
+        {activeTab === 'income' && <IncomePanel />}
         {activeTab === 'recv' && <ReceivablesPanel />}
         {activeTab === 'loans' && <LoansPanel />}
         {activeTab === 'payables' && <PayablesPanel />}

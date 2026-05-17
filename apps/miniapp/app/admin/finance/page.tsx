@@ -316,29 +316,40 @@ function FinanceContent() {
                 Операций нет
               </p>
             ) : (
-              transactions.map((tx: any) => (
-                <div
-                  key={tx.id}
-                  className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex justify-between items-center shadow-sm"
-                >
-                  <div>
-                    <p className="font-bold text-zinc-900 text-sm">
-                      {tx.category?.name ?? tx.description ?? '—'}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
-                      {tx.direction === 'income' ? '📈' : '📉'}{' '}
-                      {new Date(tx.created_at).toLocaleTimeString('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+              transactions.map((tx: any) => {
+                const walletName =
+                  tx.direction === 'income' ? tx.to_wallet?.name : tx.from_wallet?.name;
+                return (
+                  <div
+                    key={tx.id}
+                    className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex justify-between items-start shadow-sm gap-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-zinc-900 text-sm">
+                        {tx.category?.name ?? tx.description ?? '—'}
+                      </p>
+                      {tx.counterparty?.name && (
+                        <p className="text-[10px] text-blue-600 font-bold mt-0.5 truncate">
+                          {tx.direction === 'income' ? 'от: ' : 'кому: '}
+                          {tx.counterparty.name}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
+                        {tx.direction === 'income' ? '📈' : '📉'}{' '}
+                        {new Date(tx.created_at).toLocaleTimeString('ru-RU', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                        {walletName && <span className="text-zinc-300"> · {walletName}</span>}
+                      </p>
+                    </div>
+                    <Money
+                      amount={tx.amount}
+                      className={`font-black text-sm shrink-0 ${tx.direction === 'income' ? 'text-green-600' : 'text-red-500'}`}
+                    />
                   </div>
-                  <Money
-                    amount={tx.amount}
-                    className={`font-black text-sm ${tx.direction === 'income' ? 'text-green-600' : 'text-red-500'}`}
-                  />
-                </div>
-              ))
+                );
+              })
             )}
           </section>
         )}

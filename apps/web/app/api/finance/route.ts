@@ -2,6 +2,27 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: 'Нал',
+  qr: 'QR / Р/С',
+  bank_invoice: 'Р/С (договор)',
+  card_driver: 'Карта',
+  debt_cash: 'Долг нал',
+};
+
+function breakdownByPayment(orders: any[]): Record<string, string> {
+  const acc: Record<string, number> = {};
+  for (const o of orders) {
+    const method = o.payment_method ?? 'unknown';
+    acc[method] = (acc[method] ?? 0) + parseFloat(o.amount ?? '0');
+  }
+  const result: Record<string, string> = {};
+  for (const [method, total] of Object.entries(acc)) {
+    result[method] = total.toFixed(2);
+  }
+  return result;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,7 +39,7 @@ export async function GET(request: Request) {
       const monthStart = new Date(year, mon - 1, 1).toISOString();
       const monthEnd = new Date(year, mon, 0, 23, 59, 59, 999).toISOString();
 
-      const [expRes, revenueRes] = await Promise.all([
+      const [expRes, incRes, revenueRes] = await Promise.all([
         (supabase as any)
           .from('transactions')
           .select(
@@ -32,8 +53,20 @@ export async function GET(request: Request) {
           .lte('created_at', monthEnd)
           .order('created_at', { ascending: false }),
         (supabase as any)
+          .from('transactions')
+          .select(
+            'id, amount, description, created_at, category:transaction_categories(name, code), counterparty:counterparties(name), to_wallet:wallets!to_wallet_id(name)',
+          )
+          .eq('direction', 'income')
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed')
+          .neq('description', 'Корректировка остатка')
+          .gte('created_at', monthStart)
+          .lte('created_at', monthEnd)
+          .order('created_at', { ascending: false }),
+        (supabase as any)
           .from('trip_orders')
-          .select('amount, trips!inner(started_at, lifecycle_status)')
+          .select('amount, payment_method, trips!inner(started_at, lifecycle_status)')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
           .eq('trips.lifecycle_status', 'approved')
@@ -41,16 +74,17 @@ export async function GET(request: Request) {
           .lte('trips.started_at', monthEnd),
       ]);
 
-      const revenue = (revenueRes.data ?? []).reduce(
-        (s: number, o: any) => s + parseFloat(o.amount ?? '0'),
-        0,
-      );
+      const orders = (revenueRes.data ?? []) as any[];
+      const revenue = orders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
       return NextResponse.json({
         pnl: [],
         transactions: expRes.data ?? [],
+        income_transactions: incRes.data ?? [],
         payrollTotal: '0',
         revenue: revenue.toFixed(2),
+        revenue_breakdown: breakdownByPayment(orders),
+        revenue_labels: PAYMENT_LABELS,
       });
     }
 
@@ -74,7 +108,7 @@ export async function GET(request: Request) {
         // Revenue: cash-basis — только settled trip_orders одобренных рейсов
         (supabase as any)
           .from('trip_orders')
-          .select('amount, trips!inner(started_at, lifecycle_status)')
+          .select('amount, payment_method, trips!inner(started_at, lifecycle_status)')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
           .eq('trips.lifecycle_status', 'approved')
@@ -115,14 +149,16 @@ export async function GET(request: Request) {
       ],
     );
 
-    // Build P&L by month
+    const allOrdersArr = (allOrders ?? []) as any[];
+
+    // Build P&L by month (with revenue breakdown per month)
     const pnl = months.map((m) => {
-      const revenue = ((allOrders as any[]) ?? [])
-        .filter((o: any) => {
-          const d = o.trips?.started_at;
-          return d && d >= m.start && d <= m.end;
-        })
-        .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+      const monthOrders = allOrdersArr.filter((o: any) => {
+        const d = o.trips?.started_at;
+        return d && d >= m.start && d <= m.end;
+      });
+
+      const revenue = monthOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
       const expenses = ((allExpenseTx as any[]) ?? [])
         .filter((t: any) => t.created_at >= m.start && t.created_at <= m.end)
@@ -133,10 +169,15 @@ export async function GET(request: Request) {
         revenue: revenue.toFixed(2),
         expenses: expenses.toFixed(2),
         profit: (revenue - expenses).toFixed(2),
+        revenue_breakdown: breakdownByPayment(monthOrders),
       };
     });
 
-    return NextResponse.json({ pnl, transactions: transactions ?? [] });
+    return NextResponse.json({
+      pnl,
+      transactions: transactions ?? [],
+      revenue_labels: PAYMENT_LABELS,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
