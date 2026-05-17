@@ -257,11 +257,15 @@ interface RepairRequestCard {
 function RepairRequestsList() {
   const { data: requests = [] } = useQuery<RepairRequestCard[]>({
     queryKey: ['driver-repair-requests'],
-    queryFn: () => fetch('/api/driver/repair-requests').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/driver/repair-requests');
+      if (!r.ok) throw new Error('API error');
+      return r.json();
+    },
     staleTime: 30000,
   });
 
-  if (requests.length === 0) return null;
+  if (!Array.isArray(requests) || requests.length === 0) return null;
 
   const statusInfo: Record<string, { label: string; color: string }> = {
     new: { label: 'На рассмотрении', color: 'bg-amber-100 text-amber-700' },
