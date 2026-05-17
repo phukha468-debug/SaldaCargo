@@ -30,8 +30,22 @@ export async function GET() {
     .order('started_at', { ascending: false })
     .limit(60) as any);
 
-  // Все наличные заказы по всем рейсам (не отменённые)
-  const cashOrders: any[] = (cashTrips ?? []).flatMap((trip: any) =>
+  // Дата последней инкассации — считаем только рейсы ПОСЛЕ неё
+  const { data: collections } = await (supabase
+    .from('cash_collections')
+    .select('amount, created_at')
+    .eq('driver_id', driverId) as any);
+
+  const lastCollectedAt =
+    (collections ?? []).length > 0
+      ? Math.max(...(collections as any[]).map((c: any) => new Date(c.created_at).getTime()))
+      : null;
+
+  const freshTrips = lastCollectedAt
+    ? (cashTrips ?? []).filter((t: any) => new Date(t.started_at).getTime() > lastCollectedAt)
+    : (cashTrips ?? []);
+
+  const freshCashOrders: any[] = freshTrips.flatMap((trip: any) =>
     (trip.trip_orders ?? [])
       .filter(
         (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
@@ -39,26 +53,15 @@ export async function GET() {
       .map((o: any) => ({ ...o, trip_number: trip.trip_number, asset: trip.asset })),
   );
 
-  const cashIn = cashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0);
+  const cashIn = freshCashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0);
 
-  // Наличные расходы водителя (потрачено из подотчёта)
-  const cashSpent = (cashTrips ?? [])
+  // Наличные расходы водителя (только свежие рейсы)
+  const cashSpent = freshTrips
     .flatMap((trip: any) => (trip.trip_expenses as any[]) ?? [])
     .filter((e: any) => CASH_METHODS.includes(e.payment_method))
     .reduce((sum: number, e: any) => sum + parseFloat(e.amount ?? '0'), 0);
 
-  // Subtract cash collected by admin (инкассации)
-  const { data: collections } = await (supabase
-    .from('cash_collections')
-    .select('amount')
-    .eq('driver_id', driverId) as any);
-
-  const cashOut = (collections ?? []).reduce(
-    (sum: number, c: any) => sum + parseFloat(c.amount),
-    0,
-  );
-
-  const cashBalance = Math.max(0, cashIn - cashSpent - cashOut).toFixed(2);
+  const cashBalance = Math.max(0, cashIn - cashSpent).toFixed(2);
 
   // 2. ЗП по рейсам (текущий месяц)
   const now = new Date();
@@ -80,7 +83,7 @@ export async function GET() {
     accountable: {
       balance: cashBalance,
       // Показываем последние 20 наличных заказов как историю
-      transactions: cashOrders.slice(0, 20).map((o: any) => ({
+      transactions: freshCashOrders.slice(0, 20).map((o: any) => ({
         id: o.id,
         amount: o.amount,
         description: `Рейс №${o.trip_number} · ${o.asset?.short_name ?? ''}`,

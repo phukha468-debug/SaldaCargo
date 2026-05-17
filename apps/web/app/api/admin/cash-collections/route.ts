@@ -99,10 +99,10 @@ export async function GET() {
       supabase
         .from('trips')
         .select(
-          'driver_id, trip_orders(amount, payment_method, lifecycle_status), trip_expenses(amount, payment_method)',
+          'driver_id, started_at, trip_orders(amount, payment_method, lifecycle_status), trip_expenses(amount, payment_method)',
         )
         .neq('lifecycle_status', 'cancelled') as any,
-      supabase.from('cash_collections').select('driver_id, amount') as any,
+      supabase.from('cash_collections').select('driver_id, amount, created_at') as any,
     ]);
 
     if (driversError) return NextResponse.json({ error: driversError.message }, { status: 500 });
@@ -113,29 +113,39 @@ export async function GET() {
     const result = ((drivers as any[]) ?? []).map((driver: any) => {
       const driverTrips = ((trips as any[]) ?? []).filter((t: any) => t.driver_id === driver.id);
 
-      // Наличные полученные от клиентов
-      const cashIn = driverTrips
+      // Дата последней инкассации — считаем только рейсы ПОСЛЕ неё
+      const driverCollections = ((collections as any[]) ?? []).filter(
+        (c: any) => c.driver_id === driver.id,
+      );
+      const lastCollectedAt =
+        driverCollections.length > 0
+          ? Math.max(...driverCollections.map((c: any) => new Date(c.created_at).getTime()))
+          : null;
+
+      const freshTrips = lastCollectedAt
+        ? driverTrips.filter(
+            (t: any) => new Date(t.started_at ?? t.created_at).getTime() > lastCollectedAt,
+          )
+        : driverTrips;
+
+      // Наличные полученные от клиентов (только свежие рейсы)
+      const cashIn = freshTrips
         .flatMap((t: any) => (t.trip_orders as any[]) ?? [])
         .filter(
           (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
         )
         .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
-      // Наличные потраченные водителем (ГСМ, прочее)
-      const cashSpent = driverTrips
+      // Наличные потраченные водителем (ГСМ, прочее) — только свежие рейсы
+      const cashSpent = freshTrips
         .flatMap((t: any) => (t.trip_expenses as any[]) ?? [])
         .filter((e: any) => CASH_METHODS.includes(e.payment_method))
         .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
 
-      // Уже инкассированные суммы
-      const cashOut = ((collections as any[]) ?? [])
-        .filter((c: any) => c.driver_id === driver.id)
-        .reduce((s: number, c: any) => s + parseFloat(c.amount ?? '0'), 0);
-
       return {
         driver_id: driver.id,
         driver_name: driver.name,
-        balance: Math.max(0, cashIn - cashSpent - cashOut).toFixed(2),
+        balance: Math.max(0, cashIn - cashSpent).toFixed(2),
       };
     });
 

@@ -22,7 +22,7 @@ export async function GET() {
     const { data: trips, error: tripsError } = await (supabase
       .from('trips')
       .select(
-        'driver_id, trip_orders(amount, payment_method, lifecycle_status), trip_expenses(amount, payment_method)',
+        'driver_id, started_at, trip_orders(amount, payment_method, lifecycle_status), trip_expenses(amount, payment_method)',
       )
       .neq('lifecycle_status', 'cancelled') as any);
 
@@ -30,7 +30,7 @@ export async function GET() {
 
     const { data: collections, error: collectionsError } = await (supabase
       .from('cash_collections')
-      .select('driver_id, amount') as any);
+      .select('driver_id, amount, created_at') as any);
 
     if (collectionsError)
       return NextResponse.json({ error: collectionsError.message }, { status: 500 });
@@ -38,26 +38,36 @@ export async function GET() {
     const result = (drivers as any[]).map((driver: any) => {
       const driverTrips = ((trips as any[]) ?? []).filter((t: any) => t.driver_id === driver.id);
 
-      const cashIn = driverTrips
+      const driverCollections = ((collections as any[]) ?? []).filter(
+        (c: any) => c.driver_id === driver.id,
+      );
+      const lastCollectedAt =
+        driverCollections.length > 0
+          ? Math.max(...driverCollections.map((c: any) => new Date(c.created_at).getTime()))
+          : null;
+
+      const freshTrips = lastCollectedAt
+        ? driverTrips.filter(
+            (t: any) => new Date(t.started_at ?? t.created_at).getTime() > lastCollectedAt,
+          )
+        : driverTrips;
+
+      const cashIn = freshTrips
         .flatMap((t: any) => (t.trip_orders as any[]) ?? [])
         .filter(
           (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
         )
         .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
-      const cashSpent = driverTrips
+      const cashSpent = freshTrips
         .flatMap((t: any) => (t.trip_expenses as any[]) ?? [])
         .filter((e: any) => CASH_METHODS.includes(e.payment_method))
         .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
 
-      const cashOut = ((collections as any[]) ?? [])
-        .filter((c: any) => c.driver_id === driver.id)
-        .reduce((s: number, c: any) => s + parseFloat(c.amount ?? '0'), 0);
-
       return {
         driver_id: driver.id,
         driver_name: driver.name,
-        balance: Math.max(0, cashIn - cashSpent - cashOut).toFixed(2),
+        balance: Math.max(0, cashIn - cashSpent).toFixed(2),
       };
     });
 
