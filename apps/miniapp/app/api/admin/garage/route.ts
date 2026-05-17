@@ -44,7 +44,7 @@ export async function GET() {
     (supabase.from('service_orders') as any)
       .select(
         `
-        id, order_number, created_at,
+        id, order_number, created_at, machine_type,
         asset:assets(short_name, reg_number),
         mechanic:users!service_orders_assigned_mechanic_id_fkey(name),
         service_order_works(norm_minutes, actual_minutes, status)

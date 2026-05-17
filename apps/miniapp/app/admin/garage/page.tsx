@@ -35,6 +35,7 @@ interface PendingOrder {
   id: string;
   order_number: number;
   created_at: string;
+  machine_type: 'own' | 'client';
   asset: Asset | null;
   mechanic: { name: string } | null;
   service_order_works: { norm_minutes: number; actual_minutes: number | null; status: string }[];
@@ -301,6 +302,12 @@ function ApproveOrderModal({
           <p className="text-slate-500 text-xs">Механик: {order.mechanic?.name ?? 'Не назначен'}</p>
           <p className="text-slate-500 text-xs mt-1">
             Норм-часы (факт): {(totalNm / 60).toFixed(1)} ч
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            Тариф:{' '}
+            <span className="font-black text-slate-600">
+              {order.machine_type === 'client' ? '2 000 ₽/ч (клиент)' : '1 600 ₽/ч (свой автопарк)'}
+            </span>
           </p>
         </div>
 

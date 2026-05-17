@@ -29,7 +29,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .select(
         `
-        id, asset_id,
+        id, asset_id, machine_type,
         mechanic:users!service_orders_assigned_mechanic_id_fkey(id, mechanic_salary_pct),
         second_mechanic:users!service_orders_second_mechanic_id_fkey(id, mechanic_salary_pct),
         service_order_works(id, norm_minutes, actual_minutes, status, extra_work_status)
@@ -49,13 +49,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       works.reduce((sum: number, w: any) => sum + (w.actual_minutes ?? w.norm_minutes), 0);
 
     const [{ data: settings }, { data: payrollCat }] = await Promise.all([
-      (supabase.from('sto_settings') as any).select('hourly_rate').limit(1).single(),
+      (supabase.from('sto_settings') as any)
+        .select('hourly_rate, hourly_rate_own')
+        .limit(1)
+        .single(),
       (supabase.from('transaction_categories') as any)
         .select('id')
         .eq('code', 'PAYROLL_MECHANIC')
         .single(),
     ]);
-    const hourlyRate = parseFloat(settings?.hourly_rate ?? '2000');
+    const hourlyRate =
+      order.machine_type === 'client'
+        ? parseFloat(settings?.hourly_rate ?? '2000')
+        : parseFloat(settings?.hourly_rate_own ?? '1600');
     const payrollCategoryId = payrollCat?.id;
 
     const accruals: string[] = [];
