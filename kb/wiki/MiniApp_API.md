@@ -1,7 +1,7 @@
 # MiniApp — Справочник API
 
 **Теги:** #api #miniapp #разработка
-**Обновлено:** 2026-05-16
+**Обновлено:** 2026-05-17
 
 Полный перечень API-эндпоинтов `apps/miniapp`. Все роуты используют `createAdminClient()`.
 
@@ -35,6 +35,9 @@
 | POST  | `/api/driver/counterparties/new` | Создать нового контрагента                             |
 | GET   | `/api/driver/categories`         | Категории расходов для формы расхода в рейсе           |
 | GET   | `/api/driver/me`                 | Данные текущего пользователя по cookie                 |
+| GET   | `/api/driver/fault-catalog`      | Каталог неисправностей (сгруппирован по category)      |
+| GET   | `/api/driver/repair-requests`    | Заявки водителя на ремонт (последние 20)               |
+| POST  | `/api/driver/repair-requests`    | Создать заявку на ремонт                               |
 
 ### `GET /api/driver/finance` — детали ответа
 
@@ -156,21 +159,68 @@ Body: { "action": "cancel" }
 
 ## Механик (`/api/mechanic/`)
 
-| Метод | Путь                                            | Описание                   |
-| ----- | ----------------------------------------------- | -------------------------- |
-| GET   | `/api/mechanic/summary`                         | Сводка механика            |
-| GET   | `/api/mechanic/orders`                          | Список нарядов механика    |
-| GET   | `/api/mechanic/orders/{id}`                     | Детали наряда              |
-| POST  | `/api/mechanic/orders/{id}/work/{workId}/start` | Запустить таймер работы    |
-| POST  | `/api/mechanic/orders/{id}/work/{workId}/stop`  | Остановить таймер          |
-| GET   | `/api/mechanic/parts`                           | Список запчастей на складе |
+| Метод | Путь                                            | Описание                                          |
+| ----- | ----------------------------------------------- | ------------------------------------------------- | ------------ |
+| GET   | `/api/mechanic/summary`                         | Сводка механика (активный наряд, счётчики)        |
+| GET   | `/api/mechanic/orders`                          | Свои наряды (`?mechanic_id=`)                     |
+| GET   | `/api/mechanic/orders?unassigned=true`          | Свободные наряды (без назначения, `created`)      |
+| GET   | `/api/mechanic/orders/{id}`                     | Детали наряда                                     |
+| POST  | `/api/mechanic/orders/{id}/claim`               | Взять свободный наряд на себя                     |
+| GET   | `/api/mechanic/orders/{id}/works`               | Работы наряда                                     |
+| PATCH | `/api/mechanic/orders/{id}/works/{workId}`      | Обновить работу (actual_minutes, status)          |
+| POST  | `/api/mechanic/orders/{id}/work/{workId}/start` | Запустить таймер работы                           |
+| POST  | `/api/mechanic/orders/{id}/work/{workId}/stop`  | Остановить таймер (`{action: 'pause               | complete'}`) |
+| POST  | `/api/mechanic/orders/{id}/extra-work`          | Запросить доп. работу (extra_work_status=pending) |
+| GET   | `/api/mechanic/orders/{id}/parts`               | Запчасти наряда                                   |
+| GET   | `/api/mechanic/parts`                           | Список запчастей на складе                        |
+| GET   | `/api/mechanic/catalog`                         | Каталог работ                                     |
+| GET   | `/api/mechanic/salary?year=&month=`             | ЗП механика за месяц (начисления + сводка)        |
+
+### `POST /api/mechanic/orders/{id}/claim` — взять наряд
+
+Устанавливает `assigned_mechanic_id = userId` если поле ещё null (оптимистичная блокировка).
+
+### `POST /api/mechanic/orders/{id}/extra-work` — запросить доп. работу
+
+```json
+Body: {
+  "work_catalog_id": "uuid | null",
+  "custom_work_name": "Строка (если не в каталоге)",
+  "norm_minutes": 60,
+  "mechanic_note": "Что нашли при разборке..."  // обязательно
+}
+```
+
+Создаёт запись `service_order_works` с `extra_work_status='pending_approval'`.
+Наряд нельзя завершить пока есть работы в статусе `pending_approval`.
+
+### `GET /api/mechanic/salary` — ЗП за месяц
+
+```json
+{
+  "accruals": [
+    {
+      "id": "uuid",
+      "amount": "4500.00",
+      "description": "ЗП механика: наряд #abc123",
+      "settlement_status": "pending",
+      "created_at": "..."
+    }
+  ],
+  "summary": {
+    "total_accrued": "9000.00",
+    "total_paid": "4500.00",
+    "to_pay": "4500.00"
+  }
+}
+```
 
 ---
 
 ## Админ (`/api/admin/`)
 
 | Метод | Путь                                          | Описание                                                   |
-| ----- | --------------------------------------------- | ---------------------------------------------------------- |
+| ----- | --------------------------------------------- | ---------------------------------------------------------- | -------- |
 | GET   | `/api/admin/summary`                          | Дашборд: активные рейсы, ревью, выручка сегодня            |
 | GET   | `/api/admin/trips?filter=review\|active\|all` | Список рейсов с фильтрацией                                |
 | GET   | `/api/admin/trips/{id}`                       | Полные детали рейса для ревью                              |
@@ -188,6 +238,12 @@ Body: { "action": "cancel" }
 | POST  | `/api/admin/staff-settle`                     | Выплатить ЗП сотруднику                                    |
 | GET   | `/api/admin/receivables`                      | Список должников (дебиторка)                               |
 | POST  | `/api/admin/receivables/settle`               | Погасить долг клиента                                      |
+| GET   | `/api/admin/garage`                           | Дашборд гаража: заявки, доп. работы, на утверждении, ТО    |
+| GET   | `/api/admin/mechanics`                        | Список механиков (для назначения в наряд)                  |
+| GET   | `/api/admin/repair-requests`                  | Заявки на ремонт от водителей                              |
+| PATCH | `/api/admin/repair-requests/{id}`             | Одобрить/отклонить заявку (`action: approve                | reject`) |
+| GET   | `/api/admin/service-orders`                   | Все наряды с фильтрацией                                   |
+| PATCH | `/api/admin/service-orders/{id}`              | Управление нарядом (см. ниже)                              |
 
 ### `GET /api/admin/summary`
 
@@ -245,6 +301,55 @@ Body: {
 
 Создаёт `direction=expense, lifecycle=approved, settlement=pending` — долг появляется в кредиторке.
 Только для Новиков А.В. и Ромашин (не для Дерябин ГСМ — у него autoAccrue).
+
+### `GET /api/admin/garage` — дашборд гаража
+
+```json
+{
+  "repairRequests": [...],   // новые заявки водителей (status='new')
+  "activeOrders": [...],     // наряды in_progress / created
+  "pendingApproval": [...],  // завершены механиком, ждут утверждения (status=completed, lifecycle=draft)
+  "extraWorkPending": [...], // доп. работы на согласовании
+  "maintenanceAlerts": [...],// ТО алерты (overdue / soon)
+  "counts": { ... }
+}
+```
+
+### `PATCH /api/admin/repair-requests/{id}` — одобрить / отклонить заявку
+
+```json
+// Одобрить — создаёт наряд:
+{ "action": "approve", "mechanic_id": "uuid?", "odometer": 12345 }
+
+// Отклонить:
+{ "action": "reject", "admin_note": "Причина" }
+```
+
+### `PATCH /api/admin/service-orders/{id}` — управление нарядом
+
+```json
+// Утвердить + начислить ЗП механику:
+{ "action": "approve", "adjusted_norm_minutes": 90, "admin_note": "..." }
+
+// Вернуть на доработку:
+{ "action": "return", "admin_note": "Причина" }
+
+// Отменить:
+{ "action": "cancel" }
+
+// Редактировать заметку:
+{ "action": "edit_note", "admin_note": "Текст" }
+
+// Одобрить доп. работу:
+{ "action": "approve_extra_work", "work_id": "uuid" }
+
+// Отклонить доп. работу:
+{ "action": "reject_extra_work", "work_id": "uuid" }
+```
+
+При `action=approve`: начисляется ЗП через `PAYROLL_MECHANIC` транзакции.
+Формула: `normMinutes/60 * hourlyRate(sto_settings) * mechanic_salary_pct/100`.
+При двух механиках — нормочасы делятся пополам.
 
 ---
 
