@@ -1060,6 +1060,8 @@ export default function ClientsPage() {
   const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
   const [mergeError, setMergeError] = useState('');
 
+  const [oneoffView, setOneoffView] = useState<'analytics' | 'list'>('analytics');
+
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
     queryFn: () => fetch('/api/counterparties').then((r) => r.json()),
@@ -1237,6 +1239,7 @@ export default function ClientsPage() {
     setSelectedId(null);
     setSearch('');
     setMergeMode(false);
+    if (t === 'regular') setOneoffView('analytics');
     setMergeSelected(new Set());
   };
 
@@ -1314,6 +1317,30 @@ export default function ClientsPage() {
               </span>
             </button>
           </div>
+
+          {tab === 'oneoff' && (
+            <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+              <button
+                onClick={() => {
+                  setOneoffView('analytics');
+                  setSelectedId(null);
+                  setSearch('');
+                  setMergeMode(false);
+                  setMergeSelected(new Set());
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${oneoffView === 'analytics' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                📊 Аналитика
+              </button>
+              <button
+                onClick={() => setOneoffView('list')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${oneoffView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                📋 Список
+              </button>
+            </div>
+          )}
+
           <button
             onClick={openCreate}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"
@@ -1390,8 +1417,54 @@ export default function ClientsPage() {
           </div>
         )}
 
-        {/* ══ Таб 2: Разовые — агрегированная аналитика ══ */}
-        {tab === 'oneoff' && <OneoffAggregateTab irregular={irregular} regular={regular} />}
+        {/* ══ Таб 2: Разовые — аналитика или список ══ */}
+        {tab === 'oneoff' && oneoffView === 'analytics' && (
+          <OneoffAggregateTab irregular={irregular} regular={regular} />
+        )}
+        {tab === 'oneoff' && oneoffView === 'list' && (
+          <div className="flex gap-4">
+            <ClientListPanel
+              list={currentList}
+              isLoading={isLoading}
+              selectedId={selectedId}
+              debtMap={debtMap}
+              mergeMode={mergeMode}
+              mergeSelected={mergeSelected}
+              showInactive={showInactive}
+              search={search}
+              onSearch={setSearch}
+              onSelect={setSelectedId}
+              onMergeToggle={handleMergeToggle}
+              onToggleInactive={() => setShowInactive((v) => !v)}
+              onToggleMerge={() => {
+                setMergeMode((v) => !v);
+                setMergeSelected(new Set());
+                setMergeError('');
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="bg-white rounded-2xl border border-slate-200">
+                {selectedClient ? (
+                  <ClientDetail
+                    client={selectedClient}
+                    debt={debtMap.get(selectedClient.id) ?? 0}
+                    tripHistory={tripHistory}
+                    onEdit={() => openEdit(selectedClient)}
+                    onToggleActive={() => toggleActive(selectedClient)}
+                    onPromote={() => promoteClient(selectedClient)}
+                    onDelete={() => deleteClient(selectedClient)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                    <p className="text-3xl mb-3">👈</p>
+                    <p className="text-sm font-bold text-slate-400">Выберите клиента</p>
+                    <p className="text-xs text-slate-300 mt-1">Детали появятся здесь</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Модалка ── */}
