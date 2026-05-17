@@ -12,6 +12,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         amount?: string;
         driver_pay?: string;
         loader_pay?: string;
+        loader2_pay?: string;
         description?: string;
         payment_method?: string;
         counterparty_id?: string | null;
@@ -30,6 +31,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           update.driver_pay = parseFloat(fields.driver_pay).toFixed(2);
         if (fields.loader_pay !== undefined)
           update.loader_pay = parseFloat(fields.loader_pay).toFixed(2);
+        if (fields.loader2_pay !== undefined)
+          update.loader2_pay = parseFloat(fields.loader2_pay).toFixed(2);
         if (fields.description !== undefined)
           update.description = fields.description?.trim() || null;
         if (fields.payment_method !== undefined) update.payment_method = fields.payment_method;

@@ -360,6 +360,7 @@ function EditModal({
       amount: o.amount,
       driver_pay: o.driver_pay,
       loader_pay: o.loader_pay,
+      loader2_pay: o.loader2_pay ?? '0',
       payment_method: o.payment_method,
       counterparty_id: o._selectedId,
       ...(o._selectedId === null && o._inputValue.trim()
@@ -449,17 +450,32 @@ function EditModal({
                     onChange={(e) => update(order.id, 'driver_pay', e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                    ЗП грузчика, ₽
-                  </label>
-                  <input
-                    type="number"
-                    className={inputCls}
-                    value={order.loader_pay}
-                    onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
-                  />
-                </div>
+                {(order.loader_id || parseFloat(order.loader_pay) > 0) && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                      ЗП {order.loader ? order.loader.name.split(' ')[0] : 'грузчика'}, ₽
+                    </label>
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={order.loader_pay}
+                      onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
+                    />
+                  </div>
+                )}
+                {(order.loader2_id || parseFloat(order.loader2_pay ?? '0') > 0) && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                      ЗП {order.loader2 ? order.loader2.name.split(' ')[0] : 'грузчика 2'}, ₽
+                    </label>
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={order.loader2_pay ?? '0'}
+                      onChange={(e) => update(order.id, 'loader2_pay', e.target.value)}
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
                     Способ оплаты
