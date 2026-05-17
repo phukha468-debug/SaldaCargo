@@ -10,6 +10,7 @@ interface User {
   name: string;
   roles: string[];
   has_pin?: boolean;
+  current_asset_id: string | null;
 }
 
 interface Vehicle {
@@ -39,10 +40,8 @@ export default function RootDispatcher() {
   useEffect(() => {
     const existingUserId = getCookieValue('salda_user_id');
     const savedRole = localStorage.getItem('selected_role');
-    const savedVehicleId = localStorage.getItem('active_vehicle_id');
-
     if (existingUserId && savedRole) {
-      if (savedRole === 'driver' && savedVehicleId) {
+      if (savedRole === 'driver') {
         router.replace('/driver');
       } else if (savedRole === 'admin' || savedRole === 'owner') {
         router.replace('/admin');
@@ -133,6 +132,12 @@ export default function RootDispatcher() {
     localStorage.setItem('selected_role', selectedRole ?? '');
 
     if (selectedRole === 'driver') {
+      // Если машина уже закреплена — пропускаем выбор
+      if (user.current_asset_id) {
+        localStorage.setItem('active_vehicle_id', user.current_asset_id);
+        router.push('/driver');
+        return;
+      }
       setLoading(true);
       try {
         const res = await fetch('/api/vehicles/public', { cache: 'no-store' });

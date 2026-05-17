@@ -19,23 +19,30 @@ interface Part {
   stock: number;
 }
 
+interface WorkItem {
+  id: string;
+  work_catalog?: { name: string; norm_minutes: number };
+  custom_work_name?: string;
+  status: string;
+  actual_minutes: number;
+  extra_work_status?: 'pending_approval' | 'approved' | 'rejected' | null;
+  extra_work_mechanic_note?: string | null;
+  time_logs: Array<{ started_at: string; stopped_at: string | null; status: string }>;
+}
+
 interface OrderDetail {
   id: string;
   order_number: number;
   status: string;
+  lifecycle_status: string;
   machine_type: 'own' | 'client';
   asset?: { short_name: string; reg_number: string };
   client_vehicle_brand?: string;
   client_vehicle_reg?: string;
   problem_description: string;
-  works: Array<{
-    id: string;
-    work_catalog?: { name: string; norm_minutes: number };
-    custom_work_name?: string;
-    status: string;
-    actual_minutes: number;
-    time_logs: Array<{ started_at: string; stopped_at: string | null; status: string }>;
-  }>;
+  assigned_mechanic_id?: string;
+  admin_note?: string;
+  works: WorkItem[];
   parts: Array<{
     id: string;
     part: { name: string; unit: string };
@@ -114,7 +121,6 @@ function AddWorkModal({
   const [customNorm, setCustomNorm] = useState('');
   const [validationError, setValidationError] = useState('');
 
-  // сбрасываем при закрытии
   useEffect(() => {
     if (!open) {
       setSelectedCatalogId(null);
@@ -195,7 +201,6 @@ function AddWorkModal({
         </div>
       }
     >
-      {/* Вкладки */}
       <div className="flex gap-2 mb-4">
         {(['catalog', 'custom'] as const).map((t) => (
           <button
@@ -219,8 +224,7 @@ function AddWorkModal({
           {catalog.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-2xl mb-2">📋</p>
-              <p className="text-xs text-slate-400 font-bold">Каталог работ пуст</p>
-              <p className="text-xs text-slate-400 mt-1">Перейдите на вкладку «Своя работа»</p>
+              <p className="text-xs text-slate-400 font-bold">Каталог пуст</p>
             </div>
           ) : (
             catalog.map((item) => (
@@ -283,11 +287,194 @@ function AddWorkModal({
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
-          <p className="text-[10px] text-slate-400">
-            * Норму можно не заполнять — работа всё равно добавится
-          </p>
         </div>
       )}
+    </BottomSheet>
+  );
+}
+
+// ─── ExtraWorkModal ───────────────────────────────────────────────────────────
+
+function ExtraWorkModal({
+  open,
+  onClose,
+  orderId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  orderId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<'catalog' | 'custom'>('catalog');
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null);
+  const [customName, setCustomName] = useState('');
+  const [mechanicNote, setMechanicNote] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedCatalogId(null);
+      setCustomName('');
+      setMechanicNote('');
+      setError('');
+      setTab('catalog');
+    }
+  }, [open]);
+
+  const { data: catalog = [] } = useQuery<CatalogItem[]>({
+    queryKey: ['work-catalog'],
+    queryFn: async () => {
+      const r = await fetch('/api/mechanic/catalog');
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: open,
+  });
+
+  const requestMutation = useMutation({
+    mutationFn: async (body: object) => {
+      const r = await fetch(`/api/mechanic/orders/${orderId}/extra-work`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error || 'Ошибка');
+      }
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
+      onClose();
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const handleSend = () => {
+    setError('');
+    if (!mechanicNote.trim()) {
+      setError('Опишите что обнаружили — это обязательно');
+      return;
+    }
+    if (tab === 'catalog' && !selectedCatalogId) {
+      setError('Выберите вид работы из каталога');
+      return;
+    }
+    if (tab === 'custom' && !customName.trim()) {
+      setError('Введите название работы');
+      return;
+    }
+    requestMutation.mutate({
+      work_catalog_id: tab === 'catalog' ? selectedCatalogId : undefined,
+      custom_work_name: tab === 'custom' ? customName.trim() : undefined,
+      mechanic_note: mechanicNote.trim(),
+    });
+  };
+
+  return (
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title="Доп. работа → Согласование"
+      footer={
+        <div>
+          {error && <p className="text-xs text-red-500 font-bold mb-2 text-center">{error}</p>}
+          <button
+            onClick={handleSend}
+            disabled={requestMutation.isPending}
+            className="w-full bg-amber-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-amber-400"
+          >
+            {requestMutation.isPending ? 'Отправляем...' : '📤 Отправить на согласование'}
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+          <p className="text-xs text-amber-800 font-medium leading-relaxed">
+            Обнаружили дополнительную работу? Выберите тип и опишите что нашли — администратор
+            получит уведомление и одобрит или откажет.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          {(['catalog', 'custom'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => {
+                setTab(t);
+                setError('');
+              }}
+              className={cn(
+                'flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-colors',
+                tab === t ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-500',
+              )}
+            >
+              {t === 'catalog' ? 'Из каталога' : 'Описать'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'catalog' ? (
+          <div className="space-y-2 max-h-44 overflow-y-auto">
+            {catalog.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setSelectedCatalogId(item.id === selectedCatalogId ? null : item.id);
+                  setError('');
+                }}
+                className={cn(
+                  'w-full text-left p-3 rounded-xl border-2 transition-all active:scale-[0.98]',
+                  selectedCatalogId === item.id
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-slate-100 bg-white',
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-900">{item.name}</p>
+                  {selectedCatalogId === item.id && <span className="text-amber-600">✓</span>}
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                  Норма: {item.norm_minutes} мин
+                </p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+              Название работы *
+            </label>
+            <input
+              value={customName}
+              onChange={(e) => {
+                setCustomName(e.target.value);
+                setError('');
+              }}
+              placeholder="Например: Замена шаровой опоры"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+        )}
+
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+            Что обнаружили? *
+          </label>
+          <textarea
+            value={mechanicNote}
+            onChange={(e) => {
+              setMechanicNote(e.target.value);
+              setError('');
+            }}
+            placeholder="Опишите подробно что нашли и почему это нужно сделать..."
+            rows={3}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+          />
+        </div>
+      </div>
     </BottomSheet>
   );
 }
@@ -409,12 +596,11 @@ function AddPartModal({
           </div>
         </>
       ) : noStock ? (
-        /* ── Нет на складе — предложить заказать ── */
         <div className="space-y-4">
           <div className="bg-red-50 border border-red-100 rounded-xl p-4">
             <p className="text-sm font-black text-red-800">{selectedPart.name}</p>
             <p className="text-[10px] text-red-500 font-bold uppercase mt-1">
-              Остаток: 0 {selectedPart.unit} — запчасть отсутствует на складе
+              Остаток: 0 {selectedPart.unit} — отсутствует на складе
             </p>
           </div>
 
@@ -443,8 +629,7 @@ function AddPartModal({
               <p className="text-3xl">✅</p>
               <p className="text-sm font-black text-slate-900">Запрос отправлен</p>
               <p className="text-xs text-slate-500">
-                Администратор получит уведомление о необходимости закупить{' '}
-                <strong>{selectedPart.name}</strong>
+                Администратор получит уведомление о закупке <strong>{selectedPart.name}</strong>
               </p>
               <button
                 onClick={onClose}
@@ -456,7 +641,6 @@ function AddPartModal({
           )}
         </div>
       ) : (
-        /* ── Есть на складе — ввести количество ── */
         <div className="space-y-4">
           <div className="bg-green-50 border border-green-100 rounded-xl p-4">
             <p className="text-sm font-black text-green-900">{selectedPart.name}</p>
@@ -521,7 +705,7 @@ function WorkCard({
   isStarting,
   isStopping,
 }: {
-  work: OrderDetail['works'][number];
+  work: WorkItem;
   now: number;
   onStart: () => void;
   onStop: (status: 'paused' | 'completed') => void;
@@ -539,20 +723,64 @@ function WorkCard({
 
   const workName = work.work_catalog?.name || work.custom_work_name || 'Без названия';
   const normMins = work.work_catalog?.norm_minutes ?? 0;
+  const isExtraWork = work.extra_work_status != null;
+  const isPendingApproval = work.extra_work_status === 'pending_approval';
+  const isRejected = work.extra_work_status === 'rejected';
+  const canWork =
+    !isPendingApproval && !isRejected && work.status !== 'completed' && work.status !== 'cancelled';
+
+  const extraStatusLabel = () => {
+    if (!isExtraWork) return null;
+    const map: Record<string, { label: string; cls: string }> = {
+      pending_approval: { label: 'На согласовании', cls: 'bg-amber-100 text-amber-700' },
+      approved: { label: 'Согласовано', cls: 'bg-green-100 text-green-700' },
+      rejected: { label: 'Отклонено', cls: 'bg-red-100 text-red-500' },
+    };
+    const entry = map[work.extra_work_status ?? ''];
+    if (!entry) return null;
+    return (
+      <span className={cn('text-[8px] font-black uppercase px-1.5 py-0.5 rounded', entry.cls)}>
+        {entry.label}
+      </span>
+    );
+  };
 
   return (
     <div
       className={cn(
         'bg-white rounded-xl border-2 p-4 transition-all',
-        isRunning ? 'border-orange-500 shadow-lg shadow-orange-100' : 'border-slate-100',
+        isRunning
+          ? 'border-orange-500 shadow-lg shadow-orange-100'
+          : isPendingApproval
+            ? 'border-amber-300 bg-amber-50/30'
+            : isRejected
+              ? 'border-red-200 bg-red-50/30 opacity-60'
+              : 'border-slate-100',
       )}
     >
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start mb-2">
         <div className="flex-1">
-          <p className="text-sm font-black text-slate-900 leading-tight">{workName}</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">
-            Норма: {normMins}м · Факт: {totalMinutes}м
-          </p>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <p className="text-sm font-black text-slate-900 leading-tight">{workName}</p>
+            {isExtraWork && (
+              <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                Доп.
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {normMins > 0 && (
+              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                Норма: {normMins}м · Факт: {totalMinutes}м
+              </p>
+            )}
+            {extraStatusLabel()}
+          </div>
+          {isPendingApproval && work.extra_work_mechanic_note && (
+            <p className="text-[10px] text-amber-700 mt-1 italic">
+              «{work.extra_work_mechanic_note}»
+            </p>
+          )}
         </div>
         <span
           className={cn(
@@ -568,38 +796,48 @@ function WorkCard({
         </span>
       </div>
 
-      <div className="flex gap-2">
-        {isRunning ? (
-          <>
+      {canWork && (
+        <div className="flex gap-2 mt-3">
+          {isRunning ? (
+            <>
+              <button
+                onClick={() => onStop('paused')}
+                disabled={isStopping}
+                className="flex-1 bg-slate-100 text-slate-900 rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+              >
+                ⏸ Пауза
+              </button>
+              <button
+                onClick={() => onStop('completed')}
+                disabled={isStopping}
+                className="flex-[1.5] bg-green-600 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+              >
+                ✓ Завершить
+              </button>
+            </>
+          ) : (
             <button
-              onClick={() => onStop('paused')}
-              disabled={isStopping}
-              className="flex-1 bg-slate-100 text-slate-900 rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+              onClick={onStart}
+              disabled={isStarting}
+              className="flex-1 bg-zinc-900 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-zinc-400"
             >
-              ⏸ Пауза
+              ▶ Начать работу
             </button>
-            <button
-              onClick={() => onStop('completed')}
-              disabled={isStopping}
-              className="flex-[1.5] bg-green-600 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
-            >
-              ✓ Завершить
-            </button>
-          </>
-        ) : work.status !== 'completed' ? (
-          <button
-            onClick={onStart}
-            disabled={isStarting}
-            className="flex-1 bg-zinc-900 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-zinc-400"
-          >
-            ▶ Начать работу
-          </button>
-        ) : (
-          <div className="flex-1 text-center py-2 text-green-600 font-black text-xs uppercase">
-            ✓ Работа выполнена
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+
+      {isPendingApproval && (
+        <div className="mt-3 bg-amber-100 rounded-lg px-3 py-2 text-xs font-bold text-amber-700 text-center">
+          ⏳ Ожидаем одобрения администратора
+        </div>
+      )}
+
+      {work.status === 'completed' && !isRunning && !isPendingApproval && (
+        <div className="mt-2 text-center py-1 text-green-600 font-black text-xs uppercase">
+          ✓ Работа выполнена
+        </div>
+      )}
     </div>
   );
 }
@@ -610,7 +848,7 @@ function StatusBadge({ status }: { status: string }) {
   const labels: Record<string, { label: string; color: string }> = {
     created: { label: 'Новый', color: 'bg-slate-100 text-slate-500' },
     in_progress: { label: 'В работе', color: 'bg-orange-100 text-orange-700' },
-    completed: { label: 'Готово', color: 'bg-green-100 text-green-700' },
+    completed: { label: 'На утверждении', color: 'bg-blue-100 text-blue-700' },
     cancelled: { label: 'Отменён', color: 'bg-red-100 text-red-700' },
   };
   const { label, color } = labels[status] ?? {
@@ -633,6 +871,7 @@ export default function OrderDetailPage() {
   const [now, setNow] = useState(() => Date.now());
   const [showAddWork, setShowAddWork] = useState(false);
   const [showAddPart, setShowAddPart] = useState(false);
+  const [showExtraWork, setShowExtraWork] = useState(false);
   const [acceptError, setAcceptError] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
@@ -642,7 +881,7 @@ export default function OrderDetailPage() {
       if (!res.ok) throw new Error('Ошибка загрузки');
       return res.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
   useEffect(() => {
@@ -716,11 +955,19 @@ export default function OrderDetailPage() {
   if (isLoading) return <div className="p-4 animate-pulse text-sm text-slate-400">Загрузка...</div>;
   if (!order) return <div className="p-4 text-sm text-red-500">Наряд не найден</div>;
 
+  const activeWorks = order.works.filter(
+    (w) => w.status !== 'cancelled' && w.extra_work_status !== 'rejected',
+  );
+  const hasPendingExtraWork = order.works.some((w) => w.extra_work_status === 'pending_approval');
   const allWorksComplete =
-    order.works.length > 0 && order.works.every((w) => w.status === 'completed');
-  const canComplete = allWorksComplete && order.status === 'in_progress';
+    activeWorks.length > 0 &&
+    activeWorks.every(
+      (w) => w.status === 'completed' || w.extra_work_status === 'pending_approval',
+    );
+  const canComplete = allWorksComplete && !hasPendingExtraWork && order.status === 'in_progress';
   const needsAccept = order.status === 'created';
   const inProgress = order.status === 'in_progress';
+  const isApproved = order.lifecycle_status === 'approved' && order.status === 'completed';
 
   return (
     <>
@@ -739,6 +986,16 @@ export default function OrderDetailPage() {
           </p>
         </div>
 
+        {/* Баннер утверждён */}
+        {isApproved && (
+          <section className="px-4">
+            <div className="bg-green-600 text-white rounded-2xl p-4 text-center">
+              <p className="text-lg font-black">✓ Наряд утверждён</p>
+              <p className="text-sm opacity-80 mt-1">ЗП начислена</p>
+            </div>
+          </section>
+        )}
+
         {/* Баннер: нужно принять */}
         {needsAccept && (
           <section className="px-4">
@@ -747,24 +1004,21 @@ export default function OrderDetailPage() {
                 Новый наряд — требует подтверждения
               </p>
               <p className="text-sm font-medium leading-relaxed text-zinc-200">
-                Ознакомьтесь с описанием и нажмите кнопку{' '}
+                Ознакомьтесь с описанием и нажмите{' '}
                 <strong className="text-white">«Принять в работу»</strong> внизу экрана
               </p>
             </div>
           </section>
         )}
 
-        {/* Подсказка: принят, но нет работ */}
-        {inProgress && order.works.length === 0 && (
+        {/* Заметка администратора */}
+        {order.admin_note && (
           <section className="px-4">
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-wide mb-1">
-                Что делать дальше
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">
+                Заметка администратора:
               </p>
-              <p className="text-sm text-blue-800">
-                Нажмите <strong>«+ Добавить»</strong> рядом с разделом «Работы» — добавьте из
-                каталога или введите свою работу, затем нажмите <strong>«▶ Начать работу»</strong>
-              </p>
+              <p className="text-sm text-blue-800 font-medium">{order.admin_note}</p>
             </div>
           </section>
         )}
@@ -773,7 +1027,7 @@ export default function OrderDetailPage() {
         <section className="px-4">
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
             <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">
-              Описание задачи:
+              Задача:
             </p>
             <p className="text-sm text-orange-900 font-medium leading-relaxed">
               {order.problem_description || 'Описание отсутствует'}
@@ -785,22 +1039,44 @@ export default function OrderDetailPage() {
         <section className="px-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Работы ({order.works.length})
+              Работы ({activeWorks.length})
             </h2>
-            {order.status !== 'completed' && (
-              <button
-                onClick={() => setShowAddWork(true)}
-                className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform"
-              >
-                + Добавить
-              </button>
-            )}
+            <div className="flex gap-2">
+              {inProgress && (
+                <button
+                  onClick={() => setShowExtraWork(true)}
+                  className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform"
+                >
+                  ⚡ Доп. работа
+                </button>
+              )}
+              {order.status !== 'completed' && (
+                <button
+                  onClick={() => setShowAddWork(true)}
+                  className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform"
+                >
+                  + Добавить
+                </button>
+              )}
+            </div>
           </div>
+
           {order.works.length === 0 && !inProgress && (
             <p className="text-center text-xs text-slate-400 font-bold italic py-4">
               Работы не добавлены
             </p>
           )}
+          {inProgress && order.works.length === 0 && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+              <p className="text-xs font-black text-blue-600 uppercase tracking-wide mb-1">
+                Что делать дальше
+              </p>
+              <p className="text-sm text-blue-800">
+                Нажмите <strong>«+ Добавить»</strong> и выберите работу из каталога
+              </p>
+            </div>
+          )}
+
           {order.works.map((work) => (
             <WorkCard
               key={work.id}
@@ -865,21 +1141,35 @@ export default function OrderDetailPage() {
           ) : (
             <button
               onClick={() => {
-                if (window.confirm('Завершить наряд? Все работы выполнены.')) {
+                if (window.confirm('Закрыть наряд и отправить на утверждение?')) {
                   completeMutation.mutate();
                 }
               }}
               disabled={completeMutation.isPending}
               className="w-full bg-green-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-green-400"
             >
-              {completeMutation.isPending ? 'Завершаем...' : '✓ Закрыть наряд'}
+              {completeMutation.isPending ? 'Закрываем...' : '✓ Закрыть наряд'}
             </button>
           )}
         </div>
       )}
 
+      {hasPendingExtraWork && inProgress && (
+        <div className="fixed bottom-0 left-0 right-0 z-[55] bg-amber-50 border-t border-amber-200 px-4 pt-3 pb-6">
+          <div className="text-center">
+            <p className="text-xs font-black text-amber-700 uppercase">
+              ⏳ Ожидаем одобрения доп. работы
+            </p>
+            <p className="text-[10px] text-amber-600 mt-0.5">
+              Наряд нельзя закрыть до ответа администратора
+            </p>
+          </div>
+        </div>
+      )}
+
       <AddWorkModal open={showAddWork} onClose={() => setShowAddWork(false)} orderId={id} />
       <AddPartModal open={showAddPart} onClose={() => setShowAddPart(false)} orderId={id} />
+      <ExtraWorkModal open={showExtraWork} onClose={() => setShowExtraWork(false)} orderId={id} />
     </>
   );
 }

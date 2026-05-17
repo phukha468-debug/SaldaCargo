@@ -14,7 +14,10 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
 
-    let query = supabase.from('users').select('id, name, roles, pin_code').order('name');
+    let query = supabase
+      .from('users')
+      .select('id, name, roles, pin_code, current_asset_id')
+      .order('name');
 
     const { data: users, error } = await query;
 
