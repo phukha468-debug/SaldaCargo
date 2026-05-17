@@ -36,14 +36,20 @@ interface DriverSummary {
 
 // ── Форма заявки на ремонт ───────────────────────────────────
 
+interface FaultCatalogItem {
+  id: string;
+  name: string;
+  category: string;
+}
+
 function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted: () => void }) {
   const [assetId, setAssetId] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('normal');
+  const [faultId, setFaultId] = useState('');
+  const [customDescription, setCustomDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
-  // position:fixed on body blocks background scroll without breaking inner scroll
   useEffect(() => {
     const y = window.scrollY;
     document.body.style.position = 'fixed';
@@ -68,21 +74,37 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
     staleTime: 300000,
   });
 
+  const { data: faultCatalog = [] } = useQuery<FaultCatalogItem[]>({
+    queryKey: ['fault-catalog'],
+    queryFn: () => fetch('/api/driver/fault-catalog').then((r) => r.json()),
+    staleTime: 600000,
+  });
+
+  const faultsByCategory = faultCatalog.reduce<Record<string, FaultCatalogItem[]>>((acc, f) => {
+    (acc[f.category] ??= []).push(f);
+    return acc;
+  }, {});
+
   const submit = async () => {
     if (!assetId) {
       setError('Выберите автомобиль');
       return;
     }
-    if (!description.trim()) {
-      setError('Опишите проблему');
+    if (!faultId && !customDescription.trim()) {
+      setError('Выберите неисправность из каталога или опишите проблему');
       return;
     }
     setSaving(true);
     setError('');
-    const res = await fetch('/api/driver/service-orders', {
+    const res = await fetch('/api/driver/repair-requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ asset_id: assetId, problem_description: description, priority }),
+      body: JSON.stringify({
+        asset_id: assetId,
+        fault_catalog_id: faultId || undefined,
+        custom_description: customDescription.trim() || undefined,
+        idempotency_key: idempotencyKey,
+      }),
     });
     const json = await res.json();
     setSaving(false);
@@ -101,7 +123,6 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
       className="fixed inset-0 z-50 flex flex-col justify-end"
       style={{
         background: 'rgba(0,0,0,0.5)',
-        // сдвигаем лист вверх на высоту home indicator / toolbar мессенджера
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -116,12 +137,9 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           } as React.CSSProperties
         }
       >
-        {/* Хэндл */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-zinc-200 rounded-full" />
         </div>
-
-        {/* Заголовок */}
         <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
           <div>
             <h2 className="font-black text-zinc-900 text-base">🔧 Заявка на ремонт</h2>
@@ -135,7 +153,7 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
           </button>
         </div>
 
-        <div className="px-4 pt-4 pb-4 space-y-4">
+        <div className="px-4 pt-4 pb-6 space-y-4">
           {/* Машина */}
           <div>
             <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
@@ -156,46 +174,43 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
             </select>
           </div>
 
-          {/* Приоритет */}
+          {/* Каталог неисправностей */}
           <div>
             <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-              Срочность
+              Тип неисправности
             </label>
-            <div className="flex gap-2">
-              {[
-                { value: 'low', label: 'Не срочно' },
-                { value: 'normal', label: 'Обычная' },
-                { value: 'urgent', label: '🚨 Срочно' },
-              ].map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPriority(p.value)}
-                  className={cn(
-                    'flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all',
-                    priority === p.value
-                      ? p.value === 'urgent'
-                        ? 'bg-rose-600 text-white border-rose-600'
-                        : 'bg-zinc-900 text-white border-zinc-900'
-                      : 'bg-white text-zinc-500 border-zinc-200 active:bg-zinc-50',
-                  )}
-                >
-                  {p.label}
-                </button>
+            <select
+              className={inputCls}
+              value={faultId}
+              onChange={(e) => setFaultId(e.target.value)}
+            >
+              <option value="">— Не в каталоге / выбрать —</option>
+              {Object.entries(faultsByCategory).map(([cat, items]) => (
+                <optgroup key={cat} label={cat}>
+                  {items.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </div>
+            </select>
           </div>
 
-          {/* Описание */}
+          {/* Своё описание */}
           <div>
             <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-              Что случилось?
+              {faultId ? 'Уточнение (необязательно)' : 'Что случилось?'}
             </label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={customDescription}
+              onChange={(e) => setCustomDescription(e.target.value)}
               rows={3}
-              placeholder="Опиши проблему: что не работает, когда появилось..."
+              placeholder={
+                faultId
+                  ? 'Подробности, симптомы...'
+                  : 'Опиши проблему: что не работает, когда появилось...'
+              }
               className={`${inputCls} resize-none`}
             />
           </div>
@@ -206,7 +221,6 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
             </p>
           )}
 
-          {/* Кнопки */}
           <div className="flex gap-3">
             <button
               onClick={submit}
@@ -225,6 +239,78 @@ function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Карточка заявки на ремонт ────────────────────────────────
+
+interface RepairRequestCard {
+  id: string;
+  status: 'new' | 'approved' | 'rejected';
+  custom_description: string | null;
+  created_at: string;
+  asset: { short_name: string; reg_number: string } | null;
+  fault: { name: string } | null;
+  service_order: { order_number: number; status: string } | null;
+}
+
+function RepairRequestsList() {
+  const { data: requests = [] } = useQuery<RepairRequestCard[]>({
+    queryKey: ['driver-repair-requests'],
+    queryFn: () => fetch('/api/driver/repair-requests').then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  if (requests.length === 0) return null;
+
+  const statusInfo: Record<string, { label: string; color: string }> = {
+    new: { label: 'На рассмотрении', color: 'bg-amber-100 text-amber-700' },
+    approved: { label: 'Наряд создан', color: 'bg-green-100 text-green-700' },
+    rejected: { label: 'Отклонена', color: 'bg-red-100 text-red-700' },
+  };
+
+  return (
+    <section className="pt-2">
+      <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">
+        Мои заявки на ремонт
+      </h2>
+      <div className="space-y-2">
+        {requests.map((req) => {
+          const si = statusInfo[req.status] ?? {
+            label: req.status,
+            color: 'bg-zinc-100 text-zinc-500',
+          };
+          return (
+            <div key={req.id} className="bg-white rounded-lg border border-zinc-200 p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-zinc-900 text-sm truncate">
+                    {req.asset?.short_name ?? '—'}
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">
+                    {req.fault?.name ?? req.custom_description ?? 'Без описания'}
+                  </p>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">{formatDate(req.created_at)}</p>
+                  {req.service_order && (
+                    <p className="text-[10px] font-bold text-green-700 mt-0.5">
+                      Наряд #{req.service_order.order_number}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    'text-[9px] font-black px-2 py-1 rounded-full flex-shrink-0',
+                    si.color,
+                  )}
+                >
+                  {si.label}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -378,7 +464,7 @@ export default function RootPage() {
           onClose={() => setShowRepairForm(false)}
           onSubmitted={() => {
             setShowRepairForm(false);
-            queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['driver-repair-requests'] });
           }}
         />
       )}
@@ -413,6 +499,9 @@ export default function RootPage() {
           </div>
         </section>
       )}
+
+      {/* Заявки на ремонт */}
+      <RepairRequestsList />
     </div>
   );
 }
