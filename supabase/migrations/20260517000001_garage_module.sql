@@ -72,7 +72,7 @@ CREATE TABLE repair_requests (
   driver_id UUID NOT NULL REFERENCES users(id),
 
   -- Описание проблемы: из каталога или свободный текст
-  fault_catalog_id UUID REFERENCES fault_catalog(id), -- может быть NULL если текст
+  fault_catalog_id UUID, -- FK добавляется ниже после CREATE TABLE fault_catalog
   custom_description TEXT, -- свободный текст если нет в каталоге
 
   -- Статус заявки
