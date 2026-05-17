@@ -74,7 +74,7 @@ export default function AddOrderPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
-    defaultValues: { payment_method: 'cash', driver_pay: 0 },
+    defaultValues: { payment_method: 'cash', driver_pay: undefined },
   });
 
   const selectedCounterpartyId = watch('counterparty_id');
