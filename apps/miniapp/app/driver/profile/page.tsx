@@ -75,7 +75,9 @@ export default function ProfilePage() {
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-tight">Машина</span>
             <div className="flex items-center gap-3">
               <span className="text-sm font-black text-zinc-900">
-                {user?.asset?.short_name ?? 'Не закреплена'}
+                {user?.asset
+                  ? `${user.asset.short_name} · ${user.asset.reg_number}`
+                  : 'Не закреплена'}
               </span>
               <button
                 onClick={() => setShowVehiclePicker((v) => !v)}

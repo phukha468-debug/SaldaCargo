@@ -550,20 +550,27 @@ function PayrollRow({
         onClick={() => setExpanded((v) => !v)}
       >
         {/* Name + role */}
-        <div className="flex items-center gap-2 w-44 shrink-0 min-w-0">
-          <span
-            className={cn(
-              'text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
-              ROLE_COLOR[primaryRole as UserRole],
-            )}
-          >
-            {ROLE_LABEL[primaryRole as UserRole]}
-          </span>
-          <span className="font-bold text-slate-900 text-sm truncate">{user.name}</span>
-          {user.auto_settle && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
-              день
+        <div className="w-44 shrink-0 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
+                ROLE_COLOR[primaryRole as UserRole],
+              )}
+            >
+              {ROLE_LABEL[primaryRole as UserRole]}
             </span>
+            <span className="font-bold text-slate-900 text-sm truncate">{user.name}</span>
+            {user.auto_settle && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
+                день
+              </span>
+            )}
+          </div>
+          {user.asset && (
+            <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+              {user.asset.reg_number}
+            </p>
           )}
         </div>
 
