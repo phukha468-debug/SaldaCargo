@@ -2907,19 +2907,53 @@ function PayablesPanel() {
 
 // ── Panel: Доходы ──────────────────────────────────────────────────────────
 
+const INCOME_PAYMENT_LABELS: Record<string, string> = {
+  cash: 'Нал',
+  qr: 'QR / Р/С',
+  bank_invoice: 'Р/С (договор)',
+  card_driver: 'Карта',
+  debt_cash: 'Долг нал',
+};
+
 function IncomePanel() {
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7));
+  const [anchorDate, setAnchorDate] = useState(todayStr);
+  const [timePeriod, setTimePeriod] = useState<'day' | 'week' | 'month'>('month');
+
+  const selectedMonth = anchorDate.slice(0, 7);
 
   function navigate(dir: 1 | -1) {
-    setSelectedMonth((prev) => {
-      const [y, m] = prev.split('-').map(Number);
-      const d = new Date(y, m - 1 + dir, 1);
-      return d.toISOString().slice(0, 7);
+    setAnchorDate((prev) => {
+      const d = new Date(prev + 'T12:00:00');
+      if (timePeriod === 'day') d.setDate(d.getDate() + dir);
+      else if (timePeriod === 'week') d.setDate(d.getDate() + dir * 7);
+      else d.setMonth(d.getMonth() + dir);
+      return d.toISOString().slice(0, 10);
     });
   }
 
-  const isCurrent = selectedMonth >= todayStr.slice(0, 7);
+  function periodLabel() {
+    if (timePeriod === 'day') {
+      return new Date(anchorDate + 'T12:00:00').toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+    if (timePeriod === 'week') {
+      const { mon, sun } = weekBounds(anchorDate);
+      const fmt = (s: string) =>
+        new Date(s + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      return `${fmt(mon)} – ${fmt(sun)}`;
+    }
+    return formatMonthLabel(selectedMonth);
+  }
+
+  const isCurrent = (() => {
+    if (timePeriod === 'day') return anchorDate >= todayStr;
+    if (timePeriod === 'week') return weekBounds(anchorDate).sun >= todayStr;
+    return selectedMonth >= todayStr.slice(0, 7);
+  })();
 
   const { data, isLoading } = useQuery<ExpenseMonthData>({
     queryKey: ['finance-month', selectedMonth],
@@ -2927,18 +2961,22 @@ function IncomePanel() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const incomeTxs = data?.income_transactions ?? [];
+  const allIncomeTxs = data?.income_transactions ?? [];
   const revenue = n(data?.revenue);
-  const txTotal = incomeTxs.reduce((s, t) => s + n(t.amount), 0);
-  const grandTotal = txTotal + revenue;
 
-  const PAYMENT_LABELS: Record<string, string> = {
-    cash: 'Нал',
-    qr: 'QR / Р/С',
-    bank_invoice: 'Р/С (договор)',
-    card_driver: 'Карта',
-    debt_cash: 'Долг нал',
-  };
+  const periodIncomeTxs = allIncomeTxs.filter((tx) => {
+    const txDate = tx.created_at.slice(0, 10);
+    if (timePeriod === 'day') return txDate === anchorDate;
+    if (timePeriod === 'week') {
+      const { mon, sun } = weekBounds(anchorDate);
+      return txDate >= mon && txDate <= sun;
+    }
+    return true;
+  });
+
+  const periodRevenue = timePeriod === 'month' ? revenue : 0;
+  const txTotal = periodIncomeTxs.reduce((s, t) => s + n(t.amount), 0);
+  const grandTotal = txTotal + periodRevenue;
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
@@ -2949,27 +2987,27 @@ function IncomePanel() {
         <SumCard
           gradient="linear-gradient(135deg,#10b981,#059669)"
           label="Выручка с рейсов"
-          value={rub(revenue)}
-          sub="оплаченные заказы"
+          value={timePeriod === 'month' ? rub(revenue) : '—'}
+          sub={timePeriod === 'month' ? 'оплаченные заказы' : 'только за месяц'}
         />
         <SumCard
           gradient="linear-gradient(135deg,#0891b2,#3b82f6)"
           label="Прочие поступления"
           value={rub(txTotal)}
-          sub={`${incomeTxs.length} транзакц.`}
+          sub={`${periodIncomeTxs.length} транзакц.`}
         />
         <SumCard
           gradient="linear-gradient(135deg,#6366f1,#8b5cf6)"
-          label={`Итого — ${formatMonthLabel(selectedMonth)}`}
+          label="Итого"
           value={rub(grandTotal)}
-          sub="все поступления"
+          sub={timePeriod !== 'month' ? 'без выручки с рейсов' : 'все поступления'}
         />
       </div>
 
-      {/* Timeline + navigation */}
+      {/* Timeline */}
       <Card>
         <CardHead
-          title={`Доходы — ${formatMonthLabel(selectedMonth)}`}
+          title={`Доходы — ${periodLabel()}`}
           right={
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button
@@ -3008,6 +3046,16 @@ function IncomePanel() {
               >
                 ›
               </button>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {(['day', 'week', 'month'] as const).map((p) => (
+                  <TimePill
+                    key={p}
+                    label={p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
+                    active={timePeriod === p}
+                    onClick={() => setTimePeriod(p)}
+                  />
+                ))}
+              </div>
             </div>
           }
         />
@@ -3023,8 +3071,8 @@ function IncomePanel() {
           </div>
         ) : (
           <div>
-            {/* Revenue from trips row */}
-            {revenue > 0 && (
+            {/* Revenue from trips — month view only */}
+            {timePeriod === 'month' && revenue > 0 && (
               <div
                 style={{
                   display: 'flex',
@@ -3051,7 +3099,7 @@ function IncomePanel() {
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {Object.entries((data as any)?.revenue_breakdown ?? {})
                       .filter(([, v]) => (v as number) > 0)
-                      .map(([k, v]) => `${PAYMENT_LABELS[k] ?? k}: ${rub(n(String(v)))}`)
+                      .map(([k, v]) => `${INCOME_PAYMENT_LABELS[k] ?? k}: ${rub(n(String(v)))}`)
                       .join(' · ')}
                   </p>
                 </div>
@@ -3060,12 +3108,12 @@ function IncomePanel() {
             )}
 
             {/* Manual income transactions */}
-            {incomeTxs.length === 0 && revenue === 0 ? (
+            {periodIncomeTxs.length === 0 && periodRevenue === 0 ? (
               <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>
                 Поступлений нет
               </p>
-            ) : incomeTxs.length === 0 ? null : (
-              incomeTxs.map((tx) => (
+            ) : periodIncomeTxs.length === 0 ? null : (
+              periodIncomeTxs.map((tx) => (
                 <div
                   key={tx.id}
                   style={{
@@ -3211,7 +3259,15 @@ export default function FinancePage() {
   return (
     <div className="max-w-7xl mx-auto space-y-4">
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          paddingBottom: 4,
+          scrollbarWidth: 'none',
+        }}
+      >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -3228,6 +3284,8 @@ export default function FinancePage() {
                 fontWeight: 700,
                 cursor: 'pointer',
                 border: '2px solid transparent',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
                 background: isActive ? TAB_GRADIENTS[tab.id] : '#fff',
                 color: isActive ? '#fff' : '#64748b',
                 boxShadow: isActive ? '0 4px 16px rgba(0,0,0,.18)' : '0 1px 3px rgba(0,0,0,.06)',
