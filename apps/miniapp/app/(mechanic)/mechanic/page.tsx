@@ -4,6 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { cn } from '@saldacargo/ui';
 
+interface SalarySummary {
+  summary: { total_accrued: string; total_paid: string; to_pay: string };
+}
+
 interface MechanicSummary {
   activeOrder: {
     id: string;
@@ -35,6 +39,19 @@ export default function MechanicHomePage() {
     enabled: !!me?.id,
   });
 
+  const nowDate = new Date();
+  const { data: salary } = useQuery<SalarySummary>({
+    queryKey: ['mechanic-salary-preview', nowDate.getFullYear(), nowDate.getMonth() + 1],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/mechanic/salary?year=${nowDate.getFullYear()}&month=${nowDate.getMonth() + 1}`,
+      );
+      if (!res.ok)
+        return { accruals: [], summary: { total_accrued: '0', total_paid: '0', to_pay: '0' } };
+      return res.json();
+    },
+  });
+
   if (meLoading || isLoading) return <MechanicHomeSkeleton />;
 
   return (
@@ -57,6 +74,26 @@ export default function MechanicHomePage() {
           <p className="text-3xl font-black text-green-600 mt-1">{data?.completedToday ?? 0}</p>
         </div>
       </div>
+
+      {/* ЗП за текущий месяц */}
+      <Link href="/mechanic/salary">
+        <div className="bg-gradient-to-r from-zinc-900 to-zinc-700 text-white rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+              ЗП за текущий месяц
+            </p>
+            <p className="text-2xl font-black mt-1">
+              {formatMoneyPreview(salary?.summary.total_accrued ?? '0')}
+            </p>
+            {parseFloat(salary?.summary.to_pay ?? '0') > 0 && (
+              <p className="text-xs text-amber-400 font-bold mt-0.5">
+                К выплате: {formatMoneyPreview(salary?.summary.to_pay ?? '0')}
+              </p>
+            )}
+          </div>
+          <div className="text-3xl opacity-40">💰</div>
+        </div>
+      </Link>
 
       {data?.activeOrder ? (
         <Link href={`/mechanic/orders/${data.activeOrder.id}`}>
@@ -110,19 +147,12 @@ export default function MechanicHomePage() {
             label="Склад запчастей"
             color="bg-blue-50 text-blue-700"
           />
-          <Link href="/mechanic/orders">
-            <div
-              className={cn(
-                'p-4 rounded-2xl border border-transparent flex flex-col items-center text-center gap-2 active:scale-95 transition-all shadow-sm',
-                'bg-slate-50 text-slate-700',
-              )}
-            >
-              <span className="text-2xl">📋</span>
-              <span className="text-[10px] font-black uppercase tracking-tight leading-tight">
-                Все наряды
-              </span>
-            </div>
-          </Link>
+          <ActionButton
+            href="/mechanic/salary"
+            icon="💰"
+            label="Моя ЗП"
+            color="bg-green-50 text-green-700"
+          />
         </div>
       </section>
     </div>
@@ -152,6 +182,16 @@ function ActionButton({
       <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{label}</span>
     </Link>
   );
+}
+
+function formatMoneyPreview(amount: string): string {
+  const num = parseFloat(amount);
+  if (isNaN(num) || num === 0) return '—';
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'RUB',
+    maximumFractionDigits: 0,
+  }).format(num);
 }
 
 function MechanicHomeSkeleton() {

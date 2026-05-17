@@ -8,7 +8,7 @@ import { cn } from '@saldacargo/ui';
 const tabs = [
   { href: '/mechanic', label: 'Главная', icon: '🏠' },
   { href: '/mechanic/orders', label: 'Наряды', icon: '🔧' },
-  { href: '/mechanic/warehouse', label: 'Склад', icon: '📦' },
+  { href: '/mechanic/salary', label: 'ЗП', icon: '💰' },
   { href: '/mechanic/profile', label: 'Профиль', icon: '👤' },
 ] as const;
 
@@ -24,8 +24,12 @@ export default function MechanicLayout({ children }: { children: React.ReactNode
             <span className="text-xl">🛠</span>
           </div>
           <div>
-            <span className="text-lg font-black tracking-tight block leading-none">SaldaService</span>
-            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">СТО / Гараж</span>
+            <span className="text-lg font-black tracking-tight block leading-none">
+              SaldaService
+            </span>
+            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">
+              СТО / Гараж
+            </span>
           </div>
         </div>
         <NetworkIndicator />
@@ -38,7 +42,8 @@ export default function MechanicLayout({ children }: { children: React.ReactNode
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 z-50 h-20 px-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         <div className="grid grid-cols-4 h-full">
           {tabs.map((tab) => {
-            const isActive = pathname === tab.href || (tab.href !== '/mechanic' && pathname.startsWith(tab.href));
+            const isActive =
+              pathname === tab.href || (tab.href !== '/mechanic' && pathname.startsWith(tab.href));
             return (
               <Link
                 key={tab.href}
@@ -48,10 +53,12 @@ export default function MechanicLayout({ children }: { children: React.ReactNode
                   isActive ? 'text-orange-600' : 'text-zinc-400',
                 )}
               >
-                <div className={cn(
-                  'p-1 rounded-xl transition-colors',
-                  isActive ? 'bg-orange-50' : 'bg-transparent'
-                )}>
+                <div
+                  className={cn(
+                    'p-1 rounded-xl transition-colors',
+                    isActive ? 'bg-orange-50' : 'bg-transparent',
+                  )}
+                >
                   <span className="text-2xl">{tab.icon}</span>
                 </div>
                 <span className="text-[10px] font-bold uppercase tracking-wider">{tab.label}</span>
