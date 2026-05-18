@@ -184,43 +184,73 @@ function WorkSelector({
   onToggle: (id: string) => void;
 }) {
   const categories = [...new Set(workCatalog.map((w) => w.category ?? 'Прочее'))];
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
+
+  const toggleCat = (cat: string) =>
+    setOpenCats((p) => {
+      const n = new Set(p);
+      if (n.has(cat)) {
+        n.delete(cat);
+      } else {
+        n.add(cat);
+      }
+      return n;
+    });
+
   if (workCatalog.length === 0)
     return <p className="text-xs text-slate-400 py-2">Загрузка каталога...</p>;
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
       {categories.map((cat) => {
         const works = workCatalog.filter((w) => (w.category ?? 'Прочее') === cat);
+        const isOpen = openCats.has(cat);
+        const selectedCount = works.filter((w) => selectedIds.has(w.id)).length;
         return (
           <div key={cat}>
-            <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-              {cat}
-            </div>
-            {works.map((w, i) => (
-              <label
-                key={w.id}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 cursor-pointer',
-                  i < works.length - 1 && 'border-b border-slate-50',
-                  selectedIds.has(w.id) && 'bg-green-50',
+            <button
+              type="button"
+              onClick={() => toggleCat(cat)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 border-b border-slate-100 active:bg-slate-100"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  {cat}
+                </span>
+                {selectedCount > 0 && (
+                  <span className="text-[8px] font-black bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                    {selectedCount}
+                  </span>
                 )}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(w.id)}
-                  onChange={() => onToggle(w.id)}
-                  className="w-4 h-4 accent-green-600 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 leading-tight">{w.name}</p>
-                  <p className="text-xs text-slate-400">
-                    {w.norm_minutes != null ? `${(w.norm_minutes / 60).toFixed(1)} нч` : '—'}
-                    {w.default_price_client
-                      ? ` · ~${Math.round(parseFloat(w.default_price_client) * 0.5).toLocaleString('ru-RU')} ₽ ЗП`
-                      : ''}
-                  </p>
-                </div>
-              </label>
-            ))}
+              </div>
+              <span className="text-slate-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+            </button>
+            {isOpen &&
+              works.map((w, i) => (
+                <label
+                  key={w.id}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 cursor-pointer',
+                    i < works.length - 1 && 'border-b border-slate-50',
+                    selectedIds.has(w.id) && 'bg-green-50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(w.id)}
+                    onChange={() => onToggle(w.id)}
+                    className="w-4 h-4 accent-green-600 flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 leading-tight">{w.name}</p>
+                    <p className="text-xs text-slate-400">
+                      {w.norm_minutes != null ? `${(w.norm_minutes / 60).toFixed(1)} нч` : '—'}
+                      {w.default_price_client
+                        ? ` · ~${Math.round(parseFloat(w.default_price_client) * 0.5).toLocaleString('ru-RU')} ₽ ЗП`
+                        : ''}
+                    </p>
+                  </div>
+                </label>
+              ))}
           </div>
         );
       })}

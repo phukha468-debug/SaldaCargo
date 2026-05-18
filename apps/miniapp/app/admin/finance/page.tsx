@@ -328,6 +328,11 @@ function FinanceContent() {
                       <p className="font-bold text-zinc-900 text-sm">
                         {tx.category?.name ?? tx.description ?? '—'}
                       </p>
+                      {tx.description && tx.description !== tx.category?.name && (
+                        <p className="text-[10px] text-zinc-500 font-bold mt-0.5 truncate">
+                          {tx.description}
+                        </p>
+                      )}
                       {tx.counterparty?.name && (
                         <p className="text-[10px] text-blue-600 font-bold mt-0.5 truncate">
                           {tx.direction === 'income' ? 'от: ' : 'кому: '}
