@@ -71,3 +71,78 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }
+
+/** POST /api/admin/service-orders — создать наряд напрямую */
+export async function POST(request: Request) {
+  const { cookies } = await import('next/headers');
+  const cookieStore = await cookies();
+  const adminId = cookieStore.get('salda_user_id')?.value;
+  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const body = (await request.json()) as {
+      machine_type: 'own' | 'client';
+      asset_id?: string;
+      client_vehicle_brand?: string;
+      client_vehicle_model?: string;
+      client_vehicle_reg?: string;
+      client_name?: string;
+      client_phone?: string;
+      problem_description: string;
+      assigned_mechanic_id?: string;
+      second_mechanic_id?: string;
+      odometer_start?: number;
+      work_ids?: string[];
+    };
+
+    if (!body.problem_description?.trim()) {
+      return NextResponse.json({ error: 'Описание проблемы обязательно' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+
+    const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
+      .insert({
+        machine_type: body.machine_type,
+        asset_id: body.asset_id || null,
+        client_vehicle_brand: body.client_vehicle_brand?.trim() || null,
+        client_vehicle_model: body.client_vehicle_model?.trim() || null,
+        client_vehicle_reg: body.client_vehicle_reg?.trim() || null,
+        client_name: body.client_name?.trim() || null,
+        client_phone: body.client_phone?.trim() || null,
+        problem_description: body.problem_description.trim(),
+        assigned_mechanic_id: body.assigned_mechanic_id || null,
+        second_mechanic_id: body.second_mechanic_id || null,
+        odometer_start: body.odometer_start ?? null,
+        status: 'created',
+        lifecycle_status: 'draft',
+        priority: 'normal',
+        created_by: adminId,
+      })
+      .select('id, order_number')
+      .single();
+
+    if (orderErr) throw orderErr;
+
+    if (body.work_ids?.length) {
+      const { data: catalog } = await (supabase.from('work_catalog') as any)
+        .select('id, norm_minutes, default_price_client')
+        .in('id', body.work_ids);
+      if (catalog?.length) {
+        await (supabase.from('service_order_works') as any).insert(
+          catalog.map((w: any) => ({
+            service_order_id: order.id,
+            work_catalog_id: w.id,
+            norm_minutes: w.norm_minutes,
+            price_client: w.default_price_client,
+            status: 'pending',
+          })),
+        );
+      }
+    }
+
+    return NextResponse.json(order, { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
+  }
+}

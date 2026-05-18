@@ -7,16 +7,25 @@ import { formatDate } from '@saldacargo/shared';
 
 // ── Types ──────────────────────────────────────────────────────
 
-interface Asset {
+interface AssetItem {
+  id: string;
   short_name: string;
   reg_number: string;
+}
+
+interface WorkCatalogItem {
+  id: string;
+  name: string;
+  category: string | null;
+  norm_minutes: number | null;
+  default_price_client: string | null;
 }
 
 interface RepairRequest {
   id: string;
   created_at: string;
   custom_description: string | null;
-  asset: Asset | null;
+  asset: Omit<AssetItem, 'id'> | null;
   driver: { name: string } | null;
   fault: { name: string; category: string } | null;
 }
@@ -26,7 +35,7 @@ interface ActiveOrder {
   order_number: number;
   status: string;
   created_at: string;
-  asset: Asset | null;
+  asset: Omit<AssetItem, 'id'> | null;
   mechanic: { name: string } | null;
   second_mechanic: { name: string } | null;
 }
@@ -36,7 +45,7 @@ interface PendingOrder {
   order_number: number;
   created_at: string;
   machine_type: 'own' | 'client';
-  asset: Asset | null;
+  asset: Omit<AssetItem, 'id'> | null;
   mechanic: { name: string } | null;
   service_order_works: { norm_minutes: number; actual_minutes: number | null; status: string }[];
 }
@@ -51,7 +60,7 @@ interface ExtraWork {
   service_order: {
     id: string;
     order_number: number;
-    asset: Asset | null;
+    asset: Omit<AssetItem, 'id'> | null;
     mechanic: { name: string } | null;
   } | null;
 }
@@ -62,7 +71,7 @@ interface MaintenanceAlert {
   alert_status: 'overdue' | 'soon';
   next_due_km: number | null;
   next_due_at: string | null;
-  asset: (Asset & { odometer_current: number | null }) | null;
+  asset: (Omit<AssetItem, 'id'> & { odometer_current: number | null }) | null;
 }
 
 interface GarageData {
@@ -80,23 +89,30 @@ interface Mechanic {
   mechanic_salary_pct: string | null;
 }
 
-// ── Helpers ────────────────────────────────────────────────────
-
-function SectionHeader({ title, count, color }: { title: string; count: number; color: string }) {
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{title}</h2>
-      {count > 0 && (
-        <span className={cn('text-[9px] font-black px-2 py-0.5 rounded-full', color)}>{count}</span>
-      )}
-    </div>
-  );
-}
+// ── Shared UI ──────────────────────────────────────────────────
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn('bg-white rounded-xl border border-slate-200 shadow-sm p-4', className)}>
       {children}
+    </div>
+  );
+}
+
+function SectionLabel({ title, count, color }: { title: string; count?: number; color?: string }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{title}</h2>
+      {count != null && count > 0 && (
+        <span
+          className={cn(
+            'text-[9px] font-black px-2 py-0.5 rounded-full',
+            color ?? 'bg-slate-100 text-slate-500',
+          )}
+        >
+          {count}
+        </span>
+      )}
     </div>
   );
 }
@@ -132,7 +148,116 @@ function ActionBtn({
   );
 }
 
-// ── Approve Repair Request Modal ───────────────────────────────
+function EmptyState({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className="text-center py-12 text-slate-400">
+      <p className="text-4xl mb-2">{icon}</p>
+      <p className="font-bold text-sm">{text}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    created: { label: 'В очереди', color: 'bg-slate-100 text-slate-500' },
+    in_progress: { label: 'В работе', color: 'bg-orange-100 text-orange-700' },
+    completed: { label: 'Готово', color: 'bg-green-100 text-green-700' },
+    cancelled: { label: 'Отменён', color: 'bg-red-100 text-red-700' },
+  };
+  const { label, color } = map[status] ?? { label: status, color: 'bg-slate-100 text-slate-500' };
+  return (
+    <span className={cn('text-[9px] font-black uppercase px-2 py-1 rounded-full', color)}>
+      {label}
+    </span>
+  );
+}
+
+// ── Work Selector (shared) ─────────────────────────────────────
+
+function WorkSelector({
+  workCatalog,
+  selectedIds,
+  onToggle,
+}: {
+  workCatalog: WorkCatalogItem[];
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  const categories = [...new Set(workCatalog.map((w) => w.category ?? 'Прочее'))];
+  if (workCatalog.length === 0)
+    return <p className="text-xs text-slate-400 py-2">Загрузка каталога...</p>;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      {categories.map((cat) => {
+        const works = workCatalog.filter((w) => (w.category ?? 'Прочее') === cat);
+        return (
+          <div key={cat}>
+            <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+              {cat}
+            </div>
+            {works.map((w, i) => (
+              <label
+                key={w.id}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 cursor-pointer',
+                  i < works.length - 1 && 'border-b border-slate-50',
+                  selectedIds.has(w.id) && 'bg-green-50',
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(w.id)}
+                  onChange={() => onToggle(w.id)}
+                  className="w-4 h-4 accent-green-600 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 leading-tight">{w.name}</p>
+                  <p className="text-xs text-slate-400">
+                    {w.norm_minutes != null ? `${(w.norm_minutes / 60).toFixed(1)} нч` : '—'}
+                    {w.default_price_client
+                      ? ` · ~${Math.round(parseFloat(w.default_price_client) * 0.5).toLocaleString('ru-RU')} ₽ ЗП`
+                      : ''}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Bottom Sheet ───────────────────────────────────────────────
+
+function BottomSheet({
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
+      <div className="bg-white w-full rounded-t-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
+          <h3 className="font-black text-lg">{title}</h3>
+          <button onClick={onClose} className="text-zinc-400 text-2xl font-bold leading-none">
+            ✕
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 pb-4 space-y-4">{children}</div>
+        <div className="px-6 pb-6 pt-3 flex-shrink-0 border-t border-slate-100">{footer}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Approve Request Modal ──────────────────────────────────────
 
 function ApproveRequestModal({
   request,
@@ -146,7 +271,33 @@ function ApproveRequestModal({
   onSuccess: () => void;
 }) {
   const [mechanicId, setMechanicId] = useState('');
+  const [secondMechanicId, setSecondMechanicId] = useState('');
   const [odometer, setOdometer] = useState('');
+  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
+
+  const { data: workCatalog = [] } = useQuery<WorkCatalogItem[]>({
+    queryKey: ['admin-work-catalog'],
+    queryFn: () => fetch('/api/admin/work-catalog').then((r) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const toggleWork = (id: string) =>
+    setSelectedWorkIds((p) => {
+      const n = new Set(p);
+      if (n.has(id)) {
+        n.delete(id);
+      } else {
+        n.add(id);
+      }
+      return n;
+    });
+
+  const selectedWorks = workCatalog.filter((w) => selectedWorkIds.has(w.id));
+  const totalNormHours = selectedWorks.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
+  const mechPct = parseFloat(
+    mechanics.find((m) => m.id === mechanicId)?.mechanic_salary_pct ?? '50',
+  );
+  const estimatedSalary = totalNormHours * 2000 * (mechPct / 100);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -156,13 +307,12 @@ function ApproveRequestModal({
         body: JSON.stringify({
           action: 'approve',
           mechanic_id: mechanicId || undefined,
+          second_mechanic_id: secondMechanicId || undefined,
           odometer: odometer ? Number(odometer) : undefined,
+          work_ids: selectedWorkIds.size > 0 ? [...selectedWorkIds] : undefined,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка');
-      }
+      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
       return res.json();
     },
     onSuccess: () => {
@@ -172,61 +322,11 @@ function ApproveRequestModal({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-      <div className="bg-white w-full rounded-t-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-lg">Одобрить заявку</h3>
-          <button onClick={onClose} className="text-zinc-400 text-xl font-bold">
-            ✕
-          </button>
-        </div>
-
-        <div className="bg-slate-50 rounded-xl p-3 text-sm">
-          <p className="font-bold text-slate-900">{request.asset?.short_name ?? '—'}</p>
-          <p className="text-slate-500 text-xs mt-0.5">
-            {request.fault?.name ?? request.custom_description ?? 'Без описания'}
-          </p>
-          <p className="text-slate-400 text-xs mt-0.5">Водитель: {request.driver?.name ?? '—'}</p>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-              Назначить механика
-            </label>
-            <select
-              value={mechanicId}
-              onChange={(e) => setMechanicId(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold bg-white"
-            >
-              <option value="">Не назначать</option>
-              {mechanics.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-              Одометр (км)
-            </label>
-            <input
-              type="number"
-              value={odometer}
-              onChange={(e) => setOdometer(e.target.value)}
-              placeholder="Необязательно"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
-            />
-          </div>
-        </div>
-
-        {mutation.isError && (
-          <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
-        )}
-
-        <div className="flex gap-3 pt-2">
+    <BottomSheet
+      title="Одобрить → Создать наряд"
+      onClose={onClose}
+      footer={
+        <div className="flex gap-3">
           <button
             onClick={onClose}
             className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600"
@@ -236,13 +336,104 @@ function ApproveRequestModal({
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
-            className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-green-600 text-white disabled:bg-green-300"
+            className="flex-[2] py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-green-600 text-white disabled:bg-green-300"
           >
-            {mutation.isPending ? 'Создаём...' : 'Создать наряд'}
+            {mutation.isPending ? 'Создаём...' : 'Одобрить и создать наряд'}
           </button>
         </div>
+      }
+    >
+      <div className="bg-slate-50 rounded-xl p-3 text-sm">
+        <p className="font-bold text-slate-900">
+          {request.asset?.short_name ?? '—'} · {request.asset?.reg_number ?? ''}
+        </p>
+        <p className="text-slate-500 text-xs mt-0.5">
+          {request.fault?.name ?? request.custom_description ?? 'Без описания'}
+        </p>
+        <p className="text-slate-400 text-xs mt-0.5">Водитель: {request.driver?.name ?? '—'}</p>
       </div>
-    </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Текущий пробег (км)
+        </label>
+        <input
+          type="number"
+          value={odometer}
+          onChange={(e) => setOdometer(e.target.value)}
+          placeholder="Необязательно"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+          Выбрать работы
+        </label>
+        <WorkSelector
+          workCatalog={workCatalog}
+          selectedIds={selectedWorkIds}
+          onToggle={toggleWork}
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Механик
+        </label>
+        <select
+          value={mechanicId}
+          onChange={(e) => setMechanicId(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold bg-white"
+        >
+          <option value="">— Любой (возьмёт сам) —</option>
+          {mechanics.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Второй механик
+        </label>
+        <select
+          value={secondMechanicId}
+          onChange={(e) => setSecondMechanicId(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+        >
+          <option value="">— Не нужен —</option>
+          {mechanics
+            .filter((m) => m.id !== mechanicId)
+            .map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+        </select>
+      </div>
+
+      {totalNormHours > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500">Итого нч план</span>
+            <span className="font-semibold">{totalNormHours.toFixed(1)} нч</span>
+          </div>
+          <div className="flex justify-between text-sm mt-1">
+            <span className="text-slate-500">ЗП механика (при утверждении)</span>
+            <span className="font-semibold text-green-700">
+              ~{Math.round(estimatedSalary).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+        </div>
+      )}
+
+      {mutation.isError && (
+        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
+      )}
+    </BottomSheet>
   );
 }
 
@@ -259,8 +450,7 @@ function ApproveOrderModal({
 }) {
   const totalNm = order.service_order_works
     .filter((w) => w.status !== 'cancelled')
-    .reduce((sum, w) => sum + (w.actual_minutes ?? w.norm_minutes), 0);
-
+    .reduce((s, w) => s + (w.actual_minutes ?? w.norm_minutes), 0);
   const [adjustedNm, setAdjustedNm] = useState('');
   const [note, setNote] = useState('');
 
@@ -275,10 +465,7 @@ function ApproveOrderModal({
           admin_note: note.trim() || undefined,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка');
-      }
+      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
       return res.json();
     },
     onSuccess: () => {
@@ -287,62 +474,15 @@ function ApproveOrderModal({
     },
   });
 
+  const nmToUse = adjustedNm ? Number(adjustedNm) : totalNm;
+  const rate = order.machine_type === 'client' ? 2000 : 1600;
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-      <div className="bg-white w-full rounded-t-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-lg">Утвердить наряд #{order.order_number}</h3>
-          <button onClick={onClose} className="text-zinc-400 text-xl font-bold">
-            ✕
-          </button>
-        </div>
-
-        <div className="bg-slate-50 rounded-xl p-3 text-sm">
-          <p className="font-bold">{order.asset?.short_name ?? '—'}</p>
-          <p className="text-slate-500 text-xs">Механик: {order.mechanic?.name ?? 'Не назначен'}</p>
-          <p className="text-slate-500 text-xs mt-1">
-            Норм-часы (факт): {(totalNm / 60).toFixed(1)} ч
-          </p>
-          <p className="text-[10px] text-slate-400 mt-1">
-            Тариф:{' '}
-            <span className="font-black text-slate-600">
-              {order.machine_type === 'client' ? '2 000 ₽/ч (клиент)' : '1 600 ₽/ч (свой автопарк)'}
-            </span>
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-              Скорректировать норм-минуты
-            </label>
-            <input
-              type="number"
-              value={adjustedNm}
-              onChange={(e) => setAdjustedNm(e.target.value)}
-              placeholder={`По умолчанию: ${totalNm} мин`}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-              Заметка администратора
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="Необязательно"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
-            />
-          </div>
-        </div>
-
-        {mutation.isError && (
-          <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
-        )}
-
-        <div className="flex gap-3 pt-2">
+    <BottomSheet
+      title={`Утвердить наряд #${order.order_number}`}
+      onClose={onClose}
+      footer={
+        <div className="flex gap-3">
           <button
             onClick={onClose}
             className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600"
@@ -352,13 +492,69 @@ function ApproveOrderModal({
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
-            className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-green-600 text-white disabled:bg-green-300"
+            className="flex-[2] py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-green-600 text-white disabled:bg-green-300"
           >
             {mutation.isPending ? 'Утверждаем...' : 'Утвердить + начислить'}
           </button>
         </div>
+      }
+    >
+      <div className="bg-slate-50 rounded-xl p-3 text-sm">
+        <p className="font-bold">{order.asset?.short_name ?? '—'}</p>
+        <p className="text-slate-500 text-xs">Механик: {order.mechanic?.name ?? 'Не назначен'}</p>
+        <p className="text-slate-500 text-xs mt-1">
+          Норм-часы (факт): {(totalNm / 60).toFixed(1)} ч
+        </p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Тариф:{' '}
+          <span className="font-black text-slate-600">
+            {rate.toLocaleString('ru-RU')} ₽/ч (
+            {order.machine_type === 'client' ? 'клиент' : 'свой автопарк'})
+          </span>
+        </p>
       </div>
-    </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Скорректировать норм-минуты
+        </label>
+        <input
+          type="number"
+          value={adjustedNm}
+          onChange={(e) => setAdjustedNm(e.target.value)}
+          placeholder={`По умолчанию: ${totalNm} мин`}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Заметка администратора
+        </label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          placeholder="Необязательно"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
+        />
+      </div>
+
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+        <p className="text-xs text-emerald-600 mb-0.5">Начисление ЗП при утверждении</p>
+        <p className="font-bold text-emerald-800 text-lg">
+          {Math.round((nmToUse / 60) * rate * 0.5).toLocaleString('ru-RU')} ₽
+        </p>
+        <p className="text-xs text-emerald-500">
+          {(nmToUse / 60).toFixed(1)} нч × {rate.toLocaleString('ru-RU')} ₽ × 50% ·{' '}
+          {order.mechanic?.name ?? '—'}
+        </p>
+      </div>
+
+      {mutation.isError && (
+        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
+      )}
+    </BottomSheet>
   );
 }
 
@@ -382,10 +578,7 @@ function ReturnOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'return', admin_note: note.trim() || undefined }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка');
-      }
+      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
       return res.json();
     },
     onSuccess: () => {
@@ -395,33 +588,16 @@ function ReturnOrderModal({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-      <div className="bg-white w-full rounded-t-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-lg">Вернуть на доработку</h3>
-          <button onClick={onClose} className="text-zinc-400 text-xl font-bold">
-            ✕
-          </button>
-        </div>
-
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-          placeholder="Укажите причину возврата..."
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
-        />
-
-        {mutation.isError && (
-          <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
-        )}
-
+    <BottomSheet
+      title="Вернуть на доработку"
+      onClose={onClose}
+      footer={
         <div className="flex gap-3">
           <button
             onClick={onClose}
             className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600"
           >
-            Отмена
+            Назад
           </button>
           <button
             onClick={() => mutation.mutate()}
@@ -431,12 +607,23 @@ function ReturnOrderModal({
             {mutation.isPending ? 'Возвращаем...' : 'Вернуть'}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={4}
+        placeholder="Укажите причину возврата..."
+        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
+      />
+      {mutation.isError && (
+        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
+      )}
+    </BottomSheet>
   );
 }
 
-// ── Reject Repair Request Modal ────────────────────────────────
+// ── Reject Request Modal ───────────────────────────────────────
 
 function RejectRequestModal({
   request,
@@ -456,10 +643,7 @@ function RejectRequestModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject', admin_note: note.trim() || undefined }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка');
-      }
+      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
       return res.json();
     },
     onSuccess: () => {
@@ -469,30 +653,10 @@ function RejectRequestModal({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-      <div className="bg-white w-full rounded-t-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-lg">Отклонить заявку</h3>
-          <button onClick={onClose} className="text-zinc-400 text-xl font-bold">
-            ✕
-          </button>
-        </div>
-        <div className="bg-slate-50 rounded-xl p-3 text-sm">
-          <p className="font-bold">{request.asset?.short_name ?? '—'}</p>
-          <p className="text-slate-500 text-xs">
-            {request.fault?.name ?? request.custom_description ?? 'Без описания'}
-          </p>
-        </div>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-          placeholder="Причина отклонения (необязательно)..."
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
-        />
-        {mutation.isError && (
-          <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
-        )}
+    <BottomSheet
+      title="Отклонить заявку"
+      onClose={onClose}
+      footer={
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -508,31 +672,297 @@ function RejectRequestModal({
             {mutation.isPending ? 'Отклоняем...' : 'Отклонить'}
           </button>
         </div>
+      }
+    >
+      <div className="bg-slate-50 rounded-xl p-3 text-sm">
+        <p className="font-bold">{request.asset?.short_name ?? '—'}</p>
+        <p className="text-slate-500 text-xs">
+          {request.fault?.name ?? request.custom_description ?? 'Без описания'}
+        </p>
       </div>
-    </div>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={3}
+        placeholder="Причина отклонения (необязательно)..."
+        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
+      />
+      {mutation.isError && (
+        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
+      )}
+    </BottomSheet>
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────
+// ── Create Order Modal ─────────────────────────────────────────
 
-type Modal =
-  | { type: 'approve-request'; data: RepairRequest }
-  | { type: 'reject-request'; data: RepairRequest }
-  | { type: 'approve-order'; data: PendingOrder }
-  | { type: 'return-order'; data: PendingOrder };
+function CreateOrderModal({
+  mechanics,
+  onClose,
+  onSuccess,
+}: {
+  mechanics: Mechanic[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [machineType, setMachineType] = useState<'own' | 'client'>('own');
+  const [assetId, setAssetId] = useState('');
+  const [clientBrand, setClientBrand] = useState('');
+  const [clientReg, setClientReg] = useState('');
+  const [problemDesc, setProblemDesc] = useState('');
+  const [mechanicId, setMechanicId] = useState('');
+  const [secondMechanicId, setSecondMechanicId] = useState('');
+  const [odometer, setOdometer] = useState('');
+  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
+
+  const { data: assets = [] } = useQuery<AssetItem[]>({
+    queryKey: ['admin-assets'],
+    queryFn: () => fetch('/api/admin/assets').then((r) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const { data: workCatalog = [] } = useQuery<WorkCatalogItem[]>({
+    queryKey: ['admin-work-catalog'],
+    queryFn: () => fetch('/api/admin/work-catalog').then((r) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const toggleWork = (id: string) =>
+    setSelectedWorkIds((p) => {
+      const n = new Set(p);
+      if (n.has(id)) {
+        n.delete(id);
+      } else {
+        n.add(id);
+      }
+      return n;
+    });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!problemDesc.trim()) throw new Error('Введите описание проблемы');
+      if (machineType === 'own' && !assetId) throw new Error('Выберите автомобиль');
+      if (machineType === 'client' && !clientBrand.trim())
+        throw new Error('Укажите марку клиентского автомобиля');
+      const res = await fetch('/api/admin/service-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          machine_type: machineType,
+          asset_id: machineType === 'own' ? assetId : undefined,
+          client_vehicle_brand: machineType === 'client' ? clientBrand : undefined,
+          client_vehicle_reg: machineType === 'client' ? clientReg : undefined,
+          problem_description: problemDesc,
+          assigned_mechanic_id: mechanicId || undefined,
+          second_mechanic_id: secondMechanicId || undefined,
+          odometer_start: odometer ? Number(odometer) : undefined,
+          work_ids: selectedWorkIds.size > 0 ? [...selectedWorkIds] : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
+      return res.json();
+    },
+    onSuccess: () => {
+      onSuccess();
+      onClose();
+    },
+  });
+
+  return (
+    <BottomSheet
+      title="Новый наряд"
+      onClose={onClose}
+      footer={
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="flex-[2] py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-zinc-900 text-white disabled:bg-zinc-400"
+          >
+            {mutation.isPending ? 'Создаём...' : 'Создать наряд'}
+          </button>
+        </div>
+      }
+    >
+      {/* Machine type */}
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+          Тип машины
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['own', 'client'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setMachineType(t)}
+              className={cn(
+                'py-2.5 rounded-xl text-sm font-bold transition-all',
+                machineType === t ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-600',
+              )}
+            >
+              {t === 'own' ? 'Свой автопарк' : 'Клиентская'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Asset or client vehicle */}
+      {machineType === 'own' ? (
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+            Автомобиль *
+          </label>
+          <select
+            value={assetId}
+            onChange={(e) => setAssetId(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold bg-white"
+          >
+            <option value="">— Выберите —</option>
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.short_name} · {a.reg_number}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+              Марка / модель *
+            </label>
+            <input
+              value={clientBrand}
+              onChange={(e) => setClientBrand(e.target.value)}
+              placeholder="Toyota Camry"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+              Госномер
+            </label>
+            <input
+              value={clientReg}
+              onChange={(e) => setClientReg(e.target.value)}
+              placeholder="А001АА96"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+            />
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Текущий пробег (км)
+        </label>
+        <input
+          type="number"
+          value={odometer}
+          onChange={(e) => setOdometer(e.target.value)}
+          placeholder="Необязательно"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Описание проблемы *
+        </label>
+        <textarea
+          value={problemDesc}
+          onChange={(e) => setProblemDesc(e.target.value)}
+          rows={2}
+          placeholder="Что случилось..."
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+          Виды работ
+        </label>
+        <WorkSelector
+          workCatalog={workCatalog}
+          selectedIds={selectedWorkIds}
+          onToggle={toggleWork}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+            Механик
+          </label>
+          <select
+            value={mechanicId}
+            onChange={(e) => setMechanicId(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+          >
+            <option value="">— Не назначать —</option>
+            {mechanics.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+            Второй механик
+          </label>
+          <select
+            value={secondMechanicId}
+            onChange={(e) => setSecondMechanicId(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+          >
+            <option value="">— Не нужен —</option>
+            {mechanics
+              .filter((m) => m.id !== mechanicId)
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+          </select>
+        </div>
+      </div>
+
+      {mutation.isError && (
+        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
+      )}
+    </BottomSheet>
+  );
+}
+
+// ── Tabs ───────────────────────────────────────────────────────
 
 const TABS = [
+  { id: 'home', label: 'Главная', countKey: null },
   { id: 'requests', label: 'Заявки', countKey: 'repairRequests' },
+  { id: 'approval', label: 'Утверждение', countKey: 'pendingApproval' },
+  { id: 'active', label: 'Наряды', countKey: 'activeOrders' },
   { id: 'extra', label: 'Доп. работы', countKey: 'extraWorkPending' },
-  { id: 'approval', label: 'На утверждении', countKey: 'pendingApproval' },
-  { id: 'active', label: 'Активные', countKey: 'activeOrders' },
   { id: 'alerts', label: 'ТО', countKey: 'maintenanceAlerts' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+type Modal =
+  | { type: 'approve-request'; data: RepairRequest }
+  | { type: 'reject-request'; data: RepairRequest }
+  | { type: 'approve-order'; data: PendingOrder }
+  | { type: 'return-order'; data: PendingOrder }
+  | { type: 'create-order' };
+
+// ── Main Page ──────────────────────────────────────────────────
 
 export default function AdminGaragePage() {
-  const [tab, setTab] = useState<TabId>('requests');
+  const [tab, setTab] = useState<TabId>('home');
   const [modal, setModal] = useState<Modal | null>(null);
   const queryClient = useQueryClient();
 
@@ -547,9 +977,7 @@ export default function AdminGaragePage() {
     queryFn: () => fetch('/api/admin/mechanics').then((r) => r.json()),
   });
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin-garage'] });
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-garage'] });
 
   const extraWorkMutation = useMutation({
     mutationFn: async ({
@@ -566,10 +994,7 @@ export default function AdminGaragePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, work_id: workId }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка');
-      }
+      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
       return res.json();
     },
     onSuccess: invalidate,
@@ -587,30 +1012,40 @@ export default function AdminGaragePage() {
     );
   }
 
+  const totalAlerts = Object.values(counts).reduce((a, b) => a + b, 0);
+
   return (
     <>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zinc-900 text-white px-4 h-14 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2">
           <span className="text-lg font-black">Гараж</span>
-          {Object.values(counts).some((c) => c > 0) && (
+          {totalAlerts > 0 && (
             <span className="text-[9px] font-black bg-orange-500 px-2 py-0.5 rounded-full">
-              {Object.values(counts).reduce((a, b) => a + b, 0)}
+              {totalAlerts}
             </span>
           )}
         </div>
-        <button
-          onClick={() => refetch()}
-          className="text-zinc-400 text-xs font-black uppercase tracking-widest"
-        >
-          ↻ Обновить
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setModal({ type: 'create-order' })}
+            className="bg-white text-zinc-900 text-xs font-black px-3 py-1.5 rounded-lg"
+          >
+            + Создать
+          </button>
+          <button
+            onClick={() => refetch()}
+            className="text-zinc-400 text-xs font-black uppercase tracking-widest"
+          >
+            ↻
+          </button>
+        </div>
       </header>
 
       {/* Tab bar */}
       <div className="bg-white border-b border-slate-200 sticky top-14 z-30 flex overflow-x-auto">
         {TABS.map((t) => {
-          const cnt = counts[t.countKey] ?? 0;
+          const cnt = t.countKey ? (counts[t.countKey] ?? 0) : 0;
           return (
             <button
               key={t.id}
@@ -634,10 +1069,179 @@ export default function AdminGaragePage() {
       </div>
 
       <div className="p-4 space-y-3">
-        {/* Tab: Заявки водителей */}
+        {/* ── Главная ── */}
+        {tab === 'home' && (
+          <>
+            {/* KPI grid 2×2 */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: 'Заявок водителей',
+                  value: counts.repairRequests ?? 0,
+                  color: 'text-violet-600',
+                  sub: 'ждут одобрения',
+                  onClick: () => setTab('requests'),
+                },
+                {
+                  label: 'На утверждении',
+                  value: counts.pendingApproval ?? 0,
+                  color: 'text-amber-600',
+                  sub: 'нарядов закрыто',
+                  onClick: () => setTab('approval'),
+                },
+                {
+                  label: 'В работе',
+                  value: counts.activeOrders ?? 0,
+                  color: 'text-blue-600',
+                  sub: 'нарядов сейчас',
+                  onClick: () => setTab('active'),
+                },
+                {
+                  label: 'Алертов ТО',
+                  value: counts.maintenanceAlerts ?? 0,
+                  color: 'text-red-600',
+                  sub: 'требуют внимания',
+                  onClick: () => setTab('alerts'),
+                },
+              ].map((kpi) => (
+                <button
+                  key={kpi.label}
+                  onClick={kpi.onClick}
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-left active:scale-95 transition-transform"
+                >
+                  <p className="text-xs text-slate-400 mb-1">{kpi.label}</p>
+                  <p className={cn('text-3xl font-bold mb-1', kpi.color)}>{kpi.value}</p>
+                  <p className="text-xs text-slate-400">{kpi.sub}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Требуют действий */}
+            {(data?.pendingApproval ?? []).length > 0 && (
+              <>
+                <SectionLabel
+                  title="Требуют утверждения"
+                  count={data?.pendingApproval.length}
+                  color="bg-amber-100 text-amber-700"
+                />
+                {(data?.pendingApproval ?? []).slice(0, 3).map((order) => {
+                  const totalNm = order.service_order_works
+                    .filter((w) => w.status !== 'cancelled')
+                    .reduce((s, w) => s + (w.actual_minutes ?? w.norm_minutes), 0);
+                  return (
+                    <Card key={order.id} className="border-l-4 border-l-amber-400">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="font-black text-slate-900">
+                            #{order.order_number} · {order.asset?.short_name ?? '—'}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {order.mechanic?.name ?? 'Без механика'} · {(totalNm / 60).toFixed(1)}{' '}
+                            н/ч факт
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                          На проверке
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <ActionBtn
+                          variant="approve"
+                          onClick={() => setModal({ type: 'approve-order', data: order })}
+                        >
+                          Утвердить
+                        </ActionBtn>
+                        <ActionBtn
+                          variant="return"
+                          onClick={() => setModal({ type: 'return-order', data: order })}
+                        >
+                          Вернуть
+                        </ActionBtn>
+                      </div>
+                    </Card>
+                  );
+                })}
+                {(data?.pendingApproval ?? []).length > 3 && (
+                  <button
+                    onClick={() => setTab('approval')}
+                    className="w-full text-center text-xs font-bold text-orange-600 py-2"
+                  >
+                    Ещё {(data?.pendingApproval.length ?? 0) - 3} нарядов →
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Заявки водителей */}
+            {(data?.repairRequests ?? []).length > 0 && (
+              <>
+                <SectionLabel
+                  title="Новые заявки от водителей"
+                  count={data?.repairRequests.length}
+                  color="bg-violet-100 text-violet-700"
+                />
+                {(data?.repairRequests ?? []).slice(0, 2).map((req) => (
+                  <Card key={req.id} className="border-l-4 border-l-violet-400">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-900">{req.asset?.short_name ?? '—'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {req.fault?.name ?? req.custom_description ?? 'Без описания'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {req.driver?.name ?? '—'} · {formatDate(req.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <ActionBtn
+                        variant="approve"
+                        onClick={() => setModal({ type: 'approve-request', data: req })}
+                      >
+                        Создать наряд
+                      </ActionBtn>
+                      <ActionBtn
+                        variant="reject"
+                        onClick={() => setModal({ type: 'reject-request', data: req })}
+                      >
+                        Отклонить
+                      </ActionBtn>
+                    </div>
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {/* В работе */}
+            {(data?.activeOrders ?? []).length > 0 && (
+              <>
+                <SectionLabel title="В работе прямо сейчас" />
+                {(data?.activeOrders ?? []).slice(0, 3).map((order) => (
+                  <Card key={order.id} className="border-l-4 border-l-blue-400">
+                    <p className="font-black text-slate-900">{order.asset?.short_name ?? '—'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      НЗ-{order.order_number} ·{' '}
+                      {[order.mechanic?.name, order.second_mechanic?.name]
+                        .filter(Boolean)
+                        .join(' + ') || 'Без механика'}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[10px] text-slate-400">{formatDate(order.created_at)}</p>
+                      <StatusBadge status={order.status} />
+                    </div>
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {totalAlerts === 0 && <EmptyState icon="✅" text="Всё под контролем" />}
+          </>
+        )}
+
+        {/* ── Заявки водителей ── */}
         {tab === 'requests' && (
           <>
-            <SectionHeader
+            <SectionLabel
               title="Заявки водителей"
               count={data?.repairRequests.length ?? 0}
               color="bg-orange-100 text-orange-700"
@@ -685,10 +1289,99 @@ export default function AdminGaragePage() {
           </>
         )}
 
-        {/* Tab: Доп. работы */}
+        {/* ── На утверждении ── */}
+        {tab === 'approval' && (
+          <>
+            <SectionLabel
+              title="На утверждении"
+              count={data?.pendingApproval.length ?? 0}
+              color="bg-blue-100 text-blue-700"
+            />
+            {(data?.pendingApproval ?? []).length === 0 ? (
+              <EmptyState icon="✅" text="Нет нарядов на утверждении" />
+            ) : (
+              data?.pendingApproval.map((order) => {
+                const totalNm = order.service_order_works
+                  .filter((w) => w.status !== 'cancelled')
+                  .reduce((s, w) => s + (w.actual_minutes ?? w.norm_minutes), 0);
+                return (
+                  <Card key={order.id}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <p className="font-black text-slate-900">
+                          #{order.order_number} · {order.asset?.short_name ?? '—'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {order.mechanic?.name ?? 'Механик не назначен'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {formatDate(order.created_at)} · {(totalNm / 60).toFixed(1)} н/ч факт
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-black bg-blue-50 text-blue-700 px-2 py-1 rounded-full flex-shrink-0">
+                        На проверке
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <ActionBtn
+                        variant="approve"
+                        onClick={() => setModal({ type: 'approve-order', data: order })}
+                      >
+                        Утвердить
+                      </ActionBtn>
+                      <ActionBtn
+                        variant="return"
+                        onClick={() => setModal({ type: 'return-order', data: order })}
+                      >
+                        Вернуть
+                      </ActionBtn>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </>
+        )}
+
+        {/* ── Активные наряды ── */}
+        {tab === 'active' && (
+          <>
+            <SectionLabel
+              title="Активные наряды"
+              count={data?.activeOrders.length ?? 0}
+              color="bg-zinc-200 text-zinc-600"
+            />
+            {(data?.activeOrders ?? []).length === 0 ? (
+              <EmptyState icon="🏖" text="Нет активных нарядов" />
+            ) : (
+              data?.activeOrders.map((order) => (
+                <Card key={order.id}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-black text-slate-900">
+                        #{order.order_number} · {order.asset?.short_name ?? '—'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {[order.mechanic?.name, order.second_mechanic?.name]
+                          .filter(Boolean)
+                          .join(', ') || 'Не назначен'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {formatDate(order.created_at)}
+                      </p>
+                    </div>
+                    <StatusBadge status={order.status} />
+                  </div>
+                </Card>
+              ))
+            )}
+          </>
+        )}
+
+        {/* ── Доп. работы ── */}
         {tab === 'extra' && (
           <>
-            <SectionHeader
+            <SectionLabel
               title="Доп. работы на согласовании"
               count={data?.extraWorkPending.length ?? 0}
               color="bg-amber-100 text-amber-700"
@@ -750,99 +1443,10 @@ export default function AdminGaragePage() {
           </>
         )}
 
-        {/* Tab: На утверждении */}
-        {tab === 'approval' && (
-          <>
-            <SectionHeader
-              title="На утверждении"
-              count={data?.pendingApproval.length ?? 0}
-              color="bg-blue-100 text-blue-700"
-            />
-            {(data?.pendingApproval ?? []).length === 0 ? (
-              <EmptyState icon="✅" text="Нет нарядов на утверждении" />
-            ) : (
-              data?.pendingApproval.map((order) => {
-                const totalNm = order.service_order_works
-                  .filter((w) => w.status !== 'cancelled')
-                  .reduce((sum, w) => sum + (w.actual_minutes ?? w.norm_minutes), 0);
-                return (
-                  <Card key={order.id}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div>
-                        <p className="font-black text-slate-900">
-                          #{order.order_number} · {order.asset?.short_name ?? '—'}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {order.mechanic?.name ?? 'Механик не назначен'}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {formatDate(order.created_at)} · {(totalNm / 60).toFixed(1)} н/ч факт
-                        </p>
-                      </div>
-                      <span className="text-[9px] font-black bg-blue-50 text-blue-700 px-2 py-1 rounded-full flex-shrink-0">
-                        На проверке
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <ActionBtn
-                        variant="approve"
-                        onClick={() => setModal({ type: 'approve-order', data: order })}
-                      >
-                        Утвердить
-                      </ActionBtn>
-                      <ActionBtn
-                        variant="return"
-                        onClick={() => setModal({ type: 'return-order', data: order })}
-                      >
-                        Вернуть
-                      </ActionBtn>
-                    </div>
-                  </Card>
-                );
-              })
-            )}
-          </>
-        )}
-
-        {/* Tab: Активные наряды */}
-        {tab === 'active' && (
-          <>
-            <SectionHeader
-              title="Активные наряды"
-              count={data?.activeOrders.length ?? 0}
-              color="bg-zinc-200 text-zinc-600"
-            />
-            {(data?.activeOrders ?? []).length === 0 ? (
-              <EmptyState icon="🏖" text="Нет активных нарядов" />
-            ) : (
-              data?.activeOrders.map((order) => (
-                <Card key={order.id}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-black text-slate-900">
-                        #{order.order_number} · {order.asset?.short_name ?? '—'}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {[order.mechanic?.name, order.second_mechanic?.name]
-                          .filter(Boolean)
-                          .join(', ') || 'Не назначен'}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {formatDate(order.created_at)}
-                      </p>
-                    </div>
-                    <StatusBadge status={order.status} />
-                  </div>
-                </Card>
-              ))
-            )}
-          </>
-        )}
-
-        {/* Tab: ТО алерты */}
+        {/* ── ТО алерты ── */}
         {tab === 'alerts' && (
           <>
-            <SectionHeader
+            <SectionLabel
               title="Алерты технического обслуживания"
               count={data?.maintenanceAlerts.length ?? 0}
               color="bg-red-100 text-red-700"
@@ -931,30 +1535,13 @@ export default function AdminGaragePage() {
           onSuccess={invalidate}
         />
       )}
+      {modal?.type === 'create-order' && (
+        <CreateOrderModal
+          mechanics={mechanics}
+          onClose={() => setModal(null)}
+          onSuccess={invalidate}
+        />
+      )}
     </>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; color: string }> = {
-    created: { label: 'В очереди', color: 'bg-slate-100 text-slate-500' },
-    in_progress: { label: 'В работе', color: 'bg-orange-100 text-orange-700' },
-    completed: { label: 'Готово', color: 'bg-green-100 text-green-700' },
-    cancelled: { label: 'Отменён', color: 'bg-red-100 text-red-700' },
-  };
-  const { label, color } = map[status] ?? { label: status, color: 'bg-slate-100 text-slate-500' };
-  return (
-    <span className={cn('text-[9px] font-black uppercase px-2 py-1 rounded-full', color)}>
-      {label}
-    </span>
-  );
-}
-
-function EmptyState({ icon, text }: { icon: string; text: string }) {
-  return (
-    <div className="text-center py-12 text-slate-400">
-      <p className="text-4xl mb-2">{icon}</p>
-      <p className="font-bold text-sm">{text}</p>
-    </div>
   );
 }
