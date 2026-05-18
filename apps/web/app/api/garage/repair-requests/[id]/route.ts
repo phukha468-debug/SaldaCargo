@@ -31,10 +31,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (action === 'approve') {
     const { data: req, error: reqErr } = await (supabase.from('repair_requests') as any)
-      .select('asset_id, driver_id, fault_catalog_id, custom_description')
+      .select('asset_id, driver_id, fault_catalog_id, custom_description, status')
       .eq('id', id)
       .single();
     if (reqErr) return NextResponse.json({ error: reqErr.message }, { status: 500 });
+    if (req.status !== 'new') {
+      return NextResponse.json({ error: 'Заявка уже обработана' }, { status: 409 });
+    }
 
     let problemDesc = req.custom_description ?? '';
     if (req.fault_catalog_id) {

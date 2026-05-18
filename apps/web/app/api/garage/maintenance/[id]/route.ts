@@ -22,6 +22,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const supabase = createAdminClient();
+
+  // Auto-recalculate next_due_km if last_done_km or interval_km changed but next_due_km not provided
+  if (('last_done_km' in body || 'interval_km' in body) && !('next_due_km' in body)) {
+    const { data: current } = await (supabase.from('maintenance_items') as any)
+      .select('last_done_km, interval_km')
+      .eq('id', id)
+      .single();
+    if (current) {
+      const lastDoneKm =
+        'last_done_km' in body ? (body.last_done_km as number | null) : current.last_done_km;
+      const intervalKm =
+        'interval_km' in body ? (body.interval_km as number | null) : current.interval_km;
+      updates.next_due_km = lastDoneKm && intervalKm ? lastDoneKm + intervalKm : null;
+    }
+  }
   const { data, error } = await (supabase.from('maintenance_items') as any)
     .update(updates)
     .eq('id', id)

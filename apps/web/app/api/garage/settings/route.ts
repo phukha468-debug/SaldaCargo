@@ -28,8 +28,12 @@ export async function PATCH(request: Request) {
     const { data: sto } = await (supabase.from('sto_settings') as any)
       .select('id')
       .limit(1)
-      .single();
-    if (sto) await (supabase.from('sto_settings') as any).update(updates).eq('id', sto.id);
+      .maybeSingle();
+    if (sto) {
+      await (supabase.from('sto_settings') as any).update(updates).eq('id', sto.id);
+    } else {
+      await (supabase.from('sto_settings') as any).insert(updates);
+    }
   }
   if ('mechanic_id' in body && 'mechanic_salary_pct' in body) {
     await (supabase.from('users') as any)

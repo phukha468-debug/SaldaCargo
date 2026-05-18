@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -3160,10 +3160,12 @@ function ReportsSection({ tab }: { tab: ReportTab }) {
                           #{o.order_number} · {o.vehicle}
                         </span>
                         <span className="text-slate-500">
-                          {(o.works ?? []).reduce(
-                            (s, w) => s + (w.actual_minutes ?? w.norm_minutes ?? 0),
-                            0,
-                          ) / 60}{' '}
+                          {(
+                            (o.works ?? []).reduce(
+                              (s, w) => s + (w.actual_minutes ?? w.norm_minutes ?? 0),
+                              0,
+                            ) / 60
+                          ).toFixed(1)}{' '}
                           нч
                         </span>
                       </div>
@@ -3189,6 +3191,16 @@ function SettingsSection() {
   });
   const [rate, setRate] = useState('');
   const [rateOwn, setRateOwn] = useState('');
+  const [mechPct, setMechPct] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!data) return;
+    setRate(data.sto?.hourly_rate ?? '2000');
+    setRateOwn(data.sto?.hourly_rate_own ?? '1600');
+    const pctMap: Record<string, string> = {};
+    for (const m of data.mechanics ?? []) pctMap[m.id] = m.mechanic_salary_pct ?? '50';
+    setMechPct(pctMap);
+  }, [data]);
 
   const saveMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -3221,7 +3233,7 @@ function SettingsSection() {
             <div className="flex gap-2">
               <input
                 type="number"
-                defaultValue={sto.hourly_rate}
+                value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
               />
@@ -3244,7 +3256,7 @@ function SettingsSection() {
             <div className="flex gap-2">
               <input
                 type="number"
-                defaultValue={sto.hourly_rate_own}
+                value={rateOwn}
                 onChange={(e) => setRateOwn(e.target.value)}
                 className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
               />
@@ -3280,22 +3292,20 @@ function SettingsSection() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    defaultValue={m.mechanic_salary_pct}
-                    id={`pct-${m.id}`}
+                    value={mechPct[m.id] ?? pct.toString()}
+                    onChange={(e) => setMechPct((prev) => ({ ...prev, [m.id]: e.target.value }))}
                     className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1 text-sm"
                     min="0"
                     max="100"
                   />
                   <span className="text-slate-500 text-sm">%</span>
                   <button
-                    onClick={() => {
-                      const input = document.getElementById(`pct-${m.id}`) as HTMLInputElement;
-                      if (input)
-                        saveMutation.mutate({
-                          mechanic_id: m.id,
-                          mechanic_salary_pct: input.value,
-                        });
-                    }}
+                    onClick={() =>
+                      saveMutation.mutate({
+                        mechanic_id: m.id,
+                        mechanic_salary_pct: mechPct[m.id] ?? pct.toString(),
+                      })
+                    }
                     disabled={saveMutation.isPending}
                     className="text-xs font-medium px-3 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
                   >

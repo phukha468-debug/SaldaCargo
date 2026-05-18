@@ -38,10 +38,12 @@ export async function GET(request: Request) {
       totalWorksCost = 0;
 
     for (const order of mechanicOrders) {
+      // Split hours/cost equally when two mechanics worked on the same order
+      const factor = order.second_mechanic_id ? 0.5 : 1;
       for (const work of order.works ?? []) {
-        planNormHours += (work.norm_minutes ?? 0) / 60;
-        factNormHours += (work.actual_minutes ?? 0) / 60;
-        totalWorksCost += parseFloat(work.price_client ?? '0');
+        planNormHours += ((work.norm_minutes ?? 0) / 60) * factor;
+        factNormHours += ((work.actual_minutes ?? 0) / 60) * factor;
+        totalWorksCost += parseFloat(work.price_client ?? '0') * factor;
       }
     }
 

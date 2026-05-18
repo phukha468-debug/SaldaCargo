@@ -18,10 +18,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     'is_active',
   ];
   const updates: Record<string, unknown> = {};
+  const decimalFields = new Set([
+    'default_price_client',
+    'default_price_client_valdai',
+    'internal_cost_rate',
+  ]);
   for (const key of allowed) {
     if (key in body)
       updates[key] =
-        typeof body[key] === 'number' && key.includes('price') ? body[key].toString() : body[key];
+        typeof body[key] === 'number' && decimalFields.has(key) ? body[key].toString() : body[key];
   }
 
   const supabase = createAdminClient();

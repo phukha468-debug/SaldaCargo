@@ -44,7 +44,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   try {
     const supabase = createAdminClient();
-    const { error } = await (supabase as any).from('service_orders').delete().eq('id', id);
+    const { error } = await (supabase as any)
+      .from('service_orders')
+      .update({ lifecycle_status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (err: any) {
@@ -93,7 +96,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       );
 
       const totalMinutes = (order.works ?? []).reduce((s: number, w: any) => {
-        const mins = w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0);
+        const mins =
+          w.actual_minutes != null && w.actual_minutes > 0
+            ? w.actual_minutes
+            : (w.norm_minutes ?? 0);
         return s + mins;
       }, 0);
       const totalHours = totalMinutes / 60;

@@ -53,13 +53,17 @@ export async function GET(request: Request) {
       return NextResponse.json(data ?? []);
     }
 
+    // 'all' needs fullSelect to include lifecycle_status and works for client-side filtering
+    const selectStr = filter === 'active' ? activeSelect : fullSelect;
+
     let q = (supabase.from('service_orders') as any)
-      .select(filter === 'review' ? fullSelect : activeSelect)
+      .select(selectStr)
       .order('created_at', { ascending: false })
       .limit(50);
 
     if (filter === 'review') {
-      q = q.eq('lifecycle_status', 'draft');
+      // Only completed orders awaiting approval (not in-progress ones)
+      q = q.eq('lifecycle_status', 'draft').eq('status', 'completed');
     } else if (filter === 'active') {
       q = q.eq('lifecycle_status', 'approved').in('status', ['created', 'in_progress']);
     } else if (filter === 'all') {
@@ -107,7 +111,7 @@ export async function POST(request: Request) {
       .select('id')
       .contains('roles', ['admin'])
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const { data, error } = await (supabase as any)
       .from('service_orders')
