@@ -116,7 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const salary = (hours * hourlyRate * pct) / 100;
         if (salary > 0) {
           mechTxns.push({
-            type: 'expense',
+            direction: 'expense',
             lifecycle_status: 'approved',
             settlement_status: 'completed',
             amount: salary.toFixed(2),
