@@ -62,6 +62,8 @@ export async function GET(request: Request) {
       q = q.eq('lifecycle_status', 'draft');
     } else if (filter === 'active') {
       q = q.eq('lifecycle_status', 'approved').in('status', ['created', 'in_progress']);
+    } else if (filter === 'all') {
+      q = q.neq('lifecycle_status', 'cancelled');
     }
 
     const { data, error } = await q;
