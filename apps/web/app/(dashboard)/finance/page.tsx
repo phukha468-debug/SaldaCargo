@@ -628,11 +628,13 @@ function ExpensesPanel() {
   const { data, isLoading } = useQuery<ExpenseMonthData>({
     queryKey: ['finance-month', selectedMonth],
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const txList = data?.transactions ?? [];
-  const revenue = n(data?.revenue);
+  const tripRevenue = n(data?.revenue);
+  const manualIncome = (data?.income_transactions ?? []).reduce((s, t) => s + n(t.amount), 0);
+  const allIncome = tripRevenue + manualIncome;
 
   const allTimeline = [...txList];
 
@@ -662,9 +664,9 @@ function ExpensesPanel() {
     .filter((g) => !g.group.fixed)
     .reduce((s, g) => s + g.total, 0);
   const totalExp = txFixed + txVariable;
-  const periodRevenue = timePeriod === 'month' ? revenue : 0;
-  const profit = periodRevenue - totalExp;
-  const margin = periodRevenue > 0 ? Math.round((profit / periodRevenue) * 100) : 0;
+  const periodAllIncome = timePeriod === 'month' ? allIncome : 0;
+  const profit = periodAllIncome - totalExp;
+  const margin = periodAllIncome > 0 ? Math.round((profit / periodAllIncome) * 100) : 0;
 
   // Apply chip + group filters to get timeline
   const activeChipDef = EXPENSE_CHIPS.find((c) => c.id === activeChip);
@@ -732,7 +734,7 @@ function ExpensesPanel() {
           value={rub(timePeriod === 'month' ? profit : totalExp)}
           sub={
             timePeriod === 'month'
-              ? `маржа ${margin}% · выручка ${rub(revenue)}`
+              ? `маржа ${margin}% · доход ${rub(allIncome)}`
               : `за выбранный период`
           }
         />
@@ -1476,7 +1478,7 @@ function ReceivablesPanel() {
   const { data, isLoading } = useQuery<ReceivablesData>({
     queryKey: ['receivables'],
     queryFn: () => fetch('/api/receivables').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   useEffect(() => {
@@ -2222,7 +2224,7 @@ function LoansPanel() {
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
     queryKey: ['loans-all'],
     queryFn: () => fetch('/api/loans').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const filtered = loans.filter((l) => {
@@ -2672,7 +2674,7 @@ function PayablesPanel() {
   const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
     queryKey: ['payables-all'],
     queryFn: () => fetch('/api/payables').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const totalDebt = suppliers.reduce((s, sup) => s + n(sup.debt), 0);
@@ -2960,7 +2962,7 @@ function IncomePanel() {
   const { data, isLoading } = useQuery<ExpenseMonthData>({
     queryKey: ['finance-month', selectedMonth],
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const allIncomeTxs = data?.income_transactions ?? [];
@@ -2976,14 +2978,21 @@ function IncomePanel() {
     return true;
   });
 
-  const periodRevenue = timePeriod === 'month' ? revenue : 0;
-  const txTotal = periodIncomeTxs.reduce((s, t) => s + n(t.amount), 0);
-  const grandTotal = txTotal + periodRevenue;
+  // TRIP_REVENUE manual transactions belong in the "Выручка с рейсов" row, not a separate row
+  const tripRevenueTxTotal = periodIncomeTxs
+    .filter((tx) => tx.category?.code === 'TRIP_REVENUE')
+    .reduce((s, t) => s + n(t.amount), 0);
+  const nonTripIncomeTxs = periodIncomeTxs.filter((tx) => tx.category?.code !== 'TRIP_REVENUE');
 
-  // Dynamic income groups by category
+  const periodRevenue = timePeriod === 'month' ? revenue : 0;
+  const tripsTotal = periodRevenue + (timePeriod === 'month' ? tripRevenueTxTotal : 0);
+  const txTotal = nonTripIncomeTxs.reduce((s, t) => s + n(t.amount), 0);
+  const grandTotal = txTotal + tripsTotal;
+
+  // Dynamic income groups by category (excluding TRIP_REVENUE which is merged above)
   const CAT_COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#64748b'];
   const catMap = new Map<string, number>();
-  periodIncomeTxs.forEach((tx) => {
+  nonTripIncomeTxs.forEach((tx) => {
     const key = tx.category?.name ?? 'Прочие поступления';
     catMap.set(key, (catMap.get(key) ?? 0) + n(tx.amount));
   });
@@ -2997,8 +3006,8 @@ function IncomePanel() {
     }));
 
   const structureGroups = [
-    ...(periodRevenue > 0
-      ? [{ id: '__trips__', name: 'Выручка с рейсов', color: '#10b981', total: periodRevenue }]
+    ...(tripsTotal > 0
+      ? [{ id: '__trips__', name: 'Выручка с рейсов', color: '#10b981', total: tripsTotal }]
       : []),
     ...manualGroups.filter((g) => g.total > 0),
   ];
@@ -3015,14 +3024,14 @@ function IncomePanel() {
     activeChip === 'trips' && activeCatFilter === null
       ? []
       : activeCatFilter === '__trips__'
-        ? []
+        ? periodIncomeTxs.filter((tx) => tx.category?.code === 'TRIP_REVENUE')
         : activeCatFilter !== null
-          ? periodIncomeTxs.filter(
+          ? nonTripIncomeTxs.filter(
               (tx) => (tx.category?.name ?? 'Прочие поступления') === activeCatFilter,
             )
           : activeChip === 'trips'
             ? []
-            : periodIncomeTxs;
+            : nonTripIncomeTxs;
 
   const activeCatGroup = activeCatFilter
     ? (structureGroups.find((g) => g.id === activeCatFilter) ?? null)
@@ -3067,14 +3076,14 @@ function IncomePanel() {
         <SumCard
           gradient="linear-gradient(135deg,#10b981,#059669)"
           label="Выручка с рейсов"
-          value={timePeriod === 'month' ? rub(revenue) : '—'}
-          sub={timePeriod === 'month' ? 'оплаченные заказы' : 'только за месяц'}
+          value={timePeriod === 'month' ? rub(tripsTotal) : '—'}
+          sub={timePeriod === 'month' ? 'рейсы + ручной ввод' : 'только за месяц'}
         />
         <SumCard
           gradient="linear-gradient(135deg,#0891b2,#3b82f6)"
           label="Прочие поступления"
           value={rub(txTotal)}
-          sub={`${periodIncomeTxs.length} транзакц.`}
+          sub={`${nonTripIncomeTxs.length} транзакц.`}
         />
         <SumCard
           gradient="linear-gradient(135deg,#6366f1,#8b5cf6)"
@@ -3158,7 +3167,7 @@ function IncomePanel() {
           ) : (
             <div>
               {/* Trip revenue row — clickable filter */}
-              {showTripsRevenue && periodRevenue > 0 && (
+              {showTripsRevenue && tripsTotal > 0 && (
                 <div
                   onClick={() =>
                     setActiveCatFilter(activeCatFilter === '__trips__' ? null : '__trips__')
@@ -3225,13 +3234,13 @@ function IncomePanel() {
                       textAlign: 'right',
                     }}
                   >
-                    +{rub(periodRevenue)}
+                    +{rub(tripsTotal)}
                   </span>
                 </div>
               )}
 
               {/* Manual income transactions */}
-              {visibleTxs.length === 0 && (!showTripsRevenue || periodRevenue === 0) ? (
+              {visibleTxs.length === 0 && (!showTripsRevenue || tripsTotal === 0) ? (
                 <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>
                   Поступлений нет
                 </p>
@@ -3388,9 +3397,9 @@ function IncomePanel() {
                   Рейсы
                 </p>
                 <p style={{ fontSize: 20, fontWeight: 900, color: '#14532d', marginTop: 4 }}>
-                  {grandTotal > 0 ? Math.round((periodRevenue / grandTotal) * 100) : 0}%
+                  {grandTotal > 0 ? Math.round((tripsTotal / grandTotal) * 100) : 0}%
                 </p>
-                <p style={{ fontSize: 9, color: '#16a34a', marginTop: 2 }}>{rub(periodRevenue)}</p>
+                <p style={{ fontSize: 9, color: '#16a34a', marginTop: 2 }}>{rub(tripsTotal)}</p>
               </div>
               <div
                 style={{
@@ -3455,22 +3464,22 @@ export default function FinancePage() {
   const { data: recvSummary } = useQuery<{ total: string }>({
     queryKey: ['recv-summary'],
     queryFn: () => fetch('/api/receivables/summary').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
   const { data: loans = [] } = useQuery<Loan[]>({
     queryKey: ['loans-all'],
     queryFn: () => fetch('/api/loans').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ['payables-all'],
     queryFn: () => fetch('/api/payables').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
   const { data: expSummary } = useQuery<ExpenseMonthData>({
     queryKey: ['finance-month', currentMonth],
     queryFn: () => fetch(`/api/finance?month=${currentMonth}`).then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const expTotal = (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0);

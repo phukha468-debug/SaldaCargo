@@ -84,8 +84,8 @@ export default function DashboardHome() {
   const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 120000,
-    refetchInterval: 3 * 60 * 1000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: driverAccountable } = useQuery<
@@ -893,16 +893,18 @@ function WalletDrawer({
                   {isTransferTarget && (
                     <div className="px-5 pb-3 flex items-center gap-2">
                       <span className="text-[11px] text-slate-500 font-medium">Перенести в:</span>
-                      {OTHER_WALLETS[wallet].map((w) => (
-                        <button
-                          key={w.key}
-                          onClick={() => doTransfer(w.key)}
-                          disabled={transferring}
-                          className="text-[11px] font-bold px-3 py-1 rounded-lg border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50"
-                        >
-                          {transferring ? '...' : w.label}
-                        </button>
-                      ))}
+                      {OTHER_WALLETS[wallet]
+                        .filter((w) => !(transferItem?.source === 'trip_order' && w.key === 'cash'))
+                        .map((w) => (
+                          <button
+                            key={w.key}
+                            onClick={() => doTransfer(w.key)}
+                            disabled={transferring}
+                            className="text-[11px] font-bold px-3 py-1 rounded-lg border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+                          >
+                            {transferring ? '...' : w.label}
+                          </button>
+                        ))}
                       <button
                         onClick={() => setTransferItem(null)}
                         className="text-[11px] text-slate-400 ml-1"
