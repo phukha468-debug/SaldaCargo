@@ -93,8 +93,8 @@ export default function DashboardHome() {
   >({
     queryKey: ['driver-accountable'],
     queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
-    staleTime: 120000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: activeTrips } = useQuery<ActiveTrips>({

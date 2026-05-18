@@ -42,7 +42,9 @@ export async function GET(request: Request) {
 
       (supabase as any)
         .from('trips')
-        .select('trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)')
+        .select(
+          'loader_id, loader2_id, trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)',
+        )
         .eq('lifecycle_status', 'approved')
         .gte('started_at', monthStart)
         .lte('started_at', monthEnd),
@@ -81,16 +83,18 @@ export async function GET(request: Request) {
     for (const trip of (loaderTrips as any[]) ?? []) {
       for (const order of (trip.trip_orders as any[]) ?? []) {
         if (order.lifecycle_status === 'cancelled') continue;
-        if (order.loader_id) {
+        const effectiveLoaderId = order.loader_id ?? trip.loader_id;
+        const effectiveLoader2Id = order.loader2_id ?? trip.loader2_id;
+        if (effectiveLoaderId) {
           earnedMap.set(
-            order.loader_id,
-            (earnedMap.get(order.loader_id) ?? 0) + parseFloat(order.loader_pay ?? '0'),
+            effectiveLoaderId,
+            (earnedMap.get(effectiveLoaderId) ?? 0) + parseFloat(order.loader_pay ?? '0'),
           );
         }
-        if (order.loader2_id) {
+        if (effectiveLoader2Id) {
           earnedMap.set(
-            order.loader2_id,
-            (earnedMap.get(order.loader2_id) ?? 0) + parseFloat(order.loader2_pay ?? '0'),
+            effectiveLoader2Id,
+            (earnedMap.get(effectiveLoader2Id) ?? 0) + parseFloat(order.loader2_pay ?? '0'),
           );
         }
       }
