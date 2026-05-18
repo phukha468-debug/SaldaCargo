@@ -2919,6 +2919,8 @@ function IncomePanel() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const [anchorDate, setAnchorDate] = useState(todayStr);
   const [timePeriod, setTimePeriod] = useState<'day' | 'week' | 'month'>('month');
+  const [activeChip, setActiveChip] = useState<'all' | 'trips' | 'manual'>('all');
+  const [activeCatFilter, setActiveCatFilter] = useState<string | null>(null);
 
   const selectedMonth = anchorDate.slice(0, 7);
 
@@ -2978,8 +2980,86 @@ function IncomePanel() {
   const txTotal = periodIncomeTxs.reduce((s, t) => s + n(t.amount), 0);
   const grandTotal = txTotal + periodRevenue;
 
+  // Dynamic income groups by category
+  const CAT_COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#64748b'];
+  const catMap = new Map<string, number>();
+  periodIncomeTxs.forEach((tx) => {
+    const key = tx.category?.name ?? 'Прочие поступления';
+    catMap.set(key, (catMap.get(key) ?? 0) + n(tx.amount));
+  });
+  const manualGroups = Array.from(catMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, total], i) => ({
+      id: name,
+      name,
+      color: CAT_COLORS[i % CAT_COLORS.length] ?? '#64748b',
+      total,
+    }));
+
+  const structureGroups = [
+    ...(periodRevenue > 0
+      ? [{ id: '__trips__', name: 'Выручка с рейсов', color: '#10b981', total: periodRevenue }]
+      : []),
+    ...manualGroups.filter((g) => g.total > 0),
+  ];
+
+  // Visibility logic for chip + category filter
+  const showTripsRevenue =
+    activeCatFilter === '__trips__'
+      ? true
+      : activeCatFilter !== null
+        ? false
+        : activeChip !== 'manual';
+
+  const visibleTxs =
+    activeChip === 'trips' && activeCatFilter === null
+      ? []
+      : activeCatFilter === '__trips__'
+        ? []
+        : activeCatFilter !== null
+          ? periodIncomeTxs.filter(
+              (tx) => (tx.category?.name ?? 'Прочие поступления') === activeCatFilter,
+            )
+          : activeChip === 'trips'
+            ? []
+            : periodIncomeTxs;
+
+  const activeCatGroup = activeCatFilter
+    ? (structureGroups.find((g) => g.id === activeCatFilter) ?? null)
+    : null;
+
+  const INCOME_CHIPS = [
+    { id: 'all' as const, label: 'Все доходы', color: '#10b981' },
+    { id: 'trips' as const, label: '🚛 Рейсы', color: '#059669' },
+    { id: 'manual' as const, label: '💳 Поступления', color: '#0891b2' },
+  ];
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+      {/* Chips */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        {INCOME_CHIPS.map((c) => (
+          <Chip
+            key={c.id}
+            label={c.label}
+            active={activeChip === c.id && !activeCatFilter}
+            color={c.color}
+            onClick={() => {
+              setActiveChip(c.id);
+              setActiveCatFilter(null);
+            }}
+          />
+        ))}
+        {activeCatGroup && (
+          <Chip
+            label={`📂 ${activeCatGroup.name} ×`}
+            active={true}
+            color={activeCatGroup.color}
+            onClick={() => setActiveCatFilter(null)}
+          />
+        )}
+      </div>
+
       {/* Summary cards */}
       <div
         style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}
@@ -3004,96 +3084,129 @@ function IncomePanel() {
         />
       </div>
 
-      {/* Timeline */}
-      <Card>
-        <CardHead
-          title={`Доходы — ${periodLabel()}`}
-          right={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button
-                onClick={() => navigate(-1)}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                ‹
-              </button>
-              <button
-                disabled={isCurrent}
-                onClick={() => navigate(1)}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  cursor: isCurrent ? 'default' : 'pointer',
-                  fontSize: 14,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: isCurrent ? 0.3 : 1,
-                }}
-              >
-                ›
-              </button>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {(['day', 'week', 'month'] as const).map((p) => (
-                  <TimePill
-                    key={p}
-                    label={p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
-                    active={timePeriod === p}
-                    onClick={() => setTimePeriod(p)}
-                  />
-                ))}
+      {/* Main grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+        {/* Timeline */}
+        <Card>
+          <CardHead
+            title={
+              activeCatGroup
+                ? `${activeCatGroup.name} — ${periodLabel()}`
+                : `Доходы — ${periodLabel()}`
+            }
+            right={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={() => navigate(-1)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    border: '1px solid #e2e8f0',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  ‹
+                </button>
+                <button
+                  disabled={isCurrent}
+                  onClick={() => navigate(1)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    border: '1px solid #e2e8f0',
+                    background: '#fff',
+                    cursor: isCurrent ? 'default' : 'pointer',
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: isCurrent ? 0.3 : 1,
+                  }}
+                >
+                  ›
+                </button>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {(['day', 'week', 'month'] as const).map((p) => (
+                    <TimePill
+                      key={p}
+                      label={p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
+                      active={timePeriod === p}
+                      onClick={() => setTimePeriod(p)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          }
-        />
+            }
+          />
 
-        {isLoading ? (
-          <div style={{ padding: 16 }}>
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                style={{ height: 48, background: '#f1f5f9', borderRadius: 6, marginBottom: 6 }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div>
-            {/* Revenue from trips — month view only */}
-            {timePeriod === 'month' && revenue > 0 && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 16px',
-                  borderBottom: '1px solid #f1f5f9',
-                  background: '#f0fdf4',
-                }}
-              >
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>
+          {isLoading ? (
+            <div style={{ padding: 16 }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  style={{ height: 48, background: '#f1f5f9', borderRadius: 6, marginBottom: 6 }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div>
+              {/* Trip revenue row — clickable filter */}
+              {showTripsRevenue && periodRevenue > 0 && (
+                <div
+                  onClick={() =>
+                    setActiveCatFilter(activeCatFilter === '__trips__' ? null : '__trips__')
+                  }
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '9px 14px',
+                    borderBottom: '1px solid #f1f5f9',
+                    background: activeCatFilter === '__trips__' ? '#dcfce7' : '#f0fdf4',
+                    cursor: 'pointer',
+                    transition: 'background .1s',
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = '#dcfce7')}
+                  onMouseOut={(e) =>
+                    (e.currentTarget.style.background =
+                      activeCatFilter === '__trips__' ? '#dcfce7' : '#f0fdf4')
+                  }
+                >
+                  <div
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: '#10b981',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#166534',
+                      flex: 1,
+                    }}
+                  >
                     Выручка с рейсов
                   </p>
                   <p
                     style={{
-                      fontSize: 10,
+                      fontSize: 9,
                       color: '#6b7280',
                       fontWeight: 600,
-                      marginTop: 2,
                       textTransform: 'uppercase',
+                      flexShrink: 0,
+                      maxWidth: 220,
+                      textAlign: 'right',
                     }}
                   >
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -3102,61 +3215,210 @@ function IncomePanel() {
                       .map(([k, v]) => `${INCOME_PAYMENT_LABELS[k] ?? k}: ${rub(n(String(v)))}`)
                       .join(' · ')}
                   </p>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: '#059669',
+                      flexShrink: 0,
+                      minWidth: 80,
+                      textAlign: 'right',
+                    }}
+                  >
+                    +{rub(periodRevenue)}
+                  </span>
                 </div>
-                <p style={{ fontWeight: 900, fontSize: 14, color: '#166534' }}>{rub(revenue)}</p>
-              </div>
-            )}
+              )}
 
-            {/* Manual income transactions */}
-            {periodIncomeTxs.length === 0 && periodRevenue === 0 ? (
-              <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>
-                Поступлений нет
-              </p>
-            ) : periodIncomeTxs.length === 0 ? null : (
-              periodIncomeTxs.map((tx) => (
-                <div
-                  key={tx.id}
+              {/* Manual income transactions */}
+              {visibleTxs.length === 0 && (!showTripsRevenue || periodRevenue === 0) ? (
+                <p style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>
+                  Поступлений нет
+                </p>
+              ) : visibleTxs.length === 0 ? null : (
+                visibleTxs.map((tx) => {
+                  const catKey = tx.category?.name ?? 'Прочие поступления';
+                  const group = manualGroups.find((g) => g.id === catKey);
+                  const color = group?.color ?? '#64748b';
+                  return (
+                    <div
+                      key={tx.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '6px 14px',
+                        borderBottom: '1px solid #f8fafc',
+                        transition: 'background .1s',
+                        cursor: 'default',
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = '')}
+                    >
+                      <div
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: '50%',
+                          background: color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <p
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#1e293b',
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {tx.category?.name ?? tx.description ?? '—'}
+                      </p>
+                      {tx.counterparty?.name && (
+                        <span
+                          style={{ fontSize: 9, fontWeight: 700, color: '#2563eb', flexShrink: 0 }}
+                        >
+                          {tx.counterparty.name}
+                        </span>
+                      )}
+                      {tx.to_wallet?.name && (
+                        <span style={{ fontSize: 9, color: '#94a3b8', flexShrink: 0 }}>
+                          {tx.to_wallet.name}
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: '#94a3b8',
+                          flexShrink: 0,
+                          minWidth: 42,
+                          textAlign: 'right',
+                        }}
+                      >
+                        {shortDate(tx.created_at)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color,
+                          flexShrink: 0,
+                          minWidth: 80,
+                          textAlign: 'right',
+                        }}
+                      >
+                        +{rub(n(tx.amount))}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* Right: structure */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Card>
+            <CardHead title="Структура доходов" />
+            <div style={{ padding: '14px 16px' }}>
+              <StackBar
+                segments={structureGroups.map(({ color, total, name }) => ({
+                  flex: total,
+                  color,
+                  label: `${name} ${grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0}%`,
+                }))}
+              />
+            </div>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 8px 12px' }}
+            >
+              {structureGroups.map(({ id, name, color, total }) => (
+                <LegendRow
+                  key={id}
+                  color={color}
+                  name={name}
+                  pct={grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0}
+                  amount={total}
+                  active={activeCatFilter === id}
+                  onClick={() => {
+                    const next = activeCatFilter === id ? null : id;
+                    setActiveCatFilter(next);
+                    if (next === '__trips__') setActiveChip('trips');
+                    else if (next !== null) setActiveChip('manual');
+                    else setActiveChip('all');
+                  }}
+                />
+              ))}
+              {structureGroups.length === 0 && (
+                <p style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 12 }}>
+                  Нет данных
+                </p>
+              )}
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 10,
+                padding: '12px 16px',
+                borderTop: '1px solid #f8fafc',
+              }}
+            >
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
+                  borderRadius: 10,
+                }}
+              >
+                <p
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 16px',
-                    borderBottom: '1px solid #f8fafc',
-                    gap: 12,
+                    fontSize: 9,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '.1em',
+                    color: '#166534',
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
-                      {tx.category?.name ?? tx.description ?? '—'}
-                    </p>
-                    {tx.counterparty?.name && (
-                      <p style={{ fontSize: 10, fontWeight: 700, color: '#2563eb', marginTop: 2 }}>
-                        от: {tx.counterparty.name}
-                      </p>
-                    )}
-                    <p
-                      style={{
-                        fontSize: 10,
-                        color: '#94a3b8',
-                        fontWeight: 600,
-                        marginTop: 2,
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {shortDate(tx.created_at)}
-                      {tx.to_wallet?.name ? ` · ${tx.to_wallet.name}` : ''}
-                      {tx.description && tx.category ? ` · ${tx.description}` : ''}
-                    </p>
-                  </div>
-                  <p style={{ fontWeight: 900, fontSize: 14, color: '#059669', flexShrink: 0 }}>
-                    +{rub(n(tx.amount))}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </Card>
+                  Рейсы
+                </p>
+                <p style={{ fontSize: 20, fontWeight: 900, color: '#14532d', marginTop: 4 }}>
+                  {grandTotal > 0 ? Math.round((periodRevenue / grandTotal) * 100) : 0}%
+                </p>
+                <p style={{ fontSize: 9, color: '#16a34a', marginTop: 2 }}>{rub(periodRevenue)}</p>
+              </div>
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: 'linear-gradient(135deg,#dbeafe,#bfdbfe)',
+                  borderRadius: 10,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '.1em',
+                    color: '#1e40af',
+                  }}
+                >
+                  Поступления
+                </p>
+                <p style={{ fontSize: 20, fontWeight: 900, color: '#1e3a8a', marginTop: 4 }}>
+                  {grandTotal > 0 ? Math.round((txTotal / grandTotal) * 100) : 0}%
+                </p>
+                <p style={{ fontSize: 9, color: '#2563eb', marginTop: 2 }}>{rub(txTotal)}</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3302,7 +3564,7 @@ export default function FinancePage() {
                   {tab.sub}
                 </span>
               </span>
-              <TabAmount>{tab.amount}</TabAmount>
+              {tab.id !== 'payables' && <TabAmount>{tab.amount}</TabAmount>}
             </button>
           );
         })}
