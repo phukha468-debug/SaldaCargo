@@ -77,8 +77,8 @@ export default function DashboardHome() {
   const { data, isLoading, isError } = useQuery<Summary>({
     queryKey: ['dashboard-summary'],
     queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
-    staleTime: 120000,
-    refetchInterval: 3 * 60 * 1000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({

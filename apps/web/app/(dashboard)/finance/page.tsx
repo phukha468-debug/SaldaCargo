@@ -629,6 +629,7 @@ function ExpensesPanel() {
     queryKey: ['finance-month', selectedMonth],
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
     staleTime: 60 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   const txList = data?.transactions ?? [];
@@ -2963,6 +2964,7 @@ function IncomePanel() {
     queryKey: ['finance-month', selectedMonth],
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
     staleTime: 60 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   const allIncomeTxs = data?.income_transactions ?? [];
@@ -3480,6 +3482,7 @@ export default function FinancePage() {
     queryKey: ['finance-month', currentMonth],
     queryFn: () => fetch(`/api/finance?month=${currentMonth}`).then((r) => r.json()),
     staleTime: 60 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   const expTotal = (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0);
