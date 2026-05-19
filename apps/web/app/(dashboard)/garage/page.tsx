@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { cn } from '@saldacargo/ui';
+import { cn, Money } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,9 @@ type OrderDetail = Omit<OrderRow, 'works'> & {
   lifecycle_status: string;
   admin_note: string | null;
   mechanic_note: string | null;
+  mechanic_pay: string | null;
+  second_mechanic_pay: string | null;
+  second_mechanic: Mechanic | null;
   client_vehicle_model: string | null;
   client_phone: string | null;
   odometer_start: number | null;
@@ -802,6 +805,32 @@ function OrderDetailModal({
                 <p className="text-sm text-slate-700">{order.mechanic_note}</p>
               </div>
             )}
+            {order.lifecycle_status === 'approved' &&
+              (order.mechanic_pay || order.second_mechanic_pay) && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
+                    ЗП начислено
+                  </p>
+                  {order.mechanic_pay && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-700">{order.mechanic?.name ?? 'Механик'}</span>
+                      <span className="font-black text-emerald-700">
+                        <Money amount={order.mechanic_pay} />
+                      </span>
+                    </div>
+                  )}
+                  {order.second_mechanic_pay && (
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-slate-700">
+                        {order.second_mechanic?.name ?? 'Механик 2'}
+                      </span>
+                      <span className="font-black text-emerald-700">
+                        <Money amount={order.second_mechanic_pay} />
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             {isPendingApproval && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                 <p className="text-sm font-semibold text-emerald-800 mb-1">

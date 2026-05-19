@@ -12,12 +12,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         `
         id, order_number, status, lifecycle_status, priority, machine_type,
         problem_description, admin_note, mechanic_note,
+        mechanic_pay, second_mechanic_pay,
         client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
         client_name, client_phone,
         odometer_start, odometer_end,
         created_at, updated_at,
         asset:assets(id, short_name, reg_number),
         mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
+        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name),
         works:service_order_works(
           id, status, norm_minutes, actual_minutes,
           custom_work_name,
@@ -106,15 +108,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const hasTwo = !!order.second_mechanic_id;
 
       const mechTxns: any[] = [];
-      for (const [mechData, isSplit] of [
-        [order.mechanic, hasTwo],
-        [order.second_mechanic, hasTwo],
-      ] as [any, boolean][]) {
+      const payMap: Record<string, string> = {};
+
+      for (const [mechData, isSplit, payField] of [
+        [order.mechanic, hasTwo, 'mechanic_pay'],
+        [order.second_mechanic, hasTwo, 'second_mechanic_pay'],
+      ] as [any, boolean, string][]) {
         if (!mechData) continue;
         const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
         const hours = isSplit ? totalHours / 2 : totalHours;
         const salary = (hours * hourlyRate * pct) / 100;
         if (salary > 0) {
+          payMap[payField] = salary.toFixed(2);
           mechTxns.push({
             direction: 'expense',
             lifecycle_status: 'approved',
@@ -129,7 +134,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       await (supabase as any)
         .from('service_orders')
-        .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
+        .update({ lifecycle_status: 'approved', ...payMap, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (mechTxns.length) await (supabase as any).from('transactions').insert(mechTxns);
 
