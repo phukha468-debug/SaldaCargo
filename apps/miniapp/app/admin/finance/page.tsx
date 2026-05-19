@@ -30,7 +30,6 @@ function FinanceContent() {
     | 'expense_menu'
     | 'income'
     | 'expense'
-    | 'collection'
     | 'debts'
     | 'supplier_debt'
     | 'salary'
@@ -45,17 +44,15 @@ function FinanceContent() {
           ? 'income_menu'
           : initialAction === 'expense'
             ? 'expense_menu'
-            : initialAction === 'collection'
-              ? 'collection'
-              : initialAction === 'debts'
-                ? 'debts'
-                : initialAction === 'supplier_debt'
-                  ? 'supplier_debt'
-                  : initialAction === 'salary'
-                    ? 'salary'
-                    : initialAction === 'receivables'
-                      ? 'receivables'
-                      : null,
+            : initialAction === 'debts'
+              ? 'debts'
+              : initialAction === 'supplier_debt'
+                ? 'supplier_debt'
+                : initialAction === 'salary'
+                  ? 'salary'
+                  : initialAction === 'receivables'
+                    ? 'receivables'
+                    : null,
   );
   const queryClient = useQueryClient();
 
@@ -109,13 +106,6 @@ function FinanceContent() {
                 <span className="text-[10px] font-black uppercase tracking-widest">
                   Добавить доход
                 </span>
-              </button>
-              <button
-                onClick={() => setShowForm('collection')}
-                className="bg-blue-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
-              >
-                <span className="text-xl">💼</span>
-                <span className="text-[10px] font-black uppercase tracking-widest">Инкасс.</span>
               </button>
               <button
                 onClick={() => setShowForm('receivables')}
@@ -211,17 +201,6 @@ function FinanceContent() {
             onClose={() => setShowForm('expense_menu')}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
-              setShowForm(null);
-            }}
-          />
-        )}
-
-        {/* Форма инкассации */}
-        {showForm === 'collection' && (
-          <CashCollectionForm
-            onClose={() => setShowForm('income_menu')}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['admin-cash-balances'] });
               setShowForm(null);
             }}
           />
@@ -359,170 +338,6 @@ function FinanceContent() {
           </section>
         )}
       </div>
-    </div>
-  );
-}
-
-function CashCollectionForm({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [selectedDriver, setSelectedDriver] = useState('');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-
-  const {
-    data: balances = [],
-    isLoading,
-    isError,
-    error: queryError,
-  } = useQuery<any[]>({
-    queryKey: ['admin-cash-balances'],
-    queryFn: async () => {
-      const r = await fetch('/api/admin/cash-collections');
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
-      if (!Array.isArray(data)) throw new Error('Неверный ответ сервера');
-      return data;
-    },
-    staleTime: 0,
-  });
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      fetch('/api/admin/cash-collections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driver_id: selectedDriver, amount, note }),
-      }).then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error ?? 'Ошибка');
-        return data;
-      }),
-    onSuccess,
-    onError: (e: Error) => setError(e.message),
-  });
-
-  const selectedBalance = balances.find((d: any) => d.driver_id === selectedDriver);
-
-  const handleSubmit = () => {
-    if (!selectedDriver) return setError('Выберите водителя');
-    if (!amount || parseFloat(amount) <= 0) return setError('Введите сумму');
-    setError('');
-    mutation.mutate();
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-black uppercase text-sm text-blue-600">💼 Инкассация</h2>
-        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
-          ✕
-        </button>
-      </div>
-
-      {isLoading ? (
-        <div className="animate-pulse space-y-2">
-          <div className="h-12 bg-zinc-200 rounded-lg" />
-          <div className="h-12 bg-zinc-200 rounded-lg" />
-        </div>
-      ) : isError ? (
-        <p className="text-center py-4 text-red-500 font-bold text-xs uppercase">
-          ❌ {(queryError as Error)?.message ?? 'Ошибка загрузки'}
-        </p>
-      ) : balances.length === 0 ? (
-        <p className="text-center py-4 text-zinc-400 font-bold text-xs uppercase">
-          Нет данных по водителям
-        </p>
-      ) : (
-        <>
-          {/* Водители с подотчётом */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-              Водитель (подотчёт)
-            </label>
-            <div className="space-y-2">
-              {balances.map((d: any) => (
-                <button
-                  key={d.driver_id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDriver(d.driver_id);
-                    setAmount(parseFloat(d.balance) > 0 ? d.balance : '');
-                  }}
-                  className={`w-full p-3 rounded-lg border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.97] ${
-                    selectedDriver === d.driver_id
-                      ? 'border-blue-500 bg-blue-50 text-blue-900'
-                      : 'border-zinc-200 text-zinc-700'
-                  }`}
-                >
-                  <span>{d.driver_name}</span>
-                  <Money
-                    amount={d.balance}
-                    className={
-                      parseFloat(d.balance) > 0
-                        ? 'font-black text-orange-600'
-                        : 'font-bold text-zinc-400'
-                    }
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {selectedDriver && (
-            <>
-              {/* Сумма */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                  Сумма инкассации, ₽
-                  {selectedBalance && (
-                    <span className="ml-2 text-orange-600 normal-case">
-                      (подотчёт: {parseFloat(selectedBalance.balance).toLocaleString('ru-RU')} ₽)
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0"
-                  className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Заметка */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                  Заметка (необязательно)
-                </label>
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Комментарий..."
-                  className="w-full rounded-lg border-2 border-zinc-200 px-4 h-12 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-            </>
-          )}
-
-          {error && <p className="text-red-600 text-xs font-bold uppercase">{error}</p>}
-
-          <button
-            onClick={handleSubmit}
-            disabled={mutation.isPending || !selectedDriver}
-            className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-blue-600 active:scale-[0.97] transition-all disabled:opacity-50"
-          >
-            {mutation.isPending ? 'Сохраняем...' : '✓ Провести инкассацию'}
-          </button>
-        </>
-      )}
     </div>
   );
 }
