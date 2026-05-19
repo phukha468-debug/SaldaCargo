@@ -1,0 +1,706 @@
+[
+  {
+    "name": "Замена глушителя",
+    "category": "Выхлоп",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена гофры глушителя",
+    "category": "Выхлоп",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена приёмной трубы",
+    "category": "Выхлоп",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена прокладки выпускного коллектора",
+    "category": "Выхлоп",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Диагностика двигателя",
+    "category": "Двигатель",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Диагностика турбины",
+    "category": "Двигатель",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена водяной помпы",
+    "category": "Двигатель",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена натяжителя ремня",
+    "category": "Двигатель",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена подушек двигателя",
+    "category": "Двигатель",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена приводного ремня (навесного)",
+    "category": "Двигатель",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена прокладки ГБЦ",
+    "category": "Двигатель",
+    "norm_minutes": 480,
+    "norm_minutes_valdai": 540,
+    "default_price_client": 12000.0,
+    "internal_cost_rate": 6000.0
+  },
+  {
+    "name": "Замена радиатора охлаждения",
+    "category": "Двигатель",
+    "norm_minutes": 150,
+    "norm_minutes_valdai": 180,
+    "default_price_client": 3750.0,
+    "internal_cost_rate": 1875.0
+  },
+  {
+    "name": "Замена ремня ГРМ",
+    "category": "Двигатель",
+    "norm_minutes": 240,
+    "norm_minutes_valdai": 300,
+    "default_price_client": 6000.0,
+    "internal_cost_rate": 3000.0
+  },
+  {
+    "name": "Замена сальников / прокладок двигателя",
+    "category": "Двигатель",
+    "norm_minutes": 240,
+    "norm_minutes_valdai": 300,
+    "default_price_client": 6000.0,
+    "internal_cost_rate": 3000.0
+  },
+  {
+    "name": "Замена свечей зажигания",
+    "category": "Двигатель",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 30,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена свечей накала",
+    "category": "Двигатель",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена термостата",
+    "category": "Двигатель",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена турбокомпрессора",
+    "category": "Двигатель",
+    "norm_minutes": 360,
+    "norm_minutes_valdai": 420,
+    "default_price_client": 9000.0,
+    "internal_cost_rate": 4500.0
+  },
+  {
+    "name": "Замена форсунок",
+    "category": "Двигатель",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена цепи ГРМ",
+    "category": "Двигатель",
+    "norm_minutes": 360,
+    "norm_minutes_valdai": 420,
+    "default_price_client": 9000.0,
+    "internal_cost_rate": 4500.0
+  },
+  {
+    "name": "Регулировка клапанов",
+    "category": "Двигатель",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Чистка клапана EGR",
+    "category": "Двигатель",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена вентилятора печки",
+    "category": "Кузов",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена зеркала",
+    "category": "Кузов",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 30,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена компрессора кондиционера",
+    "category": "Кузов",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена радиатора печки",
+    "category": "Кузов",
+    "norm_minutes": 240,
+    "norm_minutes_valdai": 300,
+    "default_price_client": 6000.0,
+    "internal_cost_rate": 3000.0
+  },
+  {
+    "name": "Замена ручки двери / замка",
+    "category": "Кузов",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 45,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена стекла (лобовое/боковое)",
+    "category": "Кузов",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена трапеции дворников",
+    "category": "Кузов",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Заправка кондиционера",
+    "category": "Кузов",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Кузовной ремонт (мелкий)",
+    "category": "Кузов",
+    "norm_minutes": 240,
+    "norm_minutes_valdai": 300,
+    "default_price_client": 6000.0,
+    "internal_cost_rate": 3000.0
+  },
+  {
+    "name": "Покраска элемента кузова",
+    "category": "Кузов",
+    "norm_minutes": 360,
+    "norm_minutes_valdai": 420,
+    "default_price_client": 9000.0,
+    "internal_cost_rate": 4500.0
+  },
+  {
+    "name": "Замена антифриза (ОЖ)",
+    "category": "ТО и регламент",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена воздушного фильтра",
+    "category": "ТО и регламент",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 30,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена жидкости ГУР",
+    "category": "ТО и регламент",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 45,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена масла двигателя",
+    "category": "ТО и регламент",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена салонного фильтра",
+    "category": "ТО и регламент",
+    "norm_minutes": 15,
+    "norm_minutes_valdai": 15,
+    "default_price_client": 375.0,
+    "internal_cost_rate": 188.0
+  },
+  {
+    "name": "Замена топливного фильтра",
+    "category": "ТО и регламент",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 30,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена тормозной жидкости",
+    "category": "ТО и регламент",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "ТО-1 (масло, фильтры воздух/топливо)",
+    "category": "ТО и регламент",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "ТО-2 (полное)",
+    "category": "ТО и регламент",
+    "norm_minutes": 300,
+    "norm_minutes_valdai": 360,
+    "default_price_client": 7500.0,
+    "internal_cost_rate": 3750.0
+  },
+  {
+    "name": "Замена топливного бака",
+    "category": "Топливная",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена топливного насоса",
+    "category": "Топливная",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 240,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена топливных магистралей",
+    "category": "Топливная",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена гл./раб. цилиндра сцепления",
+    "category": "Трансмиссия",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена карданного вала",
+    "category": "Трансмиссия",
+    "norm_minutes": 150,
+    "norm_minutes_valdai": 180,
+    "default_price_client": 3750.0,
+    "internal_cost_rate": 1875.0
+  },
+  {
+    "name": "Замена КПП",
+    "category": "Трансмиссия",
+    "norm_minutes": 360,
+    "norm_minutes_valdai": 420,
+    "default_price_client": 9000.0,
+    "internal_cost_rate": 4500.0
+  },
+  {
+    "name": "Замена крестовины кардана",
+    "category": "Трансмиссия",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена масла заднего моста",
+    "category": "Трансмиссия",
+    "norm_minutes": 45,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1125.0,
+    "internal_cost_rate": 563.0
+  },
+  {
+    "name": "Замена масла КПП",
+    "category": "Трансмиссия",
+    "norm_minutes": 45,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1125.0,
+    "internal_cost_rate": 563.0
+  },
+  {
+    "name": "Замена ступичного подшипника (зад.)",
+    "category": "Трансмиссия",
+    "norm_minutes": 150,
+    "norm_minutes_valdai": 180,
+    "default_price_client": 3750.0,
+    "internal_cost_rate": 1875.0
+  },
+  {
+    "name": "Замена ступичного подшипника (перед.)",
+    "category": "Трансмиссия",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена сцепления (комплект)",
+    "category": "Трансмиссия",
+    "norm_minutes": 300,
+    "norm_minutes_valdai": 360,
+    "default_price_client": 7500.0,
+    "internal_cost_rate": 3750.0
+  },
+  {
+    "name": "Замена троса сцепления",
+    "category": "Трансмиссия",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Регулировка КПП / кулисы",
+    "category": "Трансмиссия",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Диагностика ходовой",
+    "category": "Ходовая",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена амортизаторов задних",
+    "category": "Ходовая",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена амортизаторов передних",
+    "category": "Ходовая",
+    "norm_minutes": 150,
+    "norm_minutes_valdai": 180,
+    "default_price_client": 3750.0,
+    "internal_cost_rate": 1875.0
+  },
+  {
+    "name": "Замена втулок стабилизатора",
+    "category": "Ходовая",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена датчика ABS",
+    "category": "Ходовая",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 45,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена насоса ГУР",
+    "category": "Ходовая",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена подшипника колеса",
+    "category": "Ходовая",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена рессоры / пружины",
+    "category": "Ходовая",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена рулевого наконечника",
+    "category": "Ходовая",
+    "norm_minutes": 45,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1125.0,
+    "internal_cost_rate": 563.0
+  },
+  {
+    "name": "Замена рулевой рейки",
+    "category": "Ходовая",
+    "norm_minutes": 240,
+    "norm_minutes_valdai": 300,
+    "default_price_client": 6000.0,
+    "internal_cost_rate": 3000.0
+  },
+  {
+    "name": "Замена рулевой тяги",
+    "category": "Ходовая",
+    "norm_minutes": 60,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 1500.0,
+    "internal_cost_rate": 750.0
+  },
+  {
+    "name": "Замена сайлентблоков задней подвески",
+    "category": "Ходовая",
+    "norm_minutes": 150,
+    "norm_minutes_valdai": 180,
+    "default_price_client": 3750.0,
+    "internal_cost_rate": 1875.0
+  },
+  {
+    "name": "Замена сайлентблоков передней подвески",
+    "category": "Ходовая",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 210,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена стоек стабилизатора",
+    "category": "Ходовая",
+    "norm_minutes": 45,
+    "norm_minutes_valdai": 60,
+    "default_price_client": 1125.0,
+    "internal_cost_rate": 563.0
+  },
+  {
+    "name": "Замена тормозных барабанов (зад.)",
+    "category": "Ходовая",
+    "norm_minutes": 150,
+    "norm_minutes_valdai": 180,
+    "default_price_client": 3750.0,
+    "internal_cost_rate": 1875.0
+  },
+  {
+    "name": "Замена тормозных дисков (пер.)",
+    "category": "Ходовая",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена тормозных колодок (зад.)",
+    "category": "Ходовая",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена тормозных колодок (пер.)",
+    "category": "Ходовая",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена шаровой опоры",
+    "category": "Ходовая",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Регулировка развал-схождения",
+    "category": "Ходовая",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 120,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Балансировка колеса",
+    "category": "Шины",
+    "norm_minutes": 15,
+    "norm_minutes_valdai": 15,
+    "default_price_client": 375.0,
+    "internal_cost_rate": 188.0
+  },
+  {
+    "name": "Ремонт прокола колеса",
+    "category": "Шины",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 30,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Шиномонтаж (1 колесо)",
+    "category": "Шины",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 30,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Шиномонтаж (комплект 4 колеса)",
+    "category": "Шины",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Диагностика электрики",
+    "category": "Электрика",
+    "norm_minutes": 90,
+    "norm_minutes_valdai": 90,
+    "default_price_client": 2250.0,
+    "internal_cost_rate": 1125.0
+  },
+  {
+    "name": "Замена АКБ",
+    "category": "Электрика",
+    "norm_minutes": 15,
+    "norm_minutes_valdai": 15,
+    "default_price_client": 375.0,
+    "internal_cost_rate": 188.0
+  },
+  {
+    "name": "Замена генератора",
+    "category": "Электрика",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена жгута проводки",
+    "category": "Электрика",
+    "norm_minutes": 180,
+    "norm_minutes_valdai": 240,
+    "default_price_client": 4500.0,
+    "internal_cost_rate": 2250.0
+  },
+  {
+    "name": "Замена катушки зажигания",
+    "category": "Электрика",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 45,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Замена ламп (фара/габарит/стоп)",
+    "category": "Электрика",
+    "norm_minutes": 15,
+    "norm_minutes_valdai": 15,
+    "default_price_client": 375.0,
+    "internal_cost_rate": 188.0
+  },
+  {
+    "name": "Замена стартера",
+    "category": "Электрика",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  },
+  {
+    "name": "Замена фары / фонаря",
+    "category": "Электрика",
+    "norm_minutes": 30,
+    "norm_minutes_valdai": 45,
+    "default_price_client": 750.0,
+    "internal_cost_rate": 375.0
+  },
+  {
+    "name": "Ремонт проводки (поиск обрыва/КЗ)",
+    "category": "Электрика",
+    "norm_minutes": 120,
+    "norm_minutes_valdai": 150,
+    "default_price_client": 3000.0,
+    "internal_cost_rate": 1500.0
+  }
+]

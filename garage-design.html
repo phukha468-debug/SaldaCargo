@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Гараж — SaldaCargo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .nav-item { transition: all .15s; }
+    .nav-item.active { background: rgba(255,255,255,.1); color: #fff; }
+    .nav-item:not(.active):hover { background: rgba(255,255,255,.06); color: #cbd5e1; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+    .btn-primary { background: #0f172a; color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s; }
+    .btn-primary:hover { background: #1e293b; }
+    .btn-sm { padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; }
+    .table-row:hover { background: #f8fafc; }
+    .alert-pulse { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+    .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.25rem; }
+    input, select, textarea { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 14px; width: 100%; outline: none; transition: border-color .15s; }
+    input:focus, select:focus, textarea:focus { border-color: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex">
+
+<!-- ══ Sidebar ══════════════════════════════════════════════════════════════ -->
+<aside class="w-56 min-h-screen bg-slate-900 flex flex-col flex-shrink-0">
+  <div class="px-5 py-5 border-b border-slate-700">
+    <div class="text-white font-bold text-base">SaldaCargo</div>
+    <div class="text-slate-400 text-xs mt-0.5">Раздел: Гараж</div>
+  </div>
+  <nav class="flex-1 py-3 px-2 overflow-y-auto">
+    <div class="text-slate-500 text-xs font-semibold px-3 mb-1 mt-1 uppercase tracking-wider">Главное</div>
+    <a onclick="nav('dashboard')" class="nav-item active flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 text-sm cursor-pointer mb-0.5" id="nav-dashboard">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Дашборд
+      <span class="ml-auto bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold" id="dash-badge">3</span>
+    </a>
+    <a onclick="nav('requests')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-requests">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+      Заявки
+      <span class="ml-auto bg-amber-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">2</span>
+    </a>
+    <a onclick="nav('workorders')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-workorders">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      Заказ-наряды
+    </a>
+    <a onclick="nav('maintenance')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-maintenance">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Регламенты ТО
+    </a>
+
+    <div class="text-slate-500 text-xs font-semibold px-3 mb-1 mt-4 uppercase tracking-wider">Справочники</div>
+    <a onclick="nav('worktypes')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-worktypes">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+      Виды работ
+    </a>
+    <a onclick="nav('faultcatalog')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-faultcatalog">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Каталог неисправностей
+    </a>
+
+    <div class="text-slate-500 text-xs font-semibold px-3 mb-1 mt-4 uppercase tracking-wider">Отчёты</div>
+    <a onclick="nav('repvehicles')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-repvehicles">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+      История автомобилей
+    </a>
+    <a onclick="nav('repmechanics')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-repmechanics">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
+      По механикам
+    </a>
+
+    <div class="text-slate-500 text-xs font-semibold px-3 mb-1 mt-4 uppercase tracking-wider">Система</div>
+    <a onclick="nav('settings')" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 text-sm cursor-pointer mb-0.5" id="nav-settings">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+      Настройки СТО
+    </a>
+  </nav>
+</aside>
+
+<!-- ══ Main Content ══════════════════════════════════════════════════════════ -->
+<main class="flex-1 overflow-auto">
+
+<!-- ═══════════════════════ DASHBOARD ═══════════════════════════════════════ -->
+<div id="section-dashboard" class="section active p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Дашборд Гараж</h1>
+      <p class="text-sm text-slate-400 mt-0.5">16 мая 2026 — оперативная сводка</p>
+    </div>
+    <button onclick="openNewWO()" class="btn-primary flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Новый наряд
+    </button>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="grid grid-cols-5 gap-3 mb-5">
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">В ремонте сейчас</div>
+      <div class="text-3xl font-bold text-slate-900">2</div>
+      <div class="text-xs text-slate-500 mt-1">из 4 автомобилей</div>
+    </div>
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">Активных нарядов</div>
+      <div class="text-3xl font-bold text-blue-600">4</div>
+      <div class="text-xs text-slate-500 mt-1">открыт / в работе</div>
+    </div>
+    <div class="stat-card">
+      <div class="text-xs text-amber-600 mb-1">На утверждении</div>
+      <div class="text-3xl font-bold text-amber-600">2</div>
+      <div class="text-xs text-slate-500 mt-1">ждут Администратора</div>
+    </div>
+    <div class="stat-card border-red-200 bg-red-50">
+      <div class="text-xs text-red-500 mb-1 font-medium">Алертов ТО</div>
+      <div class="text-3xl font-bold text-red-600">3</div>
+      <div class="text-xs text-red-400 mt-1">требуют внимания</div>
+    </div>
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">Заявок от водителей</div>
+      <div class="text-3xl font-bold text-violet-600">2</div>
+      <div class="text-xs text-slate-500 mt-1">ожидают одобрения</div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-4">
+    <!-- Alerts TO -->
+    <div class="card p-4 col-span-1">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="w-2 h-2 bg-red-500 rounded-full alert-pulse"></div>
+        <h3 class="font-semibold text-slate-900 text-sm">Алерты ТО</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-red-700 text-sm">Газель А123БВ</div>
+              <div class="text-xs text-red-500 mt-0.5">Замена масла — просрочено на 1 200 км</div>
+            </div>
+            <span class="badge bg-red-100 text-red-700">СРОЧНО</span>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button onclick="nav('workorders')" class="btn-sm bg-red-600 text-white text-xs">Создать наряд</button>
+            <button class="btn-sm bg-white border border-red-200 text-red-600 text-xs">Закрыть</button>
+          </div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-amber-700 text-sm">Валдай В789ЕЖ</div>
+              <div class="text-xs text-amber-600 mt-0.5">ТО-1 — через 800 км</div>
+            </div>
+            <span class="badge bg-amber-100 text-amber-700">СКОРО</span>
+          </div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-amber-700 text-sm">Газель Б456ГД</div>
+              <div class="text-xs text-amber-600 mt-0.5">Замена фильтра — через 12 дней</div>
+            </div>
+            <span class="badge bg-amber-100 text-amber-700">СКОРО</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Заявки от водителей + Наряды на утверждении -->
+    <div class="card p-4 col-span-1">
+      <h3 class="font-semibold text-slate-900 text-sm mb-3">Заявки от водителей</h3>
+      <div class="space-y-2 mb-4">
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="font-medium text-slate-900 text-sm">Газель А123БВ</div>
+              <div class="text-xs text-slate-500 mt-0.5">«Скрип при торможении»</div>
+              <div class="text-xs text-slate-400">Водитель: Иванов И.И. · 16 мая</div>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button class="btn-sm bg-slate-900 text-white text-xs">Одобрить</button>
+            <button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Отклонить</button>
+          </div>
+        </div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="font-medium text-slate-900 text-sm">Валдай Г012ЗИ</div>
+              <div class="text-xs text-slate-500 mt-0.5">«Вибрация на скорости 80+»</div>
+              <div class="text-xs text-slate-400">Водитель: Петров П.П. · 15 мая</div>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button class="btn-sm bg-slate-900 text-white text-xs">Одобрить</button>
+            <button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Отклонить</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-slate-100 pt-3">
+        <h3 class="font-semibold text-slate-900 text-sm mb-2">На утверждении</h3>
+        <div class="space-y-2">
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div class="flex justify-between">
+              <div>
+                <div class="font-medium text-slate-900 text-sm">НЗ-2025-041</div>
+                <div class="text-xs text-slate-500">Газель А123БВ · Иванов С.</div>
+              </div>
+              <span class="badge bg-amber-100 text-amber-700">4.5 / 5.0 нч</span>
+            </div>
+            <div class="flex gap-2 mt-2">
+              <button class="btn-sm bg-emerald-600 text-white text-xs">Утвердить</button>
+              <button onclick="openWODetail()" class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Детали</button>
+            </div>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div class="flex justify-between">
+              <div>
+                <div class="font-medium text-slate-900 text-sm">НЗ-2025-040</div>
+                <div class="text-xs text-slate-500">Валдай В789ЕЖ · Сидоров М.</div>
+              </div>
+              <span class="badge bg-amber-100 text-amber-700">6.0 / 6.0 нч</span>
+            </div>
+            <div class="flex gap-2 mt-2">
+              <button class="btn-sm bg-emerald-600 text-white text-xs">Утвердить</button>
+              <button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Детали</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Активные наряды -->
+    <div class="card p-4 col-span-1">
+      <h3 class="font-semibold text-slate-900 text-sm mb-3">Активные наряды</h3>
+      <div class="space-y-2">
+        <div class="border border-blue-200 bg-blue-50 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-slate-900 text-sm">НЗ-2025-042</div>
+              <div class="text-xs text-slate-500 mt-0.5">Газель Б456ГД · Иванов С.</div>
+              <div class="text-xs text-slate-400">Замена тормозных колодок</div>
+            </div>
+            <span class="badge bg-blue-100 text-blue-700">В работе</span>
+          </div>
+        </div>
+        <div class="border border-blue-200 bg-blue-50 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-slate-900 text-sm">НЗ-2025-043</div>
+              <div class="text-xs text-slate-500 mt-0.5">Валдай Г012ЗИ · Сидоров М.</div>
+              <div class="text-xs text-slate-400">Диагностика ходовой</div>
+            </div>
+            <span class="badge bg-blue-100 text-blue-700">В работе</span>
+          </div>
+        </div>
+        <div class="border border-slate-200 bg-slate-50 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-slate-900 text-sm">НЗ-2025-044</div>
+              <div class="text-xs text-slate-500 mt-0.5">Газель А123БВ · Не назначен</div>
+              <div class="text-xs text-slate-400">Замена ремня ГРМ</div>
+            </div>
+            <span class="badge bg-slate-100 text-slate-600">Открыт</span>
+          </div>
+        </div>
+        <div class="border border-slate-200 bg-slate-50 rounded-xl p-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium text-slate-900 text-sm">НЗ-2025-045</div>
+              <div class="text-xs text-slate-500 mt-0.5">Валдай В789ЕЖ · Не назначен</div>
+              <div class="text-xs text-slate-400">ТО-1 плановое</div>
+            </div>
+            <span class="badge bg-slate-100 text-slate-600">Открыт</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ ЗАЯВКИ ═══════════════════════════════════════════ -->
+<div id="section-requests" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Заявки на ремонт</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Поступают от водителей через MiniApp</p>
+    </div>
+  </div>
+  <!-- Tabs -->
+  <div class="flex gap-1 bg-slate-100 p-1 rounded-xl mb-4 w-fit">
+    <button onclick="setTab('req','new',this)" class="tab-req px-4 py-1.5 rounded-lg text-sm font-medium bg-white text-slate-900 shadow-sm">Новые (2)</button>
+    <button onclick="setTab('req','approved',this)" class="tab-req px-4 py-1.5 rounded-lg text-sm font-medium text-slate-500">Одобренные</button>
+    <button onclick="setTab('req','rejected',this)" class="tab-req px-4 py-1.5 rounded-lg text-sm font-medium text-slate-500">Отклонённые</button>
+  </div>
+
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 border-b border-slate-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Дата</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Автомобиль</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Водитель</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Описание проблемы</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Статус</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <tr class="table-row">
+          <td class="px-4 py-3 text-slate-500">16.05.2026</td>
+          <td class="px-4 py-3"><span class="font-medium text-slate-900">Газель А123БВ</span></td>
+          <td class="px-4 py-3 text-slate-600">Иванов И.И.</td>
+          <td class="px-4 py-3 text-slate-700">Скрип при торможении <span class="text-slate-400 text-xs">(из каталога)</span></td>
+          <td class="px-4 py-3"><span class="badge bg-violet-100 text-violet-700">Новая</span></td>
+          <td class="px-4 py-3 text-right">
+            <button class="btn-sm bg-slate-900 text-white mr-1">Одобрить</button>
+            <button class="btn-sm bg-white border border-slate-200 text-slate-600">Отклонить</button>
+          </td>
+        </tr>
+        <tr class="table-row">
+          <td class="px-4 py-3 text-slate-500">15.05.2026</td>
+          <td class="px-4 py-3"><span class="font-medium text-slate-900">Валдай Г012ЗИ</span></td>
+          <td class="px-4 py-3 text-slate-600">Петров П.П.</td>
+          <td class="px-4 py-3 text-slate-700">Вибрация на скорости 80+ <span class="text-xs text-amber-600">(не в каталоге → добавить)</span></td>
+          <td class="px-4 py-3"><span class="badge bg-violet-100 text-violet-700">Новая</span></td>
+          <td class="px-4 py-3 text-right">
+            <button class="btn-sm bg-slate-900 text-white mr-1">Одобрить</button>
+            <button class="btn-sm bg-white border border-slate-200 text-slate-600">Отклонить</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════ ЗАКАЗ-НАРЯДЫ ════════════════════════════════════ -->
+<div id="section-workorders" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Заказ-наряды</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Все наряды на ремонт и обслуживание</p>
+    </div>
+    <button onclick="openNewWO()" class="btn-primary flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Новый наряд
+    </button>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex gap-1 bg-slate-100 p-1 rounded-xl mb-4 w-fit">
+    <button onclick="setTab('wo','all',this)" class="tab-wo px-4 py-1.5 rounded-lg text-sm font-medium bg-white text-slate-900 shadow-sm">Все</button>
+    <button onclick="setTab('wo','active',this)" class="tab-wo px-4 py-1.5 rounded-lg text-sm font-medium text-slate-500">Активные (4)</button>
+    <button onclick="setTab('wo','pending',this)" class="tab-wo px-4 py-1.5 rounded-lg text-sm font-medium text-slate-500">На утверждении (2)</button>
+    <button onclick="setTab('wo','approved',this)" class="tab-wo px-4 py-1.5 rounded-lg text-sm font-medium text-slate-500">Утверждённые</button>
+  </div>
+
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 border-b border-slate-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Номер</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Автомобиль</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Работы</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Механик(и)</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Нч план / факт</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Стоимость работ</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Статус</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <tr class="table-row cursor-pointer" onclick="openWODetail()">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-045</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Валдай В789ЕЖ</div><div class="text-xs text-slate-400">пробег 87 420 км</div></td>
+          <td class="px-4 py-3 text-slate-600">ТО-1 плановое</td>
+          <td class="px-4 py-3 text-slate-500 italic">Не назначен</td>
+          <td class="px-4 py-3 text-right font-mono text-sm">3.5 / —</td>
+          <td class="px-4 py-3 text-right text-slate-500">—</td>
+          <td class="px-4 py-3"><span class="badge bg-slate-100 text-slate-600">Открыт</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button></td>
+        </tr>
+        <tr class="table-row cursor-pointer" onclick="openWODetail()">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-044</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Газель А123БВ</div><div class="text-xs text-slate-400">пробег 112 330 км</div></td>
+          <td class="px-4 py-3 text-slate-600">Замена ремня ГРМ</td>
+          <td class="px-4 py-3 text-slate-500 italic">Не назначен</td>
+          <td class="px-4 py-3 text-right font-mono text-sm">4.0 / —</td>
+          <td class="px-4 py-3 text-right text-slate-500">—</td>
+          <td class="px-4 py-3"><span class="badge bg-slate-100 text-slate-600">Открыт</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button></td>
+        </tr>
+        <tr class="table-row cursor-pointer" onclick="openWODetail()">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-043</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Валдай Г012ЗИ</div><div class="text-xs text-slate-400">пробег 64 100 км</div></td>
+          <td class="px-4 py-3 text-slate-600">Диагностика ходовой</td>
+          <td class="px-4 py-3 text-slate-700">Сидоров М.А.</td>
+          <td class="px-4 py-3 text-right font-mono text-sm">1.5 / 1.5</td>
+          <td class="px-4 py-3 text-right text-slate-500">—</td>
+          <td class="px-4 py-3"><span class="badge bg-blue-100 text-blue-700">В работе</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button></td>
+        </tr>
+        <tr class="table-row cursor-pointer" onclick="openWODetail()">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-042</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Газель Б456ГД</div><div class="text-xs text-slate-400">пробег 98 750 км</div></td>
+          <td class="px-4 py-3 text-slate-600">Замена тормозных колодок</td>
+          <td class="px-4 py-3 text-slate-700">Иванов С.Н.</td>
+          <td class="px-4 py-3 text-right font-mono text-sm">2.0 / 2.0</td>
+          <td class="px-4 py-3 text-right text-slate-500">—</td>
+          <td class="px-4 py-3"><span class="badge bg-blue-100 text-blue-700">В работе</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button></td>
+        </tr>
+        <tr class="table-row cursor-pointer" onclick="openWODetail()">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-041</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Газель А123БВ</div><div class="text-xs text-slate-400">пробег 112 010 км</div></td>
+          <td class="px-4 py-3 text-slate-600">Замена масла двигателя, замена фильтра</td>
+          <td class="px-4 py-3 text-slate-700">Иванов С.Н.</td>
+          <td class="px-4 py-3 text-right font-mono text-sm"><span class="text-amber-600 font-semibold">5.0 / 4.5</span></td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-900">9 000 ₽</td>
+          <td class="px-4 py-3"><span class="badge bg-amber-100 text-amber-700">На утверждении</span></td>
+          <td class="px-4 py-3 text-right">
+            <button class="btn-sm bg-emerald-600 text-white mr-1">Утвердить</button>
+            <button onclick="openWODetail()" class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button>
+          </td>
+        </tr>
+        <tr class="table-row cursor-pointer">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-040</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Валдай В789ЕЖ</div><div class="text-xs text-slate-400">пробег 86 900 км</div></td>
+          <td class="px-4 py-3 text-slate-600">Замена сцепления</td>
+          <td class="px-4 py-3 text-slate-700">Сидоров М.А. + Иванов С.Н.</td>
+          <td class="px-4 py-3 text-right font-mono text-sm">6.0 / 6.0</td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-900">12 000 ₽</td>
+          <td class="px-4 py-3"><span class="badge bg-amber-100 text-amber-700">На утверждении</span></td>
+          <td class="px-4 py-3 text-right">
+            <button class="btn-sm bg-emerald-600 text-white mr-1">Утвердить</button>
+            <button class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button>
+          </td>
+        </tr>
+        <tr class="table-row">
+          <td class="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">НЗ-2025-039</td>
+          <td class="px-4 py-3"><div class="font-medium text-slate-900">Газель Б456ГД</div><div class="text-xs text-slate-400">пробег 97 200 км</div></td>
+          <td class="px-4 py-3 text-slate-600">Замена амортизаторов передних</td>
+          <td class="px-4 py-3 text-slate-700">Иванов С.Н.</td>
+          <td class="px-4 py-3 text-right font-mono text-sm">2.5 / 3.0</td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-900">6 000 ₽</td>
+          <td class="px-4 py-3"><span class="badge bg-emerald-100 text-emerald-700">Утверждён</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600">Детали</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════ РЕГЛАМЕНТЫ ТО ═══════════════════════════════════ -->
+<div id="section-maintenance" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Регламенты ТО</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Плановое техническое обслуживание и контроль сроков</p>
+    </div>
+    <button class="btn-primary flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Добавить регламент
+    </button>
+  </div>
+
+  <!-- Сводка по машинам -->
+  <div class="grid grid-cols-4 gap-3 mb-5">
+    <div class="card p-4">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <div class="font-semibold text-slate-900 text-sm">Газель А123БВ</div>
+          <div class="text-xs text-slate-400">112 330 км</div>
+        </div>
+        <div class="w-2 h-2 bg-red-500 rounded-full mt-1 alert-pulse"></div>
+      </div>
+      <div class="text-xs text-red-500 font-medium">1 просрочено</div>
+      <div class="text-xs text-amber-600">0 скоро</div>
+    </div>
+    <div class="card p-4">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <div class="font-semibold text-slate-900 text-sm">Газель Б456ГД</div>
+          <div class="text-xs text-slate-400">98 750 км</div>
+        </div>
+        <div class="w-2 h-2 bg-amber-400 rounded-full mt-1"></div>
+      </div>
+      <div class="text-xs text-slate-400">0 просрочено</div>
+      <div class="text-xs text-amber-600">1 скоро</div>
+    </div>
+    <div class="card p-4">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <div class="font-semibold text-slate-900 text-sm">Валдай В789ЕЖ</div>
+          <div class="text-xs text-slate-400">87 420 км</div>
+        </div>
+        <div class="w-2 h-2 bg-amber-400 rounded-full mt-1"></div>
+      </div>
+      <div class="text-xs text-slate-400">0 просрочено</div>
+      <div class="text-xs text-amber-600">1 скоро</div>
+    </div>
+    <div class="card p-4">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <div class="font-semibold text-slate-900 text-sm">Валдай Г012ЗИ</div>
+          <div class="text-xs text-slate-400">64 100 км</div>
+        </div>
+        <div class="w-2 h-2 bg-emerald-500 rounded-full mt-1"></div>
+      </div>
+      <div class="text-xs text-slate-400">0 просрочено</div>
+      <div class="text-xs text-slate-400">0 скоро</div>
+    </div>
+  </div>
+
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 border-b border-slate-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Автомобиль</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Вид ТО</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Периодичность</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Последнее (км)</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Следующее (км)</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Осталось</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Статус</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <tr class="bg-red-50">
+          <td class="px-4 py-3 font-medium text-slate-900">Газель А123БВ</td>
+          <td class="px-4 py-3 text-slate-700">Замена масла двигателя</td>
+          <td class="px-4 py-3 text-right text-slate-500">10 000 км / 6 мес.</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">100 000</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">110 000</td>
+          <td class="px-4 py-3 text-right font-semibold text-red-600">−1 200 км</td>
+          <td class="px-4 py-3"><span class="badge bg-red-100 text-red-700">Просрочено</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-red-600 text-white text-xs">Создать наряд</button></td>
+        </tr>
+        <tr class="bg-amber-50">
+          <td class="px-4 py-3 font-medium text-slate-900">Газель Б456ГД</td>
+          <td class="px-4 py-3 text-slate-700">Замена топливного фильтра</td>
+          <td class="px-4 py-3 text-right text-slate-500">20 000 км / 12 мес.</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">80 000</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">100 000</td>
+          <td class="px-4 py-3 text-right font-semibold text-amber-600">1 250 км</td>
+          <td class="px-4 py-3"><span class="badge bg-amber-100 text-amber-700">Скоро</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Наряд</button></td>
+        </tr>
+        <tr class="bg-amber-50">
+          <td class="px-4 py-3 font-medium text-slate-900">Валдай В789ЕЖ</td>
+          <td class="px-4 py-3 text-slate-700">ТО-1 (замена масла, фильтров)</td>
+          <td class="px-4 py-3 text-right text-slate-500">10 000 км / 6 мес.</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">77 000</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">87 000</td>
+          <td class="px-4 py-3 text-right font-semibold text-amber-600">−420 км</td>
+          <td class="px-4 py-3"><span class="badge bg-amber-100 text-amber-700">Скоро</span></td>
+          <td class="px-4 py-3 text-right"><button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Наряд</button></td>
+        </tr>
+        <tr>
+          <td class="px-4 py-3 font-medium text-slate-900">Валдай В789ЕЖ</td>
+          <td class="px-4 py-3 text-slate-700">Регулировка развал-схождения</td>
+          <td class="px-4 py-3 text-right text-slate-500">30 000 км</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">70 000</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">100 000</td>
+          <td class="px-4 py-3 text-right font-semibold text-emerald-600">12 580 км</td>
+          <td class="px-4 py-3"><span class="badge bg-emerald-100 text-emerald-700">В норме</span></td>
+          <td class="px-4 py-3 text-right"></td>
+        </tr>
+        <tr>
+          <td class="px-4 py-3 font-medium text-slate-900">Валдай Г012ЗИ</td>
+          <td class="px-4 py-3 text-slate-700">Замена масла двигателя</td>
+          <td class="px-4 py-3 text-right text-slate-500">10 000 км / 6 мес.</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">55 000</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">65 000</td>
+          <td class="px-4 py-3 text-right font-semibold text-emerald-600">900 км</td>
+          <td class="px-4 py-3"><span class="badge bg-emerald-100 text-emerald-700">В норме</span></td>
+          <td class="px-4 py-3 text-right"></td>
+        </tr>
+        <tr>
+          <td class="px-4 py-3 font-medium text-slate-900">Газель А123БВ</td>
+          <td class="px-4 py-3 text-slate-700">Замена ремня ГРМ</td>
+          <td class="px-4 py-3 text-right text-slate-500">90 000 км</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">20 000</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-700">110 000</td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-400">—</td>
+          <td class="px-4 py-3"><span class="badge bg-slate-100 text-slate-600">Наряд открыт</span></td>
+          <td class="px-4 py-3 text-right"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════ ВИДЫ РАБОТ ══════════════════════════════════════ -->
+<div id="section-worktypes" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Виды работ</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Справочник нормачасов по типам автомобилей</p>
+    </div>
+    <button class="btn-primary flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Добавить вид работы
+    </button>
+  </div>
+
+  <!-- Category filter -->
+  <div class="flex gap-2 mb-4 flex-wrap">
+    <button class="btn-sm bg-slate-900 text-white">Все</button>
+    <button class="btn-sm bg-white border border-slate-200 text-slate-600">ТО и регламент</button>
+    <button class="btn-sm bg-white border border-slate-200 text-slate-600">Двигатель</button>
+    <button class="btn-sm bg-white border border-slate-200 text-slate-600">Трансмиссия</button>
+    <button class="btn-sm bg-white border border-slate-200 text-slate-600">Ходовая</button>
+    <button class="btn-sm bg-white border border-slate-200 text-slate-600">Электрика</button>
+    <button class="btn-sm bg-white border border-slate-200 text-slate-600">Кузов</button>
+  </div>
+
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 border-b border-slate-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Вид работы</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Категория</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Газель (нч)</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Валдай (нч)</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Газель (₽)</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Валдай (₽)</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody id="worktypes-body" class="divide-y divide-slate-100"></tbody>
+    </table>
+  </div>
+  <div class="text-xs text-slate-400 mt-2 px-1">Цена рассчитана по ставке СТО 2 000 ₽/нч · Механик получает 50% = 1 000 ₽/нч</div>
+</div>
+
+<!-- ═══════════════════════ КАТАЛОГ НЕИСПРАВНОСТЕЙ ═══════════════════════════ -->
+<div id="section-faultcatalog" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Каталог неисправностей</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Симптомы на языке водителя — быстрый выбор при заявке</p>
+    </div>
+    <button class="btn-primary flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Добавить симптом
+    </button>
+  </div>
+  <div class="grid grid-cols-3 gap-3" id="fault-catalog-grid"></div>
+</div>
+
+<!-- ═══════════════════════ ИСТОРИЯ АВТОМОБИЛЕЙ ══════════════════════════════ -->
+<div id="section-repvehicles" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">История автомобилей</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Все ремонты, затраты на содержание, динамика поломок</p>
+    </div>
+    <div class="flex gap-2">
+      <select class="w-40" style="width:160px"><option>Все автомобили</option><option>Газель А123БВ</option><option>Газель Б456ГД</option><option>Валдай В789ЕЖ</option><option>Валдай Г012ЗИ</option></select>
+      <select class="w-36" style="width:144px"><option>2026 год</option><option>Май 2026</option><option>Апрель 2026</option></select>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="grid grid-cols-4 gap-3 mb-5">
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">Всего ремонтов</div>
+      <div class="text-2xl font-bold text-slate-900">47</div>
+      <div class="text-xs text-slate-500 mt-1">за всё время</div>
+    </div>
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">Затраты на работы</div>
+      <div class="text-2xl font-bold text-slate-900">184 000 ₽</div>
+      <div class="text-xs text-slate-500 mt-1">нормачасы × ставка</div>
+    </div>
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">Затраты на запчасти</div>
+      <div class="text-2xl font-bold text-slate-900">312 000 ₽</div>
+      <div class="text-xs text-slate-500 mt-1">из транзакций</div>
+    </div>
+    <div class="stat-card">
+      <div class="text-xs text-slate-400 mb-1">Итого содержание</div>
+      <div class="text-2xl font-bold text-slate-900">496 000 ₽</div>
+      <div class="text-xs text-slate-500 mt-1">работы + запчасти</div>
+    </div>
+  </div>
+
+  <!-- Per-vehicle breakdown -->
+  <div class="grid grid-cols-2 gap-4 mb-4">
+    <div class="card p-4">
+      <h3 class="font-semibold text-slate-900 mb-3 text-sm">Затраты по автомобилям</h3>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Газель А123БВ</span><span class="font-semibold">168 000 ₽</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-slate-800 rounded-full" style="width:54%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Валдай В789ЕЖ</span><span class="font-semibold">142 000 ₽</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-slate-600 rounded-full" style="width:45%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Газель Б456ГД</span><span class="font-semibold">98 000 ₽</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-slate-400 rounded-full" style="width:31%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Валдай Г012ЗИ</span><span class="font-semibold">88 000 ₽</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-slate-300 rounded-full" style="width:28%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card p-4">
+      <h3 class="font-semibold text-slate-900 mb-3 text-sm">Ремонты по категориям</h3>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">ТО и регламент</span><span class="text-slate-500">19 нарядов</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-emerald-500 rounded-full" style="width:40%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Ходовая</span><span class="text-slate-500">12 нарядов</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-blue-500 rounded-full" style="width:26%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Двигатель</span><span class="text-slate-500">9 нарядов</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-amber-500 rounded-full" style="width:19%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1"><span class="text-slate-700">Трансмиссия</span><span class="text-slate-500">7 нарядов</span></div>
+          <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-red-400 rounded-full" style="width:15%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History table -->
+  <div class="card overflow-hidden">
+    <div class="px-4 py-3 border-b border-slate-200 bg-slate-50">
+      <span class="font-semibold text-slate-900 text-sm">Газель А123БВ — история ремонтов</span>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="border-b border-slate-100">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Дата</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Наряд</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Работы</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-400">Пробег</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-400">Нч</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-400">Стоимость работ</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <tr class="table-row"><td class="px-4 py-3 text-slate-500">12.05.2026</td><td class="px-4 py-3 font-mono text-xs text-slate-700">НЗ-2025-041</td><td class="px-4 py-3 text-slate-700">Замена масла, фильтра</td><td class="px-4 py-3 text-right font-mono">112 010</td><td class="px-4 py-3 text-right">4.5</td><td class="px-4 py-3 text-right font-medium">9 000 ₽</td></tr>
+        <tr class="table-row"><td class="px-4 py-3 text-slate-500">28.04.2026</td><td class="px-4 py-3 font-mono text-xs text-slate-700">НЗ-2025-037</td><td class="px-4 py-3 text-slate-700">Замена тормозных колодок (пер.)</td><td class="px-4 py-3 text-right font-mono">108 420</td><td class="px-4 py-3 text-right">2.0</td><td class="px-4 py-3 text-right font-medium">4 000 ₽</td></tr>
+        <tr class="table-row"><td class="px-4 py-3 text-slate-500">10.04.2026</td><td class="px-4 py-3 font-mono text-xs text-slate-700">НЗ-2025-031</td><td class="px-4 py-3 text-slate-700">Диагностика ходовой, регулировка</td><td class="px-4 py-3 text-right font-mono">104 100</td><td class="px-4 py-3 text-right">2.5</td><td class="px-4 py-3 text-right font-medium">5 000 ₽</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════ ПО МЕХАНИКАМ ════════════════════════════════════ -->
+<div id="section-repmechanics" class="section p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Статистика по механикам</h1>
+      <p class="text-sm text-slate-400 mt-0.5">Нормачасы, наряды, план / факт, начисленная ЗП</p>
+    </div>
+    <select class="w-44" style="width:176px"><option>Май 2026</option><option>Апрель 2026</option><option>Март 2026</option></select>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4 mb-5">
+    <!-- Mechanic 1 -->
+    <div class="card p-5">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <div class="font-bold text-slate-900 text-lg">Иванов Сергей Николаевич</div>
+          <div class="text-sm text-slate-400">Механик · ставка 50%</div>
+        </div>
+        <div class="text-right">
+          <div class="text-2xl font-bold text-slate-900">19 500 ₽</div>
+          <div class="text-xs text-slate-400">начислено за май</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-slate-50 rounded-xl p-3 text-center">
+          <div class="text-xl font-bold text-slate-900">12</div>
+          <div class="text-xs text-slate-400 mt-0.5">нарядов</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 text-center">
+          <div class="text-xl font-bold text-slate-900">39.0</div>
+          <div class="text-xs text-slate-400 mt-0.5">план нч</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 text-center">
+          <div class="text-xl font-bold text-amber-600">38.0</div>
+          <div class="text-xs text-slate-400 mt-0.5">факт нч</div>
+        </div>
+      </div>
+      <div class="text-xs text-slate-500 mb-1.5 flex justify-between"><span>Выполнение плана</span><span class="font-medium">97%</span></div>
+      <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-emerald-500 rounded-full" style="width:97%"></div></div>
+      <div class="mt-4 border-t border-slate-100 pt-3 space-y-1.5">
+        <div class="flex justify-between text-sm"><span class="text-slate-500">Начислено</span><span class="font-semibold text-slate-900">19 500 ₽</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-500">Выплачено (аванс)</span><span class="text-slate-700">10 000 ₽</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-500">К выплате</span><span class="font-semibold text-emerald-700">9 500 ₽</span></div>
+      </div>
+    </div>
+    <!-- Mechanic 2 -->
+    <div class="card p-5">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <div class="font-bold text-slate-900 text-lg">Сидоров Михаил Андреевич</div>
+          <div class="text-sm text-slate-400">Механик · ставка 50%</div>
+        </div>
+        <div class="text-right">
+          <div class="text-2xl font-bold text-slate-900">16 000 ₽</div>
+          <div class="text-xs text-slate-400">начислено за май</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-slate-50 rounded-xl p-3 text-center">
+          <div class="text-xl font-bold text-slate-900">9</div>
+          <div class="text-xs text-slate-400 mt-0.5">нарядов</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 text-center">
+          <div class="text-xl font-bold text-slate-900">34.0</div>
+          <div class="text-xs text-slate-400 mt-0.5">план нч</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 text-center">
+          <div class="text-xl font-bold text-blue-600">32.0</div>
+          <div class="text-xs text-slate-400 mt-0.5">факт нч</div>
+        </div>
+      </div>
+      <div class="text-xs text-slate-500 mb-1.5 flex justify-between"><span>Выполнение плана</span><span class="font-medium">94%</span></div>
+      <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-blue-500 rounded-full" style="width:94%"></div></div>
+      <div class="mt-4 border-t border-slate-100 pt-3 space-y-1.5">
+        <div class="flex justify-between text-sm"><span class="text-slate-500">Начислено</span><span class="font-semibold text-slate-900">16 000 ₽</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-500">Выплачено (аванс)</span><span class="text-slate-700">8 000 ₽</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-500">К выплате</span><span class="font-semibold text-emerald-700">8 000 ₽</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Наряды за период -->
+  <div class="card overflow-hidden">
+    <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+      <span class="font-semibold text-slate-900 text-sm">Наряды за май 2026</span>
+      <span class="text-xs text-slate-400">ЗП = нч × 2 000 ₽ × 50%</span>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="border-b border-slate-100">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Наряд</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Автомобиль</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Механик</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-400">Нч план</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-400">Нч факт</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-slate-400">ЗП начислено</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-slate-400">Статус</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <tr class="table-row"><td class="px-4 py-3 font-mono text-xs text-slate-700">НЗ-2025-041</td><td class="px-4 py-3 text-slate-700">Газель А123БВ</td><td class="px-4 py-3 text-slate-700">Иванов С.Н.</td><td class="px-4 py-3 text-right">5.0</td><td class="px-4 py-3 text-right text-amber-600 font-medium">4.5</td><td class="px-4 py-3 text-right font-semibold">9 000 ₽</td><td class="px-4 py-3"><span class="badge bg-amber-100 text-amber-700">На утверждении</span></td></tr>
+        <tr class="table-row"><td class="px-4 py-3 font-mono text-xs text-slate-700">НЗ-2025-039</td><td class="px-4 py-3 text-slate-700">Газель Б456ГД</td><td class="px-4 py-3 text-slate-700">Иванов С.Н.</td><td class="px-4 py-3 text-right">2.5</td><td class="px-4 py-3 text-right text-blue-600 font-medium">3.0</td><td class="px-4 py-3 text-right font-semibold">6 000 ₽</td><td class="px-4 py-3"><span class="badge bg-emerald-100 text-emerald-700">Утверждён</span></td></tr>
+        <tr class="table-row"><td class="px-4 py-3 font-mono text-xs text-slate-700">НЗ-2025-040</td><td class="px-4 py-3 text-slate-700">Валдай В789ЕЖ</td><td class="px-4 py-3 text-slate-700">Сидоров М.А. + Иванов С.Н.</td><td class="px-4 py-3 text-right">6.0</td><td class="px-4 py-3 text-right">6.0</td><td class="px-4 py-3 text-right font-semibold">6 000 ₽ / чел.</td><td class="px-4 py-3"><span class="badge bg-amber-100 text-amber-700">На утверждении</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════ НАСТРОЙКИ ════════════════════════════════════════ -->
+<div id="section-settings" class="section p-6">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-slate-900">Настройки СТО</h1>
+    <p class="text-sm text-slate-400 mt-0.5">Ставки, проценты, параметры расчёта ЗП</p>
+  </div>
+  <div class="max-w-xl space-y-4">
+    <div class="card p-5">
+      <h3 class="font-semibold text-slate-900 mb-4">Финансовые параметры</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">Ставка СТО (₽ за нормачас)</label>
+          <div class="flex gap-2">
+            <input type="number" value="2000" class="flex-1"/>
+            <button class="btn-primary">Сохранить</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">Цена нормачаса для клиента / расчёта стоимости работ</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-semibold text-slate-900 mb-4">Ставки механиков</h3>
+      <div class="space-y-3">
+        <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+          <div class="flex-1">
+            <div class="font-medium text-slate-900 text-sm">Иванов Сергей Николаевич</div>
+            <div class="text-xs text-slate-400">При ставке СТО 2000 ₽/нч → получает 1 000 ₽/нч</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" value="50" class="w-20 text-center" min="0" max="100"/>
+            <span class="text-slate-500 text-sm">%</span>
+            <button class="btn-sm bg-slate-900 text-white text-xs">OK</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+          <div class="flex-1">
+            <div class="font-medium text-slate-900 text-sm">Сидоров Михаил Андреевич</div>
+            <div class="text-xs text-slate-400">При ставке СТО 2000 ₽/нч → получает 1 000 ₽/нч</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" value="50" class="w-20 text-center" min="0" max="100"/>
+            <span class="text-slate-500 text-sm">%</span>
+            <button class="btn-sm bg-slate-900 text-white text-xs">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main><!-- end main -->
+
+<!-- ═══════════════════════ MODAL: Work Order Detail ════════════════════════ -->
+<div id="modal-wo" class="modal-overlay" onclick="if(event.target===this)closeWO()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200">
+      <div>
+        <h2 class="text-lg font-bold text-slate-900">Заказ-наряд НЗ-2025-041</h2>
+        <div class="text-sm text-slate-400 mt-0.5">Газель А123БВ · Иванов Сергей · 12.05.2026</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="badge bg-amber-100 text-amber-700">На утверждении</span>
+        <button onclick="closeWO()" class="text-slate-400 hover:text-slate-600 ml-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="px-6 py-5 space-y-5">
+      <!-- Info -->
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-400 mb-0.5">Автомобиль</div><div class="font-semibold text-slate-900 text-sm">Газель А123БВ</div></div>
+        <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-400 mb-0.5">Пробег</div><div class="font-semibold text-slate-900 text-sm">112 010 км</div></div>
+        <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-400 mb-0.5">Источник</div><div class="font-semibold text-slate-900 text-sm">Заявка водителя</div></div>
+      </div>
+      <!-- Работы -->
+      <div>
+        <h3 class="font-semibold text-slate-900 text-sm mb-2">Выполненные работы</h3>
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="text-left px-3 py-2 text-xs text-slate-400">Вид работы</th>
+                <th class="text-right px-3 py-2 text-xs text-slate-400">Нч план</th>
+                <th class="text-right px-3 py-2 text-xs text-slate-400">Нч факт</th>
+                <th class="text-right px-3 py-2 text-xs text-slate-400">К оплате</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="px-3 py-2.5 text-slate-700">Замена масла двигателя</td><td class="px-3 py-2.5 text-right">1.5</td><td class="px-3 py-2.5 text-right font-medium text-amber-600">1.0</td><td class="px-3 py-2.5 text-right font-semibold">3 000 ₽</td></tr>
+              <tr><td class="px-3 py-2.5 text-slate-700">Замена воздушного фильтра</td><td class="px-3 py-2.5 text-right">0.5</td><td class="px-3 py-2.5 text-right">0.5</td><td class="px-3 py-2.5 text-right font-semibold">1 500 ₽</td></tr>
+              <tr><td class="px-3 py-2.5 text-slate-700">Замена топливного фильтра</td><td class="px-3 py-2.5 text-right">0.5</td><td class="px-3 py-2.5 text-right">0.5</td><td class="px-3 py-2.5 text-right font-semibold">1 500 ₽</td></tr>
+              <tr><td class="px-3 py-2.5 text-slate-700">Замена тормозных колодок</td><td class="px-3 py-2.5 text-right">2.5</td><td class="px-3 py-2.5 text-right font-medium text-blue-600">2.5</td><td class="px-3 py-2.5 text-right font-semibold">5 000 ₽</td></tr>
+              <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5 text-slate-900">Итого</td><td class="px-3 py-2.5 text-right">5.0</td><td class="px-3 py-2.5 text-right text-amber-600">4.5</td><td class="px-3 py-2.5 text-right text-slate-900">9 000 ₽</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- ЗП -->
+      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+        <div class="text-sm font-semibold text-emerald-800 mb-2">Начисление ЗП при утверждении</div>
+        <div class="flex justify-between text-sm"><span class="text-emerald-700">Иванов С.Н. · 4.5 нч × 2 000 ₽ × 50%</span><span class="font-bold text-emerald-800">4 500 ₽</span></div>
+      </div>
+      <!-- Admin correction -->
+      <div class="border border-slate-200 rounded-xl p-4">
+        <div class="text-sm font-semibold text-slate-700 mb-3">Корректировка Администратора</div>
+        <div class="flex gap-3 items-end">
+          <div class="flex-1"><label class="text-xs text-slate-500 block mb-1">Скорректировать нч (к оплате)</label><input type="number" value="4.5" class=""/></div>
+          <div class="flex-1"><label class="text-xs text-slate-500 block mb-1">Причина корректировки</label><input type="text" placeholder="Необязательно" class=""/></div>
+        </div>
+      </div>
+      <!-- Actions -->
+      <div class="flex gap-2 pt-1">
+        <button class="btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700">Утвердить наряд</button>
+        <button class="btn-sm flex-1 bg-white border border-red-200 text-red-600 hover:bg-red-50">Вернуть на доработку</button>
+        <button onclick="closeWO()" class="btn-sm bg-white border border-slate-200 text-slate-600">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MODAL: New Work Order ═══════════════════════════ -->
+<div id="modal-new-wo" class="modal-overlay" onclick="if(event.target===this)closeNewWO()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200">
+      <h2 class="text-lg font-bold text-slate-900">Новый заказ-наряд</h2>
+      <button onclick="closeNewWO()" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Автомобиль</label>
+        <select><option>Выберите автомобиль</option><option>Газель А123БВ</option><option>Газель Б456ГД</option><option>Валдай В789ЕЖ</option><option>Валдай Г012ЗИ</option></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Пробег на момент ремонта (км)</label>
+        <input type="number" placeholder="Введите пробег"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Механик</label>
+        <select><option value="">— Любой механик (не назначен) —</option><option>Иванов Сергей Николаевич</option><option>Сидоров Михаил Андреевич</option></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Второй механик (если нужен)</label>
+        <select><option value="">— Не нужен —</option><option>Иванов Сергей Николаевич</option><option>Сидоров Михаил Андреевич</option></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Виды работ</label>
+        <div class="border border-slate-200 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="rounded"/> Замена масла двигателя <span class="text-slate-400 ml-auto">1.5 нч</span></label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="rounded"/> Замена тормозных колодок <span class="text-slate-400 ml-auto">2.0 нч</span></label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="rounded"/> Замена ремня ГРМ <span class="text-slate-400 ml-auto">4.0 нч</span></label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="rounded"/> Диагностика ходовой <span class="text-slate-400 ml-auto">1.0 нч</span></label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="rounded"/> Замена воздушного фильтра <span class="text-slate-400 ml-auto">0.5 нч</span></label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="rounded"/> Замена амортизаторов (пер.) <span class="text-slate-400 ml-auto">2.5 нч</span></label>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Дополнительные работы (если не в справочнике)</label>
+        <textarea rows="2" placeholder="Описание дополнительных работ..."></textarea>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button class="btn-primary flex-1">Создать наряд</button>
+        <button onclick="closeNewWO()" class="btn-sm bg-white border border-slate-200 text-slate-600">Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const STO_RATE = 2000;
+
+const workTypes = [
+  { name: 'Замена масла двигателя',         cat: 'ТО и регламент',  gazelle: 1.5, valdai: 2.0 },
+  { name: 'ТО-1 (масло, фильтры воздух/топливо)', cat: 'ТО и регламент', gazelle: 3.0, valdai: 3.5 },
+  { name: 'ТО-2 (полное)',                  cat: 'ТО и регламент',  gazelle: 5.0, valdai: 6.0 },
+  { name: 'Замена воздушного фильтра',      cat: 'ТО и регламент',  gazelle: 0.5, valdai: 0.5 },
+  { name: 'Замена топливного фильтра',      cat: 'ТО и регламент',  gazelle: 0.5, valdai: 0.5 },
+  { name: 'Замена ремня ГРМ',               cat: 'Двигатель',       gazelle: 4.0, valdai: 5.0 },
+  { name: 'Диагностика двигателя',          cat: 'Двигатель',       gazelle: 1.0, valdai: 1.0 },
+  { name: 'Замена сцепления',               cat: 'Трансмиссия',     gazelle: 5.0, valdai: 6.0 },
+  { name: 'Регулировка КПП',                cat: 'Трансмиссия',     gazelle: 1.5, valdai: 2.0 },
+  { name: 'Замена тормозных колодок (пер.)', cat: 'Ходовая',        gazelle: 2.0, valdai: 2.5 },
+  { name: 'Замена тормозных колодок (зад.)', cat: 'Ходовая',        gazelle: 1.5, valdai: 2.0 },
+  { name: 'Замена амортизаторов передних',  cat: 'Ходовая',         gazelle: 2.5, valdai: 3.0 },
+  { name: 'Регулировка развал-схождения',   cat: 'Ходовая',         gazelle: 1.5, valdai: 2.0 },
+  { name: 'Диагностика ходовой',            cat: 'Ходовая',         gazelle: 1.0, valdai: 1.5 },
+  { name: 'Диагностика электрики',          cat: 'Электрика',       gazelle: 1.5, valdai: 1.5 },
+  { name: 'Замена стартера',                cat: 'Электрика',       gazelle: 2.0, valdai: 2.5 },
+  { name: 'Замена генератора',              cat: 'Электрика',       gazelle: 2.0, valdai: 2.5 },
+  { name: 'Кузовные работы (мелкий)',       cat: 'Кузов',           gazelle: 2.0, valdai: 2.0 },
+];
+
+const faults = [
+  { symptom: 'Течь масла под машиной',        cat: 'Двигатель',      count: 8 },
+  { symptom: 'Скрип при торможении',           cat: 'Ходовая',        count: 12 },
+  { symptom: 'Вибрация на скорости',           cat: 'Ходовая',        count: 5 },
+  { symptom: 'Не заводится / плохо заводится', cat: 'Двигатель',      count: 7 },
+  { symptom: 'Перегрев двигателя',             cat: 'Двигатель',      count: 3 },
+  { symptom: 'Посторонний стук в подвеске',    cat: 'Ходовая',        count: 9 },
+  { symptom: 'Плохо переключаются передачи',   cat: 'Трансмиссия',    count: 4 },
+  { symptom: 'Горит контрольная лампа',        cat: 'Электрика',      count: 6 },
+  { symptom: 'Слабое торможение',              cat: 'Ходовая',        count: 11 },
+  { symptom: 'Нет тяги / дымит',              cat: 'Двигатель',       count: 5 },
+  { symptom: 'Посторонний запах в салоне',     cat: 'Кузов',          count: 2 },
+  { symptom: 'Не работает печка / кондиционер',cat: 'Электрика',      count: 4 },
+];
+
+const catColors = {
+  'Двигатель':    'bg-red-100 text-red-700',
+  'Ходовая':      'bg-blue-100 text-blue-700',
+  'Трансмиссия':  'bg-violet-100 text-violet-700',
+  'Электрика':    'bg-amber-100 text-amber-700',
+  'Кузов':        'bg-slate-100 text-slate-600',
+  'ТО и регламент':'bg-emerald-100 text-emerald-700',
+};
+
+// ── Render Work Types ─────────────────────────────────────────────────────────
+function renderWorkTypes() {
+  const tbody = document.getElementById('worktypes-body');
+  tbody.innerHTML = workTypes.map(w => `
+    <tr class="table-row">
+      <td class="px-4 py-3 text-slate-900 font-medium">${w.name}</td>
+      <td class="px-4 py-3"><span class="badge ${catColors[w.cat] || 'bg-slate-100 text-slate-600'}">${w.cat}</span></td>
+      <td class="px-4 py-3 text-right font-mono font-semibold text-slate-900">${w.gazelle.toFixed(1)}</td>
+      <td class="px-4 py-3 text-right font-mono font-semibold text-slate-900">${w.valdai.toFixed(1)}</td>
+      <td class="px-4 py-3 text-right text-slate-600">${(w.gazelle * STO_RATE).toLocaleString('ru')} ₽</td>
+      <td class="px-4 py-3 text-right text-slate-600">${(w.valdai * STO_RATE).toLocaleString('ru')} ₽</td>
+      <td class="px-4 py-3 text-right">
+        <button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs">Изменить</button>
+      </td>
+    </tr>`).join('');
+}
+
+// ── Render Fault Catalog ──────────────────────────────────────────────────────
+function renderFaultCatalog() {
+  const grid = document.getElementById('fault-catalog-grid');
+  grid.innerHTML = faults.map(f => `
+    <div class="card p-4">
+      <div class="flex justify-between items-start mb-2">
+        <span class="badge ${catColors[f.cat] || 'bg-slate-100 text-slate-600'} text-xs">${f.cat}</span>
+        <span class="text-xs text-slate-400">${f.count} заявок</span>
+      </div>
+      <div class="font-medium text-slate-900 text-sm mt-2">${f.symptom}</div>
+      <div class="flex gap-2 mt-3">
+        <button class="btn-sm bg-white border border-slate-200 text-slate-600 text-xs flex-1">Изменить</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function nav(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  document.getElementById('nav-' + id).classList.add('active');
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function setTab(group, id, btn) {
+  document.querySelectorAll('.tab-' + group).forEach(b => {
+    b.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+    b.classList.add('text-slate-500');
+  });
+  btn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+  btn.classList.remove('text-slate-500');
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+function openWODetail() { document.getElementById('modal-wo').classList.add('open'); }
+function closeWO()      { document.getElementById('modal-wo').classList.remove('open'); }
+function openNewWO()    { document.getElementById('modal-new-wo').classList.add('open'); }
+function closeNewWO()   { document.getElementById('modal-new-wo').classList.remove('open'); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderWorkTypes();
+renderFaultCatalog();
+</script>
+</body>
+</html>

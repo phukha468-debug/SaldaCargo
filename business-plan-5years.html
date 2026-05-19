@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>SaldaCargo — Стратегический план 2026–2031</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --navy:#0d2340; --blue:#1a4a7a; --blue2:#2d6ea8; --sky:#e8f4fd;
+  --gold:#c97a0a; --goldbg:#fef3e0; --goldlt:#f0b842;
+  --green:#157a3f; --greenbg:#eaf7f0; --greenbrd:#b7dfc7;
+  --red:#b32a2a; --redbg:#fdeaea; --redbrd:#f5c6cb;
+  --gray:#f5f7fa; --border:#dde4ef;
+  --text:#1a2535; --muted:#6b7a92;
+}
+body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; color:var(--text); background:#fff; font-size:12.5px; line-height:1.58; }
+
+/* ── PRINT / PAGE ── */
+@page { size: A4; margin: 0; }
+@media print {
+  .pb { page-break-before: always; }
+  .nob { page-break-inside: avoid; }
+  body { font-size: 11px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ── COVER ── */
+.cover {
+  background: linear-gradient(145deg,#071525 0%,#0d2340 50%,#1a4a7a 100%);
+  width:100%; min-height:297mm; display:flex; flex-direction:column;
+  justify-content:space-between; padding:72px 88px 56px; color:#fff; position:relative; overflow:hidden;
+}
+.cv-ring1 { position:absolute; right:-160px; top:-160px; width:620px; height:620px; border-radius:50%; border:1px solid rgba(255,255,255,0.05); }
+.cv-ring2 { position:absolute; right:80px; bottom:-100px; width:360px; height:360px; border-radius:50%; background:rgba(201,122,10,0.09); }
+.cv-pill {
+  display:inline-block; background:rgba(201,122,10,0.22); border:1px solid rgba(201,122,10,0.45);
+  border-radius:20px; padding:5px 16px; font-size:9.5px; font-weight:700; letter-spacing:1.8px;
+  text-transform:uppercase; color:#f0b842; margin-bottom:32px;
+}
+.cv-h1 { font-size:52px; font-weight:900; line-height:1.05; letter-spacing:-1.5px; margin-bottom:8px; }
+.cv-h1 em { color:#f0b842; font-style:normal; }
+.cv-sub { font-size:15px; font-weight:300; opacity:.65; margin-bottom:48px; }
+.cv-goals { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:48px; }
+.cv-goal {
+  background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.13);
+  border-radius:14px; padding:20px 26px; min-width:170px;
+}
+.cv-gval { font-size:30px; font-weight:800; color:#f0b842; line-height:1; margin-bottom:4px; }
+.cv-glbl { font-size:9.5px; opacity:.6; text-transform:uppercase; letter-spacing:.6px; }
+.cv-bot { display:flex; justify-content:space-between; align-items:flex-end; }
+.cv-streams { display:flex; gap:10px; flex-wrap:wrap; }
+.cv-stream { border:1px solid rgba(255,255,255,0.14); border-radius:8px; padding:9px 14px; font-size:10.5px; }
+.cv-stream strong { display:block; font-size:12px; font-weight:700; margin-bottom:1px; }
+.cv-date { font-size:10.5px; opacity:.4; text-align:right; }
+
+/* ── PAGE HEADER ── */
+.ph { background:#f0f3f8; border-bottom:2px solid var(--border); padding:11px 72px; font-size:10px; color:var(--muted); display:flex; justify-content:space-between; }
+.ph strong { color:var(--navy); }
+
+/* ── SECTIONS ── */
+.sec { padding:48px 72px; max-width:100%; }
+.sec-sm { padding:36px 72px; max-width:100%; }
+.sl { font-size:9px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--blue2); margin-bottom:6px; }
+h2 { font-size:24px; font-weight:900; color:var(--navy); margin-bottom:24px; line-height:1.2; }
+h3 { font-size:14px; font-weight:700; color:var(--navy); margin-bottom:9px; }
+.div { height:1px; background:var(--border); margin:0 72px; }
+
+/* ── GRIDS ── */
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:13px; }
+
+/* ── CARDS ── */
+.card { background:var(--gray); border:1px solid var(--border); border-radius:11px; padding:18px 20px; }
+.card h3 { font-size:12.5px; margin-bottom:8px; }
+.card p, .card li { font-size:11.5px; color:var(--muted); line-height:1.7; }
+.card ul { padding-left:15px; }
+
+.ac { border-radius:11px; padding:18px 20px; border:1px solid var(--border); }
+.ac.w { background:var(--redbg); border-left:4px solid var(--red); }
+.ac.ok { background:var(--greenbg); border-left:4px solid var(--green); }
+.ac.nt { background:var(--goldbg); border-left:4px solid var(--gold); }
+.ac h3 { font-size:12.5px; margin-bottom:7px; }
+.ac.w h3 { color:var(--red); } .ac.ok h3 { color:var(--green); } .ac.nt h3 { color:var(--gold); }
+.ac p, .ac li { font-size:12px; color:#3a4a5c; line-height:1.7; }
+.ac ul { padding-left:15px; }
+
+/* ── ROI CARDS ── */
+.roi-g { display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin-bottom:24px; }
+.rc { border:2px solid var(--border); border-radius:13px; overflow:hidden; }
+.rc.rec { border-color:var(--green); }
+.rc-head { padding:14px 17px; background:var(--gray); }
+.rc-head.rec-h { background:var(--greenbg); }
+.rc-tag { font-size:8.5px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:3px; }
+.tc-g { color:var(--green); } .tc-y { color:var(--gold); } .tc-m { color:var(--muted); }
+.rc-title { font-size:14px; font-weight:800; color:var(--navy); }
+.rc-body { padding:14px 17px; }
+.rc-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border); font-size:11.5px; }
+.rc-row:last-child { border-bottom:none; font-weight:700; font-size:12.5px; padding-top:8px; }
+.tg { color:var(--green); font-weight:600; }
+.tr { color:var(--red); font-weight:600; }
+.tb { font-weight:700; color:var(--navy); }
+.rc-note { font-size:11px; margin-top:9px; line-height:1.6; }
+
+/* ── VERDICT BOX ── */
+.verd {
+  background:linear-gradient(135deg,#0d2340,#1a4a7a); color:#fff;
+  border-radius:13px; padding:22px 26px; margin-top:6px;
+}
+.verd h3 { color:#f0b842; margin-bottom:9px; font-size:14px; }
+.verd p { font-size:12.5px; opacity:.88; line-height:1.72; }
+
+/* ── YEAR BLOCKS ── */
+.yr { border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:22px; }
+.yh { padding:18px 26px; display:flex; justify-content:space-between; align-items:center; color:#fff; }
+.yh.y1 { background:linear-gradient(90deg,#0d2340,#1a4a7a); }
+.yh.y2 { background:linear-gradient(90deg,#1a4a7a,#2d6ea8); }
+.yh.y3 { background:linear-gradient(90deg,#157a3f,#2aad64); }
+.yh.y4 { background:linear-gradient(90deg,#2d6ea8,#4a9fd4); }
+.yh.y5 { background:linear-gradient(90deg,#8a4a00,#c97a0a); }
+.yn { font-size:9px; font-weight:700; opacity:.65; text-transform:uppercase; letter-spacing:1px; }
+.yt { font-size:17px; font-weight:800; margin-top:2px; }
+.yp { font-size:10.5px; opacity:.6; }
+.yk { background:rgba(255,255,255,0.13); border-radius:9px; padding:9px 16px; text-align:right; }
+.ykv { font-size:20px; font-weight:800; }
+.ykl { font-size:8.5px; opacity:.65; text-transform:uppercase; letter-spacing:.4px; }
+.yb { padding:20px 26px; }
+.st { display:grid; grid-template-columns:160px 1fr 125px; gap:14px; align-items:start; padding:12px 0; border-bottom:1px solid var(--border); }
+.st:last-child { border-bottom:none; }
+.sn { font-weight:600; font-size:12.5px; color:var(--navy); display:flex; align-items:center; gap:7px; }
+.dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.sd { font-size:12px; color:var(--muted); }
+.sp { font-size:12.5px; font-weight:700; color:var(--green); text-align:right; white-space:nowrap; }
+.sp.r { color:var(--red); }
+
+/* ── TABLES ── */
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead th { background:var(--navy); color:#fff; padding:10px 13px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+thead th:first-child { border-radius:7px 0 0 0; } thead th:last-child { border-radius:0 7px 0 0; }
+tbody td { padding:9px 13px; border-bottom:1px solid var(--border); }
+tbody tr:nth-child(even) { background:var(--gray); }
+tbody tr.tot td { font-weight:700; background:#e5edf8; color:var(--navy); }
+
+/* ── KPI STRIP ── */
+.kpis { display:flex; gap:13px; flex-wrap:wrap; margin-bottom:22px; }
+.kpi { background:var(--gray); border:1px solid var(--border); border-radius:10px; padding:11px 18px; text-align:center; }
+.kv { font-size:19px; font-weight:800; color:var(--navy); }
+.kl { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+
+/* ── STEP CARDS ── */
+.stp { background:var(--gray); border-radius:11px; padding:16px 20px; border-left:4px solid var(--gold); }
+.stpw { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gold); margin-bottom:4px; }
+.stp h3 { font-size:13px; margin-bottom:7px; }
+.stp ul { padding-left:15px; }
+.stp li { font-size:11.5px; color:var(--muted); margin-bottom:3px; }
+
+/* ── PROD CARD ── */
+.pc { background:var(--greenbg); border:1px solid var(--greenbrd); border-radius:11px; padding:18px 20px; border-top:4px solid var(--green); }
+.pc h3 { color:var(--green); font-size:13px; margin-bottom:9px; }
+.pc p, .pc li { font-size:11.5px; color:#2d5c3f; line-height:1.7; }
+.pc ul { padding-left:15px; }
+
+/* ── SYN CARD ── */
+.syc { border:1px solid var(--border); border-radius:11px; overflow:hidden; }
+.syc-h { background:var(--navy); color:#fff; padding:11px 16px; font-size:13px; font-weight:700; }
+.syc-b { padding:14px 16px; }
+.syc-b li { font-size:11.5px; color:var(--muted); margin-bottom:4px; }
+.syc-b ul { padding-left:15px; }
+.syc-profit { font-size:13px; font-weight:800; color:var(--green); margin-top:8px; }
+
+/* ── RISK ── */
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+.b-r { background:var(--redbg); color:var(--red); }
+.b-y { background:var(--goldbg); color:var(--gold); }
+.b-g { background:var(--greenbg); color:var(--green); }
+/* risk cards */
+.rcard { border:1px solid var(--border); border-radius:10px; margin-bottom:12px; overflow:hidden; }
+.rcard.r-crit { border-left:4px solid var(--red); }
+.rcard.r-mid  { border-left:4px solid var(--gold); }
+.rcard.r-low  { border-left:4px solid var(--green); }
+.rcard-head { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--gray); }
+.rcard-name { font-size:13px; font-weight:700; color:var(--navy); }
+.rcard-body { display:grid; grid-template-columns:1fr 1fr; }
+.rcard-impact { padding:10px 16px; border-right:1px solid var(--border); font-size:12px; color:var(--text); }
+.rcard-fix    { padding:10px 16px; font-size:12px; color:var(--muted); }
+.rcard-label  { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:4px; }
+/* financial year cards */
+.fin-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:14px; }
+.fin-year { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.fin-yh   { padding:9px 14px; color:#fff; font-size:12px; font-weight:700; }
+.fin-yh.fy0 { background:var(--navy); }
+.fin-yh.fy1 { background:#1a4a7a; }
+.fin-yh.fy2 { background:#2d6ea8; }
+.fin-yh.fy3 { background:var(--green); }
+.fin-yh.fy4 { background:#3a8fd4; }
+.fin-yh.fy5 { background:var(--gold); }
+.fin-yh small { display:block; font-size:9.5px; font-weight:400; opacity:.7; }
+.fin-row { display:flex; justify-content:space-between; padding:5px 12px; border-bottom:1px solid var(--border); font-size:11px; }
+.fin-row span:first-child { color:var(--muted); }
+.fin-row span:last-child  { font-weight:600; }
+.fin-credit { display:flex; justify-content:space-between; padding:5px 12px; border-bottom:1px solid var(--border); font-size:11px; }
+.fin-credit span:first-child { color:var(--muted); }
+.fin-credit span:last-child  { color:var(--red); font-weight:600; }
+.fin-profit { display:flex; justify-content:space-between; padding:7px 12px; background:#eaf7f0; font-size:12px; font-weight:700; }
+.fin-profit span:first-child { color:var(--green); }
+.fin-profit span:last-child  { color:var(--green); }
+
+/* ── EKB BLOCK ── */
+.ekb { background:linear-gradient(135deg,#0d2340,#1a4a7a); color:#fff; border-radius:14px; padding:24px 28px; margin-top:6px; }
+.ekb h3 { color:#f0b842; font-size:16px; margin-bottom:14px; }
+.ekb-g { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.ekb-col h4 { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; opacity:.55; margin-bottom:9px; }
+.ekb-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.09); font-size:12px; }
+.ekb-row span { opacity:.7; } .ekb-row strong { color:#f0b842; }
+.ekb-note { margin-top:14px; background:rgba(255,255,255,0.07); border-radius:7px; padding:11px 15px; font-size:11.5px; opacity:.85; line-height:1.7; }
+
+/* ── FOOTER ── */
+footer { background:var(--navy); color:rgba(255,255,255,0.45); text-align:center; padding:24px; font-size:10.5px; }
+footer strong { color:rgba(255,255,255,0.88); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ COVER ═══════════ -->
+<div class="cover">
+  <div class="cv-ring1"></div><div class="cv-ring2"></div>
+  <div>
+    <div class="cv-pill">Стратегический план · Версия 3.0 · Май 2026</div>
+    <div class="cv-h1">SaldaCargo<br><em>2026 — 2031</em></div>
+    <div class="cv-sub">ИП Нигамедьянов · г. Верхняя Салда · 5-летний план развития</div>
+    <div class="cv-goals">
+      <div class="cv-goal"><div class="cv-gval">20+ млн</div><div class="cv-glbl">Актив в ЕКБ к 2031</div></div>
+      <div class="cv-goal"><div class="cv-gval">500 тыс.</div><div class="cv-glbl">Доп. доход в мес.</div></div>
+      <div class="cv-goal"><div class="cv-gval">5 потоков</div><div class="cv-glbl">Независимого дохода</div></div>
+      <div class="cv-goal"><div class="cv-gval">0 р.</div><div class="cv-glbl">Кредит к Году 3</div></div>
+    </div>
+  </div>
+  <div class="cv-bot">
+    <div class="cv-streams">
+      <div class="cv-stream"><strong>🚛 Транспорт</strong>Основа</div>
+      <div class="cv-stream"><strong>🔧 Флип + СТО</strong>Репутация</div>
+      <div class="cv-stream"><strong>⚙️ Модификации</strong>Сервис</div>
+      <div class="cv-stream"><strong>🏭 Производство</strong>Гробы + Поддоны</div>
+      <div class="cv-stream"><strong>🏢 ЕКБ Актив</strong>Цель</div>
+    </div>
+    <div class="cv-date">Составлен: май 2026<br>Горизонт: 5 лет</div>
+  </div>
+</div>
+
+<!-- ═══════════ ДИАГНОСТИКА ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>01 · Диагностика</span></div>
+<div class="sec">
+  <div class="sl">Раздел 01</div>
+  <h2>Честная диагностика: где мы сейчас</h2>
+  <div class="kpis">
+    <div class="kpi"><div class="kv">11 ед.</div><div class="kl">Техника в парке</div></div>
+    <div class="kpi"><div class="kv">700 тыс.</div><div class="kl">Ср. выручка/мес.</div></div>
+    <div class="kpi"><div class="kv">4,3 млн</div><div class="kl">Остаток кредита</div></div>
+    <div class="kpi"><div class="kv">239 тыс.</div><div class="kl">Платёж/мес.</div></div>
+    <div class="kpi"><div class="kv">188 кв.м</div><div class="kl">Гараж (собств.)</div></div>
+    <div class="kpi"><div class="kv">400 тыс.</div><div class="kl">2 участка 20 сот.</div></div>
+  </div>
+  <div class="g2">
+    <div>
+      <h3 style="color:var(--red);margin-bottom:12px">⚠ Ключевые проблемы</h3>
+      <div class="ac w nob" style="margin-bottom:12px">
+        <h3>Дефицит водителей кат. C</h3>
+        <p>Машины простаивают при наличии заказов на ATI.SU. Каждая простаивающая единица = 35–50 тыс. ежемесячного убытка на фиксированных расходах.</p>
+      </div>
+      <div class="ac w nob" style="margin-bottom:12px">
+        <h3>Главный механик — системный риск</h3>
+        <p>Зависимость от одного человека с алкогольной проблемой. Его уход в любой момент останавливает СТО, флип и модификации одновременно.</p>
+      </div>
+      <div class="ac w nob">
+        <h3>Кредитная нагрузка 239 тыс./мес.</h3>
+        <p>Составляет 30–40% выручки. Пока кредит жив — любая просадка выручки критична. Досрочное закрытие = самый быстрый способ высвободить денежный поток.</p>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:var(--green);margin-bottom:12px">✓ Реальные преимущества</h3>
+      <div class="ac ok nob" style="margin-bottom:12px">
+        <h3>10+ лет на Газелях и Валдаях</h3>
+        <p>Знаем рынок изнутри: что покупать, что чинить, за сколько продавать. Это нельзя купить или быстро скопировать.</p>
+      </div>
+      <div class="ac ok nob" style="margin-bottom:12px">
+        <h3>Своя логистика = доставка по себестоимости</h3>
+        <p>Производство гробов и поддонов с доставкой по всей области и РФ по цене топлива. Конкуренты без транспорта платят рыночную ставку — это +15–25% к их себестоимости.</p>
+      </div>
+      <div class="ac ok nob">
+        <h3>Репутация в городе + гараж в собственности</h3>
+        <p>Нас знает весь город. Сарафан работает без рекламы. Гараж 188 кв.м — залоговая база и производственная площадка без аренды.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ФЛИП-АНАЛИЗ ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>02 · Флип: анализ сегментов</span></div>
+<div class="sec">
+  <div class="sl">Раздел 02 · Честный разбор</div>
+  <h2>Флип Газелей: какой сегмент выбрать</h2>
+  <div class="roi-g nob">
+    <div class="rc">
+      <div class="rc-head"><div class="rc-tag tc-m">Не рекомендуем</div><div class="rc-title">Убитые<br>80–200 тыс.</div></div>
+      <div class="rc-body">
+        <div class="rc-row"><span>Покупка</span><span>80–150 тыс.</span></div>
+        <div class="rc-row"><span>Вложения</span><span>80–120 тыс.</span></div>
+        <div class="rc-row"><span>Продажа</span><span>400–550 тыс.</span></div>
+        <div class="rc-row"><span>Маржа</span><span class="tg">200–250 тыс.</span></div>
+        <div class="rc-row"><span>ROI</span><span class="tg">120–150%</span></div>
+        <div class="rc-note" style="color:var(--red)">⛔ Роняет репутацию. Непредсказуемый скрытый износ. Ваша стратегия — качество.</div>
+      </div>
+    </div>
+    <div class="rc rec">
+      <div class="rc-head rec-h"><div class="rc-tag tc-g">✓ Старт Год 1</div><div class="rc-title" style="color:var(--green)">Средние<br>300–550 тыс.</div></div>
+      <div class="rc-body">
+        <div class="rc-row"><span>Покупка</span><span>300–550 тыс.</span></div>
+        <div class="rc-row"><span>Вложения</span><span>100–160 тыс.</span></div>
+        <div class="rc-row"><span>Продажа</span><span>650–900 тыс.</span></div>
+        <div class="rc-row"><span>Маржа</span><span class="tg">200–280 тыс.</span></div>
+        <div class="rc-row"><span>ROI</span><span class="tg">50–70%</span></div>
+        <div class="rc-note" style="color:var(--green)">✅ Ликвидный рынок. Качество работы видно. Меньше скрытых рисков. Строит репутацию.</div>
+      </div>
+    </div>
+    <div class="rc">
+      <div class="rc-head"><div class="rc-tag tc-y">Год 2+ после камеры</div><div class="rc-title">Свежие<br>700–900 тыс.</div></div>
+      <div class="rc-body">
+        <div class="rc-row"><span>Покупка</span><span>700–900 тыс.</span></div>
+        <div class="rc-row"><span>Вложения</span><span>150–200 тыс.</span></div>
+        <div class="rc-row"><span>Продажа</span><span>1 100–1 400 тыс.</span></div>
+        <div class="rc-row"><span>Маржа</span><span class="tg">250–350 тыс.</span></div>
+        <div class="rc-row"><span>ROI</span><span class="tg">27–35%</span></div>
+        <div class="rc-note" style="color:var(--muted)">⚠ Требует 850–1 100 тыс. капитала. Нужна собственная камера для качества. Год 2+.</div>
+      </div>
+    </div>
+  </div>
+  <div class="verd nob">
+    <h3>Вывод: двухфазный подход</h3>
+    <p><b>Репутация строится качеством работы, а не ценой купленной машины.</b> Газель за 400 тыс., отремонтированная безупречно с документами — уже премиальный продукт.<br><br>
+    <b>Год 1:</b> средний сегмент (300–550 тыс.) — ниже порог входа, быстрее оборот, строим репутацию на 4–6 машинах. Покраска на аутсорс пока камеры нет.<br>
+    <b>Год 2+:</b> сегмент 700–900 тыс. с готовой камерой и накопленной репутацией. 2 машины одновременно.</p>
+  </div>
+</div>
+
+<!-- ═══════════ МОДИФИКАЦИИ ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>03 · Модификации и смежные направления</span></div>
+<div class="sec">
+  <div class="sl">Раздел 03</div>
+  <h2>Модификации + смежные бизнесы: нулевая заморозка капитала</h2>
+  <div class="g2" style="margin-bottom:22px">
+    <div>
+      <div class="ac ok nob" style="margin-bottom:14px">
+        <h3>Почему модификации лучше флипа на старте</h3>
+        <p>Флип замораживает 400–900 тыс. на 4–10 недель. Модификации — чистая услуга: клиент приезжает со своей машиной, платит за работу и запчасти, уезжает. Капитал не нужен. Первый заказ можно выполнить уже в этом месяце.</p>
+      </div>
+      <div class="ac nt nob">
+        <h3>Синергия модификации + флип</h3>
+        <p>Устанавливаем пневмо баллоны на флип-машину перед продажей → цена продажи растёт на 60–100 тыс. → стоимость установки: 35–50 тыс. Доп. маржа 25–50 тыс. с каждого флипа без дополнительного времени на поиск клиента.</p>
+      </div>
+    </div>
+    <div>
+      <table class="nob">
+        <thead><tr><th>Модификация</th><th>Запчасти</th><th>Работа</th><th>Цена</th><th>Маржа</th></tr></thead>
+        <tbody>
+          <tr><td>Пневмо баллоны</td><td>30–50 тыс.</td><td>8–10 ч.</td><td>80–110 тыс.</td><td class="tg">30–45 тыс.</td></tr>
+          <tr><td>Удлинение рамы</td><td>50–80 тыс.</td><td>3–4 дня</td><td>150–200 тыс.</td><td class="tg">60–80 тыс.</td></tr>
+          <tr><td>Установка будки</td><td>80–150 тыс.</td><td>2–3 дня</td><td>200–350 тыс.</td><td class="tg">80–120 тыс.</td></tr>
+          <tr><td>Изотермический фургон</td><td>120–200 тыс.</td><td>3–4 дня</td><td>300–450 тыс.</td><td class="tg">100–150 тыс.</td></tr>
+          <tr><td>Тахограф + GPS</td><td>15–25 тыс.</td><td>2–3 ч.</td><td>30–50 тыс.</td><td class="tg">12–20 тыс.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="nob">
+  <h3 style="margin-bottom:14px">Смежные направления с высокой синергией</h3>
+  <div class="g3">
+    <div class="syc">
+      <div class="syc-h">🔩 Запчасти для Газелей</div>
+      <div class="syc-b">
+        <ul>
+          <li>Закупаем оптом то, что уже берём для себя</li>
+          <li>Продаём другим механикам и владельцам</li>
+          <li>Знаем какие позиции ходовые — нет риска</li>
+          <li>Инвестиция: 200–300 тыс. в склад</li>
+          <li>Наценка: 30–60% к оптовой цене</li>
+        </ul>
+        <div class="syc-profit">+100–200 тыс./мес.</div>
+      </div>
+    </div>
+    <div class="syc">
+      <div class="syc-h">🛞 Шиномонтаж ком. транспорта</div>
+      <div class="syc-b">
+        <ul>
+          <li>Шиномонтажный станок + балансировка: 200–280 тыс.</li>
+          <li>Каждая машина СТО = потенциальный клиент</li>
+          <li>Коммерческие шины: 2–5 тыс. р./колесо</li>
+          <li>10–15 машин в день — реально</li>
+          <li>Малозатратно по времени механика</li>
+        </ul>
+        <div class="syc-profit">+80–150 тыс./мес.</div>
+      </div>
+    </div>
+    <div class="syc">
+      <div class="syc-h">🚐 Срочный выкуп Газелей</div>
+      <div class="syc-b">
+        <ul>
+          <li>Объявления: «Выкупаем Газели и Валдаи за 24 часа»</li>
+          <li>Оцениваем мгновенно — компетенция есть</li>
+          <li>Скупаем на 20–30% дешевле рынка</li>
+          <li>Сразу в ремонт или в свой парк</li>
+          <li>Источник машин для флипа без поиска</li>
+        </ul>
+        <div class="syc-profit">Снижает стоимость флипа</div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ═══════════ ПРОИЗВОДСТВО ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>04 · Производство: гробы и поддоны</span></div>
+<div class="sec">
+  <div class="sl">Раздел 04 · Новое направление</div>
+  <h2>Производство: гробы + поддоны — почему это работает именно у вас</h2>
+
+  <div class="verd nob" style="margin-bottom:24px">
+    <h3>Конкурентное преимущество, которого нет у других производителей</h3>
+    <p>Аренда 150 кв.м цеха в Верхней Салде: <b>15–25 тыс./мес.</b> В Екатеринбурге — 150–250 тыс./мес. Зарплата рабочего — в 2× ниже областного центра. Плюс своя доставка по себестоимости топлива. Итог: ваша себестоимость на 30–50% ниже аналогичного производителя из ЕКБ при той же цене продажи. Это устойчивое преимущество.</p>
+  </div>
+
+  <div class="g2" style="margin-bottom:24px">
+    <div class="pc nob">
+      <h3>⚰ Производство гробов</h3>
+      <ul>
+        <li><b>Рынок:</b> ~55 тыс. смертей/год в Свердловской обл. = 55 тыс. гробов в год</li>
+        <li><b>Себестоимость</b> простого гроба (сосна/ДСП): 800–1 500 р.</li>
+        <li><b>Цена продажи</b> оптом: 3 000–5 500 р.</li>
+        <li><b>Маржа:</b> 200–400% на себестоимость материала</li>
+        <li><b>Тендеры УФСИН</b> по Св. обл. — ежегодные закупки сотнями шт.</li>
+        <li><b>МКУ и муниципальные службы</b> — zakupki.gov.ru</li>
+        <li><b>Ритуальные агентства</b> — прямые договоры, стабильный объём</li>
+        <li><b>Спрос антициклический</b> — не зависит от экономики</li>
+        <li>2 рабочих: 150–250 шт./мес.</li>
+      </ul>
+      <div style="margin-top:10px;background:rgba(21,122,63,0.12);border-radius:6px;padding:9px 12px;font-size:12px;color:var(--green);font-weight:700">
+        Выручка 450 тыс.–1,4 млн/мес. → прибыль 150–500 тыс./мес.
+      </div>
+    </div>
+    <div class="pc nob">
+      <h3>📦 Производство поддонов</h3>
+      <ul>
+        <li><b>EUR-поддон</b> (800×1200 мм): себестоимость 250–350 р., цена 500–650 р.</li>
+        <li><b>Термообработанный</b> (ISPM-15): наценка +150–200 р./шт. для экспорта</li>
+        <li><b>Нестандартные</b> поддоны для заводов: наценка 30–50%</li>
+        <li><b>Клиенты:</b> заводы Н.Тагила, склады, оптовая торговля ЕКБ</li>
+        <li><b>Оборудование совпадает</b> с гробами: пила + стол сборки + гвоздезабивной</li>
+        <li>2 рабочих: 300–600 шт./мес.</li>
+        <li>Долгосрочные договоры — предсказуемый поток</li>
+        <li>Свои машины везут сразу к клиенту — ноль торговой наценки за доставку</li>
+      </ul>
+      <div style="margin-top:10px;background:rgba(21,122,63,0.12);border-radius:6px;padding:9px 12px;font-size:12px;color:var(--green);font-weight:700">
+        Выручка 150–390 тыс./мес. → прибыль 60–150 тыс./мес.
+      </div>
+    </div>
+  </div>
+
+  <div class="nob">
+  <h3 style="margin-bottom:14px">Что нужно для запуска (минимальный вариант)</h3>
+  <div class="g3">
+    <div class="stp">
+      <div class="stpw">Инвестиции</div>
+      <h3>Что покупаем</h3>
+      <ul>
+        <li>Торцовочная пила б/у: 40–60 тыс.</li>
+        <li>Ленточная пила б/у: 30–50 тыс.</li>
+        <li>Гвоздезабивной пистолет: 15–25 тыс.</li>
+        <li>Сборочный стол: 10–15 тыс.</li>
+        <li>Первая партия пиломатериала: 60–100 тыс.</li>
+        <li><b>Итого: 155–250 тыс.</b></li>
+      </ul>
+    </div>
+    <div class="stp">
+      <div class="stpw">Аренда цеха</div>
+      <h3>Операционные расходы</h3>
+      <ul>
+        <li>Аренда 150 кв.м: 15–25 тыс./мес.</li>
+        <li>2 рабочих: 35–45 тыс./мес. каждый</li>
+        <li>Материалы (сосна): 80–150 тыс./мес.</li>
+        <li>Коммунальные: 8–12 тыс./мес.</li>
+        <li><b>Итого расходов: 175–275 тыс./мес.</b></li>
+      </ul>
+    </div>
+    <div class="stp">
+      <div class="stpw">Сбыт: как продавать</div>
+      <h3>Каналы продаж</h3>
+      <ul>
+        <li>Зарегистрироваться на zakupki.gov.ru (ИП)</li>
+        <li>Обзвон ритуальных агентств Свердловской обл.</li>
+        <li>Обзвон складов/заводов под поддоны</li>
+        <li>Доставка своим транспортом = конкурентная цена</li>
+        <li><b>Первый тендер: 1–3 месяца после регистрации</b></li>
+      </ul>
+    </div>
+  </div>
+  </div>
+
+  <div class="ac ok nob" style="margin-top:18px">
+    <h3>Пилот без риска: 3 месяца аренды цеха</h3>
+    <p>Не строим ничего. Арендуем цех на 3 месяца (45–75 тыс.). Покупаем минимум оборудования за 155–250 тыс. Если за 3 месяца производство не вышло в прибыль — продаём оборудование на Авито (б/у станки ликвидны). Максимальный риск: <b>100–150 тыс. убытка.</b> Потенциал при успехе: <b>200–650 тыс. прибыли в месяц.</b></p>
+  </div>
+</div>
+
+<!-- ═══════════ ГОД 1 ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>05 · Год 1 · Июнь 2026 — Май 2027</span></div>
+<div class="sec">
+  <div class="sl">Раздел 05</div>
+  <h2>Год 1 · Фундамент и первые запуски</h2>
+  <h3 style="color:var(--gold);font-size:16px;margin-bottom:20px">«Устранить простои. Первый флип. Пилот производства. Разведать модификации.»</h3>
+
+  <div class="yr nob">
+    <div class="yh y1">
+      <div><div class="yn">Год 1</div><div class="yt">Фундамент</div><div class="yp">Июнь 2026 — Май 2027</div></div>
+      <div class="yk"><div class="ykv">1,5–2,0 млн</div><div class="ykl">Цель: выручка/мес.</div></div>
+    </div>
+    <div class="yb">
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#1a4a7a"></span>Транспорт</div>
+        <div class="sd">Решаем дефицит водителей: самозанятые через Авито, ЦЗН — субсидия на обучение кат. C. Цель: 0 простоев к сентябрю 2026. +3 запущенных машины = +210–360 тыс./мес. без вложений.</div>
+        <div class="sp">+200–400 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#157a3f"></span>Флип — старт</div>
+        <div class="sd">1-я машина: 350–500 тыс. Ремонт + аутсорс покраски. Продать за 8 нед. с маржой 200–250 тыс. Это тест. Если сработало — запускаем конвейер. К концу года: 4–6 флипов = 800 тыс.–1,5 млн суммарно.</div>
+        <div class="sp">800 тыс.–1,5 млн/год</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#c97a0a"></span>Производство — пилот</div>
+        <div class="sd">Арендуем цех на 3 месяца. Оборудование б/у: 155–250 тыс. Первые 2 мес — поддоны (проще освоить). 3-й мес — добавляем гробы. Параллельно: регистрация на zakupki.gov.ru, обзвон ритуальных агентств.</div>
+        <div class="sp">0 → 200 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#2d6ea8"></span>Модификации</div>
+        <div class="sd">Обзвон 30 транспортных компаний. Первые 2 пневмо-кейса по себестоимости с фото/видео. Публикация ВКонтакте. К маю 2027: 3–5 платных заказов/мес. Устанавливаем на флип-машины для повышения цены продажи.</div>
+        <div class="sp">0 → 80 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#b32a2a"></span>Механик — страховка</div>
+        <div class="sd"><b>Немедленно:</b> создать «книгу операций» (технокарты, поставщики, прайс). Нанять дублёра/стажёра. Кандидат на замену — иметь в запасе. Это страховка от остановки всего бизнеса.</div>
+        <div class="sp r">Снизить риск</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="g3 nob">
+    <div class="card">
+      <h3>Бюджет инвестиций, Год 1</h3>
+      <table style="margin-top:6px">
+        <tbody>
+          <tr><td>Флипы ×3 (покупка машин)</td><td class="tb">900–1 200 тыс.</td></tr>
+          <tr><td>Запчасти для флипов</td><td class="tb">250–350 тыс.</td></tr>
+          <tr><td>Покраска аутсорс ×3</td><td class="tb">90–120 тыс.</td></tr>
+          <tr><td>Оборудование производства</td><td class="tb">155–250 тыс.</td></tr>
+          <tr><td>Аренда цеха (3 мес.)</td><td class="tb">45–75 тыс.</td></tr>
+          <tr><td>Пневмо кит ×2 (кейсы)</td><td class="tb">60–80 тыс.</td></tr>
+          <tr><td>Реклама, объявления</td><td class="tb">20–30 тыс.</td></tr>
+          <tr class="tot"><td><b>ИТОГО</b></td><td class="tg">1,5–2,1 млн</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Флипы самофинансируются: вложения возвращаются при продаже. Без нового кредита.</div>
+    </div>
+    <div class="card">
+      <h3>Итог Года 1 (май 2027)</h3>
+      <table style="margin-top:6px">
+        <tbody>
+          <tr><td>Транспорт</td><td class="tb">900 тыс.–1,2 млн</td></tr>
+          <tr><td>Флип (4–6 машин за год)</td><td class="tb">800 тыс.–1,5 млн</td></tr>
+          <tr><td>Производство (с мес. 4+)</td><td class="tb">200–500 тыс.</td></tr>
+          <tr><td>Модификации (с мес. 6+)</td><td class="tb">150–300 тыс.</td></tr>
+          <tr><td>Кредит (−239 тыс.×12)</td><td class="tr">−2 868 тыс.</td></tr>
+          <tr class="tot"><td><b>Чистая прибыль/мес. к маю</b></td><td class="tg">550–750 тыс.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>5 действий — Июнь 2026</h3>
+      <ol style="padding-left:15px;font-size:12px;color:var(--muted)">
+        <li style="margin-bottom:5px">Разместить вакансию водителя + запрос в ЦЗН на субсидию</li>
+        <li style="margin-bottom:5px">Купить 1-ю флип-машину 350–500 тыс.</li>
+        <li style="margin-bottom:5px">Найти цех 100–150 кв.м, договориться на 3 мес.</li>
+        <li style="margin-bottom:5px">Зарегистрироваться на zakupki.gov.ru как ИП</li>
+        <li style="margin-bottom:5px">Начать «книгу операций» механика</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ГОД 2 ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>06 · Год 2 · Июнь 2027 — Май 2028</span></div>
+<div class="sec">
+  <div class="sl">Раздел 06</div>
+  <h2>Год 2 · Масштаб. Камера. Переход в премиум.</h2>
+
+  <div class="yr nob">
+    <div class="yh y2">
+      <div><div class="yn">Год 2</div><div class="yt">Масштаб и инфраструктура</div><div class="yp">Июнь 2027 — Май 2028</div></div>
+      <div class="yk"><div class="ykv">2,2–2,8 млн</div><div class="ykl">Цель: выручка/мес.</div></div>
+    </div>
+    <div class="yb">
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#c97a0a"></span>Покрасочная камера</div>
+        <div class="sd">Инвестируем 400–500 тыс. в модернизацию (вытяжка + обогрев + компрессор + освещение). Экономия: 30–50 тыс./машина вместо аутсорса. Внешние клиенты на покраску: +40–80 тыс./мес. Окупаемость — 4–5 машин.</div>
+        <div class="sp">−500 тыс. → +40–80 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#157a3f"></span>Флип 700–900 тыс.</div>
+        <div class="sd">Переходим в верхний сегмент. Покраска своя. Репутация наработана за 5–6 флипов. 2 машины одновременно. Расширение на Авито ЕКБ. Стратегия «дорого, но надёжно» работает на полную.</div>
+        <div class="sp">+500–700 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#c97a0a"></span>Производство — тендеры</div>
+        <div class="sd">Первые выигранные тендеры (УФСИН / МКУ). Годовые договоры с ритуальными агентствами. Поддоны — 2–3 постоянных клиента в Н.Тагиле. Производство загружено на 60–80%. Возможно: расширить до 200 кв.м.</div>
+        <div class="sp">+250–500 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#2d6ea8"></span>Модификации — регион</div>
+        <div class="sd">5–8 заказов/мес. Реклама в ВКонтакте по транспортным группам Свердловской обл. Принимаем из Н.Тагила. Возможно: выездные работы в ЕКБ раз в 2 нед.</div>
+        <div class="sp">+200–350 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#1a4a7a"></span>Запчасти + шиномонтаж</div>
+        <div class="sd">Вводим торговлю запчастями (инвестиция 200–300 тыс. в склад). Шиномонтажный станок (200–280 тыс.). Каждый клиент СТО и каждый флип — покупатель расходников и шин.</div>
+        <div class="sp">+150–250 тыс./мес.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ГОД 3 ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>07 · Год 3 — Перелом</span></div>
+<div class="sec">
+  <div class="sl">Раздел 07</div>
+  <h2>Год 3 · Закрыть кредит. Начать накапливать на ЕКБ.</h2>
+
+  <div class="yr nob">
+    <div class="yh y3">
+      <div><div class="yn">Год 3 — Перелом</div><div class="yt">Кредит = 0. Свободный поток.</div><div class="yp">Июнь 2028 — Май 2029</div></div>
+      <div class="yk"><div class="ykv">950–1 200 тыс.</div><div class="ykl">Чистая прибыль/мес.</div></div>
+    </div>
+    <div class="yb">
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#b32a2a"></span>Кредит — закрыть</div>
+        <div class="sd">К началу Года 3 остаток ~1–1,5 млн. Досрочно погашаем. 239 тыс./мес., которые уходили на платёж — теперь чистая прибыль. Это самый большой единовременный скачок денежного потока за всё время.</div>
+        <div class="sp">+239 тыс./мес. навсегда</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#157a3f"></span>Флип — конвейер 3–4/мес.</div>
+        <div class="sd">Полный цикл в своей камере. Ассистент по продажам (нанять специалиста). Активно на Авито ЕКБ и Дром.ру. Рынок ЕКБ в 5× больше В.Салды. 1 Валдай с удлинением = 350–500 тыс. маржи.</div>
+        <div class="sp">+800–1 200 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#c97a0a"></span>Производство — тендеры масштаб</div>
+        <div class="sd">Регулярные государственные контракты. Расширение ассортимента: урны, кресты, венки (маржа 300–500%). Поддоны: ISPM-15 (экспортный) под конкретных клиентов. Наш транспорт развозит по всей России.</div>
+        <div class="sp">+400–700 тыс./мес.</div>
+      </div>
+      <div class="st">
+        <div class="sn"><span class="dot" style="background:#2d6ea8"></span>Начало накопления на ЕКБ</div>
+        <div class="sd">После закрытия кредита направляем 300–400 тыс./мес. в накопление. К концу Года 3 накоплено 3,5–5 млн. Начинаем изучать объекты в ЕКБ.</div>
+        <div class="sp">+3,5–5 млн/год</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ГОДЫ 4–5 + ЕКБ ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>08 · Годы 4–5 · Актив в ЕКБ</span></div>
+<div class="sec">
+  <div class="sl">Раздел 08</div>
+  <h2>Годы 4–5 · Накопление и покупка актива в Екатеринбурге</h2>
+
+  <div class="g2" style="margin-bottom:22px">
+    <div class="yr nob" style="margin-bottom:0">
+      <div class="yh y4">
+        <div><div class="yn">Год 4</div><div class="yt">Масштаб + накопление</div><div class="yp">Июнь 2029 — Май 2030</div></div>
+        <div class="yk"><div class="ykv">1 100–1 450 тыс.</div><div class="ykl">Прибыль/мес.</div></div>
+      </div>
+      <div class="yb" style="padding:16px 22px">
+        <div class="st" style="padding:9px 0"><div class="sn" style="font-size:12px"><span class="dot" style="background:#157a3f"></span>Флип</div><div class="sd">4–5 машин/мес. ЕКБ. Делегирование.</div><div class="sp">+1,0–1,4 млн</div></div>
+        <div class="st" style="padding:9px 0"><div class="sn" style="font-size:12px"><span class="dot" style="background:#c97a0a"></span>Производство</div><div class="sd">Тендеры + расширение ассортимента.</div><div class="sp">+500–900 тыс.</div></div>
+        <div class="st" style="padding:9px 0;border-bottom:none"><div class="sn" style="font-size:12px"><span class="dot" style="background:#2d6ea8"></span>ЕКБ накопление</div><div class="sd">400–500 тыс./мес. → к концу Года 4: <b>9–11 млн накоплено.</b></div><div class="sp">+5–6 млн/год</div></div>
+      </div>
+    </div>
+    <div class="yr nob" style="margin-bottom:0">
+      <div class="yh y5">
+        <div><div class="yn">Год 5 — Цель</div><div class="yt">Покупка актива в ЕКБ</div><div class="yp">Июнь 2030 — Май 2031</div></div>
+        <div class="yk"><div class="ykv">1 350+ тыс.</div><div class="ykl">Прибыль/мес.</div></div>
+      </div>
+      <div class="yb" style="padding:16px 22px">
+        <div class="st" style="padding:9px 0"><div class="sn" style="font-size:12px"><span class="dot" style="background:#157a3f"></span>Все потоки</div><div class="sd">Частично делегированы. Работают стабильно.</div><div class="sp">+1,5–2,0 млн</div></div>
+        <div class="st" style="padding:9px 0"><div class="sn" style="font-size:12px"><span class="dot" style="background:#2d6ea8"></span>Накопление</div><div class="sd">К сер. Года 5: <b>14–17 млн накоплено.</b></div><div class="sp">+5–6 млн/год</div></div>
+        <div class="st" style="padding:9px 0;border-bottom:none"><div class="sn" style="font-size:12px"><span class="dot" style="background:#c97a0a"></span>Покупка ЕКБ</div><div class="sd">Своих 14–17 млн + ипотека 4–7 млн = объект 18–24 млн.</div><div class="sp">Актив ~20 млн</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ekb nob">
+    <h3>Стратегия объекта в Екатеринбурге: честные числа</h3>
+    <div class="ekb-g">
+      <div>
+        <div class="ekb-col"><h4>Типы объектов и доход</h4></div>
+        <div class="ekb-row"><span>Чистая аренда (9–11% год.)</span><strong>150–185 тыс./мес.</strong></div>
+        <div class="ekb-row"><span>Апарт-отель / посуточная аренда</span><strong>300–500 тыс./мес.</strong></div>
+        <div class="ekb-row"><span>Мини-склад (self-storage)</span><strong>300–500 тыс./мес.</strong></div>
+        <div class="ekb-row"><span>Автосервис с управляющим</span><strong>400–700 тыс./мес.</strong></div>
+        <div class="ekb-row"><span>Торговое стрит-ритейл</span><strong>130–200 тыс./мес.</strong></div>
+      </div>
+      <div>
+        <div class="ekb-col"><h4>Наша рекомендация</h4></div>
+        <div class="ekb-row"><span>Мини-склад самообслуживания</span><strong>🟢 Отлично</strong></div>
+        <div class="ekb-row"><span>Небольшой автосервис (ваша экспертиза)</span><strong>🟢 Синергия</strong></div>
+        <div class="ekb-row"><span>Посуточная аренда апартаментов</span><strong>🟡 Хорошо</strong></div>
+        <div class="ekb-row"><span>Торговое в спальном районе</span><strong>🟡 Стабильно</strong></div>
+        <div class="ekb-row"><span>Офисное помещение</span><strong>🔴 Риск</strong></div>
+      </div>
+    </div>
+    <div class="ekb-note">
+      <strong>Важно:</strong> Пассивная аренда объекта за 20 млн = 150–185 тыс./мес., а не 500 тыс. Чтобы получить 500 тыс./мес. с одного объекта — нужен активный бизнес внутри (сервис, склад, апарт-отель). Рекомендуем: небольшой автосервис в ЕКБ с наёмным управляющим — вы используете экспертизу, репутацию и, возможно, каналы поставки запчастей. Реалистичный доход: <strong>400–700 тыс./мес.</strong> при объекте 15–20 млн.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ФИНАНСОВАЯ СВОДКА ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>09 · Финансы и риски</span></div>
+<div class="sec">
+  <div class="sl">Раздел 09</div>
+  <h2>Финансовая динамика 2026–2031</h2>
+
+  <div class="fin-grid nob">
+    <div class="fin-year">
+      <div class="fin-yh fy0">Старт — Май 2026<small>Текущее состояние</small></div>
+      <div class="fin-row"><span>🚛 Транспорт</span><span>700–900 тыс.</span></div>
+      <div class="fin-row"><span>🔧 Флип</span><span>—</span></div>
+      <div class="fin-row"><span>🏭 Производство</span><span>—</span></div>
+      <div class="fin-row"><span>⚙️ Модификации</span><span>—</span></div>
+      <div class="fin-credit"><span>💳 Кредит</span><span>−239 тыс.</span></div>
+      <div class="fin-profit"><span>Прибыль/мес.</span><span>400–600 тыс. (в сезон)</span></div>
+    </div>
+    <div class="fin-year">
+      <div class="fin-yh fy1">Год 1 — Май 2027<small>Флип + пилот производства</small></div>
+      <div class="fin-row"><span>🚛 Транспорт</span><span>700–1 000 тыс.</span></div>
+      <div class="fin-row"><span>🔧 Флип (маржа)*</span><span>~65 тыс./мес.</span></div>
+      <div class="fin-row"><span>🏭 Производство</span><span>100–200 тыс.</span></div>
+      <div class="fin-row"><span>⚙️ Модификации</span><span>50–80 тыс.</span></div>
+      <div class="fin-credit"><span>💳 Кредит</span><span>−239 тыс.</span></div>
+      <div class="fin-profit"><span>Прибыль/мес.</span><span>550–750 тыс.</span></div>
+    </div>
+    <div class="fin-year">
+      <div class="fin-yh fy2">Год 2 — Май 2028<small>Камера + премиум флип</small></div>
+      <div class="fin-row"><span>🚛 Транспорт</span><span>800–1 000 тыс.</span></div>
+      <div class="fin-row"><span>🔧 Флип</span><span>500–700 тыс.</span></div>
+      <div class="fin-row"><span>🏭 Производство</span><span>250–500 тыс.</span></div>
+      <div class="fin-row"><span>⚙️ Модификации</span><span>200–350 тыс.</span></div>
+      <div class="fin-credit"><span>💳 Кредит</span><span>−239 тыс.</span></div>
+      <div class="fin-profit"><span>Прибыль/мес.</span><span>750–950 тыс.</span></div>
+    </div>
+  </div>
+  <div class="fin-grid nob">
+    <div class="fin-year">
+      <div class="fin-yh fy3">Год 3 — Май 2029<small>🎯 Кредит закрыт</small></div>
+      <div class="fin-row"><span>🚛 Транспорт</span><span>800–1 000 тыс.</span></div>
+      <div class="fin-row"><span>🔧 Флип</span><span>800–1 200 тыс.</span></div>
+      <div class="fin-row"><span>🏭 Производство</span><span>400–700 тыс.</span></div>
+      <div class="fin-row"><span>⚙️ Модификации</span><span>300–500 тыс.</span></div>
+      <div class="fin-credit"><span>💳 Кредит</span><span style="color:var(--green);font-weight:700">0 ✅</span></div>
+      <div class="fin-profit"><span>Прибыль/мес.</span><span>950–1 200 тыс.</span></div>
+    </div>
+    <div class="fin-year">
+      <div class="fin-yh fy4">Год 4 — Май 2030<small>Накопление на ЕКБ</small></div>
+      <div class="fin-row"><span>🚛 Транспорт</span><span>800–1 000 тыс.</span></div>
+      <div class="fin-row"><span>🔧 Флип</span><span>1 000–1 400 тыс.</span></div>
+      <div class="fin-row"><span>🏭 Производство</span><span>500–900 тыс.</span></div>
+      <div class="fin-row"><span>⚙️ Модификации</span><span>350–600 тыс.</span></div>
+      <div class="fin-credit"><span>💳 Кредит</span><span style="color:var(--green);font-weight:700">0</span></div>
+      <div class="fin-profit"><span>Прибыль/мес.</span><span>1 100–1 450 тыс.</span></div>
+    </div>
+    <div class="fin-year">
+      <div class="fin-yh fy5">Год 5 — Май 2031<small>🏆 Цель достигнута</small></div>
+      <div class="fin-row"><span>🚛 Транспорт</span><span>800–1 000 тыс.</span></div>
+      <div class="fin-row"><span>🔧 Флип</span><span>1 100–1 500 тыс.</span></div>
+      <div class="fin-row"><span>🏭 Производство</span><span>600–1 000 тыс.</span></div>
+      <div class="fin-row"><span>⚙️ Модификации</span><span>400–700 тыс.</span></div>
+      <div class="fin-credit"><span>💳 Кредит</span><span style="color:var(--green);font-weight:700">0</span></div>
+      <div class="fin-profit"><span>Прибыль/мес.</span><span>1 350–1 850 тыс.</span></div>
+    </div>
+  </div>
+  <div style="font-size:10.5px;color:var(--muted);margin-bottom:22px">* Флип Год 1: маржа 800 тыс.–1,5 млн за год ÷ 12 = ~65–125 тыс./мес. в среднем. Фактически — разово при каждой продаже.</div>
+
+  <div class="g2 nob" style="margin-bottom:24px">
+    <div>
+      <h3 style="margin-bottom:12px">Накопление на ЕКБ объект</h3>
+      <table>
+        <thead><tr><th>Год</th><th>Откладываем/мес.</th><th>Накоплено за год</th><th>Итого на счёте</th></tr></thead>
+        <tbody>
+          <tr><td class="tb">Год 1–2</td><td>100–150 тыс.</td><td>1–2 млн</td><td>до 2 млн</td></tr>
+          <tr><td class="tb">Год 3 <span style="color:var(--green);font-weight:700">(кредит = 0)</span></td><td class="tg">400–600 тыс.</td><td class="tg">5–7 млн</td><td class="tg">7–9 млн</td></tr>
+          <tr><td class="tb">Год 4</td><td class="tg">500–700 тыс.</td><td class="tg">6–8 млн</td><td class="tg">13–17 млн</td></tr>
+          <tr class="tot"><td><b>Год 5 → покупка</b></td><td class="tg"><b>500–700 тыс.</b></td><td class="tg"><b>6–8 млн</b></td><td class="tg"><b>17–22 млн своих</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3 style="margin-bottom:12px">Структура активов к маю 2031</h3>
+      <table>
+        <thead><tr><th>Актив</th><th>Оценка стоимости</th></tr></thead>
+        <tbody>
+          <tr><td>🚛 Автопарк 11+ ед.</td><td class="tg tb">5–6 млн</td></tr>
+          <tr><td>🏢 Гараж 188 кв.м (собственность)</td><td class="tg tb">3–4 млн</td></tr>
+          <tr><td>🌱 Земля 20 соток</td><td class="tg tb">400 тыс.</td></tr>
+          <tr><td>⚙️ Оборудование (камера, СТО, произв.)</td><td class="tg tb">2–3 млн</td></tr>
+          <tr><td>🤝 Бренд и клиентская база</td><td class="tg tb">2–3 млн</td></tr>
+          <tr><td>🏙️ Объект в Екатеринбурге</td><td class="tg tb">18–24 млн</td></tr>
+          <tr class="tot"><td><b>ИТОГО АКТИВОВ</b></td><td class="tg"><b>30–40 млн</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 style="margin-bottom:14px">Ключевые риски</h3>
+
+  <div class="rcard r-crit nob">
+    <div class="rcard-head">
+      <span class="badge b-r">Критический</span>
+      <span class="rcard-name">Механик — уход или срыв</span>
+    </div>
+    <div class="rcard-body">
+      <div class="rcard-impact">
+        <div class="rcard-label">Последствие</div>
+        Одновременная остановка СТО, флипов и модификаций. Весь технический блок завязан на одном человеке.
+      </div>
+      <div class="rcard-fix">
+        <div class="rcard-label">Решение</div>
+        <b>Немедленно:</b> создать «книгу операций» (технокарты, прайс, поставщики). Нанять и обучить дублёра. Горизонт 6 мес. — замена или второй механик в параллель.
+      </div>
+    </div>
+  </div>
+
+  <div class="rcard r-mid nob">
+    <div class="rcard-head">
+      <span class="badge b-y">Средний</span>
+      <span class="rcard-name">Флипы не продаются — капитал заморожен</span>
+    </div>
+    <div class="rcard-body">
+      <div class="rcard-impact">
+        <div class="rcard-label">Последствие</div>
+        Машина не уходит 2–3 мес. → 400–900 тыс. не работают, следующий флип невозможно запустить.
+      </div>
+      <div class="rcard-fix">
+        <div class="rcard-label">Решение</div>
+        Лимит в Год 1: не более 2 машин. При зависании — выставить на Авито ЕКБ (рынок в 5×), снизить цену на 50 тыс. для ускорения оборота.
+      </div>
+    </div>
+  </div>
+
+  <div class="rcard r-mid nob">
+    <div class="rcard-head">
+      <span class="badge b-y">Средний</span>
+      <span class="rcard-name">Производство убыточно — тендеры не выиграны</span>
+    </div>
+    <div class="rcard-body">
+      <div class="rcard-impact">
+        <div class="rcard-label">Последствие</div>
+        Рынок гробов/поддонов в регионе может быть занят. Тендеры требуют времени (1–3 мес. после регистрации).
+      </div>
+      <div class="rcard-fix">
+        <div class="rcard-label">Решение</div>
+        Пилот 3 мес. = максимальный убыток 100–150 тыс. Оборудование б/у продаётся обратно на Авито. Риск управляемый и ограниченный.
+      </div>
+    </div>
+  </div>
+
+  <div class="rcard r-mid nob">
+    <div class="rcard-head">
+      <span class="badge b-y">Средний</span>
+      <span class="rcard-name">Высокие ставки по ипотеке на объект в ЕКБ</span>
+    </div>
+    <div class="rcard-body">
+      <div class="rcard-impact">
+        <div class="rcard-label">Последствие</div>
+        Коммерческая ипотека под 18–22% годовых делает кредитное плечо дорогим. Ежемесячный платёж съедает доход от объекта.
+      </div>
+      <div class="rcard-fix">
+        <div class="rcard-label">Решение</div>
+        Покупать только когда накоплено 70–80% стоимости. Рассматривать объект при снижении ключевой ставки ЦБ. Приоритет — минимальный кредит.
+      </div>
+    </div>
+  </div>
+
+  <div class="rcard r-low nob">
+    <div class="rcard-head">
+      <span class="badge b-g">Низкий</span>
+      <span class="rcard-name">Гараж — нелегальный статус</span>
+    </div>
+    <div class="rcard-body">
+      <div class="rcard-impact">
+        <div class="rcard-label">Последствие</div>
+        При росте видимости СТО возможна проверка. Запрет на внешнюю рекламу ограничивает рост клиентской базы.
+      </div>
+      <div class="rcard-fix">
+        <div class="rcard-label">Решение</div>
+        Стратегия сарафана снижает риск до минимума. При необходимости легализации — «гаражная амнистия» ФЗ №79, действует и продлевается.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ДОРОЖНАЯ КАРТА ═══════════ -->
+<div class="pb"></div>
+<div class="ph"><span><strong>SaldaCargo</strong> · Стратегический план 2026–2031</span><span>10 · Дорожная карта</span></div>
+<div class="sec">
+  <div class="sl">Раздел 10</div>
+  <h2>Дорожная карта 2026–2031</h2>
+  <table class="nob" style="margin-bottom:28px">
+    <thead>
+      <tr><th>Период</th><th>Транспорт + Флип</th><th>Модификации</th><th>Производство</th><th>Инфраструктура</th><th>Финансы</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="tb">Лето 2026</td><td>Нанять водителей. 1-й флип.</td><td>30 звонков. 2 кейса бесплатно.</td><td>Найти цех. Купить оборудование.</td><td>Книга механика. Дублёр.</td><td>Кредит 4,3 млн. Прибыль 400–600 тыс. (сезон)</td></tr>
+      <tr><td class="tb">Осень 2026</td><td>0 простоев. Продать 1-й флип.</td><td>Первые платные заказы.</td><td>Поддоны: первые продажи. zakupki.gov.ru.</td><td>Подбор подрядчика на камеру.</td><td>Прибыль 450–600 тыс.</td></tr>
+      <tr><td class="tb">Зима 2026–27</td><td>2 флипа одновременно. Профиль на Авито.</td><td>3–5 заказов/мес.</td><td>Добавить гробы. Первый тендер.</td><td>Начало модернизации камеры.</td><td>Прибыль 500–650 тыс.</td></tr>
+      <tr><td class="tb">Весна 2027</td><td>5–6 флипов за год. Репутация.</td><td>Удлинения. Выход в Н.Тагил.</td><td>Первый гос. контракт.</td><td>Камера готова.</td><td>Прибыль 550–750 тыс.</td></tr>
+      <tr><td class="tb">Лето 2027</td><td>Переход 700–900 тыс. 2 машины/цикл.</td><td>5–8 заказов/мес. ВКонтакте.</td><td>Стабильный поток от агентств.</td><td>Запчасти + шиномонтаж.</td><td>Прибыль 700–900 тыс.</td></tr>
+      <tr><td class="tb">2028 (Год 3)</td><td>3–4 флипа/мес. Ассистент продаж. ЕКБ.</td><td>10–15 заказов/мес. Регион.</td><td>Годовые тендерные контракты. Урны, кресты.</td><td>Доп. рабочий в производство.</td><td>Кредит: 0 ✅ Прибыль 950–1 200 тыс.</td></tr>
+      <tr><td class="tb">2029 (Год 4)</td><td>4–5 флипов/мес. Частичное делегирование.</td><td>15+ заказов/мес. Специализация.</td><td>ISPM-15 поддоны. ЕКБ клиенты.</td><td>Мониторинг ЕКБ объектов.</td><td>Накоплено 12–15 млн. Прибыль 1 100 тыс.</td></tr>
+      <tr class="tot"><td><b>2030–31 (Год 5)</b></td><td><b>Стабильный поток. Делегирован.</b></td><td><b>Лидер в регионе.</b></td><td><b>Масштаб. Разные рынки сбыта.</b></td><td><b>Покупка ЕКБ объекта.</b></td><td class="tg"><b>Актив ~35–40 млн. Прибыль 1 350+ тыс.</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="verd nob">
+    <h3>Итоговая картина к маю 2031 года</h3>
+    <p>
+      <b>5 независимых потоков дохода:</b> Транспорт + Флип + Модификации + Производство + ЕКБ объект.<br><br>
+      <b>Общий доход:</b> основной бизнес 1,35–1,85 млн/мес. + ЕКБ объект 400–700 тыс./мес. = <b>1,75–2,55 млн/мес. суммарно.</b><br><br>
+      <b>Активы:</b> бизнес-активы ~12–16 млн + ЕКБ объект ~18–24 млн = <b>30–40 млн руб.</b><br><br>
+      <b>Цель «500 тыс./мес. дополнительно» достигается к концу Года 1</b> — на 4 года раньше горизонта плана — база уже 400–600 тыс. в сезон, новые потоки (флип + производство) дают результат быстрее.
+    </p>
+  </div>
+</div>
+
+<footer>
+  <strong>SaldaCargo · ИП Нигамедьянов · г. Верхняя Салда</strong><br>
+  <span style="margin-top:4px;display:block">Стратегический план 2026–2031 · Версия 3.0 · Составлен май 2026 · Конфиденциально</span>
+</footer>
+
+</body>
+</html>

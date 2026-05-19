@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Гараж MiniApp — SaldaCargo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; }
+    .phone {
+      width: 375px; height: 720px;
+      background: #f8fafc;
+      border-radius: 44px;
+      border: 8px solid #1e293b;
+      box-shadow: 0 0 0 2px #334155, 0 40px 80px rgba(0,0,0,.6);
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .phone-notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 120px; height: 28px; background: #1e293b;
+      border-radius: 0 0 18px 18px; z-index: 100;
+    }
+    .phone-screen { height: 100%; overflow: hidden; position: relative; }
+    .screen { display: none; height: 100%; flex-direction: column; }
+    .screen.active { display: flex; }
+    /* Bottom nav */
+    .bottom-nav { background: #fff; border-top: 1px solid #e2e8f0; padding: 8px 0 12px; flex-shrink: 0; }
+    .nav-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; padding: 4px 0; }
+    .nav-tab svg { width: 22px; height: 22px; stroke: #94a3b8; }
+    .nav-tab span { font-size: 10px; color: #94a3b8; font-weight: 500; }
+    .nav-tab.active svg { stroke: #0f172a; }
+    .nav-tab.active span { color: #0f172a; }
+    /* Components */
+    .scroll-area { flex: 1; overflow-y: auto; }
+    .scroll-area::-webkit-scrollbar { display: none; }
+    .card { background: #fff; border-radius: 16px; margin: 0 12px 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #f1f5f9; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 100px; font-size: 11px; font-weight: 600; }
+    .btn { display: block; width: 100%; text-align: center; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-dark { background: #0f172a; color: #fff; }
+    .btn-green { background: #059669; color: #fff; }
+    .btn-outline { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-red { background: #dc2626; color: #fff; }
+    .input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; }
+    .input:focus { border-color: #94a3b8; }
+    .section-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; padding: 8px 16px 4px; }
+    .wo-card { background: #fff; border-radius: 16px; margin: 0 12px 10px; padding: 14px; border-left: 4px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .wo-card.open { border-left-color: #64748b; }
+    .wo-card.inwork { border-left-color: #3b82f6; background: #f0f7ff; }
+    .wo-card.pending { border-left-color: #f59e0b; }
+    .wo-card.alert-red { border-left-color: #ef4444; background: #fff5f5; }
+    .wo-card.alert-yellow { border-left-color: #f59e0b; background: #fffbeb; }
+    .alert-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .tab-pill { padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+    .tab-pill.active { background: #0f172a; color: #fff; }
+    .tab-pill:not(.active) { background: #f1f5f9; color: #64748b; }
+    .counter { background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+    .header { background: #fff; border-bottom: 1px solid #f1f5f9; padding: 36px 16px 12px; flex-shrink: 0; }
+    .salary-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f8fafc; }
+    select { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 13px; width: 100%; outline: none; }
+    .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f8fafc; cursor: pointer; }
+    .checkbox-row input { width: 18px; height: 18px; cursor: pointer; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- Header -->
+<div class="text-center py-8">
+  <div class="text-white text-2xl font-bold mb-1">Гараж MiniApp — SaldaCargo</div>
+  <div class="text-slate-400 text-sm">Мобильный интерфейс · переключай экраны кнопками под телефонами</div>
+</div>
+
+<!-- Phones -->
+<div class="flex justify-center gap-16 pb-16 px-8 flex-wrap">
+
+  <!-- ═══════════════ МЕХАНИК ════════════════════════════════════════════════ -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="text-white font-bold text-lg flex items-center gap-2">
+      <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+      Механик — Иванов Сергей
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen" id="mech-phone">
+
+        <!-- SCREEN: Мои наряды -->
+        <div class="screen active" id="mech-orders">
+          <div class="header">
+            <div class="text-xs text-slate-400 mb-0.5">Добрый день,</div>
+            <div class="font-bold text-slate-900 text-lg">Иванов Сергей</div>
+            <div class="flex gap-2 mt-3">
+              <button onclick="mechTab('orders','my',this)" class="tab-pill active">Мои (2)</button>
+              <button onclick="mechTab('orders','free',this)" class="tab-pill">Свободные (2)</button>
+            </div>
+          </div>
+          <div class="scroll-area pt-2" id="mech-orders-list">
+            <!-- MY orders -->
+            <div id="mech-my">
+              <div class="section-title">Активные наряды</div>
+              <div class="wo-card inwork" onclick="mechScreen('wo-detail')">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <div class="font-bold text-slate-900 text-sm">НЗ-2025-042</div>
+                    <div class="text-xs text-slate-500 mt-0.5">Газель Б456ГД · 98 750 км</div>
+                  </div>
+                  <span class="badge bg-blue-100 text-blue-700">В работе</span>
+                </div>
+                <div class="text-sm text-slate-700 mb-3">Замена тормозных колодок (пер.)</div>
+                <div class="flex justify-between text-xs text-slate-400 mb-3">
+                  <span>Нч план: <b class="text-slate-700">2.0</b></span>
+                  <span>Старт: 09:15</span>
+                </div>
+                <button onclick="event.stopPropagation(); mechScreen('close-wo')" class="btn btn-dark" style="padding:10px">Закрыть наряд</button>
+              </div>
+
+              <div class="wo-card open" onclick="mechScreen('wo-detail-open')">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <div class="font-bold text-slate-900 text-sm">НЗ-2025-041</div>
+                    <div class="text-xs text-slate-500 mt-0.5">Газель А123БВ · 112 010 км</div>
+                  </div>
+                  <span class="badge bg-slate-100 text-slate-600">Открыт</span>
+                </div>
+                <div class="text-sm text-slate-700 mb-3">Замена масла, воздушного и топливного фильтров</div>
+                <div class="flex justify-between text-xs text-slate-400 mb-3">
+                  <span>Нч план: <b class="text-slate-700">2.5</b></span>
+                  <span>Назначен мне</span>
+                </div>
+                <button onclick="event.stopPropagation()" class="btn btn-outline" style="padding:10px">Начать работу</button>
+              </div>
+            </div>
+
+            <!-- FREE orders (hidden) -->
+            <div id="mech-free" style="display:none">
+              <div class="section-title">Доступные наряды</div>
+              <div class="text-xs text-slate-400 px-4 pb-2">Механик не назначен — можешь взять</div>
+              <div class="wo-card open">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <div class="font-bold text-slate-900 text-sm">НЗ-2025-044</div>
+                    <div class="text-xs text-slate-500 mt-0.5">Газель А123БВ · 112 330 км</div>
+                  </div>
+                  <span class="badge bg-slate-100 text-slate-600">Открыт</span>
+                </div>
+                <div class="text-sm text-slate-700 mb-1">Замена ремня ГРМ</div>
+                <div class="text-xs text-slate-400 mb-3">Нч план: <b class="text-slate-700">4.0</b> · ЗП: ~4 000 ₽</div>
+                <button class="btn btn-dark" style="padding:10px">Взять наряд</button>
+              </div>
+              <div class="wo-card open">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <div class="font-bold text-slate-900 text-sm">НЗ-2025-045</div>
+                    <div class="text-xs text-slate-500 mt-0.5">Валдай В789ЕЖ · 87 420 км</div>
+                  </div>
+                  <span class="badge bg-slate-100 text-slate-600">Открыт</span>
+                </div>
+                <div class="text-sm text-slate-700 mb-1">ТО-1 плановое</div>
+                <div class="text-xs text-slate-400 mb-3">Нч план: <b class="text-slate-700">3.5</b> · ЗП: ~3 500 ₽</div>
+                <button class="btn btn-dark" style="padding:10px">Взять наряд</button>
+              </div>
+            </div>
+          </div>
+          <!-- Bottom nav -->
+          <div class="bottom-nav flex">
+            <div class="nav-tab active" onclick="mechScreen('orders')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              <span>Наряды</span>
+            </div>
+            <div class="nav-tab" onclick="mechScreen('history')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>История</span>
+            </div>
+            <div class="nav-tab" onclick="mechScreen('salary')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>ЗП</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Детали наряда (в работе) -->
+        <div class="screen" id="mech-wo-detail">
+          <div class="header">
+            <button onclick="mechScreen('orders')" class="flex items-center gap-1 text-slate-500 text-sm mb-3">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              Назад
+            </button>
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-bold text-slate-900 text-base">НЗ-2025-042</div>
+                <div class="text-xs text-slate-400 mt-0.5">Газель Б456ГД · 98 750 км</div>
+              </div>
+              <span class="badge bg-blue-100 text-blue-700">В работе</span>
+            </div>
+          </div>
+          <div class="scroll-area pt-3 pb-4">
+            <div class="section-title">Информация</div>
+            <div class="card">
+              <div class="flex justify-between py-1.5 text-sm"><span class="text-slate-500">Автомобиль</span><span class="font-medium text-slate-900">Газель Б456ГД</span></div>
+              <div class="flex justify-between py-1.5 text-sm border-t border-slate-50"><span class="text-slate-500">Пробег</span><span class="font-medium text-slate-900">98 750 км</span></div>
+              <div class="flex justify-between py-1.5 text-sm border-t border-slate-50"><span class="text-slate-500">Источник</span><span class="font-medium text-slate-900">Заявка водителя</span></div>
+              <div class="flex justify-between py-1.5 text-sm border-t border-slate-50"><span class="text-slate-500">Старт работ</span><span class="font-medium text-slate-900">09:15, сегодня</span></div>
+            </div>
+
+            <div class="section-title">Работы по наряду</div>
+            <div class="card">
+              <div class="checkbox-row">
+                <input type="checkbox" checked/>
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-slate-900">Замена тормозных колодок (пер.)</div>
+                  <div class="text-xs text-slate-400">план: 2.0 нч · ЗП: ~2 000 ₽</div>
+                </div>
+              </div>
+              <div class="checkbox-row" style="border-bottom:none">
+                <input type="checkbox"/>
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-slate-900">Проверка тормозной жидкости</div>
+                  <div class="text-xs text-slate-400">план: 0.5 нч · ЗП: ~500 ₽</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-title">Описание проблемы</div>
+            <div class="card">
+              <div class="text-sm text-slate-600 italic">«Скрип при торможении»</div>
+              <div class="text-xs text-slate-400 mt-1">Водитель: Иванов И.И.</div>
+            </div>
+
+            <div class="px-3">
+              <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3 mb-3">
+                <div class="text-xs font-semibold text-blue-700 mb-0.5">Ориентировочная ЗП</div>
+                <div class="text-lg font-bold text-blue-900">2 500 ₽</div>
+                <div class="text-xs text-blue-500">2.5 нч × 2 000 ₽ × 50%</div>
+              </div>
+              <button onclick="mechScreen('close-wo')" class="btn btn-dark mb-2">Закрыть наряд</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Детали открытого наряда -->
+        <div class="screen" id="mech-wo-detail-open">
+          <div class="header">
+            <button onclick="mechScreen('orders')" class="flex items-center gap-1 text-slate-500 text-sm mb-3">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              Назад
+            </button>
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-bold text-slate-900 text-base">НЗ-2025-041</div>
+                <div class="text-xs text-slate-400 mt-0.5">Газель А123БВ · 112 010 км</div>
+              </div>
+              <span class="badge bg-slate-100 text-slate-600">Открыт</span>
+            </div>
+          </div>
+          <div class="scroll-area pt-3 pb-4">
+            <div class="section-title">Работы</div>
+            <div class="card">
+              <div class="flex justify-between py-2 text-sm"><span class="text-slate-700">Замена масла двигателя</span><span class="text-slate-400">1.5 нч</span></div>
+              <div class="flex justify-between py-2 text-sm border-t border-slate-50"><span class="text-slate-700">Замена воздушного фильтра</span><span class="text-slate-400">0.5 нч</span></div>
+              <div class="flex justify-between py-2 text-sm border-t border-slate-50"><span class="text-slate-700">Замена топливного фильтра</span><span class="text-slate-400">0.5 нч</span></div>
+              <div class="flex justify-between py-2 text-sm border-t border-slate-100 font-semibold"><span class="text-slate-900">Итого</span><span>2.5 нч · ~2 500 ₽ ЗП</span></div>
+            </div>
+            <div class="px-3">
+              <button class="btn btn-green mb-2">Начать работу</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Закрытие наряда -->
+        <div class="screen" id="mech-close-wo">
+          <div class="header">
+            <button onclick="mechScreen('wo-detail')" class="flex items-center gap-1 text-slate-500 text-sm mb-3">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              Назад
+            </button>
+            <div class="font-bold text-slate-900 text-base">Закрыть наряд НЗ-2025-042</div>
+            <div class="text-xs text-slate-400 mt-0.5">Введи фактически потраченное время</div>
+          </div>
+          <div class="scroll-area pt-3 pb-4">
+            <div class="section-title">Фактические нормачасы</div>
+            <div class="card">
+              <div class="mb-4">
+                <div class="flex justify-between items-center mb-1.5">
+                  <div>
+                    <div class="text-sm font-medium text-slate-900">Замена тормозных колодок (пер.)</div>
+                    <div class="text-xs text-slate-400">план: 2.0 нч</div>
+                  </div>
+                </div>
+                <input type="number" class="input" value="2.0" step="0.5" placeholder="Фактические нч"/>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <div>
+                    <div class="text-sm font-medium text-slate-900">Проверка тормозной жидкости</div>
+                    <div class="text-xs text-slate-400">план: 0.5 нч</div>
+                  </div>
+                </div>
+                <input type="number" class="input" value="0.5" step="0.5" placeholder="Фактические нч"/>
+              </div>
+            </div>
+
+            <div class="section-title">Примечания</div>
+            <div class="card">
+              <textarea class="input" rows="3" placeholder="Что сделано, что обнаружено дополнительно..."></textarea>
+            </div>
+
+            <div class="px-3">
+              <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 mb-3">
+                <div class="text-xs text-emerald-600 mb-0.5">Будет начислено после утверждения</div>
+                <div class="text-xl font-bold text-emerald-800">2 500 ₽</div>
+                <div class="text-xs text-emerald-500">2.5 нч × 2 000 ₽ × 50% · по плану</div>
+              </div>
+              <button onclick="mechScreen('submitted')" class="btn btn-green mb-2">Отправить на утверждение</button>
+              <button onclick="mechScreen('wo-detail')" class="btn btn-outline">Отмена</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Отправлено -->
+        <div class="screen" id="mech-submitted">
+          <div class="flex flex-col items-center justify-center flex-1 px-8 text-center">
+            <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="font-bold text-slate-900 text-xl mb-2">Наряд закрыт</div>
+            <div class="text-slate-500 text-sm mb-1">НЗ-2025-042 отправлен на утверждение</div>
+            <div class="text-slate-400 text-xs mb-8">Администратор получит уведомление</div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 w-full mb-6">
+              <div class="text-xs text-emerald-600 mb-1">Начислено после утверждения</div>
+              <div class="text-2xl font-bold text-emerald-800">2 500 ₽</div>
+            </div>
+            <button onclick="mechScreen('orders')" class="btn btn-dark" style="width:100%">К нарядам</button>
+          </div>
+        </div>
+
+        <!-- SCREEN: История -->
+        <div class="screen" id="mech-history">
+          <div class="header">
+            <div class="font-bold text-slate-900 text-base">История нарядов</div>
+            <div class="text-xs text-slate-400 mt-0.5">Иванов Сергей · май 2026</div>
+          </div>
+          <div class="scroll-area pt-2">
+            <div class="section-title">Май 2026</div>
+            <div class="card" style="margin-bottom:8px">
+              <div class="flex justify-between items-start mb-1.5">
+                <div class="font-semibold text-slate-900 text-sm">НЗ-2025-039</div>
+                <span class="badge bg-emerald-100 text-emerald-700">Утверждён</span>
+              </div>
+              <div class="text-sm text-slate-600 mb-1">Замена амортизаторов передних</div>
+              <div class="text-xs text-slate-400">Газель Б456ГД · 10.05.2026</div>
+              <div class="flex justify-between mt-2 pt-2 border-t border-slate-50 text-sm">
+                <span class="text-slate-400">3.0 нч факт <span class="text-slate-300">(план 2.5)</span></span>
+                <span class="font-semibold text-emerald-700">3 000 ₽</span>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:8px">
+              <div class="flex justify-between items-start mb-1.5">
+                <div class="font-semibold text-slate-900 text-sm">НЗ-2025-035</div>
+                <span class="badge bg-emerald-100 text-emerald-700">Утверждён</span>
+              </div>
+              <div class="text-sm text-slate-600 mb-1">Замена масла, ТО-1</div>
+              <div class="text-xs text-slate-400">Валдай Г012ЗИ · 05.05.2026</div>
+              <div class="flex justify-between mt-2 pt-2 border-t border-slate-50 text-sm">
+                <span class="text-slate-400">3.5 нч факт</span>
+                <span class="font-semibold text-emerald-700">3 500 ₽</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="flex justify-between items-start mb-1.5">
+                <div class="font-semibold text-slate-900 text-sm">НЗ-2025-030</div>
+                <span class="badge bg-slate-100 text-slate-500">Возвращён</span>
+              </div>
+              <div class="text-sm text-slate-600 mb-1">Диагностика двигателя</div>
+              <div class="text-xs text-slate-400">Газель А123БВ · 02.05.2026</div>
+              <div class="text-xs text-red-400 mt-1">Причина: «Не указаны все работы»</div>
+            </div>
+          </div>
+          <div class="bottom-nav flex">
+            <div class="nav-tab" onclick="mechScreen('orders')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              <span>Наряды</span>
+            </div>
+            <div class="nav-tab active">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>История</span>
+            </div>
+            <div class="nav-tab" onclick="mechScreen('salary')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>ЗП</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: ЗП -->
+        <div class="screen" id="mech-salary">
+          <div class="header">
+            <div class="font-bold text-slate-900 text-base">Моя зарплата</div>
+            <div class="text-xs text-slate-400 mt-0.5">Начисления и выплаты</div>
+            <div class="mt-3">
+              <select style="width:auto;padding:6px 10px;font-size:12px;">
+                <option>Май 2026</option><option>Апрель 2026</option>
+              </select>
+            </div>
+          </div>
+          <div class="scroll-area pt-3">
+            <div class="px-3 mb-3">
+              <div class="bg-slate-900 rounded-2xl p-4 text-white">
+                <div class="text-xs text-slate-400 mb-1">Начислено за май</div>
+                <div class="text-3xl font-bold mb-3">19 500 ₽</div>
+                <div class="flex justify-between text-sm">
+                  <div><div class="text-slate-400 text-xs">Выплачено</div><div class="font-semibold">10 000 ₽</div></div>
+                  <div class="text-right"><div class="text-slate-400 text-xs">К выплате</div><div class="font-semibold text-emerald-400">9 500 ₽</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-title">Статистика мая</div>
+            <div class="card">
+              <div class="salary-row text-sm"><span class="text-slate-500">Нарядов закрыто</span><span class="font-semibold text-slate-900">12</span></div>
+              <div class="salary-row text-sm"><span class="text-slate-500">Нормачасов план</span><span class="font-semibold text-slate-900">39.0 нч</span></div>
+              <div class="salary-row text-sm"><span class="text-slate-500">Нормачасов факт</span><span class="font-semibold text-amber-700">38.0 нч</span></div>
+              <div class="salary-row text-sm" style="border-bottom:none"><span class="text-slate-500">Ставка</span><span class="text-slate-700">2 000 ₽/нч × 50%</span></div>
+            </div>
+
+            <div class="section-title">Начисления по нарядам</div>
+            <div class="card">
+              <div class="salary-row text-sm">
+                <div><div class="font-medium text-slate-900">НЗ-2025-041</div><div class="text-xs text-slate-400">4.5 нч · На утверждении</div></div>
+                <span class="text-amber-600 font-semibold">4 500 ₽</span>
+              </div>
+              <div class="salary-row text-sm">
+                <div><div class="font-medium text-slate-900">НЗ-2025-040</div><div class="text-xs text-slate-400">3.0 нч (50% от 6.0) · На утверждении</div></div>
+                <span class="text-amber-600 font-semibold">3 000 ₽</span>
+              </div>
+              <div class="salary-row text-sm">
+                <div><div class="font-medium text-slate-900">НЗ-2025-039</div><div class="text-xs text-slate-400">3.0 нч · Утверждён</div></div>
+                <span class="text-emerald-600 font-semibold">3 000 ₽</span>
+              </div>
+              <div class="salary-row text-sm" style="border-bottom:none">
+                <div><div class="font-medium text-slate-900">НЗ-2025-035</div><div class="text-xs text-slate-400">3.5 нч · Утверждён</div></div>
+                <span class="text-emerald-600 font-semibold">3 500 ₽</span>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav flex">
+            <div class="nav-tab" onclick="mechScreen('orders')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              <span>Наряды</span>
+            </div>
+            <div class="nav-tab" onclick="mechScreen('history')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>История</span>
+            </div>
+            <div class="nav-tab active">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>ЗП</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- phone-screen -->
+    </div><!-- phone -->
+
+    <!-- Mechanic nav buttons -->
+    <div class="flex gap-2 flex-wrap justify-center">
+      <button onclick="mechScreen('orders')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Наряды</button>
+      <button onclick="mechScreen('wo-detail')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Детали наряда</button>
+      <button onclick="mechScreen('close-wo')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Закрытие наряда</button>
+      <button onclick="mechScreen('submitted')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Отправлено ✓</button>
+      <button onclick="mechScreen('history')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">История</button>
+      <button onclick="mechScreen('salary')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">ЗП</button>
+    </div>
+  </div><!-- mechanic column -->
+
+
+  <!-- ═══════════════ АДМИНИСТРАТОР ═════════════════════════════════════════ -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="text-white font-bold text-lg flex items-center gap-2">
+      <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      Администратор
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen" id="admin-phone">
+
+        <!-- SCREEN: Главная -->
+        <div class="screen active" id="admin-home">
+          <div class="header" style="background:#0f172a; border-color:#1e293b">
+            <div class="text-xs text-slate-500 mb-0.5">Гараж · Администратор</div>
+            <div class="font-bold text-white text-base">Сводка за сегодня</div>
+          </div>
+          <div class="scroll-area pt-2">
+            <!-- Alerts -->
+            <div class="mx-3 mb-2 mt-1">
+              <div class="bg-red-600 rounded-2xl p-3.5 text-white mb-2">
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="alert-dot bg-white"></div>
+                  <span class="font-semibold text-sm">СРОЧНО: Газель А123БВ</span>
+                </div>
+                <div class="text-xs text-red-200">Замена масла просрочена на 1 200 км</div>
+                <button onclick="adminScreen('requests')" class="mt-2 bg-white text-red-600 text-xs font-bold px-3 py-1.5 rounded-lg">Создать наряд</button>
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-2 gap-2 px-3 mb-1">
+              <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #f1f5f9">
+                <div class="text-xs text-slate-400 mb-1">Заявок водителей</div>
+                <div class="text-2xl font-bold text-violet-600">2</div>
+                <div class="text-xs text-slate-400">ждут одобрения</div>
+              </div>
+              <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #f1f5f9">
+                <div class="text-xs text-slate-400 mb-1">На утверждении</div>
+                <div class="text-2xl font-bold text-amber-600">2</div>
+                <div class="text-xs text-slate-400">нарядов закрыто</div>
+              </div>
+              <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #f1f5f9">
+                <div class="text-xs text-slate-400 mb-1">В работе</div>
+                <div class="text-2xl font-bold text-blue-600">2</div>
+                <div class="text-xs text-slate-400">наряда сейчас</div>
+              </div>
+              <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #f1f5f9">
+                <div class="text-xs text-slate-400 mb-1">Алертов ТО</div>
+                <div class="text-2xl font-bold text-red-600">3</div>
+                <div class="text-xs text-slate-400">требуют внимания</div>
+              </div>
+            </div>
+
+            <div class="section-title mt-1">Требуют действий</div>
+            <div class="wo-card pending" onclick="adminScreen('approve-wo')">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-semibold text-sm text-slate-900">НЗ-2025-041 — на утверждении</span>
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              </div>
+              <div class="text-xs text-slate-500">Иванов С. · Газель А123БВ · 4.5/5.0 нч</div>
+            </div>
+            <div class="wo-card" style="border-left-color:#8b5cf6;background:#faf5ff" onclick="adminScreen('review-request')">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-semibold text-sm text-slate-900">Заявка от водителя</span>
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              </div>
+              <div class="text-xs text-slate-500">Иванов И.И. · Газель А123БВ · «Скрип при торможении»</div>
+            </div>
+
+            <div class="section-title">В работе прямо сейчас</div>
+            <div class="wo-card inwork">
+              <div class="font-semibold text-sm text-slate-900 mb-0.5">Газель Б456ГД</div>
+              <div class="text-xs text-slate-500">НЗ-2025-042 · Иванов С. · Замена тормозных колодок</div>
+              <div class="text-xs text-blue-500 mt-1">Старт: 09:15 · идёт 2ч 40мин</div>
+            </div>
+            <div class="wo-card inwork">
+              <div class="font-semibold text-sm text-slate-900 mb-0.5">Валдай Г012ЗИ</div>
+              <div class="text-xs text-slate-500">НЗ-2025-043 · Сидоров М. · Диагностика ходовой</div>
+              <div class="text-xs text-blue-500 mt-1">Старт: 10:00 · идёт 1ч 55мин</div>
+            </div>
+          </div>
+          <div class="bottom-nav flex">
+            <div class="nav-tab active" onclick="adminScreen('home')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+              <span>Главная</span>
+            </div>
+            <div class="nav-tab" onclick="adminScreen('requests')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+              <span>Заявки</span>
+            </div>
+            <div class="nav-tab" onclick="adminScreen('workorders')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              <span>Наряды</span>
+            </div>
+            <div class="nav-tab" onclick="adminScreen('create-wo')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>Создать</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Заявки водителей -->
+        <div class="screen" id="admin-requests">
+          <div class="header">
+            <div class="font-bold text-slate-900 text-base">Заявки на ремонт</div>
+            <div class="text-xs text-slate-400 mt-0.5">От водителей · требуют одобрения</div>
+          </div>
+          <div class="scroll-area pt-2">
+            <div class="section-title">Новые (2)</div>
+            <div class="card" style="border-left:4px solid #8b5cf6;border-radius:16px;margin-bottom:10px">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <div class="font-semibold text-slate-900 text-sm">Газель А123БВ</div>
+                  <div class="text-xs text-slate-400">Иванов И.И. · 16.05 14:32</div>
+                </div>
+                <span class="badge bg-violet-100 text-violet-700">Новая</span>
+              </div>
+              <div class="bg-slate-50 rounded-xl p-2.5 mb-3">
+                <div class="text-xs text-slate-400 mb-0.5">Описание проблемы</div>
+                <div class="text-sm text-slate-800 font-medium">Скрип при торможении</div>
+                <div class="text-xs text-emerald-600 mt-0.5">✓ Из каталога неисправностей</div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="adminScreen('review-request')" class="btn btn-dark flex-1" style="padding:9px;font-size:13px">Одобрить → Наряд</button>
+                <button class="btn btn-outline flex-1" style="padding:9px;font-size:13px">Отклонить</button>
+              </div>
+            </div>
+
+            <div class="card" style="border-left:4px solid #8b5cf6;border-radius:16px">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <div class="font-semibold text-slate-900 text-sm">Валдай Г012ЗИ</div>
+                  <div class="text-xs text-slate-400">Петров П.П. · 15.05 18:10</div>
+                </div>
+                <span class="badge bg-violet-100 text-violet-700">Новая</span>
+              </div>
+              <div class="bg-slate-50 rounded-xl p-2.5 mb-3">
+                <div class="text-xs text-slate-400 mb-0.5">Описание проблемы</div>
+                <div class="text-sm text-slate-800 font-medium">Вибрация на скорости 80+</div>
+                <div class="text-xs text-amber-600 mt-0.5">⚠ Нет в каталоге — добавить?</div>
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-xl p-2 mb-3">
+                <div class="text-xs text-amber-700 font-medium mb-1">Добавить в каталог неисправностей</div>
+                <input class="input" style="font-size:12px;padding:6px 10px" value="Вибрация на скорости" placeholder="Название симптома"/>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-dark flex-1" style="padding:9px;font-size:13px">Одобрить → Наряд</button>
+                <button class="btn btn-outline flex-1" style="padding:9px;font-size:13px">Отклонить</button>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav flex">
+            <div class="nav-tab" onclick="adminScreen('home')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span>Главная</span></div>
+            <div class="nav-tab active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span>Заявки</span></div>
+            <div class="nav-tab" onclick="adminScreen('workorders')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg><span>Наряды</span></div>
+            <div class="nav-tab" onclick="adminScreen('create-wo')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>Создать</span></div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Одобрение заявки → создание наряда -->
+        <div class="screen" id="admin-review-request">
+          <div class="header">
+            <button onclick="adminScreen('requests')" class="flex items-center gap-1 text-slate-500 text-sm mb-3">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              Назад
+            </button>
+            <div class="font-bold text-slate-900 text-base">Одобрить → Создать наряд</div>
+            <div class="text-xs text-slate-400 mt-0.5">Заявка: Газель А123БВ · «Скрип при торможении»</div>
+          </div>
+          <div class="scroll-area pt-3 pb-4">
+            <div class="section-title">Автомобиль и пробег</div>
+            <div class="card">
+              <div class="flex justify-between py-1.5 text-sm"><span class="text-slate-500">Автомобиль</span><span class="font-semibold">Газель А123БВ</span></div>
+              <div class="mt-2"><label class="text-xs text-slate-400 block mb-1">Текущий пробег (км)</label><input class="input" value="112330" type="number"/></div>
+            </div>
+            <div class="section-title">Выбрать работы</div>
+            <div class="card">
+              <div class="checkbox-row">
+                <input type="checkbox" checked/>
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-slate-900">Замена тормозных колодок (пер.)</div>
+                  <div class="text-xs text-slate-400">2.0 нч · ЗП механика ~2 000 ₽</div>
+                </div>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox"/>
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-slate-900">Замена тормозных колодок (зад.)</div>
+                  <div class="text-xs text-slate-400">1.5 нч · ЗП механика ~1 500 ₽</div>
+                </div>
+              </div>
+              <div class="checkbox-row" style="border:none">
+                <input type="checkbox"/>
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-slate-900">Проверка тормозной жидкости</div>
+                  <div class="text-xs text-slate-400">0.5 нч · ЗП механика ~500 ₽</div>
+                </div>
+              </div>
+            </div>
+            <div class="section-title">Назначить механика</div>
+            <div class="card">
+              <select><option value="">— Любой (пусть возьмёт сам) —</option><option selected>Иванов Сергей Николаевич</option><option>Сидоров Михаил Андреевич</option></select>
+              <div class="mt-2"><select><option value="">— Второй механик не нужен —</option><option>Иванов Сергей Николаевич</option><option>Сидоров Михаил Андреевич</option></select></div>
+            </div>
+            <div class="px-3">
+              <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-3">
+                <div class="flex justify-between text-sm"><span class="text-slate-500">Итого нч план</span><span class="font-semibold">2.0 нч</span></div>
+                <div class="flex justify-between text-sm mt-1"><span class="text-slate-500">ЗП механика (при утверждении)</span><span class="font-semibold text-emerald-700">~2 000 ₽</span></div>
+              </div>
+              <button onclick="adminScreen('wo-created')" class="btn btn-green mb-2">Одобрить и создать наряд</button>
+              <button onclick="adminScreen('requests')" class="btn btn-outline">Отмена</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Наряд создан -->
+        <div class="screen" id="admin-wo-created">
+          <div class="flex flex-col items-center justify-center flex-1 px-8 text-center">
+            <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="font-bold text-slate-900 text-xl mb-2">Наряд создан!</div>
+            <div class="text-slate-500 text-sm mb-1">НЗ-2025-046 — Газель А123БВ</div>
+            <div class="text-slate-400 text-xs mb-8">Иванов С. получит уведомление в MiniApp</div>
+            <button onclick="adminScreen('home')" class="btn btn-dark" style="width:100%">На главную</button>
+          </div>
+        </div>
+
+        <!-- SCREEN: Утверждение наряда -->
+        <div class="screen" id="admin-approve-wo">
+          <div class="header">
+            <button onclick="adminScreen('home')" class="flex items-center gap-1 text-slate-500 text-sm mb-3">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              Назад
+            </button>
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-bold text-slate-900 text-base">НЗ-2025-041</div>
+                <div class="text-xs text-slate-400 mt-0.5">Иванов Сергей · Газель А123БВ</div>
+              </div>
+              <span class="badge bg-amber-100 text-amber-700">На утверждении</span>
+            </div>
+          </div>
+          <div class="scroll-area pt-3 pb-4">
+            <div class="section-title">Выполненные работы · план / факт</div>
+            <div class="card">
+              <div class="flex justify-between py-2 text-sm border-b border-slate-50">
+                <span class="text-slate-700">Замена масла двигателя</span>
+                <div class="text-right"><span class="text-slate-400 text-xs">1.5</span> → <span class="text-amber-600 font-bold">1.0</span></div>
+              </div>
+              <div class="flex justify-between py-2 text-sm border-b border-slate-50">
+                <span class="text-slate-700">Замена воздушного фильтра</span>
+                <div class="text-right"><span class="text-slate-400 text-xs">0.5</span> → <span class="font-bold">0.5</span></div>
+              </div>
+              <div class="flex justify-between py-2 text-sm border-b border-slate-50">
+                <span class="text-slate-700">Замена топливного фильтра</span>
+                <div class="text-right"><span class="text-slate-400 text-xs">0.5</span> → <span class="font-bold">0.5</span></div>
+              </div>
+              <div class="flex justify-between py-2 text-sm border-b border-slate-50">
+                <span class="text-slate-700">Замена тормозных колодок</span>
+                <div class="text-right"><span class="text-slate-400 text-xs">2.5</span> → <span class="font-bold">2.5</span></div>
+              </div>
+              <div class="flex justify-between py-2 text-sm font-semibold">
+                <span>Итого</span>
+                <div><span class="text-slate-400 font-normal text-xs">план 5.0</span> → <span class="text-amber-600">4.5 нч</span></div>
+              </div>
+            </div>
+
+            <div class="section-title">Корректировка (необязательно)</div>
+            <div class="card">
+              <div class="text-xs text-slate-400 mb-2">Изменить нч к оплате</div>
+              <input class="input" type="number" value="4.5" step="0.5"/>
+              <div class="mt-2"><input class="input" style="margin-top:8px" placeholder="Причина корректировки..." /></div>
+            </div>
+
+            <div class="px-3">
+              <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 mb-3">
+                <div class="text-xs text-emerald-600">Начисление ЗП при утверждении</div>
+                <div class="font-bold text-emerald-800 text-lg mt-0.5">4 500 ₽</div>
+                <div class="text-xs text-emerald-500">4.5 нч × 2 000 ₽ × 50% · Иванов С.Н.</div>
+              </div>
+              <button onclick="adminScreen('approved')" class="btn btn-green mb-2">Утвердить наряд</button>
+              <button class="btn btn-outline" style="background:#fff5f5;color:#dc2626;border-color:#fecaca">Вернуть на доработку</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Утверждено -->
+        <div class="screen" id="admin-approved">
+          <div class="flex flex-col items-center justify-center flex-1 px-8 text-center">
+            <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="font-bold text-slate-900 text-xl mb-2">Наряд утверждён</div>
+            <div class="text-slate-500 text-sm mb-1">НЗ-2025-041 · Газель А123БВ</div>
+            <div class="text-slate-400 text-xs mb-6">Иванову С.Н. начислено 4 500 ₽</div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 w-full mb-6">
+              <div class="text-xs text-emerald-600 mb-0.5">Начислено ЗП</div>
+              <div class="text-2xl font-bold text-emerald-800">4 500 ₽</div>
+              <div class="text-xs text-emerald-500 mt-0.5">Иванов Сергей Николаевич</div>
+            </div>
+            <button onclick="adminScreen('home')" class="btn btn-dark" style="width:100%">На главную</button>
+          </div>
+        </div>
+
+        <!-- SCREEN: Все наряды -->
+        <div class="screen" id="admin-workorders">
+          <div class="header">
+            <div class="font-bold text-slate-900 text-base">Все наряды</div>
+          </div>
+          <div class="scroll-area pt-2">
+            <div class="section-title">На утверждении</div>
+            <div class="wo-card pending" onclick="adminScreen('approve-wo')">
+              <div class="flex justify-between items-start">
+                <div><div class="font-semibold text-sm text-slate-900">НЗ-2025-041</div><div class="text-xs text-slate-500 mt-0.5">Газель А123БВ · Иванов С. · 4.5/5.0 нч</div></div>
+                <span class="badge bg-amber-100 text-amber-700">Утвердить</span>
+              </div>
+            </div>
+            <div class="wo-card pending">
+              <div class="flex justify-between items-start">
+                <div><div class="font-semibold text-sm text-slate-900">НЗ-2025-040</div><div class="text-xs text-slate-500 mt-0.5">Валдай В789ЕЖ · Иванов+Сидоров · 6.0/6.0 нч</div></div>
+                <span class="badge bg-amber-100 text-amber-700">Утвердить</span>
+              </div>
+            </div>
+            <div class="section-title">В работе</div>
+            <div class="wo-card inwork">
+              <div class="font-semibold text-sm text-slate-900">НЗ-2025-042</div>
+              <div class="text-xs text-slate-500 mt-0.5">Газель Б456ГД · Иванов С. · Тормоза</div>
+            </div>
+            <div class="wo-card inwork">
+              <div class="font-semibold text-sm text-slate-900">НЗ-2025-043</div>
+              <div class="text-xs text-slate-500 mt-0.5">Валдай Г012ЗИ · Сидоров М. · Ходовая</div>
+            </div>
+            <div class="section-title">Открыты (не взяты)</div>
+            <div class="wo-card open">
+              <div class="font-semibold text-sm text-slate-900">НЗ-2025-044</div>
+              <div class="text-xs text-slate-500 mt-0.5">Газель А123БВ · Не назначен · Ремень ГРМ</div>
+            </div>
+            <div class="wo-card open">
+              <div class="font-semibold text-sm text-slate-900">НЗ-2025-045</div>
+              <div class="text-xs text-slate-500 mt-0.5">Валдай В789ЕЖ · Не назначен · ТО-1</div>
+            </div>
+          </div>
+          <div class="bottom-nav flex">
+            <div class="nav-tab" onclick="adminScreen('home')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span>Главная</span></div>
+            <div class="nav-tab" onclick="adminScreen('requests')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span>Заявки</span></div>
+            <div class="nav-tab active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg><span>Наряды</span></div>
+            <div class="nav-tab" onclick="adminScreen('create-wo')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>Создать</span></div>
+          </div>
+        </div>
+
+        <!-- SCREEN: Создать наряд напрямую -->
+        <div class="screen" id="admin-create-wo">
+          <div class="header">
+            <div class="font-bold text-slate-900 text-base">Новый наряд</div>
+            <div class="text-xs text-slate-400 mt-0.5">Без заявки от водителя</div>
+          </div>
+          <div class="scroll-area pt-3 pb-4">
+            <div class="section-title">Автомобиль</div>
+            <div class="card">
+              <select><option>Выберите автомобиль</option><option>Газель А123БВ</option><option>Газель Б456ГД</option><option>Валдай В789ЕЖ</option><option>Валдай Г012ЗИ</option></select>
+              <div class="mt-2"><input class="input" type="number" placeholder="Текущий пробег (км)"/></div>
+            </div>
+            <div class="section-title">Механик</div>
+            <div class="card">
+              <select><option value="">— Любой (не назначен) —</option><option>Иванов Сергей Николаевич</option><option>Сидоров Михаил Андреевич</option></select>
+              <div class="mt-2"><select><option value="">— Второй механик не нужен —</option><option>Иванов Сергей Николаевич</option><option>Сидоров Михаил Андреевич</option></select></div>
+            </div>
+            <div class="section-title">Виды работ</div>
+            <div class="card">
+              <div class="checkbox-row"><input type="checkbox"/><div class="flex-1"><div class="text-sm font-medium">Замена масла двигателя</div><div class="text-xs text-slate-400">1.5 нч</div></div></div>
+              <div class="checkbox-row"><input type="checkbox"/><div class="flex-1"><div class="text-sm font-medium">Замена тормозных колодок (пер.)</div><div class="text-xs text-slate-400">2.0 нч</div></div></div>
+              <div class="checkbox-row"><input type="checkbox"/><div class="flex-1"><div class="text-sm font-medium">Замена ремня ГРМ</div><div class="text-xs text-slate-400">4.0 нч</div></div></div>
+              <div class="checkbox-row"><input type="checkbox"/><div class="flex-1"><div class="text-sm font-medium">ТО-1 (масло, фильтры)</div><div class="text-xs text-slate-400">3.0 нч</div></div></div>
+              <div class="checkbox-row" style="border:none"><input type="checkbox"/><div class="flex-1"><div class="text-sm font-medium">Диагностика ходовой</div><div class="text-xs text-slate-400">1.0 нч</div></div></div>
+            </div>
+            <div class="section-title">Дополнительно</div>
+            <div class="card"><textarea class="input" rows="2" placeholder="Описание работ не из справочника..."></textarea></div>
+            <div class="px-3">
+              <button onclick="adminScreen('wo-created')" class="btn btn-dark mb-2">Создать наряд</button>
+            </div>
+          </div>
+          <div class="bottom-nav flex">
+            <div class="nav-tab" onclick="adminScreen('home')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span>Главная</span></div>
+            <div class="nav-tab" onclick="adminScreen('requests')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span>Заявки</span></div>
+            <div class="nav-tab" onclick="adminScreen('workorders')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg><span>Наряды</span></div>
+            <div class="nav-tab active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>Создать</span></div>
+          </div>
+        </div>
+
+      </div><!-- phone-screen -->
+    </div><!-- phone -->
+
+    <!-- Admin nav buttons -->
+    <div class="flex gap-2 flex-wrap justify-center">
+      <button onclick="adminScreen('home')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Главная</button>
+      <button onclick="adminScreen('requests')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Заявки водителей</button>
+      <button onclick="adminScreen('review-request')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Одобрить заявку</button>
+      <button onclick="adminScreen('wo-created')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Наряд создан ✓</button>
+      <button onclick="adminScreen('approve-wo')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Утвердить наряд</button>
+      <button onclick="adminScreen('approved')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Утверждено ✓</button>
+      <button onclick="adminScreen('workorders')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Все наряды</button>
+      <button onclick="adminScreen('create-wo')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg font-medium transition-colors">Создать наряд</button>
+    </div>
+  </div><!-- admin column -->
+
+</div><!-- phones -->
+
+<script>
+function mechScreen(id) {
+  document.querySelectorAll('#mech-phone .screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('mech-' + id).classList.add('active');
+}
+function adminScreen(id) {
+  document.querySelectorAll('#admin-phone .screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('admin-' + id).classList.add('active');
+}
+function mechTab(screen, tab, btn) {
+  document.querySelectorAll('#mech-' + screen + ' .tab-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (tab === 'my') { document.getElementById('mech-my').style.display='block'; document.getElementById('mech-free').style.display='none'; }
+  else { document.getElementById('mech-my').style.display='none'; document.getElementById('mech-free').style.display='block'; }
+}
+</script>
+</body>
+</html>
