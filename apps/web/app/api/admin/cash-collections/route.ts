@@ -64,7 +64,7 @@ export async function GET() {
 
     const { data: trips, error: tripsError } = await (supabase
       .from('trips')
-      .select('driver_id, trip_orders(amount, payment_method, lifecycle_status)')
+      .select('driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status)')
       .neq('lifecycle_status', 'cancelled') as any);
 
     if (tripsError) return NextResponse.json({ error: tripsError.message }, { status: 500 });
@@ -89,7 +89,10 @@ export async function GET() {
       const cashIn = driverTrips
         .flatMap((t: any) => (t.trip_orders as any[]) ?? [])
         .filter(
-          (o: any) => CASH_METHODS.includes(o.payment_method) && o.lifecycle_status !== 'cancelled',
+          (o: any) =>
+            CASH_METHODS.includes(o.payment_method) &&
+            o.lifecycle_status !== 'cancelled' &&
+            o.settlement_status === 'completed',
         )
         .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 

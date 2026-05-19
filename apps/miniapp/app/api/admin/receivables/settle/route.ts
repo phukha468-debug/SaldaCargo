@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     id: string;
     type?: 'trip_order' | 'manual';
     note?: string;
+    to_wallet_id?: string;
   };
 
   const recordType = body.type ?? 'trip_order';
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
       category_id: TRIP_REVENUE_CATEGORY,
       amount: manual.amount,
       counterparty_id: manual.counterparty_id,
-      to_wallet_id: CASH_ID,
+      to_wallet_id: body.to_wallet_id ?? CASH_ID,
       description,
       lifecycle_status: 'approved',
       settlement_status: 'completed',
