@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     )
     .eq('lifecycle_status', 'approved')
     .eq('settlement_status', 'completed')
-    .neq('description', 'Корректировка остатка')
+    .or('description.is.null,description.neq.Корректировка остатка')
     .order('created_at', { ascending: false });
 
   if (date) {

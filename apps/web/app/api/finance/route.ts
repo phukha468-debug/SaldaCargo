@@ -48,7 +48,7 @@ export async function GET(request: Request) {
           .eq('direction', 'expense')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
-          .neq('description', 'Корректировка остатка')
+          .or('description.is.null,description.neq.Корректировка остатка')
           .gte('created_at', monthStart)
           .lte('created_at', monthEnd)
           .order('created_at', { ascending: false }),
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
           .eq('direction', 'income')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
-          .neq('description', 'Корректировка остатка')
+          .or('description.is.null,description.neq.Корректировка остатка')
           .gte('created_at', monthStart)
           .lte('created_at', monthEnd)
           .order('created_at', { ascending: false }),
@@ -121,7 +121,7 @@ export async function GET(request: Request) {
           .eq('direction', 'expense')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
-          .neq('description', 'Корректировка остатка')
+          .or('description.is.null,description.neq.Корректировка остатка')
           .gte('created_at', sixMonthsAgo),
 
         // Journal: по дате или последние N
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
             )
             .eq('lifecycle_status', 'approved')
             .eq('settlement_status', 'completed')
-            .neq('description', 'Корректировка остатка')
+            .or('description.is.null,description.neq.Корректировка остатка')
             .order('created_at', { ascending: false });
           if (direction) q = q.eq('direction', direction);
           if (date) {

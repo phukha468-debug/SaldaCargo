@@ -44,7 +44,7 @@ export async function GET() {
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .not('category_id', 'in', `(${CAT_PAYROLL.join(',')})`)
-        .neq('description', 'Корректировка остатка')
+        .or('description.is.null,description.neq.Корректировка остатка')
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 
