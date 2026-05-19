@@ -1,48 +1,56 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
   try {
     const { phone, pin } = await request.json();
-    console.log('[Auth Debug] Attempt:', { phone, pin });
 
-    if (pin !== '0911') {
+    if (!phone || !pin) {
+      return NextResponse.json({ error: 'Телефон и ПИН обязательны' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+    const cleanPhone = String(phone).trim();
+
+    const { data: user, error } = await (supabase
+      .from('users')
+      .select('id, name, roles, is_active, pin_code')
+      .eq('phone', cleanPhone)
+      .single() as any);
+
+    if (error || !user) {
+      return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 });
+    }
+
+    if (!user.is_active) {
+      return NextResponse.json({ error: 'Аккаунт отключён' }, { status: 403 });
+    }
+
+    const hasAdminRole =
+      Array.isArray(user.roles) && (user.roles.includes('admin') || user.roles.includes('owner'));
+
+    if (!hasAdminRole) {
+      return NextResponse.json({ error: 'Нет доступа к панели управления' }, { status: 403 });
+    }
+
+    if (!user.pin_code) {
+      return NextResponse.json(
+        { error: 'ПИН-код не установлен — обратитесь к владельцу' },
+        { status: 403 },
+      );
+    }
+
+    if (user.pin_code !== String(pin)) {
       return NextResponse.json({ error: 'Неверный ПИН-код' }, { status: 401 });
     }
 
-    // Создаем клиент напрямую с ключами
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-    const cleanPhone = phone.trim();
-
-    // 1. Пытаемся найти пользователя
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, name, roles, is_active, phone')
-      .eq('phone', cleanPhone)
-      .single();
-
-    if (error) {
-      console.error('[Auth Debug] Error:', error.message);
-      
-      // 2. Если не нашли, выведем ВСЕХ пользователей для сверки
-      const { data: all } = await supabase.from('users').select('name, phone');
-      const phones = all?.map(u => `"${u.phone}"`).join(', ') || 'пусто';
-      
-      return NextResponse.json({ 
-        error: `Пользователь не найден (${cleanPhone}). В базе есть: ${phones}` 
-      }, { status: 404 });
-    }
-
-    const response = NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true, name: user.name });
     response.cookies.set('salda_auth_token', user.id, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 дней
       path: '/',
     });
 
@@ -52,4 +60,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Ошибка сервера: ' + message }, { status: 500 });
   }
 }
-

@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@saldacargo/ui';
 
-export default function LoginPage() {
-  const [phone, setPhone] = useState('+79221800911');
+function LoginForm() {
+  const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from') ?? '/';
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -26,13 +28,12 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Next.js middleware подхватит куку, установленную API
-        router.push('/');
+        router.push(from);
         router.refresh();
       } else {
         setError(data.error || 'Ошибка входа');
       }
-    } catch (_err) {
+    } catch {
       setError('Ошибка сервера');
     } finally {
       setLoading(false);
@@ -58,6 +59,7 @@ export default function LoginPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
+              placeholder="+7 922 000 0000"
               className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
             />
           </div>
@@ -72,7 +74,8 @@ export default function LoginPage() {
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               required
-              placeholder="0000"
+              placeholder="••••"
+              maxLength={6}
               className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
             />
           </div>
@@ -84,10 +87,16 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
-          Только для персонала SaldaCargo
-        </p>
+        <p className="mt-6 text-center text-xs text-slate-400">Только для персонала SaldaCargo</p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
