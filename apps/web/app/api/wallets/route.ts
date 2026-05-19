@@ -21,7 +21,6 @@ export async function GET() {
     const [
       { data: bankOrders },
       { data: cardOrders },
-      { data: cashOrders },
       { data: collections },
       { data: txIn },
       { data: txOut },
@@ -35,12 +34,6 @@ export async function GET() {
       (supabase.from('trip_orders') as any)
         .select('amount')
         .eq('payment_method', 'card_driver')
-        .eq('settlement_status', 'completed')
-        .eq('lifecycle_status', 'approved'),
-
-      (supabase.from('trip_orders') as any)
-        .select('amount')
-        .eq('payment_method', 'cash')
         .eq('settlement_status', 'completed')
         .eq('lifecycle_status', 'approved'),
 
@@ -76,13 +69,10 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', CARD_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', CARD_ID);
 
-    const driversAccountable = Math.max(0, sum(cashOrders ?? []) - collectionsTotal);
-
     return NextResponse.json({
       bank: { name: 'Расчётный счёт', balance: bankBalance.toFixed(2) },
       cash: { name: 'Сейф (Наличные)', balance: cashBalance.toFixed(2) },
       card: { name: 'Карта', balance: cardBalance.toFixed(2) },
-      drivers_accountable: driversAccountable.toFixed(2),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

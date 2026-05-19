@@ -22,7 +22,6 @@ type Wallets = {
   bank: { name: string; balance: string };
   cash: { name: string; balance: string };
   card: { name: string; balance: string };
-  drivers_accountable: string;
 };
 
 type Summary = {
@@ -84,15 +83,6 @@ export default function DashboardHome() {
   const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
-
-  const { data: driverAccountable } = useQuery<
-    { driver_id: string; driver_name: string; balance: string }[]
-  >({
-    queryKey: ['driver-accountable'],
-    queryFn: () => fetch('/api/admin/cash-collections').then((r) => r.json()),
     staleTime: 30000,
     refetchInterval: 60000,
   });
@@ -239,8 +229,6 @@ export default function DashboardHome() {
 
   const activeVehicles = (activeTrips ?? []).filter((t) => t.asset).map((t) => t.asset!.short_name);
 
-  const driversWithBalance = (driverAccountable ?? []).filter((d) => parseFloat(d.balance) > 0);
-
   return (
     <div className="space-y-4 max-w-[1200px] mx-auto animate-in fade-in duration-500">
       {isError && (
@@ -330,35 +318,6 @@ export default function DashboardHome() {
             </div>
           </div>
         </div>
-
-        {/* Driver accountable strip — per driver */}
-        {driversWithBalance.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-[10px] px-3.5 py-2.5 flex items-center gap-2 shadow-sm flex-wrap">
-            <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap mr-1">
-              Подотчёт:
-            </span>
-            {driversWithBalance.map((d) => (
-              <div
-                key={d.driver_id}
-                className="flex items-center gap-1.5 bg-slate-100 rounded-md px-2.5 py-1"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-                <span className="text-[12px] font-semibold text-slate-700">{d.driver_name}</span>
-                <span className="text-[12px] font-bold text-slate-500">
-                  <Money amount={d.balance} />
-                </span>
-              </div>
-            ))}
-            <span className="ml-auto text-[12px] font-bold text-slate-800 whitespace-nowrap">
-              Итого:{' '}
-              <Money
-                amount={driversWithBalance
-                  .reduce((s, d) => s + parseFloat(d.balance), 0)
-                  .toFixed(2)}
-              />
-            </span>
-          </div>
-        )}
       </section>
 
       {/* ═══ SECTION: СЕЙЧАС ═══ */}
