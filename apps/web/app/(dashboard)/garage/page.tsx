@@ -513,6 +513,8 @@ function OrderDetailModal({
   const [editMechanic, setEditMechanic] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
+  const [showAddWork, setShowAddWork] = useState(false);
+  const [workSearch, setWorkSearch] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -549,6 +551,56 @@ function OrderDetailModal({
     (s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0)),
     0,
   );
+
+  const { data: workCatalog = [] } = useQuery<
+    Array<{
+      id: string;
+      name: string;
+      category: string | null;
+      norm_minutes: number;
+      norm_minutes_valdai: number | null;
+      default_price_client: string | null;
+    }>
+  >({
+    queryKey: ['garage-work-catalog'],
+    queryFn: () => fetch('/api/garage/work-catalog').then((r) => r.json()),
+    staleTime: 300000,
+    enabled: showAddWork,
+  });
+
+  const addWorkMutation = useMutation({
+    mutationFn: (work_catalog_id: string) =>
+      fetch(`/api/garage/orders/${orderId}/works`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ work_catalog_id }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      setWorkSearch('');
+    },
+  });
+
+  const deleteWorkMutation = useMutation({
+    mutationFn: (workId: string) =>
+      fetch(`/api/garage/orders/${orderId}/works/${workId}`, { method: 'DELETE' }).then((r) => {
+        if (!r.ok) throw new Error('Ошибка');
+        return r.json();
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+    },
+  });
+
+  const filteredCatalog = workSearch.trim()
+    ? workCatalog.filter((w) => w.name.toLowerCase().includes(workSearch.toLowerCase().trim()))
+    : workCatalog;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30" onClick={onClose}>
@@ -693,9 +745,55 @@ function OrderDetailModal({
               )}
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
-                Работы ({order.works.length})
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-slate-500 font-semibold uppercase">
+                  Работы ({order.works.length})
+                </p>
+                <button
+                  onClick={() => setShowAddWork((v) => !v)}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+                >
+                  {showAddWork ? '✕ Закрыть' : '+ Добавить'}
+                </button>
+              </div>
+
+              {showAddWork && (
+                <div className="mb-3 border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={workSearch}
+                      onChange={(e) => setWorkSearch(e.target.value)}
+                      placeholder="Поиск по названию..."
+                      className="w-full text-sm bg-transparent outline-none placeholder-slate-400"
+                    />
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {filteredCatalog.length === 0 ? (
+                      <p className="text-xs text-slate-400 px-3 py-2 italic">Ничего не найдено</p>
+                    ) : (
+                      filteredCatalog.slice(0, 30).map((w) => (
+                        <button
+                          key={w.id}
+                          onClick={() => addWorkMutation.mutate(w.id)}
+                          disabled={addWorkMutation.isPending}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
+                        >
+                          <span className="text-sm text-slate-800 group-hover:text-slate-900">
+                            {w.name}
+                          </span>
+                          <span className="text-xs text-slate-400 shrink-0 ml-2">
+                            {w.norm_minutes}м
+                            {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               {order.works.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">Работы не добавлены</p>
               ) : (
@@ -707,30 +805,40 @@ function OrderDetailModal({
                         key={w.id}
                         className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2"
                       >
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-800">{name}</p>
                           <p className="text-xs text-slate-400">
                             Норма: {w.norm_minutes}м · Факт: {w.actual_minutes ?? 0}м
                           </p>
                         </div>
-                        <span
-                          className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', {
-                            'bg-slate-100 text-slate-500': w.status === 'pending',
-                            'bg-amber-100 text-amber-700':
-                              w.status === 'in_progress' || w.status === 'paused',
-                            'bg-emerald-100 text-emerald-700': w.status === 'completed',
-                          })}
-                        >
-                          {w.status === 'pending'
-                            ? 'Очередь'
-                            : w.status === 'in_progress'
-                              ? 'В работе'
-                              : w.status === 'paused'
-                                ? 'Пауза'
-                                : w.status === 'completed'
-                                  ? 'Готово'
-                                  : w.status}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', {
+                              'bg-slate-100 text-slate-500': w.status === 'pending',
+                              'bg-amber-100 text-amber-700':
+                                w.status === 'in_progress' || w.status === 'paused',
+                              'bg-emerald-100 text-emerald-700': w.status === 'completed',
+                            })}
+                          >
+                            {w.status === 'pending'
+                              ? 'Очередь'
+                              : w.status === 'in_progress'
+                                ? 'В работе'
+                                : w.status === 'paused'
+                                  ? 'Пауза'
+                                  : w.status === 'completed'
+                                    ? 'Готово'
+                                    : w.status}
+                          </span>
+                          <button
+                            onClick={() => deleteWorkMutation.mutate(w.id)}
+                            disabled={deleteWorkMutation.isPending}
+                            className="text-slate-300 hover:text-rose-500 transition-colors text-lg leading-none disabled:opacity-30"
+                            title="Удалить работу"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
