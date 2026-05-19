@@ -1,4 +1,4 @@
-# КОНТЕКСТ ПРОЕКТА: SaldaCargo (17.05.2026 — сессия 12)
+# КОНТЕКСТ ПРОЕКТА: SaldaCargo (19.05.2026 — сессия 14)
 
 > Этот файл — точка входа для AI-ассистента. Прочитав его, ты знаешь где мы находимся и что делать дальше.
 > База знаний: `kb/wiki/` — читай соответствующие статьи перед задачами.
@@ -16,7 +16,11 @@ SaldaCargo — ERP-система для транспортной компани
 - `apps/web` — Next.js 15, десктопный дашборд для владельца и админа
 
 **Стек:** Next.js 15, React 19, TypeScript, Supabase (PostgreSQL), TanStack Query, Tailwind CSS 4  
-**Auth:** кастомная cookie-схема (`salda_user_id`), НЕ Supabase Auth  
+**Auth:**
+
+- MiniApp: кастомная cookie `salda_user_id` (UUID из `users`)
+- WebApp: кастомная cookie `salda_auth_token` (UUID из `users`) — через `/login` (телефон + PIN)
+
 **Деплой:** Vercel (miniapp и webapp — оба задеплоены, автодеплой из `main`) — **всегда пушить после коммита**
 
 ---
@@ -33,7 +37,7 @@ SaldaCargo — ERP-система для транспортной компани
   - Рейсы: На ревью / Активные / История (навигация по датам)
   - Финансы: журнал транзакций (кнопки +Доход/-Расход — на главном экране!)
   - **+Доход / −Расход:** на главном экране → подменю:
-    - Доход: Добавить доход / Инкассация / Дебиторка
+    - Доход: Добавить доход / Дебиторка _(инкассация УДАЛЕНА — заменена автологикой)_
     - Расход: Добавить расход / Долг поставщику / Кредиты / ЗП сотрудников
   - **Долг поставщику:** `/api/admin/payable-debt` POST — фиксирует взятые в кредит запчасти
   - **Дебиторка:** список должников → заказы → погасить
@@ -53,7 +57,7 @@ SaldaCargo — ERP-система для транспортной компани
 | `/` (главная)     | ✅          | KPI за месяц + плитки кошельков с корректировкой остатка                                                                            |
 | `/review`         | ✅          | Одобрение/возврат рейсов + история + итоги за день/месяц                                                                            |
 | `/retro`          | ✅          | Ручной ввод рейса задним числом                                                                                                     |
-| `/finance`        | ✅          | P&L за 6 месяцев + журнал по дням/месяцам + подотчёт водителей                                                                      |
+| `/finance`        | ✅          | P&L за 6 месяцев + журнал по дням/месяцам + аннулирование транзакций                                                                |
 | `/receivables`    | ✅          | Дебиторка — список должников, кнопка "Оплачено", исторические долги                                                                 |
 | `/counterparties` | ✅          | Постоянные / Разовые, карточка клиента с аналитикой                                                                                 |
 | `/fleet`          | ✅          | Автопарк — коллапсируемые плитки, юнит-экономика                                                                                    |
@@ -61,6 +65,7 @@ SaldaCargo — ERP-система для транспортной компани
 | `/loans`          | ✅          | Кредиты и займы                                                                                                                     |
 | `/payables`       | ✅          | Долги поставщикам — Дерябин ГСМ / Новиков / Ромашин                                                                                 |
 | `/garage`         | ⚠️ ЧАСТИЧНО | Только 3 вкладки: На ревью / Активные / История (наряды). По референсу `garage-design.html` нужно значительно больше — см. раздел 3 |
+| `/login`          | ✅          | Авторизация по телефону + PIN-код из `users.pin_code`                                                                               |
 
 ---
 
@@ -88,77 +93,75 @@ SaldaCargo — ERP-система для транспортной компани
 
 ---
 
-## 4. Что сделано в сессии 12 (17.05.2026) — Модуль Гараж
+## 4. Что сделано в сессии 14 (19.05.2026) — Аудит + Новая модель наличных
 
-### Миграции БД — ✅ ПРИМЕНЕНЫ В SUPABASE
+### Этап 1 — WebApp авторизация ✅
 
-**`20260517000001_garage_module.sql`:**
+- **Middleware** включён: защищает все маршруты, `/login` — публичный
+- **`apps/web/lib/auth.ts`** — хелпер `requireAuth()` для API-роутов
+- **`apps/web/app/api/auth/login/route.ts`** — проверяет `users.phone` + `users.pin_code` из БД; только роли `admin`/`owner`
+- Cookie: `salda_auth_token` = `users.id`, 7 дней, httpOnly, sameSite=lax, secure в production
+- **Вход:** `/login` → телефон + PIN-код из `users.pin_code`
 
-- Новые таблицы: `sto_settings`, `repair_requests`, `fault_catalog`, `maintenance_items`
-- Расширения: `users.mechanic_salary_pct`, `service_orders.second_mechanic_id`, `service_order_works.extra_work_*`, `work_catalog.norm_minutes_valdai`
-- Данные: 12 неисправностей в `fault_catalog`, 16 работ в `work_catalog`
+### Этап 2 — Исправление NULL-фильтра ✅
 
-**`20260517000002_sto_dual_rates.sql`:**
+Баг: `.neq('description', 'Корректировка остатка')` не работает для строк с `NULL` (PostgreSQL: `NULL != anything = NULL`).  
+Исправлено на `.or('description.is.null,description.neq.Корректировка остатка')` в 3 файлах:
 
-- Добавлено `sto_settings.hourly_rate_own = 1600.00` (ставка для своего автопарка)
+- `apps/miniapp/app/api/admin/transactions/route.ts`
+- `apps/web/app/api/finance/route.ts`
+- `apps/web/app/api/dashboard/summary/route.ts`
 
-### Два тарифа нормачаса
+### Этап 2 (продолжение) — Подотчёт cash-collections ✅
 
-При утверждении наряда (`PATCH /api/admin/service-orders/:id action=approve`) тариф выбирается по `service_orders.machine_type`:
+В обоих приложениях добавлен фильтр `settlement_status === 'completed'` на trip_orders в расчёте подотчёта.  
+MiniApp переведён с timestamp-подхода на кумулятивный: `cashIn − cashSpent − cashCollected`.
 
-- `'client'` → `sto_settings.hourly_rate` (2 000 ₽/ч)
-- `'own'` → `sto_settings.hourly_rate_own` (1 600 ₽/ч)
+### Этап 3 — Кошелёк при погашении ручного долга ✅
 
-ЗП механика = `normHours * hourlyRate * mechanic_salary_pct / 100`  
-При двух механиках — нормочасы делятся 50/50.
+MiniApp `receivables/settle` принимает `to_wallet_id` из тела запроса вместо хардкода CASH_ID.
 
-### API MiniApp (новые эндпоинты)
+### Этап 4 — Документация Транзакции ✅
 
-- `GET/POST /api/driver/repair-requests` — заявки водителей
-- `GET /api/driver/fault-catalog` — каталог неисправностей
-- `POST /api/mechanic/orders/{id}/claim` — взять свободный наряд
-- `POST /api/mechanic/orders/{id}/extra-work` — запрос доп. работы
-- `GET /api/mechanic/salary` — ЗП механика за месяц
-- `GET /api/admin/garage` — дашборд гаража
-- `GET/PATCH /api/admin/repair-requests/{id}` — управление заявками
-- `PATCH /api/admin/service-orders/{id}` — approve/return/cancel/extra-work
-- `GET /api/admin/mechanics` — список механиков с mechanic_salary_pct
+`kb/wiki/Транзакции.md` — добавлены ветки `returned` и `cancelled` в диаграмму жизненного цикла.
 
-### MiniApp страницы
+### Новая модель наличных (апрув = деньги в кассе) ✅
 
-- Механик: вкладки «Мои»/«Свободные» + claim, доп. работа flow, страница ЗП
-- Администратор: `/admin/garage` с 5 вкладками + все модальные окна
-- Водитель: форма заявки через repair_requests + fault catalog + история заявок
-- Навбар администратора: добавлена вкладка «Гараж 🛠»
+**Старая схема:** водитель → подотчёт → инкассация → сейф  
+**Новая схема:** водитель → апрув рейса администратором → **автоматическая income-транзакция в Сейф**
 
-**Типы Supabase (`pnpm gen:types`) — НЕ обновлены.** Требует Docker Desktop.
+Изменения:
+
+- `apps/miniapp/app/api/admin/trips/[id]/route.ts` (action=approve): при апруве считает cash-заказы → INSERT transaction в Сейф
+- `apps/web/app/api/trips/[id]/approve/route.ts`: то же самое
+- `apps/miniapp/app/admin/finance/page.tsx`: удалены кнопка «Инкасс.» и компонент `CashCollectionForm`
+
+**Расходы водителя (ГСМ, проч.):** водитель тратит свои, компания возмещает отдельно — не связаны с апрувом.
+
+### Аннулирование транзакций в WebApp ✅
+
+- `DELETE /api/transactions/[id]` — soft-cancel с причиной
+- Кнопка ✕ + подтверждение с вводом причины в таблицах доходов и расходов `/finance`
 
 ---
 
-## 5. Что сделано в сессии 11 (16.05.2026)
+## 5. Что сделано в сессии 13 (18.05.2026) — Финансы: Доходы + UX
 
-### /counterparties — рефакторинг и аналитика
+### /finance — панель «Доходы» переработана (коммит `904b1b2`)
 
-- Два таба: **Постоянные** (список + карточка) и **Разовые** (агрегированная аналитика)
-- Карточка клиента: 4 KPI-плитки, breakdown ЧП, барчарт по месяцам, история рейсов
-- Формула ЧП: `Выручка − ЗП_водителя − ЗП_грузчика − ГСМ_пропорциональный − Выручка × overhead_pct`
-- API: `GET /api/counterparties/[id]/trips`
+**Было:** простой список транзакций + 3 сводных карточки. Без структуры, без фильтрации по категориям.
 
-### Унификация фильтра выручки (везде одинаково)
+**Стало:** макет полностью переработан по образцу панели «Расходы»:
 
-```
-trip_orders.lifecycle_status = 'approved'
-trip_orders.settlement_status = 'completed'
-trips.lifecycle_status = 'approved'
-```
-
-### Другие исправления
-
-- **Подотчёт водителя** — только `payment_method = 'cash'` (не card_driver)
-- **Долг поставщику** — кнопка в MiniApp, новый API `/api/admin/payable-debt`
-- **Кнопки Доход/Расход** — только на главном экране MiniApp, убраны из Finance
-- **Баг set-balance** — добавлены CAT_OTHER_INCOME / CAT_OTHER_EXPENSE
-- **Баг /api/admin/transactions** — добавлена валидация category_id и amount
+1. **3 чипа фильтрации:** «Все доходы» / «🚛 Рейсы» / «💳 Поступления»
+2. **Двухколоночный макет:** слева — таймлайн транзакций, справа — структура доходов
+3. **Структура доходов (правая колонка):**
+   - Цветная полоска `StackBar` — пропорции источников
+   - `LegendRow` по каждой категории — клик фильтрует таймлайн
+   - 2 мини-карточки: «Рейсы %» (зелёная) и «Поступления %» (синяя)
+4. **Категории динамические** — строятся из реальных транзакций (`category.name`)
+5. **«Выручка с рейсов»** — кликабельная строка, фильтрует таймлайн только на рейсовую выручку
+6. **Период:** День / Неделя / Месяц (навигация ← →) — как в расходах
 
 ---
 
@@ -244,6 +247,17 @@ trips.lifecycle_status = 'approved'
 20000000-0000-0000-0000-000000000003 — Ромашин Запчасти
 ```
 
+### Новая модель наличных (важно!)
+
+**При апруве рейса** → система автоматически INSERT транзакцию:
+
+- `direction='income'`, `category_id=TRIP_REVENUE`, `to_wallet_id=CASH_ID`
+- `amount` = сумма всех `cash`-заказов рейса (не cancelled)
+- `lifecycle_status='approved'`, `settlement_status='completed'`
+- `description` = `Наличные рейса №{trip_number}`
+
+Понятия «подотчёт водителя» и «инкассация» **больше не существуют в системе**.
+
 ---
 
 ## 10. Следующие шаги (приоритет по порядку)
@@ -287,11 +301,12 @@ git commit -m "chore: обновить типы Supabase — модуль Гар
 - Деньги — только строкой: `"5000.00"`, компонент `<Money amount="5000.00" />`
 - `crypto.randomUUID()` для idempotency_key (НЕ пакет `uuid`)
 - `useSearchParams()` в Next.js 15 — обязательно в `<Suspense>`
-- WebApp работает **без cookie** (auth отключена локально) → API не требуют cookie
+- **WebApp auth ВКЛЮЧЕНА** → `salda_auth_token` cookie обязательна; читать через `requireAuth()` из `lib/auth.ts`
 - Скроллируемый flex-child: обязательно `min-h-0` + `overflow-y-auto`
 - Bottom-sheet в MAX WebView: `position:fixed` на body + `paddingBottom: calc(env(safe-area-inset-bottom,0px) + 56px)`
 - Двухшаговое удаление: boolean state + useRef таймер 4 сек авто-сброс
 - Новые таблицы Supabase требуют `GRANT ALL ON TABLE ... TO postgres, anon, authenticated, service_role`
+- **NULL в PostgreSQL:** `.neq('col', 'x')` не находит строки с `NULL`. Использовать `.or('col.is.null,col.neq.x')`
 
 ### ID кошельков
 
@@ -301,11 +316,11 @@ git commit -m "chore: обновить типы Supabase — модуль Гар
 10000000-0000-0000-0000-000000000003 — Карта
 ```
 
-### PIN-коды администраторов
+### PIN-коды администраторов (для WebApp /login)
 
-- Нигамедьянов А.С. → `3030`
-- Шахмаев А.О → `9111`
+- Нигамедьянов А.С. → PIN в `users.pin_code` (смотри в Supabase)
+- Шахмаев А.О → PIN в `users.pin_code` (смотри в Supabase)
 
 ---
 
-_Обновлён: 17.05.2026 (сессия 12). Исправлен статус /garage WebApp (частично, не соответствует референсу). Приоритет #1 — дорастить /garage до garage-design.html._
+_Обновлён: 19.05.2026 (сессия 14). Включена авторизация WebApp. Исправлен NULL-фильтр. Новая модель наличных: апрув рейса = автотранзакция в Сейф, инкассация удалена. Аннулирование транзакций в WebApp._

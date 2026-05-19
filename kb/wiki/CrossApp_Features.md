@@ -2,7 +2,7 @@
 
 > **Правило:** При изменении логики в любом из приложений — найди строку в этой таблице и обнови обе стороны.  
 > Этот файл обновляется при каждом изменении API.  
-> Последнее обновление: 13.05.2026
+> Последнее обновление: 19.05.2026
 
 ---
 
@@ -25,7 +25,7 @@
 | Список активных рейсов    | `api/admin/trips?filter=active`       | `api/trips?lifecycle=draft&status=in_progress` | ✅     |                                                                            |
 | История рейсов            | `api/admin/trips?filter=history`      | `api/trips?lifecycle=approved`                 | ✅     |                                                                            |
 | Детали рейса (админ)      | `api/admin/trips/[id]`                | —                                              | —      | Web видит через список                                                     |
-| Одобрить рейс             | `api/admin/trips/[id]` action=approve | `api/trips/[id]/approve`                       | ✅     | Оба: trip→approved + orders→approved                                       |
+| Одобрить рейс             | `api/admin/trips/[id]` action=approve | `api/trips/[id]/approve`                       | ✅     | Оба: trip→approved + orders→approved + **автотранзакция cash в Сейф**      |
 | Вернуть рейс              | `api/admin/trips/[id]` action=return  | `api/trips/[id]/return`                        | ✅     | Оба: trip→returned + orders→draft + очистка одометра                       |
 | Отменить рейс             | —                                     | `api/trips/[id]` DELETE                        | ⚠️     | В webapp отмена через DELETE, miniapp не нужен                             |
 | Создать рейс (водитель)   | `api/trips` POST                      | `api/trips` POST (ретро)                       | ⚠️     | Miniapp: активный рейс. WebApp: ретро-ввод завершённого                    |
@@ -68,7 +68,7 @@
 - `card_driver` — На карту владельца
 - `debt_cash` — Долг наличными
 
-**`cash` НЕ попадает в дебиторку** — создаётся `completed`, идёт через инкассацию в Сейф.
+**`cash` НЕ попадает в дебиторку** — создаётся `completed`. При апруве рейса автоматически создаётся income-транзакция в Сейф.
 
 > ⚠️ **Критично:** При погашении ОБЯЗАТЕЛЬНО:
 >
@@ -103,11 +103,11 @@
 
 ## 6. ПЕРСОНАЛ И ЗП (PAYROLL / STAFF)
 
-| Фича              | MiniApp файл                          | WebApp файл             | Статус | Примечание                                                                  |
-| ----------------- | ------------------------------------- | ----------------------- | ------ | --------------------------------------------------------------------------- |
-| Расчёт ЗП         | `api/admin/payroll` GET               | `api/staff/payroll` GET | ✅     | Базовая логика идентична. Web богаче (work_count, asset, разбивка по ролям) |
-| Выплатить ЗП      | `api/admin/staff-settle` POST         | `api/staff/settle` POST | ✅     | Идентичная логика: expense транзакция PAYROLL\_\* категории                 |
-| Подотчёт наличных | `api/admin/cash-collections` GET+POST | `api/wallets` GET       | ✅     | Единая формула: cash-заказы − расходы − инкассации. Оба закрывают при ЗП    |
+| Фича              | MiniApp файл                  | WebApp файл             | Статус | Примечание                                                                  |
+| ----------------- | ----------------------------- | ----------------------- | ------ | --------------------------------------------------------------------------- |
+| Расчёт ЗП         | `api/admin/payroll` GET       | `api/staff/payroll` GET | ✅     | Базовая логика идентична. Web богаче (work_count, asset, разбивка по ролям) |
+| Выплатить ЗП      | `api/admin/staff-settle` POST | `api/staff/settle` POST | ✅     | Идентичная логика: expense транзакция PAYROLL\_\* категории                 |
+| Подотчёт наличных | —                             | —                       | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса     |
 
 ---
 
@@ -149,14 +149,14 @@ UI: компактный accordion-список (одна строка = имя 
 
 ## Критические инварианты (нельзя нарушать)
 
-1. **При апруве рейса** → `trips.lifecycle=approved` + `trip_orders.lifecycle=approved` (оба)
+1. **При апруве рейса** → `trips.lifecycle=approved` + `trip_orders.lifecycle=approved` + **INSERT income-транзакция в Сейф** на сумму cash-заказов (оба приложения)
 2. **При возврате рейса** → `trips.lifecycle=returned` + `trip_orders.lifecycle=draft` (оба) + `odometer_end=null` + `ended_at=null`
 3. **При погашении дебиторки** → `trip_orders.settlement=completed` + INSERT транзакция direction=income + `to_wallet_id` по payment_method заказа (оба)
 4. **При выплате ЗП** → INSERT транзакция direction=expense, категория PAYROLL\_\* (оба)
 5. **lifecycle_status фильтры** — всегда одинаковые в обоих приложениях для одних и тех же данных
 6. **Cancelled рейсы** — всегда фильтровать через `neq lifecycle_status=cancelled` в списках водителя
 7. **Способы оплаты заказа** — `qr`, `card_driver`, `debt_cash` → `settlement_status=pending`; `cash` → `completed`. `bank_invoice` УДАЛЁН из форм (исторически может встречаться в БД).
-8. **Подотчёт водителя** — формула `SUM(cash-заказы, не cancelled) − SUM(cash-расходы) − SUM(инкассации)` единая в обоих приложениях. При выплате ЗП водителю — авто-закрытие подотчёта (создание cash_collection на остаток) в обоих.
+8. **Инкассация УДАЛЕНА** — понятия «подотчёт водителя» и «инкассация» больше не существуют. Наличные зачисляются в Сейф автоматически при апруве рейса.
 
 ---
 
