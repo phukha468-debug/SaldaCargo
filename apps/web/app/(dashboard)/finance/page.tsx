@@ -589,6 +589,9 @@ function ExpensesPanel() {
   const [activeChip, setActiveChip] = useState('all');
   const [timePeriod, setTimePeriod] = useState<'day' | 'week' | 'month'>('month');
   const [activeCatFilter, setActiveCatFilter] = useState<string | null>(null);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const queryClient = useQueryClient();
 
   const selectedMonth = anchorDate.slice(0, 7);
 
@@ -630,6 +633,24 @@ function ExpensesPanel() {
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
     staleTime: 60 * 1000,
     refetchInterval: 30 * 1000,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || 'Аннулировано администратором' }),
+      }).then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? 'Ошибка');
+        return data;
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      setPendingCancelId(null);
+      setCancelReason('');
+    },
   });
 
   const txList = data?.transactions ?? [];
@@ -900,83 +921,194 @@ function ExpensesPanel() {
                 const catName = tx.category?.name ?? null;
                 const group = getExpenseGroup(tx);
                 const color = group.color;
+                const isConfirming = pendingCancelId === tx.id;
                 return (
-                  <div
-                    key={tx.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '6px 14px',
-                      borderBottom: '1px solid #f8fafc',
-                      transition: 'background .1s',
-                      cursor: 'default',
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')}
-                    onMouseOut={(e) => (e.currentTarget.style.background = '')}
-                  >
+                  <div key={tx.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                     <div
+                      className="group"
                       style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: '50%',
-                        background: color,
-                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '6px 14px',
+                        transition: 'background .1s',
+                        cursor: 'default',
+                        background: isConfirming ? '#fef2f2' : undefined,
                       }}
-                    />
-                    <p
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: '#1e293b',
-                        flex: 1,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                      onMouseOver={(e) => {
+                        if (!isConfirming) e.currentTarget.style.background = '#f8fafc';
+                      }}
+                      onMouseOut={(e) => {
+                        if (!isConfirming) e.currentTarget.style.background = '';
                       }}
                     >
-                      {name}
-                    </p>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', flexShrink: 0 }}>
-                      {catName ?? '—'}
-                    </span>
-                    <span
-                      style={{
-                        padding: '1px 6px',
-                        borderRadius: 8,
-                        fontSize: 9,
-                        fontWeight: 800,
-                        flexShrink: 0,
-                        background: !group.fixed ? '#fee2e2' : '#dbeafe',
-                        color: !group.fixed ? '#b91c1c' : '#1d4ed8',
-                      }}
-                    >
-                      {!group.fixed ? 'перем.' : 'пост.'}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 9,
-                        color: '#94a3b8',
-                        flexShrink: 0,
-                        minWidth: 42,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {shortDate(tx.created_at)}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 900,
-                        color,
-                        flexShrink: 0,
-                        minWidth: 80,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {rub(n(tx.amount))}
-                    </span>
+                      <div
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: '50%',
+                          background: color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <p
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#1e293b',
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {name}
+                      </p>
+                      <span
+                        style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', flexShrink: 0 }}
+                      >
+                        {catName ?? '—'}
+                      </span>
+                      <span
+                        style={{
+                          padding: '1px 6px',
+                          borderRadius: 8,
+                          fontSize: 9,
+                          fontWeight: 800,
+                          flexShrink: 0,
+                          background: !group.fixed ? '#fee2e2' : '#dbeafe',
+                          color: !group.fixed ? '#b91c1c' : '#1d4ed8',
+                        }}
+                      >
+                        {!group.fixed ? 'перем.' : 'пост.'}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: '#94a3b8',
+                          flexShrink: 0,
+                          minWidth: 42,
+                          textAlign: 'right',
+                        }}
+                      >
+                        {shortDate(tx.created_at)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color,
+                          flexShrink: 0,
+                          minWidth: 80,
+                          textAlign: 'right',
+                        }}
+                      >
+                        {rub(n(tx.amount))}
+                      </span>
+                      <button
+                        title="Аннулировать"
+                        onClick={() => {
+                          setPendingCancelId(isConfirming ? null : tx.id);
+                          setCancelReason('');
+                        }}
+                        style={{
+                          flexShrink: 0,
+                          width: 22,
+                          height: 22,
+                          borderRadius: 4,
+                          border: 'none',
+                          background: isConfirming ? '#fca5a5' : 'transparent',
+                          color: isConfirming ? '#7f1d1d' : '#cbd5e1',
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'background .15s, color .15s',
+                        }}
+                        onMouseOver={(e) => {
+                          if (!isConfirming) {
+                            e.currentTarget.style.background = '#fee2e2';
+                            e.currentTarget.style.color = '#dc2626';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!isConfirming) {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#cbd5e1';
+                          }
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {isConfirming && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '6px 14px 8px 28px',
+                          background: '#fef2f2',
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={cancelReason}
+                          onChange={(e) => setCancelReason(e.target.value)}
+                          placeholder="Причина (необязательно)"
+                          autoFocus
+                          style={{
+                            flex: 1,
+                            height: 28,
+                            borderRadius: 6,
+                            border: '1px solid #fca5a5',
+                            padding: '0 8px',
+                            fontSize: 11,
+                            outline: 'none',
+                            background: '#fff',
+                          }}
+                        />
+                        <button
+                          onClick={() => cancelMutation.mutate({ id: tx.id, reason: cancelReason })}
+                          disabled={cancelMutation.isPending}
+                          style={{
+                            height: 28,
+                            padding: '0 10px',
+                            borderRadius: 6,
+                            border: 'none',
+                            background: '#dc2626',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            opacity: cancelMutation.isPending ? 0.6 : 1,
+                          }}
+                        >
+                          {cancelMutation.isPending ? '...' : 'Аннулировать'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPendingCancelId(null);
+                            setCancelReason('');
+                          }}
+                          style={{
+                            height: 28,
+                            padding: '0 8px',
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            background: '#fff',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            color: '#64748b',
+                          }}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2924,6 +3056,9 @@ function IncomePanel() {
   const [timePeriod, setTimePeriod] = useState<'day' | 'week' | 'month'>('month');
   const [activeChip, setActiveChip] = useState<'all' | 'trips' | 'manual'>('all');
   const [activeCatFilter, setActiveCatFilter] = useState<string | null>(null);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const queryClient = useQueryClient();
 
   const selectedMonth = anchorDate.slice(0, 7);
 
@@ -2965,6 +3100,24 @@ function IncomePanel() {
     queryFn: () => fetch(`/api/finance?month=${selectedMonth}`).then((r) => r.json()),
     staleTime: 60 * 1000,
     refetchInterval: 30 * 1000,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || 'Аннулировано администратором' }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      setPendingCancelId(null);
+      setCancelReason('');
+    },
   });
 
   const allIncomeTxs = data?.income_transactions ?? [];
@@ -3251,79 +3404,194 @@ function IncomePanel() {
                   const catKey = tx.category?.name ?? 'Прочие поступления';
                   const group = manualGroups.find((g) => g.id === catKey);
                   const color = group?.color ?? '#64748b';
+                  const isConfirming = pendingCancelId === tx.id;
                   return (
-                    <div
-                      key={tx.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        padding: '6px 14px',
-                        borderBottom: '1px solid #f8fafc',
-                        transition: 'background .1s',
-                        cursor: 'default',
-                      }}
-                      onMouseOver={(e) => (e.currentTarget.style.background = '#f8fafc')}
-                      onMouseOut={(e) => (e.currentTarget.style.background = '')}
-                    >
+                    <div key={tx.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                       <div
                         style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: '50%',
-                          background: color,
-                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '6px 14px',
+                          transition: 'background .1s',
+                          cursor: 'default',
+                          background: isConfirming ? '#fef2f2' : undefined,
                         }}
-                      />
-                      <p
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#1e293b',
-                          flex: 1,
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                        onMouseOver={(e) => {
+                          if (!isConfirming) e.currentTarget.style.background = '#f8fafc';
+                        }}
+                        onMouseOut={(e) => {
+                          if (!isConfirming) e.currentTarget.style.background = '';
                         }}
                       >
-                        {tx.category?.name ?? tx.description ?? '—'}
-                      </p>
-                      {tx.counterparty?.name && (
-                        <span
-                          style={{ fontSize: 9, fontWeight: 700, color: '#2563eb', flexShrink: 0 }}
+                        <div
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            background: color,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <p
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
                         >
-                          {tx.counterparty.name}
+                          {tx.category?.name ?? tx.description ?? '—'}
+                        </p>
+                        {tx.counterparty?.name && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              color: '#2563eb',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {tx.counterparty.name}
+                          </span>
+                        )}
+                        {tx.to_wallet?.name && (
+                          <span style={{ fontSize: 9, color: '#94a3b8', flexShrink: 0 }}>
+                            {tx.to_wallet.name}
+                          </span>
+                        )}
+                        <span
+                          style={{
+                            fontSize: 9,
+                            color: '#94a3b8',
+                            flexShrink: 0,
+                            minWidth: 42,
+                            textAlign: 'right',
+                          }}
+                        >
+                          {shortDate(tx.created_at)}
                         </span>
-                      )}
-                      {tx.to_wallet?.name && (
-                        <span style={{ fontSize: 9, color: '#94a3b8', flexShrink: 0 }}>
-                          {tx.to_wallet.name}
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color,
+                            flexShrink: 0,
+                            minWidth: 80,
+                            textAlign: 'right',
+                          }}
+                        >
+                          +{rub(n(tx.amount))}
                         </span>
+                        <button
+                          title="Аннулировать"
+                          onClick={() => {
+                            setPendingCancelId(isConfirming ? null : tx.id);
+                            setCancelReason('');
+                          }}
+                          style={{
+                            flexShrink: 0,
+                            width: 22,
+                            height: 22,
+                            borderRadius: 4,
+                            border: 'none',
+                            background: isConfirming ? '#fca5a5' : 'transparent',
+                            color: isConfirming ? '#7f1d1d' : '#cbd5e1',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background .15s, color .15s',
+                          }}
+                          onMouseOver={(e) => {
+                            if (!isConfirming) {
+                              e.currentTarget.style.background = '#fee2e2';
+                              e.currentTarget.style.color = '#dc2626';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!isConfirming) {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = '#cbd5e1';
+                            }
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {isConfirming && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '6px 14px 8px 28px',
+                            background: '#fef2f2',
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="Причина (необязательно)"
+                            autoFocus
+                            style={{
+                              flex: 1,
+                              height: 28,
+                              borderRadius: 6,
+                              border: '1px solid #fca5a5',
+                              padding: '0 8px',
+                              fontSize: 11,
+                              outline: 'none',
+                              background: '#fff',
+                            }}
+                          />
+                          <button
+                            onClick={() =>
+                              cancelMutation.mutate({ id: tx.id, reason: cancelReason })
+                            }
+                            disabled={cancelMutation.isPending}
+                            style={{
+                              height: 28,
+                              padding: '0 10px',
+                              borderRadius: 6,
+                              border: 'none',
+                              background: '#dc2626',
+                              color: '#fff',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              opacity: cancelMutation.isPending ? 0.6 : 1,
+                            }}
+                          >
+                            {cancelMutation.isPending ? '...' : 'Аннулировать'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPendingCancelId(null);
+                              setCancelReason('');
+                            }}
+                            style={{
+                              height: 28,
+                              padding: '0 8px',
+                              borderRadius: 6,
+                              border: '1px solid #e2e8f0',
+                              background: '#fff',
+                              fontSize: 11,
+                              cursor: 'pointer',
+                              color: '#64748b',
+                            }}
+                          >
+                            Отмена
+                          </button>
+                        </div>
                       )}
-                      <span
-                        style={{
-                          fontSize: 9,
-                          color: '#94a3b8',
-                          flexShrink: 0,
-                          minWidth: 42,
-                          textAlign: 'right',
-                        }}
-                      >
-                        {shortDate(tx.created_at)}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 900,
-                          color,
-                          flexShrink: 0,
-                          minWidth: 80,
-                          textAlign: 'right',
-                        }}
-                      >
-                        +{rub(n(tx.amount))}
-                      </span>
                     </div>
                   );
                 })
