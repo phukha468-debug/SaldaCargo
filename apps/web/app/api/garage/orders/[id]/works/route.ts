@@ -6,17 +6,19 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
   const body = await request.json();
-  const { work_catalog_id, custom_work_name, actual_minutes, price_client } = body as {
+  const { work_catalog_id, custom_work_name, actual_minutes, price_client, quantity } = body as {
     work_catalog_id?: string;
     custom_work_name?: string;
     actual_minutes?: number;
     price_client?: string;
+    quantity?: number;
   };
 
   if (!work_catalog_id && !custom_work_name?.trim()) {
     return NextResponse.json({ error: 'Укажите вид работы' }, { status: 400 });
   }
 
+  const qty = Math.max(1, Math.round(quantity ?? 1));
   const supabase = createAdminClient();
 
   // Fetch order to determine status and machine_type
@@ -40,7 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  // Price = norm_hours × hourly_rate; explicit price_client in body overrides
+  // Price = norm_hours × quantity × hourly_rate; explicit price_client in body overrides
   let clientPrice: string;
   if (price_client) {
     clientPrice = price_client;
@@ -52,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const rate = parseFloat(
       isOwn ? (sto?.hourly_rate_own ?? '1600') : (sto?.hourly_rate ?? '2000'),
     );
-    clientPrice = ((normMinutes / 60) * rate).toFixed(2);
+    clientPrice = (((normMinutes * qty) / 60) * rate).toFixed(2);
   }
 
   // Works always start as pending — mechanic or admin marks them done separately
@@ -64,10 +66,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       norm_minutes: normMinutes,
       actual_minutes: actual_minutes ?? null,
       price_client: clientPrice,
+      quantity: qty,
       status: 'pending',
     })
     .select(
-      'id, status, norm_minutes, actual_minutes, price_client, custom_work_name, work_catalog:work_catalog(id, name)',
+      'id, status, quantity, norm_minutes, actual_minutes, price_client, custom_work_name, work_catalog:work_catalog(id, name)',
     )
     .single();
 

@@ -17,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       mechanic:users!service_orders_assigned_mechanic_id_fkey(name),
       second_mechanic:users!service_orders_second_mechanic_id_fkey(name),
       works:service_order_works(
-        id, status, norm_minutes, actual_minutes, price_client, work_description, custom_work_name,
+        id, status, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
@@ -73,7 +73,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .map((w: any, i: number) => {
       const name = w.work_catalog?.name ?? w.custom_work_name ?? '—';
       const desc = w.work_description ?? '';
-      const minutes = w.actual_minutes ?? w.norm_minutes ?? 0;
+      const qty: number = w.quantity ?? 1;
+      // actual_minutes is total for all units; norm is per-unit
+      const minutes = w.actual_minutes ?? (w.norm_minutes ?? 0) * qty;
       const hours = (minutes / 60).toFixed(2);
       const price = parseFloat(w.price_client ?? '0');
       const status = w.status === 'completed' ? '✓' : '—';
@@ -83,8 +85,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           <div class="bold">${name}</div>
           ${desc ? `<div class="muted">${desc}</div>` : ''}
         </td>
-        <td class="center">${hours}</td>
-        <td class="center">н/ч</td>
+        <td class="center">${qty}</td>
+        <td class="center">${hours} н/ч</td>
         <td class="right">${hourlyRate.toLocaleString('ru-RU')}</td>
         <td class="right bold">${price > 0 ? price.toLocaleString('ru-RU') + ' ₽' : '—'}</td>
         <td class="center">${status}</td>
@@ -195,8 +197,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   <thead><tr>
     <th style="width:28px">№</th>
     <th>Наименование работы / Описание</th>
-    <th class="center" style="width:46px">Кол-во</th>
-    <th class="center" style="width:36px">Ед.</th>
+    <th class="center" style="width:40px">Кол-во</th>
+    <th class="center" style="width:56px">Н/ч всего</th>
     <th class="right" style="width:70px">Ставка</th>
     <th class="right" style="width:80px">Сумма</th>
     <th class="center" style="width:28px">Вып.</th>

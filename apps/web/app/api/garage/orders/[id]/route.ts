@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
         second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name),
         works:service_order_works(
-          id, status, salary_paid, norm_minutes, actual_minutes, price_client, work_description,
+          id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description,
           custom_work_name,
           work_catalog:work_catalog(id, name, norm_minutes),
           time_logs:work_time_logs(id, started_at, stopped_at, status)

@@ -29,6 +29,7 @@ type DetailWork = {
   id: string;
   status: string;
   salary_paid: boolean;
+  quantity: number;
   norm_minutes: number;
   actual_minutes: number;
   price_client: string | null;
@@ -520,10 +521,12 @@ function OrderDetailModal({
   const [workSearch, setWorkSearch] = useState('');
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [addWorkError, setAddWorkError] = useState<string | null>(null);
+  const [addWorkQty, setAddWorkQty] = useState(1);
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
   const [editWorkMinutes, setEditWorkMinutes] = useState('');
   const [editWorkPrice, setEditWorkPrice] = useState('');
   const [editWorkDesc, setEditWorkDesc] = useState('');
+  const [editWorkQty, setEditWorkQty] = useState(1);
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -578,11 +581,11 @@ function OrderDetailModal({
   });
 
   const addWorkMutation = useMutation({
-    mutationFn: (work_catalog_id: string) =>
+    mutationFn: ({ work_catalog_id, quantity }: { work_catalog_id: string; quantity: number }) =>
       fetch(`/api/garage/orders/${orderId}/works`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ work_catalog_id }),
+        body: JSON.stringify({ work_catalog_id, quantity }),
       }).then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
@@ -591,6 +594,7 @@ function OrderDetailModal({
     onSuccess: () => {
       setAddWorkError(null);
       setWorkSearch('');
+      setAddWorkQty(1);
       setShowAddWork(false);
       queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
@@ -623,6 +627,7 @@ function OrderDetailModal({
         price_client?: string;
         status?: string;
         work_description?: string | null;
+        quantity?: number;
       };
     }) =>
       fetch(`/api/garage/orders/${orderId}/works/${workId}`, {
@@ -863,6 +868,25 @@ function OrderDetailModal({
                       placeholder="Поиск по названию..."
                       className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400"
                     />
+                    <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
+                      <button
+                        type="button"
+                        onClick={() => setAddWorkQty((q) => Math.max(1, q - 1))}
+                        className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                      >
+                        −
+                      </button>
+                      <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
+                        {addWorkQty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAddWorkQty((q) => q + 1)}
+                        className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
                     {addWorkMutation.isPending && (
                       <span className="text-xs text-slate-400 shrink-0">Добавляем...</span>
                     )}
@@ -880,7 +904,9 @@ function OrderDetailModal({
                       filteredCatalog.map((w) => (
                         <button
                           key={w.id}
-                          onClick={() => addWorkMutation.mutate(w.id)}
+                          onClick={() =>
+                            addWorkMutation.mutate({ work_catalog_id: w.id, quantity: addWorkQty })
+                          }
                           disabled={addWorkMutation.isPending}
                           className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
                         >
@@ -937,7 +963,12 @@ function OrderDetailModal({
                               items.map((w) => (
                                 <button
                                   key={w.id}
-                                  onClick={() => addWorkMutation.mutate(w.id)}
+                                  onClick={() =>
+                                    addWorkMutation.mutate({
+                                      work_catalog_id: w.id,
+                                      quantity: addWorkQty,
+                                    })
+                                  }
                                   disabled={addWorkMutation.isPending}
                                   className="w-full text-left px-4 py-2 hover:bg-blue-50 border-t border-slate-100 flex justify-between items-center group disabled:opacity-50"
                                 >
@@ -969,9 +1000,19 @@ function OrderDetailModal({
                       <div key={w.id}>
                         <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-800">{name}</p>
+                            <p className="text-sm font-medium text-slate-800">
+                              {name}
+                              {(w.quantity ?? 1) > 1 && (
+                                <span className="ml-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                  ×{w.quantity}
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-slate-400">
                               Норма: {w.norm_minutes}м
+                              {(w.quantity ?? 1) > 1
+                                ? ` × ${w.quantity} = ${w.norm_minutes * (w.quantity ?? 1)}м`
+                                : ''}
                               {w.actual_minutes ? ` · Факт: ${w.actual_minutes}м` : ''}
                               {w.price_client
                                 ? ` · ${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
@@ -1003,6 +1044,7 @@ function OrderDetailModal({
                               setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
                               setEditWorkPrice(w.price_client ?? '');
                               setEditWorkDesc(w.work_description ?? '');
+                              setEditWorkQty(w.quantity ?? 1);
                             }}
                             className="text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
                             title="Редактировать"
@@ -1024,9 +1066,31 @@ function OrderDetailModal({
                               Отметить выполненным
                             </p>
                             <div className="flex gap-2 items-end">
+                              <div style={{ width: '72px' }}>
+                                <label className="text-xs text-slate-500 block mb-1">Кол-во</label>
+                                <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditWorkQty((q) => Math.max(1, q - 1))}
+                                    className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                  >
+                                    −
+                                  </button>
+                                  <span className="flex-1 text-center text-sm font-semibold text-slate-800">
+                                    {editWorkQty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditWorkQty((q) => q + 1)}
+                                    className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
                               <div className="flex-1">
                                 <label className="text-xs text-slate-500 block mb-1">
-                                  Факт. время (мин)
+                                  Факт. время (мин){editWorkQty > 1 ? ' всего' : ''}
                                 </label>
                                 <input
                                   type="number"
@@ -1053,8 +1117,8 @@ function OrderDetailModal({
                               </div>
                             </div>
                             <p className="text-xs text-slate-400">
-                              Стоимость пересчитается автоматически (факт.мин × нормачас). Введите
-                              вручную только для переопределения.
+                              Стоимость пересчитается автоматически (факт.мин × нормачас × кол-во).
+                              Введите вручную только для переопределения.
                             </p>
                             <div>
                               <label className="text-xs text-slate-500 block mb-1">
@@ -1074,7 +1138,9 @@ function OrderDetailModal({
                                   patchWorkMutation.mutate({
                                     workId: w.id,
                                     body: {
-                                      actual_minutes: parseInt(editWorkMinutes) || w.norm_minutes,
+                                      quantity: editWorkQty,
+                                      actual_minutes:
+                                        parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
                                       ...(editWorkPrice ? { price_client: editWorkPrice } : {}),
                                       work_description: editWorkDesc || null,
                                       status: 'completed',
@@ -1092,7 +1158,9 @@ function OrderDetailModal({
                                     patchWorkMutation.mutate({
                                       workId: w.id,
                                       body: {
-                                        actual_minutes: parseInt(editWorkMinutes) || w.norm_minutes,
+                                        quantity: editWorkQty,
+                                        actual_minutes:
+                                          parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
                                         ...(editWorkPrice ? { price_client: editWorkPrice } : {}),
                                         work_description: editWorkDesc || null,
                                       },
