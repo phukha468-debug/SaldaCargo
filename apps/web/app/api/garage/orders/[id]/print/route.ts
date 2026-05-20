@@ -34,15 +34,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: sto } = await (supabase.from('sto_settings') as any)
     .select('hourly_rate, hourly_rate_own, company_name, company_address, company_phone')
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const isOwn = order.machine_type === 'own';
   const hourlyRate = parseFloat(
     isOwn ? (sto?.hourly_rate_own ?? '1600') : (sto?.hourly_rate ?? '2000'),
   );
-  const companyName = sto?.company_name ?? 'СТО СалдаКарго';
-  const companyAddress = sto?.company_address ?? 'г. Верхняя Салда';
-  const companyPhone = sto?.company_phone ?? '';
+  // These fields exist after migration 20260520000002; fallback to defaults if not yet applied
+  const companyName = (sto as any)?.company_name ?? 'СТО СалдаКарго';
+  const companyAddress = (sto as any)?.company_address ?? 'г. Верхняя Салда';
+  const companyPhone = (sto as any)?.company_phone ?? '';
 
   const vehicle = isOwn
     ? `${order.asset?.short_name ?? ''} (${order.asset?.reg_number ?? ''})`
