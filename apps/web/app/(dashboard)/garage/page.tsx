@@ -32,6 +32,7 @@ type DetailWork = {
   norm_minutes: number;
   actual_minutes: number;
   price_client: string | null;
+  work_description: string | null;
   custom_work_name: string | null;
   work_catalog: { id: string; name: string; norm_minutes: number } | null;
   time_logs: Array<{ id: string; started_at: string; stopped_at: string | null; status: string }>;
@@ -522,6 +523,7 @@ function OrderDetailModal({
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
   const [editWorkMinutes, setEditWorkMinutes] = useState('');
   const [editWorkPrice, setEditWorkPrice] = useState('');
+  const [editWorkDesc, setEditWorkDesc] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -616,7 +618,12 @@ function OrderDetailModal({
       body,
     }: {
       workId: string;
-      body: { actual_minutes?: number; price_client?: string; status?: string };
+      body: {
+        actual_minutes?: number;
+        price_client?: string;
+        status?: string;
+        work_description?: string | null;
+      };
     }) =>
       fetch(`/api/garage/orders/${orderId}/works/${workId}`, {
         method: 'PATCH',
@@ -667,72 +674,7 @@ function OrderDetailModal({
 
   function printOrder() {
     if (!order) return;
-    const vehicle =
-      order.machine_type === 'own'
-        ? `${order.asset?.short_name ?? ''} (${order.asset?.reg_number ?? ''})`
-        : [order.client_vehicle_brand, order.client_vehicle_model, order.client_vehicle_reg]
-            .filter(Boolean)
-            .join(' ');
-    const worksRows = order.works
-      .map(
-        (w) =>
-          `<tr>
-            <td>${w.work_catalog?.name ?? w.custom_work_name ?? '—'}</td>
-            <td style="text-align:center">${w.actual_minutes ?? w.norm_minutes}м</td>
-            <td style="text-align:right">${w.price_client ? parseFloat(w.price_client).toLocaleString('ru-RU') + ' ₽' : '—'}</td>
-            <td style="text-align:center">${w.status === 'completed' ? '✓' : '—'}</td>
-          </tr>`,
-      )
-      .join('');
-    const total = order.works.reduce(
-      (s, w) => s + (w.price_client ? parseFloat(w.price_client) : 0),
-      0,
-    );
-    const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-<title>Заказ-наряд НЗ-${order.order_number}</title>
-<style>
-  body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:24px}
-  h1{font-size:18px;margin:0 0 4px}
-  .sub{color:#555;font-size:12px;margin-bottom:16px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
-  .label{font-size:11px;color:#888;margin-bottom:2px}
-  .val{font-size:13px;font-weight:600}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  th{background:#f5f5f5;text-align:left;padding:6px 8px;font-size:11px;border-bottom:2px solid #ddd}
-  td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}
-  .total{text-align:right;font-size:15px;font-weight:700;margin-bottom:24px}
-  .note{background:#fafafa;border:1px solid #eee;padding:10px;border-radius:4px;margin-bottom:16px;font-size:12px}
-  .footer{border-top:1px solid #ddd;padding-top:12px;font-size:11px;color:#888;margin-top:24px}
-  @media print{body{padding:12px}}
-</style></head><body>
-<h1>Заказ-наряд НЗ-${order.order_number}</h1>
-<div class="sub">от ${new Date(order.created_at).toLocaleDateString('ru-RU')} &nbsp;·&nbsp; СТО СалдаКарго</div>
-<div class="grid">
-  <div><div class="label">Транспортное средство</div><div class="val">${vehicle || '—'}</div></div>
-  <div><div class="label">Клиент</div><div class="val">${order.client_name || (order.machine_type === 'own' ? 'Собственный ТС' : '—')}</div></div>
-  <div><div class="label">Исполнитель</div><div class="val">${order.mechanic?.name ?? '—'}${order.second_mechanic ? ', ' + order.second_mechanic.name : ''}</div></div>
-  <div><div class="label">Одометр</div><div class="val">${order.odometer_start ? order.odometer_start.toLocaleString('ru-RU') + ' км' : '—'}${order.odometer_end ? ' → ' + order.odometer_end.toLocaleString('ru-RU') + ' км' : ''}</div></div>
-</div>
-<table>
-  <thead><tr>
-    <th>Вид работы</th>
-    <th style="text-align:center">Время</th>
-    <th style="text-align:right">Стоимость</th>
-    <th style="text-align:center">Вып.</th>
-  </tr></thead>
-  <tbody>${worksRows || '<tr><td colspan="4" style="color:#aaa;font-style:italic">Работы не указаны</td></tr>'}</tbody>
-</table>
-<div class="total">Итого: ${total.toLocaleString('ru-RU')} ₽</div>
-${order.admin_note ? `<div class="note"><b>Примечание:</b> ${order.admin_note}</div>` : ''}
-${order.mechanic_note ? `<div class="note"><b>Заметка механика:</b> ${order.mechanic_note}</div>` : ''}
-<div class="footer">Подпись клиента: _____________________ &nbsp;&nbsp;&nbsp; Подпись мастера: _____________________</div>
-<script>window.onload=function(){window.print()}</script>
-</body></html>`;
-    const w = window.open('', '_blank', 'width=800,height=900');
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-    }
+    window.open(`/api/garage/orders/${orderId}/print`, '_blank', 'width=900,height=1000');
   }
 
   return (
@@ -1060,6 +1002,7 @@ ${order.mechanic_note ? `<div class="note"><b>Заметка механика:</
                               setEditingWorkId(isEditing ? null : w.id);
                               setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
                               setEditWorkPrice(w.price_client ?? '');
+                              setEditWorkDesc(w.work_description ?? '');
                             }}
                             className="text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
                             title="Редактировать"
@@ -1080,10 +1023,10 @@ ${order.mechanic_note ? `<div class="note"><b>Заметка механика:</
                             <p className="text-xs font-semibold text-blue-800">
                               Отметить выполненным
                             </p>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-end">
                               <div className="flex-1">
                                 <label className="text-xs text-slate-500 block mb-1">
-                                  Факт. время (минут)
+                                  Факт. время (мин)
                                 </label>
                                 <input
                                   type="number"
@@ -1095,7 +1038,8 @@ ${order.mechanic_note ? `<div class="note"><b>Заметка механика:</
                               </div>
                               <div className="flex-1">
                                 <label className="text-xs text-slate-500 block mb-1">
-                                  Стоимость (₽)
+                                  Стоимость ₽{' '}
+                                  <span className="text-slate-400 font-normal">(авто)</span>
                                 </label>
                                 <input
                                   type="number"
@@ -1103,9 +1047,26 @@ ${order.mechanic_note ? `<div class="note"><b>Заметка механика:</
                                   step="0.01"
                                   value={editWorkPrice}
                                   onChange={(e) => setEditWorkPrice(e.target.value)}
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                                  placeholder="по нормачасу"
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm placeholder-slate-300"
                                 />
                               </div>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              Стоимость пересчитается автоматически (факт.мин × нормачас). Введите
+                              вручную только для переопределения.
+                            </p>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">
+                                Описание выполненного (для заказ-наряда)
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={editWorkDesc}
+                                onChange={(e) => setEditWorkDesc(e.target.value)}
+                                placeholder="Что именно сделано: заменены колодки передней оси, суппорт проверен..."
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm resize-none"
+                              />
                             </div>
                             <div className="flex gap-2">
                               <button
@@ -1114,7 +1075,8 @@ ${order.mechanic_note ? `<div class="note"><b>Заметка механика:</
                                     workId: w.id,
                                     body: {
                                       actual_minutes: parseInt(editWorkMinutes) || w.norm_minutes,
-                                      price_client: editWorkPrice || w.price_client || '0',
+                                      ...(editWorkPrice ? { price_client: editWorkPrice } : {}),
+                                      work_description: editWorkDesc || null,
                                       status: 'completed',
                                     },
                                   })
@@ -1131,7 +1093,8 @@ ${order.mechanic_note ? `<div class="note"><b>Заметка механика:</
                                       workId: w.id,
                                       body: {
                                         actual_minutes: parseInt(editWorkMinutes) || w.norm_minutes,
-                                        price_client: editWorkPrice || w.price_client || '0',
+                                        ...(editWorkPrice ? { price_client: editWorkPrice } : {}),
+                                        work_description: editWorkDesc || null,
                                       },
                                     })
                                   }
