@@ -115,9 +115,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 <meta charset="UTF-8"/>
 <title>Заказ-наряд НЗ-${order.order_number}</title>
 <style>
-  @page { size: A4; margin: 16mm 14mm; }
+  @page { size: A4; margin: 22mm 20mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; line-height: 1.4; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; line-height: 1.4; max-width: 780px; margin: 0 auto; padding: 24px 28px; }
+  @media print { body { padding: 0; max-width: none; } }
 
   /* Header */
   .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 12px; }
