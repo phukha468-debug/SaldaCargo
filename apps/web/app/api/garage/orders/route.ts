@@ -30,9 +30,14 @@ export async function GET(request: Request) {
 
     const activeSelect = `
       id, order_number, machine_type, status, lifecycle_status, priority, created_at,
-      asset:assets(short_name, reg_number),
-      mechanic:users!service_orders_assigned_mechanic_id_fkey(name),
-      client_vehicle_brand, client_vehicle_reg
+      problem_description, admin_note,
+      asset:assets(id, short_name, reg_number),
+      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
+      client_vehicle_brand, client_vehicle_model, client_vehicle_reg, client_name,
+      works:service_order_works(
+        id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes,
+        work_catalog:work_catalog(name)
+      )
     `;
 
     if (filter === 'history') {
