@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id: orderId } = await params;
 
   const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value;
+  const userId = cookieStore.get('salda_auth_token')?.value;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();

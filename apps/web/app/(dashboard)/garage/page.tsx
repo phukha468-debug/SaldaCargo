@@ -658,6 +658,7 @@ function OrderDetailModal({
     return map;
   })();
 
+  const [paySalaryError, setPaySalaryError] = useState<string | null>(null);
   const paySalaryMutation = useMutation({
     mutationFn: () =>
       fetch(`/api/garage/orders/${orderId}/pay-salary`, { method: 'POST' }).then(async (r) => {
@@ -666,9 +667,11 @@ function OrderDetailModal({
         return d;
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      setPaySalaryError(null);
+      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['staff-payroll'] });
     },
+    onError: (err: Error) => setPaySalaryError(err.message),
   });
 
   const unpaidCompletedWorks = (order?.works ?? []).filter(
@@ -1267,6 +1270,11 @@ function OrderDetailModal({
                   {unpaidCompletedWorks.length} выполненных{' '}
                   {unpaidCompletedWorks.length === 1 ? 'работа' : 'работ'} без начисления ЗП
                 </p>
+                {paySalaryError && (
+                  <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">
+                    {paySalaryError}
+                  </p>
+                )}
                 <button
                   onClick={() => paySalaryMutation.mutate()}
                   disabled={paySalaryMutation.isPending}
