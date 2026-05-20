@@ -28,6 +28,7 @@ type OrderRow = {
 type DetailWork = {
   id: string;
   status: string;
+  salary_paid: boolean;
   norm_minutes: number;
   actual_minutes: number;
   custom_work_name: string | null;
@@ -602,6 +603,23 @@ function OrderDetailModal({
     ? workCatalog.filter((w) => w.name.toLowerCase().includes(workSearch.toLowerCase().trim()))
     : workCatalog;
 
+  const paySalaryMutation = useMutation({
+    mutationFn: () =>
+      fetch(`/api/garage/orders/${orderId}/pay-salary`, { method: 'POST' }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['staff-payroll'] });
+    },
+  });
+
+  const unpaidCompletedWorks = (order?.works ?? []).filter(
+    (w) => w.status === 'completed' && !w.salary_paid,
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30" onClick={onClose}>
       <div
@@ -939,14 +957,30 @@ function OrderDetailModal({
                   )}
                 </div>
               )}
+            {unpaidCompletedWorks.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-amber-800 mb-1">ЗП не начислена</p>
+                <p className="text-xs text-amber-700 mb-3">
+                  {unpaidCompletedWorks.length} выполненных{' '}
+                  {unpaidCompletedWorks.length === 1 ? 'работа' : 'работ'} без начисления ЗП
+                </p>
+                <button
+                  onClick={() => paySalaryMutation.mutate()}
+                  disabled={paySalaryMutation.isPending}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50"
+                >
+                  {paySalaryMutation.isPending
+                    ? 'Начисляем...'
+                    : `Начислить ЗП за ${unpaidCompletedWorks.length} работ`}
+                </button>
+              </div>
+            )}
             {isPendingApproval && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-emerald-800 mb-1">
-                  Начисление ЗП при утверждении
-                </p>
+                <p className="text-sm font-semibold text-emerald-800 mb-1">Утверждение наряда</p>
                 <p className="text-xs text-emerald-700">
-                  {order.mechanic?.name ?? 'Механик'} · {(totalFactMinutes / 60).toFixed(1)} нч →
-                  рассчитается автоматически
+                  {order.mechanic?.name ?? 'Механик'} · {(totalFactMinutes / 60).toFixed(1)} нч
+                  выполнено
                 </p>
                 <div className="flex gap-2 mt-3">
                   <button
