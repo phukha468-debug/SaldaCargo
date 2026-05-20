@@ -524,7 +524,6 @@ function OrderDetailModal({
   const [addWorkQty, setAddWorkQty] = useState(1);
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
   const [editWorkMinutes, setEditWorkMinutes] = useState('');
-  const [editWorkPrice, setEditWorkPrice] = useState('');
   const [editWorkDesc, setEditWorkDesc] = useState('');
   const [editWorkQty, setEditWorkQty] = useState(1);
 
@@ -624,7 +623,6 @@ function OrderDetailModal({
       workId: string;
       body: {
         actual_minutes?: number;
-        price_client?: string;
         status?: string;
         work_description?: string | null;
         quantity?: number;
@@ -1042,7 +1040,6 @@ function OrderDetailModal({
                             onClick={() => {
                               setEditingWorkId(isEditing ? null : w.id);
                               setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
-                              setEditWorkPrice(w.price_client ?? '');
                               setEditWorkDesc(w.work_description ?? '');
                               setEditWorkQty(w.quantity ?? 1);
                             }}
@@ -1100,25 +1097,9 @@ function OrderDetailModal({
                                   className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
                                 />
                               </div>
-                              <div className="flex-1">
-                                <label className="text-xs text-slate-500 block mb-1">
-                                  Стоимость ₽{' '}
-                                  <span className="text-slate-400 font-normal">(авто)</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={editWorkPrice}
-                                  onChange={(e) => setEditWorkPrice(e.target.value)}
-                                  placeholder="по нормачасу"
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm placeholder-slate-300"
-                                />
-                              </div>
                             </div>
                             <p className="text-xs text-slate-400">
-                              Стоимость пересчитается автоматически (факт.мин × нормачас × кол-во).
-                              Введите вручную только для переопределения.
+                              Стоимость пересчитается автоматически: факт.мин × нормачас × кол-во.
                             </p>
                             <div>
                               <label className="text-xs text-slate-500 block mb-1">
@@ -1141,7 +1122,6 @@ function OrderDetailModal({
                                       quantity: editWorkQty,
                                       actual_minutes:
                                         parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
-                                      ...(editWorkPrice ? { price_client: editWorkPrice } : {}),
                                       work_description: editWorkDesc || null,
                                       status: 'completed',
                                     },
@@ -1161,7 +1141,6 @@ function OrderDetailModal({
                                         quantity: editWorkQty,
                                         actual_minutes:
                                           parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
-                                        ...(editWorkPrice ? { price_client: editWorkPrice } : {}),
                                         work_description: editWorkDesc || null,
                                       },
                                     })
