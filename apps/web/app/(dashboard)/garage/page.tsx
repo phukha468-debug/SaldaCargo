@@ -31,6 +31,7 @@ type DetailWork = {
   salary_paid: boolean;
   norm_minutes: number;
   actual_minutes: number;
+  price_client: string | null;
   custom_work_name: string | null;
   work_catalog: { id: string; name: string; norm_minutes: number } | null;
   time_logs: Array<{ id: string; started_at: string; stopped_at: string | null; status: string }>;
@@ -518,6 +519,9 @@ function OrderDetailModal({
   const [workSearch, setWorkSearch] = useState('');
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [addWorkError, setAddWorkError] = useState<string | null>(null);
+  const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
+  const [editWorkMinutes, setEditWorkMinutes] = useState('');
+  const [editWorkPrice, setEditWorkPrice] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -601,7 +605,31 @@ function OrderDetailModal({
         return r.json();
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+    },
+  });
+
+  const patchWorkMutation = useMutation({
+    mutationFn: ({
+      workId,
+      body,
+    }: {
+      workId: string;
+      body: { actual_minutes?: number; price_client?: string; status?: string };
+    }) =>
+      fetch(`/api/garage/orders/${orderId}/works/${workId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess: () => {
+      setEditingWorkId(null);
+      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
     },
   });
@@ -637,6 +665,76 @@ function OrderDetailModal({
     (w) => w.status === 'completed' && !w.salary_paid,
   );
 
+  function printOrder() {
+    if (!order) return;
+    const vehicle =
+      order.machine_type === 'own'
+        ? `${order.asset?.short_name ?? ''} (${order.asset?.reg_number ?? ''})`
+        : [order.client_vehicle_brand, order.client_vehicle_model, order.client_vehicle_reg]
+            .filter(Boolean)
+            .join(' ');
+    const worksRows = order.works
+      .map(
+        (w) =>
+          `<tr>
+            <td>${w.work_catalog?.name ?? w.custom_work_name ?? '—'}</td>
+            <td style="text-align:center">${w.actual_minutes ?? w.norm_minutes}м</td>
+            <td style="text-align:right">${w.price_client ? parseFloat(w.price_client).toLocaleString('ru-RU') + ' ₽' : '—'}</td>
+            <td style="text-align:center">${w.status === 'completed' ? '✓' : '—'}</td>
+          </tr>`,
+      )
+      .join('');
+    const total = order.works.reduce(
+      (s, w) => s + (w.price_client ? parseFloat(w.price_client) : 0),
+      0,
+    );
+    const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+<title>Заказ-наряд НЗ-${order.order_number}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:24px}
+  h1{font-size:18px;margin:0 0 4px}
+  .sub{color:#555;font-size:12px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+  .label{font-size:11px;color:#888;margin-bottom:2px}
+  .val{font-size:13px;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th{background:#f5f5f5;text-align:left;padding:6px 8px;font-size:11px;border-bottom:2px solid #ddd}
+  td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}
+  .total{text-align:right;font-size:15px;font-weight:700;margin-bottom:24px}
+  .note{background:#fafafa;border:1px solid #eee;padding:10px;border-radius:4px;margin-bottom:16px;font-size:12px}
+  .footer{border-top:1px solid #ddd;padding-top:12px;font-size:11px;color:#888;margin-top:24px}
+  @media print{body{padding:12px}}
+</style></head><body>
+<h1>Заказ-наряд НЗ-${order.order_number}</h1>
+<div class="sub">от ${new Date(order.created_at).toLocaleDateString('ru-RU')} &nbsp;·&nbsp; СТО СалдаКарго</div>
+<div class="grid">
+  <div><div class="label">Транспортное средство</div><div class="val">${vehicle || '—'}</div></div>
+  <div><div class="label">Клиент</div><div class="val">${order.client_name || (order.machine_type === 'own' ? 'Собственный ТС' : '—')}</div></div>
+  <div><div class="label">Исполнитель</div><div class="val">${order.mechanic?.name ?? '—'}${order.second_mechanic ? ', ' + order.second_mechanic.name : ''}</div></div>
+  <div><div class="label">Одометр</div><div class="val">${order.odometer_start ? order.odometer_start.toLocaleString('ru-RU') + ' км' : '—'}${order.odometer_end ? ' → ' + order.odometer_end.toLocaleString('ru-RU') + ' км' : ''}</div></div>
+</div>
+<table>
+  <thead><tr>
+    <th>Вид работы</th>
+    <th style="text-align:center">Время</th>
+    <th style="text-align:right">Стоимость</th>
+    <th style="text-align:center">Вып.</th>
+  </tr></thead>
+  <tbody>${worksRows || '<tr><td colspan="4" style="color:#aaa;font-style:italic">Работы не указаны</td></tr>'}</tbody>
+</table>
+<div class="total">Итого: ${total.toLocaleString('ru-RU')} ₽</div>
+${order.admin_note ? `<div class="note"><b>Примечание:</b> ${order.admin_note}</div>` : ''}
+${order.mechanic_note ? `<div class="note"><b>Заметка механика:</b> ${order.mechanic_note}</div>` : ''}
+<div class="footer">Подпись клиента: _____________________ &nbsp;&nbsp;&nbsp; Подпись мастера: _____________________</div>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`;
+    const w = window.open('', '_blank', 'width=800,height=900');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30" onClick={onClose}>
       <div
@@ -655,6 +753,23 @@ function OrderDetailModal({
               <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-700">
                 На утверждении
               </span>
+            )}
+            {order && (
+              <button
+                onClick={printOrder}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"
+                title="Распечатать заказ-наряд"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
+                </svg>
+                Печать
+              </button>
             )}
             <button
               onClick={onClose}
@@ -904,48 +1019,137 @@ function OrderDetailModal({
               {order.works.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">Работы не добавлены</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {order.works.map((w) => {
                     const name = w.work_catalog?.name ?? w.custom_work_name ?? 'Без названия';
+                    const isEditing = editingWorkId === w.id;
                     return (
-                      <div
-                        key={w.id}
-                        className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800">{name}</p>
-                          <p className="text-xs text-slate-400">
-                            Норма: {w.norm_minutes}м · Факт: {w.actual_minutes ?? 0}м
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                      <div key={w.id}>
+                        <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-800">{name}</p>
+                            <p className="text-xs text-slate-400">
+                              Норма: {w.norm_minutes}м
+                              {w.actual_minutes ? ` · Факт: ${w.actual_minutes}м` : ''}
+                              {w.price_client
+                                ? ` · ${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
+                                : ''}
+                            </p>
+                          </div>
                           <span
-                            className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', {
-                              'bg-slate-100 text-slate-500': w.status === 'pending',
-                              'bg-amber-100 text-amber-700':
-                                w.status === 'in_progress' || w.status === 'paused',
-                              'bg-emerald-100 text-emerald-700': w.status === 'completed',
-                            })}
+                            className={cn(
+                              'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0',
+                              {
+                                'bg-slate-100 text-slate-500': w.status === 'pending',
+                                'bg-amber-100 text-amber-700':
+                                  w.status === 'in_progress' || w.status === 'paused',
+                                'bg-emerald-100 text-emerald-700': w.status === 'completed',
+                              },
+                            )}
                           >
                             {w.status === 'pending'
-                              ? 'Очередь'
+                              ? 'В очереди'
                               : w.status === 'in_progress'
                                 ? 'В работе'
                                 : w.status === 'paused'
                                   ? 'Пауза'
-                                  : w.status === 'completed'
-                                    ? 'Готово'
-                                    : w.status}
+                                  : 'Выполнено'}
                           </span>
+                          <button
+                            onClick={() => {
+                              setEditingWorkId(isEditing ? null : w.id);
+                              setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
+                              setEditWorkPrice(w.price_client ?? '');
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
+                            title="Редактировать"
+                          >
+                            ✏
+                          </button>
                           <button
                             onClick={() => deleteWorkMutation.mutate(w.id)}
                             disabled={deleteWorkMutation.isPending}
-                            className="text-slate-300 hover:text-rose-500 transition-colors text-lg leading-none disabled:opacity-30"
-                            title="Удалить работу"
+                            className="text-slate-300 hover:text-rose-500 text-lg leading-none disabled:opacity-30 shrink-0"
+                            title="Удалить"
                           >
                             ×
                           </button>
                         </div>
+                        {isEditing && (
+                          <div className="mx-1 mb-1 border border-blue-200 bg-blue-50 rounded-b-lg px-3 py-2.5 space-y-2">
+                            <p className="text-xs font-semibold text-blue-800">
+                              Отметить выполненным
+                            </p>
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                <label className="text-xs text-slate-500 block mb-1">
+                                  Факт. время (минут)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={editWorkMinutes}
+                                  onChange={(e) => setEditWorkMinutes(e.target.value)}
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-xs text-slate-500 block mb-1">
+                                  Стоимость (₽)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={editWorkPrice}
+                                  onChange={(e) => setEditWorkPrice(e.target.value)}
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() =>
+                                  patchWorkMutation.mutate({
+                                    workId: w.id,
+                                    body: {
+                                      actual_minutes: parseInt(editWorkMinutes) || w.norm_minutes,
+                                      price_client: editWorkPrice || w.price_client || '0',
+                                      status: 'completed',
+                                    },
+                                  })
+                                }
+                                disabled={patchWorkMutation.isPending}
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
+                              >
+                                {patchWorkMutation.isPending ? '...' : '✓ Выполнено'}
+                              </button>
+                              {w.status === 'completed' && (
+                                <button
+                                  onClick={() =>
+                                    patchWorkMutation.mutate({
+                                      workId: w.id,
+                                      body: {
+                                        actual_minutes: parseInt(editWorkMinutes) || w.norm_minutes,
+                                        price_client: editWorkPrice || w.price_client || '0',
+                                      },
+                                    })
+                                  }
+                                  disabled={patchWorkMutation.isPending}
+                                  className="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
+                                >
+                                  Сохранить
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setEditingWorkId(null)}
+                                className="px-3 text-xs text-slate-500 hover:text-slate-700"
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

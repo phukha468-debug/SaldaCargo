@@ -55,19 +55,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     clientPrice = ((normMinutes / 60) * rate).toFixed(2);
   }
 
-  // For approved orders mark work as completed immediately
-  const isApproved = order.lifecycle_status === 'approved';
-  const workActualMinutes = actual_minutes ?? (isApproved ? normMinutes : null);
-
+  // Works always start as pending — mechanic or admin marks them done separately
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
       service_order_id: orderId,
       work_catalog_id: work_catalog_id ?? null,
       custom_work_name: custom_work_name?.trim() ?? null,
       norm_minutes: normMinutes,
-      actual_minutes: workActualMinutes,
+      actual_minutes: actual_minutes ?? null,
       price_client: clientPrice,
-      status: isApproved ? 'completed' : 'pending',
+      status: 'pending',
     })
     .select(
       'id, status, norm_minutes, actual_minutes, price_client, custom_work_name, work_catalog:work_catalog(id, name)',
