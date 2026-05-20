@@ -584,6 +584,7 @@ function OrderDetailModal({
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
       setWorkSearch('');
+      setShowAddWork(false);
     },
   });
 
@@ -602,6 +603,16 @@ function OrderDetailModal({
   const filteredCatalog = workSearch.trim()
     ? workCatalog.filter((w) => w.name.toLowerCase().includes(workSearch.toLowerCase().trim()))
     : workCatalog;
+
+  const catalogByCategory = (() => {
+    const map = new Map<string, typeof workCatalog>();
+    for (const w of filteredCatalog) {
+      const cat = w.category ?? 'Прочее';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(w);
+    }
+    return map;
+  })();
 
   const paySalaryMutation = useMutation({
     mutationFn: () =>
@@ -777,28 +788,32 @@ function OrderDetailModal({
 
               {showAddWork && (
                 <div className="mb-3 border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
+                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 items-center">
                     <input
                       autoFocus
                       type="text"
                       value={workSearch}
                       onChange={(e) => setWorkSearch(e.target.value)}
                       placeholder="Поиск по названию..."
-                      className="w-full text-sm bg-transparent outline-none placeholder-slate-400"
+                      className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400"
                     />
+                    {addWorkMutation.isPending && (
+                      <span className="text-xs text-slate-400 shrink-0">Добавляем...</span>
+                    )}
                   </div>
-                  <div className="max-h-52 overflow-y-auto">
+                  <div className="max-h-72 overflow-y-auto">
                     {filteredCatalog.length === 0 ? (
-                      <p className="text-xs text-slate-400 px-3 py-2 italic">Ничего не найдено</p>
-                    ) : (
-                      filteredCatalog.slice(0, 30).map((w) => (
+                      <p className="text-xs text-slate-400 px-3 py-3 italic">Ничего не найдено</p>
+                    ) : workSearch.trim() ? (
+                      // Flat list when searching
+                      filteredCatalog.map((w) => (
                         <button
                           key={w.id}
                           onClick={() => addWorkMutation.mutate(w.id)}
                           disabled={addWorkMutation.isPending}
-                          className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
+                          className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
                         >
-                          <span className="text-sm text-slate-800 group-hover:text-slate-900">
+                          <span className="text-sm text-slate-800 group-hover:text-blue-700">
                             {w.name}
                           </span>
                           <span className="text-xs text-slate-400 shrink-0 ml-2">
@@ -806,6 +821,33 @@ function OrderDetailModal({
                             {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
                           </span>
                         </button>
+                      ))
+                    ) : (
+                      // Grouped by category
+                      Array.from(catalogByCategory.entries()).map(([cat, items]) => (
+                        <div key={cat}>
+                          <div className="px-3 py-1.5 bg-slate-100 sticky top-0">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                              {cat}
+                            </span>
+                          </div>
+                          {items.map((w) => (
+                            <button
+                              key={w.id}
+                              onClick={() => addWorkMutation.mutate(w.id)}
+                              disabled={addWorkMutation.isPending}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
+                            >
+                              <span className="text-sm text-slate-800 group-hover:text-blue-700">
+                                {w.name}
+                              </span>
+                              <span className="text-xs text-slate-400 shrink-0 ml-2">
+                                {w.norm_minutes}м
+                                {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
                       ))
                     )}
                   </div>
