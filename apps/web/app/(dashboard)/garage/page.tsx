@@ -516,6 +516,8 @@ function OrderDetailModal({
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [showAddWork, setShowAddWork] = useState(false);
   const [workSearch, setWorkSearch] = useState('');
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [addWorkError, setAddWorkError] = useState<string | null>(null);
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -581,10 +583,14 @@ function OrderDetailModal({
         return d;
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
-      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      setAddWorkError(null);
       setWorkSearch('');
       setShowAddWork(false);
+      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+    },
+    onError: (err: Error) => {
+      setAddWorkError(err.message);
     },
   });
 
@@ -793,7 +799,10 @@ function OrderDetailModal({
                       autoFocus
                       type="text"
                       value={workSearch}
-                      onChange={(e) => setWorkSearch(e.target.value)}
+                      onChange={(e) => {
+                        setWorkSearch(e.target.value);
+                        setAddWorkError(null);
+                      }}
                       placeholder="Поиск по названию..."
                       className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400"
                     />
@@ -801,6 +810,11 @@ function OrderDetailModal({
                       <span className="text-xs text-slate-400 shrink-0">Добавляем...</span>
                     )}
                   </div>
+                  {addWorkError && (
+                    <div className="px-3 py-2 bg-red-50 border-b border-red-200">
+                      <p className="text-xs text-red-700 font-medium">{addWorkError}</p>
+                    </div>
+                  )}
                   <div className="max-h-72 overflow-y-auto">
                     {filteredCatalog.length === 0 ? (
                       <p className="text-xs text-slate-400 px-3 py-3 italic">Ничего не найдено</p>
@@ -823,32 +837,65 @@ function OrderDetailModal({
                         </button>
                       ))
                     ) : (
-                      // Grouped by category
-                      Array.from(catalogByCategory.entries()).map(([cat, items]) => (
-                        <div key={cat}>
-                          <div className="px-3 py-1.5 bg-slate-100 sticky top-0">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                              {cat}
-                            </span>
-                          </div>
-                          {items.map((w) => (
+                      // Accordion by category
+                      Array.from(catalogByCategory.entries()).map(([cat, items]) => {
+                        const isOpen = expandedCats.has(cat);
+                        return (
+                          <div key={cat} className="border-b border-slate-100 last:border-0">
                             <button
-                              key={w.id}
-                              onClick={() => addWorkMutation.mutate(w.id)}
-                              disabled={addWorkMutation.isPending}
-                              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
+                              onClick={() =>
+                                setExpandedCats((prev) => {
+                                  const next = new Set(prev);
+                                  if (isOpen) next.delete(cat);
+                                  else next.add(cat);
+                                  return next;
+                                })
+                              }
+                              className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
                             >
-                              <span className="text-sm text-slate-800 group-hover:text-blue-700">
-                                {w.name}
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                                {cat}
                               </span>
-                              <span className="text-xs text-slate-400 shrink-0 ml-2">
-                                {w.norm_minutes}м
-                                {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
+                              <span className="flex items-center gap-2">
+                                <span className="text-xs text-slate-400">{items.length}</span>
+                                <svg
+                                  className={cn(
+                                    'w-3.5 h-3.5 text-slate-400 transition-transform',
+                                    isOpen && 'rotate-180',
+                                  )}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2.5"
+                                    d="M19 9l-7 7-7-7"
+                                  />
+                                </svg>
                               </span>
                             </button>
-                          ))}
-                        </div>
-                      ))
+                            {isOpen &&
+                              items.map((w) => (
+                                <button
+                                  key={w.id}
+                                  onClick={() => addWorkMutation.mutate(w.id)}
+                                  disabled={addWorkMutation.isPending}
+                                  className="w-full text-left px-4 py-2 hover:bg-blue-50 border-t border-slate-100 flex justify-between items-center group disabled:opacity-50"
+                                >
+                                  <span className="text-sm text-slate-800 group-hover:text-blue-700">
+                                    {w.name}
+                                  </span>
+                                  <span className="text-xs text-slate-400 shrink-0 ml-2">
+                                    {w.norm_minutes}м
+                                    {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
