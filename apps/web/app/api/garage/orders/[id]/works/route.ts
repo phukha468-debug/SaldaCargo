@@ -27,28 +27,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
 
   let normMinutes = 60;
-  let clientPrice: string | null = price_client ?? null;
+  const isOwn = order.machine_type === 'own';
 
   if (work_catalog_id) {
     const { data: cat } = await (supabase.from('work_catalog') as any)
-      .select(
-        'norm_minutes, norm_minutes_valdai, default_price_client, default_price_client_valdai',
-      )
+      .select('norm_minutes, norm_minutes_valdai')
       .eq('id', work_catalog_id)
       .single();
     if (cat) {
-      // Use valdai norms for own vehicles if available
-      const isOwn = order.machine_type === 'own';
       normMinutes =
         isOwn && cat.norm_minutes_valdai ? cat.norm_minutes_valdai : (cat.norm_minutes ?? 60);
-      if (!clientPrice) {
-        const price =
-          isOwn && cat.default_price_client_valdai
-            ? cat.default_price_client_valdai
-            : cat.default_price_client;
-        if (price) clientPrice = String(price);
-      }
     }
+  }
+
+  // Price = norm_hours × hourly_rate; explicit price_client in body overrides
+  let clientPrice: string;
+  if (price_client) {
+    clientPrice = price_client;
+  } else {
+    const { data: sto } = await (supabase.from('sto_settings') as any)
+      .select('hourly_rate, hourly_rate_own')
+      .limit(1)
+      .single();
+    const rate = parseFloat(
+      isOwn ? (sto?.hourly_rate_own ?? '1600') : (sto?.hourly_rate ?? '2000'),
+    );
+    clientPrice = ((normMinutes / 60) * rate).toFixed(2);
   }
 
   // For approved orders mark work as completed immediately
