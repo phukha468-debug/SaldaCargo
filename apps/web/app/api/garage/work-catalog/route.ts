@@ -46,9 +46,9 @@ export async function POST(request: Request) {
       category: category?.trim() || null,
       norm_minutes: norm_minutes ?? null,
       norm_minutes_valdai: norm_minutes_valdai ?? null,
-      default_price_client: default_price_client?.toString() ?? null,
+      default_price_client: (default_price_client ?? 0).toString(),
       default_price_client_valdai: default_price_client_valdai?.toString() ?? null,
-      internal_cost_rate: internal_cost_rate?.toString() ?? null,
+      internal_cost_rate: (internal_cost_rate ?? 0).toString(),
       is_active: true,
     })
     .select()
