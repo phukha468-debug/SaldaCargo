@@ -3,119 +3,220 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const PAYROLL_CATEGORIES: Record<string, string> = {
-  driver: 'd79213ee-3bc6-4433-b58a-ca7ea1040d00',
-  loader: '18792fa8-fda8-472d-8e04-e19d2c6c053c',
-  mechanic: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
-  mechanic_lead: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
-};
-const FALLBACK_CATEGORY = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30'; // OTHER_EXPENSE
+const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
-async function resolveUserId(supabase: any): Promise<string> {
+const PAYROLL_CATEGORY_IDS = [
+  'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
+  '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
+  '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
+];
+
+async function getAdminId(): Promise<string | null> {
   const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
-  if (fromCookie) return fromCookie;
-  const { data } = await (supabase.from('users') as any)
-    .select('id')
-    .overlaps('roles', ['owner', 'admin'])
-    .limit(1)
-    .single();
-  return data?.id ?? '00000000-0000-0000-0000-000000000000';
+  return cookieStore.get('salda_auth_token')?.value ?? null;
 }
 
+/**
+ * GET /api/staff/settle?user_id=...
+ * Возвращает сводку: сколько pending ЗП, сколько аванса, сколько к выплате
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('user_id');
+  if (!userId) return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
+
+  const supabase = createAdminClient();
+
+  const [{ data: pendingPayroll }, { data: advanceGiven }, { data: advanceOffset }] =
+    await Promise.all([
+      // Начисленная, но не выплаченная ЗП
+      (supabase.from('transactions') as any)
+        .select('id, amount, description, created_at, category_id')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .eq('related_user_id', userId)
+        .in('category_id', PAYROLL_CATEGORY_IDS)
+        .order('created_at', { ascending: true }),
+
+      // Всего выдано авансов
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', userId),
+
+      // Уже зачтено авансов (через выплату ЗП)
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'income')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', userId),
+    ]);
+
+  const salaryTotal = ((pendingPayroll as any[]) ?? []).reduce(
+    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+    0,
+  );
+  const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
+    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+    0,
+  );
+  const offsetTotal = ((advanceOffset as any[]) ?? []).reduce(
+    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+    0,
+  );
+
+  const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
+  const offset = Math.min(salaryTotal, advanceBalance);
+  const payout = salaryTotal - offset;
+
+  return NextResponse.json({
+    salary_total: salaryTotal.toFixed(2),
+    advance_balance: advanceBalance.toFixed(2),
+    offset: offset.toFixed(2),
+    payout: payout.toFixed(2),
+    pending_transactions: pendingPayroll ?? [],
+  });
+}
+
+/**
+ * POST /api/staff/settle — выплатить ЗП сотруднику
+ * Body: { user_id, from_wallet_id? }
+ *
+ * Логика:
+ * 1. Берём все pending PAYROLL транзакции сотрудника
+ * 2. Считаем остаток аванса (выдано − уже зачтено)
+ * 3. offset = min(salary, advance_balance) → зачитывается без списания со счёта
+ * 4. payout = salary − offset → списывается с кошелька (from_wallet_id обязателен если > 0)
+ * 5. Все pending PAYROLL → settlement_status: completed
+ * 6. Если offset > 0 → INSERT ADVANCE_PAYMENT income = запись о зачёте
+ */
 export async function POST(request: Request) {
   try {
-    const supabase = createAdminClient();
-    const adminId = await resolveUserId(supabase);
-
     const body = (await request.json()) as {
       user_id: string;
-      amount: string;
-      from_wallet_id: string;
-      description?: string;
+      from_wallet_id?: string;
     };
 
-    if (!body.user_id || !body.amount || !body.from_wallet_id) {
+    if (!body.user_id) {
+      return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+    const adminId = await getAdminId();
+
+    const [
+      { data: pendingPayroll },
+      { data: advanceGiven },
+      { data: advanceOffset },
+      { data: userRow },
+    ] = await Promise.all([
+      (supabase.from('transactions') as any)
+        .select('id, amount, description')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .eq('related_user_id', body.user_id)
+        .in('category_id', PAYROLL_CATEGORY_IDS),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', body.user_id),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'income')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', body.user_id),
+
+      (supabase.from('users') as any).select('name').eq('id', body.user_id).single(),
+    ]);
+
+    if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
+      return NextResponse.json({ error: 'Нет начисленной ЗП к выплате' }, { status: 400 });
+    }
+
+    const salaryTotal = (pendingPayroll as any[]).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const offsetTotal = ((advanceOffset as any[]) ?? []).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+
+    const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
+    const offset = Math.min(salaryTotal, advanceBalance);
+    const payout = salaryTotal - offset;
+
+    if (payout > 0 && !body.from_wallet_id) {
       return NextResponse.json(
-        { error: 'user_id, amount, from_wallet_id обязательны' },
+        {
+          error: 'Укажите кошелёк для выплаты',
+          salary_total: salaryTotal.toFixed(2),
+          advance_balance: advanceBalance.toFixed(2),
+          offset: offset.toFixed(2),
+          payout: payout.toFixed(2),
+        },
         { status: 400 },
       );
     }
 
-    const amount = parseFloat(body.amount);
-    if (isNaN(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
+    const pendingIds = (pendingPayroll as any[]).map((t: any) => t.id);
+    const employeeName = userRow?.name ?? 'Сотрудник';
+    const dateLabel = new Date().toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const ops: Promise<any>[] = [
+      // Все pending PAYROLL → completed
+      (supabase.from('transactions') as any)
+        .update({
+          settlement_status: 'completed',
+          from_wallet_id: payout > 0 ? body.from_wallet_id : null,
+        })
+        .in('id', pendingIds),
+    ];
+
+    if (offset > 0) {
+      // Запись о зачёте аванса (income = уменьшает остаток долга)
+      ops.push(
+        (supabase.from('transactions') as any).insert({
+          direction: 'income',
+          category_id: ADVANCE_CATEGORY_ID,
+          amount: offset.toFixed(2),
+          description: `Зачёт аванса в счёт ЗП: ${employeeName} — ${dateLabel}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          related_user_id: body.user_id,
+          created_by: adminId,
+          idempotency_key: crypto.randomUUID(),
+        }),
+      );
     }
 
-    // Определяем категорию ЗП по роли сотрудника
-    const { data: user } = await (supabase as any)
-      .from('users')
-      .select('name, roles')
-      .eq('id', body.user_id)
-      .single();
+    await Promise.all(ops);
 
-    if (!user) return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 });
-
-    const operationalRole = (user.roles as string[]).find((r) => r in PAYROLL_CATEGORIES);
-    const categoryId = operationalRole ? PAYROLL_CATEGORIES[operationalRole] : FALLBACK_CATEGORY;
-
-    const description =
-      body.description?.trim() ||
-      `ЗП: ${user.name} — ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-
-    const { data, error } = await (supabase as any)
-      .from('transactions')
-      .insert({
-        direction: 'expense',
-        category_id: categoryId,
-        amount: amount.toFixed(2),
-        description,
-        lifecycle_status: 'approved',
-        settlement_status: 'completed',
-        related_user_id: body.user_id,
-        from_wallet_id: body.from_wallet_id,
-        created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
-      })
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    // Для водителей — автоматически закрыть подотчёт (создать инкассацию на текущий остаток)
-    if ((user.roles as string[]).includes('driver')) {
-      const [{ data: driverOrders }, { data: driverCollections }] = await Promise.all([
-        (supabase as any)
-          .from('trip_orders')
-          .select('trips!inner(driver_id), amount')
-          .eq('trips.driver_id', body.user_id)
-          .in('payment_method', ['cash'])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-        (supabase as any).from('cash_collections').select('amount').eq('driver_id', body.user_id),
-      ]);
-
-      const cashIn = ((driverOrders as any[]) ?? []).reduce(
-        (s: number, r: any) => s + parseFloat(r.amount ?? '0'),
-        0,
-      );
-      const cashOut = ((driverCollections as any[]) ?? []).reduce(
-        (s: number, r: any) => s + parseFloat(r.amount ?? '0'),
-        0,
-      );
-      const accountable = cashIn - cashOut;
-
-      if (accountable > 0) {
-        await (supabase as any).from('cash_collections').insert({
-          driver_id: body.user_id,
-          amount: accountable.toFixed(2),
-          collected_by: adminId,
-          note: `Закрытие подотчёта при выплате ЗП (${description})`,
-        });
-      }
-    }
-
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({
+      ok: true,
+      salary_total: salaryTotal.toFixed(2),
+      advance_balance: advanceBalance.toFixed(2),
+      offset: offset.toFixed(2),
+      payout: payout.toFixed(2),
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

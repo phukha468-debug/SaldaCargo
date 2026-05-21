@@ -2805,7 +2805,7 @@ function PayablesPanel() {
   const [activeChip, setActiveChip] = useState('all');
 
   const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
-    queryKey: ['payables-all'],
+    queryKey: ['payables'],
     queryFn: () => fetch('/api/payables').then((r) => r.json()),
     staleTime: 60 * 1000,
   });
@@ -3013,7 +3013,7 @@ function PayablesPanel() {
                 marginBottom: 12,
               }}
             >
-              Действия
+              Управление
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <a
@@ -3030,7 +3030,7 @@ function PayablesPanel() {
                   textAlign: 'center',
                 }}
               >
-                + Добавить долг
+                Управлять долгами поставщиков →
               </a>
             </div>
           </Card>
@@ -3742,7 +3742,7 @@ export default function FinancePage() {
     staleTime: 60 * 1000,
   });
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ['payables-all'],
+    queryKey: ['payables'],
     queryFn: () => fetch('/api/payables').then((r) => r.json()),
     staleTime: 60 * 1000,
   });

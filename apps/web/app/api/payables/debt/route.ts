@@ -32,12 +32,6 @@ export async function POST(request: Request) {
     if (!supplier) {
       return NextResponse.json({ error: 'Неверный поставщик' }, { status: 400 });
     }
-    if (supplier.autoAccrue) {
-      return NextResponse.json(
-        { error: 'Для Опти24 долг накапливается автоматически из расходов по топливной карте' },
-        { status: 400 },
-      );
-    }
 
     const amt = parseFloat(body.amount);
     if (isNaN(amt) || amt <= 0) {

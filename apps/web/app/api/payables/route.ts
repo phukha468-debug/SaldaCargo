@@ -2,16 +2,21 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-export const OPTI24_ID = '20000000-0000-0000-0000-000000000001';
+export const DERYABIN_ID = '20000000-0000-0000-0000-000000000001';
 export const NOVIKOV_ID = '20000000-0000-0000-0000-000000000002';
 export const ROMASHIM_ID = '20000000-0000-0000-0000-000000000003';
+
+// Kept for backwards-compat imports
+export const OPTI24_ID = DERYABIN_ID;
 
 const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 const CAT_PARTS = '9d18370d-3228-4f2a-8530-52b168cfa8d7';
 
+const DERYABIN_DISCOUNT_PCT = 12;
+
 export const SUPPLIERS = [
   {
-    id: OPTI24_ID,
+    id: DERYABIN_ID,
     name: 'Дерябин ГСМ',
     icon: '⛽',
     category: CAT_FUEL,
@@ -45,76 +50,76 @@ const sum = (rows: any[]) =>
 export async function GET() {
   try {
     const supabase = createAdminClient();
+    const allIds = SUPPLIERS.map((s) => s.id);
 
-    const allSupplierIds = SUPPLIERS.map((s) => s.id);
+    const [{ data: fuelExpensesAllTime }, { data: txAllTime }] = await Promise.all([
+      (supabase.from('trip_expenses') as any)
+        .select(
+          'amount, created_at, description, trips(trip_number, assets(short_name, reg_number))',
+        )
+        .eq('payment_method', 'fuel_card')
+        .order('created_at', { ascending: false }),
 
-    const [
-      { data: fuelExpenses },
-      { data: supplierTxPending },
-      { data: supplierTxCompleted },
-      { data: recentEntries },
-    ] = await Promise.all([
-      // Расходы по топливной карте (источник долга Опти24)
-      (supabase.from('trip_expenses') as any).select('amount').eq('payment_method', 'fuel_card'),
-
-      // Pending транзакции = неоплаченные долги (Новиков/Ромашин)
       (supabase.from('transactions') as any)
-        .select('amount, counterparty_id')
-        .in('counterparty_id', allSupplierIds)
-        .eq('direction', 'expense')
-        .eq('settlement_status', 'pending')
-        .eq('lifecycle_status', 'approved'),
-
-      // Completed транзакции = платежи поставщикам
-      (supabase.from('transactions') as any)
-        .select('amount, counterparty_id')
-        .in('counterparty_id', allSupplierIds)
-        .eq('direction', 'expense')
-        .eq('settlement_status', 'completed')
-        .eq('lifecycle_status', 'approved'),
-
-      // Последние записи для истории (pending + completed, все поставщики)
-      (supabase.from('transactions') as any)
-        .select('id, amount, description, settlement_status, created_at, counterparty_id')
-        .in('counterparty_id', allSupplierIds)
-        .eq('direction', 'expense')
+        .select(
+          'id, amount, counterparty_id, settlement_status, description, created_at, direction',
+        )
+        .in('counterparty_id', allIds)
         .eq('lifecycle_status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(20),
+        .order('created_at', { ascending: false }),
     ]);
 
-    const opti24FuelTotal = sum(fuelExpenses ?? []);
-    const opti24Payments = (supplierTxCompleted ?? [])
-      .filter((t: any) => t.counterparty_id === OPTI24_ID)
-      .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
-    const opti24ManualPending = (supplierTxPending ?? [])
-      .filter((t: any) => t.counterparty_id === OPTI24_ID)
-      .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
+    const allTx = (txAllTime ?? []) as any[];
+    const allFuel = (fuelExpensesAllTime ?? []) as any[];
 
     const result = SUPPLIERS.map((s) => {
       let debt: number;
+      let accumulated: number | null = null;
+      let discount: number | null = null;
 
-      if (s.autoAccrue) {
-        // Дерябин ГСМ: fuel_card расходы + ручные pending − все платежи
-        debt = opti24FuelTotal + opti24ManualPending - opti24Payments;
+      const sTxAll = allTx.filter((t) => t.counterparty_id === s.id);
+      const pending = sum(
+        sTxAll.filter((t) => t.settlement_status === 'pending' && t.direction === 'expense'),
+      );
+      const payments = sum(
+        sTxAll.filter((t) => t.settlement_status === 'completed' && t.direction === 'expense'),
+      );
+
+      if (s.id === DERYABIN_ID) {
+        const fuelTotal = sum(allFuel);
+        accumulated = fuelTotal + pending;
+        discount = accumulated * (DERYABIN_DISCOUNT_PCT / 100);
+        debt = Math.max(0, accumulated - discount - payments);
       } else {
-        // Новиков/Ромашин: pending минус completed
-        const pending = (supplierTxPending ?? [])
-          .filter((t: any) => t.counterparty_id === s.id)
-          .reduce((acc: number, t: any) => acc + parseFloat(t.amount ?? '0'), 0);
-        const paid = (supplierTxCompleted ?? [])
-          .filter((t: any) => t.counterparty_id === s.id)
-          .reduce((acc: number, t: any) => acc + parseFloat(t.amount ?? '0'), 0);
-        debt = pending - paid;
+        debt = Math.max(0, pending - payments);
       }
 
-      const history = (recentEntries ?? [])
-        .filter((t: any) => t.counterparty_id === s.id)
-        .slice(0, 5);
+      let history: any[];
+      if (s.id === DERYABIN_ID) {
+        const fuelRows = allFuel.map((f: any) => ({
+          id: `fuel_${f.created_at}`,
+          amount: f.amount,
+          description: f.description || 'Топливо по карте',
+          trip_number: f.trips?.trip_number ?? null,
+          asset_short_name: f.trips?.assets?.short_name ?? null,
+          asset_reg_number: f.trips?.assets?.reg_number ?? null,
+          settlement_status: 'pending',
+          created_at: f.created_at,
+          source: 'fuel_card',
+          direction: 'expense',
+        }));
+        history = [...sTxAll.map((t: any) => ({ ...t, source: 'manual' })), ...fuelRows].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+      } else {
+        history = sTxAll;
+      }
 
       return {
         ...s,
         debt: debt.toFixed(2),
+        accumulated: accumulated !== null ? accumulated.toFixed(2) : null,
+        discount: discount !== null ? discount.toFixed(2) : null,
         history,
       };
     });

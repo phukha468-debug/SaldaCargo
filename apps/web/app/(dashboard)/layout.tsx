@@ -16,7 +16,7 @@ const navItems = [
   { href: '/staff', label: 'Персонал' },
 ] as const;
 
-const FINANCE_PATHS = ['/finance', '/receivables', '/loans'];
+const FINANCE_PATHS = ['/finance', '/receivables', '/loans', '/payables'];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (

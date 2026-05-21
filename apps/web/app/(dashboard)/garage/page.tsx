@@ -97,6 +97,11 @@ type DashboardData = {
     maintenanceAlerts: number;
     vehiclesInRepair: number;
   };
+  month: {
+    completedOrders: number;
+    revenue: string;
+    salaryAccrued: string;
+  };
 };
 
 type RepairRequest = {
@@ -515,6 +520,7 @@ function OrderDetailModal({
   const queryClient = useQueryClient();
   const [editNote, setEditNote] = useState<string | null>(null);
   const [editMechanic, setEditMechanic] = useState<string | null>(null);
+  const [editSecondMechanic, setEditSecondMechanic] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [showAddWork, setShowAddWork] = useState(false);
@@ -534,6 +540,7 @@ function OrderDetailModal({
       if (!r.ok) throw new Error('Ошибка');
       return r.json();
     },
+    staleTime: 30000,
   });
 
   const patchMutation = useMutation({
@@ -546,10 +553,13 @@ function OrderDetailModal({
       if (!r.ok) throw new Error('Ошибка');
       return r.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      // Обновляем список и дашборд только при смене lifecycle (закрытие/открытие наряда)
+      if ('lifecycle_status' in variables) {
+        queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+        queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
+      }
       setEditNote(null);
       setEditMechanic(null);
       setEditStatus(null);
@@ -557,11 +567,7 @@ function OrderDetailModal({
     },
   });
 
-  const isPendingApproval = order?.status === 'completed' && order?.lifecycle_status === 'draft';
-  const totalFactMinutes = (order?.works ?? []).reduce(
-    (s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0)),
-    0,
-  );
+  const isClosed = order?.lifecycle_status === 'approved';
 
   const { data: workCatalog = [] } = useQuery<
     Array<{
@@ -595,8 +601,7 @@ function OrderDetailModal({
       setWorkSearch('');
       setAddWorkQty(1);
       setShowAddWork(false);
-      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
-      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
     },
     onError: (err: Error) => {
       setAddWorkError(err.message);
@@ -610,8 +615,7 @@ function OrderDetailModal({
         return r.json();
       }),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
-      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
     },
   });
 
@@ -639,8 +643,7 @@ function OrderDetailModal({
       }),
     onSuccess: () => {
       setEditingWorkId(null);
-      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
-      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
     },
   });
 
@@ -658,25 +661,27 @@ function OrderDetailModal({
     return map;
   })();
 
-  const [paySalaryError, setPaySalaryError] = useState<string | null>(null);
-  const paySalaryMutation = useMutation({
-    mutationFn: () =>
-      fetch(`/api/garage/orders/${orderId}/pay-salary`, { method: 'POST' }).then(async (r) => {
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const deleteOrderMutation = useMutation({
+    mutationFn: (password: string) =>
+      fetch(`/api/garage/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      }).then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
         return d;
       }),
     onSuccess: () => {
-      setPaySalaryError(null);
-      queryClient.refetchQueries({ queryKey: ['garage-order', orderId] });
-      queryClient.invalidateQueries({ queryKey: ['staff-payroll'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      onClose();
     },
-    onError: (err: Error) => setPaySalaryError(err.message),
+    onError: (err: Error) => setDeleteError(err.message),
   });
-
-  const unpaidCompletedWorks = (order?.works ?? []).filter(
-    (w) => w.status === 'completed' && !w.salary_paid,
-  );
 
   function printOrder() {
     if (!order) return;
@@ -697,9 +702,9 @@ function OrderDetailModal({
             {order && <p className="text-xs text-slate-400">{fmtDate(order.created_at)}</p>}
           </div>
           <div className="flex items-center gap-2">
-            {isPendingApproval && (
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-700">
-                На утверждении
+            {isClosed && (
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                Закрыт
               </span>
             )}
             {order && (
@@ -817,7 +822,7 @@ function OrderDetailModal({
               </div>
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик</p>
+              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 1</p>
               <select
                 value={editMechanic ?? order.mechanic?.id ?? ''}
                 onChange={(e) => setEditMechanic(e.target.value)}
@@ -841,6 +846,34 @@ function OrderDetailModal({
                   Сохранить
                 </button>
               )}
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 2</p>
+              <select
+                value={editSecondMechanic ?? order.second_mechanic?.id ?? ''}
+                onChange={(e) => setEditSecondMechanic(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">— Не назначен —</option>
+                {mechanics.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              {editSecondMechanic !== null &&
+                editSecondMechanic !== (order.second_mechanic?.id ?? '') && (
+                  <button
+                    onClick={() =>
+                      patchMutation.mutate({ second_mechanic_id: editSecondMechanic || null })
+                    }
+                    disabled={patchMutation.isPending}
+                    className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
+                  >
+                    Сохранить
+                  </button>
+                )}
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -1117,24 +1150,30 @@ function OrderDetailModal({
                               />
                             </div>
                             <div className="flex gap-2">
-                              <button
-                                onClick={() =>
-                                  patchWorkMutation.mutate({
-                                    workId: w.id,
-                                    body: {
-                                      quantity: editWorkQty,
-                                      actual_minutes:
-                                        parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
-                                      work_description: editWorkDesc || null,
-                                      status: 'completed',
-                                    },
-                                  })
-                                }
-                                disabled={patchWorkMutation.isPending}
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
-                              >
-                                {patchWorkMutation.isPending ? '...' : '✓ Выполнено'}
-                              </button>
+                              {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
+                                <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-1.5 rounded-lg text-center">
+                                  Назначьте механика
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    patchWorkMutation.mutate({
+                                      workId: w.id,
+                                      body: {
+                                        quantity: editWorkQty,
+                                        actual_minutes:
+                                          parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
+                                        work_description: editWorkDesc || null,
+                                        status: 'completed',
+                                      },
+                                    })
+                                  }
+                                  disabled={patchWorkMutation.isPending}
+                                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
+                                >
+                                  {patchWorkMutation.isPending ? '...' : '✓ Выполнено'}
+                                </button>
+                              )}
                               {w.status === 'completed' && (
                                 <button
                                   onClick={() =>
@@ -1169,6 +1208,28 @@ function OrderDetailModal({
                 </div>
               )}
             </div>
+            {!isClosed &&
+              order.works.length > 0 &&
+              order.works.every((w) => w.status === 'completed') && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <p className="text-sm text-emerald-800 font-semibold mb-1">
+                    Все работы выполнены
+                  </p>
+                  <p className="text-xs text-emerald-700 mb-3">
+                    Нажмите «Завершить наряд» — он уйдёт в Архив.
+                  </p>
+                  <button
+                    onClick={() => {
+                      patchMutation.mutate({ lifecycle_status: 'approved' });
+                      onClose();
+                    }}
+                    disabled={patchMutation.isPending}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50"
+                  >
+                    {patchMutation.isPending ? '...' : 'Завершить наряд'}
+                  </button>
+                </div>
+              )}
             {order.parts.length > 0 && (
               <div>
                 <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
@@ -1263,55 +1324,70 @@ function OrderDetailModal({
                   )}
                 </div>
               )}
-            {unpaidCompletedWorks.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-amber-800 mb-1">ЗП не начислена</p>
-                <p className="text-xs text-amber-700 mb-3">
-                  {unpaidCompletedWorks.length} выполненных{' '}
-                  {unpaidCompletedWorks.length === 1 ? 'работа' : 'работ'} без начисления ЗП
-                </p>
-                {paySalaryError && (
-                  <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">
-                    {paySalaryError}
-                  </p>
+            {order.lifecycle_status === 'approved' && (
+              <div className="border border-slate-200 rounded-xl p-4 space-y-2">
+                {!showDeleteConfirm ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        patchMutation.mutate({ lifecycle_status: 'draft' });
+                        onClose();
+                      }}
+                      disabled={patchMutation.isPending}
+                      className="flex-1 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2 rounded-xl text-sm"
+                    >
+                      Открыть заново
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(true);
+                        setDeleteError(null);
+                      }}
+                      className="flex-1 border border-red-200 text-red-500 hover:bg-red-50 font-semibold py-2 rounded-xl text-sm"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-600 font-medium">
+                      Введите пароль для удаления:
+                    </p>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => {
+                        setDeletePassword(e.target.value);
+                        setDeleteError(null);
+                      }}
+                      placeholder="Пароль"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') deleteOrderMutation.mutate(deletePassword);
+                      }}
+                    />
+                    {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteOrderMutation.mutate(deletePassword)}
+                        disabled={deleteOrderMutation.isPending}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-xl text-sm disabled:opacity-50"
+                      >
+                        {deleteOrderMutation.isPending ? '...' : 'Удалить'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDeleteConfirm(false);
+                          setDeletePassword('');
+                          setDeleteError(null);
+                        }}
+                        className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2 rounded-xl text-sm"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
                 )}
-                <button
-                  onClick={() => paySalaryMutation.mutate()}
-                  disabled={paySalaryMutation.isPending}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50"
-                >
-                  {paySalaryMutation.isPending
-                    ? 'Начисляем...'
-                    : `Начислить ЗП за ${unpaidCompletedWorks.length} работ`}
-                </button>
-              </div>
-            )}
-            {isPendingApproval && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-emerald-800 mb-1">Утверждение наряда</p>
-                <p className="text-xs text-emerald-700">
-                  {order.mechanic?.name ?? 'Механик'} · {(totalFactMinutes / 60).toFixed(1)} нч
-                  выполнено
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => {
-                      patchMutation.mutate({ lifecycle_status: 'approved' });
-                      onClose();
-                    }}
-                    disabled={patchMutation.isPending}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50"
-                  >
-                    {patchMutation.isPending ? 'Утверждаем...' : '✓ Утвердить наряд'}
-                  </button>
-                  <button
-                    onClick={() => patchMutation.mutate({ lifecycle_status: 'returned' })}
-                    disabled={patchMutation.isPending}
-                    className="flex-1 border border-red-200 text-red-600 hover:bg-red-50 font-semibold py-2.5 rounded-xl text-sm"
-                  >
-                    ↩ Вернуть на доработку
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -1698,6 +1774,8 @@ function DashboardSection({
     maintenanceAlerts: 0,
     vehiclesInRepair: 0,
   };
+  const m = data?.month ?? { completedOrders: 0, revenue: '0.00', salaryAccrued: '0.00' };
+  const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
 
   return (
     <div className="space-y-5">
@@ -1758,6 +1836,35 @@ function DashboardSection({
           <div className="text-xs text-slate-400 mb-1">Заявок от водителей</div>
           <div className="text-3xl font-bold text-violet-600">{c.repairRequests}</div>
           <div className="text-xs text-slate-500 mt-1">ожидают одобрения</div>
+        </div>
+      </div>
+
+      {/* Статистика за месяц */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+          <div className="text-xs text-emerald-600 font-semibold mb-1 uppercase tracking-wide">
+            Завершено за {monthName}
+          </div>
+          <div className="text-3xl font-bold text-emerald-700">{m.completedOrders}</div>
+          <div className="text-xs text-emerald-500 mt-1">нарядов закрыто</div>
+        </div>
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+          <div className="text-xs text-sky-600 font-semibold mb-1 uppercase tracking-wide">
+            Выручка за {monthName}
+          </div>
+          <div className="text-2xl font-bold text-sky-700">
+            <Money amount={m.revenue} />
+          </div>
+          <div className="text-xs text-sky-500 mt-1">по закрытым нарядам</div>
+        </div>
+        <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4">
+          <div className="text-xs text-violet-600 font-semibold mb-1 uppercase tracking-wide">
+            Начислено механикам
+          </div>
+          <div className="text-2xl font-bold text-violet-700">
+            <Money amount={m.salaryAccrued} />
+          </div>
+          <div className="text-xs text-violet-500 mt-1">ЗП за {monthName}</div>
         </div>
       </div>
 
@@ -2223,8 +2330,8 @@ function WorkOrdersSection() {
         {[
           { key: 'all' as WOTab, label: 'Все', count: counts.all },
           { key: 'active' as WOTab, label: 'Активные', count: counts.active },
-          { key: 'pending' as WOTab, label: 'На утверждении', count: counts.pending },
-          { key: 'approved' as WOTab, label: 'Утверждённые' },
+          { key: 'pending' as WOTab, label: 'На проверке', count: counts.pending },
+          { key: 'approved' as WOTab, label: 'Архив' },
         ].map((t) => (
           <button
             key={t.key}
@@ -2464,43 +2571,43 @@ function WorkOrdersSection() {
                       <span
                         className={cn(
                           'badge text-xs px-2 py-0.5 rounded-full',
-                          o.status === 'completed' && o.lifecycle_status !== 'approved'
-                            ? 'bg-amber-100 text-amber-700'
-                            : o.lifecycle_status === 'approved'
-                              ? 'bg-emerald-100 text-emerald-700'
+                          o.lifecycle_status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : o.lifecycle_status === 'returned'
+                              ? 'bg-red-100 text-red-700'
                               : STATUS_COLOR[o.status],
                         )}
                       >
-                        {o.status === 'completed' && o.lifecycle_status !== 'approved'
-                          ? 'На утверждении'
-                          : o.lifecycle_status === 'approved'
-                            ? 'Утверждён'
+                        {o.lifecycle_status === 'approved'
+                          ? 'Закрыт'
+                          : o.lifecycle_status === 'returned'
+                            ? 'Возвращён'
                             : STATUS_LABEL[o.status]}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {woTab === 'pending' && (
-                        <div className="flex gap-1 justify-end">
+                      <div className="flex gap-1 justify-end">
+                        {woTab === 'approved' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              patch.mutate({ id: o.id, body: { lifecycle_status: 'approved' } });
+                              patch.mutate({ id: o.id, body: { lifecycle_status: 'draft' } });
                             }}
-                            className="text-xs font-medium px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                            className="text-xs font-medium px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200"
                           >
-                            Утвердить
+                            Открыть заново
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedOrderId(o.id);
-                            }}
-                            className="text-xs font-medium px-2 py-1 rounded bg-white border border-slate-200 text-slate-600"
-                          >
-                            Детали
-                          </button>
-                        </div>
-                      )}
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrderId(o.id);
+                          }}
+                          className="text-xs font-medium px-2 py-1 rounded bg-white border border-slate-200 text-slate-600"
+                        >
+                          Детали
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

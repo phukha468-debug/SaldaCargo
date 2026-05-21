@@ -67,10 +67,11 @@ export async function GET(request: Request) {
       .limit(50);
 
     if (filter === 'review') {
-      // Only completed orders awaiting approval (not in-progress ones)
+      // draft orders that mechanic completed (status=completed) and admin hasn't closed yet
       q = q.eq('lifecycle_status', 'draft').eq('status', 'completed');
     } else if (filter === 'active') {
-      q = q.eq('lifecycle_status', 'approved').in('status', ['created', 'in_progress']);
+      // All open (draft) orders regardless of work status
+      q = q.eq('lifecycle_status', 'draft');
     } else if (filter === 'all') {
       q = q.neq('lifecycle_status', 'cancelled');
     }
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
         priority: body.priority ?? 'normal',
         admin_note: body.admin_note?.trim() || null,
         status: 'created',
-        lifecycle_status: 'approved',
+        lifecycle_status: 'draft',
         created_by: adminUsers?.id ?? null,
       })
       .select()

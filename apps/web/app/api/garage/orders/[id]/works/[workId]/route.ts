@@ -2,7 +2,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-/** PATCH /api/garage/orders/[id]/works/[workId] — update actual_minutes, price_client, status, quantity */
+const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
+
+/** PATCH /api/garage/orders/[id]/works/[workId] */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; workId: string }> },
@@ -34,7 +36,6 @@ export async function PATCH(
     ('actual_minutes' in updates || 'quantity' in updates) && !('price_client' in updates);
 
   if (needsRecalc) {
-    // Fetch current work row to get values not present in updates
     const { data: currentWork } = await (supabase.from('service_order_works') as any)
       .select('norm_minutes, actual_minutes, quantity')
       .eq('id', workId)
@@ -63,14 +64,14 @@ export async function PATCH(
         : (currentWork?.actual_minutes ?? null);
     const normMinutes = currentWork?.norm_minutes ?? 60;
 
-    // Use actual if set, otherwise norm × quantity
     const totalMinutes =
       effectiveActual != null && effectiveActual > 0 ? effectiveActual : normMinutes * effectiveQty;
 
     updates.price_client = ((totalMinutes / 60) * rate).toFixed(2);
   }
 
-  const { data, error } = await (supabase.from('service_order_works') as any)
+  // Update the work
+  const { data: updatedWork, error } = await (supabase.from('service_order_works') as any)
     .update(updates)
     .eq('id', workId)
     .select(
@@ -79,7 +80,61 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // When work is marked completed and salary not yet paid → auto-accrue as debt (pending)
+  if (updates.status === 'completed' && !updatedWork.salary_paid) {
+    await accrueWorkSalary(supabase, orderId, updatedWork);
+  }
+
+  return NextResponse.json(updatedWork);
+}
+
+async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
+  const { data: order } = await (supabase.from('service_orders') as any)
+    .select(
+      `
+      id, order_number, machine_type,
+      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+      second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct)
+    `,
+    )
+    .eq('id', orderId)
+    .single();
+
+  if (!order?.mechanic) return;
+
+  const workPrice = parseFloat(work.price_client ?? '0');
+  if (workPrice <= 0) return;
+
+  const hasTwo = !!order.second_mechanic;
+  const txns: any[] = [];
+
+  for (const mechData of [order.mechanic, order.second_mechanic]) {
+    if (!mechData) continue;
+    const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
+    const base = hasTwo ? workPrice / 2 : workPrice;
+    const salary = (base * pct) / 100;
+    if (salary <= 0) continue;
+
+    const workName = work.work_catalog?.name ?? work.custom_work_name ?? 'работа';
+    txns.push({
+      direction: 'expense',
+      lifecycle_status: 'approved',
+      settlement_status: 'pending',
+      amount: salary.toFixed(2),
+      category_id: CAT_PAYROLL_MECHANIC,
+      related_user_id: mechData.id,
+      description: `Долг механику — наряд #${order.order_number}: ${workName} (${pct}% от ${workPrice.toLocaleString('ru-RU')} ₽)`,
+      idempotency_key: crypto.randomUUID(),
+    });
+  }
+
+  if (txns.length > 0) {
+    await (supabase.from('transactions') as any).insert(txns);
+    await (supabase.from('service_order_works') as any)
+      .update({ salary_paid: true })
+      .eq('id', work.id);
+  }
 }
 
 /** DELETE /api/garage/orders/[id]/works/[workId] */

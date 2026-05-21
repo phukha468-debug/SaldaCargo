@@ -42,9 +42,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
+    const { password } = await req.json().catch(() => ({}));
+    if (password !== '9111') {
+      return NextResponse.json({ error: 'Неверный пароль' }, { status: 403 });
+    }
     const supabase = createAdminClient();
     const { error } = await (supabase as any)
       .from('service_orders')
@@ -97,6 +101,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'status',
       'priority',
       'assigned_mechanic_id',
+      'second_mechanic_id',
       'admin_note',
       'odometer_start',
       'odometer_end',
