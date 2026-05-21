@@ -67,11 +67,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = (await request.json()) as Record<string, unknown>;
     const supabase = createAdminClient();
 
-    // Approve: просто утверждаем наряд, ЗП начисляется отдельно через /pay-salary
     if (body.lifecycle_status === 'approved') {
       const { data: order, error: orderErr } = await (supabase as any)
         .from('service_orders')
-        .select('id, lifecycle_status')
+        .select(
+          `id, lifecycle_status, order_number, machine_type,
+           mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+           second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
+           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes)`,
+        )
         .eq('id', id)
         .single();
 
@@ -80,10 +84,86 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Наряд уже утверждён' }, { status: 409 });
       }
 
+      // Утверждаем наряд
       await (supabase as any)
         .from('service_orders')
         .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
         .eq('id', id);
+
+      // Начисляем ЗП механикам автоматически
+      const unpaidWorks = (order.works ?? []).filter(
+        (w: any) => w.status === 'completed' && !w.salary_paid,
+      );
+      if (unpaidWorks.length > 0) {
+        const { data: sto } = await (supabase as any)
+          .from('sto_settings')
+          .select('hourly_rate, hourly_rate_own')
+          .limit(1)
+          .single();
+        const hourlyRate = parseFloat(
+          order.machine_type === 'own'
+            ? (sto?.hourly_rate_own ?? '1600')
+            : (sto?.hourly_rate ?? '2000'),
+        );
+        const { data: adminUser } = await (supabase as any)
+          .from('users')
+          .select('id')
+          .filter('roles', 'cs', '{"admin"}')
+          .limit(1)
+          .single();
+        const createdBy = adminUser?.id ?? null;
+        const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
+
+        const unpaidMinutes = unpaidWorks.reduce((s: number, w: any) => {
+          return s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0));
+        }, 0);
+        const unpaidHours = unpaidMinutes / 60;
+        const hasTwo = !!order.second_mechanic;
+        const txns: any[] = [];
+        const payMap: Record<string, string> = {};
+
+        for (const [mechData, payField] of [
+          [order.mechanic, 'mechanic_pay'],
+          [order.second_mechanic, 'second_mechanic_pay'],
+        ] as [any, string][]) {
+          if (!mechData?.id) continue;
+          const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
+          const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
+          const salary = (hours * hourlyRate * pct) / 100;
+          if (salary <= 0) continue;
+          payMap[payField] = salary.toFixed(2);
+          txns.push({
+            direction: 'expense',
+            lifecycle_status: 'approved',
+            settlement_status: 'pending',
+            amount: salary.toFixed(2),
+            category_id: CAT_PAYROLL_MECHANIC,
+            related_user_id: mechData.id,
+            created_by: createdBy,
+            description: `ЗП механика ${mechData.name} — наряд #${order.order_number} (${hours.toFixed(1)} нч × ${hourlyRate} ₽ × ${pct}%)`,
+            idempotency_key: crypto.randomUUID(),
+          });
+        }
+
+        if (txns.length > 0) {
+          await Promise.all([
+            (supabase as any).from('transactions').insert(txns),
+            (supabase as any)
+              .from('service_order_works')
+              .update({ salary_paid: true })
+              .in(
+                'id',
+                unpaidWorks.map((w: any) => w.id),
+              ),
+            Object.keys(payMap).length
+              ? (supabase as any)
+                  .from('service_orders')
+                  .update({ ...payMap, updated_at: new Date().toISOString() })
+                  .eq('id', id)
+              : Promise.resolve(),
+          ]);
+        }
+      }
 
       return NextResponse.json({ id, lifecycle_status: 'approved' });
     }
