@@ -1,0 +1,2 @@
+-- Откат: ALTER TABLE work_catalog ALTER COLUMN code SET NOT NULL;
+ALTER TABLE work_catalog ALTER COLUMN code DROP NOT NULL;
