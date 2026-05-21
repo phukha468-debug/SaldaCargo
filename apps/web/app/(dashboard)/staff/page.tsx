@@ -30,12 +30,21 @@ type PayrollUser = {
   phone: string | null;
   notes: string | null;
   asset: { short_name: string; reg_number: string } | null;
-  earned: string;
-  paid: string;
-  debt: string;
-  advance_outstanding: string;
-  advances: { amount: string; date: string }[];
-  work_count: number;
+  earned: string; // начислено за месяц
+  paid: string; // выплачено за месяц
+  debt: string; // всего pending к выплате (all-time)
+  advance_balance: string; // остаток долга по авансу
+  advance_offset: string; // сколько зачтётся при выплате
+  payout: string; // сколько реально выплатить деньгами
+  all_time_paid: string;
+  history: Array<{
+    amount: string;
+    direction: string;
+    description: string;
+    created_at: string;
+    settlement_status: string;
+    category_id: string;
+  }>;
 };
 
 type PayrollResponse = {
@@ -44,7 +53,7 @@ type PayrollResponse = {
   mechanics: PayrollUser[];
   office: PayrollUser[];
   total_debt: string;
-  total_fund: string;
+  total_payout: string;
   total_paid_alltime: string;
 };
 
@@ -353,12 +362,14 @@ function SettleModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [amount, setAmount] = useState(
-    parseFloat(user.debt) > 0 ? parseFloat(user.debt).toFixed(0) : '',
-  );
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
-  const [note, setNote] = useState('');
   const [error, setError] = useState('');
+
+  const debt = parseFloat(user.debt);
+  const advanceBalance = parseFloat(user.advance_balance ?? '0');
+  const offset = parseFloat(user.advance_offset ?? '0');
+  const payout = parseFloat(user.payout ?? '0');
+  const needsWallet = payout > 0;
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -367,9 +378,7 @@ function SettleModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.id,
-          amount,
-          from_wallet_id: walletId,
-          description: note,
+          from_wallet_id: needsWallet ? walletId : undefined,
         }),
       }).then(async (r) => {
         const data = await r.json();
@@ -379,15 +388,6 @@ function SettleModal({
     onSuccess,
     onError: (e: Error) => setError(e.message),
   });
-
-  const handleSubmit = () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      setError('Введите сумму');
-      return;
-    }
-    setError('');
-    mutation.mutate();
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -404,67 +404,76 @@ function SettleModal({
             ×
           </button>
         </div>
-        <div className="p-6 space-y-4">
-          {parseFloat(user.debt) > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex justify-between items-center">
-              <span className="text-xs font-bold text-amber-700">Долг по ЗП</span>
-              <span className="text-sm font-black text-amber-700">
+        <div className="p-6 space-y-3">
+          {/* Разбивка */}
+          <div className="bg-slate-50 rounded-xl divide-y divide-slate-200 overflow-hidden">
+            <div className="flex justify-between items-center px-4 py-3">
+              <span className="text-sm text-slate-600">Начислено ЗП</span>
+              <span className="text-sm font-bold text-slate-900">
                 <Money amount={user.debt} />
               </span>
             </div>
-          )}
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              Сумма выплаты, ₽
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="w-full border-2 border-slate-200 rounded-xl px-4 h-14 text-2xl font-black text-slate-900 focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
-            <div className="flex gap-2">
-              {WALLETS.map((w) => (
-                <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => setWalletId(w.id)}
-                  className={cn(
-                    'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
-                    walletId === w.id
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 text-slate-500',
-                  )}
-                >
-                  {w.label}
-                </button>
-              ))}
+            {offset > 0 && (
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-sm text-violet-700">Зачёт аванса</span>
+                <span className="text-sm font-bold text-violet-700">
+                  −&nbsp;
+                  <Money amount={user.advance_offset} />
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center px-4 py-3 bg-emerald-50">
+              <span className="text-sm font-bold text-emerald-800">К выплате деньгами</span>
+              <span className="text-lg font-black text-emerald-700">
+                {payout > 0 ? <Money amount={user.payout} /> : '0 ₽'}
+              </span>
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Комментарий</label>
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Необязательно"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
-            />
-          </div>
+
+          {advanceBalance > 0 && offset < advanceBalance && (
+            <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5 flex justify-between">
+              <span className="text-xs text-violet-600">Остаток аванса после зачёта</span>
+              <span className="text-xs font-bold text-violet-700">
+                <Money amount={String(Math.max(0, advanceBalance - offset).toFixed(2))} />
+              </span>
+            </div>
+          )}
+
+          {needsWallet && (
+            <div>
+              <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
+              <div className="flex gap-2">
+                {WALLETS.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setWalletId(w.id)}
+                    className={cn(
+                      'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
+                      walletId === w.id
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 text-slate-500',
+                    )}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {debt <= 0 && (
+            <p className="text-sm text-slate-400 text-center py-2">Нет начисленной ЗП к выплате</p>
+          )}
           {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <button
-            onClick={handleSubmit}
-            disabled={mutation.isPending}
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || debt <= 0}
             className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
-            {mutation.isPending ? 'Проводим...' : '✓ Выплатить'}
+            {mutation.isPending ? 'Проводим...' : '✓ Подтвердить'}
           </button>
           <button
             onClick={onClose}
@@ -486,12 +495,14 @@ function PayrollRow({
   onEdit,
   onDeactivate,
   onAdvance,
+  onManualPay,
 }: {
   user: PayrollUser;
   onSettle: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
   onAdvance: () => void;
+  onManualPay: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
@@ -499,9 +510,10 @@ function PayrollRow({
 
   const debt = parseFloat(user.debt);
   const earned = parseFloat(user.earned);
-  const advanceOutstanding = parseFloat(user.advance_outstanding ?? '0');
+  const advanceBalance = parseFloat(user.advance_balance ?? '0');
   const hasDebt = debt > 0;
-  const hasAdvance = advanceOutstanding > 0;
+  const hasAdvance = advanceBalance > 0;
+  const isAdminOrOwner = user.roles.some((r) => r === 'owner' || r === 'admin');
 
   const handleDeactivate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -514,20 +526,6 @@ function PayrollRow({
       onDeactivate();
     }
   };
-
-  const primaryRole =
-    user.roles.find((r) =>
-      [
-        'driver',
-        'loader',
-        'mechanic',
-        'mechanic_lead',
-        'welder',
-        'painter',
-        'electrician',
-        'handyman',
-      ].includes(r),
-    ) ?? user.roles[0];
 
   return (
     <div
@@ -545,24 +543,30 @@ function PayrollRow({
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
         onClick={() => setExpanded((v) => !v)}
       >
-        {/* Name + role */}
+        {/* Name + roles */}
         <div className="w-44 shrink-0 min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
-                ROLE_COLOR[primaryRole as UserRole],
-              )}
-            >
-              {ROLE_LABEL[primaryRole as UserRole]}
-            </span>
-            <span className="font-bold text-slate-900 text-sm truncate">{user.name}</span>
+          <div className="flex flex-wrap items-center gap-1 mb-0.5">
+            {user.roles.slice(0, 2).map((role) => (
+              <span
+                key={role}
+                className={cn(
+                  'text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
+                  ROLE_COLOR[role as UserRole] ?? 'bg-slate-100 text-slate-500',
+                )}
+              >
+                {ROLE_LABEL[role as UserRole] ?? role}
+              </span>
+            ))}
+            {user.roles.length > 2 && (
+              <span className="text-[9px] text-slate-400 font-bold">+{user.roles.length - 2}</span>
+            )}
             {user.auto_settle && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
                 день
               </span>
             )}
           </div>
+          <span className="font-bold text-slate-900 text-sm truncate block">{user.name}</span>
           {user.asset && (
             <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
               {user.asset.reg_number}
@@ -572,9 +576,7 @@ function PayrollRow({
 
         {/* Shifts/orders */}
         <div className="w-16 shrink-0 text-center">
-          <p className="text-xs font-black text-slate-700">
-            {user.work_count > 0 ? user.work_count : '—'}
-          </p>
+          <p className="text-xs font-black text-slate-700">—</p>
           <p className="text-[9px] text-slate-400">смен</p>
         </div>
 
@@ -604,33 +606,29 @@ function PayrollRow({
 
         {/* Debt / Advance */}
         <div className="w-28 shrink-0 text-right">
-          {hasAdvance ? (
-            <>
-              <p className="text-sm font-black text-violet-600">
-                <Money amount={user.advance_outstanding} />
-              </p>
-              {(user.advances ?? []).slice(0, 1).map((adv, i) => (
-                <p key={i} className="text-[9px] text-violet-400">
-                  аванс{' '}
-                  {new Date(adv.date).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </p>
-              ))}
-              {!(user.advances ?? []).length && <p className="text-[9px] text-violet-400">аванс</p>}
-            </>
-          ) : hasDebt ? (
+          {hasDebt ? (
             <>
               <p className="text-sm font-black text-amber-600">
                 <Money amount={user.debt} />
               </p>
-              <p className="text-[9px] text-slate-400">долг</p>
+              {hasAdvance && (
+                <p className="text-[9px] text-violet-500">
+                  аванс −<Money amount={user.advance_offset} />
+                </p>
+              )}
+              {!hasAdvance && <p className="text-[9px] text-slate-400">к выплате</p>}
+            </>
+          ) : hasAdvance ? (
+            <>
+              <p className="text-sm font-black text-violet-600">
+                <Money amount={user.advance_balance} />
+              </p>
+              <p className="text-[9px] text-violet-400">аванс долг</p>
             </>
           ) : earned > 0 ? (
             <>
               <p className="text-xs font-bold text-emerald-500">✓ выплачено</p>
-              <p className="text-[9px] text-slate-400">долг</p>
+              <p className="text-[9px] text-slate-400">&nbsp;</p>
             </>
           ) : (
             <p className="text-xs text-slate-300">—</p>
@@ -639,7 +637,7 @@ function PayrollRow({
 
         {/* Action */}
         <div className="flex-1 flex items-center justify-end gap-1.5">
-          {hasDebt && !user.auto_settle ? (
+          {hasDebt && !user.auto_settle && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -649,7 +647,18 @@ function PayrollRow({
             >
               Рассчитаться
             </button>
-          ) : null}
+          )}
+          {isAdminOrOwner && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onManualPay();
+              }}
+              className="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0"
+            >
+              Выплатить ЗП
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -729,6 +738,7 @@ function PayrollSection({
   onEdit,
   onDeactivate,
   onAdvance,
+  onManualPay,
 }: {
   users: PayrollUser[];
   headerBg: string;
@@ -737,6 +747,7 @@ function PayrollSection({
   onEdit: (u: PayrollUser) => void;
   onDeactivate: (u: PayrollUser) => void;
   onAdvance: (u: PayrollUser) => void;
+  onManualPay: (u: PayrollUser) => void;
 }) {
   if (users.length === 0)
     return (
@@ -746,7 +757,7 @@ function PayrollSection({
     );
 
   const totalDebt = users.reduce((s, u) => s + parseFloat(u.debt), 0);
-  const totalAdvance = users.reduce((s, u) => s + parseFloat(u.advance_outstanding ?? '0'), 0);
+  const totalAdvance = users.reduce((s, u) => s + parseFloat(u.advance_balance ?? '0'), 0);
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -800,8 +811,143 @@ function PayrollSection({
           onEdit={() => onEdit(u)}
           onDeactivate={() => onDeactivate(u)}
           onAdvance={() => onAdvance(u)}
+          onManualPay={() => onManualPay(u)}
         />
       ))}
+    </div>
+  );
+}
+
+// ─── ManualPayModal ───────────────────────────────────────────────────────────
+
+function ManualPayModal({
+  user,
+  onClose,
+  onSuccess,
+}: {
+  user: PayrollUser;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState('');
+  const [walletId, setWalletId] = useState(WALLETS[1]!.id);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      fetch('/api/staff/pay-salary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          amount: parseFloat(amount.replace(',', '.')).toFixed(2),
+          from_wallet_id: walletId,
+          note: note.trim() || undefined,
+        }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const handleSubmit = () => {
+    const val = parseFloat(amount.replace(',', '.'));
+    if (isNaN(val) || val <= 0) {
+      setError('Введите сумму');
+      return;
+    }
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-slate-900">Выплата ЗП</h2>
+            <p className="text-sm text-slate-500">{user.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Сумма, ₽ *</label>
+            <input
+              autoFocus
+              type="number"
+              min="1"
+              step="1000"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setError('');
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              placeholder="0"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
+            <div className="flex gap-2">
+              {WALLETS.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWalletId(w.id)}
+                  className={cn(
+                    'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
+                    walletId === w.id
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 text-slate-500',
+                  )}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Комментарий</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Необязательно"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            />
+          </div>
+
+          {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {mutation.isPending ? 'Проводим...' : '✓ Выплатить'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-sm text-slate-500 px-4 py-3 rounded-xl border border-slate-200"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -842,7 +988,7 @@ function AdvanceModal({
     onError: (e: Error) => setError(e.message),
   });
 
-  const advanceOutstanding = parseFloat(user.advance_outstanding ?? '0');
+  const advanceOutstanding = parseFloat(user.advance_balance ?? '0');
 
   const handleSubmit = () => {
     const val = parseFloat(amount.replace(',', '.'));
@@ -875,21 +1021,9 @@ function AdvanceModal({
               <div className="flex justify-between items-center">
                 <span className="text-sm font-bold text-violet-700">Текущий аванс</span>
                 <span className="text-lg font-black text-violet-700">
-                  <Money amount={user.advance_outstanding} />
+                  <Money amount={user.advance_balance} />
                 </span>
               </div>
-              {(user.advances ?? []).map((adv, i) => (
-                <div key={i} className="flex justify-between text-xs text-violet-500">
-                  <span>
-                    {new Date(adv.date).toLocaleDateString('ru-RU', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </span>
-                  <Money amount={adv.amount} />
-                </div>
-              ))}
             </div>
           )}
 
@@ -1030,6 +1164,7 @@ export default function StaffPage() {
   const [activeGroup, setActiveGroup] = useState<GroupKey>('drivers');
   const [settleUser, setSettleUser] = useState<PayrollUser | null>(null);
   const [advanceUser, setAdvanceUser] = useState<PayrollUser | null>(null);
+  const [manualPayUser, setManualPayUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
 
   const shiftMonth = (delta: number) => {
@@ -1090,7 +1225,7 @@ export default function StaffPage() {
     (payroll?.mechanics.length ?? 0) +
     (payroll?.office.length ?? 0);
 
-  const totalFund = payroll ? parseFloat(payroll.total_fund ?? '0') : 0;
+  const totalFund = payroll ? parseFloat(payroll.total_payout ?? '0') : 0;
   const totalPaidAllTime = payroll ? parseFloat(payroll.total_paid_alltime ?? '0') : 0;
 
   const cfg = GROUP_CONFIG[activeGroup];
@@ -1214,6 +1349,7 @@ export default function StaffPage() {
           onEdit={handleEdit}
           onDeactivate={handleDeactivate}
           onAdvance={setAdvanceUser}
+          onManualPay={setManualPayUser}
         />
       )}
 
@@ -1225,6 +1361,19 @@ export default function StaffPage() {
           onSuccess={() => {
             setSettleUser(null);
             qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+          }}
+        />
+      )}
+
+      {/* Модал ручной выплаты ЗП */}
+      {manualPayUser && (
+        <ManualPayModal
+          user={manualPayUser}
+          onClose={() => setManualPayUser(null)}
+          onSuccess={() => {
+            setManualPayUser(null);
+            qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
           }}
         />
       )}

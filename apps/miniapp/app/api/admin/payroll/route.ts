@@ -8,6 +8,8 @@ const PAYROLL_CATEGORY_IDS = [
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
 ];
 
+const MANAGEMENT_ROLES = ['owner', 'admin'];
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -114,8 +116,11 @@ export async function GET(request: Request) {
 
     const OPERATIONAL = ['driver', 'loader', 'mechanic', 'mechanic_lead'];
     const result = ((users as any[]) ?? [])
-      .filter((u: any) => u.roles.some((r: string) => OPERATIONAL.includes(r)))
       .map((u: any) => {
+        const isManagement = (u.roles as string[]).some((r) => MANAGEMENT_ROLES.includes(r));
+        const isOp = (u.roles as string[]).some((r) => OPERATIONAL.includes(r));
+        if (!isOp && !isManagement) return null;
+
         const earned = earnedMap.get(u.id) ?? 0;
         const paid = paidMap.get(u.id) ?? 0;
         const debt = u.auto_settle ? 0 : Math.max(earned - paid, 0);
@@ -124,12 +129,15 @@ export async function GET(request: Request) {
           name: u.name,
           roles: u.roles,
           auto_settle: u.auto_settle,
+          is_management: isManagement && !isOp,
           earned: earned.toFixed(2),
           paid: paid.toFixed(2),
           debt: debt.toFixed(2),
         };
       })
-      .filter((u) => parseFloat(u.earned) > 0 || parseFloat(u.debt) > 0);
+      .filter((u): u is NonNullable<typeof u> => u !== null)
+      // Показываем: операционный с долгом/заработком, или руководство всегда
+      .filter((u) => u.is_management || parseFloat(u.earned) > 0 || parseFloat(u.debt) > 0);
 
     return NextResponse.json(result);
   } catch (err: any) {

@@ -749,6 +749,7 @@ type PayrollStaff = {
   name: string;
   roles: string[];
   auto_settle: boolean;
+  is_management: boolean;
   earned: string;
   paid: string;
   debt: string;
@@ -763,6 +764,8 @@ const ROLE_LABELS: Record<string, string> = {
   painter: 'Маляр',
   electrician: 'Электрик',
   handyman: 'Разнорабочий',
+  owner: 'Владелец',
+  admin: 'Администратор',
 };
 
 function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
@@ -815,6 +818,7 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
 
   const selectStaff = (s: PayrollStaff) => {
     setSelected(s);
+    // Для руководства долга нет — сумму вводят вручную
     setAmount(parseFloat(s.debt) > 0 ? parseFloat(s.debt).toFixed(0) : '');
     setError('');
   };
@@ -827,7 +831,7 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
   };
 
   const getRoleLabel = (roles: string[]) => {
-    for (const r of ['mechanic_lead', 'mechanic', 'loader', 'driver']) {
+    for (const r of ['mechanic_lead', 'mechanic', 'loader', 'driver', 'owner', 'admin']) {
       if (roles.includes(r)) return ROLE_LABELS[r] ?? r;
     }
     return roles[0] ?? '—';
@@ -858,40 +862,77 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
         </p>
       ) : (
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-            Сотрудник (долг за месяц)
-          </label>
-          {staff.map((s) => {
-            const isSelected = selected?.id === s.id;
-            const hasDebt = parseFloat(s.debt) > 0;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => selectStaff(s)}
-                className={`w-full p-3 rounded-xl border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.98] ${
-                  isSelected
-                    ? 'border-violet-500 bg-violet-50 text-violet-900'
-                    : 'border-zinc-200 text-zinc-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wide text-zinc-400">
-                    {getRoleLabel(s.roles)}
-                  </span>
-                  <span>{s.name}</span>
-                </div>
-                <div className="text-right">
-                  <p
-                    className={`font-black text-xs ${hasDebt ? 'text-rose-600' : 'text-zinc-400'}`}
-                  >
-                    {parseFloat(s.debt).toLocaleString('ru-RU')} ₽
-                  </p>
-                  <p className="text-[9px] text-zinc-400 font-bold uppercase">долг</p>
-                </div>
-              </button>
-            );
-          })}
+          {/* Операционный персонал */}
+          {staff.filter((s) => !s.is_management).length > 0 && (
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              Сотрудники (долг за месяц)
+            </label>
+          )}
+          {staff
+            .filter((s) => !s.is_management)
+            .map((s) => {
+              const isSelected = selected?.id === s.id;
+              const hasDebt = parseFloat(s.debt) > 0;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => selectStaff(s)}
+                  className={`w-full p-3 rounded-xl border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-violet-500 bg-violet-50 text-violet-900'
+                      : 'border-zinc-200 text-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-zinc-400">
+                      {getRoleLabel(s.roles)}
+                    </span>
+                    <span>{s.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={`font-black text-xs ${hasDebt ? 'text-rose-600' : 'text-zinc-400'}`}
+                    >
+                      {parseFloat(s.debt).toLocaleString('ru-RU')} ₽
+                    </p>
+                    <p className="text-[9px] text-zinc-400 font-bold uppercase">долг</p>
+                  </div>
+                </button>
+              );
+            })}
+
+          {/* Руководство */}
+          {staff.filter((s) => s.is_management).length > 0 && (
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pt-2 block">
+              Руководство (ручная выплата)
+            </label>
+          )}
+          {staff
+            .filter((s) => s.is_management)
+            .map((s) => {
+              const isSelected = selected?.id === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => selectStaff(s)}
+                  className={`w-full p-3 rounded-xl border-2 flex justify-between items-center text-sm font-bold transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-violet-500 bg-violet-50 text-violet-900'
+                      : 'border-zinc-200 text-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-violet-400">
+                      {getRoleLabel(s.roles)}
+                    </span>
+                    <span>{s.name}</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">ввести сумму</p>
+                </button>
+              );
+            })}
         </div>
       )}
 
@@ -899,10 +940,13 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
         <div className="space-y-3 pt-2 border-t border-zinc-100">
           <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
             Выплата: {selected.name}
-            {parseFloat(selected.debt) > 0 && (
+            {!selected.is_management && parseFloat(selected.debt) > 0 && (
               <span className="text-rose-400 ml-1 normal-case">
                 · долг: {parseFloat(selected.debt).toLocaleString('ru-RU')} ₽
               </span>
+            )}
+            {selected.is_management && (
+              <span className="text-violet-400 ml-1 normal-case">· введите сумму</span>
             )}
           </p>
 
