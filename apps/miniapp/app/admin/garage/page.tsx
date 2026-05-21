@@ -307,7 +307,11 @@ function ApproveRequestModal({
 
   const { data: workCatalog = [] } = useQuery<WorkCatalogItem[]>({
     queryKey: ['admin-work-catalog'],
-    queryFn: () => fetch('/api/admin/work-catalog').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/admin/work-catalog');
+      if (!r.ok) throw new Error('Ошибка загрузки каталога');
+      return r.json();
+    },
     staleTime: 60_000,
   });
 
@@ -747,13 +751,21 @@ function CreateOrderModal({
 
   const { data: assets = [] } = useQuery<AssetItem[]>({
     queryKey: ['admin-assets'],
-    queryFn: () => fetch('/api/admin/assets').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/admin/assets');
+      if (!r.ok) throw new Error('Ошибка загрузки');
+      return r.json();
+    },
     staleTime: 60_000,
   });
 
   const { data: workCatalog = [] } = useQuery<WorkCatalogItem[]>({
     queryKey: ['admin-work-catalog'],
-    queryFn: () => fetch('/api/admin/work-catalog').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/admin/work-catalog');
+      if (!r.ok) throw new Error('Ошибка загрузки');
+      return r.json();
+    },
     staleTime: 60_000,
   });
 
@@ -998,13 +1010,21 @@ export default function AdminGaragePage() {
 
   const { data, isLoading, refetch } = useQuery<GarageData>({
     queryKey: ['admin-garage'],
-    queryFn: () => fetch('/api/admin/garage').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/admin/garage');
+      if (!r.ok) throw new Error('Ошибка загрузки гаража');
+      return r.json();
+    },
     refetchInterval: 30_000,
   });
 
   const { data: mechanics = [] } = useQuery<Mechanic[]>({
     queryKey: ['admin-mechanics'],
-    queryFn: () => fetch('/api/admin/mechanics').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/admin/mechanics');
+      if (!r.ok) throw new Error('Ошибка загрузки механиков');
+      return r.json();
+    },
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-garage'] });

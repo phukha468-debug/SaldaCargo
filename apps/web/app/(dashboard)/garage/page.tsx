@@ -525,7 +525,8 @@ function OrderDetailModal({
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [showAddWork, setShowAddWork] = useState(false);
   const [workSearch, setWorkSearch] = useState('');
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [workCatFilter, setWorkCatFilter] = useState<string | null>(null);
+  const [confirmDeleteWorkId, setConfirmDeleteWorkId] = useState<string | null>(null);
   const [addWorkError, setAddWorkError] = useState<string | null>(null);
   const [addWorkQty, setAddWorkQty] = useState(1);
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
@@ -562,6 +563,7 @@ function OrderDetailModal({
       }
       setEditNote(null);
       setEditMechanic(null);
+      setEditSecondMechanic(null);
       setEditStatus(null);
       setEditPriority(null);
     },
@@ -649,17 +651,22 @@ function OrderDetailModal({
 
   const filteredCatalog = workSearch.trim()
     ? workCatalog.filter((w) => w.name.toLowerCase().includes(workSearch.toLowerCase().trim()))
-    : workCatalog;
+    : workCatFilter
+      ? workCatalog.filter((w) => (w.category ?? 'Прочее') === workCatFilter)
+      : workCatalog;
 
-  const catalogByCategory = (() => {
-    const map = new Map<string, typeof workCatalog>();
-    for (const w of filteredCatalog) {
-      const cat = w.category ?? 'Прочее';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(w);
-    }
-    return map;
-  })();
+  const catalogCategories = [...new Set(workCatalog.map((w) => w.category ?? 'Прочее'))].sort();
+
+  const totalPrice =
+    order?.works
+      .filter((w) => w.status !== 'cancelled')
+      .reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0) ?? 0;
+  const totalNormMin =
+    order?.works
+      .filter((w) => w.status !== 'cancelled')
+      .reduce((s, w) => s + w.norm_minutes * (w.quantity ?? 1), 0) ?? 0;
+  const allWorksCompleted =
+    (order?.works.length ?? 0) > 0 && (order?.works ?? []).every((w) => w.status === 'completed');
 
   const [deletePassword, setDeletePassword] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -689,12 +696,15 @@ function OrderDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-2xl bg-white h-full overflow-y-auto shadow-xl"
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
               Наряд #{order?.order_number ?? '...'}
@@ -732,141 +742,114 @@ function OrderDetailModal({
             </button>
           </div>
         </div>
-        {isLoading && <div className="p-6 text-sm text-slate-400 animate-pulse">Загрузка...</div>}
-        {order && (
-          <div className="p-6 space-y-6">
-            <div className="flex flex-wrap gap-2 items-center">
-              <span
-                className={cn(
-                  'text-xs font-semibold px-3 py-1 rounded-full',
-                  STATUS_COLOR[order.status],
-                )}
-              >
-                {STATUS_LABEL[order.status] ?? order.status}
-              </span>
-              <span
-                className={cn(
-                  'text-xs font-semibold px-3 py-1 rounded-full',
-                  PRIORITY_COLOR[order.priority],
-                )}
-              >
-                {PRIORITY_LABEL[order.priority] ?? order.priority}
-              </span>
-              <span className="text-sm font-bold text-slate-700">
-                {order.machine_type === 'own'
-                  ? `${order.asset?.short_name} · ${order.asset?.reg_number}`
-                  : `${order.client_vehicle_brand ?? ''} ${order.client_vehicle_model ?? ''} · ${order.client_vehicle_reg ?? ''}`}
-              </span>
-            </div>
-            {order.machine_type === 'client' && (order.client_name || order.client_phone) && (
-              <div className="bg-slate-50 rounded-lg p-3">
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Клиент</p>
-                {order.client_name && (
-                  <p className="text-sm font-medium text-slate-800">{order.client_name}</p>
-                )}
-                {order.client_phone && (
-                  <p className="text-sm text-slate-500">{order.client_phone}</p>
-                )}
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Описание</p>
-              <p className="text-sm text-slate-800">{order.problem_description}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Статус</p>
-                <select
-                  value={editStatus ?? order.status}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && <div className="p-6 text-sm text-slate-400 animate-pulse">Загрузка...</div>}
+          {order && (
+            <div className="p-6 space-y-6">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span
+                  className={cn(
+                    'text-xs font-semibold px-3 py-1 rounded-full',
+                    STATUS_COLOR[order.status],
+                  )}
                 >
-                  {Object.entries(STATUS_LABEL).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                {editStatus && editStatus !== order.status && (
-                  <button
-                    onClick={() => patchMutation.mutate({ status: editStatus })}
-                    disabled={patchMutation.isPending}
-                    className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
-                  >
-                    Сохранить
-                  </button>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Приоритет</p>
-                <select
-                  value={editPriority ?? order.priority}
-                  onChange={(e) => setEditPriority(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  {STATUS_LABEL[order.status] ?? order.status}
+                </span>
+                <span
+                  className={cn(
+                    'text-xs font-semibold px-3 py-1 rounded-full',
+                    PRIORITY_COLOR[order.priority],
+                  )}
                 >
-                  {Object.entries(PRIORITY_LABEL).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                {editPriority && editPriority !== order.priority && (
-                  <button
-                    onClick={() => patchMutation.mutate({ priority: editPriority })}
-                    disabled={patchMutation.isPending}
-                    className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
-                  >
-                    Сохранить
-                  </button>
-                )}
+                  {PRIORITY_LABEL[order.priority] ?? order.priority}
+                </span>
+                <span className="text-sm font-bold text-slate-700">
+                  {order.machine_type === 'own'
+                    ? `${order.asset?.short_name} · ${order.asset?.reg_number}`
+                    : `${order.client_vehicle_brand ?? ''} ${order.client_vehicle_model ?? ''} · ${order.client_vehicle_reg ?? ''}`}
+                </span>
               </div>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 1</p>
-              <select
-                value={editMechanic ?? order.mechanic?.id ?? ''}
-                onChange={(e) => setEditMechanic(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">— Не назначен —</option>
-                {mechanics.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              {editMechanic !== null && editMechanic !== (order.mechanic?.id ?? '') && (
-                <button
-                  onClick={() =>
-                    patchMutation.mutate({ assigned_mechanic_id: editMechanic || null })
-                  }
-                  disabled={patchMutation.isPending}
-                  className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
-                >
-                  Сохранить
-                </button>
+              {order.machine_type === 'client' && (order.client_name || order.client_phone) && (
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Клиент</p>
+                  {order.client_name && (
+                    <p className="text-sm font-medium text-slate-800">{order.client_name}</p>
+                  )}
+                  {order.client_phone && (
+                    <p className="text-sm text-slate-500">{order.client_phone}</p>
+                  )}
+                </div>
               )}
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 2</p>
-              <select
-                value={editSecondMechanic ?? order.second_mechanic?.id ?? ''}
-                onChange={(e) => setEditSecondMechanic(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">— Не назначен —</option>
-                {mechanics.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              {editSecondMechanic !== null &&
-                editSecondMechanic !== (order.second_mechanic?.id ?? '') && (
+              <div>
+                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Описание</p>
+                <p className="text-sm text-slate-800">{order.problem_description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Статус</p>
+                  <select
+                    value={editStatus ?? order.status}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {Object.entries(STATUS_LABEL).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  {editStatus && editStatus !== order.status && (
+                    <button
+                      onClick={() => patchMutation.mutate({ status: editStatus })}
+                      disabled={patchMutation.isPending}
+                      className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
+                    >
+                      Сохранить
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Приоритет</p>
+                  <select
+                    value={editPriority ?? order.priority}
+                    onChange={(e) => setEditPriority(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {Object.entries(PRIORITY_LABEL).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  {editPriority && editPriority !== order.priority && (
+                    <button
+                      onClick={() => patchMutation.mutate({ priority: editPriority })}
+                      disabled={patchMutation.isPending}
+                      className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
+                    >
+                      Сохранить
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 1</p>
+                <select
+                  value={editMechanic ?? order.mechanic?.id ?? ''}
+                  onChange={(e) => setEditMechanic(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Не назначен —</option>
+                  {mechanics.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                {editMechanic !== null && editMechanic !== (order.mechanic?.id ?? '') && (
                   <button
                     onClick={() =>
-                      patchMutation.mutate({ second_mechanic_id: editSecondMechanic || null })
+                      patchMutation.mutate({ assigned_mechanic_id: editMechanic || null })
                     }
                     disabled={patchMutation.isPending}
                     className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
@@ -874,514 +857,410 @@ function OrderDetailModal({
                     Сохранить
                   </button>
                 )}
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-slate-500 font-semibold uppercase">
-                  Работы ({order.works.length})
-                </p>
-                <button
-                  onClick={() => setShowAddWork((v) => !v)}
-                  className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
-                >
-                  {showAddWork ? '✕ Закрыть' : '+ Добавить'}
-                </button>
               </div>
 
-              {showAddWork && (
-                <div className="mb-3 border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 items-center">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={workSearch}
-                      onChange={(e) => {
-                        setWorkSearch(e.target.value);
-                        setAddWorkError(null);
-                      }}
-                      placeholder="Поиск по названию..."
-                      className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400"
-                    />
-                    <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
-                      <button
-                        type="button"
-                        onClick={() => setAddWorkQty((q) => Math.max(1, q - 1))}
-                        className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
-                      >
-                        −
-                      </button>
-                      <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
-                        {addWorkQty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setAddWorkQty((q) => q + 1)}
-                        className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
-                      >
-                        +
-                      </button>
-                    </div>
-                    {addWorkMutation.isPending && (
-                      <span className="text-xs text-slate-400 shrink-0">Добавляем...</span>
-                    )}
-                  </div>
-                  {addWorkError && (
-                    <div className="px-3 py-2 bg-red-50 border-b border-red-200">
-                      <p className="text-xs text-red-700 font-medium">{addWorkError}</p>
-                    </div>
-                  )}
-                  <div className="max-h-72 overflow-y-auto">
-                    {filteredCatalog.length === 0 ? (
-                      <p className="text-xs text-slate-400 px-3 py-3 italic">Ничего не найдено</p>
-                    ) : workSearch.trim() ? (
-                      // Flat list when searching
-                      filteredCatalog.map((w) => (
-                        <button
-                          key={w.id}
-                          onClick={() =>
-                            addWorkMutation.mutate({ work_catalog_id: w.id, quantity: addWorkQty })
-                          }
-                          disabled={addWorkMutation.isPending}
-                          className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
-                        >
-                          <span className="text-sm text-slate-800 group-hover:text-blue-700">
-                            {w.name}
-                          </span>
-                          <span className="text-xs text-slate-400 shrink-0 ml-2">
-                            {w.norm_minutes}м
-                            {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
-                          </span>
-                        </button>
-                      ))
-                    ) : (
-                      // Accordion by category
-                      Array.from(catalogByCategory.entries()).map(([cat, items]) => {
-                        const isOpen = expandedCats.has(cat);
-                        return (
-                          <div key={cat} className="border-b border-slate-100 last:border-0">
-                            <button
-                              onClick={() =>
-                                setExpandedCats((prev) => {
-                                  const next = new Set(prev);
-                                  if (isOpen) next.delete(cat);
-                                  else next.add(cat);
-                                  return next;
-                                })
-                              }
-                              className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
-                            >
-                              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                                {cat}
-                              </span>
-                              <span className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400">{items.length}</span>
-                                <svg
-                                  className={cn(
-                                    'w-3.5 h-3.5 text-slate-400 transition-transform',
-                                    isOpen && 'rotate-180',
-                                  )}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2.5"
-                                    d="M19 9l-7 7-7-7"
-                                  />
-                                </svg>
-                              </span>
-                            </button>
-                            {isOpen &&
-                              items.map((w) => (
-                                <button
-                                  key={w.id}
-                                  onClick={() =>
-                                    addWorkMutation.mutate({
-                                      work_catalog_id: w.id,
-                                      quantity: addWorkQty,
-                                    })
-                                  }
-                                  disabled={addWorkMutation.isPending}
-                                  className="w-full text-left px-4 py-2 hover:bg-blue-50 border-t border-slate-100 flex justify-between items-center group disabled:opacity-50"
-                                >
-                                  <span className="text-sm text-slate-800 group-hover:text-blue-700">
-                                    {w.name}
-                                  </span>
-                                  <span className="text-xs text-slate-400 shrink-0 ml-2">
-                                    {w.norm_minutes}м
-                                    {w.default_price_client ? ` · ${w.default_price_client} ₽` : ''}
-                                  </span>
-                                </button>
-                              ))}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {order.works.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">Работы не добавлены</p>
-              ) : (
-                <div className="space-y-1">
-                  {order.works.map((w) => {
-                    const name = w.work_catalog?.name ?? w.custom_work_name ?? 'Без названия';
-                    const isEditing = editingWorkId === w.id;
-                    return (
-                      <div key={w.id}>
-                        <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-800">
-                              {name}
-                              {(w.quantity ?? 1) > 1 && (
-                                <span className="ml-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                                  ×{w.quantity}
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              Норма: {w.norm_minutes}м
-                              {(w.quantity ?? 1) > 1
-                                ? ` × ${w.quantity} = ${w.norm_minutes * (w.quantity ?? 1)}м`
-                                : ''}
-                              {w.actual_minutes ? ` · Факт: ${w.actual_minutes}м` : ''}
-                              {w.price_client
-                                ? ` · ${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
-                                : ''}
-                            </p>
-                          </div>
-                          <span
-                            className={cn(
-                              'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0',
-                              {
-                                'bg-slate-100 text-slate-500': w.status === 'pending',
-                                'bg-amber-100 text-amber-700':
-                                  w.status === 'in_progress' || w.status === 'paused',
-                                'bg-emerald-100 text-emerald-700': w.status === 'completed',
-                              },
-                            )}
-                          >
-                            {w.status === 'pending'
-                              ? 'В очереди'
-                              : w.status === 'in_progress'
-                                ? 'В работе'
-                                : w.status === 'paused'
-                                  ? 'Пауза'
-                                  : 'Выполнено'}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setEditingWorkId(isEditing ? null : w.id);
-                              setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
-                              setEditWorkDesc(w.work_description ?? '');
-                              setEditWorkQty(w.quantity ?? 1);
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
-                            title="Редактировать"
-                          >
-                            ✏
-                          </button>
-                          <button
-                            onClick={() => deleteWorkMutation.mutate(w.id)}
-                            disabled={deleteWorkMutation.isPending}
-                            className="text-slate-300 hover:text-rose-500 text-lg leading-none disabled:opacity-30 shrink-0"
-                            title="Удалить"
-                          >
-                            ×
-                          </button>
-                        </div>
-                        {isEditing && (
-                          <div className="mx-1 mb-1 border border-blue-200 bg-blue-50 rounded-b-lg px-3 py-2.5 space-y-2">
-                            <p className="text-xs font-semibold text-blue-800">
-                              Отметить выполненным
-                            </p>
-                            <div className="flex gap-2 items-end">
-                              <div style={{ width: '72px' }}>
-                                <label className="text-xs text-slate-500 block mb-1">Кол-во</label>
-                                <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditWorkQty((q) => Math.max(1, q - 1))}
-                                    className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
-                                  >
-                                    −
-                                  </button>
-                                  <span className="flex-1 text-center text-sm font-semibold text-slate-800">
-                                    {editWorkQty}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditWorkQty((q) => q + 1)}
-                                    className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="flex-1">
-                                <label className="text-xs text-slate-500 block mb-1">
-                                  Факт. время (мин){editWorkQty > 1 ? ' всего' : ''}
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={editWorkMinutes}
-                                  onChange={(e) => setEditWorkMinutes(e.target.value)}
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
-                                />
-                              </div>
-                            </div>
-                            <p className="text-xs text-slate-400">
-                              Стоимость пересчитается автоматически: факт.мин × нормачас × кол-во.
-                            </p>
-                            <div>
-                              <label className="text-xs text-slate-500 block mb-1">
-                                Описание выполненного (для заказ-наряда)
-                              </label>
-                              <textarea
-                                rows={2}
-                                value={editWorkDesc}
-                                onChange={(e) => setEditWorkDesc(e.target.value)}
-                                placeholder="Что именно сделано: заменены колодки передней оси, суппорт проверен..."
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm resize-none"
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
-                                <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-1.5 rounded-lg text-center">
-                                  Назначьте механика
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() =>
-                                    patchWorkMutation.mutate({
-                                      workId: w.id,
-                                      body: {
-                                        quantity: editWorkQty,
-                                        actual_minutes:
-                                          parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
-                                        work_description: editWorkDesc || null,
-                                        status: 'completed',
-                                      },
-                                    })
-                                  }
-                                  disabled={patchWorkMutation.isPending}
-                                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
-                                >
-                                  {patchWorkMutation.isPending ? '...' : '✓ Выполнено'}
-                                </button>
-                              )}
-                              {w.status === 'completed' && (
-                                <button
-                                  onClick={() =>
-                                    patchWorkMutation.mutate({
-                                      workId: w.id,
-                                      body: {
-                                        quantity: editWorkQty,
-                                        actual_minutes:
-                                          parseInt(editWorkMinutes) || w.norm_minutes * editWorkQty,
-                                        work_description: editWorkDesc || null,
-                                      },
-                                    })
-                                  }
-                                  disabled={patchWorkMutation.isPending}
-                                  className="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
-                                >
-                                  Сохранить
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setEditingWorkId(null)}
-                                className="px-3 text-xs text-slate-500 hover:text-slate-700"
-                              >
-                                Отмена
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            {!isClosed &&
-              order.works.length > 0 &&
-              order.works.every((w) => w.status === 'completed') && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                  <p className="text-sm text-emerald-800 font-semibold mb-1">
-                    Все работы выполнены
-                  </p>
-                  <p className="text-xs text-emerald-700 mb-3">
-                    Нажмите «Завершить наряд» — он уйдёт в Архив.
-                  </p>
-                  <button
-                    onClick={() => {
-                      patchMutation.mutate({ lifecycle_status: 'approved' });
-                      onClose();
-                    }}
-                    disabled={patchMutation.isPending}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50"
-                  >
-                    {patchMutation.isPending ? '...' : 'Завершить наряд'}
-                  </button>
-                </div>
-              )}
-            {order.parts.length > 0 && (
               <div>
-                <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
-                  Запчасти ({order.parts.length})
-                </p>
-                <div className="space-y-1">
-                  {order.parts.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2"
-                    >
-                      <span className="text-sm text-slate-800">{p.part.name}</span>
-                      <span className="text-sm font-semibold text-slate-700">
-                        {p.quantity} {p.part.unit}
-                      </span>
-                    </div>
+                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 2</p>
+                <select
+                  value={editSecondMechanic ?? order.second_mechanic?.id ?? ''}
+                  onChange={(e) => setEditSecondMechanic(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Не назначен —</option>
+                  {mechanics.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
                   ))}
-                </div>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Заметка (admin)</p>
-              {editNote === null ? (
-                <div className="flex items-start gap-2">
-                  <p className="text-sm text-slate-700 flex-1">
-                    {order.admin_note || <span className="italic text-slate-400">Нет заметки</span>}
-                  </p>
-                  <button
-                    onClick={() => setEditNote(order.admin_note ?? '')}
-                    className="text-xs text-blue-600 hover:underline shrink-0"
-                  >
-                    Изменить
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <textarea
-                    value={editNote}
-                    onChange={(e) => setEditNote(e.target.value)}
-                    rows={3}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <div className="flex gap-2">
+                </select>
+                {editSecondMechanic !== null &&
+                  editSecondMechanic !== (order.second_mechanic?.id ?? '') && (
                     <button
-                      onClick={() => patchMutation.mutate({ admin_note: editNote })}
+                      onClick={() =>
+                        patchMutation.mutate({ second_mechanic_id: editSecondMechanic || null })
+                      }
                       disabled={patchMutation.isPending}
-                      className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-lg font-semibold"
+                      className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
                     >
                       Сохранить
                     </button>
-                    <button
-                      onClick={() => setEditNote(null)}
-                      className="text-xs text-slate-400 hover:text-slate-700"
-                    >
-                      Отмена
-                    </button>
+                  )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-slate-500 font-semibold uppercase">
+                    Работы ({order.works.length})
+                  </p>
+                  <button
+                    onClick={() => setShowAddWork((v) => !v)}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+                  >
+                    {showAddWork ? '✕ Закрыть' : '+ Добавить'}
+                  </button>
+                </div>
+
+                {showAddWork && (
+                  <div className="mb-3 border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 items-center">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={workSearch}
+                        onChange={(e) => {
+                          setWorkSearch(e.target.value);
+                          setAddWorkError(null);
+                        }}
+                        placeholder="Поиск по названию..."
+                        className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400"
+                      />
+                      <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
+                        <button
+                          type="button"
+                          onClick={() => setAddWorkQty((q) => Math.max(1, q - 1))}
+                          className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                        >
+                          −
+                        </button>
+                        <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
+                          {addWorkQty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setAddWorkQty((q) => q + 1)}
+                          className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                      {addWorkMutation.isPending && (
+                        <span className="text-xs text-slate-400 shrink-0">Добавляем...</span>
+                      )}
+                    </div>
+                    {addWorkError && (
+                      <div className="px-3 py-2 bg-red-50 border-b border-red-200">
+                        <p className="text-xs text-red-700 font-medium">{addWorkError}</p>
+                      </div>
+                    )}
+                    {!workSearch.trim() && (
+                      <div className="px-3 py-2 flex gap-1.5 flex-wrap border-b border-slate-100 bg-slate-50/70">
+                        {catalogCategories.map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => setWorkCatFilter(workCatFilter === cat ? null : cat)}
+                            className={cn(
+                              'text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors',
+                              workCatFilter === cat
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400',
+                            )}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="max-h-60 overflow-y-auto">
+                      {!workSearch.trim() && !workCatFilter ? (
+                        <p className="text-xs text-slate-400 px-3 py-4 italic text-center">
+                          Выберите категорию или введите название для поиска
+                        </p>
+                      ) : filteredCatalog.length === 0 ? (
+                        <p className="text-xs text-slate-400 px-3 py-3 italic">Ничего не найдено</p>
+                      ) : (
+                        filteredCatalog.map((w) => (
+                          <button
+                            key={w.id}
+                            onClick={() =>
+                              addWorkMutation.mutate({
+                                work_catalog_id: w.id,
+                                quantity: addWorkQty,
+                              })
+                            }
+                            disabled={addWorkMutation.isPending}
+                            className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
+                          >
+                            <span className="text-sm text-slate-800 group-hover:text-blue-700">
+                              {w.name}
+                            </span>
+                            <span className="text-xs text-slate-400 shrink-0 ml-2">
+                              {w.norm_minutes}м
+                              {w.default_price_client
+                                ? ` · ${parseInt(w.default_price_client).toLocaleString('ru-RU')} ₽`
+                                : ''}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {order.works.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">Работы не добавлены</p>
+                ) : (
+                  <div className="space-y-1">
+                    {order.works.map((w) => {
+                      const name = w.work_catalog?.name ?? w.custom_work_name ?? 'Без названия';
+                      const isEditing = editingWorkId === w.id;
+                      return (
+                        <div key={w.id}>
+                          <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800">
+                                {name}
+                                {(w.quantity ?? 1) > 1 && (
+                                  <span className="ml-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                    ×{w.quantity}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-slate-400">
+                                Норма: {w.norm_minutes}м
+                                {(w.quantity ?? 1) > 1
+                                  ? ` × ${w.quantity} = ${w.norm_minutes * (w.quantity ?? 1)}м`
+                                  : ''}
+                                {w.actual_minutes ? ` · Факт: ${w.actual_minutes}м` : ''}
+                                {w.price_client
+                                  ? ` · ${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
+                                  : ''}
+                              </p>
+                            </div>
+                            <span
+                              className={cn(
+                                'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0',
+                                {
+                                  'bg-slate-100 text-slate-500': w.status === 'pending',
+                                  'bg-amber-100 text-amber-700':
+                                    w.status === 'in_progress' || w.status === 'paused',
+                                  'bg-emerald-100 text-emerald-700': w.status === 'completed',
+                                },
+                              )}
+                            >
+                              {w.status === 'pending'
+                                ? 'В очереди'
+                                : w.status === 'in_progress'
+                                  ? 'В работе'
+                                  : w.status === 'paused'
+                                    ? 'Пауза'
+                                    : 'Выполнено'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditingWorkId(isEditing ? null : w.id);
+                                setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
+                                setEditWorkDesc(w.work_description ?? '');
+                                setEditWorkQty(w.quantity ?? 1);
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
+                              title="Редактировать"
+                            >
+                              ✏
+                            </button>
+                            {confirmDeleteWorkId === w.id ? (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => {
+                                    deleteWorkMutation.mutate(w.id);
+                                    setConfirmDeleteWorkId(null);
+                                  }}
+                                  disabled={deleteWorkMutation.isPending}
+                                  className="text-xs font-semibold text-rose-600 hover:text-rose-800 px-2 py-0.5 rounded bg-rose-50 border border-rose-200"
+                                >
+                                  Удалить
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteWorkId(null)}
+                                  className="text-xs text-slate-400 hover:text-slate-600 px-1.5 py-0.5"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteWorkId(w.id)}
+                                className="text-slate-300 hover:text-rose-500 text-lg leading-none shrink-0"
+                                title="Удалить"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                          {isEditing && (
+                            <div className="mx-1 mb-1 border border-blue-200 bg-blue-50 rounded-b-lg px-3 py-2.5 space-y-2">
+                              <p className="text-xs font-semibold text-blue-800">
+                                Отметить выполненным
+                              </p>
+                              <div className="flex gap-2 items-end">
+                                <div style={{ width: '72px' }}>
+                                  <label className="text-xs text-slate-500 block mb-1">
+                                    Кол-во
+                                  </label>
+                                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditWorkQty((q) => Math.max(1, q - 1))}
+                                      className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                    >
+                                      −
+                                    </button>
+                                    <span className="flex-1 text-center text-sm font-semibold text-slate-800">
+                                      {editWorkQty}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditWorkQty((q) => q + 1)}
+                                      className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-xs text-slate-500 block mb-1">
+                                    Факт. время (мин){editWorkQty > 1 ? ' всего' : ''}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={editWorkMinutes}
+                                    onChange={(e) => setEditWorkMinutes(e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-400">
+                                Стоимость пересчитается автоматически: факт.мин × нормачас × кол-во.
+                              </p>
+                              <div>
+                                <label className="text-xs text-slate-500 block mb-1">
+                                  Описание выполненного (для заказ-наряда)
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={editWorkDesc}
+                                  onChange={(e) => setEditWorkDesc(e.target.value)}
+                                  placeholder="Что именно сделано: заменены колодки передней оси, суппорт проверен..."
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm resize-none"
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
+                                  <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-1.5 rounded-lg text-center">
+                                    Назначьте механика
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      patchWorkMutation.mutate({
+                                        workId: w.id,
+                                        body: {
+                                          quantity: editWorkQty,
+                                          actual_minutes:
+                                            parseInt(editWorkMinutes) ||
+                                            w.norm_minutes * editWorkQty,
+                                          work_description: editWorkDesc || null,
+                                          status: 'completed',
+                                        },
+                                      })
+                                    }
+                                    disabled={patchWorkMutation.isPending}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
+                                  >
+                                    {patchWorkMutation.isPending ? '...' : '✓ Выполнено'}
+                                  </button>
+                                )}
+                                {w.status === 'completed' && (
+                                  <button
+                                    onClick={() =>
+                                      patchWorkMutation.mutate({
+                                        workId: w.id,
+                                        body: {
+                                          quantity: editWorkQty,
+                                          actual_minutes:
+                                            parseInt(editWorkMinutes) ||
+                                            w.norm_minutes * editWorkQty,
+                                          work_description: editWorkDesc || null,
+                                        },
+                                      })
+                                    }
+                                    disabled={patchWorkMutation.isPending}
+                                    className="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
+                                  >
+                                    Сохранить
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setEditingWorkId(null)}
+                                  className="px-3 text-xs text-slate-500 hover:text-slate-700"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              {order.parts.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
+                    Запчасти ({order.parts.length})
+                  </p>
+                  <div className="space-y-1">
+                    {order.parts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2"
+                      >
+                        <span className="text-sm text-slate-800">{p.part.name}</span>
+                        <span className="text-sm font-semibold text-slate-700">
+                          {p.quantity} {p.part.unit}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
-            </div>
-            {order.mechanic_note && (
               <div>
                 <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
-                  Заметка механика
+                  Заметка (admin)
                 </p>
-                <p className="text-sm text-slate-700">{order.mechanic_note}</p>
-              </div>
-            )}
-            {order.lifecycle_status === 'approved' &&
-              (order.mechanic_pay || order.second_mechanic_pay) && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
-                    ЗП начислено
-                  </p>
-                  {order.mechanic_pay && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-700">{order.mechanic?.name ?? 'Механик'}</span>
-                      <span className="font-black text-emerald-700">
-                        <Money amount={order.mechanic_pay} />
-                      </span>
-                    </div>
-                  )}
-                  {order.second_mechanic_pay && (
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-slate-700">
-                        {order.second_mechanic?.name ?? 'Механик 2'}
-                      </span>
-                      <span className="font-black text-emerald-700">
-                        <Money amount={order.second_mechanic_pay} />
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            {order.lifecycle_status === 'approved' && (
-              <div className="border border-slate-200 rounded-xl p-4 space-y-2">
-                {!showDeleteConfirm ? (
-                  <div className="flex gap-2">
+                {editNote === null ? (
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm text-slate-700 flex-1">
+                      {order.admin_note || (
+                        <span className="italic text-slate-400">Нет заметки</span>
+                      )}
+                    </p>
                     <button
-                      onClick={() => {
-                        patchMutation.mutate({ lifecycle_status: 'draft' });
-                        onClose();
-                      }}
-                      disabled={patchMutation.isPending}
-                      className="flex-1 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2 rounded-xl text-sm"
+                      onClick={() => setEditNote(order.admin_note ?? '')}
+                      className="text-xs text-blue-600 hover:underline shrink-0"
                     >
-                      Открыть заново
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDeleteConfirm(true);
-                        setDeleteError(null);
-                      }}
-                      className="flex-1 border border-red-200 text-red-500 hover:bg-red-50 font-semibold py-2 rounded-xl text-sm"
-                    >
-                      Удалить
+                      Изменить
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs text-slate-600 font-medium">
-                      Введите пароль для удаления:
-                    </p>
-                    <input
-                      type="password"
-                      value={deletePassword}
-                      onChange={(e) => {
-                        setDeletePassword(e.target.value);
-                        setDeleteError(null);
-                      }}
-                      placeholder="Пароль"
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') deleteOrderMutation.mutate(deletePassword);
-                      }}
+                    <textarea
+                      value={editNote}
+                      onChange={(e) => setEditNote(e.target.value)}
+                      rows={3}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
                     />
-                    {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
                     <div className="flex gap-2">
                       <button
-                        onClick={() => deleteOrderMutation.mutate(deletePassword)}
-                        disabled={deleteOrderMutation.isPending}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-xl text-sm disabled:opacity-50"
+                        onClick={() => patchMutation.mutate({ admin_note: editNote })}
+                        disabled={patchMutation.isPending}
+                        className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-lg font-semibold"
                       >
-                        {deleteOrderMutation.isPending ? '...' : 'Удалить'}
+                        Сохранить
                       </button>
                       <button
-                        onClick={() => {
-                          setShowDeleteConfirm(false);
-                          setDeletePassword('');
-                          setDeleteError(null);
-                        }}
-                        className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2 rounded-xl text-sm"
+                        onClick={() => setEditNote(null)}
+                        className="text-xs text-slate-400 hover:text-slate-700"
                       >
                         Отмена
                       </button>
@@ -1389,7 +1268,136 @@ function OrderDetailModal({
                   </div>
                 )}
               </div>
-            )}
+              {order.mechanic_note && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
+                    Заметка механика
+                  </p>
+                  <p className="text-sm text-slate-700">{order.mechanic_note}</p>
+                </div>
+              )}
+              {order.lifecycle_status === 'approved' &&
+                (order.mechanic_pay || order.second_mechanic_pay) && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
+                      ЗП начислено
+                    </p>
+                    {order.mechanic_pay && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-700">{order.mechanic?.name ?? 'Механик'}</span>
+                        <span className="font-black text-emerald-700">
+                          <Money amount={order.mechanic_pay} />
+                        </span>
+                      </div>
+                    )}
+                    {order.second_mechanic_pay && (
+                      <div className="flex justify-between text-sm mt-1">
+                        <span className="text-slate-700">
+                          {order.second_mechanic?.name ?? 'Механик 2'}
+                        </span>
+                        <span className="font-black text-emerald-700">
+                          <Money amount={order.second_mechanic_pay} />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              {order.lifecycle_status === 'approved' && (
+                <div className="border border-slate-200 rounded-xl p-4 space-y-2">
+                  {!showDeleteConfirm ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          patchMutation.mutate({ lifecycle_status: 'draft' });
+                          onClose();
+                        }}
+                        disabled={patchMutation.isPending}
+                        className="flex-1 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2 rounded-xl text-sm"
+                      >
+                        Открыть заново
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDeleteConfirm(true);
+                          setDeleteError(null);
+                        }}
+                        className="flex-1 border border-red-200 text-red-500 hover:bg-red-50 font-semibold py-2 rounded-xl text-sm"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-600 font-medium">
+                        Введите пароль для удаления:
+                      </p>
+                      <input
+                        type="password"
+                        value={deletePassword}
+                        onChange={(e) => {
+                          setDeletePassword(e.target.value);
+                          setDeleteError(null);
+                        }}
+                        placeholder="Пароль"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') deleteOrderMutation.mutate(deletePassword);
+                        }}
+                      />
+                      {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => deleteOrderMutation.mutate(deletePassword)}
+                          disabled={deleteOrderMutation.isPending}
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-xl text-sm disabled:opacity-50"
+                        >
+                          {deleteOrderMutation.isPending ? '...' : 'Удалить'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowDeleteConfirm(false);
+                            setDeletePassword('');
+                            setDeleteError(null);
+                          }}
+                          className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2 rounded-xl text-sm"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {order && (
+          <div className="flex-shrink-0 border-t border-slate-100 px-6 py-4 bg-slate-50/50 rounded-b-2xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">
+                  Итого
+                </p>
+                <p className="text-xl font-black text-slate-900">
+                  {totalPrice.toLocaleString('ru-RU')} ₽
+                </p>
+                {totalNormMin > 0 && (
+                  <p className="text-xs text-slate-400">{(totalNormMin / 60).toFixed(1)} нч план</p>
+                )}
+              </div>
+              {!isClosed && allWorksCompleted && (
+                <button
+                  onClick={() => {
+                    patchMutation.mutate({ lifecycle_status: 'approved' });
+                    onClose();
+                  }}
+                  disabled={patchMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl text-sm disabled:opacity-50 shrink-0"
+                >
+                  {patchMutation.isPending ? '...' : 'Завершить наряд →'}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -3068,15 +3076,6 @@ function MaintenanceSection() {
 
 // ═══════════════════════════ WORK CATALOG ════════════════════════════════════
 
-const WORK_CATEGORIES: Record<string, string> = {
-  'ТО и регламент': 'ТО и регламент',
-  Двигатель: 'Двигатель',
-  Трансмиссия: 'Трансмиссия',
-  Ходовая: 'Ходовая',
-  Электрика: 'Электрика',
-  Кузов: 'Кузов',
-};
-
 function WorkCatalogSection() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
@@ -3089,6 +3088,7 @@ function WorkCatalogSection() {
     hours_valdai: '',
   });
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const { data: items = [], isLoading } = useQuery<WorkCatalogItem[]>({
     queryKey: ['garage-work-catalog'],
@@ -3118,17 +3118,23 @@ function WorkCatalogSection() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      fetch('/api/garage/work-catalog', {
+    mutationFn: async (body: Record<string, unknown>) => {
+      const r = await fetch('/api/garage/work-catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }).then((r) => r.json()),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'Ошибка создания');
+      return d;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['garage-work-catalog'] });
       setShowCreate(false);
+      setCreateError(null);
       setCreateForm({ name: '', category: '', hours_gazelle: '', hours_valdai: '' });
     },
+    onError: (err: Error) => setCreateError(err.message),
   });
 
   const updateMutation = useMutation({
@@ -3178,7 +3184,7 @@ function WorkCatalogSection() {
         >
           Все
         </button>
-        {Object.keys(WORK_CATEGORIES).map((cat) => (
+        {[...new Set(items.map((i) => i.category ?? 'Прочее'))].sort().map((cat) => (
           <button
             key={cat}
             onClick={() => setCategoryFilter(cat === categoryFilter ? null : cat)}
@@ -3449,9 +3455,17 @@ function WorkCatalogSection() {
               <div className="text-xs text-slate-400">
                 Цены: клиент = нч × {rateClient} ₽, свой парк = нч × {rateOwn} ₽
               </div>
+              {createError && (
+                <p className="text-xs text-red-600 font-medium bg-red-50 rounded-lg px-3 py-2">
+                  {createError}
+                </p>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => setShowCreate(false)}
+                  onClick={() => {
+                    setShowCreate(false);
+                    setCreateError(null);
+                  }}
                   className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold"
                 >
                   Отмена
