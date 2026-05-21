@@ -31,14 +31,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let normMinutes = 60;
   const isOwn = order.machine_type === 'own';
 
+  let catalogDescription: string | null = null;
   if (work_catalog_id) {
     const { data: cat } = await (supabase.from('work_catalog') as any)
-      .select('norm_minutes, norm_minutes_valdai')
+      .select('norm_minutes, norm_minutes_valdai, description')
       .eq('id', work_catalog_id)
       .single();
     if (cat) {
       normMinutes =
         isOwn && cat.norm_minutes_valdai ? cat.norm_minutes_valdai : (cat.norm_minutes ?? 60);
+      catalogDescription = cat.description ?? null;
     }
   }
 
@@ -68,6 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       price_client: clientPrice,
       quantity: qty,
       status: 'pending',
+      work_description: catalogDescription,
     })
     .select(
       'id, status, quantity, norm_minutes, actual_minutes, price_client, custom_work_name, work_catalog:work_catalog(id, name)',
