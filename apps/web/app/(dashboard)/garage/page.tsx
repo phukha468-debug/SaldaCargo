@@ -506,6 +506,136 @@ function Sidebar({
   );
 }
 
+// ─── Default work descriptions (pre-filled on edit open) ─────────────────────
+
+const DEFAULT_WORK_DESCRIPTIONS: Record<string, string> = {
+  TO_1: 'ТО-1 выполнено: замена моторного масла, воздушного и топливного фильтров. Визуальный осмотр агрегатов проведён.',
+  TO_2: 'ТО-2 выполнено: замена масла, всех фильтров, свечей, проверка тормозной системы, ходовой, уровней технических жидкостей.',
+  OIL_CHANGE: 'Замена моторного масла и масляного фильтра. Уровень проверен после замены.',
+  AIR_FILTER: 'Заменён воздушный фильтр двигателя.',
+  FUEL_FILTER: 'Заменён топливный фильтр.',
+  CABIN_FILTER: 'Заменён салонный фильтр.',
+  ANTIFREEZE: 'Замена охлаждающей жидкости (антифриз). Система промыта, заправлена до нормы.',
+  BRAKE_FLUID: 'Замена тормозной жидкости. Система прокачана, воздух удалён.',
+  GUR_FLUID: 'Замена жидкости гидроусилителя руля.',
+  TIMING_BELT:
+    'Заменён ремень ГРМ в сборе с натяжителем и роликами. Метки установлены по регламенту.',
+  TIMING_CHAIN:
+    'Заменена цепь ГРМ, натяжитель и успокоитель. Фазы газораспределения выставлены по меткам.',
+  ENGINE_DIAG:
+    'Диагностика двигателя проведена. Считаны коды ошибок, составлен перечень неисправностей.',
+  HEAD_GASKET:
+    'Заменена прокладка ГБЦ. Головка снята, проверена на плоскостность, плоскость обработана.',
+  VALVE_ADJUST: 'Регулировка тепловых зазоров клапанов выполнена по заводскому регламенту.',
+  INJECTORS: 'Заменены форсунки. Давление топливной системы проверено после установки.',
+  GLOW_PLUGS:
+    'Заменены свечи накала. Резьба в колодцах очищена, затяжка выполнена с требуемым моментом.',
+  SPARK_PLUGS: 'Заменены свечи зажигания. Зазоры выставлены по регламенту.',
+  TURBO_REPLACE:
+    'Заменён турбокомпрессор. Маслоподводящая и сливная трубки проверены, масло заменено.',
+  TURBO_DIAG:
+    'Диагностика турбокомпрессора: давление наддува, осевой и радиальный люфт крыльчатки проверены.',
+  EGR_CLEAN: 'Клапан EGR очищен от нагара. Подвижность клапана проверена, установлен на место.',
+  ENGINE_MOUNT: 'Заменены подушки (опоры) двигателя.',
+  RADIATOR_REPLACE: 'Заменён радиатор системы охлаждения. Система промыта и заправлена антифризом.',
+  THERMOSTAT: 'Заменён термостат. Система охлаждения проверена на герметичность.',
+  WATER_PUMP: 'Заменена водяная помпа. ОЖ заменена, система прокачана.',
+  BELT_DRIVE: 'Заменён приводной ремень навесного оборудования.',
+  BELT_TENSIONER: 'Заменён натяжитель приводного ремня.',
+  SEALS_GASKETS: 'Заменены сальники и прокладки двигателя. Подтёки устранены.',
+  CLUTCH:
+    'Заменён комплект сцепления: диск, корзина, выжимной подшипник. Коробка снята и установлена.',
+  CLUTCH_CABLE: 'Заменён трос сцепления. Свободный ход педали отрегулирован.',
+  CLUTCH_CYLINDER: 'Заменён главный/рабочий цилиндр сцепления. Система прокачана.',
+  GEARBOX_OIL: 'Замена масла в коробке переключения передач.',
+  REAR_AXLE_OIL: 'Замена масла в редукторе заднего моста.',
+  GEARBOX_REPLACE: 'Заменена КПП. Установлена и отрегулирована.',
+  GEARBOX_ADJUST: 'Регулировка механизма переключения передач / кулисы выполнена.',
+  CARDAN_REPLACE: 'Заменён карданный вал в сборе. Крестовины и шлицевые соединения проверены.',
+  CARDAN_CROSS: 'Заменена крестовина карданного вала. Вал сбалансирован после установки.',
+  CARDAN_CROSS_150:
+    'Заменена крестовина карданного вала (2.5 нч): карданный вал снят, крестовина выпрессована и запрессована, вал установлен обратно.',
+  HUB_BEARING_FRONT: 'Заменён ступичный подшипник передней оси. Затяжка выполнена по регламенту.',
+  HUB_BEARING_REAR: 'Заменён ступичный подшипник задней оси.',
+  BRAKE_PADS_FRONT:
+    'Заменены тормозные колодки передней оси. Суппорты очищены, направляющие смазаны.',
+  BRAKE_PADS_REAR: 'Заменены тормозные колодки задней оси.',
+  BRAKE_DISCS_FRONT: 'Заменены тормозные диски передней оси.',
+  BRAKE_DRUMS_REAR: 'Заменены тормозные барабаны задней оси.',
+  SHOCK_FRONT: 'Заменены амортизаторы передней подвески.',
+  SHOCK_REAR: 'Заменены амортизаторы задней подвески.',
+  ALIGNMENT: 'Регулировка развал-схождения выполнена. Параметры выставлены по заводским нормам.',
+  SUSPENSION_DIAG:
+    'Диагностика ходовой части: проверка люфтов, износ сайлентблоков, шаровых, рулевых наконечников.',
+  BALL_JOINT: 'Заменена шаровая опора. Люфт в соединении устранён.',
+  TIE_ROD: 'Заменена рулевая тяга. Схождение проверено после установки.',
+  TIE_ROD_END: 'Заменён рулевой наконечник.',
+  SILENTBLOCK_FRONT: 'Заменены сайлентблоки передних рычагов подвески.',
+  SILENTBLOCK_REAR: 'Заменены сайлентблоки задней подвески.',
+  SPRING_REPLACE: 'Заменена рессора / пружина подвески.',
+  STABILIZER_BUSH: 'Заменены втулки стабилизатора поперечной устойчивости.',
+  STABILIZER_LINK: 'Заменены стойки стабилизатора.',
+  STEERING_RACK: 'Заменена рулевая рейка. Схождение передних колёс отрегулировано.',
+  STEERING_PUMP: 'Заменён насос ГУР. Жидкость заменена, система прокачана.',
+  WHEEL_BEARING: 'Заменён подшипник колеса.',
+  ABS_SENSOR: 'Заменён датчик ABS. Работа системы проверена.',
+  ALTERNATOR: 'Заменён генератор. Напряжение в бортсети после замены 14,0–14,5 В — норма.',
+  STARTER: 'Заменён стартер. Работа проверена — запуск двигателя штатный.',
+  ELECTRIC_DIAG:
+    'Диагностика электрооборудования проведена. Коды ошибок считаны, неисправности задокументированы.',
+  BATTERY_REPLACE: 'Заменена аккумуляторная батарея.',
+  WIRING_REPAIR: 'Поиск и ремонт обрыва / КЗ в проводке. Повреждённый участок восстановлен.',
+  HEADLIGHT_REPLACE: 'Заменена фара / задний фонарь.',
+  LAMP_REPLACE: 'Заменены лампы освещения.',
+  IGNITION_COIL: 'Заменена катушка зажигания.',
+  WIRING_HARNESS: 'Заменён жгут проводки.',
+  WIRING_HARNESS_PARTIAL:
+    'Ремонт участка кабельной трассы: изоляция восстановлена, соединения обжаты и защищены термоусадкой.',
+  ELECTRIC_CIRCUIT_CHECK:
+    'Выходной контроль электрических цепей: все цепи прозвонены, обрывов и КЗ не выявлено.',
+  ABS_EBS_DIAG:
+    'Диагностика ABS/EBS проведена. Коды ошибок считаны, неисправности задокументированы.',
+  ABS_CIRCUIT_CHECK:
+    'Проверка цепи датчика ABS: сопротивление, питание, сигнал соответствуют норме.',
+  ABS_SENSOR_REMOVE: 'Датчик ABS демонтирован.',
+  ABS_SENSOR_INSTALL_ADJ:
+    'Датчик ABS установлен, зазор между датчиком и ротором выставлен по регламенту.',
+  ECU_RESET_TEST:
+    'Ошибки ЭБУ сброшены. Финальное тестирование на ХХ и в движении — нарушений не выявлено.',
+  BODY_REPAIR: 'Кузовной ремонт: правка, шпаклёвка, грунтование повреждённого участка.',
+  BODY_PAINT: 'Окраска элемента кузова. Цвет подобран по заводскому коду.',
+  GLASS_REPLACE: 'Заменено стекло. Герметик нанесён по периметру, выдержан до полимеризации.',
+  DOOR_HANDLE: 'Заменена ручка двери / замок.',
+  MIRROR_REPLACE: 'Заменено зеркало заднего вида.',
+  WIPER_MECH: 'Заменена трапеция дворников.',
+  HEATER_CORE:
+    'Заменён радиатор печки. Приборная панель частично демонтирована, система охлаждения промыта.',
+  HEATER_FAN: 'Заменён вентилятор отопителя (моторчик печки).',
+  AC_CHARGE: 'Заправка кондиционера хладагентом. Давление в системе соответствует норме.',
+  AC_COMPRESSOR: 'Заменён компрессор кондиционера.',
+  EXHAUST_MUFFLER: 'Заменён глушитель.',
+  EXHAUST_PIPE: 'Заменена приёмная труба выхлопной системы.',
+  EXHAUST_GASKET: 'Заменена прокладка выпускного коллектора. Течь выхлопных газов устранена.',
+  EXHAUST_FLEX: 'Заменена гофрированная вставка глушителя.',
+  FUEL_PUMP: 'Заменён топливный насос.',
+  FUEL_TANK: 'Заменён топливный бак.',
+  FUEL_LINES: 'Заменены топливные магистрали (трубки / шланги).',
+  TYRE_MOUNT_SET: 'Шиномонтаж комплекта (4 колеса): бортировка и балансировка.',
+  TYRE_MOUNT_ONE: 'Шиномонтаж 1 колеса: бортировка и балансировка.',
+  TYRE_BALANCE: 'Балансировка колеса выполнена.',
+  TYRE_REPAIR: 'Ремонт прокола: жгутование / установка грибка.',
+  GBO_BALLOON_LP:
+    'Снятие и установка газового баллона (пропан). Соединения проверены на герметичность.',
+  REAR_AXLE_REMOVE: 'Снятие и установка заднего моста в сборе.',
+  REAR_AXLE_OVERHAUL: 'Разборка, дефектовка и сборка заднего моста. Изношенные детали заменены.',
+  AXLE_WELD_PAINT:
+    'Сварочно-восстановительные работы на чулке моста (заварка трещины / деформации), поверхность окрашена грунтом.',
+  SPRING_STUD_REMOVE: 'Срезание закисших стремянок рессор.',
+  SPRING_SILENTBLOCK_REPLACE: 'Заменены сайлентблоки рессор.',
+  SHOCK_ABSORBER_BUSH: 'Заменены втулки амортизаторов.',
+  BRAKE_BLEED: 'Прокачка тормозного контура. Воздух удалён, уровень ТЖ доведён до нормы.',
+};
+
 // ═══════════════════════════ MODALS (unchanged) ═══════════════════════════════
 
 function OrderDetailModal({
@@ -530,9 +660,9 @@ function OrderDetailModal({
   const [addWorkError, setAddWorkError] = useState<string | null>(null);
   const [addWorkQty, setAddWorkQty] = useState(1);
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
-  const [editWorkMinutes, setEditWorkMinutes] = useState('');
   const [editWorkDesc, setEditWorkDesc] = useState('');
   const [editWorkQty, setEditWorkQty] = useState(1);
+  const [editWorkPrice, setEditWorkPrice] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -629,6 +759,7 @@ function OrderDetailModal({
       workId: string;
       body: {
         actual_minutes?: number;
+        price_client?: string;
         status?: string;
         work_description?: string | null;
         quantity?: number;
@@ -657,16 +788,22 @@ function OrderDetailModal({
 
   const catalogCategories = [...new Set(workCatalog.map((w) => w.category ?? 'Прочее'))].sort();
 
-  const totalPrice =
-    order?.works
-      .filter((w) => w.status !== 'cancelled')
-      .reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0) ?? 0;
   const totalNormMin =
     order?.works
       .filter((w) => w.status !== 'cancelled')
       .reduce((s, w) => s + w.norm_minutes * (w.quantity ?? 1), 0) ?? 0;
   const allWorksCompleted =
     (order?.works.length ?? 0) > 0 && (order?.works ?? []).every((w) => w.status === 'completed');
+
+  const hourlyRate = order?.machine_type === 'own' ? 1600 : 2000;
+  const dynamicTotal = (order?.works ?? [])
+    .filter((w) => w.status !== 'cancelled')
+    .reduce((sum, w) => {
+      if (editingWorkId === w.id && editWorkPrice !== '') {
+        return sum + parseFloat(editWorkPrice || '0');
+      }
+      return sum + parseFloat(w.price_client ?? '0');
+    }, 0);
 
   const [deletePassword, setDeletePassword] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -983,7 +1120,7 @@ function OrderDetailModal({
                               {w.name}
                             </span>
                             <span className="text-xs text-slate-400 shrink-0 ml-2">
-                              {w.norm_minutes}м
+                              {(w.norm_minutes / 60).toFixed(1)} нч
                               {w.default_price_client
                                 ? ` · ${parseInt(w.default_price_client).toLocaleString('ru-RU')} ₽`
                                 : ''}
@@ -1002,11 +1139,33 @@ function OrderDetailModal({
                     {order.works.map((w) => {
                       const name = w.work_catalog?.name ?? w.custom_work_name ?? 'Без названия';
                       const isEditing = editingWorkId === w.id;
+                      const isDone = w.status === 'completed';
+                      const workCode = (w.work_catalog as unknown as { code?: string } | null)
+                        ?.code;
+                      const priceNum = parseFloat(w.price_client ?? '0');
+                      const normHours = (w.norm_minutes * (w.quantity ?? 1)) / 60;
                       return (
                         <div key={w.id}>
-                          <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                          <div
+                            className={cn(
+                              'group flex items-center gap-2 rounded-lg px-3 py-2.5 transition-all duration-150',
+                              'hover:shadow-md hover:scale-[1.01] cursor-default',
+                              isDone
+                                ? 'bg-emerald-50/60 border border-emerald-100'
+                                : 'bg-slate-50 border border-transparent',
+                            )}
+                          >
+                            {/* Status circle */}
+                            <div
+                              className={cn(
+                                'w-2.5 h-2.5 rounded-full flex-shrink-0',
+                                isDone ? 'bg-emerald-500' : 'bg-red-400',
+                              )}
+                            />
+
+                            {/* Name + hours */}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800">
+                              <p className="text-sm font-medium text-slate-800 leading-snug">
                                 {name}
                                 {(w.quantity ?? 1) > 1 && (
                                   <span className="ml-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
@@ -1015,47 +1174,47 @@ function OrderDetailModal({
                                 )}
                               </p>
                               <p className="text-xs text-slate-400">
-                                Норма: {w.norm_minutes}м
-                                {(w.quantity ?? 1) > 1
-                                  ? ` × ${w.quantity} = ${w.norm_minutes * (w.quantity ?? 1)}м`
-                                  : ''}
-                                {w.actual_minutes ? ` · Факт: ${w.actual_minutes}м` : ''}
-                                {w.price_client
-                                  ? ` · ${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
+                                {normHours.toFixed(1)} нч
+                                {w.actual_minutes
+                                  ? ` · факт ${(w.actual_minutes / 60).toFixed(1)} нч`
                                   : ''}
                               </p>
                             </div>
+
+                            {/* Price — prominent */}
                             <span
                               className={cn(
-                                'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0',
-                                {
-                                  'bg-slate-100 text-slate-500': w.status === 'pending',
-                                  'bg-amber-100 text-amber-700':
-                                    w.status === 'in_progress' || w.status === 'paused',
-                                  'bg-emerald-100 text-emerald-700': w.status === 'completed',
-                                },
+                                'text-base font-black shrink-0',
+                                isDone ? 'text-emerald-700' : 'text-slate-700',
                               )}
                             >
-                              {w.status === 'pending'
-                                ? 'В очереди'
-                                : w.status === 'in_progress'
-                                  ? 'В работе'
-                                  : w.status === 'paused'
-                                    ? 'Пауза'
-                                    : 'Выполнено'}
+                              {priceNum > 0 ? `${priceNum.toLocaleString('ru-RU')} ₽` : '—'}
                             </span>
+
+                            {/* Edit pencil — grows on hover */}
                             <button
                               onClick={() => {
-                                setEditingWorkId(isEditing ? null : w.id);
-                                setEditWorkMinutes(String(w.actual_minutes ?? w.norm_minutes));
-                                setEditWorkDesc(w.work_description ?? '');
+                                if (isEditing) {
+                                  setEditingWorkId(null);
+                                  return;
+                                }
+                                setEditingWorkId(w.id);
+                                setEditWorkPrice(
+                                  w.price_client ?? String(Math.round(normHours * hourlyRate)),
+                                );
+                                setEditWorkDesc(
+                                  w.work_description ??
+                                    (workCode ? (DEFAULT_WORK_DESCRIPTIONS[workCode] ?? '') : ''),
+                                );
                                 setEditWorkQty(w.quantity ?? 1);
                               }}
-                              className="text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
+                              className="shrink-0 text-slate-300 group-hover:text-blue-500 transition-all duration-150 text-base hover:text-2xl hover:text-blue-700"
                               title="Редактировать"
                             >
                               ✏
                             </button>
+
+                            {/* Delete */}
                             {confirmDeleteWorkId === w.id ? (
                               <div className="flex items-center gap-1 shrink-0">
                                 <button
@@ -1085,119 +1244,150 @@ function OrderDetailModal({
                               </button>
                             )}
                           </div>
-                          {isEditing && (
-                            <div className="mx-1 mb-1 border border-blue-200 bg-blue-50 rounded-b-lg px-3 py-2.5 space-y-2">
-                              <p className="text-xs font-semibold text-blue-800">
-                                Отметить выполненным
-                              </p>
-                              <div className="flex gap-2 items-end">
-                                <div style={{ width: '72px' }}>
-                                  <label className="text-xs text-slate-500 block mb-1">
-                                    Кол-во
-                                  </label>
-                                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditWorkQty((q) => Math.max(1, q - 1))}
-                                      className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
-                                    >
-                                      −
-                                    </button>
-                                    <span className="flex-1 text-center text-sm font-semibold text-slate-800">
-                                      {editWorkQty}
+
+                          {/* Edit panel */}
+                          {isEditing &&
+                            (() => {
+                              const editPrice = parseFloat(editWorkPrice || '0');
+                              const computedMinutes =
+                                editPrice > 0
+                                  ? Math.max(1, Math.round((editPrice / hourlyRate) * 60))
+                                  : w.norm_minutes * editWorkQty;
+                              const computedHours = computedMinutes / 60;
+                              return (
+                                <div className="mx-1 mb-1 border border-blue-200 bg-blue-50 rounded-b-xl px-4 py-3 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs font-black text-blue-800 uppercase tracking-wide">
+                                      {isDone ? 'Редактировать работу' : 'Отметить выполненной'}
+                                    </p>
+                                    <span className="text-xs text-blue-500">
+                                      Тариф: {hourlyRate.toLocaleString('ru-RU')} ₽/ч
                                     </span>
+                                  </div>
+
+                                  {/* Price + computed hours */}
+                                  <div className="flex gap-3 items-end">
+                                    <div className="flex-1">
+                                      <label className="text-xs text-slate-500 block mb-1">
+                                        Стоимость (₽)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="100"
+                                        value={editWorkPrice}
+                                        onChange={(e) => setEditWorkPrice(e.target.value)}
+                                        className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <div className="shrink-0 pb-1 text-right">
+                                      <p className="text-xs text-slate-400">автоматически</p>
+                                      <p className="text-lg font-black text-blue-700">
+                                        {computedHours.toFixed(1)} нч
+                                      </p>
+                                    </div>
+                                    <div style={{ width: '72px' }}>
+                                      <label className="text-xs text-slate-500 block mb-1 text-center">
+                                        Кол-во
+                                      </label>
+                                      <div className="flex items-center border border-blue-200 rounded-lg overflow-hidden bg-white">
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditWorkQty((q) => Math.max(1, q - 1))}
+                                          className="px-2 py-2 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                        >
+                                          −
+                                        </button>
+                                        <span className="flex-1 text-center text-sm font-semibold text-slate-800">
+                                          {editWorkQty}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditWorkQty((q) => q + 1)}
+                                          className="px-2 py-2 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Description */}
+                                  <div>
+                                    <label className="text-xs text-slate-500 block mb-1">
+                                      Описание для заказ-наряда
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      value={editWorkDesc}
+                                      onChange={(e) => setEditWorkDesc(e.target.value)}
+                                      placeholder="Что именно сделано..."
+                                      className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm resize-none bg-white"
+                                    />
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="flex gap-2">
+                                    {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
+                                      <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-2 rounded-lg text-center">
+                                        Сначала назначьте механика
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() =>
+                                          patchWorkMutation.mutate({
+                                            workId: w.id,
+                                            body: {
+                                              quantity: editWorkQty,
+                                              actual_minutes: computedMinutes,
+                                              price_client:
+                                                editPrice > 0 ? editPrice.toFixed(2) : undefined,
+                                              work_description: editWorkDesc || null,
+                                              status: 'completed',
+                                            },
+                                          })
+                                        }
+                                        disabled={patchWorkMutation.isPending}
+                                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 rounded-lg disabled:opacity-50 uppercase tracking-wide"
+                                      >
+                                        {patchWorkMutation.isPending
+                                          ? '...'
+                                          : isDone
+                                            ? '✓ Обновить'
+                                            : '✓ Выполнено'}
+                                      </button>
+                                    )}
+                                    {isDone && (
+                                      <button
+                                        onClick={() =>
+                                          patchWorkMutation.mutate({
+                                            workId: w.id,
+                                            body: {
+                                              quantity: editWorkQty,
+                                              actual_minutes: computedMinutes,
+                                              price_client:
+                                                editPrice > 0 ? editPrice.toFixed(2) : undefined,
+                                              work_description: editWorkDesc || null,
+                                            },
+                                          })
+                                        }
+                                        disabled={patchWorkMutation.isPending}
+                                        className="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-black py-2 rounded-lg disabled:opacity-50 uppercase tracking-wide"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
                                     <button
-                                      type="button"
-                                      onClick={() => setEditWorkQty((q) => q + 1)}
-                                      className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                                      onClick={() => setEditingWorkId(null)}
+                                      className="px-3 text-xs text-slate-500 hover:text-slate-700"
                                     >
-                                      +
+                                      Отмена
                                     </button>
                                   </div>
                                 </div>
-                                <div className="flex-1">
-                                  <label className="text-xs text-slate-500 block mb-1">
-                                    Факт. время (мин){editWorkQty > 1 ? ' всего' : ''}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={editWorkMinutes}
-                                    onChange={(e) => setEditWorkMinutes(e.target.value)}
-                                    className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
-                                  />
-                                </div>
-                              </div>
-                              <p className="text-xs text-slate-400">
-                                Стоимость пересчитается автоматически: факт.мин × нормачас × кол-во.
-                              </p>
-                              <div>
-                                <label className="text-xs text-slate-500 block mb-1">
-                                  Описание выполненного (для заказ-наряда)
-                                </label>
-                                <textarea
-                                  rows={2}
-                                  value={editWorkDesc}
-                                  onChange={(e) => setEditWorkDesc(e.target.value)}
-                                  placeholder="Что именно сделано: заменены колодки передней оси, суппорт проверен..."
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm resize-none"
-                                />
-                              </div>
-                              <div className="flex gap-2">
-                                {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
-                                  <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-1.5 rounded-lg text-center">
-                                    Назначьте механика
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      patchWorkMutation.mutate({
-                                        workId: w.id,
-                                        body: {
-                                          quantity: editWorkQty,
-                                          actual_minutes:
-                                            parseInt(editWorkMinutes) ||
-                                            w.norm_minutes * editWorkQty,
-                                          work_description: editWorkDesc || null,
-                                          status: 'completed',
-                                        },
-                                      })
-                                    }
-                                    disabled={patchWorkMutation.isPending}
-                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
-                                  >
-                                    {patchWorkMutation.isPending ? '...' : '✓ Выполнено'}
-                                  </button>
-                                )}
-                                {w.status === 'completed' && (
-                                  <button
-                                    onClick={() =>
-                                      patchWorkMutation.mutate({
-                                        workId: w.id,
-                                        body: {
-                                          quantity: editWorkQty,
-                                          actual_minutes:
-                                            parseInt(editWorkMinutes) ||
-                                            w.norm_minutes * editWorkQty,
-                                          work_description: editWorkDesc || null,
-                                        },
-                                      })
-                                    }
-                                    disabled={patchWorkMutation.isPending}
-                                    className="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 rounded-lg disabled:opacity-50"
-                                  >
-                                    Сохранить
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => setEditingWorkId(null)}
-                                  className="px-3 text-xs text-slate-500 hover:text-slate-700"
-                                >
-                                  Отмена
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                              );
+                            })()}
                         </div>
                       );
                     })}
@@ -1378,8 +1568,8 @@ function OrderDetailModal({
                 <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">
                   Итого
                 </p>
-                <p className="text-xl font-black text-slate-900">
-                  {totalPrice.toLocaleString('ru-RU')} ₽
+                <p className="text-2xl font-black text-slate-900">
+                  {dynamicTotal.toLocaleString('ru-RU')} ₽
                 </p>
                 {totalNormMin > 0 && (
                   <p className="text-xs text-slate-400">{(totalNormMin / 60).toFixed(1)} нч план</p>
