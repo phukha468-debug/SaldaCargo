@@ -45,6 +45,12 @@ type ReceivablesData = {
   overdueCount: number;
 };
 
+const WALLET_OPTIONS = [
+  { id: '10000000-0000-0000-0000-000000000001', label: 'Расчётный счёт' },
+  { id: '10000000-0000-0000-0000-000000000002', label: 'Касса (наличные)' },
+  { id: '10000000-0000-0000-0000-000000000003', label: 'Карта' },
+];
+
 type Counterparty = { id: string; name: string };
 type AgingFilter = 'all' | '0-30' | '31-60' | '60+';
 
@@ -367,6 +373,8 @@ function AddDebtForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   );
 }
 
+type CloseAllModal = { debtor: Debtor; walletId: string };
+
 export default function ReceivablesPage() {
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -375,6 +383,8 @@ export default function ReceivablesPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [agingFilter, setAgingFilter] = useState<AgingFilter>('all');
+  const [closeAllModal, setCloseAllModal] = useState<CloseAllModal | null>(null);
+  const [closingAllId, setClosingAllId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!expandedId) return;
@@ -436,6 +446,30 @@ export default function ReceivablesPage() {
     }
   }
 
+  async function handleCloseAll(debtor: Debtor, walletId: string) {
+    setClosingAllId(debtor.counterparty_id);
+    try {
+      const r = await fetch('/api/receivables/close-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: debtor.orders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
+          to_wallet_id: walletId,
+          counterparty_name: debtor.counterparty_name,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
+      setCloseAllModal(null);
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      await queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setClosingAllId(null);
+    }
+  }
+
   function handleAddSuccess() {
     setShowAddForm(false);
     queryClient.invalidateQueries({ queryKey: ['receivables'] });
@@ -454,6 +488,71 @@ export default function ReceivablesPage() {
     <>
       {showAddForm && (
         <AddDebtForm onClose={() => setShowAddForm(false)} onSuccess={handleAddSuccess} />
+      )}
+
+      {closeAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">Закрыть весь долг</h2>
+              <button
+                onClick={() => setCloseAllModal(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+              <p className="text-xs text-slate-500">{closeAllModal.debtor.counterparty_name}</p>
+              <p className="text-2xl font-black text-emerald-600">
+                <Money amount={closeAllModal.debtor.total} />
+              </p>
+              <p className="text-[10px] text-slate-400">
+                {closeAllModal.debtor.orders.length} записей будут закрыты
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Деньги поступят в
+              </p>
+              <div className="space-y-2">
+                {WALLET_OPTIONS.map((w) => (
+                  <label
+                    key={w.id}
+                    className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50"
+                  >
+                    <input
+                      type="radio"
+                      name="wallet"
+                      value={w.id}
+                      checked={closeAllModal.walletId === w.id}
+                      onChange={() => setCloseAllModal({ ...closeAllModal, walletId: w.id })}
+                      className="accent-emerald-600"
+                    />
+                    <span className="text-sm font-semibold text-slate-700">{w.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setCloseAllModal(null)}
+                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => handleCloseAll(closeAllModal.debtor, closeAllModal.walletId)}
+                disabled={closingAllId === closeAllModal.debtor.counterparty_id}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {closingAllId === closeAllModal.debtor.counterparty_id
+                  ? 'Закрываем...'
+                  : '✓ Закрыть долг'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="space-y-6 p-4 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -650,12 +749,26 @@ export default function ReceivablesPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <span
                           className={`text-base font-black ${isOverdue ? 'text-rose-600' : 'text-amber-600'}`}
                         >
                           <Money amount={debtor.total} />
                         </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCloseAllModal({
+                              debtor,
+                              walletId: '10000000-0000-0000-0000-000000000001',
+                            });
+                          }}
+                          disabled={closingAllId === debtor.counterparty_id}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors disabled:opacity-50 shrink-0"
+                          title="Закрыть весь долг одной кнопкой"
+                        >
+                          {closingAllId === debtor.counterparty_id ? '...' : 'Закрыть всё'}
+                        </button>
                         <span
                           className="material-symbols-outlined text-slate-400 text-lg transition-transform duration-200"
                           style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
