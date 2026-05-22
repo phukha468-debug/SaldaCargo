@@ -1607,6 +1607,8 @@ function ReceivablesPanel() {
   const [partialAmount, setPartialAmount] = useState('');
   const [partialWallet, setPartialWallet] = useState<'bank' | 'cash' | 'card'>('bank');
   const [partialSaving, setPartialSaving] = useState(false);
+  const [closingAllId, setClosingAllId] = useState<string | null>(null);
+  const [closeAllWalletId, setCloseAllWalletId] = useState('10000000-0000-0000-0000-000000000001');
 
   const { data, isLoading } = useQuery<ReceivablesData>({
     queryKey: ['receivables'],
@@ -1639,6 +1641,29 @@ function ReceivablesPanel() {
     if (da > 30) return { text: '#ef4444', bg: '#fee2e2' };
     if (da >= 10) return { text: '#f59e0b', bg: '#fef3c7' };
     return { text: '#10b981', bg: '#d1fae5' };
+  }
+
+  async function handleCloseAll(debtor: Debtor) {
+    setClosingAllId(debtor.counterparty_id);
+    try {
+      const r = await fetch('/api/receivables/close-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: debtor.orders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
+          to_wallet_id: closeAllWalletId,
+          counterparty_name: debtor.counterparty_name,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      await queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setClosingAllId(null);
+    }
   }
 
   async function handleMarkPaid(order: RecvOrder) {
@@ -2064,6 +2089,28 @@ function ReceivablesPanel() {
                     <span style={{ fontSize: 14, fontWeight: 900, color: col.text, flexShrink: 0 }}>
                       <Money amount={debtor.total} />
                     </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCloseAllWalletId('10000000-0000-0000-0000-000000000001');
+                        handleCloseAll(debtor);
+                      }}
+                      disabled={closingAllId === debtor.counterparty_id}
+                      style={{
+                        padding: '4px 10px',
+                        background: closingAllId === debtor.counterparty_id ? '#6ee7b7' : '#059669',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 6,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        opacity: closingAllId === debtor.counterparty_id ? 0.6 : 1,
+                      }}
+                    >
+                      {closingAllId === debtor.counterparty_id ? '...' : 'Закрыть всё'}
+                    </button>
                     <span
                       style={{
                         fontSize: 14,
@@ -2169,6 +2216,76 @@ function ReceivablesPanel() {
                           onClose={() => setEditingFollowUpId(null)}
                           onSaved={handleFollowUpSaved}
                         />
+                      )}
+
+                      {/* Close all debt panel */}
+                      {(debtor.orders ?? []).length > 0 && (
+                        <div
+                          style={{
+                            padding: '10px 16px',
+                            borderBottom: '1px solid #e2e8f0',
+                            background: '#f0fdf4',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#166534' }}>
+                            Закрыть весь долг{' '}
+                            <strong>
+                              <Money amount={debtor.total} />
+                            </strong>{' '}
+                            →
+                          </span>
+                          {[
+                            { id: '10000000-0000-0000-0000-000000000001', label: '🏦 Р/С' },
+                            { id: '10000000-0000-0000-0000-000000000002', label: '💵 Нал' },
+                            { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
+                          ].map((w) => (
+                            <button
+                              key={w.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCloseAllWalletId(w.id);
+                              }}
+                              style={{
+                                padding: '4px 10px',
+                                border: `2px solid ${closeAllWalletId === w.id ? '#16a34a' : '#d1d5db'}`,
+                                borderRadius: 6,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                background: closeAllWalletId === w.id ? '#16a34a' : '#fff',
+                                color: closeAllWalletId === w.id ? '#fff' : '#374151',
+                              }}
+                            >
+                              {w.label}
+                            </button>
+                          ))}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCloseAll(debtor);
+                            }}
+                            disabled={closingAllId === debtor.counterparty_id}
+                            style={{
+                              padding: '6px 14px',
+                              background: '#16a34a',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              opacity: closingAllId === debtor.counterparty_id ? 0.5 : 1,
+                            }}
+                          >
+                            {closingAllId === debtor.counterparty_id
+                              ? 'Закрываем...'
+                              : `✓ Закрыть (${(debtor.orders ?? []).length} записей)`}
+                          </button>
+                        </div>
                       )}
 
                       {/* Orders table */}
