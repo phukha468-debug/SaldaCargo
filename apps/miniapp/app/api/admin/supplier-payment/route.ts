@@ -7,20 +7,12 @@ const OPTI24_ID = '20000000-0000-0000-0000-000000000001';
 const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 const CAT_OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 
-async function resolveUserId(supabase: any): Promise<string> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
-  if (fromCookie) return fromCookie;
-  const { data } = await (supabase.from('users') as any)
-    .select('id')
-    .or('roles.cs.{owner},roles.cs.{admin}')
-    .limit(1)
-    .single();
-  return data?.id ?? '00000000-0000-0000-0000-000000000000';
-}
-
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get('salda_user_id')?.value;
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = (await request.json()) as {
       supplier_id: string;
       amount: string;
@@ -51,8 +43,6 @@ export async function POST(request: Request) {
     if (supplierError || !supplier) {
       return NextResponse.json({ error: 'Поставщик не найден' }, { status: 404 });
     }
-
-    const userId = await resolveUserId(supabase);
     const isOpti24 = body.supplier_id === OPTI24_ID;
     const category = isOpti24 ? CAT_FUEL : CAT_OTHER_EXPENSE;
     const description = body.description?.trim() || `Оплата долга: ${supplier.name}`;

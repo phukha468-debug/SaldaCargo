@@ -5,20 +5,12 @@ import { cookies } from 'next/headers';
 
 const LOAN_REPAYMENT_CATEGORY = '00000000-0000-0000-0000-000000000020';
 
-async function resolveUserId(supabase: any): Promise<string> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
-  if (fromCookie) return fromCookie;
-  const { data } = await (supabase.from('users') as any)
-    .select('id')
-    .or('roles.cs.{owner},roles.cs.{admin}')
-    .limit(1)
-    .single();
-  return data?.id ?? '00000000-0000-0000-0000-000000000000';
-}
-
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get('salda_user_id')?.value;
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = (await request.json()) as {
       loan_id: string;
       amount: string;
@@ -50,8 +42,6 @@ export async function POST(request: Request) {
     if (loanError || !loan) {
       return NextResponse.json({ error: 'Кредит не найден' }, { status: 404 });
     }
-
-    const userId = await resolveUserId(supabase);
     const currentRemaining = parseFloat(loan.remaining_amount);
     const newRemaining = Math.max(0, currentRemaining - amt);
     const isFullyRepaid = newRemaining === 0;

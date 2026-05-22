@@ -43,8 +43,8 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
 
     const cookieStore = await cookies();
-    const userId =
-      cookieStore.get('salda_user_id')?.value ?? '00000000-0000-0000-0000-000000000000';
+    const userId = cookieStore.get('salda_user_id')?.value;
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const description = body.description?.trim() || `Запчасти в кредит: ${supplier.name}`;
 
