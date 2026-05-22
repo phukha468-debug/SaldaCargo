@@ -11,7 +11,7 @@ async function resolveUserId(supabase: any): Promise<string> {
   // webapp без cookie — берём любого owner/admin
   const { data } = await (supabase.from('users') as any)
     .select('id')
-    .overlaps('roles', ['owner', 'admin'])
+    .or('roles.cs.{owner},roles.cs.{admin}')
     .limit(1)
     .single();
   return data?.id ?? '00000000-0000-0000-0000-000000000000';

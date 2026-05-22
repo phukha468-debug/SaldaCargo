@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     const { data: adminUser } = await (supabase.from('users') as any)
       .select('id')
-      .overlaps('roles', ['admin', 'owner'])
+      .or('roles.cs.{admin},roles.cs.{owner}')
       .limit(1)
       .single();
 
