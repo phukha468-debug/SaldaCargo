@@ -478,12 +478,29 @@ type DebtItem =
     }
   | { kind: 'supplier'; id: string; name: string; icon: string; debt: string };
 
+type SupplierTx = {
+  id: string;
+  amount: string;
+  description: string | null;
+  created_at: string;
+  settlement_status: 'pending' | 'completed';
+};
+
+type SupplierWithTxns = {
+  id: string;
+  name: string;
+  icon: string;
+  pending: SupplierTx[];
+  completed: SupplierTx[];
+};
+
 function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [selected, setSelected] = useState<DebtItem | null>(null);
   const [amount, setAmount] = useState('');
   const [walletId, setWalletId] = useState(WALLET_OPTIONS[0]?.id ?? '');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [expandedSupplierId, setExpandedSupplierId] = useState<string | null>(null);
 
   const { data: loans = [], isLoading: loansLoading } = useQuery<any[]>({
     queryKey: ['admin-loans'],
@@ -494,6 +511,12 @@ function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucces
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<any[]>({
     queryKey: ['admin-payables'],
     queryFn: () => fetch('/api/admin/payables').then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  const { data: supplierTxns = [] } = useQuery<SupplierWithTxns[]>({
+    queryKey: ['admin-payables-txns'],
+    queryFn: () => fetch('/api/admin/payables/transactions').then((r) => r.json()),
     staleTime: 30000,
   });
 
@@ -642,29 +665,121 @@ function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                 debt: s.debt,
               };
               const isSelected = selected?.id === s.id;
+              const isExpanded = expandedSupplierId === s.id;
+              const txData = supplierTxns.find((t) => t.id === s.id);
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => selectItem(item)}
-                  className={`w-full p-3 rounded-xl border-2 text-left transition-all active:scale-[0.98] ${
-                    isSelected ? 'border-rose-500 bg-rose-50' : 'border-zinc-200'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <p
-                      className={`font-black text-sm ${isSelected ? 'text-rose-800' : 'text-zinc-900'}`}
-                    >
-                      {s.icon} {s.name}
-                    </p>
-                    <div className="text-right">
-                      <p className="text-xs font-black text-rose-600">
-                        {parseFloat(s.debt).toLocaleString('ru-RU')} ₽
-                      </p>
-                      <p className="text-[9px] text-zinc-400 font-bold uppercase">долг</p>
+                <div key={s.id} className="space-y-1">
+                  <div
+                    className={`rounded-xl border-2 transition-all ${
+                      isSelected ? 'border-rose-500 bg-rose-50' : 'border-zinc-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 p-3">
+                      <button
+                        type="button"
+                        onClick={() => selectItem(item)}
+                        className="flex-1 flex justify-between items-center text-left"
+                      >
+                        <p
+                          className={`font-black text-sm ${isSelected ? 'text-rose-800' : 'text-zinc-900'}`}
+                        >
+                          {s.icon} {s.name}
+                        </p>
+                        <div className="text-right mr-2">
+                          <p className="text-xs font-black text-rose-600">
+                            {parseFloat(s.debt).toLocaleString('ru-RU')} ₽
+                          </p>
+                          <p className="text-[9px] text-zinc-400 font-bold uppercase">долг</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSupplierId(isExpanded ? null : s.id)}
+                        className="shrink-0 w-8 h-8 rounded-lg border border-zinc-200 bg-white flex items-center justify-center text-zinc-500 active:scale-95"
+                        title="История транзакций"
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            transition: 'transform .2s',
+                            display: 'block',
+                            transform: isExpanded ? 'rotate(180deg)' : 'none',
+                          }}
+                        >
+                          ▾
+                        </span>
+                      </button>
                     </div>
+
+                    {/* Transaction history */}
+                    {isExpanded && (
+                      <div className="border-t border-zinc-100 px-3 pb-3 space-y-2">
+                        {/* Pending charges */}
+                        {(txData?.pending ?? []).length > 0 && (
+                          <div className="pt-2">
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-1">
+                              Начислено (не оплачено)
+                            </p>
+                            <div className="space-y-1">
+                              {txData!.pending.map((t) => (
+                                <div
+                                  key={t.id}
+                                  className="flex justify-between items-center py-1.5 border-b border-zinc-50"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-zinc-700 font-semibold truncate">
+                                      {t.description ?? 'Без описания'}
+                                    </p>
+                                    <p className="text-[9px] text-zinc-400">
+                                      {formatDate(t.created_at)}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs font-black text-rose-600 ml-2 shrink-0">
+                                    −{parseFloat(t.amount).toLocaleString('ru-RU')} ₽
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Completed payments */}
+                        {(txData?.completed ?? []).length > 0 && (
+                          <div className="pt-1">
+                            <p className="text-[9px] font-black text-green-600 uppercase tracking-widest mb-1">
+                              Оплачено
+                            </p>
+                            <div className="space-y-1">
+                              {txData!.completed.map((t) => (
+                                <div
+                                  key={t.id}
+                                  className="flex justify-between items-center py-1.5 border-b border-zinc-50"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-zinc-700 font-semibold truncate">
+                                      {t.description ?? 'Оплата'}
+                                    </p>
+                                    <p className="text-[9px] text-zinc-400">
+                                      {formatDate(t.created_at)}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs font-black text-green-600 ml-2 shrink-0">
+                                    {parseFloat(t.amount).toLocaleString('ru-RU')} ₽
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(txData?.pending ?? []).length === 0 &&
+                          (txData?.completed ?? []).length === 0 && (
+                            <p className="text-center text-zinc-400 text-xs py-3">Транзакций нет</p>
+                          )}
+                      </div>
+                    )}
                   </div>
-                </button>
+                </div>
               );
             })}
         </div>
