@@ -84,6 +84,7 @@ export default function LoansPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
+  const [payingLoan, setPayingLoan] = useState<Loan | null>(null);
 
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
     queryKey: ['loans'],
@@ -205,6 +206,16 @@ export default function LoansPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500">
+      {payingLoan && (
+        <PayModal
+          loan={payingLoan}
+          onClose={() => setPayingLoan(null)}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['loans'] });
+            setPayingLoan(null);
+          }}
+        />
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Кредиты и займы</h1>
         <button
@@ -418,10 +429,130 @@ export default function LoansPage() {
               onEdit={() => openEdit(loan)}
               onDelete={() => handleDelete(loan)}
               onRestore={() => handleRestore(loan)}
+              onPay={() => setPayingLoan(loan)}
             />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+const WALLET_OPTIONS = [
+  { id: '10000000-0000-0000-0000-000000000001', label: '🏦 Р/С' },
+  { id: '10000000-0000-0000-0000-000000000002', label: '💵 Нал' },
+  { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
+];
+
+function PayModal({
+  loan,
+  onClose,
+  onSuccess,
+}: {
+  loan: Loan;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState(loan.monthly_payment ?? '');
+  const [walletId, setWalletId] = useState(WALLET_OPTIONS[0]!.id);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/loans/${loan.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, from_wallet_id: walletId, description: note }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      return json;
+    },
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-slate-900">Провести платёж</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">
+            ✕
+          </button>
+        </div>
+        <p className="text-sm text-slate-500">
+          Кредитор: <span className="font-bold text-slate-800">{loan.lender_name}</span>
+          {loan.monthly_payment && (
+            <span className="ml-2 text-slate-400">
+              · плановый платёж <Money amount={loan.monthly_payment} />
+            </span>
+          )}
+        </p>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-500 block">Сумма платежа, ₽</label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-500 block">Списать с</label>
+          <div className="flex gap-2">
+            {WALLET_OPTIONS.map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                onClick={() => setWalletId(w.id)}
+                className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-colors ${
+                  walletId === w.id
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 text-slate-500 hover:border-slate-400'
+                }`}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-500 block">Комментарий</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Необязательно"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+          />
+        </div>
+        {error && <p className="text-rose-600 text-sm font-medium">{error}</p>}
+        <div className="flex gap-3 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:border-slate-400 transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={() => {
+              if (!amount || parseFloat(amount) <= 0) {
+                setError('Введите сумму');
+                return;
+              }
+              setError('');
+              mutation.mutate();
+            }}
+            disabled={mutation.isPending}
+            className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors disabled:opacity-50"
+          >
+            {mutation.isPending ? 'Записываем…' : '✓ Провести платёж'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -431,11 +562,13 @@ function LoanCard({
   onEdit,
   onDelete,
   onRestore,
+  onPay,
 }: {
   loan: Loan;
   onEdit: () => void;
   onDelete: () => void;
   onRestore: () => void;
+  onPay: () => void;
 }) {
   const pct = paidPct(loan.original_amount, loan.remaining_amount);
   const months = monthsLeft(loan.ends_at);
@@ -513,18 +646,38 @@ function LoanCard({
           </div>
 
           {loan.next_payment_date && (
-            <div
-              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold ${
-                payOverdue
-                  ? 'bg-rose-100 text-rose-700'
-                  : payAlert
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              🔔 Следующий платёж: {fmtDate(loan.next_payment_date)}
-              {payOverdue && ' — просрочен!'}
-              {payAlert && !payOverdue && ` — через ${payDays} дн.`}
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                  payOverdue
+                    ? 'bg-rose-100 text-rose-700'
+                    : payAlert
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                🔔 Следующий платёж: {fmtDate(loan.next_payment_date)}
+                {payOverdue && ' — просрочен!'}
+                {payAlert && !payOverdue && ` — через ${payDays} дн.`}
+              </div>
+              {loan.is_active && (
+                <button
+                  onClick={onPay}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
+                >
+                  ✓ Оплачено
+                </button>
+              )}
+            </div>
+          )}
+          {!loan.next_payment_date && loan.is_active && (
+            <div className="mt-3">
+              <button
+                onClick={onPay}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
+              >
+                ✓ Провести платёж
+              </button>
             </div>
           )}
           {loan.notes && <p className="text-xs text-slate-400 italic mt-2">{loan.notes}</p>}

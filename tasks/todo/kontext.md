@@ -205,7 +205,13 @@ settlement_status: 'pending' = долг (НЕ выплата)
 | Страховка                | INSURANCE        | 992ed3ae-66a7-4a16-a2da-cecd9b7086c5 |
 | Офис и связь             | OFFICE_COMMS     | 73f565eb-f509-4538-9658-9cdff69bee37 |
 | Прочий расход            | OTHER_EXPENSE    | df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30 |
+| Погашение кредита/займа  | LOAN_REPAYMENT   | 00000000-0000-0000-0000-000000000020 |
 | Перевод между кошельками | WALLET_TRANSFER  | b9946a5e-4a33-4ed9-a272-5dee12d4ca93 |
+| Инкассация               | CASH_COLLECT     | 72f677d4-84af-4d0d-a845-a1b63c7ae607 |
+| Амортизация              | DEPRECIATION     | c88b4234-2a91-4223-aad4-56f6e1ab4ded |
+| Аренда                   | RENT             | 59ef1110-6c3f-49c7-a29c-b9e97a3a3d92 |
+| Сторонний ремонт         | REPAIR_EXTERNAL  | 8c5f3080-d0a8-49ea-b759-3286f2084940 |
+| Списание балансовой ст.  | ASSET_WRITE_OFF  | 63babd3d-b1d3-4710-86e2-5d1ff348b21f |
 
 ### Доходы
 
@@ -215,6 +221,7 @@ settlement_status: 'pending' = долг (НЕ выплата)
 | Выручка с ремонта | SERVICE_REVENUE | 600e7f70-2797-474d-948b-432230036d67 |
 | Продажа актива    | ASSET_SALE      | 84562648-767a-47b8-8821-a5c938da6e75 |
 | Прочий доход      | OTHER_INCOME    | 68225ea2-d7de-4442-8ed8-ce2366b5d369 |
+| Аванс сотруднику  | ADVANCE_PAYMENT | a0000000-0000-0000-0000-000000000001 |
 
 ---
 
