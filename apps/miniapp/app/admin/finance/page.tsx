@@ -1058,10 +1058,19 @@ const FOLLOW_UP_STATUS_COLORS: Record<string, string> = {
   bad_debt: 'border-red-400 bg-red-50 text-red-700',
 };
 
+const CLOSE_ALL_WALLETS = [
+  { id: '10000000-0000-0000-0000-000000000001', label: '🏦 Р/С' },
+  { id: '10000000-0000-0000-0000-000000000002', label: '💵 Нал' },
+  { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
+];
+
 function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [selectedDebtorId, setSelectedDebtorId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<ReceivableOrder | null>(null);
   const [showFollowUpId, setShowFollowUpId] = useState<string | null>(null);
+  const [closeAllWallet, setCloseAllWallet] = useState('10000000-0000-0000-0000-000000000001');
+  const [closingAllId, setClosingAllId] = useState<string | null>(null);
+  const [closeAllError, setCloseAllError] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -1116,6 +1125,32 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
     },
     onError: (e: Error) => setError(e.message),
   });
+
+  async function handleCloseAll(debtor: Debtor) {
+    setClosingAllId(debtor.counterparty_id);
+    setCloseAllError('');
+    try {
+      const r = await fetch('/api/admin/receivables/close-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: debtor.orders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
+          to_wallet_id: closeAllWallet,
+          counterparty_name: debtor.counterparty_name,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
+      setSelectedDebtorId(null);
+      setSelectedOrder(null);
+      onSuccess();
+    } catch (e: unknown) {
+      setCloseAllError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setClosingAllId(null);
+    }
+  }
 
   async function handleFollowUpSave(counterpartyId: string) {
     setFuSaving(true);
@@ -1400,6 +1435,49 @@ function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                       >
                         📲 Позвонить {formatPhone(d.counterparty_phone)}
                       </a>
+                    )}
+
+                    {/* Close all debt — shown when debtor has records */}
+                    {selectedDebtor && selectedDebtor.orders.length > 0 && (
+                      <div className="p-3 bg-green-50 rounded-xl border-2 border-green-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black text-green-700 uppercase tracking-widest">
+                            Погасить весь долг
+                          </p>
+                          <p className="font-black text-green-700 text-sm">
+                            {parseFloat(selectedDebtor.total).toLocaleString('ru-RU')} ₽
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {CLOSE_ALL_WALLETS.map((w) => (
+                            <button
+                              key={w.id}
+                              type="button"
+                              onClick={() => setCloseAllWallet(w.id)}
+                              className={`py-2 rounded-lg border-2 text-[10px] font-black transition-all active:scale-[0.97] ${
+                                closeAllWallet === w.id
+                                  ? 'border-green-500 bg-green-600 text-white'
+                                  : 'border-zinc-200 bg-white text-zinc-600'
+                              }`}
+                            >
+                              {w.label}
+                            </button>
+                          ))}
+                        </div>
+                        {closeAllError && (
+                          <p className="text-red-600 text-xs font-bold">{closeAllError}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleCloseAll(selectedDebtor)}
+                          disabled={closingAllId === selectedDebtor.counterparty_id}
+                          className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-white bg-green-600 active:scale-[0.97] transition-all disabled:opacity-50 text-xs"
+                        >
+                          {closingAllId === selectedDebtor.counterparty_id
+                            ? 'Проводим...'
+                            : `✓ Погасить ${parseFloat(selectedDebtor.total).toLocaleString('ru-RU')} ₽ (${selectedDebtor.orders.length} записей)`}
+                        </button>
+                      </div>
                     )}
 
                     {/* Orders list */}
