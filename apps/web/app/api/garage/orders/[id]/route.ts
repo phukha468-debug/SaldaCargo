@@ -90,6 +90,51 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
         .eq('id', id);
 
+      // Доход с наряда — SERVICE_REVENUE (сразу completed)
+      {
+        const CAT_SERVICE_REVENUE = '600e7f70-2797-474d-948b-432230036d67';
+        const { data: worksForRevenue } = await (supabase as any)
+          .from('service_order_works')
+          .select('price_client, status')
+          .eq('service_order_id', id)
+          .neq('status', 'cancelled');
+        const { data: partsForRevenue } = await (supabase as any)
+          .from('service_order_parts')
+          .select('client_price, quantity')
+          .eq('service_order_id', id);
+
+        const worksTotal = ((worksForRevenue ?? []) as any[]).reduce(
+          (s: number, w: any) => s + parseFloat(w.price_client ?? '0'),
+          0,
+        );
+        const partsTotal = ((partsForRevenue ?? []) as any[]).reduce(
+          (s: number, p: any) =>
+            s + parseFloat(p.client_price ?? '0') * parseFloat(p.quantity ?? '1'),
+          0,
+        );
+        const revenueTotal = worksTotal + partsTotal;
+
+        if (revenueTotal > 0) {
+          const { data: adminForRevenue } = await (supabase as any)
+            .from('users')
+            .select('id')
+            .filter('roles', 'cs', '{"admin"}')
+            .limit(1)
+            .maybeSingle();
+          await (supabase as any).from('transactions').insert({
+            direction: 'income',
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            amount: revenueTotal.toFixed(2),
+            category_id: CAT_SERVICE_REVENUE,
+            service_order_id: id,
+            created_by: adminForRevenue?.id ?? null,
+            description: `Выручка — наряд #${order.order_number}`,
+            idempotency_key: crypto.randomUUID(),
+          });
+        }
+      }
+
       // Начисляем ЗП механикам автоматически
       const unpaidWorks = (order.works ?? []).filter(
         (w: any) => w.status === 'completed' && !w.salary_paid,

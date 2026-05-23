@@ -2413,6 +2413,482 @@ function RequestsSection() {
   );
 }
 
+// ═══════════════════════════ AI IMPORT MODAL ═════════════════════════════════
+
+type AiWork = {
+  group?: string;
+  custom_work_name: string;
+  work_description?: string;
+  norm_minutes: number;
+  price_client: string;
+};
+type AiPart = {
+  name: string;
+  quantity: number;
+  unit?: string;
+  unit_price: string;
+  total_price?: string;
+};
+type AiParsed = {
+  order: {
+    machine_type: 'client' | 'own';
+    client_vehicle_brand?: string;
+    client_vehicle_model?: string;
+    client_vehicle_reg?: string;
+    client_name?: string;
+    client_phone?: string;
+    odometer_start?: number | null;
+    problem_description: string;
+    priority?: string;
+  };
+  works: AiWork[];
+  parts: AiPart[];
+  totals: { works: string; parts: string; complications: string; total: string };
+  recommendations?: string[];
+  warranty_note?: string;
+  delivery_note?: string | null;
+};
+
+function parseAiResponse(text: string): AiParsed | null {
+  const match = text.match(/```json-order\s*([\s\S]*?)```/);
+  if (!match) return null;
+  try {
+    return JSON.parse((match[1] ?? '').trim()) as AiParsed;
+  } catch {
+    return null;
+  }
+}
+
+function AiImportModal({
+  onClose,
+  mechanics,
+  onCreated,
+}: {
+  onClose: () => void;
+  mechanics: Mechanic[];
+  onCreated: (id: string) => void;
+}) {
+  const [tab, setTab] = useState<'prompt' | 'import'>('prompt');
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const [parsed, setParsed] = useState<AiParsed | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [selectedMechanic, setSelectedMechanic] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Загружаем промпт при открытии вкладки
+  async function loadPrompt() {
+    if (prompt) return;
+    setPromptLoading(true);
+    try {
+      const r = await fetch('/api/garage/ai-prompt');
+      const d = await r.json();
+      setPrompt(d.prompt ?? '');
+    } finally {
+      setPromptLoading(false);
+    }
+  }
+
+  function handleTabChange(t: 'prompt' | 'import') {
+    setTab(t);
+    if (t === 'prompt') loadPrompt();
+  }
+
+  async function copyPrompt() {
+    if (!prompt) return;
+    await navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleRecognize() {
+    setParseError(null);
+    const result = parseAiResponse(pasted);
+    if (!result) {
+      setParseError(
+        'Не найден блок ```json-order ... ```. Убедитесь, что скопировали весь ответ ИИ целиком.',
+      );
+      return;
+    }
+    setParsed(result);
+  }
+
+  async function handleCreate() {
+    if (!parsed) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const r = await fetch('/api/garage/orders/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order: {
+            ...parsed.order,
+            assigned_mechanic_id: selectedMechanic || undefined,
+          },
+          works: parsed.works,
+          parts: parsed.parts ?? [],
+          ai_generated_text: pasted,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+      onCreated(d.id);
+      onClose();
+    } catch (e: unknown) {
+      setCreateError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const worksTotal = parsed?.works?.reduce((s, w) => s + parseFloat(w.price_client || '0'), 0) ?? 0;
+  const partsTotal =
+    parsed?.parts?.reduce((s, p) => s + parseFloat(p.unit_price || '0') * (p.quantity || 1), 0) ??
+    0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Создать наряд через ИИ</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Скопируйте промпт → вставьте в ChatGPT/Claude → вставьте ответ сюда
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl">
+            ×
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex-shrink-0 flex gap-1 px-6 pt-3">
+          {(
+            [
+              { key: 'prompt', label: '1. Промпт для ИИ' },
+              { key: 'import', label: '2. Вставить ответ' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => handleTabChange(t.key)}
+              className={cn(
+                'text-sm font-semibold px-4 py-2 rounded-t-lg border-b-2 transition-colors',
+                tab === t.key
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-400 hover:text-slate-600',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
+          {/* Tab 1: Промпт */}
+          {tab === 'prompt' && (
+            <div className="space-y-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <p className="font-semibold mb-1">Как использовать:</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs">
+                  <li>
+                    Нажмите «Скопировать промпт» и вставьте его в ChatGPT как «System Instructions»
+                    или в Claude как «Project Instructions»
+                  </li>
+                  <li>В следующем сообщении опишите автомобиль и проблему</li>
+                  <li>Скопируйте весь ответ ИИ целиком и перейдите на вкладку «Вставить ответ»</li>
+                </ol>
+              </div>
+              <button
+                onClick={copyPrompt}
+                disabled={promptLoading || !prompt}
+                className={cn(
+                  'w-full font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2',
+                  copied
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-900 hover:bg-slate-700 text-white disabled:opacity-50',
+                )}
+              >
+                {promptLoading ? (
+                  'Загрузка...'
+                ) : copied ? (
+                  '✓ Скопировано!'
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                    Скопировать промпт
+                  </>
+                )}
+              </button>
+              {prompt && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-medium">
+                    Содержимое промпта (для справки)
+                  </div>
+                  <pre className="text-xs text-slate-600 p-3 overflow-x-auto whitespace-pre-wrap max-h-64 font-mono leading-relaxed">
+                    {prompt}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Вставить ответ */}
+          {tab === 'import' && (
+            <div className="space-y-4">
+              {!parsed ? (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
+                      Вставьте полный ответ от ИИ
+                    </label>
+                    <textarea
+                      rows={10}
+                      value={pasted}
+                      onChange={(e) => {
+                        setPasted(e.target.value);
+                        setParseError(null);
+                      }}
+                      placeholder="Скопируйте и вставьте сюда весь ответ от ChatGPT или Claude, включая смету и JSON-блок..."
+                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-slate-300"
+                    />
+                  </div>
+                  {parseError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                      {parseError}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleRecognize}
+                    disabled={!pasted.trim()}
+                    className="w-full bg-slate-900 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-40"
+                  >
+                    Распознать наряд →
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-5">
+                  {/* Авто и клиент */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-1">
+                    <p className="text-xs font-semibold text-blue-700 uppercase mb-2">
+                      Автомобиль и клиент
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <div className="text-slate-500">Марка/модель</div>
+                      <div className="font-medium text-slate-800">
+                        {[parsed.order.client_vehicle_brand, parsed.order.client_vehicle_model]
+                          .filter(Boolean)
+                          .join(' ') || '—'}
+                      </div>
+                      <div className="text-slate-500">Госномер</div>
+                      <div className="font-medium text-slate-800">
+                        {parsed.order.client_vehicle_reg || '—'}
+                      </div>
+                      {parsed.order.client_name && (
+                        <>
+                          <div className="text-slate-500">Клиент</div>
+                          <div className="font-medium text-slate-800">
+                            {parsed.order.client_name}
+                          </div>
+                        </>
+                      )}
+                      <div className="text-slate-500">Приоритет</div>
+                      <div className="font-medium text-slate-800">
+                        {PRIORITY_LABEL[parsed.order.priority ?? 'normal'] ?? parsed.order.priority}
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-blue-200">
+                      <p className="text-xs text-slate-500 mb-0.5">Описание проблемы</p>
+                      <p className="text-sm text-slate-800">{parsed.order.problem_description}</p>
+                    </div>
+                  </div>
+
+                  {/* Работы */}
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                      Работы ({parsed.works.length})
+                    </p>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500">
+                            <th className="text-left px-3 py-2">Работа</th>
+                            <th className="text-right px-3 py-2 w-16">Нч</th>
+                            <th className="text-right px-3 py-2 w-24">Стоимость</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsed.works.map((w, i) => (
+                            <tr key={i} className="border-b border-slate-100 last:border-0">
+                              <td className="px-3 py-2">
+                                <p className="font-medium text-slate-800">{w.custom_work_name}</p>
+                                {w.work_description && (
+                                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                                    {w.work_description}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right text-slate-500 tabular-nums">
+                                {(w.norm_minutes / 60).toFixed(1)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold text-slate-800 tabular-nums">
+                                {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-slate-50">
+                            <td
+                              colSpan={2}
+                              className="px-3 py-2 text-xs text-slate-500 font-semibold"
+                            >
+                              Итого работы
+                            </td>
+                            <td className="px-3 py-2 text-right font-black text-slate-800 tabular-nums">
+                              {worksTotal.toLocaleString('ru-RU')} ₽
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Запчасти */}
+                  {parsed.parts && parsed.parts.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                        Запчасти ({parsed.parts.length})
+                      </p>
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500">
+                              <th className="text-left px-3 py-2">Наименование</th>
+                              <th className="text-right px-3 py-2 w-16">Кол-во</th>
+                              <th className="text-right px-3 py-2 w-24">Сумма</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {parsed.parts.map((p, i) => (
+                              <tr key={i} className="border-b border-slate-100 last:border-0">
+                                <td className="px-3 py-2 font-medium text-slate-800">{p.name}</td>
+                                <td className="px-3 py-2 text-right text-slate-500 tabular-nums">
+                                  {p.quantity} {p.unit || 'шт'}
+                                </td>
+                                <td className="px-3 py-2 text-right font-semibold text-slate-800 tabular-nums">
+                                  {(parseFloat(p.unit_price) * p.quantity).toLocaleString('ru-RU')}{' '}
+                                  ₽
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-50">
+                              <td
+                                colSpan={2}
+                                className="px-3 py-2 text-xs text-slate-500 font-semibold"
+                              >
+                                Итого запчасти
+                              </td>
+                              <td className="px-3 py-2 text-right font-black text-slate-800 tabular-nums">
+                                {partsTotal.toLocaleString('ru-RU')} ₽
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Итого */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-emerald-700 font-semibold uppercase">
+                        Итого к оплате
+                      </p>
+                      {parsed.recommendations && parsed.recommendations.length > 0 && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {parsed.recommendations.length} рекомендаций от ИИ
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-2xl font-black text-emerald-800">
+                      {(worksTotal + partsTotal).toLocaleString('ru-RU')} ₽
+                    </p>
+                  </div>
+
+                  {/* Назначить механика */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
+                      Назначить механика
+                    </label>
+                    <select
+                      value={selectedMechanic}
+                      onChange={(e) => setSelectedMechanic(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                    >
+                      <option value="">— Назначить позже —</option>
+                      {mechanics.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {createError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                      {createError}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setParsed(null);
+                        setParseError(null);
+                      }}
+                      className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-50"
+                    >
+                      ← Изменить ответ
+                    </button>
+                    <button
+                      onClick={handleCreate}
+                      disabled={creating}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
+                    >
+                      {creating ? 'Создаём...' : 'Создать наряд →'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════ WORK ORDERS ═════════════════════════════════════
 
 type WOTab = 'all' | 'active' | 'pending' | 'approved';
@@ -2420,6 +2896,7 @@ type WOTab = 'all' | 'active' | 'pending' | 'approved';
 function WorkOrdersSection() {
   const [woTab, setWoTab] = useState<WOTab>('all');
   const [showCreate, setShowCreate] = useState(false);
+  const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [historyDate, setHistoryDate] = useState(todayStr());
   const qc = useQueryClient();
@@ -2512,15 +2989,36 @@ function WorkOrdersSection() {
           <h1 className="text-2xl font-bold text-slate-900">Заказ-наряды</h1>
           <p className="text-sm text-slate-400 mt-0.5">Все наряды на ремонт и обслуживание</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          Новый наряд
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAiImport(true)}
+            className="bg-violet-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-violet-700 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+            Создать через ИИ
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Новый наряд
+          </button>
+        </div>
       </div>
 
       {/* Sub-tabs */}
@@ -2820,6 +3318,17 @@ function WorkOrdersSection() {
           onClose={() => setShowCreate(false)}
           mechanics={mechanics}
           assets={assets}
+        />
+      )}
+      {showAiImport && (
+        <AiImportModal
+          onClose={() => setShowAiImport(false)}
+          mechanics={mechanics}
+          onCreated={(id) => {
+            qc.invalidateQueries({ queryKey: ['garage-orders'] });
+            setShowAiImport(false);
+            setSelectedOrderId(id);
+          }}
         />
       )}
       {selectedOrderId && (
