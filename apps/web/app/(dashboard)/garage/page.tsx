@@ -2449,14 +2449,38 @@ type AiParsed = {
   delivery_note?: string | null;
 };
 
-function parseAiResponse(text: string): AiParsed | null {
-  const match = text.match(/```json-order\s*([\s\S]*?)```/);
-  if (!match) return null;
+function tryParseJson(raw: string): AiParsed | null {
   try {
-    return JSON.parse((match[1] ?? '').trim()) as AiParsed;
+    const parsed = JSON.parse(raw.trim());
+    if (parsed && typeof parsed === 'object' && 'order' in parsed && 'works' in parsed) {
+      return parsed as AiParsed;
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+function parseAiResponse(text: string): AiParsed | null {
+  // 1. Точный маркер ```json-order
+  const m1 = text.match(/```json-order\s*([\s\S]*?)```/);
+  if (m1) return tryParseJson(m1[1] ?? '');
+
+  // 2. Любой ```json блок с нужными ключами (LLM часто игнорирует нестандартный маркер)
+  const jsonBlocks = [...text.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/g)];
+  for (const m of jsonBlocks) {
+    const result = tryParseJson(m[1] ?? '');
+    if (result) return result;
+  }
+
+  // 3. Последний JSON-объект {...} в тексте — крайний случай
+  const rawBlocks = [...text.matchAll(/(\{[\s\S]*?"order"[\s\S]*?"works"[\s\S]*?\})\s*(?:```|$)/g)];
+  for (const m of rawBlocks) {
+    const result = tryParseJson(m[1] ?? '');
+    if (result) return result;
+  }
+
+  return null;
 }
 
 function AiImportModal({
@@ -2509,7 +2533,7 @@ function AiImportModal({
     const result = parseAiResponse(pasted);
     if (!result) {
       setParseError(
-        'Не найден блок ```json-order ... ```. Убедитесь, что скопировали весь ответ ИИ целиком.',
+        'Не удалось найти JSON с данными наряда. Убедитесь, что скопировали весь ответ ИИ целиком — включая JSON-блок в конце с полями "order", "works", "parts".',
       );
       return;
     }
