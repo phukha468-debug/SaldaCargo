@@ -1532,10 +1532,10 @@ function OrderDetailModal({
                     )}
                   </div>
                 )}
-              {order.lifecycle_status === 'approved' && (
-                <div className="border border-slate-200 rounded-xl p-4 space-y-2">
-                  {!showDeleteConfirm ? (
-                    <div className="flex gap-2">
+              <div className="border border-red-100 rounded-xl p-4 space-y-2">
+                {!showDeleteConfirm ? (
+                  <div className="flex gap-2">
+                    {order.lifecycle_status === 'approved' && (
                       <button
                         onClick={() => {
                           patchMutation.mutate({ lifecycle_status: 'draft' });
@@ -1546,58 +1546,59 @@ function OrderDetailModal({
                       >
                         Открыть заново
                       </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(true);
+                        setDeleteError(null);
+                      }}
+                      className="flex-1 border border-red-200 text-red-500 hover:bg-red-50 font-semibold py-2 rounded-xl text-sm"
+                    >
+                      Удалить наряд
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-red-700">
+                      Удаление необратимо — будут удалены работы, запчасти, таймеры и все
+                      начисленные транзакции (ЗП, выручка СТО).
+                    </p>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => {
+                        setDeletePassword(e.target.value);
+                        setDeleteError(null);
+                      }}
+                      placeholder="Пароль администратора"
+                      className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') deleteOrderMutation.mutate(deletePassword);
+                      }}
+                    />
+                    {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteOrderMutation.mutate(deletePassword)}
+                        disabled={deleteOrderMutation.isPending}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-xl text-sm disabled:opacity-50"
+                      >
+                        {deleteOrderMutation.isPending ? '...' : 'Удалить безвозвратно'}
+                      </button>
                       <button
                         onClick={() => {
-                          setShowDeleteConfirm(true);
+                          setShowDeleteConfirm(false);
+                          setDeletePassword('');
                           setDeleteError(null);
                         }}
-                        className="flex-1 border border-red-200 text-red-500 hover:bg-red-50 font-semibold py-2 rounded-xl text-sm"
+                        className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2 rounded-xl text-sm"
                       >
-                        Удалить
+                        Отмена
                       </button>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-600 font-medium">
-                        Введите пароль для удаления:
-                      </p>
-                      <input
-                        type="password"
-                        value={deletePassword}
-                        onChange={(e) => {
-                          setDeletePassword(e.target.value);
-                          setDeleteError(null);
-                        }}
-                        placeholder="Пароль"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') deleteOrderMutation.mutate(deletePassword);
-                        }}
-                      />
-                      {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => deleteOrderMutation.mutate(deletePassword)}
-                          disabled={deleteOrderMutation.isPending}
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-xl text-sm disabled:opacity-50"
-                        >
-                          {deleteOrderMutation.isPending ? '...' : 'Удалить'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowDeleteConfirm(false);
-                            setDeletePassword('');
-                            setDeleteError(null);
-                          }}
-                          className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2 rounded-xl text-sm"
-                        >
-                          Отмена
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

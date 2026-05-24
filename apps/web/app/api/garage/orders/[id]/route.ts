@@ -50,11 +50,44 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Неверный пароль' }, { status: 403 });
     }
     const supabase = createAdminClient();
-    const { error } = await (supabase as any)
-      .from('service_orders')
-      .update({ lifecycle_status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', id);
+
+    // 1. Таймеры механиков (зависят от works)
+    const { data: workIds } = await (supabase as any)
+      .from('service_order_works')
+      .select('id')
+      .eq('service_order_id', id);
+    if (workIds?.length) {
+      await (supabase as any)
+        .from('work_time_logs')
+        .delete()
+        .in(
+          'service_order_work_id',
+          workIds.map((w: any) => w.id),
+        );
+    }
+
+    // 2. Запчасти
+    await (supabase as any).from('service_order_parts').delete().eq('service_order_id', id);
+
+    // 3. Работы
+    await (supabase as any).from('service_order_works').delete().eq('service_order_id', id);
+
+    // 4. Финансовые транзакции (ЗП механиков, выручка СТО)
+    await (supabase as any).from('transactions').delete().eq('service_order_id', id);
+
+    // 5. Заявки на закупку
+    await (supabase as any).from('purchase_requests').delete().eq('service_order_id', id);
+
+    // 6. Заявки на ремонт (если есть связь)
+    await (supabase as any)
+      .from('repair_requests')
+      .update({ service_order_id: null })
+      .eq('service_order_id', id);
+
+    // 7. Сам наряд
+    const { error } = await (supabase as any).from('service_orders').delete().eq('id', id);
     if (error) throw error;
+
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка' }, { status: 500 });
