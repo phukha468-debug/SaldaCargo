@@ -21,8 +21,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       id, trip_number, driver_id,
       driver:users!trips_driver_id_fkey(id, name),
       trip_orders(
-        amount, payment_method, lifecycle_status,
+        amount, payment_method, lifecycle_status, description,
         driver_pay, loader_id, loader_pay, loader2_id, loader2_pay,
+        counterparty:counterparties(name),
         loader:users!trip_orders_loader_id_fkey(id, name),
         loader2:users!trip_orders_loader2_id_fkey(id, name)
       )
@@ -46,14 +47,35 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
 
+  // Наличные оплачены сразу при инкассации — отмечаем как settled
+  await (supabase.from('trip_orders') as any)
+    .update({ settlement_status: 'completed' })
+    .eq('trip_id', id)
+    .eq('payment_method', 'cash')
+    .neq('lifecycle_status', 'cancelled');
+
   const activeOrders = ((trip.trip_orders as any[]) ?? []).filter(
     (o: any) => o.lifecycle_status !== 'cancelled',
   );
 
   // Зачисляем наличные с рейса в Сейф
-  const cashTotal = activeOrders
-    .filter((o: any) => o.payment_method === 'cash')
-    .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+  const cashOrders = activeOrders.filter((o: any) => o.payment_method === 'cash');
+  const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+  const clientNames = [
+    ...new Set(
+      cashOrders
+        .map((o: any) => (o.counterparty as any)?.name ?? o.description ?? null)
+        .filter(Boolean),
+    ),
+  ] as string[];
+  const cashDescription = [
+    `Рейс №${trip.trip_number}`,
+    (trip.driver as any)?.name ?? null,
+    clientNames.length > 0 ? clientNames.join(', ') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const payrollTxns: any[] = [];
 
@@ -113,7 +135,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         category_id: TRIP_REVENUE_CATEGORY,
         amount: cashTotal.toFixed(2),
         to_wallet_id: CASH_ID,
-        description: `Наличные рейса №${trip.trip_number}`,
+        description: cashDescription,
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         created_by: adminId,

@@ -3250,14 +3250,15 @@ function IncomePanel() {
     return true;
   });
 
-  // TRIP_REVENUE manual transactions belong in the "Выручка с рейсов" row, not a separate row
-  const tripRevenueTxTotal = periodIncomeTxs
-    .filter((tx) => tx.category?.code === 'TRIP_REVENUE')
-    .reduce((s, t) => s + n(t.amount), 0);
+  // TRIP_REVENUE transactions: cash collected at trip approval → belong in "Выручка с рейсов" row
+  const tripRevenueTxs = periodIncomeTxs.filter((tx) => tx.category?.code === 'TRIP_REVENUE');
+  const tripRevenueTxTotal = tripRevenueTxs.reduce((s, t) => s + n(t.amount), 0);
   const nonTripIncomeTxs = periodIncomeTxs.filter((tx) => tx.category?.code !== 'TRIP_REVENUE');
 
+  // Month: use trip_orders revenue (covers all settled payment methods).
+  // Day/week: use TRIP_REVENUE transactions (real-time cash events from trip approvals).
   const periodRevenue = timePeriod === 'month' ? revenue : 0;
-  const tripsTotal = periodRevenue + (timePeriod === 'month' ? tripRevenueTxTotal : 0);
+  const tripsTotal = timePeriod === 'month' ? periodRevenue : tripRevenueTxTotal;
   const txTotal = nonTripIncomeTxs.reduce((s, t) => s + n(t.amount), 0);
   const grandTotal = txTotal + tripsTotal;
 
@@ -3292,18 +3293,29 @@ function IncomePanel() {
         ? false
         : activeChip !== 'manual';
 
+  // In day/week mode: TRIP_REVENUE transactions are shown directly in the list under "Рейсы"
   const visibleTxs =
-    activeChip === 'trips' && activeCatFilter === null
-      ? []
-      : activeCatFilter === '__trips__'
-        ? periodIncomeTxs.filter((tx) => tx.category?.code === 'TRIP_REVENUE')
-        : activeCatFilter !== null
-          ? nonTripIncomeTxs.filter(
-              (tx) => (tx.category?.name ?? 'Прочие поступления') === activeCatFilter,
-            )
-          : activeChip === 'trips'
-            ? []
-            : nonTripIncomeTxs;
+    timePeriod !== 'month'
+      ? activeChip === 'manual'
+        ? nonTripIncomeTxs
+        : activeChip === 'trips' || activeCatFilter === '__trips__'
+          ? tripRevenueTxs
+          : activeCatFilter !== null
+            ? nonTripIncomeTxs.filter(
+                (tx) => (tx.category?.name ?? 'Прочие поступления') === activeCatFilter,
+              )
+            : [...tripRevenueTxs, ...nonTripIncomeTxs]
+      : activeChip === 'trips' && activeCatFilter === null
+        ? []
+        : activeCatFilter === '__trips__'
+          ? tripRevenueTxs
+          : activeCatFilter !== null
+            ? nonTripIncomeTxs.filter(
+                (tx) => (tx.category?.name ?? 'Прочие поступления') === activeCatFilter,
+              )
+            : activeChip === 'trips'
+              ? []
+              : nonTripIncomeTxs;
 
   const activeCatGroup = activeCatFilter
     ? (structureGroups.find((g) => g.id === activeCatFilter) ?? null)
@@ -3550,33 +3562,28 @@ function IncomePanel() {
                             flexShrink: 0,
                           }}
                         />
-                        <p
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: '#1e293b',
-                            flex: 1,
-                            minWidth: 0,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {tx.category?.name ?? tx.description ?? '—'}
-                        </p>
-                        {tx.counterparty?.name && (
-                          <span
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p
                             style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              color: '#2563eb',
-                              flexShrink: 0,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: '#1e293b',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
                             }}
                           >
-                            {tx.counterparty.name}
-                          </span>
-                        )}
-                        {tx.to_wallet?.name && (
+                            {tx.category?.code === 'TRIP_REVENUE'
+                              ? (tx.description ?? tx.category?.name ?? '—')
+                              : (tx.category?.name ?? tx.description ?? '—')}
+                          </p>
+                          {tx.category?.code !== 'TRIP_REVENUE' && tx.counterparty?.name && (
+                            <p style={{ fontSize: 10, color: '#2563eb', marginTop: 1 }}>
+                              {tx.counterparty.name}
+                            </p>
+                          )}
+                        </div>
+                        {tx.to_wallet?.name && tx.category?.code !== 'TRIP_REVENUE' && (
                           <span style={{ fontSize: 9, color: '#94a3b8', flexShrink: 0 }}>
                             {tx.to_wallet.name}
                           </span>

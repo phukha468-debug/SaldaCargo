@@ -51,7 +51,13 @@ type OrderDetail = Omit<OrderRow, 'works'> & {
   odometer_start: number | null;
   odometer_end: number | null;
   works: DetailWork[];
-  parts: Array<{ id: string; quantity: number; part: { id: string; name: string; unit: string } }>;
+  parts: Array<{
+    id: string;
+    quantity: number;
+    custom_part_name: string | null;
+    unit: string | null;
+    part: { id: string; name: string; unit: string } | null;
+  }>;
 };
 
 type DashboardData = {
@@ -827,9 +833,14 @@ function OrderDetailModal({
     onError: (err: Error) => setDeleteError(err.message),
   });
 
-  function printOrder() {
+  function printWorks() {
     if (!order) return;
-    window.open(`/api/garage/orders/${orderId}/print`, '_blank', 'width=900,height=1000');
+    window.open(`/api/garage/orders/${orderId}/print?doc=works`, '_blank', 'width=900,height=1000');
+  }
+
+  function printParts() {
+    if (!order) return;
+    window.open(`/api/garage/orders/${orderId}/print?doc=parts`, '_blank', 'width=900,height=1000');
   }
 
   return (
@@ -855,21 +866,48 @@ function OrderDetailModal({
               </span>
             )}
             {order && (
-              <button
-                onClick={printOrder}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"
-                title="Распечатать заказ-наряд"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                  />
-                </svg>
-                Печать
-              </button>
+              <>
+                <button
+                  onClick={printWorks}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"
+                  title="Заказ-наряд на работы (клиентский документ)"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                    />
+                  </svg>
+                  Наряд
+                </button>
+                <button
+                  onClick={printParts}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 flex items-center gap-1.5"
+                  title="Перечень запчастей (внутренний документ)"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                    />
+                  </svg>
+                  Запчасти
+                </button>
+              </>
             )}
             <button
               onClick={onClose}
@@ -1405,9 +1443,11 @@ function OrderDetailModal({
                         key={p.id}
                         className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2"
                       >
-                        <span className="text-sm text-slate-800">{p.part.name}</span>
+                        <span className="text-sm text-slate-800">
+                          {p.part?.name ?? p.custom_part_name ?? '—'}
+                        </span>
                         <span className="text-sm font-semibold text-slate-700">
-                          {p.quantity} {p.part.unit}
+                          {p.quantity} {p.part?.unit ?? p.unit ?? 'шт'}
                         </span>
                       </div>
                     ))}
