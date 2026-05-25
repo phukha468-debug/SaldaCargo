@@ -385,6 +385,9 @@ export default function ReceivablesPage() {
   const [agingFilter, setAgingFilter] = useState<AgingFilter>('all');
   const [closeAllModal, setCloseAllModal] = useState<CloseAllModal | null>(null);
   const [closingAllId, setClosingAllId] = useState<string | null>(null);
+  const [linkingOrderId, setLinkingOrderId] = useState<string | null>(null);
+  const [linkCpSearch, setLinkCpSearch] = useState('');
+  const [linkingPending, setLinkingPending] = useState(false);
 
   useEffect(() => {
     if (!expandedId) return;
@@ -402,6 +405,13 @@ export default function ReceivablesPage() {
     queryKey: ['receivables'],
     queryFn: () => fetch('/api/receivables').then((r) => r.json()),
     staleTime: 30000,
+  });
+
+  const { data: counterparties = [] } = useQuery<Counterparty[]>({
+    queryKey: ['counterparties-active'],
+    queryFn: () => fetch('/api/counterparties?active=1').then((r) => r.json()),
+    enabled: linkingOrderId !== null,
+    staleTime: 60000,
   });
 
   const allDebtors = data?.debtors ?? [];
@@ -474,6 +484,34 @@ export default function ReceivablesPage() {
     setShowAddForm(false);
     queryClient.invalidateQueries({ queryKey: ['receivables'] });
     queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+  }
+
+  async function handleLinkToCounterparty(debtor: Debtor, cpId: string) {
+    setLinkingPending(true);
+    try {
+      await Promise.all(
+        debtor.orders.map((o) =>
+          fetch(`/api/receivables/${o.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ counterparty_id: cpId }),
+          }).then(async (r) => {
+            if (!r.ok) {
+              const json = await r.json();
+              throw new Error(json.error ?? `Статус ${r.status}`);
+            }
+          }),
+        ),
+      );
+      setLinkingOrderId(null);
+      setLinkCpSearch('');
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      await queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setLinkingPending(false);
+    }
   }
 
   function handleFollowUpSaved() {
@@ -781,6 +819,81 @@ export default function ReceivablesPage() {
                     {/* Expanded content */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 bg-slate-50/50">
+                        {/* Link to counterparty — for individual debtors */}
+                        {debtor.is_individual && (
+                          <div className="px-6 py-3 border-b border-slate-100">
+                            {linkingOrderId === debtor.counterparty_id ? (
+                              <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                  Выберите контрагента
+                                </p>
+                                <input
+                                  type="text"
+                                  value={linkCpSearch}
+                                  onChange={(e) => setLinkCpSearch(e.target.value)}
+                                  placeholder="Поиск по названию..."
+                                  autoFocus
+                                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                />
+                                {(Array.isArray(counterparties) ? counterparties : []).filter(
+                                  (cp) =>
+                                    !linkCpSearch ||
+                                    cp.name.toLowerCase().includes(linkCpSearch.toLowerCase()),
+                                ).length > 0 && (
+                                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white shadow-sm">
+                                    {(Array.isArray(counterparties) ? counterparties : [])
+                                      .filter(
+                                        (cp) =>
+                                          !linkCpSearch ||
+                                          cp.name
+                                            .toLowerCase()
+                                            .includes(linkCpSearch.toLowerCase()),
+                                      )
+                                      .map((cp) => (
+                                        <button
+                                          key={cp.id}
+                                          type="button"
+                                          onClick={() => handleLinkToCounterparty(debtor, cp.id)}
+                                          disabled={linkingPending}
+                                          className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors disabled:opacity-50"
+                                        >
+                                          {cp.name}
+                                        </button>
+                                      ))}
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setLinkingOrderId(null);
+                                    setLinkCpSearch('');
+                                  }}
+                                  className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <p className="text-[10px] text-slate-400">
+                                  Нет привязки к контрагенту
+                                </p>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLinkingOrderId(debtor.counterparty_id);
+                                  }}
+                                  className="px-3 py-1.5 text-[10px] font-bold text-violet-600 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors uppercase tracking-wide"
+                                >
+                                  <span className="material-symbols-outlined text-xs align-middle mr-1">
+                                    link
+                                  </span>
+                                  Привязать к контрагенту
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Follow-up panel — only for real counterparties */}
                         {isReal && (
                           <div className="px-6 py-3 border-b border-slate-100">
@@ -903,8 +1016,11 @@ export default function ReceivablesPage() {
                                   ) : (
                                     `№${order.trip_number}`
                                   )}
-                                  {order.description && (
-                                    <span className="block text-[10px] text-slate-400 font-normal">
+                                  {order.description && !debtor.is_individual && (
+                                    <span className="block text-xs text-slate-600 font-normal mt-0.5">
+                                      <span className="material-symbols-outlined text-[11px] align-middle mr-0.5 text-slate-400">
+                                        chat_bubble
+                                      </span>
                                       {order.description}
                                     </span>
                                   )}

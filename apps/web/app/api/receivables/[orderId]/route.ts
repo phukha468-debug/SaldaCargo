@@ -14,6 +14,21 @@ function walletForPaymentMethod(pm: string): string {
   return CASH_ID;
 }
 
+/** PUT /api/receivables/[orderId] — привязать trip_order к контрагенту */
+export async function PUT(req: Request, { params }: { params: Promise<{ orderId: string }> }) {
+  const { orderId } = await params;
+  const { counterparty_id } = await req.json();
+  if (!counterparty_id) {
+    return NextResponse.json({ error: 'counterparty_id обязателен' }, { status: 400 });
+  }
+  const supabase = createAdminClient();
+  const { error } = await (supabase.from('trip_orders') as any)
+    .update({ counterparty_id })
+    .eq('id', orderId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 /** PATCH /api/receivables/[orderId] — отметить заказ как оплаченный + создать доходную транзакцию */
 export async function PATCH(_req: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
