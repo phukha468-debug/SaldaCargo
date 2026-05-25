@@ -793,6 +793,20 @@ export default function ReceivablesPage() {
                         >
                           <Money amount={debtor.total} />
                         </span>
+                        {debtor.is_individual && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedId(debtor.counterparty_id);
+                              setLinkingOrderId(debtor.counterparty_id);
+                            }}
+                            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
+                            title="Привязать к контрагенту"
+                          >
+                            <span className="material-symbols-outlined text-xs">link</span>
+                            Привязать
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
