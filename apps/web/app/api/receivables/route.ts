@@ -34,20 +34,26 @@ export async function GET() {
     const grouped = new Map<string, any>();
 
     for (const order of orders ?? []) {
-      const hasDescription = !!order.description?.trim();
-      const groupKey = hasDescription
-        ? `__individual__${order.id}`
-        : (order.counterparty?.id ?? '__unknown__');
-      const displayName = hasDescription
-        ? order.description.trim()
-        : (order.counterparty?.name ?? 'Без контрагента');
+      // counterparty takes priority over description — once linked, must group under counterparty
+      const hasCounterparty = !!order.counterparty?.id;
+      const hasDescription = !hasCounterparty && !!order.description?.trim();
+      const groupKey = hasCounterparty
+        ? order.counterparty!.id
+        : hasDescription
+          ? `__individual__${order.id}`
+          : '__unknown__';
+      const displayName = hasCounterparty
+        ? (order.counterparty!.name ?? 'Без контрагента')
+        : hasDescription
+          ? order.description!.trim()
+          : 'Без контрагента';
 
       if (!grouped.has(groupKey)) {
         grouped.set(groupKey, {
           counterparty_id: groupKey,
           counterparty_name: displayName,
-          counterparty_phone: hasDescription ? null : (order.counterparty?.phone ?? null),
-          counterparty_email: hasDescription ? null : (order.counterparty?.email ?? null),
+          counterparty_phone: hasCounterparty ? (order.counterparty?.phone ?? null) : null,
+          counterparty_email: hasCounterparty ? (order.counterparty?.email ?? null) : null,
           counterparty_subname: hasDescription ? (order.counterparty?.name ?? null) : null,
           is_individual: hasDescription,
           total: 0,
