@@ -1761,29 +1761,37 @@ function ReceivablesPanel() {
     queryClient.invalidateQueries({ queryKey: ['receivables'] });
   }
 
-  async function handleLinkToCounterparty(debtor: Debtor, cpId: string) {
+  async function handleLinkToCounterparty(debtor: Debtor, cpId: string, cpName: string) {
+    const tripOrders = debtor.orders.filter((o) => o.type === 'trip_order');
+    if (tripOrders.length === 0) {
+      alert('Нет заказов для привязки (только ручные записи)');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Привязать ${tripOrders.length} зап. (${debtor.counterparty_name}) → ${cpName}?\n\nЭто действие изменит контрагента у всех заказов этого должника.`,
+    );
+    if (!confirmed) return;
     setLinkingPending(true);
     try {
-      await Promise.all(
-        debtor.orders
-          .filter((o) => o.type === 'trip_order')
-          .map((o) =>
-            fetch(`/api/receivables/${o.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ counterparty_id: cpId }),
-            }).then(async (r) => {
-              if (!r.ok) {
-                const json = await r.json();
-                throw new Error(json.error ?? `Статус ${r.status}`);
-              }
-            }),
-          ),
+      const results = await Promise.all(
+        tripOrders.map((o) =>
+          fetch(`/api/receivables/${o.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ counterparty_id: cpId }),
+          }).then(async (r) => {
+            const json = await r.json();
+            if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
+            return json;
+          }),
+        ),
       );
-      setLinkingDebtorId(null);
-      setLinkCpSearch('');
-      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
-      await queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+      if (results.every((r) => r.ok)) {
+        setLinkingDebtorId(null);
+        setLinkCpSearch('');
+        await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+        await queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+      }
     } catch (e: unknown) {
       alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -2132,31 +2140,6 @@ function ReceivablesPanel() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExpandedId(debtor.counterparty_id);
-                        setLinkingDebtorId(debtor.counterparty_id);
-                        setLinkCpSearch('');
-                      }}
-                      style={{
-                        padding: '4px 10px',
-                        background: '#7c3aed',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 6,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 3,
-                      }}
-                      title="Привязать к контрагенту"
-                    >
-                      🔗 {isReal ? 'Изменить' : 'Привязать'}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
                         setCloseAllWalletId('10000000-0000-0000-0000-000000000001');
                         handleCloseAll(debtor);
                       }}
@@ -2192,6 +2175,36 @@ function ReceivablesPanel() {
                   {isExpanded && (
                     <div style={{ background: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>
                       {/* Link to counterparty */}
+                      {linkingDebtorId !== debtor.counterparty_id && (
+                        <div
+                          style={{
+                            padding: '6px 14px',
+                            borderBottom: '1px solid #f1f5f9',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLinkingDebtorId(debtor.counterparty_id);
+                              setLinkCpSearch('');
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              background: 'none',
+                              color: '#7c3aed',
+                              border: '1px solid #c4b5fd',
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            🔗 {isReal ? 'Изменить контрагента' : 'Привязать к контрагенту'}
+                          </button>
+                        </div>
+                      )}
                       {linkingDebtorId === debtor.counterparty_id && (
                         <div
                           style={{
@@ -2256,7 +2269,7 @@ function ReceivablesPanel() {
                                     key={cp.id}
                                     type="button"
                                     disabled={linkingPending}
-                                    onClick={() => handleLinkToCounterparty(debtor, cp.id)}
+                                    onClick={() => handleLinkToCounterparty(debtor, cp.id, cp.name)}
                                     style={{
                                       display: 'block',
                                       width: '100%',
