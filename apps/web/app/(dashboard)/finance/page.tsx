@@ -1609,11 +1609,21 @@ function ReceivablesPanel() {
   const [partialSaving, setPartialSaving] = useState(false);
   const [closingAllId, setClosingAllId] = useState<string | null>(null);
   const [closeAllWalletId, setCloseAllWalletId] = useState('10000000-0000-0000-0000-000000000001');
+  const [linkingDebtorId, setLinkingDebtorId] = useState<string | null>(null);
+  const [linkCpSearch, setLinkCpSearch] = useState('');
+  const [linkingPending, setLinkingPending] = useState(false);
 
   const { data, isLoading } = useQuery<ReceivablesData>({
     queryKey: ['receivables'],
     queryFn: () => fetch('/api/receivables').then((r) => r.json()),
     staleTime: 60 * 1000,
+  });
+
+  const { data: counterpartiesList = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['counterparties-active'],
+    queryFn: () => fetch('/api/counterparties?active=1').then((r) => r.json()),
+    enabled: linkingDebtorId !== null,
+    staleTime: 60000,
   });
 
   useEffect(() => {
@@ -1749,6 +1759,36 @@ function ReceivablesPanel() {
   function handleFollowUpSaved() {
     setEditingFollowUpId(null);
     queryClient.invalidateQueries({ queryKey: ['receivables'] });
+  }
+
+  async function handleLinkToCounterparty(debtor: Debtor, cpId: string) {
+    setLinkingPending(true);
+    try {
+      await Promise.all(
+        debtor.orders
+          .filter((o) => o.type === 'trip_order')
+          .map((o) =>
+            fetch(`/api/receivables/${o.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ counterparty_id: cpId }),
+            }).then(async (r) => {
+              if (!r.ok) {
+                const json = await r.json();
+                throw new Error(json.error ?? `Статус ${r.status}`);
+              }
+            }),
+          ),
+      );
+      setLinkingDebtorId(null);
+      setLinkCpSearch('');
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      await queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setLinkingPending(false);
+    }
   }
 
   const agingChips = [
@@ -2092,6 +2132,31 @@ function ReceivablesPanel() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setExpandedId(debtor.counterparty_id);
+                        setLinkingDebtorId(debtor.counterparty_id);
+                        setLinkCpSearch('');
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        background: '#7c3aed',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 6,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                      title="Привязать к контрагенту"
+                    >
+                      🔗 {isReal ? 'Изменить' : 'Привязать'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setCloseAllWalletId('10000000-0000-0000-0000-000000000001');
                         handleCloseAll(debtor);
                       }}
@@ -2126,6 +2191,113 @@ function ReceivablesPanel() {
                   {/* Expanded */}
                   {isExpanded && (
                     <div style={{ background: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>
+                      {/* Link to counterparty */}
+                      {linkingDebtorId === debtor.counterparty_id && (
+                        <div
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid #ede9fe',
+                            background: '#f5f3ff',
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              color: '#7c3aed',
+                              textTransform: 'uppercase',
+                              letterSpacing: 1,
+                              marginBottom: 6,
+                            }}
+                          >
+                            {isReal
+                              ? `Текущий: ${debtor.counterparty_name} — выберите другого`
+                              : 'Привязать к контрагенту'}
+                          </p>
+                          <input
+                            type="text"
+                            value={linkCpSearch}
+                            onChange={(e) => setLinkCpSearch(e.target.value)}
+                            placeholder="Поиск по названию..."
+                            autoFocus
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              border: '1px solid #c4b5fd',
+                              borderRadius: 6,
+                              fontSize: 12,
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          {(Array.isArray(counterpartiesList) ? counterpartiesList : []).filter(
+                            (cp) =>
+                              !linkCpSearch ||
+                              cp.name.toLowerCase().includes(linkCpSearch.toLowerCase()),
+                          ).length > 0 && (
+                            <div
+                              style={{
+                                maxHeight: 160,
+                                overflowY: 'auto',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: 6,
+                                background: '#fff',
+                                marginTop: 4,
+                              }}
+                            >
+                              {(Array.isArray(counterpartiesList) ? counterpartiesList : [])
+                                .filter(
+                                  (cp) =>
+                                    !linkCpSearch ||
+                                    cp.name.toLowerCase().includes(linkCpSearch.toLowerCase()),
+                                )
+                                .map((cp) => (
+                                  <button
+                                    key={cp.id}
+                                    type="button"
+                                    disabled={linkingPending}
+                                    onClick={() => handleLinkToCounterparty(debtor, cp.id)}
+                                    style={{
+                                      display: 'block',
+                                      width: '100%',
+                                      textAlign: 'left',
+                                      padding: '7px 10px',
+                                      fontSize: 12,
+                                      color: '#1e293b',
+                                      background: 'none',
+                                      border: 'none',
+                                      borderBottom: '1px solid #f1f5f9',
+                                      cursor: 'pointer',
+                                    }}
+                                    onMouseOver={(e) =>
+                                      (e.currentTarget.style.background = '#f5f3ff')
+                                    }
+                                    onMouseOut={(e) => (e.currentTarget.style.background = 'none')}
+                                  >
+                                    {linkingPending ? '...' : cp.name}
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              setLinkingDebtorId(null);
+                              setLinkCpSearch('');
+                            }}
+                            style={{
+                              marginTop: 6,
+                              fontSize: 10,
+                              color: '#94a3b8',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      )}
+
                       {/* Follow-up */}
                       {isReal && !editingFollowUpId && (
                         <div
