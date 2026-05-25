@@ -38,6 +38,7 @@ type PayrollUser = {
   payout: string; // сколько реально выплатить деньгами
   all_time_paid: string;
   history: Array<{
+    id: string;
     amount: string;
     direction: string;
     description: string;
@@ -540,6 +541,230 @@ function SettleModal({
   );
 }
 
+// ─── PayrollHistoryModal ──────────────────────────────────────────────────────
+
+const ADVANCE_CAT = 'a0000000-0000-0000-0000-000000000001';
+const PAYROLL_CATS = [
+  'd79213ee-3bc6-4433-b58a-ca7ea1040d00',
+  '18792fa8-fda8-472d-8e04-e19d2c6c053c',
+  '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+];
+
+function txLabel(tx: PayrollUser['history'][number]): string {
+  if (tx.category_id === ADVANCE_CAT) {
+    return tx.direction === 'expense' ? 'Аванс выдан' : 'Аванс зачтён';
+  }
+  return tx.settlement_status === 'pending' ? 'ЗП начислена' : 'ЗП выплачена';
+}
+
+function PayrollHistoryModal({
+  user,
+  onClose,
+  onChanged,
+}: {
+  user: PayrollUser;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave(txId: string) {
+    const val = parseFloat(editAmount);
+    if (isNaN(val) || val < 0) {
+      setError('Некорректная сумма');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const r = await fetch(`/api/staff/transactions/${txId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: val.toFixed(2) }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      setEditingId(null);
+      onChanged();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(txId: string, label: string) {
+    if (!confirm(`Удалить запись «${label}»? Это действие необратимо.`)) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`/api/staff/transactions/${txId}`, { method: 'DELETE' });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      onChanged();
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const history = user.history;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="font-bold text-slate-900">История транзакций</h2>
+            <p className="text-sm text-slate-500">{user.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1">
+          {history.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-10">История пуста</p>
+          ) : (
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                    Дата
+                  </th>
+                  <th className="px-2 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                    Описание
+                  </th>
+                  <th className="px-2 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest text-right">
+                    Сумма
+                  </th>
+                  <th className="px-2 py-2 w-16" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {history.map((tx) => {
+                  const label = txLabel(tx);
+                  const isAdvance = tx.category_id === ADVANCE_CAT;
+                  const isPayroll = PAYROLL_CATS.includes(tx.category_id);
+                  const canEdit = isAdvance || isPayroll;
+                  const colorCls =
+                    isAdvance && tx.direction === 'expense'
+                      ? 'text-violet-600'
+                      : isAdvance
+                        ? 'text-violet-400'
+                        : tx.settlement_status === 'pending'
+                          ? 'text-amber-600'
+                          : 'text-emerald-600';
+
+                  return (
+                    <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-4 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
+                        {new Date(tx.created_at).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: '2-digit',
+                        })}
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <span className={cn('text-[10px] font-bold', colorCls)}>{label}</span>
+                        {tx.description && (
+                          <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">
+                            {tx.description}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-2 py-2.5 text-right">
+                        {editingId === tx.id ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                            autoFocus
+                            className="w-24 border border-blue-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                        ) : (
+                          <span className={cn('text-xs font-bold', colorCls)}>
+                            {tx.direction === 'income' ? '+' : '−'}&nbsp;
+                            <Money amount={tx.amount} />
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2.5">
+                        {canEdit &&
+                          (editingId === tx.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleSave(tx.id)}
+                                disabled={saving}
+                                className="text-[9px] font-bold px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                              >
+                                {saving ? '...' : '✓'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setError('');
+                                }}
+                                className="text-[9px] font-bold px-2 py-1 border border-slate-200 text-slate-500 rounded hover:bg-slate-100 transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setEditingId(tx.id);
+                                  setEditAmount(tx.amount);
+                                  setError('');
+                                }}
+                                className="text-[9px] text-slate-400 hover:text-blue-600 transition-colors p-1"
+                                title="Изменить сумму"
+                              >
+                                <span className="material-symbols-outlined text-sm">edit</span>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(tx.id, label)}
+                                disabled={saving}
+                                className="text-[9px] text-slate-400 hover:text-rose-600 transition-colors p-1 disabled:opacity-50"
+                                title="Удалить"
+                              >
+                                <span className="material-symbols-outlined text-sm">delete</span>
+                              </button>
+                            </div>
+                          ))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {error && <p className="px-4 py-2 text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full text-sm text-slate-500 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── PayrollRow ───────────────────────────────────────────────────────────────
 
 function PayrollRow({
@@ -549,6 +774,7 @@ function PayrollRow({
   onDeactivate,
   onAdvance,
   onManualPay,
+  onHistory,
 }: {
   user: PayrollUser;
   onSettle: () => void;
@@ -556,6 +782,7 @@ function PayrollRow({
   onDeactivate: () => void;
   onAdvance: () => void;
   onManualPay: () => void;
+  onHistory: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
@@ -757,6 +984,15 @@ function PayrollRow({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onHistory();
+              }}
+              className="text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg py-1 px-3 transition-colors"
+            >
+              История
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onEdit();
               }}
               className="text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg py-1 px-3 transition-colors"
@@ -792,6 +1028,7 @@ function PayrollSection({
   onDeactivate,
   onAdvance,
   onManualPay,
+  onHistory,
 }: {
   users: PayrollUser[];
   headerBg: string;
@@ -801,6 +1038,7 @@ function PayrollSection({
   onDeactivate: (u: PayrollUser) => void;
   onAdvance: (u: PayrollUser) => void;
   onManualPay: (u: PayrollUser) => void;
+  onHistory: (u: PayrollUser) => void;
 }) {
   if (users.length === 0)
     return (
@@ -865,6 +1103,7 @@ function PayrollSection({
           onDeactivate={() => onDeactivate(u)}
           onAdvance={() => onAdvance(u)}
           onManualPay={() => onManualPay(u)}
+          onHistory={() => onHistory(u)}
         />
       ))}
     </div>
@@ -1219,6 +1458,7 @@ export default function StaffPage() {
   const [advanceUser, setAdvanceUser] = useState<PayrollUser | null>(null);
   const [manualPayUser, setManualPayUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
+  const [historyUser, setHistoryUser] = useState<PayrollUser | null>(null);
 
   const shiftMonth = (delta: number) => {
     const d = new Date(year, month - 1 + delta, 1);
@@ -1403,6 +1643,19 @@ export default function StaffPage() {
           onDeactivate={handleDeactivate}
           onAdvance={setAdvanceUser}
           onManualPay={setManualPayUser}
+          onHistory={setHistoryUser}
+        />
+      )}
+
+      {/* Модал истории транзакций */}
+      {historyUser && (
+        <PayrollHistoryModal
+          user={historyUser}
+          onClose={() => setHistoryUser(null)}
+          onChanged={() => {
+            setHistoryUser(null);
+            qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+          }}
         />
       )}
 
