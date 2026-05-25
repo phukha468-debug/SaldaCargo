@@ -793,20 +793,18 @@ export default function ReceivablesPage() {
                         >
                           <Money amount={debtor.total} />
                         </span>
-                        {debtor.is_individual && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedId(debtor.counterparty_id);
-                              setLinkingOrderId(debtor.counterparty_id);
-                            }}
-                            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
-                            title="Привязать к контрагенту"
-                          >
-                            <span className="material-symbols-outlined text-xs">link</span>
-                            Привязать
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedId(debtor.counterparty_id);
+                            setLinkingOrderId(debtor.counterparty_id);
+                          }}
+                          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
+                          title="Привязать к контрагенту"
+                        >
+                          <span className="material-symbols-outlined text-xs">link</span>
+                          {isReal ? 'Изменить' : 'Привязать'}
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -833,8 +831,8 @@ export default function ReceivablesPage() {
                     {/* Expanded content */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 bg-slate-50/50">
-                        {/* Link to counterparty — for individual debtors */}
-                        {debtor.is_individual && (
+                        {/* Link to counterparty */}
+                        {
                           <div className="px-6 py-3 border-b border-slate-100">
                             {linkingOrderId === debtor.counterparty_id ? (
                               <div className="space-y-2">
@@ -889,7 +887,9 @@ export default function ReceivablesPage() {
                             ) : (
                               <div className="flex items-center justify-between">
                                 <p className="text-[10px] text-slate-400">
-                                  Нет привязки к контрагенту
+                                  {isReal
+                                    ? `Текущий контрагент: ${debtor.counterparty_name}`
+                                    : 'Нет привязки к контрагенту'}
                                 </p>
                                 <button
                                   onClick={(e) => {
@@ -901,12 +901,12 @@ export default function ReceivablesPage() {
                                   <span className="material-symbols-outlined text-xs align-middle mr-1">
                                     link
                                   </span>
-                                  Привязать к контрагенту
+                                  {isReal ? 'Изменить контрагента' : 'Привязать к контрагенту'}
                                 </button>
                               </div>
                             )}
                           </div>
-                        )}
+                        }
 
                         {/* Follow-up panel — only for real counterparties */}
                         {isReal && (
