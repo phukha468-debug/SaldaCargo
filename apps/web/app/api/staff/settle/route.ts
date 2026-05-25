@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       user_id: string;
       from_wallet_id?: string;
+      partial_offset?: string;
     };
 
     if (!body.user_id) {
@@ -157,7 +158,11 @@ export async function POST(request: Request) {
     );
 
     const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
-    const offset = Math.min(salaryTotal, advanceBalance);
+    const maxOffset = Math.min(salaryTotal, advanceBalance);
+    const offset =
+      body.partial_offset !== undefined
+        ? Math.min(Math.max(0, parseFloat(body.partial_offset)), maxOffset)
+        : maxOffset;
     const payout = salaryTotal - offset;
 
     if (payout > 0 && !body.from_wallet_id) {

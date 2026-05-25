@@ -362,13 +362,17 @@ function SettleModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const salaryTotal = parseFloat(user.debt);
+  const advanceBalance = parseFloat(user.advance_balance ?? '0');
+  const maxOffset = Math.min(salaryTotal, advanceBalance);
+
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
+  const [offsetInput, setOffsetInput] = useState(maxOffset.toFixed(2));
   const [error, setError] = useState('');
 
-  const debt = parseFloat(user.debt);
-  const advanceBalance = parseFloat(user.advance_balance ?? '0');
-  const offset = parseFloat(user.advance_offset ?? '0');
-  const payout = parseFloat(user.payout ?? '0');
+  const offsetVal = Math.min(Math.max(0, parseFloat(offsetInput) || 0), maxOffset);
+  const payout = Math.max(0, salaryTotal - offsetVal);
+  const remainingDebt = Math.max(0, advanceBalance - offsetVal);
   const needsWallet = payout > 0;
 
   const mutation = useMutation({
@@ -379,6 +383,7 @@ function SettleModal({
         body: JSON.stringify({
           user_id: user.id,
           from_wallet_id: needsWallet ? walletId : undefined,
+          partial_offset: offsetVal.toFixed(2),
         }),
       }).then(async (r) => {
         const data = await r.json();
@@ -413,28 +418,76 @@ function SettleModal({
                 <Money amount={user.debt} />
               </span>
             </div>
-            {offset > 0 && (
+            {advanceBalance > 0 && (
               <div className="flex justify-between items-center px-4 py-3">
-                <span className="text-sm text-violet-700">Зачёт аванса</span>
-                <span className="text-sm font-bold text-violet-700">
-                  −&nbsp;
-                  <Money amount={user.advance_offset} />
+                <span className="text-sm text-slate-600">Долг сотрудника (аванс)</span>
+                <span className="text-sm font-bold text-rose-600">
+                  <Money amount={user.advance_balance} />
                 </span>
+              </div>
+            )}
+            {advanceBalance > 0 && (
+              <div className="px-4 py-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-violet-700">Зачесть в счёт долга</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setOffsetInput('0')}
+                      className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      0%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOffsetInput((maxOffset * 0.3).toFixed(2))}
+                      className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      30%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOffsetInput((maxOffset * 0.5).toFixed(2))}
+                      className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      50%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOffsetInput(maxOffset.toFixed(2))}
+                      className="text-[10px] px-2 py-0.5 rounded border border-violet-200 text-violet-600 hover:bg-violet-50 transition-colors font-bold"
+                    >
+                      Весь
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max={maxOffset}
+                    step="100"
+                    value={offsetInput}
+                    onChange={(e) => setOffsetInput(e.target.value)}
+                    className="w-full border border-violet-200 rounded-lg px-3 py-2 text-sm font-bold text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-violet-50"
+                  />
+                  <span className="text-sm text-slate-500 shrink-0">₽</span>
+                </div>
               </div>
             )}
             <div className="flex justify-between items-center px-4 py-3 bg-emerald-50">
               <span className="text-sm font-bold text-emerald-800">К выплате деньгами</span>
               <span className="text-lg font-black text-emerald-700">
-                {payout > 0 ? <Money amount={user.payout} /> : '0 ₽'}
+                {payout > 0 ? <Money amount={payout.toFixed(2)} /> : '0 ₽'}
               </span>
             </div>
           </div>
 
-          {advanceBalance > 0 && offset < advanceBalance && (
+          {advanceBalance > 0 && (
             <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5 flex justify-between">
-              <span className="text-xs text-violet-600">Остаток аванса после зачёта</span>
+              <span className="text-xs text-violet-600">Остаток долга после зачёта</span>
               <span className="text-xs font-bold text-violet-700">
-                <Money amount={String(Math.max(0, advanceBalance - offset).toFixed(2))} />
+                <Money amount={remainingDebt.toFixed(2)} />
               </span>
             </div>
           )}
@@ -462,7 +515,7 @@ function SettleModal({
             </div>
           )}
 
-          {debt <= 0 && (
+          {salaryTotal <= 0 && (
             <p className="text-sm text-slate-400 text-center py-2">Нет начисленной ЗП к выплате</p>
           )}
           {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
@@ -470,7 +523,7 @@ function SettleModal({
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || debt <= 0}
+            disabled={mutation.isPending || salaryTotal <= 0}
             className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
             {mutation.isPending ? 'Проводим...' : '✓ Подтвердить'}
