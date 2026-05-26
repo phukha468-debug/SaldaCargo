@@ -2,7 +2,7 @@
 
 > **Правило:** При изменении логики в любом из приложений — найди строку в этой таблице и обнови обе стороны.  
 > Этот файл обновляется при каждом изменении API.  
-> Последнее обновление: 20.05.2026
+> Последнее обновление: 26.05.2026
 
 ---
 
@@ -36,16 +36,16 @@
 
 ## 2. НАРЯДЫ (SERVICE ORDERS)
 
-| Фича                     | MiniApp файл                                   | WebApp файл                                       | Статус | Примечание                                                               |
-| ------------------------ | ---------------------------------------------- | ------------------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| Список на ревью          | `api/admin/service-orders?filter=review`       | `api/garage/orders?filter=review`                 | ✅     | Фильтр: `lifecycle=draft`                                                |
-| Список активных          | `api/admin/service-orders?filter=active`       | `api/garage/orders?filter=active`                 | ✅     | Фильтр: `lifecycle=approved + status in (created,in_progress)`           |
-| История нарядов          | `api/admin/service-orders?filter=history`      | `api/garage/orders?filter=history`                | ✅     | Фильтр: `or(cancelled/returned, approved+completed)`                     |
-| Одобрить наряд           | `api/admin/service-orders/[id]` action=approve | `api/garage/orders/[id]` PATCH lifecycle=approved | ✅     |                                                                          |
-| Вернуть наряд            | `api/admin/service-orders/[id]` action=return  | `api/garage/orders/[id]` PATCH lifecycle=returned | ✅     |                                                                          |
-| Отменить наряд           | `api/admin/service-orders/[id]` action=cancel  | `api/garage/orders/[id]` DELETE                   | ⚠️     | MiniApp: soft-delete. WebApp: hard DELETE (intentional — per kontext.md) |
-| Создать наряд (водитель) | `api/driver/service-orders` POST               | —                                                 | —      | lifecycle=draft, ждёт апрува                                             |
-| Создать наряд (админ)    | —                                              | `api/garage/orders` POST                          | ⚠️     | lifecycle=approved (админ создаёт сразу апрувнутым)                      |
+| Фича                     | MiniApp файл                                   | WebApp файл                                       | Статус | Примечание                                                                         |
+| ------------------------ | ---------------------------------------------- | ------------------------------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| Список на ревью          | `api/admin/service-orders?filter=review`       | `api/garage/orders?filter=review`                 | ✅     | Фильтр: `lifecycle=draft`                                                          |
+| Список активных          | `api/admin/service-orders?filter=active`       | `api/garage/orders?filter=active`                 | ✅     | Фильтр: `lifecycle=approved + status in (created,in_progress)`                     |
+| История нарядов          | `api/admin/service-orders?filter=history`      | `api/garage/orders?filter=history`                | ✅     | Фильтр: `or(cancelled/returned, approved+completed)`                               |
+| Одобрить наряд           | `api/admin/service-orders/[id]` action=approve | `api/garage/orders/[id]` PATCH lifecycle=approved | ✅     | Принимает `mechanic_id`/`second_mechanic_id` для смены исполнителя при утверждении |
+| Вернуть наряд            | `api/admin/service-orders/[id]` action=return  | `api/garage/orders/[id]` PATCH lifecycle=returned | ✅     |                                                                                    |
+| Отменить наряд           | `api/admin/service-orders/[id]` action=cancel  | `api/garage/orders/[id]` DELETE                   | ⚠️     | MiniApp: soft-delete. WebApp: hard DELETE (intentional — per kontext.md)           |
+| Создать наряд (водитель) | `api/driver/service-orders` POST               | —                                                 | —      | lifecycle=draft, ждёт апрува                                                       |
+| Создать наряд (админ)    | —                                              | `api/garage/orders` POST                          | ⚠️     | lifecycle=approved (админ создаёт сразу апрувнутым)                                |
 
 ---
 
@@ -103,11 +103,12 @@
 
 ## 6. ПЕРСОНАЛ И ЗП (PAYROLL / STAFF)
 
-| Фича              | MiniApp файл                  | WebApp файл             | Статус | Примечание                                                                     |
-| ----------------- | ----------------------------- | ----------------------- | ------ | ------------------------------------------------------------------------------ |
-| Расчёт ЗП         | `api/admin/payroll` GET       | `api/staff/payroll` GET | ✅     | Web читает pending PAYROLL-транзакции (сессия 16). MiniApp — пока старая схема |
-| Выплатить ЗП      | `api/admin/staff-settle` POST | `api/staff/settle` POST | ⚠️     | Web (сессия 16): pending→completed + зачёт аванса. MiniApp — старая схема      |
-| Подотчёт наличных | —                             | —                       | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса        |
+| Фича                          | MiniApp файл                  | WebApp файл                                  | Статус | Примечание                                                                                      |
+| ----------------------------- | ----------------------------- | -------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| Расчёт ЗП                     | `api/admin/payroll` GET       | `api/staff/payroll` GET                      | ✅     | Web: pending PAYROLL-транзакции + счётчик смен за месяц (`shifts`). MiniApp — пока старая схема |
+| Выплатить ЗП                  | `api/admin/staff-settle` POST | `api/staff/settle` POST                      | ⚠️     | Web: pending→completed + частичный зачёт аванса (`partial_offset`). MiniApp — старая схема      |
+| История транзакций сотрудника | —                             | `api/staff/transactions/[txId]` PATCH/DELETE | —      | Только WebApp. Редактирование суммы и удаление PAYROLL/ADVANCE транзакций                       |
+| Подотчёт наличных             | —                             | —                                            | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса                         |
 
 ---
 
@@ -122,11 +123,11 @@
 
 ## 8. СПРАВОЧНИКИ
 
-| Фича               | MiniApp файл                    | WebApp файл              | Статус | Примечание                                                                        |
-| ------------------ | ------------------------------- | ------------------------ | ------ | --------------------------------------------------------------------------------- |
-| Список сотрудников | `api/users/public` GET          | `api/users` GET          | ⚠️     | Web богаче (фильтры, неактивные)                                                  |
-| Постоянные клиенты | `api/driver/counterparties` GET | `api/counterparties` GET | ⚠️     | MiniApp: только выбор клиента в заказе. WebApp: аналитические карточки (см. ниже) |
-| Машины             | `api/driver/assets` GET         | `api/fleet` GET          | ⚠️     | Web полная аналитика по юнитам                                                    |
+| Фича               | MiniApp файл                    | WebApp файл              | Статус | Примечание                                                                                                |
+| ------------------ | ------------------------------- | ------------------------ | ------ | --------------------------------------------------------------------------------------------------------- |
+| Список сотрудников | `api/users/public` GET          | `api/users` GET          | ⚠️     | Web богаче (фильтры, неактивные). `?role=mechanic` → возвращает mechanic+mechanic_lead+welder+electrician |
+| Постоянные клиенты | `api/driver/counterparties` GET | `api/counterparties` GET | ⚠️     | MiniApp: только выбор клиента в заказе. WebApp: аналитические карточки (см. ниже)                         |
+| Машины             | `api/driver/assets` GET         | `api/fleet` GET          | ⚠️     | Web полная аналитика по юнитам                                                                            |
 
 **WebApp `/counterparties` — аналитика постоянных клиентов (только `type IN ('client','both')`):**
 
