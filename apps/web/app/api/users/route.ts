@@ -13,7 +13,11 @@ export async function GET(request: Request) {
     .order('name');
 
   if (!includeInactive) query = query.eq('is_active', true);
-  if (role) query = query.contains('roles', [role]);
+  if (role === 'mechanic') {
+    query = query.filter('roles', 'ov', '{mechanic,mechanic_lead,welder,electrician}');
+  } else if (role) {
+    query = query.contains('roles', [role]);
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
