@@ -46,7 +46,8 @@ interface PendingOrder {
   created_at: string;
   machine_type: 'own' | 'client';
   asset: Omit<AssetItem, 'id'> | null;
-  mechanic: { name: string } | null;
+  mechanic: { id: string; name: string } | null;
+  second_mechanic: { id: string; name: string } | null;
   service_order_works: { norm_minutes: number; actual_minutes: number | null; status: string }[];
 }
 
@@ -475,10 +476,12 @@ function ApproveRequestModal({
 
 function ApproveOrderModal({
   order,
+  mechanics,
   onClose,
   onSuccess,
 }: {
   order: PendingOrder;
+  mechanics: Mechanic[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -487,6 +490,8 @@ function ApproveOrderModal({
     .reduce((s, w) => s + (w.actual_minutes ?? w.norm_minutes), 0);
   const [adjustedNm, setAdjustedNm] = useState('');
   const [note, setNote] = useState('');
+  const [mechanicId, setMechanicId] = useState(order.mechanic?.id ?? '');
+  const [secondMechanicId, setSecondMechanicId] = useState(order.second_mechanic?.id ?? '');
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -497,6 +502,8 @@ function ApproveOrderModal({
           action: 'approve',
           adjusted_norm_minutes: adjustedNm ? Number(adjustedNm) : undefined,
           admin_note: note.trim() || undefined,
+          mechanic_id: mechanicId || undefined,
+          second_mechanic_id: secondMechanicId || undefined,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
@@ -510,6 +517,11 @@ function ApproveOrderModal({
 
   const nmToUse = adjustedNm ? Number(adjustedNm) : totalNm;
   const rate = order.machine_type === 'client' ? 2000 : 1600;
+  const mechPct = parseFloat(
+    mechanics.find((m) => m.id === mechanicId)?.mechanic_salary_pct ?? '50',
+  );
+  const mechCount = [mechanicId, secondMechanicId].filter(Boolean).length || 1;
+  const estimatedSalary = Math.round(((nmToUse / 60 / mechCount) * rate * mechPct) / 100);
 
   return (
     <BottomSheet
@@ -535,7 +547,6 @@ function ApproveOrderModal({
     >
       <div className="bg-slate-50 rounded-xl p-3 text-sm">
         <p className="font-bold">{order.asset?.short_name ?? '—'}</p>
-        <p className="text-slate-500 text-xs">Механик: {order.mechanic?.name ?? 'Не назначен'}</p>
         <p className="text-slate-500 text-xs mt-1">
           Норм-часы (факт): {(totalNm / 60).toFixed(1)} ч
         </p>
@@ -546,6 +557,44 @@ function ApproveOrderModal({
             {order.machine_type === 'client' ? 'клиент' : 'свой автопарк'})
           </span>
         </p>
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Исполнитель
+        </label>
+        <select
+          value={mechanicId}
+          onChange={(e) => setMechanicId(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold bg-white"
+        >
+          <option value="">— Не назначен —</option>
+          {mechanics.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+          Второй исполнитель
+        </label>
+        <select
+          value={secondMechanicId}
+          onChange={(e) => setSecondMechanicId(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+        >
+          <option value="">— Не нужен —</option>
+          {mechanics
+            .filter((m) => m.id !== mechanicId)
+            .map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+        </select>
       </div>
 
       <div>
@@ -577,11 +626,13 @@ function ApproveOrderModal({
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
         <p className="text-xs text-emerald-600 mb-0.5">Начисление ЗП при утверждении</p>
         <p className="font-bold text-emerald-800 text-lg">
-          {Math.round((nmToUse / 60) * rate * 0.5).toLocaleString('ru-RU')} ₽
+          {estimatedSalary.toLocaleString('ru-RU')} ₽{mechCount === 2 && ' × 2'}
         </p>
         <p className="text-xs text-emerald-500">
-          {(nmToUse / 60).toFixed(1)} нч × {rate.toLocaleString('ru-RU')} ₽ × 50% ·{' '}
-          {order.mechanic?.name ?? '—'}
+          {(nmToUse / 60).toFixed(1)} нч × {rate.toLocaleString('ru-RU')} ₽ × {mechPct}%
+          {mechanicId
+            ? ` · ${mechanics.find((m) => m.id === mechanicId)?.name ?? '—'}`
+            : ' · нет исполнителя'}
         </p>
       </div>
 
@@ -1574,6 +1625,7 @@ export default function AdminGaragePage() {
       {modal?.type === 'approve-order' && (
         <ApproveOrderModal
           order={modal.data}
+          mechanics={mechanics}
           onClose={() => setModal(null)}
           onSuccess={invalidate}
         />

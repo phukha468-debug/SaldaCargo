@@ -21,11 +21,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     admin_note?: string;
     adjusted_norm_minutes?: number;
     work_id?: string;
+    mechanic_id?: string;
+    second_mechanic_id?: string;
   };
   const supabase = createAdminClient();
 
   // ── Утверждение наряда + начисление ЗП ────────────────────────────────
   if (body.action === 'approve') {
+    if (body.mechanic_id !== undefined || body.second_mechanic_id !== undefined) {
+      await (supabase.from('service_orders') as any)
+        .update({
+          assigned_mechanic_id: body.mechanic_id || null,
+          second_mechanic_id: body.second_mechanic_id || null,
+        })
+        .eq('id', id);
+    }
+
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .select(
         `

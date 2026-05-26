@@ -46,7 +46,8 @@ export async function GET() {
         `
         id, order_number, created_at, machine_type,
         asset:assets(short_name, reg_number),
-        mechanic:users!service_orders_assigned_mechanic_id_fkey(name),
+        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
+        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name),
         service_order_works(norm_minutes, actual_minutes, status)
       `,
       )
