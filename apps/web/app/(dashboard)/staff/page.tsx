@@ -30,6 +30,7 @@ type PayrollUser = {
   phone: string | null;
   notes: string | null;
   asset: { short_name: string; reg_number: string } | null;
+  shifts: number; // количество начислений за месяц
   earned: string; // начислено за месяц
   paid: string; // выплачено за месяц
   debt: string; // всего pending к выплате (all-time)
@@ -629,6 +630,16 @@ function PayrollHistoryModal({
           </button>
         </div>
 
+        {/* Предупреждение */}
+        <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-[10px] text-amber-800 leading-relaxed">
+          <span className="font-bold">Правила редактирования:</span> ЗП начислена (ожидает выплаты)
+          — можно смело исправлять или удалять.{' '}
+          <span className="font-bold text-rose-700">
+            ЗП выплачена и Авансы — редактировать только для исправления ошибки ввода:
+          </span>{' '}
+          изменение суммы повлияет на P&L и остаток долга, удаление необратимо.
+        </div>
+
         <div className="overflow-y-auto flex-1">
           {history.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-10">История пуста</p>
@@ -664,7 +675,7 @@ function PayrollHistoryModal({
                           : 'text-emerald-600';
 
                   return (
-                    <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors group">
                       <td className="px-4 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
                         {new Date(tx.created_at).toLocaleDateString('ru-RU', {
                           day: 'numeric',
@@ -856,7 +867,7 @@ function PayrollRow({
 
         {/* Shifts/orders */}
         <div className="w-16 shrink-0 text-center">
-          <p className="text-xs font-black text-slate-700">—</p>
+          <p className="text-xs font-black text-slate-700">{user.shifts > 0 ? user.shifts : '—'}</p>
           <p className="text-[9px] text-slate-400">смен</p>
         </div>
 

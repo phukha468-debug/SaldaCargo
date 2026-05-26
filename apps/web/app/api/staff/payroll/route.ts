@@ -136,7 +136,17 @@ export async function GET(request: Request) {
       return map;
     };
 
+    const countByUser = (rows: any[] | null) => {
+      const map = new Map<string, number>();
+      for (const r of rows ?? []) {
+        const uid = r.related_user_id;
+        if (uid) map.set(uid, (map.get(uid) ?? 0) + 1);
+      }
+      return map;
+    };
+
     const earnedThisMonthMap = sumByUser(earnedThisMonth);
+    const shiftsThisMonthMap = countByUser(earnedThisMonth);
     const paidThisMonthMap = sumByUser(paidThisMonth);
     const pendingMap = sumByUser(pendingAllTime);
     const paidAllTimeMap = sumByUser(paidAllTime);
@@ -176,6 +186,7 @@ export async function GET(request: Request) {
         notes: u.notes,
         asset: u.current_asset_id ? (assetMap[u.current_asset_id] ?? null) : null,
         // Этот месяц
+        shifts: shiftsThisMonthMap.get(u.id) ?? 0, // количество начислений за месяц
         earned: earnedMonth.toFixed(2), // начислено за месяц
         paid: paidMonth.toFixed(2), // выплачено за месяц (completed)
         // All-time долги
