@@ -1008,7 +1008,7 @@ function OrderDetailModal({
                 </div>
               </div>
               <div>
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 1</p>
+                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Исполнитель 1</p>
                 <select
                   value={editMechanic ?? order.mechanic?.id ?? ''}
                   onChange={(e) => setEditMechanic(e.target.value)}
@@ -1035,7 +1035,7 @@ function OrderDetailModal({
               </div>
 
               <div>
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Механик 2</p>
+                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Исполнитель 2</p>
                 <select
                   value={editSecondMechanic ?? order.second_mechanic?.id ?? ''}
                   onChange={(e) => setEditSecondMechanic(e.target.value)}
@@ -1619,7 +1619,11 @@ function OrderDetailModal({
               {!isClosed && allWorksCompleted && (
                 <button
                   onClick={() => {
-                    patchMutation.mutate({ lifecycle_status: 'approved' });
+                    const updates: Record<string, unknown> = { lifecycle_status: 'approved' };
+                    if (editMechanic !== null) updates.assigned_mechanic_id = editMechanic || null;
+                    if (editSecondMechanic !== null)
+                      updates.second_mechanic_id = editSecondMechanic || null;
+                    patchMutation.mutate(updates);
                     onClose();
                   }}
                   disabled={patchMutation.isPending}
@@ -1781,7 +1785,7 @@ function CreateOrderModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Механик
+                Исполнитель
               </label>
               <select
                 value={form.assigned_mechanic_id}
@@ -3278,7 +3282,7 @@ function WorkOrdersSection() {
                   Работы
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Механик(и)
+                  Исполнитель
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
                   Нч план / факт

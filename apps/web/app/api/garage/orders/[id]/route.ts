@@ -101,6 +101,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const supabase = createAdminClient();
 
     if (body.lifecycle_status === 'approved') {
+      if (body.assigned_mechanic_id !== undefined || body.second_mechanic_id !== undefined) {
+        await (supabase as any)
+          .from('service_orders')
+          .update({
+            assigned_mechanic_id: (body.assigned_mechanic_id as string) || null,
+            second_mechanic_id: (body.second_mechanic_id as string) || null,
+          })
+          .eq('id', id);
+      }
+
       const { data: order, error: orderErr } = await (supabase as any)
         .from('service_orders')
         .select(
