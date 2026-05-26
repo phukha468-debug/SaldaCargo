@@ -3279,6 +3279,9 @@ function WorkOrdersSection() {
                   Автомобиль
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
+                  Тип / Дата
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
                   Работы
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
@@ -3312,7 +3315,48 @@ function WorkOrdersSection() {
                       НЗ-{o.order_number}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{o.asset?.short_name ?? '—'}</div>
+                      {o.machine_type === 'own' ? (
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            {o.asset?.short_name ?? '—'}
+                          </div>
+                          <div className="text-xs text-slate-400 font-mono">
+                            {o.asset?.reg_number ?? ''}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            {o.client_vehicle_brand ?? '—'}
+                            {o.client_vehicle_reg && (
+                              <span className="ml-1.5 font-mono text-xs text-slate-500">
+                                {o.client_vehicle_reg}
+                              </span>
+                            )}
+                          </div>
+                          {o.client_name && (
+                            <div className="text-xs text-slate-400">{o.client_name}</div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          'text-[10px] font-semibold px-1.5 py-0.5 rounded',
+                          o.machine_type === 'own'
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'bg-amber-50 text-amber-600',
+                        )}
+                      >
+                        {o.machine_type === 'own' ? 'Свой' : 'Клиент'}
+                      </span>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {new Date(o.created_at).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">
                       {(o.works ?? [])
