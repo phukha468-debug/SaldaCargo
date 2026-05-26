@@ -7,7 +7,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data, error } = await (supabase.from('users') as any)
     .select('id, name, mechanic_salary_pct')
-    .or('roles.cs.{mechanic},roles.cs.{mechanic_lead},roles.cs.{welder},roles.cs.{electrician}')
+    .filter('roles', 'ov', '{mechanic,mechanic_lead,welder,electrician}')
     .eq('is_active', true)
     .order('name');
 
