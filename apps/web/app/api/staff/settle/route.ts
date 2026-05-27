@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       user_id: string;
       from_wallet_id?: string;
       partial_offset?: string;
+      partial_amount?: string; // если задано — платим только эту сумму, остальное остаётся pending
     };
 
     if (!body.user_id) {
@@ -165,20 +166,57 @@ export async function POST(request: Request) {
         : maxOffset;
     const payout = salaryTotal - offset;
 
-    if (payout > 0 && !body.from_wallet_id) {
+    // Проверка кошелька делается после вычисления actualPayout ниже
+    const needsWalletCheck =
+      body.partial_amount === undefined && payout > 0 && !body.from_wallet_id;
+    if (needsWalletCheck) {
       return NextResponse.json(
-        {
-          error: 'Укажите кошелёк для выплаты',
-          salary_total: salaryTotal.toFixed(2),
-          advance_balance: advanceBalance.toFixed(2),
-          offset: offset.toFixed(2),
-          payout: payout.toFixed(2),
-        },
+        { error: 'Укажите кошелёк для выплаты', payout: payout.toFixed(2) },
         { status: 400 },
       );
     }
 
-    const pendingIds = (pendingPayroll as any[]).map((t: any) => t.id);
+    // Если задана partial_amount — платим только её часть (закрываем транзакции от старых к новым)
+    let idsToSettle: string[];
+    let actualPayout: number;
+    let actualOffset: number;
+
+    if (body.partial_amount !== undefined) {
+      const requestedAmount = Math.min(
+        Math.max(0, parseFloat(body.partial_amount) || 0),
+        salaryTotal,
+      );
+
+      // Сортируем по created_at (API уже возвращает в порядке asc, но на всякий случай)
+      const sorted = [...(pendingPayroll as any[])].sort(
+        (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
+      );
+
+      let accumulated = 0;
+      idsToSettle = [];
+      for (const t of sorted) {
+        const amt = parseFloat(t.amount ?? '0');
+        if (accumulated + amt <= requestedAmount + 0.001) {
+          idsToSettle.push(t.id);
+          accumulated += amt;
+        }
+      }
+      // Если ничего не вошло но сумма > 0 — берём первую транзакцию (наименьшую)
+      if (idsToSettle.length === 0 && requestedAmount > 0 && sorted.length > 0) {
+        idsToSettle = [sorted[0]!.id];
+        accumulated = parseFloat(sorted[0]!.amount ?? '0');
+      }
+
+      const settledSalary = accumulated;
+      const usedOffset = Math.min(offset, settledSalary);
+      actualOffset = usedOffset;
+      actualPayout = Math.max(0, settledSalary - usedOffset);
+    } else {
+      idsToSettle = (pendingPayroll as any[]).map((t: any) => t.id);
+      actualOffset = offset;
+      actualPayout = payout;
+    }
+
     const employeeName = userRow?.name ?? 'Сотрудник';
     const dateLabel = new Date().toLocaleDateString('ru-RU', {
       day: 'numeric',
@@ -186,23 +224,27 @@ export async function POST(request: Request) {
       year: 'numeric',
     });
 
+    if (actualPayout > 0 && !body.from_wallet_id) {
+      return NextResponse.json({ error: 'Укажите кошелёк для выплаты' }, { status: 400 });
+    }
+
     const ops: Promise<any>[] = [
-      // Все pending PAYROLL → completed
+      // Выбранные pending PAYROLL → completed
       (supabase.from('transactions') as any)
         .update({
           settlement_status: 'completed',
-          from_wallet_id: payout > 0 ? body.from_wallet_id : null,
+          from_wallet_id: actualPayout > 0 ? body.from_wallet_id : null,
         })
-        .in('id', pendingIds),
+        .in('id', idsToSettle),
     ];
 
-    if (offset > 0) {
+    if (actualOffset > 0) {
       // Запись о зачёте аванса (income = уменьшает остаток долга)
       ops.push(
         (supabase.from('transactions') as any).insert({
           direction: 'income',
           category_id: ADVANCE_CATEGORY_ID,
-          amount: offset.toFixed(2),
+          amount: actualOffset.toFixed(2),
           description: `Зачёт аванса в счёт ЗП: ${employeeName} — ${dateLabel}`,
           lifecycle_status: 'approved',
           settlement_status: 'completed',
@@ -219,8 +261,16 @@ export async function POST(request: Request) {
       ok: true,
       salary_total: salaryTotal.toFixed(2),
       advance_balance: advanceBalance.toFixed(2),
-      offset: offset.toFixed(2),
-      payout: payout.toFixed(2),
+      offset: actualOffset.toFixed(2),
+      payout: actualPayout.toFixed(2),
+      settled_count: idsToSettle.length,
+      remaining: (
+        salaryTotal -
+        idsToSettle.reduce((s, id) => {
+          const t = (pendingPayroll as any[]).find((x: any) => x.id === id);
+          return s + parseFloat(t?.amount ?? '0');
+        }, 0)
+      ).toFixed(2),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

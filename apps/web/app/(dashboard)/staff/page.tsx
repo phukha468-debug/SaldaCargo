@@ -370,11 +370,18 @@ function SettleModal({
 
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
   const [offsetInput, setOffsetInput] = useState(maxOffset.toFixed(2));
+  const [partialInput, setPartialInput] = useState(salaryTotal.toFixed(2));
   const [error, setError] = useState('');
 
+  const isPartial = parseFloat(partialInput) < salaryTotal - 0.001;
+  const partialVal = Math.min(Math.max(0, parseFloat(partialInput) || 0), salaryTotal);
+
   const offsetVal = Math.min(Math.max(0, parseFloat(offsetInput) || 0), maxOffset);
-  const payout = Math.max(0, salaryTotal - offsetVal);
-  const remainingDebt = Math.max(0, advanceBalance - offsetVal);
+  // При частичной выплате зачёт аванса пропорционально
+  const effectiveOffset = isPartial ? Math.min(offsetVal, partialVal) : offsetVal;
+  const payout = Math.max(0, partialVal - effectiveOffset);
+  const remainingDebt = Math.max(0, advanceBalance - effectiveOffset);
+  const remainingSalary = Math.max(0, salaryTotal - partialVal);
   const needsWallet = payout > 0;
 
   const mutation = useMutation({
@@ -385,7 +392,8 @@ function SettleModal({
         body: JSON.stringify({
           user_id: user.id,
           from_wallet_id: needsWallet ? walletId : undefined,
-          partial_offset: offsetVal.toFixed(2),
+          partial_offset: effectiveOffset.toFixed(2),
+          ...(isPartial ? { partial_amount: partialVal.toFixed(2) } : {}),
         }),
       }).then(async (r) => {
         const data = await r.json();
@@ -412,6 +420,42 @@ function SettleModal({
           </button>
         </div>
         <div className="p-6 space-y-3">
+          {/* Сумма к выплате */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1.5">
+              Сумма к выплате сейчас
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max={salaryTotal}
+                step="100"
+                value={partialInput}
+                onChange={(e) => setPartialInput(e.target.value)}
+                className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+              <span className="text-sm text-slate-500 shrink-0">₽</span>
+              <button
+                type="button"
+                onClick={() => setPartialInput(salaryTotal.toFixed(2))}
+                className={cn(
+                  'text-xs px-2.5 py-1.5 rounded-lg border font-semibold shrink-0 transition-colors',
+                  !isPartial
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 text-slate-500 hover:bg-slate-50',
+                )}
+              >
+                Всё
+              </button>
+            </div>
+            {isPartial && (
+              <p className="text-xs text-amber-600 mt-1.5 font-medium">
+                Остаток долга {remainingSalary.toLocaleString('ru-RU')} ₽ останется к выплате
+              </p>
+            )}
+          </div>
+
           {/* Разбивка */}
           <div className="bg-slate-50 rounded-xl divide-y divide-slate-200 overflow-hidden">
             <div className="flex justify-between items-center px-4 py-3">
@@ -478,7 +522,9 @@ function SettleModal({
               </div>
             )}
             <div className="flex justify-between items-center px-4 py-3 bg-emerald-50">
-              <span className="text-sm font-bold text-emerald-800">К выплате деньгами</span>
+              <span className="text-sm font-bold text-emerald-800">
+                {isPartial ? 'К выплате сейчас' : 'К выплате деньгами'}
+              </span>
               <span className="text-lg font-black text-emerald-700">
                 {payout > 0 ? <Money amount={payout.toFixed(2)} /> : '0 ₽'}
               </span>
