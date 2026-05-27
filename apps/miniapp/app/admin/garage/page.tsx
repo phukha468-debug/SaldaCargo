@@ -779,6 +779,187 @@ function RejectRequestModal({
   );
 }
 
+// ── Client Vehicle Selector ────────────────────────────────────
+
+interface ClientVehicle {
+  id: string;
+  brand: string;
+  model: string | null;
+  reg_number: string;
+  color: string | null;
+  counterparty: { id: string; name: string; phone: string | null } | null;
+}
+
+function ClientVehicleSelector({
+  value,
+  onChange,
+}: {
+  value: ClientVehicle | null;
+  onChange: (v: ClientVehicle | null) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [newBrand, setNewBrand] = useState('');
+  const [newModel, setNewModel] = useState('');
+  const [newReg, setNewReg] = useState('');
+  const queryClient = useQueryClient();
+
+  const { data: results = [], isFetching } = useQuery<ClientVehicle[]>({
+    queryKey: ['client-vehicles-search', search],
+    queryFn: async () => {
+      const r = await fetch(`/api/admin/client-vehicles?search=${encodeURIComponent(search)}`);
+      if (!r.ok) throw new Error('Ошибка загрузки');
+      return r.json();
+    },
+    staleTime: 10_000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!newBrand.trim() || !newReg.trim()) throw new Error('Марка и госномер обязательны');
+      const r = await fetch('/api/admin/client-vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand: newBrand.trim(),
+          model: newModel.trim() || null,
+          reg_number: newReg.trim(),
+        }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || 'Ошибка');
+      return r.json() as Promise<ClientVehicle>;
+    },
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['client-vehicles-search'] });
+      onChange(created);
+      setShowCreate(false);
+      setNewBrand('');
+      setNewModel('');
+      setNewReg('');
+    },
+  });
+
+  if (value) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-slate-900">
+            {value.brand} {value.model} · {value.reg_number}
+          </p>
+          {value.counterparty && (
+            <p className="text-xs text-slate-500">{value.counterparty.name}</p>
+          )}
+        </div>
+        <button
+          onClick={() => onChange(null)}
+          className="text-slate-400 text-lg font-bold leading-none ml-3"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setShowCreate(false);
+          }}
+          placeholder="Поиск по марке, модели, госномеру..."
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+        />
+        {isFetching && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+            ...
+          </span>
+        )}
+      </div>
+
+      {results.length > 0 && (
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          {results.map((v, i) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => {
+                onChange(v);
+                setSearch('');
+              }}
+              className={cn(
+                'w-full text-left px-3 py-2.5 active:bg-slate-100',
+                i < results.length - 1 && 'border-b border-slate-100',
+              )}
+            >
+              <p className="text-sm font-bold text-slate-900">
+                {v.brand} {v.model} · {v.reg_number}
+              </p>
+              {v.counterparty && <p className="text-xs text-slate-400">{v.counterparty.name}</p>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!showCreate ? (
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="text-xs font-black text-blue-600 uppercase tracking-widest py-1"
+        >
+          + Добавить новый автомобиль
+        </button>
+      ) : (
+        <div className="border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            Новый автомобиль
+          </p>
+          <input
+            value={newBrand}
+            onChange={(e) => setNewBrand(e.target.value)}
+            placeholder="Марка (Toyota) *"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <input
+            value={newModel}
+            onChange={(e) => setNewModel(e.target.value)}
+            placeholder="Модель (Camry)"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <input
+            value={newReg}
+            onChange={(e) => setNewReg(e.target.value)}
+            placeholder="Госномер (А001АА96) *"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          {createMutation.isError && (
+            <p className="text-xs text-red-500">{(createMutation.error as Error).message}</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowCreate(false)}
+              className="flex-1 py-2 rounded-lg text-xs font-black bg-slate-200 text-slate-600"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending}
+              className="flex-[2] py-2 rounded-lg text-xs font-black bg-zinc-900 text-white disabled:bg-zinc-400"
+            >
+              {createMutation.isPending ? 'Сохраняем...' : 'Сохранить и выбрать'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Create Order Modal ─────────────────────────────────────────
 
 function CreateOrderModal({
@@ -792,8 +973,7 @@ function CreateOrderModal({
 }) {
   const [machineType, setMachineType] = useState<'own' | 'client'>('own');
   const [assetId, setAssetId] = useState('');
-  const [clientBrand, setClientBrand] = useState('');
-  const [clientReg, setClientReg] = useState('');
+  const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
   const [problemDesc, setProblemDesc] = useState('');
   const [mechanicId, setMechanicId] = useState('');
   const [secondMechanicId, setSecondMechanicId] = useState('');
@@ -834,17 +1014,16 @@ function CreateOrderModal({
   const mutation = useMutation({
     mutationFn: async () => {
       if (!problemDesc.trim()) throw new Error('Введите описание проблемы');
-      if (machineType === 'own' && !assetId) throw new Error('Выберите автомобиль');
-      if (machineType === 'client' && !clientBrand.trim())
-        throw new Error('Укажите марку клиентского автомобиля');
+      if (machineType === 'own' && !assetId) throw new Error('Выберите автомобиль из парка');
+      if (machineType === 'client' && !selectedClientVehicle)
+        throw new Error('Выберите или создайте клиентский автомобиль');
       const res = await fetch('/api/admin/service-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           machine_type: machineType,
           asset_id: machineType === 'own' ? assetId : undefined,
-          client_vehicle_brand: machineType === 'client' ? clientBrand : undefined,
-          client_vehicle_reg: machineType === 'client' ? clientReg : undefined,
+          client_vehicle_id: machineType === 'client' ? selectedClientVehicle?.id : undefined,
           problem_description: problemDesc,
           assigned_mechanic_id: mechanicId || undefined,
           second_mechanic_id: secondMechanicId || undefined,
@@ -924,29 +1103,14 @@ function CreateOrderModal({
           </select>
         </div>
       ) : (
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-              Марка / модель *
-            </label>
-            <input
-              value={clientBrand}
-              onChange={(e) => setClientBrand(e.target.value)}
-              placeholder="Toyota Camry"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-              Госномер
-            </label>
-            <input
-              value={clientReg}
-              onChange={(e) => setClientReg(e.target.value)}
-              placeholder="А001АА96"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
-            />
-          </div>
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+            Автомобиль клиента *
+          </label>
+          <ClientVehicleSelector
+            value={selectedClientVehicle}
+            onChange={setSelectedClientVehicle}
+          />
         </div>
       )}
 

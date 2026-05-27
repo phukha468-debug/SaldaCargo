@@ -83,11 +83,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       machine_type: 'own' | 'client';
       asset_id?: string;
-      client_vehicle_brand?: string;
-      client_vehicle_model?: string;
-      client_vehicle_reg?: string;
-      client_name?: string;
-      client_phone?: string;
+      client_vehicle_id?: string;
       problem_description: string;
       assigned_mechanic_id?: string;
       second_mechanic_id?: string;
@@ -98,18 +94,42 @@ export async function POST(request: Request) {
     if (!body.problem_description?.trim()) {
       return NextResponse.json({ error: 'Описание проблемы обязательно' }, { status: 400 });
     }
+    if (body.machine_type === 'own' && !body.asset_id) {
+      return NextResponse.json({ error: 'Выберите автомобиль из парка' }, { status: 400 });
+    }
+    if (body.machine_type === 'client' && !body.client_vehicle_id) {
+      return NextResponse.json(
+        { error: 'Выберите или создайте клиентский автомобиль' },
+        { status: 400 },
+      );
+    }
 
     const supabase = createAdminClient();
+
+    // Денормализуем данные клиентской машины для отображения в старых запросах
+    let clientVehicleFields: Record<string, string | null> = {};
+    if (body.client_vehicle_id) {
+      const { data: cv } = await (supabase.from('client_vehicles') as any)
+        .select('brand, model, reg_number, counterparty:counterparties(name, phone)')
+        .eq('id', body.client_vehicle_id)
+        .single();
+      if (cv) {
+        clientVehicleFields = {
+          client_vehicle_brand: cv.brand ?? null,
+          client_vehicle_model: cv.model ?? null,
+          client_vehicle_reg: cv.reg_number ?? null,
+          client_name: cv.counterparty?.name ?? null,
+          client_phone: cv.counterparty?.phone ?? null,
+        };
+      }
+    }
 
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .insert({
         machine_type: body.machine_type,
         asset_id: body.asset_id || null,
-        client_vehicle_brand: body.client_vehicle_brand?.trim() || null,
-        client_vehicle_model: body.client_vehicle_model?.trim() || null,
-        client_vehicle_reg: body.client_vehicle_reg?.trim() || null,
-        client_name: body.client_name?.trim() || null,
-        client_phone: body.client_phone?.trim() || null,
+        client_vehicle_id: body.client_vehicle_id || null,
+        ...clientVehicleFields,
         problem_description: body.problem_description.trim(),
         assigned_mechanic_id: body.assigned_mechanic_id || null,
         second_mechanic_id: body.second_mechanic_id || null,
