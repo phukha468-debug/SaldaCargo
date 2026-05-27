@@ -1811,9 +1811,11 @@ interface CounterpartyOption {
 function CounterpartySubForm({
   value,
   onChange,
+  stoOnly = false,
 }: {
   value: CounterpartyOption | null;
   onChange: (v: CounterpartyOption | null) => void;
+  stoOnly?: boolean;
 }) {
   const [cpSearch, setCpSearch] = useState('');
   const [showNewCp, setShowNewCp] = useState(false);
@@ -1822,9 +1824,11 @@ function CounterpartySubForm({
   const queryClient = useQueryClient();
 
   const { data: cpResults = [] } = useQuery<CounterpartyOption[]>({
-    queryKey: ['cp-search', cpSearch],
+    queryKey: ['cp-search', cpSearch, stoOnly],
     queryFn: async () => {
-      const r = await fetch(`/api/counterparties/search?q=${encodeURIComponent(cpSearch)}`);
+      const params = new URLSearchParams({ q: cpSearch });
+      if (stoOnly) params.set('sto_only', '1');
+      const r = await fetch(`/api/counterparties/search?${params}`);
       if (!r.ok) throw new Error('Ошибка загрузки');
       return r.json();
     },
@@ -6990,7 +6994,11 @@ function CreateVehicleModal({
             <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
               Клиент
             </label>
-            <CounterpartySubForm value={selectedCounterparty} onChange={setSelectedCounterparty} />
+            <CounterpartySubForm
+              value={selectedCounterparty}
+              onChange={setSelectedCounterparty}
+              stoOnly
+            />
           </div>
           <div>
             <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
