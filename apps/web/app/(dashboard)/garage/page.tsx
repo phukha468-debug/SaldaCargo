@@ -5503,11 +5503,100 @@ function ruleAlert(rule: VehicleRule, odometer: number | null): 'ok' | 'soon' | 
   return null;
 }
 
+function CreateClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const qc = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!name.trim()) throw new Error('Введите имя клиента');
+      const r = await fetch('/api/counterparties/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim() || null }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+      return d;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['counterparties-clients'] });
+      onCreated();
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900">Новый клиент</h3>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div>
+            <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+              Имя / организация *
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Иван Иванов"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+              Телефон
+            </label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+7 900 000-00-00"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+        <div className="border-t border-slate-100 px-6 py-4 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-xl text-sm"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="flex-1 bg-slate-900 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+          >
+            {mutation.isPending ? '...' : 'Добавить клиента'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClientsSection() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateVehicle, setShowCreateVehicle] = useState(false);
+  const [showCreateClient, setShowCreateClient] = useState(false);
 
   const {
     data: vehicles = [],
@@ -5545,10 +5634,16 @@ function ClientsSection() {
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-base font-bold text-slate-900 flex-1">Клиенты СТО</h2>
             <button
+              onClick={() => setShowCreateClient(true)}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+            >
+              + Клиент
+            </button>
+            <button
               onClick={() => setShowCreateVehicle(true)}
               className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700"
             >
-              + Добавить
+              + Авто
             </button>
           </div>
           <input
@@ -5623,6 +5718,15 @@ function ClientsSection() {
             qc.invalidateQueries({ queryKey: ['client-vehicles'] });
             setShowCreateVehicle(false);
             setSelectedId(id);
+          }}
+        />
+      )}
+      {showCreateClient && (
+        <CreateClientModal
+          onClose={() => setShowCreateClient(false)}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ['counterparties-clients'] });
+            setShowCreateClient(false);
           }}
         />
       )}
@@ -6294,27 +6398,18 @@ function CreateVehicleModal({
     reg_number: '',
     vin: '',
     color: '',
-    counterparty_id: '',
     odometer_last: '',
     notes: '',
   });
+  const [selectedCounterparty, setSelectedCounterparty] = useState<CounterpartyOption | null>(null);
   const [error, setError] = useState('');
-
-  const { data: counterparties = [] } = useQuery<Array<{ id: string; name: string }>>({
-    queryKey: ['counterparties-clients'],
-    queryFn: () =>
-      fetch('/api/counterparties?type=client')
-        .then((r) => r.json())
-        .then((d) => d.items ?? d),
-    staleTime: 60000,
-  });
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const r = await fetch('/api/garage/client-vehicles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, counterparty_id: selectedCounterparty?.id ?? null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? 'Ошибка');
@@ -6420,18 +6515,7 @@ function CreateVehicleModal({
             <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
               Клиент
             </label>
-            <select
-              value={form.counterparty_id}
-              onChange={(e) => setForm({ ...form, counterparty_id: e.target.value })}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">— не привязан —</option>
-              {counterparties.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <CounterpartySubForm value={selectedCounterparty} onChange={setSelectedCounterparty} />
           </div>
           <div>
             <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
