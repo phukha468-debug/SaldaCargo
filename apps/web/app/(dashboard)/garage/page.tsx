@@ -39,13 +39,16 @@ type DetailWork = {
   time_logs: Array<{ id: string; started_at: string; stopped_at: string | null; status: string }>;
 };
 
-type OrderDetail = Omit<OrderRow, 'works'> & {
+type MechanicWithPct = Mechanic & { mechanic_salary_pct: string | null };
+
+type OrderDetail = Omit<OrderRow, 'works' | 'mechanic'> & {
   lifecycle_status: string;
   admin_note: string | null;
   mechanic_note: string | null;
   mechanic_pay: string | null;
   second_mechanic_pay: string | null;
-  second_mechanic: Mechanic | null;
+  mechanic: MechanicWithPct | null;
+  second_mechanic: MechanicWithPct | null;
   client_vehicle_model: string | null;
   client_phone: string | null;
   odometer_start: number | null;
@@ -221,6 +224,7 @@ type GarageSection =
   | 'faultcatalog'
   | 'repvehicles'
   | 'repmechanics'
+  | 'clients'
   | 'settings';
 type ReportTab = 'vehicles' | 'mechanics';
 
@@ -387,6 +391,16 @@ const Icons = {
       />
     </svg>
   ),
+  clients: (
+    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+      />
+    </svg>
+  ),
   settings: (
     <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
@@ -410,6 +424,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   faultcatalog: Icons.faultcatalog,
   repvehicles: Icons.repvehicles,
   repmechanics: Icons.repmechanics,
+  clients: Icons.clients,
   settings: Icons.settings,
 };
 
@@ -439,6 +454,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'repmechanics', label: 'По механикам' },
     ],
   },
+  { label: 'Клиенты СТО', items: [{ id: 'clients', label: 'Карточки клиентов' }] },
   { label: 'Система', items: [{ id: 'settings', label: 'Настройки СТО' }] },
 ];
 
@@ -659,6 +675,9 @@ function OrderDetailModal({
   const [editSecondMechanic, setEditSecondMechanic] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [closePay1, setClosePay1] = useState('');
+  const [closePay2, setClosePay2] = useState('');
   const [showAddWork, setShowAddWork] = useState(false);
   const [workSearch, setWorkSearch] = useState('');
   const [workCatFilter, setWorkCatFilter] = useState<string | null>(null);
@@ -678,6 +697,13 @@ function OrderDetailModal({
       return r.json();
     },
     staleTime: 30000,
+  });
+
+  const { data: stoSettings } = useQuery<SettingsData>({
+    queryKey: ['garage-settings'],
+    queryFn: () => fetch('/api/garage/settings').then((r) => r.json()),
+    staleTime: 300000,
+    enabled: showCloseDialog,
   });
 
   const patchMutation = useMutation({
@@ -706,6 +732,38 @@ function OrderDetailModal({
   });
 
   const isClosed = order?.lifecycle_status === 'approved';
+
+  // Заполняем поля ЗП расчётными значениями, когда открывается диалог закрытия
+  useEffect(() => {
+    if (!showCloseDialog || !order || !stoSettings) return;
+    const hourlyRate = parseFloat(
+      order.machine_type === 'own'
+        ? (stoSettings.sto.hourly_rate_own ?? '1600')
+        : (stoSettings.sto.hourly_rate ?? '2000'),
+    );
+    const unpaidMinutes = order.works
+      .filter((w) => w.status === 'completed' && !w.salary_paid)
+      .reduce((s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0)), 0);
+    const unpaidHours = unpaidMinutes / 60;
+    const mech1 =
+      editMechanic !== null
+        ? (mechanics.find((m) => m.id === editMechanic) ?? null)
+        : order.mechanic;
+    const mech2 =
+      editSecondMechanic !== null
+        ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
+        : order.second_mechanic;
+    const hasTwo = !!(mech1 && mech2);
+    const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
+
+    const getPct = (mechId: string | undefined) => {
+      const fromSettings = stoSettings.mechanics.find((m) => m.id === mechId);
+      return parseFloat(fromSettings?.mechanic_salary_pct ?? '50');
+    };
+
+    if (mech1) setClosePay1(Math.round((hours * hourlyRate * getPct(mech1.id)) / 100).toString());
+    if (mech2) setClosePay2(Math.round((hours * hourlyRate * getPct(mech2.id)) / 100).toString());
+  }, [showCloseDialog, stoSettings]);
 
   const { data: workCatalog = [] } = useQuery<
     Array<{
@@ -849,7 +907,7 @@ function OrderDetailModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
@@ -1619,19 +1677,121 @@ function OrderDetailModal({
               {!isClosed && allWorksCompleted && (
                 <button
                   onClick={() => {
-                    const updates: Record<string, unknown> = { lifecycle_status: 'approved' };
-                    if (editMechanic !== null) updates.assigned_mechanic_id = editMechanic || null;
-                    if (editSecondMechanic !== null)
-                      updates.second_mechanic_id = editSecondMechanic || null;
-                    patchMutation.mutate(updates);
-                    onClose();
+                    setClosePay1('');
+                    setClosePay2('');
+                    setShowCloseDialog(true);
                   }}
                   disabled={patchMutation.isPending}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl text-sm disabled:opacity-50 shrink-0"
                 >
-                  {patchMutation.isPending ? '...' : 'Завершить наряд →'}
+                  Завершить наряд →
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Диалог закрытия наряда с вводом зарплат */}
+        {showCloseDialog && order && (
+          <div className="absolute inset-0 z-10 bg-white rounded-2xl flex flex-col">
+            <div className="flex-shrink-0 border-b border-slate-200 px-6 py-4">
+              <h3 className="text-lg font-bold text-slate-900">
+                Завершить наряд #{order.order_number}
+              </h3>
+              <p className="text-sm text-slate-500 mt-0.5">Укажите зарплату исполнителей</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+              {(() => {
+                const mech1 =
+                  editMechanic !== null
+                    ? (mechanics.find((m) => m.id === editMechanic) ?? null)
+                    : order.mechanic;
+                const mech2 =
+                  editSecondMechanic !== null
+                    ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
+                    : order.second_mechanic;
+                return (
+                  <>
+                    {mech1 ? (
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">
+                          {mech1.name}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={closePay1}
+                            onChange={(e) => setClosePay1(e.target.value)}
+                            placeholder={stoSettings ? '0' : 'Загрузка...'}
+                            className="flex-1 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-mono"
+                          />
+                          <span className="text-slate-400 text-sm shrink-0">₽</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-amber-600 bg-amber-50 rounded-xl px-4 py-3">
+                        Исполнитель не назначен. Зарплата не будет начислена.
+                      </p>
+                    )}
+                    {mech2 && (
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">
+                          {mech2.name}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={closePay2}
+                            onChange={(e) => setClosePay2(e.target.value)}
+                            placeholder={stoSettings ? '0' : 'Загрузка...'}
+                            className="flex-1 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-mono"
+                          />
+                          <span className="text-slate-400 text-sm shrink-0">₽</span>
+                        </div>
+                      </div>
+                    )}
+                    {!mech1 && !mech2 && (
+                      <p className="text-sm text-slate-500">Исполнители не назначены.</p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+            <div className="flex-shrink-0 border-t border-slate-100 px-6 py-4 flex gap-3">
+              <button
+                onClick={() => setShowCloseDialog(false)}
+                className="flex-1 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2.5 rounded-xl text-sm"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  const mech1 =
+                    editMechanic !== null
+                      ? (mechanics.find((m) => m.id === editMechanic) ?? null)
+                      : order.mechanic;
+                  const mech2 =
+                    editSecondMechanic !== null
+                      ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
+                      : order.second_mechanic;
+                  const updates: Record<string, unknown> = {
+                    lifecycle_status: 'approved',
+                    assigned_mechanic_id: mech1?.id ?? null,
+                    second_mechanic_id: mech2?.id ?? null,
+                    mechanic_pay: closePay1 || '0',
+                    second_mechanic_pay: closePay2 || '0',
+                  };
+                  patchMutation.mutate(updates);
+                  setShowCloseDialog(false);
+                  onClose();
+                }}
+                disabled={patchMutation.isPending}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
+              >
+                {patchMutation.isPending ? '...' : 'Подтвердить и закрыть'}
+              </button>
             </div>
           </div>
         )}
@@ -4923,6 +5083,7 @@ export default function GaragePage() {
         {section === 'faultcatalog' && <FaultCatalogSection />}
         {section === 'repvehicles' && <ReportsSection tab="vehicles" />}
         {section === 'repmechanics' && <ReportsSection tab="mechanics" />}
+        {section === 'clients' && <ClientsSection />}
         {section === 'settings' && <SettingsSection />}
       </main>
       {showCreate && (
@@ -4932,6 +5093,1072 @@ export default function GaragePage() {
           assets={assets}
         />
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════ CLIENTS SECTION ══════════════════════════════════
+
+type ClientVehicle = {
+  id: string;
+  brand: string;
+  model: string | null;
+  year: number | null;
+  reg_number: string;
+  vin: string | null;
+  color: string | null;
+  odometer_last: number | null;
+  odometer_updated_at: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  counterparty: { id: string; name: string; phone: string | null } | null;
+};
+
+type VehicleRule = {
+  id: string;
+  work_name: string;
+  interval_km: number | null;
+  interval_months: number | null;
+  last_done_km: number | null;
+  last_done_at: string | null;
+};
+
+type VehicleRec = {
+  id: string;
+  text: string;
+  due_km: number | null;
+  due_date: string | null;
+  is_done: boolean;
+  done_at: string | null;
+  created_at: string;
+  created_user: { name: string } | null;
+};
+
+type VehicleOrder = {
+  id: string;
+  order_number: number;
+  created_at: string;
+  status: string;
+  lifecycle_status: string;
+  problem_description: string | null;
+  odometer_start: number | null;
+  odometer_end: number | null;
+  mechanic: { id: string; name: string } | null;
+  works_cost: string;
+  parts_cost: string;
+  total_cost: string;
+  works: Array<{
+    id: string;
+    status: string;
+    price_client: string | null;
+    custom_work_name: string | null;
+    work_catalog: { name: string } | null;
+  }>;
+  parts: Array<{
+    id: string;
+    quantity: number;
+    custom_part_name: string | null;
+    part: { name: string; unit: string } | null;
+  }>;
+};
+
+type VehicleDetail = {
+  vehicle: ClientVehicle;
+  orders: VehicleOrder[];
+  rules: VehicleRule[];
+  recommendations: VehicleRec[];
+};
+
+function ruleAlert(rule: VehicleRule, odometer: number | null): 'ok' | 'soon' | 'overdue' | null {
+  const now = new Date();
+  let kmStatus: 'ok' | 'soon' | 'overdue' | null = null;
+  let dateStatus: 'ok' | 'soon' | 'overdue' | null = null;
+
+  if (rule.interval_km && rule.last_done_km && odometer) {
+    const nextKm = rule.last_done_km + rule.interval_km;
+    const remaining = nextKm - odometer;
+    if (remaining <= 0) kmStatus = 'overdue';
+    else if (remaining <= rule.interval_km * 0.15) kmStatus = 'soon';
+    else kmStatus = 'ok';
+  }
+
+  if (rule.interval_months && rule.last_done_at) {
+    const nextDate = new Date(rule.last_done_at);
+    nextDate.setMonth(nextDate.getMonth() + rule.interval_months);
+    const daysLeft = Math.ceil((nextDate.getTime() - now.getTime()) / 86400000);
+    if (daysLeft <= 0) dateStatus = 'overdue';
+    else if (daysLeft <= 30) dateStatus = 'soon';
+    else dateStatus = 'ok';
+  }
+
+  const statuses = [kmStatus, dateStatus].filter(Boolean) as Array<'ok' | 'soon' | 'overdue'>;
+  if (statuses.includes('overdue')) return 'overdue';
+  if (statuses.includes('soon')) return 'soon';
+  if (statuses.includes('ok')) return 'ok';
+  return null;
+}
+
+function ClientsSection() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showCreateVehicle, setShowCreateVehicle] = useState(false);
+
+  const {
+    data: vehicles = [],
+    isLoading,
+    error: vehiclesError,
+  } = useQuery<ClientVehicle[]>({
+    queryKey: ['client-vehicles', search],
+    queryFn: async () => {
+      const r = await fetch(`/api/garage/client-vehicles?search=${encodeURIComponent(search)}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'Ошибка загрузки');
+      if (!Array.isArray(d)) return [];
+      return d;
+    },
+    staleTime: 30000,
+  });
+
+  const { data: detail, isLoading: detailLoading } = useQuery<VehicleDetail>({
+    queryKey: ['client-vehicle-detail', selectedId],
+    queryFn: async () => {
+      const r = await fetch(`/api/garage/client-vehicles/${selectedId}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+      return d;
+    },
+    enabled: !!selectedId,
+    staleTime: 15000,
+  });
+
+  return (
+    <div className="flex h-full gap-0 min-h-0">
+      {/* ── Левая панель: список машин ── */}
+      <div className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-white">
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-base font-bold text-slate-900 flex-1">Клиенты СТО</h2>
+            <button
+              onClick={() => setShowCreateVehicle(true)}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700"
+            >
+              + Добавить
+            </button>
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по марке, номеру..."
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-sm text-slate-400">Загрузка...</div>
+          ) : vehiclesError ? (
+            <div className="p-4 text-sm text-red-500">
+              Ошибка: {(vehiclesError as Error).message}
+              <div className="text-xs text-slate-400 mt-1">Проверьте, применена ли миграция БД</div>
+            </div>
+          ) : vehicles.length === 0 ? (
+            <div className="p-4 text-sm text-slate-400">Нет машин</div>
+          ) : (
+            vehicles.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setSelectedId(v.id)}
+                className={cn(
+                  'w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors',
+                  selectedId === v.id && 'bg-blue-50 border-l-2 border-l-blue-500',
+                )}
+              >
+                <div className="font-semibold text-sm text-slate-900">
+                  {v.brand} {v.model ?? ''} {v.year ? `(${v.year})` : ''}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                  <span className="font-mono">{v.reg_number}</span>
+                  {v.counterparty && <span>· {v.counterparty.name}</span>}
+                </div>
+                {v.odometer_last && (
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    {v.odometer_last.toLocaleString('ru-RU')} км
+                  </div>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ── Правая панель: карточка машины ── */}
+      <div className="flex-1 overflow-y-auto bg-slate-50">
+        {!selectedId ? (
+          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+            Выберите автомобиль из списка
+          </div>
+        ) : detailLoading ? (
+          <div className="p-8 text-slate-400 text-sm">Загрузка...</div>
+        ) : detail ? (
+          <VehicleCard
+            detail={detail}
+            onUpdate={() => {
+              qc.invalidateQueries({ queryKey: ['client-vehicle-detail', selectedId] });
+              qc.invalidateQueries({ queryKey: ['client-vehicles'] });
+            }}
+          />
+        ) : null}
+      </div>
+
+      {showCreateVehicle && (
+        <CreateVehicleModal
+          onClose={() => setShowCreateVehicle(false)}
+          onCreated={(id) => {
+            qc.invalidateQueries({ queryKey: ['client-vehicles'] });
+            setShowCreateVehicle(false);
+            setSelectedId(id);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VehicleCard({ detail, onUpdate }: { detail: VehicleDetail; onUpdate: () => void }) {
+  const { vehicle, orders, rules, recommendations } = detail;
+  const [tab, setTab] = useState<'history' | 'rules' | 'recs'>('history');
+  const [editOdo, setEditOdo] = useState('');
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [showAddRec, setShowAddRec] = useState('');
+  const [editNotes, setEditNotes] = useState<string | null>(null);
+
+  const patchVehicle = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetch(`/api/garage/client-vehicles/${vehicle.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: onUpdate,
+  });
+
+  const addRec = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetch(`/api/garage/client-vehicles/${vehicle.id}/recommendations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      setShowAddRec('');
+      onUpdate();
+    },
+  });
+
+  const patchRec = useMutation({
+    mutationFn: ({ recId, body }: { recId: string; body: Record<string, unknown> }) =>
+      fetch(`/api/garage/client-vehicles/${vehicle.id}/recommendations?rec_id=${recId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: onUpdate,
+  });
+
+  const addRule = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetch(`/api/garage/client-vehicles/${vehicle.id}/rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      setShowAddRule(false);
+      onUpdate();
+    },
+  });
+
+  const patchRule = useMutation({
+    mutationFn: ({ ruleId, body }: { ruleId: string; body: Record<string, unknown> }) =>
+      fetch(`/api/garage/client-vehicles/${vehicle.id}/rules?rule_id=${ruleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: onUpdate,
+  });
+
+  const totalSpent = orders.reduce((s, o) => s + parseFloat(o.total_cost), 0);
+  const openRecs = recommendations.filter((r) => !r.is_done);
+  const alertRules = rules.filter((r) => {
+    const st = ruleAlert(r, vehicle.odometer_last);
+    return st === 'overdue' || st === 'soon';
+  });
+
+  return (
+    <div className="p-6 space-y-6 max-w-4xl">
+      {/* Шапка машины */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">
+              {vehicle.brand} {vehicle.model ?? ''} {vehicle.year ? `· ${vehicle.year}` : ''}
+            </h2>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="font-mono text-sm font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                {vehicle.reg_number}
+              </span>
+              {vehicle.vin && <span className="text-xs text-slate-400">VIN: {vehicle.vin}</span>}
+              {vehicle.color && <span className="text-xs text-slate-400">{vehicle.color}</span>}
+            </div>
+            {vehicle.counterparty && (
+              <div className="mt-2 text-sm text-slate-600">
+                Клиент: <span className="font-semibold">{vehicle.counterparty.name}</span>
+                {vehicle.counterparty.phone && (
+                  <span className="text-slate-400 ml-2">{vehicle.counterparty.phone}</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-xs text-slate-400 uppercase font-semibold">Потрачено всего</div>
+            <div className="text-2xl font-black text-slate-900">
+              {totalSpent.toLocaleString('ru-RU')} ₽
+            </div>
+            <div className="text-xs text-slate-400">{orders.length} визитов</div>
+          </div>
+        </div>
+
+        {/* Одометр */}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
+          <div className="flex-1">
+            <span className="text-xs text-slate-400 uppercase font-semibold">Одометр</span>
+            <div className="text-base font-bold text-slate-900">
+              {vehicle.odometer_last
+                ? `${vehicle.odometer_last.toLocaleString('ru-RU')} км`
+                : 'не указан'}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={editOdo}
+              onChange={(e) => setEditOdo(e.target.value)}
+              placeholder="Обновить..."
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm w-36"
+            />
+            <button
+              onClick={() => {
+                if (!editOdo) return;
+                patchVehicle.mutate({ odometer_last: editOdo });
+                setEditOdo('');
+              }}
+              disabled={!editOdo || patchVehicle.isPending}
+              className="text-xs px-3 py-1.5 bg-slate-900 text-white rounded-lg font-semibold disabled:opacity-40"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
+
+        {/* Предупреждения */}
+        {(alertRules.length > 0 || openRecs.length > 0) && (
+          <div className="mt-4 space-y-2">
+            {alertRules.map((rule) => {
+              const st = ruleAlert(rule, vehicle.odometer_last);
+              return (
+                <div
+                  key={rule.id}
+                  className={cn(
+                    'flex items-start gap-2 text-sm px-3 py-2 rounded-lg',
+                    st === 'overdue' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700',
+                  )}
+                >
+                  <span className="font-bold shrink-0">{st === 'overdue' ? '⚠' : '!'}</span>
+                  <span>
+                    <span className="font-semibold">{rule.work_name}</span>
+                    {st === 'overdue' ? ' — просрочено' : ' — скоро'}
+                    {rule.interval_km && rule.last_done_km && vehicle.odometer_last && (
+                      <span className="ml-1 text-xs opacity-70">
+                        (осталось{' '}
+                        {(
+                          rule.last_done_km +
+                          rule.interval_km -
+                          vehicle.odometer_last
+                        ).toLocaleString('ru-RU')}{' '}
+                        км)
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+            {openRecs.length > 0 && (
+              <div className="bg-blue-50 text-blue-700 text-sm px-3 py-2 rounded-lg">
+                <span className="font-semibold">{openRecs.length} открытых рекомендаций</span> от
+                мастера
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Заметки */}
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          {editNotes !== null ? (
+            <div className="flex gap-2">
+              <textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                rows={2}
+                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none"
+                placeholder="Особенности, пожелания клиента..."
+              />
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={() => {
+                    patchVehicle.mutate({ notes: editNotes });
+                    setEditNotes(null);
+                  }}
+                  className="text-xs px-3 py-1.5 bg-slate-900 text-white rounded-lg font-semibold"
+                >
+                  Сохранить
+                </button>
+                <button
+                  onClick={() => setEditNotes(null)}
+                  className="text-xs text-slate-500 hover:underline"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditNotes(vehicle.notes ?? '')}
+              className="text-sm text-slate-400 hover:text-slate-700 text-left w-full"
+            >
+              {vehicle.notes ? vehicle.notes : '+ Добавить заметку по автомобилю...'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Вкладки */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+        {(
+          [
+            { id: 'history' as const, label: `История (${orders.length})` },
+            { id: 'rules' as const, label: `Регламент (${rules.length})` },
+            { id: 'recs' as const, label: `Рекомендации (${recommendations.length})` },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'flex-1 text-sm font-semibold py-2 rounded-lg transition-colors',
+              tab === t.id
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* История нарядов */}
+      {tab === 'history' && (
+        <div className="space-y-3">
+          {orders.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 text-sm">
+              Нарядов по этой машине нет
+            </div>
+          ) : (
+            orders.map((o) => (
+              <div key={o.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <span className="font-bold text-slate-900">Наряд #{o.order_number}</span>
+                    <span
+                      className={cn(
+                        'ml-2 text-xs px-2 py-0.5 rounded-full font-semibold',
+                        STATUS_COLOR[o.status],
+                      )}
+                    >
+                      {STATUS_LABEL[o.status]}
+                    </span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-black text-slate-900">
+                      {parseFloat(o.total_cost).toLocaleString('ru-RU')} ₽
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {new Date(o.created_at).toLocaleDateString('ru-RU')}
+                    </div>
+                  </div>
+                </div>
+                {o.problem_description && (
+                  <p className="text-sm text-slate-600 mb-2">{o.problem_description}</p>
+                )}
+                {o.mechanic && (
+                  <div className="text-xs text-slate-400 mb-2">Мастер: {o.mechanic.name}</div>
+                )}
+                {o.odometer_start && (
+                  <div className="text-xs text-slate-400">
+                    Одометр: {o.odometer_start.toLocaleString('ru-RU')} км
+                    {o.odometer_end ? ` → ${o.odometer_end.toLocaleString('ru-RU')} км` : ''}
+                  </div>
+                )}
+                {o.works.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                    {o.works.map((w) => (
+                      <div key={w.id} className="flex justify-between text-xs text-slate-600">
+                        <span>{w.work_catalog?.name ?? w.custom_work_name ?? '—'}</span>
+                        {w.price_client && (
+                          <span className="font-mono">
+                            {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {o.parts.length > 0 &&
+                      o.parts.map((p) => (
+                        <div key={p.id} className="flex justify-between text-xs text-slate-500">
+                          <span className="italic">
+                            {p.part?.name ?? p.custom_part_name ?? '—'} × {p.quantity}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Регламенты ТО */}
+      {tab === 'rules' && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAddRule(true)}
+              className="text-xs font-semibold px-3 py-1.5 bg-slate-900 text-white rounded-lg"
+            >
+              + Добавить регламент
+            </button>
+          </div>
+          {showAddRule && (
+            <AddRuleForm
+              onSubmit={(body) => addRule.mutate(body)}
+              onCancel={() => setShowAddRule(false)}
+              isPending={addRule.isPending}
+            />
+          )}
+          {rules.length === 0 && !showAddRule ? (
+            <div className="text-center py-8 text-slate-400 text-sm">Регламенты не настроены</div>
+          ) : (
+            rules.map((rule) => {
+              const st = ruleAlert(rule, vehicle.odometer_last);
+              return (
+                <div
+                  key={rule.id}
+                  className={cn(
+                    'bg-white rounded-xl border p-4',
+                    st === 'overdue'
+                      ? 'border-red-200'
+                      : st === 'soon'
+                        ? 'border-amber-200'
+                        : 'border-slate-200',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-semibold text-slate-900">{rule.work_name}</div>
+                    {st && (
+                      <span
+                        className={cn(
+                          'text-xs px-2 py-0.5 rounded-full font-semibold shrink-0',
+                          st === 'overdue'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-amber-100 text-amber-700',
+                        )}
+                      >
+                        {st === 'overdue' ? 'Просрочено' : 'Скоро'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 space-y-0.5">
+                    {rule.interval_km && (
+                      <div>Каждые {rule.interval_km.toLocaleString('ru-RU')} км</div>
+                    )}
+                    {rule.interval_months && <div>Каждые {rule.interval_months} мес.</div>}
+                    {rule.last_done_km && (
+                      <div>
+                        Последний раз: {rule.last_done_km.toLocaleString('ru-RU')} км
+                        {rule.last_done_at
+                          ? ` · ${new Date(rule.last_done_at).toLocaleDateString('ru-RU')}`
+                          : ''}
+                      </div>
+                    )}
+                    {rule.interval_km && rule.last_done_km && vehicle.odometer_last && (
+                      <div
+                        className={cn(
+                          'font-semibold',
+                          st === 'overdue'
+                            ? 'text-red-600'
+                            : st === 'soon'
+                              ? 'text-amber-600'
+                              : 'text-emerald-600',
+                        )}
+                      >
+                        Следующий: {(rule.last_done_km + rule.interval_km).toLocaleString('ru-RU')}{' '}
+                        км (осталось{' '}
+                        {(
+                          rule.last_done_km +
+                          rule.interval_km -
+                          vehicle.odometer_last
+                        ).toLocaleString('ru-RU')}{' '}
+                        км)
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => {
+                        const km = prompt('Одометр при последней замене (км):');
+                        const date = prompt('Дата последней замены (ГГГГ-ММ-ДД):');
+                        if (km)
+                          patchRule.mutate({
+                            ruleId: rule.id,
+                            body: { last_done_km: km, last_done_at: date || null },
+                          });
+                      }}
+                      className="text-xs px-3 py-1 border border-slate-300 rounded-lg hover:bg-slate-50 font-semibold"
+                    >
+                      Обновить данные
+                    </button>
+                    <button
+                      onClick={() =>
+                        patchRule.mutate({ ruleId: rule.id, body: { is_active: false } })
+                      }
+                      className="text-xs px-2 py-1 text-red-400 hover:text-red-600"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Рекомендации */}
+      {tab === 'recs' && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAddRec('new')}
+              className="text-xs font-semibold px-3 py-1.5 bg-slate-900 text-white rounded-lg"
+            >
+              + Добавить рекомендацию
+            </button>
+          </div>
+          {showAddRec === 'new' && (
+            <AddRecForm
+              onSubmit={(text, dueKm, dueDate) =>
+                addRec.mutate({ text, due_km: dueKm || null, due_date: dueDate || null })
+              }
+              onCancel={() => setShowAddRec('')}
+              isPending={addRec.isPending}
+            />
+          )}
+          {recommendations.length === 0 && showAddRec !== 'new' ? (
+            <div className="text-center py-8 text-slate-400 text-sm">Рекомендаций нет</div>
+          ) : (
+            <div className="space-y-2">
+              {recommendations.map((rec) => (
+                <div
+                  key={rec.id}
+                  className={cn(
+                    'bg-white rounded-xl border p-4',
+                    rec.is_done ? 'border-slate-100 opacity-60' : 'border-slate-200',
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() =>
+                        patchRec.mutate({ recId: rec.id, body: { is_done: !rec.is_done } })
+                      }
+                      className={cn(
+                        'mt-0.5 w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center',
+                        rec.is_done ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300',
+                      )}
+                    >
+                      {rec.is_done && <span className="text-white text-xs font-bold">✓</span>}
+                    </button>
+                    <div className="flex-1">
+                      <p
+                        className={cn(
+                          'text-sm',
+                          rec.is_done ? 'line-through text-slate-400' : 'text-slate-800',
+                        )}
+                      >
+                        {rec.text}
+                      </p>
+                      <div className="flex flex-wrap gap-3 mt-1">
+                        {rec.due_km && (
+                          <span className="text-xs text-slate-400">
+                            до {rec.due_km.toLocaleString('ru-RU')} км
+                          </span>
+                        )}
+                        {rec.due_date && (
+                          <span className="text-xs text-slate-400">
+                            до {new Date(rec.due_date).toLocaleDateString('ru-RU')}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-300">
+                          {new Date(rec.created_at).toLocaleDateString('ru-RU')}
+                          {rec.created_user && ` · ${rec.created_user.name}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddRuleForm({
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  onSubmit: (body: Record<string, unknown>) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [workName, setWorkName] = useState('');
+  const [intervalKm, setIntervalKm] = useState('');
+  const [intervalMonths, setIntervalMonths] = useState('');
+  const [lastKm, setLastKm] = useState('');
+  const [lastDate, setLastDate] = useState('');
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <p className="text-sm font-semibold text-slate-700">Новый регламент</p>
+      <input
+        type="text"
+        value={workName}
+        onChange={(e) => setWorkName(e.target.value)}
+        placeholder="Название работы (напр. Замена масла)"
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="number"
+          value={intervalKm}
+          onChange={(e) => setIntervalKm(e.target.value)}
+          placeholder="Интервал, км"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
+        <input
+          type="number"
+          value={intervalMonths}
+          onChange={(e) => setIntervalMonths(e.target.value)}
+          placeholder="Интервал, мес."
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="number"
+          value={lastKm}
+          onChange={(e) => setLastKm(e.target.value)}
+          placeholder="Последний раз, км"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={lastDate}
+          onChange={(e) => setLastDate(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 border border-slate-300 text-slate-600 rounded-lg py-2 text-sm font-semibold"
+        >
+          Отмена
+        </button>
+        <button
+          disabled={!workName || isPending}
+          onClick={() =>
+            onSubmit({
+              work_name: workName,
+              interval_km: intervalKm,
+              interval_months: intervalMonths,
+              last_done_km: lastKm,
+              last_done_at: lastDate,
+            })
+          }
+          className="flex-1 bg-slate-900 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-40"
+        >
+          Добавить
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AddRecForm({
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  onSubmit: (text: string, dueKm: string, dueDate: string) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [text, setText] = useState('');
+  const [dueKm, setDueKm] = useState('');
+  const [dueDate, setDueDate] = useState('');
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <p className="text-sm font-semibold text-slate-700">Новая рекомендация</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={2}
+        placeholder="Что рекомендует мастер..."
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="number"
+          value={dueKm}
+          onChange={(e) => setDueKm(e.target.value)}
+          placeholder="Сделать до, км"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 border border-slate-300 text-slate-600 rounded-lg py-2 text-sm font-semibold"
+        >
+          Отмена
+        </button>
+        <button
+          disabled={!text || isPending}
+          onClick={() => onSubmit(text, dueKm, dueDate)}
+          className="flex-1 bg-slate-900 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-40"
+        >
+          Добавить
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CreateVehicleModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const [form, setForm] = useState({
+    brand: '',
+    model: '',
+    year: '',
+    reg_number: '',
+    vin: '',
+    color: '',
+    counterparty_id: '',
+    odometer_last: '',
+    notes: '',
+  });
+  const [error, setError] = useState('');
+
+  const { data: counterparties = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['counterparties-clients'],
+    queryFn: () =>
+      fetch('/api/counterparties?type=client')
+        .then((r) => r.json())
+        .then((d) => d.items ?? d),
+    staleTime: 60000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch('/api/garage/client-vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+      return d;
+    },
+    onSuccess: (data) => onCreated(data.id),
+    onError: (e: Error) => setError(e.message),
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-white rounded-2xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900">Новый автомобиль клиента</h3>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+                Марка *
+              </label>
+              <input
+                value={form.brand}
+                onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                placeholder="Toyota"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+                Модель
+              </label>
+              <input
+                value={form.model}
+                onChange={(e) => setForm({ ...form, model: e.target.value })}
+                placeholder="Camry"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+                Госномер *
+              </label>
+              <input
+                value={form.reg_number}
+                onChange={(e) => setForm({ ...form, reg_number: e.target.value })}
+                placeholder="А123ВС96"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+                Год
+              </label>
+              <input
+                type="number"
+                value={form.year}
+                onChange={(e) => setForm({ ...form, year: e.target.value })}
+                placeholder="2020"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+                VIN
+              </label>
+              <input
+                value={form.vin}
+                onChange={(e) => setForm({ ...form, vin: e.target.value })}
+                placeholder="JTMBE..."
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+                Цвет
+              </label>
+              <input
+                value={form.color}
+                onChange={(e) => setForm({ ...form, color: e.target.value })}
+                placeholder="Белый"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+              Клиент
+            </label>
+            <select
+              value={form.counterparty_id}
+              onChange={(e) => setForm({ ...form, counterparty_id: e.target.value })}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">— не привязан —</option>
+              {counterparties.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 font-semibold uppercase mb-1 block">
+              Текущий одометр, км
+            </label>
+            <input
+              type="number"
+              value={form.odometer_last}
+              onChange={(e) => setForm({ ...form, odometer_last: e.target.value })}
+              placeholder="150000"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+        <div className="border-t border-slate-100 px-6 py-4 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-xl text-sm"
+          >
+            Отмена
+          </button>
+          <button
+            disabled={!form.brand || !form.reg_number || createMutation.isPending}
+            onClick={() => createMutation.mutate()}
+            className="flex-1 bg-slate-900 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+          >
+            {createMutation.isPending ? '...' : 'Добавить автомобиль'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

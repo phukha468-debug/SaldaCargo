@@ -18,8 +18,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         odometer_start, odometer_end,
         created_at, updated_at,
         asset:assets(id, short_name, reg_number),
-        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
-        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name),
+        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
         works:service_order_works(
           id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description,
           custom_work_name,
@@ -102,13 +102,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     if (body.lifecycle_status === 'approved') {
       if (body.assigned_mechanic_id !== undefined || body.second_mechanic_id !== undefined) {
-        await (supabase as any)
-          .from('service_orders')
-          .update({
-            assigned_mechanic_id: (body.assigned_mechanic_id as string) || null,
-            second_mechanic_id: (body.second_mechanic_id as string) || null,
-          })
-          .eq('id', id);
+        const mechanicUpdate: Record<string, string | null> = {};
+        if (body.assigned_mechanic_id !== undefined)
+          mechanicUpdate.assigned_mechanic_id = (body.assigned_mechanic_id as string) || null;
+        if (body.second_mechanic_id !== undefined)
+          mechanicUpdate.second_mechanic_id = (body.second_mechanic_id as string) || null;
+        await (supabase as any).from('service_orders').update(mechanicUpdate).eq('id', id);
       }
 
       const { data: order, error: orderErr } = await (supabase as any)
@@ -178,21 +177,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
       }
 
-      // Начисляем ЗП механикам автоматически
+      // Начисляем ЗП механикам
       const unpaidWorks = (order.works ?? []).filter(
         (w: any) => w.status === 'completed' && !w.salary_paid,
       );
-      if (unpaidWorks.length > 0) {
-        const { data: sto } = await (supabase as any)
-          .from('sto_settings')
-          .select('hourly_rate, hourly_rate_own')
-          .limit(1)
-          .single();
-        const hourlyRate = parseFloat(
-          order.machine_type === 'own'
-            ? (sto?.hourly_rate_own ?? '1600')
-            : (sto?.hourly_rate ?? '2000'),
-        );
+      const hasManualPay =
+        body.mechanic_pay !== undefined || body.second_mechanic_pay !== undefined;
+
+      if (hasManualPay || unpaidWorks.length > 0) {
+        const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
         const { data: adminUser } = await (supabase as any)
           .from('users')
           .select('id')
@@ -200,50 +193,88 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           .limit(1)
           .single();
         const createdBy = adminUser?.id ?? null;
-        const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
-
-        const unpaidMinutes = unpaidWorks.reduce((s: number, w: any) => {
-          return s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0));
-        }, 0);
-        const unpaidHours = unpaidMinutes / 60;
-        const hasTwo = !!order.second_mechanic;
         const txns: any[] = [];
         const payMap: Record<string, string> = {};
 
-        for (const [mechData, payField] of [
-          [order.mechanic, 'mechanic_pay'],
-          [order.second_mechanic, 'second_mechanic_pay'],
-        ] as [any, string][]) {
-          if (!mechData?.id) continue;
-          const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
-          const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
-          const salary = (hours * hourlyRate * pct) / 100;
-          if (salary <= 0) continue;
-          payMap[payField] = salary.toFixed(2);
-          txns.push({
-            direction: 'expense',
-            lifecycle_status: 'approved',
-            settlement_status: 'pending',
-            amount: salary.toFixed(2),
-            category_id: CAT_PAYROLL_MECHANIC,
-            related_user_id: mechData.id,
-            created_by: createdBy,
-            description: `ЗП механика ${mechData.name} — наряд #${order.order_number} (${hours.toFixed(1)} нч × ${hourlyRate} ₽ × ${pct}%)`,
-            idempotency_key: crypto.randomUUID(),
-          });
+        if (hasManualPay) {
+          // Ручной ввод ЗП — использовать значения из запроса
+          for (const [mechData, payField, rawAmt] of [
+            [order.mechanic, 'mechanic_pay', body.mechanic_pay],
+            [order.second_mechanic, 'second_mechanic_pay', body.second_mechanic_pay],
+          ] as [any, string, unknown][]) {
+            if (!mechData?.id || rawAmt === undefined) continue;
+            const salary = parseFloat(rawAmt as string);
+            if (salary <= 0) continue;
+            payMap[payField] = salary.toFixed(2);
+            txns.push({
+              direction: 'expense',
+              lifecycle_status: 'approved',
+              settlement_status: 'pending',
+              amount: salary.toFixed(2),
+              category_id: CAT_PAYROLL_MECHANIC,
+              related_user_id: mechData.id,
+              created_by: createdBy,
+              description: `ЗП механика ${mechData.name} — наряд #${order.order_number}`,
+              idempotency_key: crypto.randomUUID(),
+            });
+          }
+        } else {
+          // Автоматический расчёт на основе нормо-часов
+          const { data: sto } = await (supabase as any)
+            .from('sto_settings')
+            .select('hourly_rate, hourly_rate_own')
+            .limit(1)
+            .single();
+          const hourlyRate = parseFloat(
+            order.machine_type === 'own'
+              ? (sto?.hourly_rate_own ?? '1600')
+              : (sto?.hourly_rate ?? '2000'),
+          );
+          const unpaidMinutes = unpaidWorks.reduce((s: number, w: any) => {
+            return s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0));
+          }, 0);
+          const unpaidHours = unpaidMinutes / 60;
+          const hasTwo = !!order.second_mechanic;
+
+          for (const [mechData, payField] of [
+            [order.mechanic, 'mechanic_pay'],
+            [order.second_mechanic, 'second_mechanic_pay'],
+          ] as [any, string][]) {
+            if (!mechData?.id) continue;
+            const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
+            const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
+            const salary = (hours * hourlyRate * pct) / 100;
+            if (salary <= 0) continue;
+            payMap[payField] = salary.toFixed(2);
+            txns.push({
+              direction: 'expense',
+              lifecycle_status: 'approved',
+              settlement_status: 'pending',
+              amount: salary.toFixed(2),
+              category_id: CAT_PAYROLL_MECHANIC,
+              related_user_id: mechData.id,
+              created_by: createdBy,
+              description: `ЗП механика ${mechData.name} — наряд #${order.order_number} (${hours.toFixed(1)} нч × ${hourlyRate} ₽ × ${pct}%)`,
+              idempotency_key: crypto.randomUUID(),
+            });
+          }
         }
 
-        if (txns.length > 0) {
+        if (txns.length > 0 || Object.keys(payMap).length > 0) {
           await Promise.all([
-            (supabase as any).from('transactions').insert(txns),
-            (supabase as any)
-              .from('service_order_works')
-              .update({ salary_paid: true })
-              .in(
-                'id',
-                unpaidWorks.map((w: any) => w.id),
-              ),
-            Object.keys(payMap).length
+            txns.length > 0
+              ? (supabase as any).from('transactions').insert(txns)
+              : Promise.resolve(),
+            unpaidWorks.length > 0
+              ? (supabase as any)
+                  .from('service_order_works')
+                  .update({ salary_paid: true })
+                  .in(
+                    'id',
+                    unpaidWorks.map((w: any) => w.id),
+                  )
+              : Promise.resolve(),
+            Object.keys(payMap).length > 0
               ? (supabase as any)
                   .from('service_orders')
                   .update({ ...payMap, updated_at: new Date().toISOString() })
