@@ -132,8 +132,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
         .eq('id', id);
 
-      // Доход с наряда — SERVICE_REVENUE (сразу completed)
-      {
+      // Доход с наряда — только для клиентских машин (свои не приносят выручки)
+      if (order.machine_type === 'client') {
         const CAT_SERVICE_REVENUE = '600e7f70-2797-474d-948b-432230036d67';
         const { data: worksForRevenue } = await (supabase as any)
           .from('service_order_works')
