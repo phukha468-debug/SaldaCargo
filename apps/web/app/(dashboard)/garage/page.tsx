@@ -2999,10 +2999,12 @@ function parseAiResponse(text: string): AiParsed | null {
 function AiImportModal({
   onClose,
   mechanics,
+  assets,
   onCreated,
 }: {
   onClose: () => void;
   mechanics: Mechanic[];
+  assets: Asset[];
   onCreated: (id: string) => void;
 }) {
   const [tab, setTab] = useState<'prompt' | 'import'>('prompt');
@@ -3013,6 +3015,8 @@ function AiImportModal({
   const [parsed, setParsed] = useState<AiParsed | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [selectedMechanic, setSelectedMechanic] = useState('');
+  const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -3055,6 +3059,14 @@ function AiImportModal({
 
   async function handleCreate() {
     if (!parsed) return;
+    if (parsed.order.machine_type === 'own' && !selectedAssetId) {
+      setCreateError('Выберите машину из автопарка');
+      return;
+    }
+    if (parsed.order.machine_type === 'client' && !selectedClientVehicle) {
+      setCreateError('Выберите или создайте автомобиль клиента');
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {
@@ -3065,6 +3077,9 @@ function AiImportModal({
           order: {
             ...parsed.order,
             assigned_mechanic_id: selectedMechanic || undefined,
+            asset_id: parsed.order.machine_type === 'own' ? selectedAssetId : undefined,
+            client_vehicle_id:
+              parsed.order.machine_type === 'client' ? selectedClientVehicle?.id : undefined,
           },
           works: parsed.works,
           parts: parsed.parts ?? [],
@@ -3373,6 +3388,51 @@ function AiImportModal({
                     </p>
                   </div>
 
+                  {/* Автомобиль клиента */}
+                  {parsed.order.machine_type === 'client' && (
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
+                        Автомобиль клиента *
+                      </label>
+                      <ClientVehicleSelector
+                        value={selectedClientVehicle}
+                        onChange={setSelectedClientVehicle}
+                      />
+                      {!selectedClientVehicle && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Выберите существующий автомобиль или создайте нового клиента
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Машина из автопарка (только для своих) */}
+                  {parsed.order.machine_type === 'own' && (
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
+                        Машина из автопарка *
+                      </label>
+                      <select
+                        value={selectedAssetId}
+                        onChange={(e) => setSelectedAssetId(e.target.value)}
+                        className={cn(
+                          'w-full border rounded-xl px-3 py-2.5 text-sm',
+                          !selectedAssetId ? 'border-red-300 bg-red-50' : 'border-slate-200',
+                        )}
+                      >
+                        <option value="">— Выберите машину —</option>
+                        {assets.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.short_name} · {a.reg_number}
+                          </option>
+                        ))}
+                      </select>
+                      {!selectedAssetId && (
+                        <p className="text-xs text-red-500 mt-1">Выберите машину из автопарка</p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Назначить механика */}
                   <div>
                     <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
@@ -3479,10 +3539,7 @@ function WorkOrdersSection() {
   });
   const { data: assets = [] } = useQuery<Asset[]>({
     queryKey: ['assets-select'],
-    queryFn: async () => {
-      const json = await fetch('/api/fleet').then((r) => r.json());
-      return Array.isArray(json?.assets) ? json.assets : [];
-    },
+    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
     staleTime: 300000,
   });
 
@@ -3905,6 +3962,7 @@ function WorkOrdersSection() {
         <AiImportModal
           onClose={() => setShowAiImport(false)}
           mechanics={mechanics}
+          assets={assets}
           onCreated={(id) => {
             qc.invalidateQueries({ queryKey: ['garage-orders'] });
             setShowAiImport(false);
@@ -3940,10 +3998,7 @@ function MaintenanceSection() {
 
   const { data: assets = [] } = useQuery<Asset[]>({
     queryKey: ['assets-select'],
-    queryFn: async () => {
-      const json = await fetch('/api/fleet').then((r) => r.json());
-      return Array.isArray(json?.assets) ? json.assets : [];
-    },
+    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
     staleTime: 300000,
   });
   const { data: items = [], isLoading } = useQuery<MaintenanceItem[]>({
@@ -4974,10 +5029,7 @@ function ReportsSection({ tab }: { tab: ReportTab }) {
 
   const { data: assets = [] } = useQuery<Asset[]>({
     queryKey: ['assets-select'],
-    queryFn: async () => {
-      const json = await fetch('/api/fleet').then((r) => r.json());
-      return Array.isArray(json?.assets) ? json.assets : [];
-    },
+    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
     staleTime: 300000,
   });
   const { data: vehicleHistory = [], isLoading: vhLoading } = useQuery<VehicleHistoryItem[]>({
@@ -5368,10 +5420,7 @@ export default function GaragePage() {
   });
   const { data: assets = [] } = useQuery<Asset[]>({
     queryKey: ['assets-select'],
-    queryFn: async () => {
-      const json = await fetch('/api/fleet').then((r) => r.json());
-      return Array.isArray(json?.assets) ? json.assets : [];
-    },
+    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
     staleTime: 300000,
   });
 

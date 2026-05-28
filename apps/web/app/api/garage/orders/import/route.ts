@@ -22,6 +22,7 @@ type ImportBody = {
   order: {
     machine_type: 'own' | 'client';
     asset_id?: string;
+    client_vehicle_id?: string;
     client_vehicle_brand?: string;
     client_vehicle_model?: string;
     client_vehicle_reg?: string;
@@ -45,10 +46,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Описание проблемы обязательно' }, { status: 400 });
     }
     if (body.order.machine_type === 'own' && !body.order.asset_id) {
-      return NextResponse.json({ error: 'Выберите машину' }, { status: 400 });
+      return NextResponse.json({ error: 'Выберите машину из автопарка' }, { status: 400 });
     }
-    if (body.order.machine_type === 'client' && !body.order.client_vehicle_brand?.trim()) {
-      return NextResponse.json({ error: 'Укажите марку клиентской машины' }, { status: 400 });
+    if (body.order.machine_type === 'client' && !body.order.client_vehicle_id) {
+      return NextResponse.json({ error: 'Выберите автомобиль клиента' }, { status: 400 });
     }
     if (!Array.isArray(body.works) || body.works.length === 0) {
       return NextResponse.json({ error: 'Список работ пуст' }, { status: 400 });
@@ -63,16 +64,43 @@ export async function POST(request: Request) {
       .limit(1)
       .maybeSingle();
 
+    // Для client-заказов подтягиваем данные авто из client_vehicles
+    let clientVehicleFields: Record<string, string | null> = {};
+    if (body.order.machine_type === 'client' && body.order.client_vehicle_id) {
+      const { data: cv } = await (supabase as any)
+        .from('client_vehicles')
+        .select('brand, model, reg_number, counterparty:counterparties(name, phone)')
+        .eq('id', body.order.client_vehicle_id)
+        .single();
+      if (cv) {
+        clientVehicleFields = {
+          client_vehicle_brand: cv.brand,
+          client_vehicle_model: cv.model ?? null,
+          client_vehicle_reg: cv.reg_number,
+          client_name: cv.counterparty?.name ?? body.order.client_name?.trim() ?? null,
+          client_phone: cv.counterparty?.phone ?? body.order.client_phone?.trim() ?? null,
+        };
+      }
+    }
+
     const { data: order, error: orderErr } = await (supabase as any)
       .from('service_orders')
       .insert({
         machine_type: body.order.machine_type,
         asset_id: body.order.asset_id || null,
-        client_vehicle_brand: body.order.client_vehicle_brand?.trim() || null,
-        client_vehicle_model: body.order.client_vehicle_model?.trim() || null,
-        client_vehicle_reg: body.order.client_vehicle_reg?.trim() || null,
-        client_name: body.order.client_name?.trim() || null,
-        client_phone: body.order.client_phone?.trim() || null,
+        client_vehicle_id: body.order.client_vehicle_id || null,
+        client_vehicle_brand:
+          clientVehicleFields.client_vehicle_brand ??
+          body.order.client_vehicle_brand?.trim() ??
+          null,
+        client_vehicle_model:
+          clientVehicleFields.client_vehicle_model ??
+          body.order.client_vehicle_model?.trim() ??
+          null,
+        client_vehicle_reg:
+          clientVehicleFields.client_vehicle_reg ?? body.order.client_vehicle_reg?.trim() ?? null,
+        client_name: clientVehicleFields.client_name ?? body.order.client_name?.trim() ?? null,
+        client_phone: clientVehicleFields.client_phone ?? body.order.client_phone?.trim() ?? null,
         odometer_start: body.order.odometer_start ?? null,
         problem_description: body.order.problem_description.trim(),
         assigned_mechanic_id: body.order.assigned_mechanic_id || null,
