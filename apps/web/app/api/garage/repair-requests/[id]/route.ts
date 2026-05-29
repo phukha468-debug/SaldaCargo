@@ -39,6 +39,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Заявка уже обработана' }, { status: 409 });
     }
 
+    const { data: adminUser } = await (supabase.from('users') as any)
+      .select('id')
+      .contains('roles', ['admin'])
+      .limit(1)
+      .maybeSingle();
+    if (!adminUser?.id) {
+      return NextResponse.json({ error: 'Администратор не найден' }, { status: 500 });
+    }
+
     let problemDesc = req.custom_description ?? '';
     if (req.fault_catalog_id) {
       const { data: fault } = await (supabase.from('fault_catalog') as any)
@@ -59,6 +68,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         status: 'created',
         lifecycle_status: 'draft',
         priority: 'normal',
+        payment_received: true,
+        created_by: adminUser.id,
       })
       .select('id, order_number')
       .single();

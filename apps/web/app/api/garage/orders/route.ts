@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
 
     const fullSelect = `
-      id, order_number, machine_type, status, lifecycle_status, priority,
+      id, order_number, machine_type, status, lifecycle_status, priority, payment_received,
       problem_description, mechanic_note, admin_note, created_at, updated_at,
       asset:assets(id, short_name, reg_number),
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     `;
 
     const activeSelect = `
-      id, order_number, machine_type, status, lifecycle_status, priority, created_at,
+      id, order_number, machine_type, status, lifecycle_status, priority, payment_received, created_at,
       problem_description, admin_note,
       asset:assets(id, short_name, reg_number),
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),

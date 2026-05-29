@@ -2466,6 +2466,7 @@ function CreateOrderModal({
 
 type TabOrder = Omit<OrderRow, 'works'> & {
   lifecycle_status?: string;
+  payment_received?: boolean;
   mechanic_note?: string | null;
   admin_note?: string | null;
   client_vehicle_model?: string | null;
@@ -3590,7 +3591,7 @@ function WorkOrdersSection() {
   const [showCreate, setShowCreate] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [showArchive, setShowArchive] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'pending_payment' | 'archive'>('active');
   const [historyDate, setHistoryDate] = useState(todayStr());
   // Filters (all client-side — instant, no API calls)
   const [search, setSearch] = useState('');
@@ -3619,7 +3620,7 @@ function WorkOrdersSection() {
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 120000,
-    enabled: showArchive,
+    enabled: activeTab === 'archive',
   });
 
   const { data: mechanics = [] } = useQuery<Mechanic[]>({
@@ -3649,24 +3650,37 @@ function WorkOrdersSection() {
     },
   });
 
-  // Active orders = not cancelled/returned
+  // Draft orders (in work)
   const activePool = useMemo(
+    () => allOrders.filter((o) => o.lifecycle_status === 'draft'),
+    [allOrders],
+  );
+
+  // Client orders approved but not yet paid
+  const pendingPaymentPool = useMemo(
     () =>
       allOrders.filter(
-        (o) => o.lifecycle_status !== 'cancelled' && o.lifecycle_status !== 'returned',
+        (o) =>
+          o.lifecycle_status === 'approved' && o.machine_type === 'client' && !o.payment_received,
       ),
     [allOrders],
   );
 
-  // Counters for status badges
+  // Counters for tab badges
   const inWorkCount = activePool.filter((o) => o.status === 'in_progress').length;
   const reviewCount = activePool.filter(
     (o) => o.lifecycle_status === 'draft' && o.status === 'completed',
   ).length;
+  const pendingPaymentCount = pendingPaymentPool.length;
 
   // Client-side filtered list (instant)
   const filteredOrders = useMemo(() => {
-    const pool = showArchive ? historyOrders : activePool;
+    const pool =
+      activeTab === 'archive'
+        ? historyOrders
+        : activeTab === 'pending_payment'
+          ? pendingPaymentPool
+          : activePool;
     let result = pool;
 
     if (search.trim()) {
@@ -3699,7 +3713,16 @@ function WorkOrdersSection() {
       }
     }
     return result;
-  }, [activePool, historyOrders, showArchive, search, filterType, filterMechanic, filterStatus]);
+  }, [
+    activePool,
+    pendingPaymentPool,
+    historyOrders,
+    activeTab,
+    search,
+    filterType,
+    filterMechanic,
+    filterStatus,
+  ]);
 
   const totalCost = useMemo(
     () =>
@@ -3726,7 +3749,9 @@ function WorkOrdersSection() {
     const normH = works.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
     const factH = works.reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
     const isReview = o.lifecycle_status === 'draft' && o.status === 'completed';
-    const isClosed = o.lifecycle_status === 'approved';
+    const isPendingPayment =
+      o.lifecycle_status === 'approved' && o.machine_type === 'client' && !o.payment_received;
+    const isClosed = o.lifecycle_status === 'approved' && !isPendingPayment;
 
     const vehicleLabel =
       o.machine_type === 'own'
@@ -3742,13 +3767,15 @@ function WorkOrdersSection() {
 
     const statusBadge = isClosed
       ? { label: 'Закрыт', cls: 'bg-emerald-100 text-emerald-700' }
-      : isReview
-        ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
-        : o.status === 'in_progress'
-          ? { label: 'В работе', cls: 'bg-blue-100 text-blue-700' }
-          : o.status === 'completed'
-            ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
-            : { label: 'В очереди', cls: 'bg-slate-100 text-slate-500' };
+      : isPendingPayment
+        ? { label: 'Ждёт оплаты', cls: 'bg-orange-100 text-orange-700' }
+        : isReview
+          ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
+          : o.status === 'in_progress'
+            ? { label: 'В работе', cls: 'bg-blue-100 text-blue-700' }
+            : o.status === 'completed'
+              ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
+              : { label: 'В очереди', cls: 'bg-slate-100 text-slate-500' };
 
     return (
       <div
@@ -3835,6 +3862,17 @@ function WorkOrdersSection() {
               {normH.toFixed(1)}нч{factH > 0 ? ` / ${factH.toFixed(1)}` : ''}
             </span>
           )}
+          {isPendingPayment && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                patch.mutate({ id: o.id, body: { payment_received: true } });
+              }}
+              className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 mt-0.5"
+            >
+              Оплачено ✓
+            </button>
+          )}
           {isClosed && (
             <button
               onClick={(e) => {
@@ -3878,7 +3916,7 @@ function WorkOrdersSection() {
     return Array.from(map.values());
   }, [filteredOrders, groupByVehicle]);
 
-  const isLoading = showArchive ? histLoading : allLoading;
+  const isLoading = activeTab === 'archive' ? histLoading : allLoading;
 
   return (
     <div className="space-y-4">
@@ -3924,19 +3962,19 @@ function WorkOrdersSection() {
         </div>
       </div>
 
-      {/* ── Mode: Active / Archive ── */}
+      {/* ── Tabs: Active / Pending Payment / Archive ── */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
           <button
-            onClick={() => setShowArchive(false)}
+            onClick={() => setActiveTab('active')}
             className={cn(
               'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-              !showArchive
+              activeTab === 'active'
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700',
             )}
           >
-            Активные
+            В работе
             {inWorkCount > 0 && (
               <span className="bg-blue-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                 {inWorkCount}
@@ -3949,10 +3987,26 @@ function WorkOrdersSection() {
             )}
           </button>
           <button
-            onClick={() => setShowArchive(true)}
+            onClick={() => setActiveTab('pending_payment')}
+            className={cn(
+              'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
+              activeTab === 'pending_payment'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            Ждёт оплаты
+            {pendingPaymentCount > 0 && (
+              <span className="bg-orange-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {pendingPaymentCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('archive')}
             className={cn(
               'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors',
-              showArchive
+              activeTab === 'archive'
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700',
             )}
@@ -3960,9 +4014,9 @@ function WorkOrdersSection() {
             Архив
           </button>
         </div>
-        {showArchive && <DateNav date={historyDate} onChange={setHistoryDate} />}
+        {activeTab === 'archive' && <DateNav date={historyDate} onChange={setHistoryDate} />}
         {/* Группировка по машинам (только для активных) */}
-        {!showArchive && (
+        {activeTab === 'active' && (
           <button
             onClick={() => setGroupByVehicle((v) => !v)}
             className={cn(
@@ -3978,7 +4032,7 @@ function WorkOrdersSection() {
       </div>
 
       {/* ── Filter bar (активные только) ── */}
-      {!showArchive && (
+      {activeTab === 'active' && (
         <div className="flex flex-wrap gap-2 items-center">
           {/* Поиск */}
           <div className="relative flex-1 min-w-52">

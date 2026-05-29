@@ -126,10 +126,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Наряд уже утверждён' }, { status: 409 });
       }
 
-      // Утверждаем наряд
+      // Утверждаем наряд; own-машины не требуют оплаты от клиента
       await (supabase as any)
         .from('service_orders')
-        .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
+        .update({
+          lifecycle_status: 'approved',
+          payment_received: order.machine_type === 'own',
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id);
 
       // Доход с наряда — только для клиентских машин (свои не приносят выручки)
@@ -305,6 +309,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'odometer_start',
       'odometer_end',
       'is_ready_for_pickup',
+      'payment_received',
     ];
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
