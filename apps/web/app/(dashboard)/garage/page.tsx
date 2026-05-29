@@ -2538,9 +2538,19 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
 function MonthNav({ month, onChange }: { month: string; onChange: (m: string) => void }) {
   const [y, mn] = month.split('-').map(Number) as [number, number];
   const shift = (delta: number) => {
-    const d = new Date(y, mn - 1 + delta, 1);
-    onChange(d.toISOString().slice(0, 7));
+    let newM = mn + delta;
+    let newY = y;
+    if (newM > 12) {
+      newM = 1;
+      newY += 1;
+    }
+    if (newM < 1) {
+      newM = 12;
+      newY -= 1;
+    }
+    onChange(`${newY}-${String(newM).padStart(2, '0')}`);
   };
+  const currentMonth = todayStr().slice(0, 7);
   const label = new Date(y, mn - 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
   return (
     <div className="flex items-center gap-2">
@@ -2550,7 +2560,11 @@ function MonthNav({ month, onChange }: { month: string; onChange: (m: string) =>
       <span className="text-sm font-semibold text-slate-700 capitalize min-w-[120px] text-center">
         {label}
       </span>
-      <button onClick={() => shift(1)} className="p-1.5 rounded-lg hover:bg-slate-100">
+      <button
+        onClick={() => shift(1)}
+        disabled={month >= currentMonth}
+        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30"
+      >
         <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_right</span>
       </button>
     </div>
@@ -3634,6 +3648,17 @@ function WorkOrdersSection() {
     enabled: activeTab === 'archive',
   });
 
+  const { data: pendingPaymentOrders = [], isLoading: pendingLoading } = useQuery<TabOrder[]>({
+    queryKey: ['garage-orders', 'pending_payment'],
+    queryFn: () =>
+      fetch('/api/garage/orders?filter=pending_payment')
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : [])),
+    staleTime: 30000,
+    refetchInterval: 60000,
+    enabled: activeTab === 'pending_payment',
+  });
+
   const { data: mechanics = [] } = useQuery<Mechanic[]>({
     queryKey: ['mechanics-list'],
     queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
@@ -3667,22 +3692,15 @@ function WorkOrdersSection() {
     [allOrders],
   );
 
-  // Client orders approved but not yet paid
-  const pendingPaymentPool = useMemo(
-    () =>
-      allOrders.filter(
-        (o) =>
-          o.lifecycle_status === 'approved' && o.machine_type === 'client' && !o.payment_received,
-      ),
-    [allOrders],
-  );
+  // Client orders approved but not yet paid — dedicated query, no limit issues
+  const pendingPaymentPool = pendingPaymentOrders;
 
   // Counters for tab badges
   const inWorkCount = activePool.filter((o) => o.status === 'in_progress').length;
   const reviewCount = activePool.filter(
     (o) => o.lifecycle_status === 'draft' && o.status === 'completed',
   ).length;
-  const pendingPaymentCount = pendingPaymentPool.length;
+  const pendingPaymentCount = pendingPaymentOrders.length;
 
   // Client-side filtered list (instant)
   const filteredOrders = useMemo(() => {
@@ -3726,7 +3744,7 @@ function WorkOrdersSection() {
     return result;
   }, [
     activePool,
-    pendingPaymentPool,
+    pendingPaymentOrders,
     historyOrders,
     activeTab,
     search,
@@ -3927,7 +3945,12 @@ function WorkOrdersSection() {
     return Array.from(map.values());
   }, [filteredOrders, groupByVehicle]);
 
-  const isLoading = activeTab === 'archive' ? histLoading : allLoading;
+  const isLoading =
+    activeTab === 'archive'
+      ? histLoading
+      : activeTab === 'pending_payment'
+        ? pendingLoading
+        : allLoading;
 
   return (
     <div className="space-y-4">

@@ -54,8 +54,10 @@ export async function GET(request: Request) {
         q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
       } else if (month) {
         const [y, m] = month.split('-').map(Number);
-        const start = new Date(y, m - 1, 1).toISOString();
-        const end = new Date(y, m, 1).toISOString();
+        const start = `${month}-01T00:00:00.000Z`;
+        const nextM = m === 12 ? 1 : m + 1;
+        const nextY = m === 12 ? y + 1 : y;
+        const end = `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000Z`;
         q = q.gte('created_at', start).lt('created_at', end);
       }
 
@@ -78,6 +80,12 @@ export async function GET(request: Request) {
     } else if (filter === 'active') {
       // All open (draft) orders regardless of work status
       q = q.eq('lifecycle_status', 'draft');
+    } else if (filter === 'pending_payment') {
+      // Approved client orders waiting for cash payment
+      q = q
+        .eq('lifecycle_status', 'approved')
+        .eq('machine_type', 'client')
+        .eq('payment_received', false);
     } else if (filter === 'all') {
       q = q.neq('lifecycle_status', 'cancelled');
     }
