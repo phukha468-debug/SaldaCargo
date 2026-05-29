@@ -3159,10 +3159,7 @@ function AiImportModal({
   assets: Asset[];
   onCreated: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<'prompt' | 'import'>('prompt');
-  const [prompt, setPrompt] = useState<string | null>(null);
-  const [promptLoading, setPromptLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const aiBackdropDown = useRef(false);
   const [pasted, setPasted] = useState('');
   const [parsed, setParsed] = useState<AiParsed | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -3172,37 +3169,12 @@ function AiImportModal({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Загружаем промпт при открытии вкладки
-  async function loadPrompt() {
-    if (prompt) return;
-    setPromptLoading(true);
-    try {
-      const r = await fetch('/api/garage/ai-prompt');
-      const d = await r.json();
-      setPrompt(d.prompt ?? '');
-    } finally {
-      setPromptLoading(false);
-    }
-  }
-
-  function handleTabChange(t: 'prompt' | 'import') {
-    setTab(t);
-    if (t === 'prompt') loadPrompt();
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    await navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   function handleRecognize() {
     setParseError(null);
     const result = parseAiResponse(pasted);
     if (!result) {
       setParseError(
-        'Не удалось найти JSON с данными наряда. Убедитесь, что скопировали весь ответ ИИ целиком — включая JSON-блок в конце с полями "order", "works", "parts".',
+        'JSON не найден. Убедитесь, что в тексте есть блок с полями "order", "works", "parts".',
       );
       return;
     }
@@ -3257,392 +3229,356 @@ function AiImportModal({
   const partsTotal =
     parsed?.parts?.reduce((s, p) => s + parseFloat(p.unit_price || '0') * (p.quantity || 1), 0) ??
     0;
+  const grandTotal = worksTotal + partsTotal;
+  const totalNormH = parsed?.works?.reduce((s, w) => s + (w.norm_minutes || 0), 0) ?? 0;
+
+  const canCreate =
+    !creating &&
+    !!parsed &&
+    (parsed.order.machine_type === 'own' ? !!selectedAssetId : !!selectedClientVehicle) &&
+    !!selectedMechanic;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onMouseDown={(e) => {
+        aiBackdropDown.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (aiBackdropDown.current && e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+        className={cn(
+          'bg-white rounded-2xl shadow-2xl flex flex-col transition-all',
+          parsed ? 'w-full max-w-4xl max-h-[92vh]' : 'w-full max-w-xl max-h-[80vh]',
+        )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* ── Шапка ── */}
         <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Создать наряд через ИИ</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Скопируйте промпт → вставьте в ChatGPT/Claude → вставьте ответ сюда
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+              <svg
+                className="w-4 h-4 text-violet-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Создать наряд через ИИ</h2>
+              <p className="text-xs text-slate-400">
+                {parsed
+                  ? `Распознано: ${parsed.works.length} работ · ${grandTotal.toLocaleString('ru-RU')} ₽`
+                  : 'Вставьте JSON-ответ от ИИ'}
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-xl leading-none"
+          >
             ×
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex-shrink-0 flex gap-1 px-6 pt-3">
-          {(
-            [
-              { key: 'prompt', label: '1. Промпт для ИИ' },
-              { key: 'import', label: '2. Вставить ответ' },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => handleTabChange(t.key)}
-              className={cn(
-                'text-sm font-semibold px-4 py-2 rounded-t-lg border-b-2 transition-colors',
-                tab === t.key
-                  ? 'border-slate-900 text-slate-900'
-                  : 'border-transparent text-slate-400 hover:text-slate-600',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
-          {/* Tab 1: Промпт */}
-          {tab === 'prompt' && (
-            <div className="space-y-3">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-                <p className="font-semibold mb-1">Как использовать:</p>
-                <ol className="list-decimal list-inside space-y-1 text-xs">
-                  <li>
-                    Нажмите «Скопировать промпт» и вставьте его в ChatGPT как «System Instructions»
-                    или в Claude как «Project Instructions»
-                  </li>
-                  <li>В следующем сообщении опишите автомобиль и проблему</li>
-                  <li>Скопируйте весь ответ ИИ целиком и перейдите на вкладку «Вставить ответ»</li>
-                </ol>
+        {/* ── Контент ── */}
+        {!parsed ? (
+          /* ─── Шаг 1: Ввод JSON ─── */
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
+              <p className="font-semibold text-slate-800 mb-1">Как использовать</p>
+              <p className="text-xs leading-relaxed">
+                Получите ответ ИИ со сметой (через наш промпт или свой), скопируйте его целиком и
+                вставьте сюда. Система автоматически найдёт JSON с данными наряда.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest block mb-2">
+                Ответ от ИИ
+              </label>
+              <textarea
+                rows={12}
+                value={pasted}
+                onChange={(e) => {
+                  setPasted(e.target.value);
+                  setParseError(null);
+                }}
+                placeholder={
+                  'Вставьте сюда ответ от ChatGPT / Claude / другого ИИ...\n\nСистема найдёт JSON с данными наряда автоматически.'
+                }
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 leading-relaxed"
+              />
+            </div>
+            {parseError && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                <span className="text-red-500 mt-0.5 shrink-0">✕</span>
+                <p className="text-sm text-red-700">{parseError}</p>
               </div>
-              <button
-                onClick={copyPrompt}
-                disabled={promptLoading || !prompt}
-                className={cn(
-                  'w-full font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2',
-                  copied
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-900 hover:bg-slate-700 text-white disabled:opacity-50',
-                )}
-              >
-                {promptLoading ? (
-                  'Загрузка...'
-                ) : copied ? (
-                  '✓ Скопировано!'
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Скопировать промпт
-                  </>
-                )}
-              </button>
-              {prompt && (
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-medium">
-                    Содержимое промпта (для справки)
+            )}
+            <button
+              onClick={handleRecognize}
+              disabled={!pasted.trim()}
+              className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl text-sm disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              Распознать наряд
+            </button>
+          </div>
+        ) : (
+          /* ─── Шаг 2: Подтверждение ─── */
+          <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
+            {/* Левая колонка: данные из ИИ */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 border-r border-slate-100">
+              {/* Шапка авто */}
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="bg-slate-900 px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-bold text-sm">
+                      {parsed.order.machine_type === 'client'
+                        ? [parsed.order.client_vehicle_brand, parsed.order.client_vehicle_model]
+                            .filter(Boolean)
+                            .join(' ') || 'Клиентский авт.'
+                        : 'Автопарк компании'}
+                    </p>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      {parsed.order.client_vehicle_reg
+                        ? `Госномер: ${parsed.order.client_vehicle_reg}`
+                        : (parsed.order.client_name ?? '')}
+                    </p>
                   </div>
-                  <pre className="text-xs text-slate-600 p-3 overflow-x-auto whitespace-pre-wrap max-h-64 font-mono leading-relaxed">
-                    {prompt}
-                  </pre>
+                  <span
+                    className={cn(
+                      'text-xs font-black px-2 py-1 rounded-full',
+                      parsed.order.priority === 'urgent'
+                        ? 'bg-red-500 text-white'
+                        : parsed.order.priority === 'low'
+                          ? 'bg-blue-200 text-blue-800'
+                          : 'bg-slate-700 text-slate-200',
+                    )}
+                  >
+                    {PRIORITY_LABEL[parsed.order.priority ?? 'normal']}
+                  </span>
+                </div>
+                <div className="px-4 py-3 bg-slate-50 text-sm text-slate-700 border-t border-slate-200">
+                  {parsed.order.problem_description}
+                </div>
+              </div>
+
+              {/* Метрики */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Работы</p>
+                  <p className="text-base font-black text-slate-900">
+                    {worksTotal.toLocaleString('ru-RU')} ₽
+                  </p>
+                </div>
+                {partsTotal > 0 && (
+                  <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                    <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">
+                      Запчасти
+                    </p>
+                    <p className="text-base font-black text-slate-900">
+                      {partsTotal.toLocaleString('ru-RU')} ₽
+                    </p>
+                  </div>
+                )}
+                <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
+                  <p className="text-[10px] text-emerald-600 uppercase font-semibold mb-1">Итого</p>
+                  <p className="text-base font-black text-emerald-800">
+                    {grandTotal.toLocaleString('ru-RU')} ₽
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">
+                    Нормочасы
+                  </p>
+                  <p className="text-base font-black text-slate-900">
+                    {(totalNormH / 60).toFixed(1)} ч
+                  </p>
+                </div>
+              </div>
+
+              {/* Работы */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Работы · {parsed.works.length}
+                  </span>
+                </div>
+                {parsed.works.map((w, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-start gap-3 px-3 py-2.5',
+                      i > 0 && 'border-t border-slate-100',
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">
+                        {w.custom_work_name}
+                      </p>
+                      {w.work_description && (
+                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                          {w.work_description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {(w.norm_minutes / 60).toFixed(1)} нч
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Запчасти */}
+              {parsed.parts && parsed.parts.length > 0 && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Запчасти · {parsed.parts.length}
+                    </span>
+                  </div>
+                  {parsed.parts.map((p, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5',
+                        i > 0 && 'border-t border-slate-100',
+                      )}
+                    >
+                      <p className="flex-1 text-sm text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-400 shrink-0">
+                        {p.quantity} {p.unit || 'шт'}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-900 shrink-0">
+                        {(parseFloat(p.unit_price) * p.quantity).toLocaleString('ru-RU')} ₽
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          )}
 
-          {/* Tab 2: Вставить ответ */}
-          {tab === 'import' && (
-            <div className="space-y-4">
-              {!parsed ? (
-                <>
+            {/* Правая колонка: выбор машины и механика */}
+            <div className="w-full lg:w-80 flex-shrink-0 flex flex-col border-t lg:border-t-0 border-slate-100">
+              <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Привязка
+                </p>
+
+                {/* Машина */}
+                {parsed.order.machine_type === 'own' ? (
                   <div>
-                    <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
-                      Вставьте полный ответ от ИИ
-                    </label>
-                    <textarea
-                      rows={10}
-                      value={pasted}
-                      onChange={(e) => {
-                        setPasted(e.target.value);
-                        setParseError(null);
-                      }}
-                      placeholder="Скопируйте и вставьте сюда весь ответ от ChatGPT или Claude, включая смету и JSON-блок..."
-                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-slate-300"
-                    />
-                  </div>
-                  {parseError && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-                      {parseError}
-                    </div>
-                  )}
-                  <button
-                    onClick={handleRecognize}
-                    disabled={!pasted.trim()}
-                    className="w-full bg-slate-900 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-40"
-                  >
-                    Распознать наряд →
-                  </button>
-                </>
-              ) : (
-                <div className="space-y-5">
-                  {/* Авто и клиент */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-1">
-                    <p className="text-xs font-semibold text-blue-700 uppercase mb-2">
-                      Автомобиль и клиент
-                    </p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      <div className="text-slate-500">Марка/модель</div>
-                      <div className="font-medium text-slate-800">
-                        {[parsed.order.client_vehicle_brand, parsed.order.client_vehicle_model]
-                          .filter(Boolean)
-                          .join(' ') || '—'}
-                      </div>
-                      <div className="text-slate-500">Госномер</div>
-                      <div className="font-medium text-slate-800">
-                        {parsed.order.client_vehicle_reg || '—'}
-                      </div>
-                      {parsed.order.client_name && (
-                        <>
-                          <div className="text-slate-500">Клиент</div>
-                          <div className="font-medium text-slate-800">
-                            {parsed.order.client_name}
-                          </div>
-                        </>
-                      )}
-                      <div className="text-slate-500">Приоритет</div>
-                      <div className="font-medium text-slate-800">
-                        {PRIORITY_LABEL[parsed.order.priority ?? 'normal'] ?? parsed.order.priority}
-                      </div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-blue-200">
-                      <p className="text-xs text-slate-500 mb-0.5">Описание проблемы</p>
-                      <p className="text-sm text-slate-800">{parsed.order.problem_description}</p>
-                    </div>
-                  </div>
-
-                  {/* Работы */}
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                      Работы ({parsed.works.length})
-                    </p>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500">
-                            <th className="text-left px-3 py-2">Работа</th>
-                            <th className="text-right px-3 py-2 w-16">Нч</th>
-                            <th className="text-right px-3 py-2 w-24">Стоимость</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {parsed.works.map((w, i) => (
-                            <tr key={i} className="border-b border-slate-100 last:border-0">
-                              <td className="px-3 py-2">
-                                <p className="font-medium text-slate-800">{w.custom_work_name}</p>
-                                {w.work_description && (
-                                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
-                                    {w.work_description}
-                                  </p>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right text-slate-500 tabular-nums">
-                                {(w.norm_minutes / 60).toFixed(1)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-semibold text-slate-800 tabular-nums">
-                                {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-slate-50">
-                            <td
-                              colSpan={2}
-                              className="px-3 py-2 text-xs text-slate-500 font-semibold"
-                            >
-                              Итого работы
-                            </td>
-                            <td className="px-3 py-2 text-right font-black text-slate-800 tabular-nums">
-                              {worksTotal.toLocaleString('ru-RU')} ₽
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Запчасти */}
-                  {parsed.parts && parsed.parts.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                        Запчасти ({parsed.parts.length})
-                      </p>
-                      <div className="border border-slate-200 rounded-xl overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500">
-                              <th className="text-left px-3 py-2">Наименование</th>
-                              <th className="text-right px-3 py-2 w-16">Кол-во</th>
-                              <th className="text-right px-3 py-2 w-24">Сумма</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {parsed.parts.map((p, i) => (
-                              <tr key={i} className="border-b border-slate-100 last:border-0">
-                                <td className="px-3 py-2 font-medium text-slate-800">{p.name}</td>
-                                <td className="px-3 py-2 text-right text-slate-500 tabular-nums">
-                                  {p.quantity} {p.unit || 'шт'}
-                                </td>
-                                <td className="px-3 py-2 text-right font-semibold text-slate-800 tabular-nums">
-                                  {(parseFloat(p.unit_price) * p.quantity).toLocaleString('ru-RU')}{' '}
-                                  ₽
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-slate-50">
-                              <td
-                                colSpan={2}
-                                className="px-3 py-2 text-xs text-slate-500 font-semibold"
-                              >
-                                Итого запчасти
-                              </td>
-                              <td className="px-3 py-2 text-right font-black text-slate-800 tabular-nums">
-                                {partsTotal.toLocaleString('ru-RU')} ₽
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Итого */}
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-emerald-700 font-semibold uppercase">
-                        Итого к оплате
-                      </p>
-                      {parsed.recommendations && parsed.recommendations.length > 0 && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          {parsed.recommendations.length} рекомендаций от ИИ
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-2xl font-black text-emerald-800">
-                      {(worksTotal + partsTotal).toLocaleString('ru-RU')} ₽
-                    </p>
-                  </div>
-
-                  {/* Автомобиль клиента */}
-                  {parsed.order.machine_type === 'client' && (
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
-                        Автомобиль клиента *
-                      </label>
-                      <ClientVehicleSelector
-                        value={selectedClientVehicle}
-                        onChange={setSelectedClientVehicle}
-                      />
-                      {!selectedClientVehicle && (
-                        <p className="text-xs text-red-500 mt-1">
-                          Выберите существующий автомобиль или создайте нового клиента
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Машина из автопарка (только для своих) */}
-                  {parsed.order.machine_type === 'own' && (
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
-                        Машина из автопарка *
-                      </label>
-                      <select
-                        value={selectedAssetId}
-                        onChange={(e) => setSelectedAssetId(e.target.value)}
-                        className={cn(
-                          'w-full border rounded-xl px-3 py-2.5 text-sm',
-                          !selectedAssetId ? 'border-red-300 bg-red-50' : 'border-slate-200',
-                        )}
-                      >
-                        <option value="">— Выберите машину —</option>
-                        {assets.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.short_name} · {a.reg_number}
-                          </option>
-                        ))}
-                      </select>
-                      {!selectedAssetId && (
-                        <p className="text-xs text-red-500 mt-1">Выберите машину из автопарка</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Назначить механика */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-500 uppercase block mb-1.5">
-                      Назначить механика
+                    <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                      Машина из автопарка *
                     </label>
                     <select
-                      value={selectedMechanic}
-                      onChange={(e) => setSelectedMechanic(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                      value={selectedAssetId}
+                      onChange={(e) => setSelectedAssetId(e.target.value)}
+                      className={cn(
+                        'w-full border rounded-xl px-3 py-2.5 text-sm bg-white',
+                        !selectedAssetId ? 'border-red-300 bg-red-50' : 'border-slate-200',
+                      )}
                     >
-                      <option value="">— Назначить позже —</option>
-                      {mechanics.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
+                      <option value="">— Выберите машину —</option>
+                      {assets.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.short_name} · {a.reg_number}
                         </option>
                       ))}
                     </select>
+                    {!selectedAssetId && <p className="text-xs text-red-500 mt-1">Обязательно</p>}
                   </div>
-
-                  {createError && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-                      {createError}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        setParsed(null);
-                        setParseError(null);
-                      }}
-                      className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-50"
-                    >
-                      ← Изменить ответ
-                    </button>
-                    <button
-                      onClick={handleCreate}
-                      disabled={
-                        creating ||
-                        (parsed?.order.machine_type === 'own'
-                          ? !selectedAssetId
-                          : !selectedClientVehicle) ||
-                        !selectedMechanic
-                      }
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
-                    >
-                      {creating ? 'Создаём...' : 'Создать наряд →'}
-                    </button>
+                ) : (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                      Автомобиль клиента *
+                    </label>
+                    <ClientVehicleSelector
+                      value={selectedClientVehicle}
+                      onChange={setSelectedClientVehicle}
+                    />
+                    {!selectedClientVehicle && (
+                      <p className="text-xs text-red-500 mt-1">Обязательно</p>
+                    )}
                   </div>
+                )}
+
+                {/* Механик */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                    Исполнитель *
+                  </label>
+                  <select
+                    value={selectedMechanic}
+                    onChange={(e) => setSelectedMechanic(e.target.value)}
+                    className={cn(
+                      'w-full border rounded-xl px-3 py-2.5 text-sm bg-white',
+                      !selectedMechanic ? 'border-red-300 bg-red-50' : 'border-slate-200',
+                    )}
+                  >
+                    <option value="">— Выберите механика —</option>
+                    {mechanics.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedMechanic && <p className="text-xs text-red-500 mt-1">Обязательно</p>}
                 </div>
-              )}
+
+                {createError && (
+                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                    <span className="text-red-500 shrink-0 mt-0.5">✕</span>
+                    <p className="text-sm text-red-700">{createError}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Кнопки */}
+              <div className="flex-shrink-0 border-t border-slate-100 px-5 py-4 space-y-2">
+                <button
+                  onClick={handleCreate}
+                  disabled={!canCreate}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm disabled:opacity-40 transition-colors"
+                >
+                  {creating ? 'Создаём...' : 'Создать наряд →'}
+                </button>
+                <button
+                  onClick={() => {
+                    setParsed(null);
+                    setParseError(null);
+                    setCreateError(null);
+                  }}
+                  className="w-full border border-slate-200 text-slate-500 hover:bg-slate-50 font-semibold py-2 rounded-xl text-sm transition-colors"
+                >
+                  ← Вставить другой ответ
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
