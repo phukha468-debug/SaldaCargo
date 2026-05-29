@@ -107,7 +107,9 @@ export async function POST(request: Request) {
         odometer_start: body.order.odometer_start ?? null,
         problem_description: body.order.problem_description.trim(),
         assigned_mechanic_id: body.order.assigned_mechanic_id || null,
-        priority: body.order.priority ?? 'normal',
+        priority: ['low', 'normal', 'urgent'].includes(body.order.priority ?? '')
+          ? body.order.priority
+          : 'normal',
         status: 'created',
         lifecycle_status: 'draft',
         ai_generated_text: body.ai_generated_text || null,

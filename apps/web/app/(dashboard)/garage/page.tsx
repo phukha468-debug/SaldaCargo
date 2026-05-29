@@ -2991,6 +2991,9 @@ function tryParseJson(raw: string): AiParsed | null {
       if (parsed.order?.machine_type && !['own', 'client'].includes(parsed.order.machine_type)) {
         parsed.order.machine_type = 'own';
       }
+      if (parsed.order?.priority && !['low', 'normal', 'urgent'].includes(parsed.order.priority)) {
+        parsed.order.priority = 'normal';
+      }
       return parsed as AiParsed;
     }
     return null;
