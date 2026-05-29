@@ -2,7 +2,7 @@
 
 > **Правило:** При изменении логики в любом из приложений — найди строку в этой таблице и обнови обе стороны.  
 > Этот файл обновляется при каждом изменении API.  
-> Последнее обновление: 26.05.2026
+> Последнее обновление: 29.05.2026
 
 ---
 
@@ -36,16 +36,17 @@
 
 ## 2. НАРЯДЫ (SERVICE ORDERS)
 
-| Фича                     | MiniApp файл                                   | WebApp файл                                       | Статус | Примечание                                                                         |
-| ------------------------ | ---------------------------------------------- | ------------------------------------------------- | ------ | ---------------------------------------------------------------------------------- |
-| Список на ревью          | `api/admin/service-orders?filter=review`       | `api/garage/orders?filter=review`                 | ✅     | Фильтр: `lifecycle=draft`                                                          |
-| Список активных          | `api/admin/service-orders?filter=active`       | `api/garage/orders?filter=active`                 | ✅     | Фильтр: `lifecycle=approved + status in (created,in_progress)`                     |
-| История нарядов          | `api/admin/service-orders?filter=history`      | `api/garage/orders?filter=history`                | ✅     | Фильтр: `or(cancelled/returned, approved+completed)`                               |
-| Одобрить наряд           | `api/admin/service-orders/[id]` action=approve | `api/garage/orders/[id]` PATCH lifecycle=approved | ✅     | Принимает `mechanic_id`/`second_mechanic_id` для смены исполнителя при утверждении |
-| Вернуть наряд            | `api/admin/service-orders/[id]` action=return  | `api/garage/orders/[id]` PATCH lifecycle=returned | ✅     |                                                                                    |
-| Отменить наряд           | `api/admin/service-orders/[id]` action=cancel  | `api/garage/orders/[id]` DELETE                   | ⚠️     | MiniApp: soft-delete. WebApp: hard DELETE (intentional — per kontext.md)           |
-| Создать наряд (водитель) | `api/driver/service-orders` POST               | —                                                 | —      | lifecycle=draft, ждёт апрува                                                       |
-| Создать наряд (админ)    | —                                              | `api/garage/orders` POST                          | ⚠️     | lifecycle=approved (админ создаёт сразу апрувнутым)                                |
+| Фича                     | MiniApp файл                                   | WebApp файл                                       | Статус | Примечание                                                                                              |
+| ------------------------ | ---------------------------------------------- | ------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| Список на ревью          | `api/admin/service-orders?filter=review`       | `api/garage/orders?filter=review`                 | ✅     | Фильтр: `lifecycle=draft`                                                                               |
+| Список активных          | `api/admin/service-orders?filter=active`       | `api/garage/orders?filter=active`                 | ✅     | Фильтр: `lifecycle=approved + status in (created,in_progress)`                                          |
+| История нарядов          | `api/admin/service-orders?filter=history`      | `api/garage/orders?filter=history`                | ✅     | Фильтр: `or(cancelled/returned, approved+completed)`                                                    |
+| Одобрить наряд           | `api/admin/service-orders/[id]` action=approve | `api/garage/orders/[id]` PATCH lifecycle=approved | ✅     | Принимает `mechanic_id`/`second_mechanic_id` для смены исполнителя при утверждении                      |
+| Вернуть наряд            | `api/admin/service-orders/[id]` action=return  | `api/garage/orders/[id]` PATCH lifecycle=returned | ✅     |                                                                                                         |
+| Отменить наряд           | `api/admin/service-orders/[id]` action=cancel  | `api/garage/orders/[id]` DELETE                   | ⚠️     | MiniApp: soft-delete. WebApp: hard DELETE (intentional — per kontext.md)                                |
+| Создать наряд (водитель) | `api/driver/service-orders` POST               | —                                                 | —      | lifecycle=draft, ждёт апрува                                                                            |
+| Создать наряд (админ)    | `api/admin/service-orders` POST                | `api/garage/orders` POST                          | ✅     | **Обязательны:** machine (asset_id или client_vehicle_id) + assigned_mechanic_id. 400 если отсутствуют. |
+| Создать наряд через ИИ   | —                                              | `api/garage/orders/import` POST                   | —      | Только WebApp. Нормализовать machine_type и priority из AI-ответа перед отправкой.                      |
 
 ---
 
