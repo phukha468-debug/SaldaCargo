@@ -2966,6 +2966,9 @@ function tryParseJson(raw: string): AiParsed | null {
   try {
     const parsed = JSON.parse(raw.trim());
     if (parsed && typeof parsed === 'object' && 'order' in parsed && 'works' in parsed) {
+      if (parsed.order?.machine_type && !['own', 'client'].includes(parsed.order.machine_type)) {
+        parsed.order.machine_type = 'own';
+      }
       return parsed as AiParsed;
     }
     return null;
