@@ -41,16 +41,22 @@ export async function GET(request: Request) {
     `;
 
     if (filter === 'history') {
+      const month = searchParams.get('month');
       let q = (supabase.from('service_orders') as any)
         .select(fullSelect)
         .or(
           'lifecycle_status.in.(cancelled,returned),and(lifecycle_status.eq.approved,status.eq.completed)',
         )
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(300);
 
       if (date) {
         q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
+      } else if (month) {
+        const [y, m] = month.split('-').map(Number);
+        const start = new Date(y, m - 1, 1).toISOString();
+        const end = new Date(y, m, 1).toISOString();
+        q = q.gte('created_at', start).lt('created_at', end);
       }
 
       const { data, error } = await q;

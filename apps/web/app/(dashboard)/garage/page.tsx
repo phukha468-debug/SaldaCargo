@@ -3592,7 +3592,9 @@ function WorkOrdersSection() {
   const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'pending_payment' | 'archive'>('active');
+  const [archiveMode, setArchiveMode] = useState<'month' | 'day'>('month');
   const [historyDate, setHistoryDate] = useState(todayStr());
+  const [historyMonth, setHistoryMonth] = useState(todayStr().slice(0, 7));
   // Filters (all client-side — instant, no API calls)
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
@@ -3613,10 +3615,19 @@ function WorkOrdersSection() {
     staleTime: 60000,
     refetchInterval: 60000,
   });
+  const archiveUrl =
+    archiveMode === 'day'
+      ? `/api/garage/orders?filter=history&date=${historyDate}`
+      : `/api/garage/orders?filter=history&month=${historyMonth}`;
   const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
-    queryKey: ['garage-orders', 'history', historyDate],
+    queryKey: [
+      'garage-orders',
+      'history',
+      archiveMode,
+      archiveMode === 'day' ? historyDate : historyMonth,
+    ],
     queryFn: () =>
-      fetch(`/api/garage/orders?filter=history&date=${historyDate}`)
+      fetch(archiveUrl)
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 120000,
@@ -4014,7 +4025,39 @@ function WorkOrdersSection() {
             Архив
           </button>
         </div>
-        {activeTab === 'archive' && <DateNav date={historyDate} onChange={setHistoryDate} />}
+        {activeTab === 'archive' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                onClick={() => setArchiveMode('month')}
+                className={cn(
+                  'px-3 py-1 rounded-lg text-sm font-semibold transition-colors',
+                  archiveMode === 'month'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700',
+                )}
+              >
+                Месяц
+              </button>
+              <button
+                onClick={() => setArchiveMode('day')}
+                className={cn(
+                  'px-3 py-1 rounded-lg text-sm font-semibold transition-colors',
+                  archiveMode === 'day'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700',
+                )}
+              >
+                День
+              </button>
+            </div>
+            {archiveMode === 'day' ? (
+              <DateNav date={historyDate} onChange={setHistoryDate} />
+            ) : (
+              <MonthNav month={historyMonth} onChange={setHistoryMonth} />
+            )}
+          </div>
+        )}
         {/* Группировка по машинам (только для активных) */}
         {activeTab === 'active' && (
           <button
