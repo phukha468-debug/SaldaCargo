@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { cn, Money } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -3586,39 +3586,31 @@ function AiImportModal({
 
 // ═══════════════════════════ WORK ORDERS ═════════════════════════════════════
 
-type WOTab = 'all' | 'active' | 'pending' | 'approved';
-
 function WorkOrdersSection() {
-  const [woTab, setWoTab] = useState<WOTab>('all');
   const [showCreate, setShowCreate] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
   const [historyDate, setHistoryDate] = useState(todayStr());
+  // Filters (all client-side — instant, no API calls)
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
+  const [filterMechanic, setFilterMechanic] = useState('');
+  const [filterStatus, setFilterStatus] = useState<
+    'all' | 'created' | 'in_progress' | 'completed' | 'review'
+  >('all');
+  const [groupByVehicle, setGroupByVehicle] = useState(false);
   const qc = useQueryClient();
 
-  const { data: allOrders = [] } = useQuery<TabOrder[]>({
+  // One "all" query covers active + review. Archive by date is separate.
+  const { data: allOrders = [], isLoading: allLoading } = useQuery<TabOrder[]>({
     queryKey: ['garage-orders', 'all'],
     queryFn: () =>
       fetch('/api/garage/orders?filter=all')
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 120000,
-  });
-  const { data: activeOrders = [] } = useQuery<TabOrder[]>({
-    queryKey: ['garage-orders', 'active'],
-    queryFn: () =>
-      fetch('/api/garage/orders?filter=active')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 120000,
-  });
-  const { data: pendingOrders = [] } = useQuery<TabOrder[]>({
-    queryKey: ['garage-orders', 'review'],
-    queryFn: () =>
-      fetch('/api/garage/orders?filter=review')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 120000,
+    staleTime: 60000,
+    refetchInterval: 60000,
   });
   const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
     queryKey: ['garage-orders', 'history', historyDate],
@@ -3627,7 +3619,7 @@ function WorkOrdersSection() {
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 120000,
-    enabled: woTab === 'approved',
+    enabled: showArchive,
   });
 
   const { data: mechanics = [] } = useQuery<Mechanic[]>({
@@ -3657,34 +3649,253 @@ function WorkOrdersSection() {
     },
   });
 
-  const getOrders = (): TabOrder[] => {
-    if (woTab === 'all')
-      return allOrders.filter(
+  // Active orders = not cancelled/returned
+  const activePool = useMemo(
+    () =>
+      allOrders.filter(
         (o) => o.lifecycle_status !== 'cancelled' && o.lifecycle_status !== 'returned',
-      );
-    if (woTab === 'active') return activeOrders;
-    if (woTab === 'pending') return pendingOrders;
-    return historyOrders;
-  };
+      ),
+    [allOrders],
+  );
 
-  const orders = getOrders();
-  const counts = {
-    all: allOrders.length,
-    active: activeOrders.length,
-    pending: pendingOrders.length,
-  };
+  // Counters for status badges
+  const inWorkCount = activePool.filter((o) => o.status === 'in_progress').length;
+  const reviewCount = activePool.filter(
+    (o) => o.lifecycle_status === 'draft' && o.status === 'completed',
+  ).length;
+
+  // Client-side filtered list (instant)
+  const filteredOrders = useMemo(() => {
+    const pool = showArchive ? historyOrders : activePool;
+    let result = pool;
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (o) =>
+          String(o.order_number).includes(q) ||
+          o.asset?.short_name?.toLowerCase().includes(q) ||
+          o.asset?.reg_number?.toLowerCase().includes(q) ||
+          o.client_vehicle_brand?.toLowerCase().includes(q) ||
+          (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model
+            ?.toLowerCase()
+            .includes(q) ||
+          o.client_vehicle_reg?.toLowerCase().includes(q) ||
+          (o.client_name as string | null)?.toLowerCase().includes(q) ||
+          o.mechanic?.name?.toLowerCase().includes(q) ||
+          o.problem_description?.toLowerCase().includes(q) ||
+          (o.works ?? []).some((w) =>
+            (w.work_catalog?.name ?? w.custom_work_name ?? '').toLowerCase().includes(q),
+          ),
+      );
+    }
+    if (filterType !== 'all') result = result.filter((o) => o.machine_type === filterType);
+    if (filterMechanic) result = result.filter((o) => o.mechanic?.id === filterMechanic);
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'review') {
+        result = result.filter((o) => o.lifecycle_status === 'draft' && o.status === 'completed');
+      } else {
+        result = result.filter((o) => o.status === filterStatus);
+      }
+    }
+    return result;
+  }, [activePool, historyOrders, showArchive, search, filterType, filterMechanic, filterStatus]);
+
+  const totalCost = useMemo(
+    () =>
+      filteredOrders.reduce(
+        (s, o) => s + (o.works ?? []).reduce((ws, w) => ws + moneyVal(w.price_client), 0),
+        0,
+      ),
+    [filteredOrders],
+  );
+
+  const hasFilters = !!(search || filterType !== 'all' || filterMechanic || filterStatus !== 'all');
+
+  function clearFilters() {
+    setSearch('');
+    setFilterType('all');
+    setFilterMechanic('');
+    setFilterStatus('all');
+  }
+
+  // ── Order card ──────────────────────────────────────────────────────────────
+  function OrderCard({ o }: { o: TabOrder }) {
+    const works = o.works ?? [];
+    const cost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
+    const normH = works.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
+    const factH = works.reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
+    const isReview = o.lifecycle_status === 'draft' && o.status === 'completed';
+    const isClosed = o.lifecycle_status === 'approved';
+
+    const vehicleLabel =
+      o.machine_type === 'own'
+        ? [o.asset?.short_name, o.asset?.reg_number].filter(Boolean).join(' · ')
+        : [
+            o.client_vehicle_brand,
+            (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
+            o.client_vehicle_reg,
+          ]
+            .filter(Boolean)
+            .join(' ');
+    const clientLabel = o.machine_type === 'client' ? (o.client_name as string | null) : null;
+
+    const statusBadge = isClosed
+      ? { label: 'Закрыт', cls: 'bg-emerald-100 text-emerald-700' }
+      : isReview
+        ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
+        : o.status === 'in_progress'
+          ? { label: 'В работе', cls: 'bg-blue-100 text-blue-700' }
+          : o.status === 'completed'
+            ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
+            : { label: 'В очереди', cls: 'bg-slate-100 text-slate-500' };
+
+    return (
+      <div
+        onClick={() => setSelectedOrderId(o.id)}
+        className={cn(
+          'bg-white border rounded-xl px-4 py-3.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all flex gap-4 items-start',
+          isReview ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200',
+        )}
+      >
+        {/* Left: number + date + type */}
+        <div className="shrink-0 w-20 flex flex-col gap-1.5">
+          <span className="font-mono text-xs font-black text-slate-700">НЗ-{o.order_number}</span>
+          <span
+            className={cn(
+              'text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit',
+              o.machine_type === 'own'
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-amber-100 text-amber-700',
+            )}
+          >
+            {o.machine_type === 'own' ? 'Свой' : 'Клиент'}
+          </span>
+          <span className="text-[10px] text-slate-400">
+            {new Date(o.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+          </span>
+        </div>
+
+        {/* Center: vehicle + works */}
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm text-slate-900 truncate">
+              {vehicleLabel || '—'}
+            </span>
+            {clientLabel && <span className="text-xs text-slate-500 truncate">{clientLabel}</span>}
+          </div>
+          {works.length === 0 ? (
+            <span className="text-xs text-amber-600 italic">⚠ Работы не указаны</span>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {works.slice(0, 4).map((w) => (
+                <span
+                  key={w.id}
+                  className={cn(
+                    'text-[11px] px-2 py-0.5 rounded-full font-medium',
+                    w.status === 'completed'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : w.status === 'in_progress' || w.status === 'paused'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-600',
+                  )}
+                >
+                  {w.work_catalog?.name ?? w.custom_work_name ?? '—'}
+                </span>
+              ))}
+              {works.length > 4 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">
+                  +{works.length - 4}
+                </span>
+              )}
+            </div>
+          )}
+          {o.problem_description && (
+            <p className="text-[11px] text-slate-400 truncate">{o.problem_description}</p>
+          )}
+        </div>
+
+        {/* Right: mechanic + hours + status + cost */}
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <span
+            className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', statusBadge.cls)}
+          >
+            {statusBadge.label}
+          </span>
+          {cost > 0 && (
+            <span className="text-sm font-bold text-slate-800">
+              {cost.toLocaleString('ru-RU')} ₽
+            </span>
+          )}
+          {o.mechanic?.name && (
+            <span className="text-[11px] text-slate-500">{o.mechanic.name}</span>
+          )}
+          {normH > 0 && (
+            <span className="text-[10px] font-mono text-slate-400">
+              {normH.toFixed(1)}нч{factH > 0 ? ` / ${factH.toFixed(1)}` : ''}
+            </span>
+          )}
+          {isClosed && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                patch.mutate({ id: o.id, body: { lifecycle_status: 'draft' } });
+              }}
+              className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 mt-0.5"
+            >
+              Открыть заново
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Grouped by vehicle ──────────────────────────────────────────────────────
+  const vehicleGroups = useMemo(() => {
+    if (!groupByVehicle) return null;
+    const map = new Map<string, { label: string; sublabel: string; orders: TabOrder[] }>();
+    for (const o of filteredOrders) {
+      const key = o.asset?.id ?? `cl:${o.client_vehicle_reg ?? o.id}`;
+      if (!map.has(key)) {
+        const label =
+          o.machine_type === 'own'
+            ? (o.asset?.short_name ?? 'Свой ТС')
+            : [
+                o.client_vehicle_brand,
+                (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
+              ]
+                .filter(Boolean)
+                .join(' ') || 'Клиентский ТС';
+        const sublabel =
+          o.machine_type === 'own'
+            ? (o.asset?.reg_number ?? '')
+            : (o.client_vehicle_reg ?? (o.client_name as string | null) ?? '');
+        map.set(key, { label, sublabel, orders: [] });
+      }
+      map.get(key)!.orders.push(o);
+    }
+    return Array.from(map.values());
+  }, [filteredOrders, groupByVehicle]);
+
+  const isLoading = showArchive ? histLoading : allLoading;
 
   return (
     <div className="space-y-4">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Заказ-наряды</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Все наряды на ремонт и обслуживание</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {isLoading
+              ? 'Загрузка...'
+              : `${filteredOrders.length} нарядов${totalCost > 0 ? ` · ${totalCost.toLocaleString('ru-RU')} ₽` : ''}`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAiImport(true)}
-            className="bg-violet-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-violet-700 flex items-center gap-2"
+            className="bg-violet-600 text-white text-sm font-semibold px-3 py-2 rounded-xl hover:bg-violet-700 flex items-center gap-1.5"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -3694,11 +3905,11 @@ function WorkOrdersSection() {
                 d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
               />
             </svg>
-            Создать через ИИ
+            ИИ
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-2"
+            className="bg-slate-900 text-white text-sm font-semibold px-3 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-1.5"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -3713,339 +3924,219 @@ function WorkOrdersSection() {
         </div>
       </div>
 
-      {/* Sub-tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {[
-          { key: 'all' as WOTab, label: 'Все', count: counts.all },
-          { key: 'active' as WOTab, label: 'Активные', count: counts.active },
-          { key: 'pending' as WOTab, label: 'На проверке', count: counts.pending },
-          { key: 'approved' as WOTab, label: 'Архив' },
-        ].map((t) => (
+      {/* ── Mode: Active / Archive ── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
           <button
-            key={t.key}
-            onClick={() => setWoTab(t.key)}
+            onClick={() => setShowArchive(false)}
             className={cn(
-              'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
-              woTab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+              'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
+              !showArchive
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700',
             )}
           >
-            {t.label}
-            {(t.count ?? 0) > 0 && <span className="ml-1 text-slate-400">({t.count})</span>}
+            Активные
+            {inWorkCount > 0 && (
+              <span className="bg-blue-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {inWorkCount}
+              </span>
+            )}
+            {reviewCount > 0 && (
+              <span className="bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {reviewCount}
+              </span>
+            )}
           </button>
-        ))}
+          <button
+            onClick={() => setShowArchive(true)}
+            className={cn(
+              'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors',
+              showArchive
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            Архив
+          </button>
+        </div>
+        {showArchive && <DateNav date={historyDate} onChange={setHistoryDate} />}
+        {/* Группировка по машинам (только для активных) */}
+        {!showArchive && (
+          <button
+            onClick={() => setGroupByVehicle((v) => !v)}
+            className={cn(
+              'text-sm font-semibold px-3 py-1.5 rounded-xl border transition-colors',
+              groupByVehicle
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 text-slate-500 hover:border-slate-400',
+            )}
+          >
+            По машинам
+          </button>
+        )}
       </div>
 
-      {woTab === 'approved' && <DateNav date={historyDate} onChange={setHistoryDate} />}
+      {/* ── Filter bar (активные только) ── */}
+      {!showArchive && (
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Поиск */}
+          <div className="relative flex-1 min-w-52">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="НЗ-42, авто, клиент, механик, работа..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-      {histLoading ? (
+          {/* Тип */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
+            {(
+              [
+                ['all', 'Все'],
+                ['own', 'Свои'],
+                ['client', 'Клиентские'],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={v}
+                onClick={() => setFilterType(v)}
+                className={cn(
+                  'px-3 py-1 rounded-lg font-medium transition-colors',
+                  filterType === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Статус */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
+          >
+            <option value="all">Все статусы</option>
+            <option value="created">В очереди</option>
+            <option value="in_progress">В работе</option>
+            <option value="review">На проверке</option>
+            <option value="completed">Завершён</option>
+          </select>
+
+          {/* Механик */}
+          <select
+            value={filterMechanic}
+            onChange={(e) => setFilterMechanic(e.target.value)}
+            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
+          >
+            <option value="">Все механики</option>
+            {mechanics.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Сброс */}
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
+            >
+              × Сбросить
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── List ── */}
+      {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
           <p className="text-5xl mb-3">🔧</p>
-          <p className="font-medium text-slate-500">Нарядов нет</p>
+          <p className="font-semibold text-slate-500">
+            {hasFilters ? 'Нарядов по фильтру не найдено' : 'Нарядов нет'}
+          </p>
+          {hasFilters && (
+            <button onClick={clearFilters} className="mt-3 text-sm text-slate-400 underline">
+              Сбросить фильтры
+            </button>
+          )}
         </div>
-      ) : woTab === 'active' ? (
-        // ── Grouped by vehicle ─────────────────────────────────────────────────
-        (() => {
-          type VehicleGroup = {
-            key: string;
-            label: string;
-            sublabel: string;
-            orders: TabOrder[];
-          };
-          const groupMap = new Map<string, VehicleGroup>();
-          for (const o of orders) {
-            const key = o.asset?.id ?? `client:${o.client_vehicle_reg ?? o.id}`;
-            if (!groupMap.has(key)) {
-              const label =
-                o.machine_type === 'own'
-                  ? (o.asset?.short_name ?? 'Свой ТС')
-                  : `${o.client_vehicle_brand ?? ''} ${o.client_vehicle_model ?? ''}`.trim() ||
-                    'Клиентский ТС';
-              const sublabel =
-                o.machine_type === 'own'
-                  ? (o.asset?.reg_number ?? '')
-                  : (o.client_vehicle_reg ?? o.client_name ?? '');
-              groupMap.set(key, { key, label, sublabel, orders: [] });
-            }
-            groupMap.get(key)!.orders.push(o);
-          }
-          const groups = Array.from(groupMap.values());
-          return (
-            <div className="space-y-4">
-              {groups.map((g) => (
-                <div
-                  key={g.key}
-                  className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
-                >
-                  {/* Vehicle header */}
-                  <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
-                      <svg
-                        className="w-4 h-4 text-slate-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 text-sm">{g.label}</p>
-                      {g.sublabel && <p className="text-xs text-slate-500">{g.sublabel}</p>}
-                    </div>
-                    <span className="ml-auto text-xs font-semibold text-slate-400">
-                      {g.orders.length} {g.orders.length === 1 ? 'наряд' : 'нарядов'}
-                    </span>
-                  </div>
-                  {/* Orders list */}
-                  <div className="divide-y divide-slate-100">
-                    {g.orders.map((o) => {
-                      const works = o.works ?? [];
-                      const normH = works.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
-                      const factH = works.reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
-                      const cost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
-                      const noWorks = works.length === 0;
-                      return (
-                        <div
-                          key={o.id}
-                          onClick={() => setSelectedOrderId(o.id)}
-                          className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer flex items-start gap-3"
-                        >
-                          <div className="shrink-0 pt-0.5">
-                            <span className="font-mono text-xs font-bold text-slate-500">
-                              НЗ-{o.order_number}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            {noWorks ? (
-                              <p className="text-xs italic text-amber-600 font-medium">
-                                ⚠ Виды работ не указаны — нажмите для добавления
-                              </p>
-                            ) : (
-                              <div className="flex flex-wrap gap-1">
-                                {works.map((w) => {
-                                  const wname = w.work_catalog?.name ?? w.custom_work_name ?? '—';
-                                  return (
-                                    <span
-                                      key={w.id}
-                                      className={cn(
-                                        'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium',
-                                        w.status === 'completed'
-                                          ? 'bg-emerald-100 text-emerald-700'
-                                          : w.status === 'in_progress' || w.status === 'paused'
-                                            ? 'bg-amber-100 text-amber-700'
-                                            : 'bg-slate-100 text-slate-600',
-                                      )}
-                                    >
-                                      {wname}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {o.mechanic?.name && (
-                              <p className="text-xs text-slate-400 mt-1">
-                                {o.mechanic.name}
-                                {normH > 0 && (
-                                  <span className="ml-2 font-mono">
-                                    {normH.toFixed(1)}нч
-                                    {factH > 0 && ` / факт ${factH.toFixed(1)}`}
-                                  </span>
-                                )}
-                              </p>
-                            )}
-                          </div>
-                          <div className="shrink-0 flex flex-col items-end gap-1">
-                            <span
-                              className={cn(
-                                'text-xs px-2 py-0.5 rounded-full font-semibold',
-                                STATUS_COLOR[o.status],
-                              )}
-                            >
-                              {STATUS_LABEL[o.status] ?? o.status}
-                            </span>
-                            {cost > 0 && (
-                              <span className="text-xs font-bold text-slate-700">
-                                {cost.toLocaleString('ru-RU')} ₽
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })()
-      ) : (
-        // ── Flat table (all / pending / approved) ──────────────────────────────
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Номер
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Автомобиль
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Тип / Дата
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Работы
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Исполнитель
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Нч план / факт
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Стоимость
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Статус
-                </th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {orders.map((o) => {
-                const normSum = (o.works ?? []).reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
-                const factSum =
-                  (o.works ?? []).reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
-                const cost = (o.works ?? []).reduce((s, w) => s + moneyVal(w.price_client), 0);
-                return (
-                  <tr
-                    key={o.id}
-                    className="hover:bg-slate-50/60 cursor-pointer"
-                    onClick={() => setSelectedOrderId(o.id)}
+      ) : groupByVehicle && vehicleGroups ? (
+        /* ── По машинам ── */
+        <div className="space-y-3">
+          {vehicleGroups.map((g) => (
+            <div
+              key={g.label + g.sublabel}
+              className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
+            >
+              <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
+                  <svg
+                    className="w-3.5 h-3.5 text-slate-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-slate-700 font-semibold">
-                      НЗ-{o.order_number}
-                    </td>
-                    <td className="px-4 py-3">
-                      {o.machine_type === 'own' ? (
-                        <div>
-                          <div className="font-medium text-slate-900">
-                            {o.asset?.short_name ?? '—'}
-                          </div>
-                          <div className="text-xs text-slate-400 font-mono">
-                            {o.asset?.reg_number ?? ''}
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="font-medium text-slate-900">
-                            {o.client_vehicle_brand ?? '—'}
-                            {o.client_vehicle_reg && (
-                              <span className="ml-1.5 font-mono text-xs text-slate-500">
-                                {o.client_vehicle_reg}
-                              </span>
-                            )}
-                          </div>
-                          {o.client_name && (
-                            <div className="text-xs text-slate-400">{o.client_name}</div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          'text-[10px] font-semibold px-1.5 py-0.5 rounded',
-                          o.machine_type === 'own'
-                            ? 'bg-blue-50 text-blue-600'
-                            : 'bg-amber-50 text-amber-600',
-                        )}
-                      >
-                        {o.machine_type === 'own' ? 'Свой' : 'Клиент'}
-                      </span>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {new Date(o.created_at).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 text-xs">
-                      {(o.works ?? [])
-                        .map((w) => w.work_catalog?.name ?? w.custom_work_name ?? '—')
-                        .join(', ') || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 text-xs">
-                      {o.mechanic?.name ?? (
-                        <span className="italic text-slate-400">Не назначен</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">
-                      {normSum > 0
-                        ? `${normSum.toFixed(1)} / ${factSum > 0 ? factSum.toFixed(1) : '—'}`
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900 text-xs">
-                      {cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          'badge text-xs px-2 py-0.5 rounded-full',
-                          o.lifecycle_status === 'approved'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : o.lifecycle_status === 'returned'
-                              ? 'bg-red-100 text-red-700'
-                              : STATUS_COLOR[o.status],
-                        )}
-                      >
-                        {o.lifecycle_status === 'approved'
-                          ? 'Закрыт'
-                          : o.lifecycle_status === 'returned'
-                            ? 'Возвращён'
-                            : STATUS_LABEL[o.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex gap-1 justify-end">
-                        {woTab === 'approved' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              patch.mutate({ id: o.id, body: { lifecycle_status: 'draft' } });
-                            }}
-                            className="text-xs font-medium px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          >
-                            Открыть заново
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedOrderId(o.id);
-                          }}
-                          className="text-xs font-medium px-2 py-1 rounded bg-white border border-slate-200 text-slate-600"
-                        >
-                          Детали
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 text-sm">{g.label}</p>
+                  {g.sublabel && <p className="text-xs text-slate-400">{g.sublabel}</p>}
+                </div>
+                <span className="text-xs font-semibold text-slate-400 shrink-0">
+                  {g.orders.length} нар.
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {g.orders.map((o) => (
+                  <OrderCard key={o.id} o={o} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* ── Плоский список карточек ── */
+        <div className="space-y-2">
+          {filteredOrders.map((o) => (
+            <OrderCard key={o.id} o={o} />
+          ))}
         </div>
       )}
 
