@@ -44,6 +44,7 @@ export async function GET(request: Request) {
       { data: tripCountRows },
       { data: orderCountRows },
       { data: partCostRows },
+      { data: mechanicPayRows },
     ] = await Promise.all([
       // Все машины
       (supabase as any)
@@ -128,6 +129,16 @@ export async function GET(request: Request) {
         .eq('service_orders.machine_type', 'own')
         .eq('service_orders.status', 'completed')
         .not('service_orders.asset_id', 'is', null),
+
+      // ЗП механиков за ремонт своих машин
+      (supabase as any)
+        .from('service_orders')
+        .select('asset_id, mechanic_pay, second_mechanic_pay')
+        .eq('machine_type', 'own')
+        .eq('lifecycle_status', 'approved')
+        .not('asset_id', 'is', null)
+        .gte('updated_at', periodStart)
+        .lte('updated_at', periodEnd),
     ]);
 
     if (assetsError) return NextResponse.json({ error: assetsError.message }, { status: 500 });
@@ -172,6 +183,14 @@ export async function GET(request: Request) {
       if (id) orderCountMap.set(id, (orderCountMap.get(id) ?? 0) + 1);
     }
 
+    const mechanicPayMap = new Map<string, number>();
+    for (const o of (mechanicPayRows as any[]) ?? []) {
+      if (o.asset_id) {
+        const pay = parseFloat(o.mechanic_pay ?? '0') + parseFloat(o.second_mechanic_pay ?? '0');
+        mechanicPayMap.set(o.asset_id, (mechanicPayMap.get(o.asset_id) ?? 0) + pay);
+      }
+    }
+
     const maintenanceMap = new Map<string, number>();
     for (const m of (partCostRows as any[]) ?? []) {
       const id = m.service_order?.asset_id;
@@ -187,7 +206,9 @@ export async function GET(request: Request) {
       const revenue = revenueMap.get(a.id) ?? 0;
       const tripExpenses = expenseMap.get(a.id) ?? 0;
       const pay = payMap.get(a.id) ?? 0;
-      const maintenance = maintenanceMap.get(a.id) ?? 0;
+      const maintenanceParts = maintenanceMap.get(a.id) ?? 0;
+      const maintenanceLabor = mechanicPayMap.get(a.id) ?? 0;
+      const maintenance = maintenanceParts + maintenanceLabor; // запчасти + ЗП механиков
       const fixedCost = parseFloat(a.monthly_fixed_cost ?? '0') * periodMonths;
       const operationalCosts = tripExpenses + pay; // операционные (на рейс)
       const totalCosts = operationalCosts + maintenance + fixedCost; // полные

@@ -656,7 +656,7 @@ function AssetTile({
                 value={a.order_count > 0 ? `${a.order_count} заказ.` : '—'}
               />
               <StatRow
-                label="Обслуживание (запчасти)"
+                label="Обслуживание (запчасти + ЗП)"
                 value={parseFloat(a.maintenance) > 0 ? <Money amount={a.maintenance} /> : '—'}
                 color="text-amber-600"
               />
