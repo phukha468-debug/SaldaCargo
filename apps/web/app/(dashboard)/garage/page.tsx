@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn, Money } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -670,6 +670,7 @@ function OrderDetailModal({
   mechanics: Mechanic[];
 }) {
   const queryClient = useQueryClient();
+  const backdropMouseDownOnSelf = useRef(false);
   const [editNote, setEditNote] = useState<string | null>(null);
   const [editMechanic, setEditMechanic] = useState<string | null>(null);
   const [editSecondMechanic, setEditSecondMechanic] = useState<string | null>(null);
@@ -904,7 +905,12 @@ function OrderDetailModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={onClose}
+      onMouseDown={(e) => {
+        backdropMouseDownOnSelf.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (backdropMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
@@ -1692,109 +1698,227 @@ function OrderDetailModal({
         )}
 
         {/* Диалог закрытия наряда с вводом зарплат */}
-        {showCloseDialog && order && (
-          <div className="absolute inset-0 z-10 bg-white rounded-2xl flex flex-col">
-            <div className="flex-shrink-0 border-b border-slate-200 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Завершить наряд #{order.order_number}
-              </h3>
-              <p className="text-sm text-slate-500 mt-0.5">Укажите зарплату исполнителей</p>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-              {(() => {
-                const mech1 =
-                  editMechanic !== null
-                    ? (mechanics.find((m) => m.id === editMechanic) ?? null)
-                    : order.mechanic;
-                const mech2 =
-                  editSecondMechanic !== null
-                    ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
-                    : order.second_mechanic;
-                return (
-                  <>
+        {showCloseDialog &&
+          order &&
+          (() => {
+            const mech1 =
+              editMechanic !== null
+                ? (mechanics.find((m) => m.id === editMechanic) ?? null)
+                : order.mechanic;
+            const mech2 =
+              editSecondMechanic !== null
+                ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
+                : order.second_mechanic;
+            const orderTotal = order.works
+              .filter((w) => w.status !== 'cancelled')
+              .reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0);
+            const totalActMin = order.works
+              .filter((w) => w.status === 'completed')
+              .reduce((s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : w.norm_minutes), 0);
+            const pay1 = parseFloat(closePay1 || '0');
+            const pay2 = parseFloat(closePay2 || '0');
+            const totalPay = pay1 + pay2;
+            const margin = orderTotal - totalPay;
+            const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
+
+            return (
+              <div
+                className="absolute inset-0 z-10 bg-white rounded-2xl flex flex-col"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {/* Шапка */}
+                <div className="flex-shrink-0 border-b border-slate-200 px-6 py-4 flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Завершить наряд #{order.order_number}
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {order.machine_type === 'own'
+                        ? `${order.asset?.short_name ?? ''} · ${order.asset?.reg_number ?? ''}`
+                        : `${order.client_vehicle_brand ?? ''} ${order.client_vehicle_model ?? ''} · ${order.client_vehicle_reg ?? ''}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCloseDialog(false)}
+                    className="text-slate-400 hover:text-slate-600 text-2xl leading-none ml-4"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                  {/* Итог по наряду */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-slate-50 rounded-xl p-3 text-center">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                        Выручка
+                      </p>
+                      <p className="text-lg font-black text-slate-900">{fmt(orderTotal)} ₽</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3 text-center">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                        Факт. часов
+                      </p>
+                      <p className="text-lg font-black text-slate-900">
+                        {(totalActMin / 60).toFixed(1)} ч
+                      </p>
+                    </div>
+                    <div
+                      className={cn(
+                        'rounded-xl p-3 text-center',
+                        margin >= 0 ? 'bg-emerald-50' : 'bg-red-50',
+                      )}
+                    >
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                        Маржа
+                      </p>
+                      <p
+                        className={cn(
+                          'text-lg font-black',
+                          margin >= 0 ? 'text-emerald-700' : 'text-red-600',
+                        )}
+                      >
+                        {fmt(margin)} ₽
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Список работ */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Работы
+                    </div>
+                    {order.works
+                      .filter((w) => w.status !== 'cancelled')
+                      .map((w) => (
+                        <div
+                          key={w.id}
+                          className="flex items-center justify-between px-3 py-2 border-t border-slate-100 text-sm"
+                        >
+                          <span className="text-slate-700 truncate mr-2">
+                            {w.work_catalog?.name ?? w.custom_work_name ?? '—'}
+                          </span>
+                          <span className="font-semibold text-slate-900 shrink-0">
+                            {parseFloat(w.price_client ?? '0').toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* ЗП механиков */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Зарплата исполнителей
+                    </p>
                     {mech1 ? (
                       <div>
-                        <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">
+                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
                           {mech1.name}
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-0 border border-slate-300 rounded-xl overflow-hidden focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-300">
                           <input
                             type="number"
                             min="0"
                             value={closePay1}
                             onChange={(e) => setClosePay1(e.target.value)}
-                            placeholder={stoSettings ? '0' : 'Загрузка...'}
-                            className="flex-1 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-mono"
+                            onFocus={(e) => {
+                              if (e.target.value === '0') setClosePay1('');
+                            }}
+                            placeholder="0"
+                            className="flex-1 px-4 py-3 text-base font-bold outline-none bg-white"
                           />
-                          <span className="text-slate-400 text-sm shrink-0">₽</span>
+                          <span className="px-4 py-3 text-slate-400 font-semibold bg-slate-50 border-l border-slate-200 text-sm select-none">
+                            ₽
+                          </span>
                         </div>
                       </div>
                     ) : (
                       <p className="text-sm text-amber-600 bg-amber-50 rounded-xl px-4 py-3">
-                        Исполнитель не назначен. Зарплата не будет начислена.
+                        Исполнитель не назначен — зарплата не будет начислена.
                       </p>
                     )}
                     {mech2 && (
                       <div>
-                        <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">
+                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
                           {mech2.name}
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-0 border border-slate-300 rounded-xl overflow-hidden focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-300">
                           <input
                             type="number"
                             min="0"
                             value={closePay2}
                             onChange={(e) => setClosePay2(e.target.value)}
-                            placeholder={stoSettings ? '0' : 'Загрузка...'}
-                            className="flex-1 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-mono"
+                            onFocus={(e) => {
+                              if (e.target.value === '0') setClosePay2('');
+                            }}
+                            placeholder="0"
+                            className="flex-1 px-4 py-3 text-base font-bold outline-none bg-white"
                           />
-                          <span className="text-slate-400 text-sm shrink-0">₽</span>
+                          <span className="px-4 py-3 text-slate-400 font-semibold bg-slate-50 border-l border-slate-200 text-sm select-none">
+                            ₽
+                          </span>
                         </div>
                       </div>
                     )}
-                    {!mech1 && !mech2 && (
-                      <p className="text-sm text-slate-500">Исполнители не назначены.</p>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-            <div className="flex-shrink-0 border-t border-slate-100 px-6 py-4 flex gap-3">
-              <button
-                onClick={() => setShowCloseDialog(false)}
-                className="flex-1 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2.5 rounded-xl text-sm"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={() => {
-                  const mech1 =
-                    editMechanic !== null
-                      ? (mechanics.find((m) => m.id === editMechanic) ?? null)
-                      : order.mechanic;
-                  const mech2 =
-                    editSecondMechanic !== null
-                      ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
-                      : order.second_mechanic;
-                  const updates: Record<string, unknown> = {
-                    lifecycle_status: 'approved',
-                    assigned_mechanic_id: mech1?.id ?? null,
-                    second_mechanic_id: mech2?.id ?? null,
-                    mechanic_pay: closePay1 || '0',
-                    second_mechanic_pay: closePay2 || '0',
-                  };
-                  patchMutation.mutate(updates);
-                  setShowCloseDialog(false);
-                  onClose();
-                }}
-                disabled={patchMutation.isPending}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
-              >
-                {patchMutation.isPending ? '...' : 'Подтвердить и закрыть'}
-              </button>
-            </div>
-          </div>
-        )}
+                  </div>
+
+                  {/* Итоговый расчёт */}
+                  {(mech1 || mech2) && (
+                    <div className="bg-slate-900 rounded-xl p-4 space-y-2 text-sm">
+                      {mech1 && pay1 > 0 && (
+                        <div className="flex justify-between text-slate-300">
+                          <span>{mech1.name}</span>
+                          <span className="font-bold text-white">{fmt(pay1)} ₽</span>
+                        </div>
+                      )}
+                      {mech2 && pay2 > 0 && (
+                        <div className="flex justify-between text-slate-300">
+                          <span>{mech2.name}</span>
+                          <span className="font-bold text-white">{fmt(pay2)} ₽</span>
+                        </div>
+                      )}
+                      {totalPay > 0 && (
+                        <div className="flex justify-between border-t border-slate-700 pt-2 mt-1">
+                          <span className="text-slate-400 text-xs uppercase tracking-wide font-semibold">
+                            Итого ЗП
+                          </span>
+                          <span className="font-black text-white text-base">{fmt(totalPay)} ₽</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Кнопки */}
+                <div className="flex-shrink-0 border-t border-slate-100 px-6 py-4 flex gap-3">
+                  <button
+                    onClick={() => setShowCloseDialog(false)}
+                    className="flex-1 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2.5 rounded-xl text-sm"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={() => {
+                      const updates: Record<string, unknown> = {
+                        lifecycle_status: 'approved',
+                        assigned_mechanic_id: mech1?.id ?? null,
+                        second_mechanic_id: mech2?.id ?? null,
+                        mechanic_pay: closePay1 || '0',
+                        second_mechanic_pay: closePay2 || '0',
+                      };
+                      patchMutation.mutate(updates);
+                      setShowCloseDialog(false);
+                      onClose();
+                    }}
+                    disabled={patchMutation.isPending}
+                    className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
+                  >
+                    {patchMutation.isPending ? 'Сохраняем...' : 'Подтвердить и закрыть наряд'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
       </div>
     </div>
   );
