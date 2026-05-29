@@ -3606,10 +3606,11 @@ function WorkOrdersSection() {
   const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'pending_payment' | 'archive'>('active');
-  const [archiveMode, setArchiveMode] = useState<'month' | 'day'>('month');
-  const [historyDate, setHistoryDate] = useState(todayStr());
-  const [historyMonth, setHistoryMonth] = useState(todayStr().slice(0, 7));
-  // Filters (all client-side — instant, no API calls)
+  // Unified date filter — applies to all tabs
+  const [dateMode, setDateMode] = useState<'all' | 'month' | 'day'>('all');
+  const [filterDate, setFilterDate] = useState(todayStr());
+  const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
+  // Text / type / status / mechanic filters (all client-side — instant)
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
   const [filterMechanic, setFilterMechanic] = useState('');
@@ -3630,15 +3631,17 @@ function WorkOrdersSection() {
     refetchInterval: 60000,
   });
   const archiveUrl =
-    archiveMode === 'day'
-      ? `/api/garage/orders?filter=history&date=${historyDate}`
-      : `/api/garage/orders?filter=history&month=${historyMonth}`;
+    dateMode === 'day'
+      ? `/api/garage/orders?filter=history&date=${filterDate}`
+      : dateMode === 'month'
+        ? `/api/garage/orders?filter=history&month=${filterMonth}`
+        : `/api/garage/orders?filter=history`;
   const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
     queryKey: [
       'garage-orders',
       'history',
-      archiveMode,
-      archiveMode === 'day' ? historyDate : historyMonth,
+      dateMode,
+      dateMode === 'day' ? filterDate : dateMode === 'month' ? filterMonth : 'all',
     ],
     queryFn: () =>
       fetch(archiveUrl)
@@ -3741,6 +3744,11 @@ function WorkOrdersSection() {
         result = result.filter((o) => o.status === filterStatus);
       }
     }
+    // Date filter for non-archive tabs (archive uses server-side filtering)
+    if (activeTab !== 'archive' && dateMode !== 'all') {
+      const prefix = dateMode === 'day' ? filterDate : filterMonth;
+      result = result.filter((o) => o.created_at?.startsWith(prefix));
+    }
     return result;
   }, [
     activePool,
@@ -3751,6 +3759,9 @@ function WorkOrdersSection() {
     filterType,
     filterMechanic,
     filterStatus,
+    dateMode,
+    filterDate,
+    filterMonth,
   ]);
 
   const totalCost = useMemo(
@@ -3762,13 +3773,20 @@ function WorkOrdersSection() {
     [filteredOrders],
   );
 
-  const hasFilters = !!(search || filterType !== 'all' || filterMechanic || filterStatus !== 'all');
+  const hasFilters = !!(
+    search ||
+    filterType !== 'all' ||
+    filterMechanic ||
+    filterStatus !== 'all' ||
+    dateMode !== 'all'
+  );
 
   function clearFilters() {
     setSearch('');
     setFilterType('all');
     setFilterMechanic('');
     setFilterStatus('all');
+    setDateMode('all');
   }
 
   // ── Order card ──────────────────────────────────────────────────────────────
@@ -3997,97 +4015,170 @@ function WorkOrdersSection() {
         </div>
       </div>
 
-      {/* ── Tabs: Active / Pending Payment / Archive ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-          <button
-            onClick={() => setActiveTab('active')}
-            className={cn(
-              'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-              activeTab === 'active'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700',
-            )}
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={cn(
+            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
+            activeTab === 'active'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          В работе
+          {inWorkCount > 0 && (
+            <span className="bg-blue-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {inWorkCount}
+            </span>
+          )}
+          {reviewCount > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {reviewCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('pending_payment')}
+          className={cn(
+            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
+            activeTab === 'pending_payment'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          Ждёт оплаты
+          {pendingPaymentCount > 0 && (
+            <span className="bg-orange-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {pendingPaymentCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('archive')}
+          className={cn(
+            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors',
+            activeTab === 'archive'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          Архив
+        </button>
+      </div>
+
+      {/* ── Global filter bar ── */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Поиск */}
+        <div className="relative flex-1 min-w-52">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            В работе
-            {inWorkCount > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {inWorkCount}
-              </span>
-            )}
-            {reviewCount > 0 && (
-              <span className="bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {reviewCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('pending_payment')}
-            className={cn(
-              'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-              activeTab === 'pending_payment'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700',
-            )}
-          >
-            Ждёт оплаты
-            {pendingPaymentCount > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {pendingPaymentCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('archive')}
-            className={cn(
-              'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors',
-              activeTab === 'archive'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700',
-            )}
-          >
-            Архив
-          </button>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="НЗ-42, авто, клиент, механик, работа..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              ✕
+            </button>
+          )}
         </div>
-        {activeTab === 'archive' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-              <button
-                onClick={() => setArchiveMode('month')}
-                className={cn(
-                  'px-3 py-1 rounded-lg text-sm font-semibold transition-colors',
-                  archiveMode === 'month'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                Месяц
-              </button>
-              <button
-                onClick={() => setArchiveMode('day')}
-                className={cn(
-                  'px-3 py-1 rounded-lg text-sm font-semibold transition-colors',
-                  archiveMode === 'day'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                День
-              </button>
-            </div>
-            {archiveMode === 'day' ? (
-              <DateNav date={historyDate} onChange={setHistoryDate} />
-            ) : (
-              <MonthNav month={historyMonth} onChange={setHistoryMonth} />
-            )}
-          </div>
-        )}
-        {/* Группировка по машинам (только для активных) */}
-        {activeTab === 'active' && (
+
+        {/* Тип */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
+          {(
+            [
+              ['all', 'Все'],
+              ['own', 'Свои'],
+              ['client', 'Клиент'],
+            ] as const
+          ).map(([v, l]) => (
+            <button
+              key={v}
+              onClick={() => setFilterType(v)}
+              className={cn(
+                'px-3 py-1 rounded-lg font-medium transition-colors',
+                filterType === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+              )}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Статус */}
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+          className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
+        >
+          <option value="all">Все статусы</option>
+          <option value="created">В очереди</option>
+          <option value="in_progress">В работе</option>
+          <option value="review">На проверке</option>
+          <option value="completed">Завершён</option>
+        </select>
+
+        {/* Механик */}
+        <select
+          value={filterMechanic}
+          onChange={(e) => setFilterMechanic(e.target.value)}
+          className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
+        >
+          <option value="">Все механики</option>
+          {mechanics.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Диапазон дат */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
+          {(
+            [
+              ['all', 'Все даты'],
+              ['month', 'Месяц'],
+              ['day', 'День'],
+            ] as const
+          ).map(([v, l]) => (
+            <button
+              key={v}
+              onClick={() => setDateMode(v)}
+              className={cn(
+                'px-3 py-1 rounded-lg font-medium transition-colors',
+                dateMode === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+              )}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        {dateMode === 'day' && <DateNav date={filterDate} onChange={setFilterDate} />}
+        {dateMode === 'month' && <MonthNav month={filterMonth} onChange={setFilterMonth} />}
+
+        {/* Группировка по машинам */}
+        {activeTab !== 'archive' && (
           <button
             onClick={() => setGroupByVehicle((v) => !v)}
             className={cn(
-              'text-sm font-semibold px-3 py-1.5 rounded-xl border transition-colors',
+              'text-sm font-semibold px-3 py-1.5 rounded-xl border transition-colors shrink-0',
               groupByVehicle
                 ? 'border-slate-900 bg-slate-900 text-white'
                 : 'border-slate-200 text-slate-500 hover:border-slate-400',
@@ -4096,102 +4187,17 @@ function WorkOrdersSection() {
             По машинам
           </button>
         )}
+
+        {/* Сброс */}
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
+          >
+            × Сбросить
+          </button>
+        )}
       </div>
-
-      {/* ── Filter bar (активные только) ── */}
-      {activeTab === 'active' && (
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Поиск */}
-          <div className="relative flex-1 min-w-52">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="НЗ-42, авто, клиент, механик, работа..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Тип */}
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
-            {(
-              [
-                ['all', 'Все'],
-                ['own', 'Свои'],
-                ['client', 'Клиентские'],
-              ] as const
-            ).map(([v, l]) => (
-              <button
-                key={v}
-                onClick={() => setFilterType(v)}
-                className={cn(
-                  'px-3 py-1 rounded-lg font-medium transition-colors',
-                  filterType === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-                )}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-
-          {/* Статус */}
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
-          >
-            <option value="all">Все статусы</option>
-            <option value="created">В очереди</option>
-            <option value="in_progress">В работе</option>
-            <option value="review">На проверке</option>
-            <option value="completed">Завершён</option>
-          </select>
-
-          {/* Механик */}
-          <select
-            value={filterMechanic}
-            onChange={(e) => setFilterMechanic(e.target.value)}
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
-          >
-            <option value="">Все механики</option>
-            {mechanics.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Сброс */}
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
-            >
-              × Сбросить
-            </button>
-          )}
-        </div>
-      )}
 
       {/* ── List ── */}
       {isLoading ? (
