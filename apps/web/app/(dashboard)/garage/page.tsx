@@ -2146,8 +2146,14 @@ function CreateOrderModal({
   const [error, setError] = useState('');
   const createMutation = useMutation({
     mutationFn: async () => {
+      if (form.machine_type === 'own' && !form.asset_id) {
+        throw new Error('Выберите автомобиль из парка');
+      }
       if (form.machine_type === 'client' && !selectedClientVehicle) {
         throw new Error('Выберите или создайте клиентский автомобиль');
+      }
+      if (!form.assigned_mechanic_id) {
+        throw new Error('Назначьте исполнителя');
       }
       const r = await fetch('/api/garage/orders', {
         method: 'POST',
@@ -2217,15 +2223,19 @@ function CreateOrderModal({
               <select
                 value={form.asset_id}
                 onChange={(e) => set('asset_id', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                className={cn(
+                  'w-full border rounded-lg px-3 py-2 text-sm',
+                  !form.asset_id ? 'border-red-400 bg-red-50' : 'border-slate-200',
+                )}
               >
-                <option value="">— Выберите —</option>
+                <option value="">— Выберите машину —</option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.short_name} · {a.reg_number}
                   </option>
                 ))}
               </select>
+              {!form.asset_id && <p className="text-xs text-red-500 mt-0.5">Обязательно</p>}
             </div>
           ) : (
             <div>
@@ -2236,6 +2246,7 @@ function CreateOrderModal({
                 value={selectedClientVehicle}
                 onChange={setSelectedClientVehicle}
               />
+              {!selectedClientVehicle && <p className="text-xs text-red-500 mt-0.5">Обязательно</p>}
             </div>
           )}
           <div>
@@ -2253,20 +2264,26 @@ function CreateOrderModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Исполнитель
+                Исполнитель *
               </label>
               <select
                 value={form.assigned_mechanic_id}
                 onChange={(e) => set('assigned_mechanic_id', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                className={cn(
+                  'w-full border rounded-lg px-3 py-2 text-sm',
+                  !form.assigned_mechanic_id ? 'border-red-400 bg-red-50' : 'border-slate-200',
+                )}
               >
-                <option value="">— Не назначен —</option>
+                <option value="">— Выберите механика —</option>
                 {mechanics.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
                   </option>
                 ))}
               </select>
+              {!form.assigned_mechanic_id && (
+                <p className="text-xs text-red-500 mt-0.5">Обязательно</p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
@@ -2306,7 +2323,12 @@ function CreateOrderModal({
             </button>
             <button
               onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending}
+              disabled={
+                createMutation.isPending ||
+                (form.machine_type === 'own' ? !form.asset_id : !selectedClientVehicle) ||
+                !form.assigned_mechanic_id ||
+                !form.problem_description.trim()
+              }
               className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
             >
               {createMutation.isPending ? 'Создаём...' : 'Создать наряд'}
@@ -3070,6 +3092,10 @@ function AiImportModal({
       setCreateError('Выберите или создайте автомобиль клиента');
       return;
     }
+    if (!selectedMechanic) {
+      setCreateError('Назначьте исполнителя');
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {
@@ -3473,7 +3499,13 @@ function AiImportModal({
                     </button>
                     <button
                       onClick={handleCreate}
-                      disabled={creating}
+                      disabled={
+                        creating ||
+                        (parsed?.order.machine_type === 'own'
+                          ? !selectedAssetId
+                          : !selectedClientVehicle) ||
+                        !selectedMechanic
+                      }
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
                     >
                       {creating ? 'Создаём...' : 'Создать наряд →'}

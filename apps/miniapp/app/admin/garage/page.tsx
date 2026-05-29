@@ -1173,10 +1173,11 @@ function CreateOrderModal({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!problemDesc.trim()) throw new Error('Введите описание проблемы');
       if (machineType === 'own' && !assetId) throw new Error('Выберите автомобиль из парка');
       if (machineType === 'client' && !selectedClientVehicle)
         throw new Error('Выберите или создайте клиентский автомобиль');
+      if (!mechanicId) throw new Error('Назначьте исполнителя');
+      if (!problemDesc.trim()) throw new Error('Введите описание проблемы');
       const res = await fetch('/api/admin/service-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1214,7 +1215,12 @@ function CreateOrderModal({
           </button>
           <button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
+            disabled={
+              mutation.isPending ||
+              (machineType === 'own' ? !assetId : !selectedClientVehicle) ||
+              !mechanicId ||
+              !problemDesc.trim()
+            }
             className="flex-[2] py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-zinc-900 text-white disabled:bg-zinc-400"
           >
             {mutation.isPending ? 'Создаём...' : 'Создать наряд'}
@@ -1252,15 +1258,19 @@ function CreateOrderModal({
           <select
             value={assetId}
             onChange={(e) => setAssetId(e.target.value)}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold bg-white"
+            className={cn(
+              'w-full border rounded-xl px-3 py-2.5 text-sm font-bold bg-white',
+              !assetId ? 'border-red-400 bg-red-50' : 'border-slate-200',
+            )}
           >
-            <option value="">— Выберите —</option>
+            <option value="">— Выберите машину —</option>
             {assets.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.short_name} · {a.reg_number}
               </option>
             ))}
           </select>
+          {!assetId && <p className="text-[10px] text-red-500 font-bold mt-0.5">Обязательно</p>}
         </div>
       ) : (
         <div>
@@ -1271,6 +1281,9 @@ function CreateOrderModal({
             value={selectedClientVehicle}
             onChange={setSelectedClientVehicle}
           />
+          {!selectedClientVehicle && (
+            <p className="text-[10px] text-red-500 font-bold mt-0.5">Обязательно</p>
+          )}
         </div>
       )}
 
@@ -1314,20 +1327,24 @@ function CreateOrderModal({
       <div className="grid grid-cols-1 gap-3">
         <div>
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-            Механик
+            Механик *
           </label>
           <select
             value={mechanicId}
             onChange={(e) => setMechanicId(e.target.value)}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+            className={cn(
+              'w-full border rounded-xl px-3 py-2.5 text-sm bg-white',
+              !mechanicId ? 'border-red-400 bg-red-50' : 'border-slate-200',
+            )}
           >
-            <option value="">— Не назначать —</option>
+            <option value="">— Выберите механика —</option>
             {mechanics.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
             ))}
           </select>
+          {!mechanicId && <p className="text-[10px] text-red-500 font-bold mt-0.5">Обязательно</p>}
         </div>
         <div>
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">

@@ -51,6 +51,9 @@ export async function POST(request: Request) {
     if (body.order.machine_type === 'client' && !body.order.client_vehicle_id) {
       return NextResponse.json({ error: 'Выберите автомобиль клиента' }, { status: 400 });
     }
+    if (!body.order.assigned_mechanic_id) {
+      return NextResponse.json({ error: 'Назначьте исполнителя' }, { status: 400 });
+    }
     if (!Array.isArray(body.works) || body.works.length === 0) {
       return NextResponse.json({ error: 'Список работ пуст' }, { status: 400 });
     }

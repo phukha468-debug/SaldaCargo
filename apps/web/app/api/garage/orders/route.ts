@@ -108,6 +108,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (!body.assigned_mechanic_id) {
+      return NextResponse.json({ error: 'Назначьте исполнителя' }, { status: 400 });
+    }
 
     const supabase = createAdminClient();
 
