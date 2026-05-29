@@ -3895,9 +3895,10 @@ function WorkOrdersSection() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                if (!confirm(`Подтвердить оплату наряда НЗ-${o.order_number}?`)) return;
                 patch.mutate({ id: o.id, body: { payment_received: true } });
               }}
-              className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 mt-0.5"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 mt-1 shadow-sm"
             >
               Оплачено ✓
             </button>
