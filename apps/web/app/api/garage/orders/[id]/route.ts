@@ -27,7 +27,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           time_logs:work_time_logs(id, started_at, stopped_at, status)
         ),
         parts:service_order_parts(
-          id, quantity, custom_part_name, unit,
+          id, quantity, custom_part_name, unit, unit_price, client_price,
           part:parts(id, name, unit)
         )
       `,

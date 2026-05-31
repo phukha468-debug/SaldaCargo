@@ -59,6 +59,8 @@ type OrderDetail = Omit<OrderRow, 'works' | 'mechanic'> & {
     quantity: number;
     custom_part_name: string | null;
     unit: string | null;
+    unit_price: string | null;
+    client_price: string | null;
     part: { id: string; name: string; unit: string } | null;
   }>;
 };
@@ -113,11 +115,19 @@ type DashboardData = {
   };
 };
 
+type ServiceJson = {
+  problem_description?: string;
+  priority?: string;
+  mechanic_note?: string;
+  works?: Array<{ name: string; norm_minutes?: number }>;
+};
+
 type RepairRequest = {
   id: string;
   status: string;
   custom_description: string | null;
   admin_note: string | null;
+  service_json: ServiceJson | null;
   created_at: string;
   reviewed_at: string | null;
   asset: { id: string; short_name: string; reg_number: string } | null;
@@ -689,6 +699,7 @@ function OrderDetailModal({
   const [editWorkDesc, setEditWorkDesc] = useState('');
   const [editWorkQty, setEditWorkQty] = useState(1);
   const [editWorkPrice, setEditWorkPrice] = useState('');
+  const [partPricesDraft, setPartPricesDraft] = useState<Record<string, string>>({});
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -844,6 +855,33 @@ function OrderDetailModal({
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
     },
   });
+
+  const patchPartMutation = useMutation({
+    mutationFn: ({ partId, client_price }: { partId: string; client_price: string }) =>
+      fetch(`/api/garage/orders/${orderId}/parts/${partId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_price, unit_price: client_price }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+    },
+  });
+
+  // Sync part price drafts when order loads (only reset on order switch)
+  useEffect(() => {
+    if (!order) return;
+    const draft: Record<string, string> = {};
+    order.parts.forEach((p) => {
+      const val = parseFloat(p.client_price ?? '0');
+      draft[p.id] = val > 0 ? String(Math.round(val)) : '';
+    });
+    setPartPricesDraft(draft);
+  }, [order?.id]);
 
   const filteredCatalog = workSearch.trim()
     ? workCatalog.filter((w) => w.name.toLowerCase().includes(workSearch.toLowerCase().trim()))
@@ -1498,24 +1536,69 @@ function OrderDetailModal({
               </div>
               {order.parts.length > 0 && (
                 <div>
-                  <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
-                    Запчасти ({order.parts.length})
-                  </p>
-                  <div className="space-y-1">
-                    {order.parts.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2"
-                      >
-                        <span className="text-sm text-slate-800">
-                          {p.part?.name ?? p.custom_part_name ?? '—'}
-                        </span>
-                        <span className="text-sm font-semibold text-slate-700">
-                          {p.quantity} {p.part?.unit ?? p.unit ?? 'шт'}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs text-slate-500 font-semibold uppercase">
+                      Запчасти ({order.parts.length})
+                    </p>
+                    <p className="text-[10px] text-slate-400 italic">
+                      — укажите цену, если запчасть наша; оставьте пустым если клиентская
+                    </p>
                   </div>
+                  <div className="space-y-1">
+                    {order.parts.map((p) => {
+                      const partName = p.part?.name ?? p.custom_part_name ?? '—';
+                      const partUnit = p.part?.unit ?? p.unit ?? 'шт';
+                      const draft = partPricesDraft[p.id] ?? '';
+                      const savedPrice = parseFloat(p.client_price ?? '0');
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-sm text-slate-800 flex-1 truncate">{partName}</span>
+                          <span className="text-xs text-slate-500 shrink-0">
+                            {p.quantity} {partUnit}
+                          </span>
+                          <div className="flex items-center shrink-0">
+                            <input
+                              type="number"
+                              min="0"
+                              value={draft}
+                              onChange={(e) =>
+                                setPartPricesDraft((prev) => ({ ...prev, [p.id]: e.target.value }))
+                              }
+                              onBlur={() => {
+                                const newVal = parseFloat(draft || '0');
+                                if (Math.abs(newVal - savedPrice) > 0.01) {
+                                  patchPartMutation.mutate({
+                                    partId: p.id,
+                                    client_price: newVal.toFixed(2),
+                                  });
+                                }
+                              }}
+                              placeholder="Клиент"
+                              className="w-24 text-right text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                            />
+                            <span className="text-xs text-slate-400 ml-1.5">₽</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {order.parts.some((p) => parseFloat(p.client_price ?? '0') > 0) && (
+                    <div className="mt-1.5 flex justify-end text-xs text-slate-500">
+                      Итого запчасти:{' '}
+                      <span className="font-semibold text-slate-700 ml-1">
+                        {order.parts
+                          .reduce(
+                            (s, p) => s + parseFloat(p.client_price ?? '0') * (p.quantity ?? 1),
+                            0,
+                          )
+                          .toLocaleString('ru-RU')}{' '}
+                        ₽
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
               <div>
@@ -1709,9 +1792,14 @@ function OrderDetailModal({
               editSecondMechanic !== null
                 ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
                 : order.second_mechanic;
-            const orderTotal = order.works
+            const worksTotal = order.works
               .filter((w) => w.status !== 'cancelled')
               .reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0);
+            const partsTotal = order.parts.reduce(
+              (s, p) => s + parseFloat(p.client_price ?? '0') * (p.quantity ?? 1),
+              0,
+            );
+            const orderTotal = worksTotal + partsTotal;
             const totalActMin = order.works
               .filter((w) => w.status === 'completed')
               .reduce((s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : w.norm_minutes), 0);
@@ -1804,6 +1892,45 @@ function OrderDetailModal({
                         </div>
                       ))}
                   </div>
+
+                  {/* Запчасти */}
+                  {order.parts.length > 0 && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                        <span>Запчасти</span>
+                        {partsTotal > 0 && (
+                          <span className="text-slate-600 normal-case font-semibold">
+                            {partsTotal.toLocaleString('ru-RU')} ₽
+                          </span>
+                        )}
+                      </div>
+                      {order.parts.map((p) => {
+                        const pPrice = parseFloat(p.client_price ?? '0');
+                        const pName = p.part?.name ?? p.custom_part_name ?? '—';
+                        const pUnit = p.part?.unit ?? p.unit ?? 'шт';
+                        return (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between px-3 py-2 border-t border-slate-100 text-sm"
+                          >
+                            <span className="text-slate-700 truncate mr-2">
+                              {pName}
+                              <span className="text-slate-400 text-xs ml-1">
+                                × {p.quantity} {pUnit}
+                              </span>
+                            </span>
+                            {pPrice > 0 ? (
+                              <span className="font-semibold text-slate-900 shrink-0">
+                                {(pPrice * (p.quantity ?? 1)).toLocaleString('ru-RU')} ₽
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic shrink-0">Клиент</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* ЗП механиков */}
                   <div className="space-y-3">
@@ -3605,7 +3732,9 @@ function WorkOrdersSection() {
   const [showCreate, setShowCreate] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'active' | 'pending_payment' | 'archive'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'pending_payment' | 'archive' | 'requests'>(
+    'active',
+  );
   // Unified date filter — applies to all tabs
   const [dateMode, setDateMode] = useState<'all' | 'month' | 'day'>('all');
   const [filterDate, setFilterDate] = useState(todayStr());
@@ -3661,6 +3790,108 @@ function WorkOrdersSection() {
     refetchInterval: 60000,
     enabled: activeTab === 'pending_payment',
   });
+
+  // ── Repair requests (заявки водителей) ──
+  const { data: repairRequests = [] } = useQuery<RepairRequest[]>({
+    queryKey: ['garage-repair-requests', 'new'],
+    queryFn: () =>
+      fetch('/api/garage/repair-requests?status=pending_json')
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : [])),
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  // Attach JSON state
+  const [attachId, setAttachId] = useState<string | null>(null);
+  const [jsonText, setJsonText] = useState('');
+  const [jsonError, setJsonError] = useState('');
+
+  // Approve modal state
+  const [approveReqId, setApproveReqId] = useState<string | null>(null);
+  const [approveMechanicId, setApproveMechanicId] = useState('');
+  const [approveOdometer, setApproveOdometer] = useState('');
+  const [approving, setApproving] = useState(false);
+
+  const attachJsonMutation = useMutation({
+    mutationFn: ({ id, service_json }: { id: string; service_json: unknown }) =>
+      fetch(`/api/garage/repair-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'attach_json', service_json }),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
+      setAttachId(null);
+      setJsonText('');
+      setJsonError('');
+    },
+  });
+
+  const approveReqMutation = useMutation({
+    mutationFn: ({
+      id,
+      mechanic_id,
+      odometer,
+    }: {
+      id: string;
+      mechanic_id: string;
+      odometer?: number;
+    }) =>
+      fetch(`/api/garage/repair-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', mechanic_id, odometer }),
+      }).then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+        return json;
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
+      qc.invalidateQueries({ queryKey: ['garage-orders'] });
+      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
+      setApproveReqId(null);
+      setApproveMechanicId('');
+      setApproveOdometer('');
+    },
+  });
+
+  const rejectReqMutation = useMutation({
+    mutationFn: (id: string) =>
+      fetch(`/api/garage/repair-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject' }),
+      }).then((r) => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['garage-repair-requests'] }),
+  });
+
+  const handleAttachJson = (id: string) => {
+    setJsonError('');
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      setJsonError('Невалидный JSON');
+      return;
+    }
+    attachJsonMutation.mutate({ id, service_json: parsed });
+  };
+
+  const handleApproveRequest = async (id: string) => {
+    if (!approveMechanicId) return;
+    setApproving(true);
+    try {
+      await approveReqMutation.mutateAsync({
+        id,
+        mechanic_id: approveMechanicId,
+        odometer: approveOdometer ? parseInt(approveOdometer) : undefined,
+      });
+    } finally {
+      setApproving(false);
+    }
+  };
 
   const { data: mechanics = [] } = useQuery<Mechanic[]>({
     queryKey: ['mechanics-list'],
@@ -4065,6 +4296,22 @@ function WorkOrdersSection() {
         >
           Архив
         </button>
+        <button
+          onClick={() => setActiveTab('requests')}
+          className={cn(
+            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
+            activeTab === 'requests'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          Заявки
+          {repairRequests.filter((r) => r.status === 'new').length > 0 && (
+            <span className="bg-rose-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {repairRequests.filter((r) => r.status === 'new').length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ── Global filter bar ── */}
@@ -4199,73 +4446,349 @@ function WorkOrdersSection() {
         )}
       </div>
 
-      {/* ── List ── */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />
-          ))}
-        </div>
-      ) : filteredOrders.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-          <p className="text-5xl mb-3">🔧</p>
-          <p className="font-semibold text-slate-500">
-            {hasFilters ? 'Нарядов по фильтру не найдено' : 'Нарядов нет'}
-          </p>
-          {hasFilters && (
-            <button onClick={clearFilters} className="mt-3 text-sm text-slate-400 underline">
-              Сбросить фильтры
-            </button>
-          )}
-        </div>
-      ) : groupByVehicle && vehicleGroups ? (
-        /* ── По машинам ── */
+      {/* ── Заявки водителей ── */}
+      {activeTab === 'requests' && (
         <div className="space-y-3">
-          {vehicleGroups.map((g) => (
-            <div
-              key={g.label + g.sublabel}
-              className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
-            >
-              <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
-                  <svg
-                    className="w-3.5 h-3.5 text-slate-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900 text-sm">{g.label}</p>
-                  {g.sublabel && <p className="text-xs text-slate-400">{g.sublabel}</p>}
-                </div>
-                <span className="text-xs font-semibold text-slate-400 shrink-0">
-                  {g.orders.length} нар.
-                </span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {g.orders.map((o) => (
-                  <OrderCard key={o.id} o={o} />
-                ))}
-              </div>
+          {repairRequests.length === 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+              <p className="text-5xl mb-3">📋</p>
+              <p className="font-semibold text-slate-500">Новых заявок нет</p>
             </div>
-          ))}
-        </div>
-      ) : (
-        /* ── Плоский список карточек ── */
-        <div className="space-y-2">
-          {filteredOrders.map((o) => (
-            <OrderCard key={o.id} o={o} />
-          ))}
+          )}
+          {repairRequests.map((req) => {
+            const sj = req.service_json;
+            const isAttaching = attachId === req.id;
+            const isApproving = approveReqId === req.id;
+            return (
+              <div
+                key={req.id}
+                className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
+              >
+                {/* Заголовок */}
+                <div className="px-4 py-3 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 text-sm">
+                        {req.asset?.short_name ?? '—'}
+                      </span>
+                      <span className="text-xs text-slate-400">{req.asset?.reg_number}</span>
+                      <span className="text-xs text-slate-500">· {req.driver?.name ?? '—'}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(req.created_at).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-700 mt-1">
+                      {req.fault?.name ?? req.custom_description ?? '—'}
+                    </p>
+                  </div>
+                  {/* Статус JSON */}
+                  {sj ? (
+                    <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      JSON ✓
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                      Без JSON
+                    </span>
+                  )}
+                </div>
+
+                {/* Превью JSON если прикреплён */}
+                {sj && !isApproving && (
+                  <div className="px-4 pb-3 space-y-1">
+                    {sj.problem_description && (
+                      <p className="text-xs text-slate-600 italic">
+                        &quot;{sj.problem_description}&quot;
+                      </p>
+                    )}
+                    {sj.works && sj.works.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {sj.works.map((w, i) => (
+                          <span
+                            key={i}
+                            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full"
+                          >
+                            {w.name}
+                            {w.norm_minutes ? ` (${w.norm_minutes} мин)` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {sj.priority && sj.priority !== 'normal' && (
+                      <span
+                        className={cn(
+                          'inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1',
+                          sj.priority === 'urgent'
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-100 text-slate-500',
+                        )}
+                      >
+                        {sj.priority === 'urgent' ? 'Срочно' : sj.priority}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Блок прикрепления JSON */}
+                {isAttaching && (
+                  <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-2">
+                    <p className="text-xs font-semibold text-slate-600">Вставьте JSON от ИИ:</p>
+                    <textarea
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
+                      rows={6}
+                      placeholder={
+                        '{\n  "order": {\n    "problem_description": "...",\n    "priority": "normal"\n  },\n  "works": [\n    { "custom_work_name": "Замена колодок", "norm_minutes": 90, "price_client": "0" }\n  ],\n  "parts": []\n}'
+                      }
+                      value={jsonText}
+                      onChange={(e) => setJsonText(e.target.value)}
+                    />
+                    {jsonError && <p className="text-xs text-rose-600 font-medium">{jsonError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAttachJson(req.id)}
+                        disabled={!jsonText.trim() || attachJsonMutation.isPending}
+                        className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                      >
+                        {attachJsonMutation.isPending ? 'Сохранение...' : 'Прикрепить'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAttachId(null);
+                          setJsonText('');
+                          setJsonError('');
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Форма одобрения */}
+                {isApproving && (
+                  <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
+                    <p className="text-xs font-semibold text-slate-700">Создать наряд</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Механик *
+                        </label>
+                        <select
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+                          value={approveMechanicId}
+                          onChange={(e) => setApproveMechanicId(e.target.value)}
+                        >
+                          <option value="">— выбрать —</option>
+                          {mechanics.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Одометр (км)
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+                          placeholder="0"
+                          value={approveOdometer}
+                          onChange={(e) => setApproveOdometer(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproveRequest(req.id)}
+                        disabled={!approveMechanicId || approving}
+                        className="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                      >
+                        {approving ? 'Создание...' : 'Создать наряд'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setApproveReqId(null);
+                          setApproveMechanicId('');
+                          setApproveOdometer('');
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Кнопки действий */}
+                {!isAttaching && !isApproving && (
+                  <div className="px-4 pb-3 border-t border-slate-100 pt-2.5 flex flex-col gap-2">
+                    {req.status === 'approved' ? (
+                      /* Заявка одобрена — наряд уже существует */
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {req.service_order && (
+                          <button
+                            onClick={() => setSelectedOrderId(req.service_order!.id)}
+                            className="text-sm font-bold bg-slate-900 text-white hover:bg-slate-700 px-4 py-2 rounded-xl transition-colors"
+                          >
+                            Открыть наряд #{req.service_order.order_number}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setAttachId(req.id);
+                            setJsonText(sj ? JSON.stringify(sj, null, 2) : '');
+                            setJsonError('');
+                          }}
+                          className="text-xs font-semibold text-violet-600 hover:text-violet-800 border border-violet-200 hover:border-violet-400 px-3 py-2 rounded-xl transition-colors"
+                        >
+                          {sj ? '✏️ Изменить JSON' : '+ Прикрепить JSON к наряду'}
+                        </button>
+                      </div>
+                    ) : sj ? (
+                      /* Новая заявка с JSON — одобрить */
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setApproveReqId(req.id);
+                            setApproveMechanicId('');
+                            setApproveOdometer('');
+                          }}
+                          className="text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors"
+                        >
+                          ✓ Одобрить → Наряд
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAttachId(req.id);
+                            setJsonText(JSON.stringify(sj, null, 2));
+                            setJsonError('');
+                          }}
+                          className="text-xs text-slate-400 hover:text-slate-600 underline"
+                        >
+                          изменить JSON
+                        </button>
+                      </div>
+                    ) : (
+                      /* Новая заявка без JSON */
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => {
+                            setAttachId(req.id);
+                            setJsonText('');
+                            setJsonError('');
+                          }}
+                          className="w-full text-sm font-bold bg-violet-600 text-white hover:bg-violet-700 px-4 py-2 rounded-xl transition-colors"
+                        >
+                          Шаг 1: Прикрепить JSON от ИИ
+                        </button>
+                        <p className="text-[10px] text-slate-400 text-center">
+                          Возьми описание водителя, дай ИИ — вставь сюда JSON
+                        </p>
+                        <button
+                          onClick={() => {
+                            setApproveReqId(req.id);
+                            setApproveMechanicId('');
+                            setApproveOdometer('');
+                          }}
+                          className="w-full text-xs text-slate-400 hover:text-slate-600 py-1 underline"
+                        >
+                          Одобрить без JSON (наряд без описания работ)
+                        </button>
+                      </div>
+                    )}
+                    {/* Удалить заявку */}
+                    <button
+                      onClick={() => {
+                        if (confirm('Удалить заявку?')) rejectReqMutation.mutate(req.id);
+                      }}
+                      className="text-[10px] text-slate-300 hover:text-rose-500 self-start transition-colors"
+                    >
+                      удалить заявку
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {/* ── List (скрыт на вкладке Заявки) ── */}
+      {activeTab !== 'requests' &&
+        (isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+            <p className="text-5xl mb-3">🔧</p>
+            <p className="font-semibold text-slate-500">
+              {hasFilters ? 'Нарядов по фильтру не найдено' : 'Нарядов нет'}
+            </p>
+            {hasFilters && (
+              <button onClick={clearFilters} className="mt-3 text-sm text-slate-400 underline">
+                Сбросить фильтры
+              </button>
+            )}
+          </div>
+        ) : groupByVehicle && vehicleGroups ? (
+          /* ── По машинам ── */
+          <div className="space-y-3">
+            {vehicleGroups.map((g) => (
+              <div
+                key={g.label + g.sublabel}
+                className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
+              >
+                <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
+                    <svg
+                      className="w-3.5 h-3.5 text-slate-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-900 text-sm">{g.label}</p>
+                    {g.sublabel && <p className="text-xs text-slate-400">{g.sublabel}</p>}
+                  </div>
+                  <span className="text-xs font-semibold text-slate-400 shrink-0">
+                    {g.orders.length} нар.
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {g.orders.map((o) => (
+                    <OrderCard key={o.id} o={o} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* ── Плоский список карточек ── */
+          <div className="space-y-2">
+            {filteredOrders.map((o) => (
+              <OrderCard key={o.id} o={o} />
+            ))}
+          </div>
+        ))}
 
       {showCreate && (
         <CreateOrderModal
