@@ -2,13 +2,14 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-const PAYROLL_CATEGORY_IDS = [
+const SALARY_CATEGORY_IDS = [
   'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
   '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
 ];
 
 const MANAGEMENT_ROLES = ['owner', 'admin'];
+const OPERATIONAL_ROLES = ['driver', 'loader', 'mechanic', 'mechanic_lead'];
 
 export async function GET(request: Request) {
   try {
@@ -24,39 +25,26 @@ export async function GET(request: Request) {
 
     const [
       { data: users },
-      { data: driverTrips },
-      { data: loaderTrips },
-      { data: mechanicOrders },
-      { data: paidRows },
+      // Начислено за месяц: approved payroll-транзакции (pending + completed)
+      { data: earnedThisMonth },
+      // Выплачено за месяц: approved + completed payroll-транзакции
+      { data: paidThisMonth },
+      // Долг: all-time pending payroll-транзакции
+      { data: pendingAllTime },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
-        .select('id, name, roles, auto_settle')
+        .select('id, name, roles, auto_settle, is_active')
         .eq('is_active', true)
         .order('name'),
 
       (supabase as any)
-        .from('trips')
-        .select('driver_id, trip_orders(driver_pay, lifecycle_status)')
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
-        .gte('started_at', monthStart)
-        .lte('started_at', monthEnd),
-
-      (supabase as any)
-        .from('trips')
-        .select(
-          'loader_id, loader2_id, trip_orders(loader_id, loader2_id, loader_pay, loader2_pay, lifecycle_status)',
-        )
-        .eq('lifecycle_status', 'approved')
-        .gte('started_at', monthStart)
-        .lte('started_at', monthEnd),
-
-      (supabase as any)
-        .from('service_orders')
-        .select('assigned_mechanic_id, mechanic_pay')
-        .eq('status', 'completed')
-        .not('assigned_mechanic_id', 'is', null)
-        .not('mechanic_pay', 'is', null)
+        .in('category_id', SALARY_CATEGORY_IDS)
+        .not('related_user_id', 'is', null)
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 
@@ -65,65 +53,47 @@ export async function GET(request: Request) {
         .select('related_user_id, amount')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
-        .in('category_id', PAYROLL_CATEGORY_IDS)
+        .eq('settlement_status', 'completed')
+        .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
+
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .in('category_id', SALARY_CATEGORY_IDS)
+        .not('related_user_id', 'is', null),
     ]);
 
-    const earnedMap = new Map<string, number>();
-
-    for (const trip of (driverTrips as any[]) ?? []) {
-      const uid = trip.driver_id;
-      if (!uid) continue;
-      const pay = ((trip.trip_orders as any[]) ?? [])
-        .filter((o: any) => o.lifecycle_status !== 'cancelled')
-        .reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
-      earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + pay);
-    }
-
-    for (const trip of (loaderTrips as any[]) ?? []) {
-      for (const order of (trip.trip_orders as any[]) ?? []) {
-        if (order.lifecycle_status === 'cancelled') continue;
-        const effectiveLoaderId = order.loader_id ?? trip.loader_id;
-        const effectiveLoader2Id = order.loader2_id ?? trip.loader2_id;
-        if (effectiveLoaderId) {
-          earnedMap.set(
-            effectiveLoaderId,
-            (earnedMap.get(effectiveLoaderId) ?? 0) + parseFloat(order.loader_pay ?? '0'),
-          );
-        }
-        if (effectiveLoader2Id) {
-          earnedMap.set(
-            effectiveLoader2Id,
-            (earnedMap.get(effectiveLoader2Id) ?? 0) + parseFloat(order.loader2_pay ?? '0'),
-          );
-        }
+    const sumByUser = (rows: any[] | null) => {
+      const map = new Map<string, number>();
+      for (const r of rows ?? []) {
+        const uid = r.related_user_id;
+        if (uid) map.set(uid, (map.get(uid) ?? 0) + parseFloat(r.amount ?? '0'));
       }
-    }
+      return map;
+    };
 
-    for (const order of (mechanicOrders as any[]) ?? []) {
-      const uid = order.assigned_mechanic_id;
-      if (!uid) continue;
-      earnedMap.set(uid, (earnedMap.get(uid) ?? 0) + parseFloat(order.mechanic_pay ?? '0'));
-    }
+    const earnedMap = sumByUser(earnedThisMonth);
+    const paidMap = sumByUser(paidThisMonth);
+    const pendingMap = sumByUser(pendingAllTime);
 
-    const paidMap = new Map<string, number>();
-    for (const tx of (paidRows as any[]) ?? []) {
-      const uid = tx.related_user_id;
-      if (uid) paidMap.set(uid, (paidMap.get(uid) ?? 0) + parseFloat(tx.amount ?? '0'));
-    }
-
-    const OPERATIONAL = ['driver', 'loader', 'mechanic', 'mechanic_lead'];
     const result = ((users as any[]) ?? [])
       .map((u: any) => {
-        const isManagement = (u.roles as string[]).some((r) => MANAGEMENT_ROLES.includes(r));
-        const isOp = (u.roles as string[]).some((r) => OPERATIONAL.includes(r));
+        const isManagement = (u.roles as string[]).some((r: string) =>
+          MANAGEMENT_ROLES.includes(r),
+        );
+        const isOp = (u.roles as string[]).some((r: string) => OPERATIONAL_ROLES.includes(r));
         if (!isOp && !isManagement) return null;
 
         const earned = earnedMap.get(u.id) ?? 0;
         const paid = paidMap.get(u.id) ?? 0;
-        const debt = u.auto_settle ? 0 : Math.max(earned - paid, 0);
+        const debt = u.auto_settle ? 0 : (pendingMap.get(u.id) ?? 0);
+
         return {
           id: u.id,
           name: u.name,
@@ -136,7 +106,6 @@ export async function GET(request: Request) {
         };
       })
       .filter((u): u is NonNullable<typeof u> => u !== null)
-      // Показываем: операционный с долгом/заработком, или руководство всегда
       .filter((u) => u.is_management || parseFloat(u.earned) > 0 || parseFloat(u.debt) > 0);
 
     return NextResponse.json(result);
