@@ -3,9 +3,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import { Money } from '@saldacargo/ui';
-import { formatDate, formatPhone } from '@saldacargo/shared';
+import { formatDate } from '@saldacargo/shared';
 
 export default function AdminFinancePage() {
   return (
@@ -33,7 +34,6 @@ function FinanceContent() {
     | 'debts'
     | 'supplier_debt'
     | 'salary'
-    | 'receivables'
     | null
   >(
     initialAction === 'income_menu'
@@ -50,9 +50,7 @@ function FinanceContent() {
                 ? 'supplier_debt'
                 : initialAction === 'salary'
                   ? 'salary'
-                  : initialAction === 'receivables'
-                    ? 'receivables'
-                    : null,
+                  : null,
   );
   const queryClient = useQueryClient();
 
@@ -75,6 +73,15 @@ function FinanceContent() {
     queryFn: () => fetch(`/api/admin/transactions?date=${txDate}`).then((r) => r.json()),
     staleTime: 15000,
   });
+
+  const { data: receivablesSummary } = useQuery<{ debtors: any[]; totalAmount: string }>({
+    queryKey: ['admin-receivables'],
+    queryFn: () => fetch('/api/admin/receivables').then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const debtorCount = receivablesSummary?.debtors?.length ?? 0;
+  const totalDebt = parseFloat(receivablesSummary?.totalAmount ?? '0');
 
   return (
     <div>
@@ -107,13 +114,22 @@ function FinanceContent() {
                   Добавить доход
                 </span>
               </button>
-              <button
-                onClick={() => setShowForm('receivables')}
-                className="col-span-2 bg-orange-500 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              <Link
+                href="/admin/finance/receivables"
+                className="col-span-2 bg-orange-500 text-white rounded-2xl p-4 flex items-center justify-between active:scale-[0.97] transition-all shadow-sm"
               >
-                <span className="text-xl">📋</span>
-                <span className="text-[10px] font-black uppercase tracking-widest">Дебиторка</span>
-              </button>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">📋</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    Дебиторка
+                  </span>
+                </div>
+                {debtorCount > 0 && (
+                  <span className="text-[11px] font-black bg-white/20 rounded-xl px-3 py-1">
+                    {debtorCount} · {totalDebt.toLocaleString('ru-RU')} ₽
+                  </span>
+                )}
+              </Link>
             </div>
           </div>
         )}
@@ -218,16 +234,58 @@ function FinanceContent() {
           />
         )}
 
-        {/* Форма погашения дебиторки */}
-        {showForm === 'receivables' && (
-          <ReceivablesForm
-            onClose={() => setShowForm('income_menu')}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
-              queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
-              setShowForm(null);
-            }}
-          />
+        {/* Быстрые кнопки */}
+        {showForm === null && (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setShowForm('income_menu')}
+              className="bg-green-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            >
+              <span className="text-xl">➕</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">Доход</span>
+            </button>
+            <button
+              onClick={() => setShowForm('expense_menu')}
+              className="bg-zinc-800 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            >
+              <span className="text-xl">➖</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">Расход</span>
+            </button>
+
+            {/* Дебиторка — большая карточка */}
+            <Link
+              href="/admin/finance/receivables"
+              className="col-span-2 rounded-2xl p-4 flex items-center justify-between active:scale-[0.97] transition-all shadow-sm overflow-hidden relative"
+              style={{
+                background:
+                  debtorCount > 0 ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' : '#f4f4f5',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <p
+                    className={`text-[10px] font-black uppercase tracking-widest ${debtorCount > 0 ? 'text-orange-100' : 'text-zinc-400'}`}
+                  >
+                    Дебиторка
+                  </p>
+                  {debtorCount > 0 ? (
+                    <p className="text-white font-black text-lg leading-tight">
+                      {totalDebt.toLocaleString('ru-RU')} ₽
+                    </p>
+                  ) : (
+                    <p className="text-zinc-400 font-black text-sm leading-tight">Долгов нет</p>
+                  )}
+                </div>
+              </div>
+              {debtorCount > 0 && (
+                <div className="text-right">
+                  <p className="text-white font-black text-2xl">{debtorCount}</p>
+                  <p className="text-orange-200 text-[9px] font-black uppercase">должн.</p>
+                </div>
+              )}
+            </Link>
+          </div>
         )}
 
         {/* История */}
@@ -1122,568 +1180,6 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
         >
           {mutation.isPending ? 'Проводим...' : '✓ Выплатить ЗП'}
         </button>
-      )}
-    </div>
-  );
-}
-
-type ReceivableOrder = {
-  id: string;
-  type: 'trip_order' | 'manual';
-  amount: string;
-  payment_method: string | null;
-  description: string | null;
-  created_at: string;
-  trip_number: number | null;
-  started_at: string | null;
-  driver_name: string | null;
-};
-
-type FollowUp = {
-  status: 'active' | 'promised' | 'disputed' | 'bad_debt';
-  promise_date: string | null;
-  last_contact_at: string | null;
-  next_contact_at: string | null;
-  notes: string | null;
-};
-
-type Debtor = {
-  counterparty_id: string;
-  counterparty_name: string;
-  counterparty_phone: string | null;
-  counterparty_subname: string | null;
-  is_individual: boolean;
-  total: string;
-  oldest_at: string;
-  orders: ReceivableOrder[];
-  follow_up: FollowUp | null;
-};
-
-const FOLLOW_UP_STATUS_LABELS: Record<string, string> = {
-  active: 'В работе',
-  promised: 'Обещание',
-  disputed: 'Оспаривает',
-  bad_debt: 'Безнадёжный',
-};
-
-const FOLLOW_UP_STATUS_COLORS: Record<string, string> = {
-  active: 'border-amber-400 bg-amber-50 text-amber-800',
-  promised: 'border-blue-400 bg-blue-50 text-blue-800',
-  disputed: 'border-zinc-300 bg-zinc-50 text-zinc-600',
-  bad_debt: 'border-red-400 bg-red-50 text-red-700',
-};
-
-const CLOSE_ALL_WALLETS = [
-  { id: '10000000-0000-0000-0000-000000000001', label: '🏦 Р/С' },
-  { id: '10000000-0000-0000-0000-000000000002', label: '💵 Нал' },
-  { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
-];
-
-function ReceivablesForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [selectedDebtorId, setSelectedDebtorId] = useState<string | null>(null);
-  const [selectedOrder, setSelectedOrder] = useState<ReceivableOrder | null>(null);
-  const [showFollowUpId, setShowFollowUpId] = useState<string | null>(null);
-  const [closeAllWallet, setCloseAllWallet] = useState('10000000-0000-0000-0000-000000000001');
-  const [closingAllId, setClosingAllId] = useState<string | null>(null);
-  const [closeAllError, setCloseAllError] = useState('');
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-
-  // Follow-up form state
-  const [fuStatus, setFuStatus] = useState<string>('active');
-  const [fuPromiseDate, setFuPromiseDate] = useState('');
-  const [fuNextContact, setFuNextContact] = useState('');
-  const [fuNotes, setFuNotes] = useState('');
-  const [fuSaving, setFuSaving] = useState(false);
-  const [fuError, setFuError] = useState('');
-
-  const {
-    data,
-    isLoading,
-    isError,
-    error: queryError,
-  } = useQuery<{ debtors: Debtor[]; totalAmount: string }>({
-    queryKey: ['admin-receivables'],
-    queryFn: async () => {
-      const r = await fetch('/api/admin/receivables');
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? 'Ошибка сервера');
-      return json;
-    },
-    staleTime: 0,
-  });
-
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedOrder) throw new Error('Не выбран заказ');
-      const r = await fetch('/api/admin/receivables/settle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedOrder.id,
-          type: selectedOrder.type,
-          note: note || undefined,
-        }),
-      });
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
-      return json;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
-      setSelectedOrder(null);
-      setNote('');
-      setError('');
-      onSuccess();
-    },
-    onError: (e: Error) => setError(e.message),
-  });
-
-  async function handleCloseAll(debtor: Debtor) {
-    setClosingAllId(debtor.counterparty_id);
-    setCloseAllError('');
-    try {
-      const r = await fetch('/api/admin/receivables/close-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orders: debtor.orders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
-          to_wallet_id: closeAllWallet,
-          counterparty_name: debtor.counterparty_name,
-        }),
-      });
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
-      queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
-      setSelectedDebtorId(null);
-      setSelectedOrder(null);
-      onSuccess();
-    } catch (e: unknown) {
-      setCloseAllError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setClosingAllId(null);
-    }
-  }
-
-  async function handleFollowUpSave(counterpartyId: string) {
-    setFuSaving(true);
-    setFuError('');
-    try {
-      const r = await fetch(`/api/admin/receivables/follow-up/${counterpartyId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: fuStatus,
-          promise_date: fuPromiseDate || null,
-          next_contact_at: fuNextContact || null,
-          notes: fuNotes || null,
-        }),
-      });
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
-      queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
-      setShowFollowUpId(null);
-    } catch (e: unknown) {
-      setFuError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setFuSaving(false);
-    }
-  }
-
-  function openFollowUp(debtor: Debtor) {
-    const fu = debtor.follow_up;
-    setFuStatus(fu?.status ?? 'active');
-    setFuPromiseDate(fu?.promise_date ?? '');
-    setFuNextContact(fu?.next_contact_at ?? '');
-    setFuNotes(fu?.notes ?? '');
-    setFuError('');
-    setShowFollowUpId(debtor.counterparty_id);
-  }
-
-  useEffect(() => {
-    if (!selectedDebtorId) return;
-    const el = document.querySelector(`[data-debtor-id="${selectedDebtorId}"]`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [selectedDebtorId]);
-
-  useEffect(() => {
-    if (!showFollowUpId) return;
-    const el = document.querySelector(`[data-followup-id="${showFollowUpId}"]`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [showFollowUpId]);
-
-  const debtors = data?.debtors ?? [];
-  const selectedDebtor = debtors.find((d) => d.counterparty_id === selectedDebtorId) ?? null;
-
-  const PAYMENT_METHOD_LABELS: Record<string, string> = {
-    qr: '📱 QR / Р/С',
-    card_driver: '💳 На карту',
-    debt_cash: '⏳ Долг нал',
-    cash: '💵 Нал',
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-black uppercase text-sm text-orange-600">📋 Дебиторка</h2>
-        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
-          ✕
-        </button>
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-2 animate-pulse">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 bg-zinc-200 rounded-xl" />
-          ))}
-        </div>
-      ) : isError ? (
-        <p className="text-center py-4 text-red-500 font-bold text-xs uppercase">
-          ❌ {(queryError as Error)?.message ?? 'Ошибка загрузки'}
-        </p>
-      ) : debtors.length === 0 ? (
-        <p className="text-center py-6 text-zinc-400 font-bold text-xs uppercase">Долгов нет 🎉</p>
-      ) : (
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-            Должники · итого {parseFloat(data?.totalAmount ?? '0').toLocaleString('ru-RU')} ₽
-          </label>
-          {debtors.map((d) => {
-            const isSelected = selectedDebtorId === d.counterparty_id;
-            const fu = d.follow_up;
-            const isReal = !d.is_individual && !String(d.counterparty_id).startsWith('__');
-            const today = new Date().toISOString().split('T')[0]!;
-            const promiseOverdue = fu?.promise_date && fu.promise_date < today;
-
-            return (
-              <div key={d.counterparty_id} data-debtor-id={d.counterparty_id}>
-                {/* Debtor header */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDebtorId(isSelected ? null : d.counterparty_id);
-                    setSelectedOrder(null);
-                    setShowFollowUpId(null);
-                    setError('');
-                  }}
-                  className={`w-full p-3 rounded-xl border-2 flex justify-between items-start text-sm font-bold transition-all active:scale-[0.98] ${
-                    isSelected
-                      ? 'border-orange-500 bg-orange-50 text-orange-900'
-                      : 'border-zinc-200 text-zinc-700'
-                  }`}
-                >
-                  <div className="text-left">
-                    <p>{d.counterparty_name}</p>
-                    {d.is_individual && d.counterparty_subname && (
-                      <p className="text-[9px] text-zinc-400 font-bold uppercase mt-0.5">
-                        {d.counterparty_subname}
-                      </p>
-                    )}
-                    {fu && (
-                      <p
-                        className={`text-[9px] font-bold uppercase mt-0.5 ${promiseOverdue ? 'text-red-500' : 'text-zinc-400'}`}
-                      >
-                        {promiseOverdue
-                          ? `⚠ Обещание просрочено`
-                          : FOLLOW_UP_STATUS_LABELS[fu.status]}
-                        {fu.promise_date &&
-                          !promiseOverdue &&
-                          ` · ${new Date(fu.promise_date + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-black text-xs text-orange-600">
-                      {parseFloat(d.total).toLocaleString('ru-RU')} ₽
-                    </p>
-                    <p className="text-[9px] text-zinc-400 font-bold uppercase">
-                      {d.orders.length} {d.orders.length === 1 ? 'запись' : 'записи'}
-                    </p>
-                  </div>
-                </button>
-
-                {isSelected && (
-                  <div className="mt-1 ml-2 space-y-2">
-                    {/* Follow-up controls — only for real counterparties */}
-                    {isReal && (
-                      <div>
-                        {showFollowUpId === d.counterparty_id ? (
-                          /* Follow-up form */
-                          <div
-                            data-followup-id={d.counterparty_id}
-                            className="p-3 bg-blue-50 rounded-xl border border-blue-200 space-y-3"
-                          >
-                            <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
-                              📞 Фиксация звонка
-                            </p>
-
-                            {/* Status buttons */}
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {Object.entries(FOLLOW_UP_STATUS_LABELS).map(([key, label]) => (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  onClick={() => setFuStatus(key)}
-                                  className={`py-2 rounded-lg border-2 text-[10px] font-black uppercase tracking-wide transition-all active:scale-[0.97] ${
-                                    fuStatus === key
-                                      ? FOLLOW_UP_STATUS_COLORS[key]
-                                      : 'border-zinc-200 text-zinc-500 bg-white'
-                                  }`}
-                                >
-                                  {label}
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Promise date — only when promised */}
-                            {fuStatus === 'promised' && (
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                                  Обещает оплатить
-                                </label>
-                                <input
-                                  type="date"
-                                  value={fuPromiseDate}
-                                  onChange={(e) => setFuPromiseDate(e.target.value)}
-                                  className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
-                                />
-                              </div>
-                            )}
-
-                            {/* Next contact */}
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                                Следующий звонок
-                              </label>
-                              <input
-                                type="date"
-                                value={fuNextContact}
-                                onChange={(e) => setFuNextContact(e.target.value)}
-                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
-                              />
-                            </div>
-
-                            {/* Notes */}
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                                Заметка
-                              </label>
-                              <input
-                                type="text"
-                                value={fuNotes}
-                                onChange={(e) => setFuNotes(e.target.value)}
-                                placeholder="Итог разговора..."
-                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-blue-500 focus:outline-none"
-                              />
-                            </div>
-
-                            {fuError && <p className="text-red-600 text-xs font-bold">{fuError}</p>}
-
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowFollowUpId(null)}
-                                className="flex-1 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 border-zinc-200 text-zinc-500 active:scale-[0.97]"
-                              >
-                                Отмена
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleFollowUpSave(d.counterparty_id)}
-                                disabled={fuSaving}
-                                className="flex-1 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest text-white bg-blue-600 active:scale-[0.97] disabled:opacity-50"
-                              >
-                                {fuSaving ? '...' : '✓ Сохранить'}
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          /* Follow-up summary + open button */
-                          <div className="flex items-center justify-between px-1 py-1.5">
-                            <div>
-                              {fu ? (
-                                <div>
-                                  <p
-                                    className={`text-[10px] font-black uppercase ${promiseOverdue ? 'text-red-500' : 'text-zinc-400'}`}
-                                  >
-                                    {FOLLOW_UP_STATUS_LABELS[fu.status]}
-                                    {fu.notes &&
-                                      ` · «${fu.notes.slice(0, 30)}${fu.notes.length > 30 ? '…' : ''}»`}
-                                  </p>
-                                  {fu.next_contact_at && (
-                                    <p className="text-[9px] text-blue-500 font-bold">
-                                      Позвонить:{' '}
-                                      {new Date(
-                                        fu.next_contact_at + 'T12:00:00',
-                                      ).toLocaleDateString('ru-RU', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                      })}
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-[10px] text-zinc-300 font-bold uppercase">
-                                  Звонки не фиксировались
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => openFollowUp(d)}
-                              className="px-3 py-2 rounded-lg border-2 border-blue-200 text-blue-600 text-[10px] font-black uppercase tracking-wide active:scale-[0.97] bg-blue-50"
-                            >
-                              📞 Звонок
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Phone button */}
-                    {d.counterparty_phone && (
-                      <a
-                        href={`tel:${d.counterparty_phone}`}
-                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-zinc-200 text-zinc-700 text-xs font-black uppercase tracking-wide active:scale-[0.97]"
-                      >
-                        📲 Позвонить {formatPhone(d.counterparty_phone)}
-                      </a>
-                    )}
-
-                    {/* Close all debt — shown when debtor has records */}
-                    {selectedDebtor && selectedDebtor.orders.length > 0 && (
-                      <div className="p-3 bg-green-50 rounded-xl border-2 border-green-200 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-black text-green-700 uppercase tracking-widest">
-                            Погасить весь долг
-                          </p>
-                          <p className="font-black text-green-700 text-sm">
-                            {parseFloat(selectedDebtor.total).toLocaleString('ru-RU')} ₽
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {CLOSE_ALL_WALLETS.map((w) => (
-                            <button
-                              key={w.id}
-                              type="button"
-                              onClick={() => setCloseAllWallet(w.id)}
-                              className={`py-2 rounded-lg border-2 text-[10px] font-black transition-all active:scale-[0.97] ${
-                                closeAllWallet === w.id
-                                  ? 'border-green-500 bg-green-600 text-white'
-                                  : 'border-zinc-200 bg-white text-zinc-600'
-                              }`}
-                            >
-                              {w.label}
-                            </button>
-                          ))}
-                        </div>
-                        {closeAllError && (
-                          <p className="text-red-600 text-xs font-bold">{closeAllError}</p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleCloseAll(selectedDebtor)}
-                          disabled={closingAllId === selectedDebtor.counterparty_id}
-                          className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-white bg-green-600 active:scale-[0.97] transition-all disabled:opacity-50 text-xs"
-                        >
-                          {closingAllId === selectedDebtor.counterparty_id
-                            ? 'Проводим...'
-                            : `✓ Погасить ${parseFloat(selectedDebtor.total).toLocaleString('ru-RU')} ₽ (${selectedDebtor.orders.length} записей)`}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Orders list */}
-                    {selectedDebtor?.orders.map((order) => {
-                      const isOrderSelected = selectedOrder?.id === order.id;
-                      return (
-                        <div key={order.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedOrder(isOrderSelected ? null : order);
-                              setError('');
-                            }}
-                            className={`w-full p-3 rounded-lg border-2 flex justify-between items-center text-xs font-bold transition-all active:scale-[0.98] ${
-                              isOrderSelected
-                                ? 'border-orange-400 bg-orange-50 text-orange-800'
-                                : 'border-zinc-100 text-zinc-600 bg-zinc-50'
-                            }`}
-                          >
-                            <div className="text-left">
-                              {order.type === 'manual' ? (
-                                <p className="font-black text-blue-600">Ист. долг</p>
-                              ) : order.trip_number ? (
-                                <p className="font-black text-zinc-700">
-                                  Рейс №{order.trip_number}
-                                </p>
-                              ) : null}
-                              <p className="text-[10px] text-zinc-400 uppercase">
-                                {order.payment_method
-                                  ? (PAYMENT_METHOD_LABELS[order.payment_method] ??
-                                    order.payment_method)
-                                  : 'Ручная запись'}
-                                {' · '}
-                                {formatDate(order.created_at)}
-                                {order.driver_name ? ` · ${order.driver_name}` : ''}
-                              </p>
-                              {order.description && (
-                                <p className="text-[9px] text-zinc-400 mt-0.5">
-                                  {order.description}
-                                </p>
-                              )}
-                            </div>
-                            <p className="font-black text-orange-600">
-                              {parseFloat(order.amount).toLocaleString('ru-RU')} ₽
-                            </p>
-                          </button>
-
-                          {isOrderSelected && (
-                            <div className="mt-2 ml-2 p-3 bg-orange-50 rounded-lg border border-orange-200 space-y-3">
-                              {order.type !== 'manual' && (
-                                <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                  {order.payment_method === 'qr' && '→ 🏦 Расчётный счёт'}
-                                  {order.payment_method === 'card_driver' && '→ 💳 Карта'}
-                                  {order.payment_method === 'debt_cash' && '→ 💵 Сейф (Наличные)'}
-                                </div>
-                              )}
-                              {order.type === 'manual' && (
-                                <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                  → 💵 Сейф (Наличные)
-                                </div>
-                              )}
-                              <input
-                                type="text"
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                placeholder="Комментарий (необязательно)"
-                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
-                              />
-                              {error && (
-                                <p className="text-red-600 text-xs font-bold uppercase">{error}</p>
-                              )}
-                              <button
-                                onClick={() => mutation.mutate()}
-                                disabled={mutation.isPending}
-                                className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-white bg-orange-500 active:scale-[0.97] transition-all disabled:opacity-50"
-                              >
-                                {mutation.isPending
-                                  ? 'Проводим...'
-                                  : `✓ Погасить ${parseFloat(order.amount).toLocaleString('ru-RU')} ₽`}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       )}
     </div>
   );
