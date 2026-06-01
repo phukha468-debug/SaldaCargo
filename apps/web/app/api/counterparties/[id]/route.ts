@@ -29,6 +29,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.notes !== undefined) update.notes = body.notes?.trim() || null;
     if (body.is_active !== undefined) update.is_active = body.is_active;
     if (body.is_regular !== undefined) update.is_regular = body.is_regular;
+    if ((body as any).is_legal_entity !== undefined)
+      update.is_legal_entity = (body as any).is_legal_entity;
     if (body.payable_amount !== undefined)
       update.payable_amount = body.payable_amount
         ? parseFloat(body.payable_amount).toFixed(2)

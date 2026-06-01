@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
     let q = (supabase as any)
       .from('counterparties')
-      .select('id, name, phone, email, credit_limit, notes, is_active, is_regular')
+      .select('id, name, phone, email, credit_limit, notes, is_active, is_regular, is_legal_entity')
       .in('type', ['client', 'both'])
       .order('name');
 
@@ -221,6 +221,7 @@ export async function GET(request: Request) {
         credit_limit: cp.credit_limit ?? null,
         is_active: cp.is_active,
         is_regular: cp.is_regular ?? false,
+        is_legal_entity: cp.is_legal_entity ?? false,
         total_revenue: s.total_revenue.toFixed(2),
         revenue_30d: s.revenue_30d.toFixed(2),
         net_profit: netProfit.toFixed(2),

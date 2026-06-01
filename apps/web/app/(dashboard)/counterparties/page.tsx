@@ -16,6 +16,7 @@ type Client = {
   credit_limit: string | null;
   is_active: boolean;
   is_regular: boolean;
+  is_legal_entity: boolean;
   total_revenue: string;
   revenue_30d: string;
   net_profit: string;
@@ -145,6 +146,7 @@ function ClientRow({
   mergeSelected,
   onSelect,
   onMergeToggle,
+  onToggleLegal,
 }: {
   client: Client;
   debt: number;
@@ -153,6 +155,7 @@ function ClientRow({
   mergeSelected: boolean;
   onSelect: () => void;
   onMergeToggle: () => void;
+  onToggleLegal: () => void;
 }) {
   const days = daysAgo(c.last_trip_at);
   return (
@@ -181,7 +184,16 @@ function ClientRow({
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-slate-800 truncate leading-tight">{c.name}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-slate-800 truncate leading-tight">
+            {c.name}
+          </span>
+          {c.is_legal_entity && (
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide bg-blue-100 text-blue-700 px-1.5 py-px rounded-full">
+              ЮЛ
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-xs text-slate-400">
             <Money amount={c.total_revenue} />
@@ -193,9 +205,34 @@ function ClientRow({
           )}
         </div>
       </div>
-      <div className="text-right shrink-0">
-        <div className={`text-[11px] ${actColor(days)}`}>{lastTripLabel(days)}</div>
-        <div className="text-[10px] text-slate-400 mt-0.5">{c.trips_count} рейс.</div>
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Юрлицо чекбокс */}
+        {!mergeMode && (
+          <button
+            type="button"
+            title={
+              c.is_legal_entity
+                ? 'Юрлицо — нажмите чтобы сменить на физлицо'
+                : 'Физлицо — нажмите чтобы отметить как юрлицо'
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLegal();
+            }}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold transition-colors ${
+              c.is_legal_entity
+                ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'
+                : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+            }`}
+          >
+            <span>{c.is_legal_entity ? '☑' : '☐'}</span>
+            <span>ЮЛ</span>
+          </button>
+        )}
+        <div className="text-right">
+          <div className={`text-[11px] ${actColor(days)}`}>{lastTripLabel(days)}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{c.trips_count} рейс.</div>
+        </div>
       </div>
     </div>
   );
@@ -962,6 +999,7 @@ function ClientListPanel({
   onMergeToggle,
   onToggleInactive,
   onToggleMerge,
+  onToggleLegal,
 }: {
   list: Client[];
   isLoading: boolean;
@@ -976,6 +1014,7 @@ function ClientListPanel({
   onMergeToggle: (id: string) => void;
   onToggleInactive: () => void;
   onToggleMerge: () => void;
+  onToggleLegal: (c: Client) => void;
 }) {
   return (
     <div className="w-80 flex-shrink-0">
@@ -1001,18 +1040,64 @@ function ClientListPanel({
           ) : list.length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-400">Нет клиентов</div>
           ) : (
-            list.map((c) => (
-              <ClientRow
-                key={c.id}
-                client={c}
-                debt={debtMap.get(c.id) ?? 0}
-                selected={selectedId === c.id}
-                mergeMode={mergeMode}
-                mergeSelected={mergeSelected.has(c.id)}
-                onSelect={() => onSelect(c.id)}
-                onMergeToggle={() => onMergeToggle(c.id)}
-              />
-            ))
+            <>
+              {/* Секция Юрлиц */}
+              {list.some((c) => c.is_legal_entity) && (
+                <>
+                  <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                      🏢 Юрлица
+                    </span>
+                    <span className="text-[10px] text-blue-400">
+                      {list.filter((c) => c.is_legal_entity).length} кл.
+                    </span>
+                  </div>
+                  {list
+                    .filter((c) => c.is_legal_entity)
+                    .map((c) => (
+                      <ClientRow
+                        key={c.id}
+                        client={c}
+                        debt={debtMap.get(c.id) ?? 0}
+                        selected={selectedId === c.id}
+                        mergeMode={mergeMode}
+                        mergeSelected={mergeSelected.has(c.id)}
+                        onSelect={() => onSelect(c.id)}
+                        onMergeToggle={() => onMergeToggle(c.id)}
+                        onToggleLegal={() => onToggleLegal(c)}
+                      />
+                    ))}
+                </>
+              )}
+              {/* Секция Физлиц */}
+              {list.some((c) => !c.is_legal_entity) && (
+                <>
+                  <div className="px-4 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      👤 Физлица
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {list.filter((c) => !c.is_legal_entity).length} кл.
+                    </span>
+                  </div>
+                  {list
+                    .filter((c) => !c.is_legal_entity)
+                    .map((c) => (
+                      <ClientRow
+                        key={c.id}
+                        client={c}
+                        debt={debtMap.get(c.id) ?? 0}
+                        selected={selectedId === c.id}
+                        mergeMode={mergeMode}
+                        mergeSelected={mergeSelected.has(c.id)}
+                        onSelect={() => onSelect(c.id)}
+                        onMergeToggle={() => onMergeToggle(c.id)}
+                        onToggleLegal={() => onToggleLegal(c)}
+                      />
+                    ))}
+                </>
+              )}
+            </>
           )}
         </div>
 
@@ -1102,21 +1187,39 @@ export default function ClientsPage() {
   const revPctReg = totalRevAll > 0 ? Math.round((totalRevReg / totalRevAll) * 100) : 0;
   const revPctIrreg = totalRevAll > 0 ? Math.round((totalRevIrreg / totalRevAll) * 100) : 0;
 
+  // Дубли: клиенты с одинаковым именем (нормализованным) — только активные
+  const duplicateGroups = useMemo(() => {
+    const nameMap = new Map<string, Client[]>();
+    for (const c of clients.filter((c) => c.is_active)) {
+      const key = c.name.trim().toLowerCase();
+      const arr = nameMap.get(key) ?? [];
+      arr.push(c);
+      nameMap.set(key, arr);
+    }
+    return Array.from(nameMap.values()).filter((arr) => arr.length > 1);
+  }, [clients]);
+
   function getList(isRegular: boolean) {
     const q = search.toLowerCase();
-    return clients
-      .filter((c) => {
-        if (!showInactive && !c.is_active) return false;
-        if (c.is_regular !== isRegular) return false;
-        if (q)
-          return (
-            c.name.toLowerCase().includes(q) ||
-            (c.phone ?? '').includes(q) ||
-            (c.email ?? '').toLowerCase().includes(q)
-          );
-        return true;
-      })
-      .sort((a, b) => parseFloat(b.total_revenue) - parseFloat(a.total_revenue));
+    return (
+      clients
+        .filter((c) => {
+          if (!showInactive && !c.is_active) return false;
+          if (c.is_regular !== isRegular) return false;
+          if (q)
+            return (
+              c.name.toLowerCase().includes(q) ||
+              (c.phone ?? '').includes(q) ||
+              (c.email ?? '').toLowerCase().includes(q)
+            );
+          return true;
+        })
+        // Юрлица первыми, внутри группы — по выручке
+        .sort((a, b) => {
+          if (a.is_legal_entity !== b.is_legal_entity) return a.is_legal_entity ? -1 : 1;
+          return parseFloat(b.total_revenue) - parseFloat(a.total_revenue);
+        })
+    );
   }
 
   const regularList = getList(true);
@@ -1177,6 +1280,13 @@ export default function ClientsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !c.is_active }),
+    }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
+
+  const toggleLegal = (c: Client) =>
+    fetch(`/api/counterparties/${c.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_legal_entity: !c.is_legal_entity }),
     }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
 
   const promoteClient = (c: Client) =>
@@ -1357,6 +1467,34 @@ export default function ClientsPage() {
           </button>
         </div>
 
+        {/* ── Дубли-баннер ── */}
+        {duplicateGroups.length > 0 && !mergeMode && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-amber-500 text-lg mt-0.5">⚠</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 mb-1">
+                  Обнаружены дубли — {duplicateGroups.length} группы
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {duplicateGroups.map((group) => (
+                    <span
+                      key={group[0]!.id}
+                      className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium"
+                    >
+                      «{group[0]!.name}» × {group.length}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-600 mt-2">
+                  Нажмите <strong>⇋ Объединить</strong> в панели слева, выберите двух дублей и
+                  нажмите «Объединить».
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Merge panel ── */}
         {mergeMode && (
           <div className="mb-4">
@@ -1391,6 +1529,7 @@ export default function ClientsPage() {
                 setMergeSelected(new Set());
                 setMergeError('');
               }}
+              onToggleLegal={toggleLegal}
             />
 
             <div className="flex-1 min-w-0">
@@ -1441,6 +1580,7 @@ export default function ClientsPage() {
                 setMergeSelected(new Set());
                 setMergeError('');
               }}
+              onToggleLegal={toggleLegal}
             />
             <div className="flex-1 min-w-0">
               <div className="bg-white rounded-2xl border border-slate-200">
