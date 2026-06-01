@@ -114,6 +114,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // ── Возврат на доработку ───────────────────────────────────────────────
   if (body.action === 'return') {
+    // Удаляем все финансовые транзакции наряда (ЗП, выручка) — при повторном апруве создадутся заново
+    await (supabase.from('transactions') as any).delete().eq('service_order_id', id);
+
+    // Сбрасываем флаг salary_paid на работах — иначе при повторном апруве они не попадут в расчёт
+    await (supabase.from('service_order_works') as any)
+      .update({ salary_paid: false })
+      .eq('service_order_id', id);
+
     const { error } = await (supabase.from('service_orders') as any)
       .update({
         lifecycle_status: 'returned',

@@ -293,6 +293,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // Handle lifecycle changes other than 'approved' (e.g. returned, cancelled)
     if ('lifecycle_status' in body && body.lifecycle_status !== 'approved') {
+      // При возврате наряда — откатываем финансы: удаляем транзакции и сбрасываем salary_paid
+      if (body.lifecycle_status === 'returned') {
+        await Promise.all([
+          (supabase as any).from('transactions').delete().eq('service_order_id', id),
+          (supabase as any)
+            .from('service_order_works')
+            .update({ salary_paid: false })
+            .eq('service_order_id', id),
+        ]);
+      }
+
       await (supabase as any)
         .from('service_orders')
         .update({ lifecycle_status: body.lifecycle_status, updated_at: new Date().toISOString() })
