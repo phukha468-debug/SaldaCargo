@@ -20,9 +20,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const supabase = createAdminClient();
 
-  // Определяем settlement_status по способу оплаты
-  const pendingMethods = ['debt_cash', 'qr', 'card_driver'];
-  const settlementStatus = pendingMethods.includes(body.payment_method) ? 'pending' : 'completed';
+  // settlement_status: только долг = pending; наличка и QR — деньги получены сразу
+  const settlementStatus = body.payment_method === 'debt_cash' ? 'pending' : 'completed';
 
   const { data, error } = await ((supabase.from('trip_orders') as any)
     .insert({

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 /** POST /api/driver/counterparties/new — создать нового клиента (с проверкой дублей) */
 export async function POST(request: Request) {
-  const body = (await request.json()) as { name: string; type?: string };
+  const body = (await request.json()) as { name: string; type?: string; is_legal_entity?: boolean };
   const name = body.name?.trim();
   if (!name) return NextResponse.json({ error: 'Название обязательно' }, { status: 400 });
 
@@ -31,7 +31,12 @@ export async function POST(request: Request) {
 
   const { data, error } = await (supabase as any)
     .from('counterparties')
-    .insert({ name, type: body.type || 'client', is_active: true })
+    .insert({
+      name,
+      type: body.type || 'client',
+      is_active: true,
+      is_legal_entity: body.is_legal_entity ?? false,
+    })
     .select()
     .single();
 

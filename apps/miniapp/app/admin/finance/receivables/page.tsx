@@ -52,13 +52,8 @@ const WALLET_OPTIONS = [
   },
   {
     id: '10000000-0000-0000-0000-000000000002',
-    label: '💵 Нал',
+    label: '💵 Касса',
     color: 'border-green-500 bg-green-600 text-white',
-  },
-  {
-    id: '10000000-0000-0000-0000-000000000003',
-    label: '💳 Карта',
-    color: 'border-violet-500 bg-violet-600 text-white',
   },
 ];
 
@@ -70,16 +65,16 @@ const FOLLOW_UP_STATUSES = [
 ];
 
 const PM_LABELS: Record<string, string> = {
-  qr: '📱 QR / Р/С',
-  card_driver: '💳 Карта',
-  debt_cash: '⏳ Долг нал',
+  qr: '📱 QR / Безнал',
+  card_driver: '💵 Нал/Карта',
+  debt_cash: '⏳ Долг',
   cash: '💵 Нал',
 };
 
 const PM_WALLET_LABEL: Record<string, string> = {
   qr: '→ 🏦 Р/С',
-  card_driver: '→ 💳 Карта',
-  debt_cash: '→ 💵 Сейф',
+  card_driver: '→ 💵 Касса',
+  debt_cash: '→ зависит от типа клиента',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await (supabase
     .from('counterparties')
-    .select('id, name')
+    .select('id, name, is_legal_entity')
     .eq('is_active', true)
     .order('name') as any);
 

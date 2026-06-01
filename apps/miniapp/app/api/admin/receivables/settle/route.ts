@@ -7,12 +7,10 @@ import { v4 as uuid } from 'uuid';
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
-const CARD_ID = '10000000-0000-0000-0000-000000000003';
 
-function walletForPaymentMethod(pm: string): string {
-  if (pm === 'qr') return BANK_ID;
-  if (pm === 'card_driver') return CARD_ID;
-  return CASH_ID;
+function walletForDebt(isLegalEntity: boolean): string {
+  // Юрлицо платит через Р/С; физлицо — наличными в Кассу
+  return isLegalEntity ? BANK_ID : CASH_ID;
 }
 
 /** POST /api/admin/receivables/settle — погасить долг по заказу или ручной записи */
@@ -72,7 +70,7 @@ export async function POST(request: Request) {
   const { data: order, error: orderErr } = await (supabase
     .from('trip_orders')
     .select(
-      'id, amount, counterparty_id, payment_method, counterparty:counterparties(name), settlement_status',
+      'id, amount, counterparty_id, payment_method, settlement_status, counterparty:counterparties(name, is_legal_entity)',
     )
     .eq('id', body.id)
     .single() as any);
@@ -90,7 +88,8 @@ export async function POST(request: Request) {
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
   const cpName = order.counterparty?.name ?? 'Должник';
-  const toWalletId = walletForPaymentMethod(order.payment_method);
+  const isLegal = order.counterparty?.is_legal_entity ?? false;
+  const toWalletId = walletForDebt(isLegal);
   const description = body.note ? body.note : `Погашение: ${cpName}`;
 
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
