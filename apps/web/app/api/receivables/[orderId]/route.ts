@@ -6,12 +6,9 @@ import { cookies } from 'next/headers';
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
-const CARD_ID = '10000000-0000-0000-0000-000000000003';
 
-function walletForPaymentMethod(pm: string): string {
-  if (pm === 'qr') return BANK_ID;
-  if (pm === 'card_driver') return CARD_ID;
-  return CASH_ID;
+function walletForDebt(isLegalEntity: boolean): string {
+  return isLegalEntity ? BANK_ID : CASH_ID;
 }
 
 /** PUT /api/receivables/[orderId] — привязать trip_order к контрагенту */
@@ -49,11 +46,11 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ order
     adminId = adminUser?.id ?? 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
   }
 
-  // Получаем заказ — включая payment_method для маршрутизации в кошелёк
+  // Получаем заказ — включая is_legal_entity контрагента для маршрутизации в кошелёк
   const { data: order, error: orderErr } = await (supabase
     .from('trip_orders')
     .select(
-      'id, amount, counterparty_id, payment_method, settlement_status, counterparty:counterparties(name)',
+      'id, amount, counterparty_id, payment_method, settlement_status, counterparty:counterparties(name, is_legal_entity)',
     )
     .eq('id', orderId)
     .single() as any);
@@ -72,9 +69,10 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ order
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
-  // Создаём доходную транзакцию с маршрутизацией в нужный кошелёк
+  // Юрлицо → Р/С; физлицо → Касса
   const cpName = order.counterparty?.name ?? 'Должник';
-  const toWalletId = walletForPaymentMethod(order.payment_method);
+  const isLegal = order.counterparty?.is_legal_entity ?? false;
+  const toWalletId = walletForDebt(isLegal);
 
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
     direction: 'income',

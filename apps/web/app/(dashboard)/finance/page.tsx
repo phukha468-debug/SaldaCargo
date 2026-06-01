@@ -1605,7 +1605,7 @@ function ReceivablesPanel() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [partialOrder, setPartialOrder] = useState<RecvOrder | null>(null);
   const [partialAmount, setPartialAmount] = useState('');
-  const [partialWallet, setPartialWallet] = useState<'bank' | 'cash' | 'card'>('bank');
+  const [partialWallet, setPartialWallet] = useState<'bank' | 'cash'>('bank');
   const [partialSaving, setPartialSaving] = useState(false);
   const [closingAllId, setClosingAllId] = useState<string | null>(null);
   const [closeAllWalletId, setCloseAllWalletId] = useState('10000000-0000-0000-0000-000000000001');
@@ -1726,7 +1726,6 @@ function ReceivablesPanel() {
     const WALLET_IDS = {
       bank: '10000000-0000-0000-0000-000000000001',
       cash: '10000000-0000-0000-0000-000000000002',
-      card: '10000000-0000-0000-0000-000000000003',
     };
     try {
       const r = await fetch(`/api/receivables/manual/${partialOrder.id}`, {
@@ -1877,7 +1876,7 @@ function ReceivablesPanel() {
             <label style={{ fontSize: 12, color: '#94a3b8' }}>Зачислить на счёт</label>
             <select
               value={partialWallet}
-              onChange={(e) => setPartialWallet(e.target.value as 'bank' | 'cash' | 'card')}
+              onChange={(e) => setPartialWallet(e.target.value as 'bank' | 'cash')}
               style={{
                 width: '100%',
                 marginTop: 4,
@@ -1891,8 +1890,7 @@ function ReceivablesPanel() {
               }}
             >
               <option value="bank">Банк (р/с)</option>
-              <option value="cash">Наличные</option>
-              <option value="card">Карта</option>
+              <option value="cash">Касса (наличные)</option>
             </select>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -2425,8 +2423,7 @@ function ReceivablesPanel() {
                           </span>
                           {[
                             { id: '10000000-0000-0000-0000-000000000001', label: '🏦 Р/С' },
-                            { id: '10000000-0000-0000-0000-000000000002', label: '💵 Нал' },
-                            { id: '10000000-0000-0000-0000-000000000003', label: '💳 Карта' },
+                            { id: '10000000-0000-0000-0000-000000000002', label: '💵 Касса' },
                           ].map((w) => (
                             <button
                               key={w.id}

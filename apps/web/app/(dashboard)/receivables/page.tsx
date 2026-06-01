@@ -48,7 +48,6 @@ type ReceivablesData = {
 const WALLET_OPTIONS = [
   { id: '10000000-0000-0000-0000-000000000001', label: 'Расчётный счёт' },
   { id: '10000000-0000-0000-0000-000000000002', label: 'Касса (наличные)' },
-  { id: '10000000-0000-0000-0000-000000000003', label: 'Карта' },
 ];
 
 type Counterparty = { id: string; name: string };
@@ -59,7 +58,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   debt_cash: 'Долг нал',
   qr: 'QR',
   cash: 'Нал',
-  card_driver: 'Карта',
+  card_driver: 'Нал/Карта',
 };
 
 const STATUS_CONFIG = {

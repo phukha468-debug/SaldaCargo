@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Money } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
 
-type WalletKey = 'bank' | 'cash' | 'card';
+type WalletKey = 'bank' | 'cash';
 type WalletHistoryItem = {
   id: string;
   date: string;
@@ -21,7 +21,6 @@ type WalletHistoryItem = {
 type Wallets = {
   bank: { name: string; balance: string };
   cash: { name: string; balance: string };
-  card: { name: string; balance: string };
 };
 
 type Summary = {
@@ -239,7 +238,7 @@ export default function DashboardHome() {
 
       {/* ═══ SECTION: СЧЕТА КОМПАНИИ ═══ */}
       <section>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-[10px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-[10px]">
           {/* Bank */}
           <div
             onClick={() => setDrawerWallet('bank')}
@@ -289,32 +288,6 @@ export default function DashboardHome() {
                 </div>
               )}
               <div className="text-[9px] text-white/75 mt-[3px]">Наличные в кассе</div>
-            </div>
-          </div>
-
-          {/* Card */}
-          <div
-            onClick={() => setDrawerWallet('card')}
-            className="relative overflow-hidden rounded-xl text-white min-h-[78px] flex flex-col justify-between shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
-            style={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              padding: '14px 16px',
-            }}
-          >
-            <div className="absolute -right-3.5 -top-3.5 w-[60px] h-[60px] rounded-full bg-white/12 pointer-events-none" />
-            <div className="absolute right-2.5 -bottom-5 w-12 h-12 rounded-full bg-white/7 pointer-events-none" />
-            <div className="relative">
-              <div className="text-[8px] font-extrabold uppercase tracking-[.1em] text-white/80 mb-1">
-                Карта
-              </div>
-              {walletsLoading ? (
-                <div className="h-6 w-24 bg-white/20 rounded animate-pulse mt-1" />
-              ) : (
-                <div className="text-[20px] font-black tracking-tight leading-none mt-1">
-                  <Money amount={wallets?.card?.balance ?? '0'} />
-                </div>
-              )}
-              <div className="text-[9px] text-white/75 mt-[3px]">Корпоративная карта</div>
             </div>
           </div>
         </div>
@@ -441,21 +414,10 @@ export default function DashboardHome() {
 const WALLET_LABELS: Record<WalletKey, { name: string; sub: string; color: string }> = {
   bank: { name: 'Банк', sub: 'Расчётный счёт', color: '#3b82f6' },
   cash: { name: 'Касса', sub: 'Наличные', color: '#10b981' },
-  card: { name: 'Карта', sub: 'Корпоративная карта', color: '#8b5cf6' },
 };
 const OTHER_WALLETS: Record<WalletKey, { key: WalletKey; label: string }[]> = {
-  bank: [
-    { key: 'cash', label: 'Касса' },
-    { key: 'card', label: 'Карта' },
-  ],
-  cash: [
-    { key: 'bank', label: 'Банк' },
-    { key: 'card', label: 'Карта' },
-  ],
-  card: [
-    { key: 'bank', label: 'Банк' },
-    { key: 'cash', label: 'Касса' },
-  ],
+  bank: [{ key: 'cash', label: 'Касса' }],
+  cash: [{ key: 'bank', label: 'Банк' }],
 };
 
 type Period = 'day' | 'week' | 'month';
@@ -505,9 +467,7 @@ function WalletDrawer({
 }: {
   wallet: WalletKey;
   onClose: () => void;
-  wallets:
-    | { bank: { balance: string }; cash: { balance: string }; card: { balance: string } }
-    | undefined;
+  wallets: { bank: { balance: string }; cash: { balance: string } } | undefined;
 }) {
   const [period, setPeriod] = useState<Period>('day');
   const [offset, setOffset] = useState(0);
