@@ -5,93 +5,152 @@ import { useEffect } from 'react';
 /**
  * MinimizeOnBack
  *
- * Intercepting the hardware back button (Android) and swipe-back (iOS) so the
- * app minimizes instead of closing when the user reaches the history root.
+ * Prevents the app from closing when the user presses Back on the root page.
+ * MAX SDK (window.WebApp) does NOT have a minimize() method, so we use two
+ * complementary strategies:
  *
- * Strategy (History API barrier):
- *   1. replaceState marks the very first history entry as our "barrier"
- *   2. pushState adds a clean entry above it — this is where the app lives
- *   3. popstate handler: if we popped to the barrier → call minimize SDK,
- *      then push a fresh entry to keep the barrier accessible for next time
+ * 1. window.WebApp.BackButton — MAX native back button (appears in the MAX header).
+ *    When shown, it intercepts BOTH the header button AND the Android hardware back.
+ *    We show it on root pages and handle its onClick to do nothing (app stays open).
+ *    On inner pages Next.js handles navigation normally via router — BackButton hidden.
  *
- * Next.js Router pushes its own states on navigation; those don't have the
- * barrier marker, so normal in-app back navigation is unaffected.
+ * 2. History API barrier — fallback for environments where BackButton is unavailable.
+ *    replaceState tags the initial entry as "barrier"; pushState adds an entry above it.
+ *    popstate: if we popped to the barrier → re-push to keep app alive.
  *
- * Platform SDK priority:
- *   1. window.Telegram.WebApp.minimize()  — Telegram / MAX if they mirror TG API
- *   2. window.max.minimize()              — MAX native SDK (add when docs arrive)
- *   3. postMessage to parent frame        — generic WebView containers
+ * 3. window.WebApp.enableClosingConfirmation() — shows a native dialog when the user
+ *    taps the ✕ button in the MAX header, preventing accidental full close.
+ *
+ * MAX SDK reference: https://dev.max.ru/docs/webapps/bridge
+ *   window.WebApp.BackButton.show()
+ *   window.WebApp.BackButton.hide()
+ *   window.WebApp.BackButton.onClick(cb)
+ *   window.WebApp.BackButton.offClick(cb)
+ *   window.WebApp.BackButton.isVisible
+ *   window.WebApp.enableClosingConfirmation()
+ *   window.WebApp.disableClosingConfirmation()
  */
 
 declare global {
   interface Window {
-    Telegram?: {
-      WebApp?: {
-        minimize?: () => void;
-        close?: () => void;
-        enableClosingConfirmation?: () => void;
+    WebApp?: {
+      BackButton?: {
+        isVisible: boolean;
+        show: () => void;
+        hide: () => void;
+        onClick: (callback: () => void) => void;
+        offClick: (callback: () => void) => void;
       };
-    };
-    // MAX messenger SDK (placeholder — update when official docs available)
-    max?: {
-      minimize?: () => void;
-      close?: () => void;
+      enableClosingConfirmation?: () => void;
+      disableClosingConfirmation?: () => void;
+      platform?: string;
+      version?: string;
     };
   }
 }
 
 const BARRIER_KEY = '_salda_back_barrier';
 
-function callMinimize() {
-  // 1. Telegram / MAX (if they expose Telegram-compatible API)
-  const tg = window.Telegram?.WebApp;
-  if (tg?.minimize) {
-    tg.minimize();
-    return;
-  }
+// Root paths where back press should NOT navigate away (keep app open instead)
+const ROOT_PATHS = new Set(['/', '/driver', '/admin', '/mechanic', '/login']);
 
-  // 2. MAX native SDK
-  if (window.max?.minimize) {
-    window.max.minimize();
-    return;
-  }
-
-  // 3. postMessage — some mini-app containers listen for this
-  try {
-    window.parent?.postMessage(JSON.stringify({ type: 'minimize_app' }), '*');
-    // Also try the Telegram Web App event format
-    window.parent?.postMessage(JSON.stringify({ eventType: 'web_app_minimize' }), '*');
-  } catch {
-    // Swallow — we're in a sandboxed context
-  }
+function isRootPath(pathname: string): boolean {
+  return ROOT_PATHS.has(pathname);
 }
 
 export function MinimizeOnBack() {
   useEffect(() => {
-    // Mark the initial history entry as our barrier
-    // (replaceState = no new entry, just tags what's already there)
+    const WebApp = window.WebApp;
+
+    // ── Closing confirmation (handles the ✕ button in MAX header) ──────────
+    try {
+      WebApp?.enableClosingConfirmation?.();
+    } catch {
+      // Not supported — silently skip
+    }
+
+    // ── History API barrier (hardware back / environments without BackButton) ─
     try {
       history.replaceState({ [BARRIER_KEY]: true }, '');
     } catch {
       return; // SSR guard or restricted environment
     }
 
-    // Push a clean entry for the actual app content to live on
+    // Push a clean entry for the app to live on; barrier is below it
     history.pushState({ [BARRIER_KEY]: false }, '');
 
     function onPopState(e: PopStateEvent) {
       if (e.state?.[BARRIER_KEY] === true) {
-        // User navigated back past the app root — minimize instead of closing
-        callMinimize();
-
-        // Restore a clean entry so the barrier stays accessible on next back press
+        // User hit the barrier — re-push a clean entry so the app stays alive
+        // (there is no SDK minimize in MAX, so we just keep the app open at root)
         history.pushState({ [BARRIER_KEY]: false }, '');
       }
-      // For all other popstate events (normal Next.js navigation), do nothing
     }
 
     window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+
+    // ── MAX BackButton: intercept header back button on root pages ────────────
+    const backButton = WebApp?.BackButton;
+
+    function handleBackButtonClick() {
+      if (isRootPath(window.location.pathname)) {
+        // On root — do nothing; app stays open (no SDK minimize available)
+        // The History API barrier also ensures hardware back doesn't close the app
+      } else {
+        // On inner pages — navigate back within the app
+        history.back();
+      }
+    }
+
+    if (backButton) {
+      backButton.onClick(handleBackButtonClick);
+
+      // Show BackButton on root pages (routes the hardware back button through MAX SDK)
+      // Visibility will be updated on each navigation via the route-aware hook below
+      if (isRootPath(window.location.pathname)) {
+        backButton.show();
+      }
+    }
+
+    // Watch for URL changes (Next.js App Router navigation) to toggle BackButton
+    let lastPathname = window.location.pathname;
+
+    function onLocationChange() {
+      const current = window.location.pathname;
+      if (current === lastPathname) return;
+      lastPathname = current;
+
+      if (!backButton) return;
+
+      if (isRootPath(current)) {
+        // On root pages: show BackButton so MAX routes hardware back through our handler
+        if (!backButton.isVisible) backButton.show();
+      } else {
+        // On inner pages: hide BackButton so Next.js router handles navigation
+        if (backButton.isVisible) backButton.hide();
+      }
+    }
+
+    // Next.js App Router doesn't fire popstate on push — observe via MutationObserver
+    // on the URL, or use the popstate event (fires on back/forward, not push).
+    // We combine popstate + a periodic check as the simplest cross-version approach.
+    window.addEventListener('popstate', onLocationChange);
+
+    // Poll for pushState-based navigation (Next.js link clicks)
+    const pollInterval = setInterval(onLocationChange, 300);
+
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('popstate', onLocationChange);
+      clearInterval(pollInterval);
+      backButton?.offClick(handleBackButtonClick);
+      // Restore closing without confirmation on unmount (component teardown)
+      try {
+        WebApp?.disableClosingConfirmation?.();
+      } catch {
+        // ignore
+      }
+    };
   }, []);
 
   return null;
