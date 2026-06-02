@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -206,6 +206,18 @@ function StaffContent() {
 
   const activeList = grouped[activeGroup];
 
+  // Lock scroll when modal is open
+  useEffect(() => {
+    if (settleTarget) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [settleTarget]);
+
   return (
     <div className="min-h-screen bg-zinc-50">
       {/* Header */}
@@ -367,56 +379,67 @@ function StaffContent() {
 
       {/* Settle modal */}
       {settleTarget && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
-          <div className="bg-white w-full rounded-t-3xl p-6 space-y-5">
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center animate-in fade-in duration-200"
+          onClick={() => setSettleTarget(null)}
+        >
+          <div
+            className="bg-white w-full max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] p-6 space-y-6 shadow-2xl animate-in slide-in-from-bottom duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                <p className="text-xs font-black text-zinc-400 uppercase tracking-widest">
                   Выплата ЗП
                 </p>
-                <p className="text-lg font-black text-zinc-900 mt-0.5">{settleTarget.name}</p>
+                <p className="text-xl font-black text-zinc-900 mt-1">{settleTarget.name}</p>
               </div>
               <button
                 onClick={() => setSettleTarget(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-100 text-zinc-500 font-bold"
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 text-zinc-500 font-bold active:scale-90 transition-all"
               >
                 ✕
               </button>
             </div>
 
             {/* Amount */}
-            <div>
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-1.5">
-                Сумма (₽)
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                Сумма к выплате, ₽
               </label>
               <input
                 type="number"
+                inputMode="decimal"
                 value={settleAmount}
                 onChange={(e) => setSettleAmount(e.target.value)}
-                className="w-full border-2 border-zinc-200 rounded-2xl px-4 py-3 text-xl font-black text-zinc-900 focus:border-orange-400 focus:outline-none"
+                className="w-full border-2 border-zinc-100 bg-zinc-50 rounded-2xl px-5 py-4 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:bg-white focus:outline-none transition-all"
                 placeholder="0"
                 min="1"
               />
             </div>
 
             {/* Wallet selector */}
-            <div>
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-2">
-                Откуда выплатить
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                Источник средств
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {walletList.map((w) => (
                   <button
                     key={w.id}
                     onClick={() => setSettleWallet(w.id)}
-                    className={`rounded-2xl p-3 border-2 text-left transition-colors ${
+                    className={`rounded-2xl p-4 border-2 text-left transition-all active:scale-[0.97] ${
                       settleWallet === w.id
-                        ? 'border-orange-400 bg-orange-50'
-                        : 'border-zinc-200 bg-white'
+                        ? 'border-orange-500 bg-orange-50 ring-4 ring-orange-500/10'
+                        : 'border-zinc-100 bg-zinc-50 text-zinc-600'
                     }`}
                   >
-                    <p className="text-[11px] font-black text-zinc-700 leading-tight">{w.name}</p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                    <p className="text-xs font-black uppercase tracking-tight leading-tight">
+                      {w.name.split(' ')[0]}
+                    </p>
+                    <p
+                      className={`text-sm font-black mt-1 ${settleWallet === w.id ? 'text-orange-600' : 'text-zinc-900'}`}
+                    >
                       <Money amount={w.balance} />
                     </p>
                   </button>
@@ -424,24 +447,26 @@ function StaffContent() {
               </div>
             </div>
 
-            <button
-              onClick={handleSettle}
-              disabled={
-                settleMutation.isPending ||
-                !settleWallet ||
-                !settleAmount ||
-                parseFloat(settleAmount) <= 0
-              }
-              className="w-full bg-orange-500 text-white font-black text-base py-4 rounded-2xl disabled:opacity-40 active:bg-orange-700 transition-colors"
-            >
-              {settleMutation.isPending ? 'Выплата...' : 'Подтвердить выплату'}
-            </button>
+            <div className="pt-4 pb-10">
+              <button
+                onClick={handleSettle}
+                disabled={
+                  settleMutation.isPending ||
+                  !settleWallet ||
+                  !settleAmount ||
+                  parseFloat(settleAmount) <= 0
+                }
+                className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
+              >
+                {settleMutation.isPending ? 'Проводим выплату...' : 'Подтвердить и выплатить'}
+              </button>
 
-            {settleMutation.isError && (
-              <p className="text-sm text-rose-600 text-center font-semibold">
-                {(settleMutation.error as Error).message}
-              </p>
-            )}
+              {settleMutation.isError && (
+                <p className="text-sm text-rose-600 text-center font-bold mt-4 bg-rose-50 p-3 rounded-xl">
+                  {(settleMutation.error as Error).message}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
