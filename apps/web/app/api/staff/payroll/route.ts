@@ -236,8 +236,10 @@ export async function GET(request: Request) {
       loaders,
       mechanics,
       office,
-      total_debt: all.reduce((s, u) => s + parseFloat(u.debt), 0).toFixed(2),
-      total_payout: all.reduce((s, u) => s + parseFloat(u.payout), 0).toFixed(2),
+      total_earned_month: all.reduce((s, u) => s + parseFloat(u.earned), 0).toFixed(2),
+      total_paid_month: all.reduce((s, u) => s + parseFloat(u.paid), 0).toFixed(2),
+      total_debt_alltime: all.reduce((s, u) => s + parseFloat(u.debt), 0).toFixed(2),
+      total_payout_alltime: all.reduce((s, u) => s + parseFloat(u.payout), 0).toFixed(2),
       total_paid_alltime: all.reduce((s, u) => s + parseFloat(u.all_time_paid), 0).toFixed(2),
     });
   } catch (err: any) {

@@ -86,6 +86,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       amount: salary.toFixed(2),
       category_id: CAT_PAYROLL_MECHANIC,
       related_user_id: mechData.id,
+      service_order_id: orderId, // Добавлено: привязка к наряду
       created_by: userId,
       description: `ЗП механик — наряд #${order.order_number} (${hours.toFixed(1)} нч × ${hourlyRate} ₽ × ${pct}%)`,
       idempotency_key: crypto.randomUUID(),

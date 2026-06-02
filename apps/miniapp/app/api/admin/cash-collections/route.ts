@@ -92,7 +92,8 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  const { data, error } = await (supabase.from('cash_collections') as any)
+  // 1. Создаём запись в cash_collections (для совместимости со старой логикой балансов)
+  const { data: collection, error } = await (supabase.from('cash_collections') as any)
     .insert({
       driver_id: body.driver_id,
       amount: body.amount,
@@ -103,5 +104,42 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+
+  // 2. Создаём транзакцию типа 'transfer' (для нового финансового движка)
+  try {
+    const [{ data: category }, { data: driverWallet }, { data: adminUser }] = await Promise.all([
+      (supabase.from('transaction_categories') as any)
+        .select('id')
+        .eq('code', 'CASH_COLLECT')
+        .single(),
+      (supabase.from('wallets') as any)
+        .select('id')
+        .eq('owner_user_id', body.driver_id)
+        .eq('type', 'driver_accountable')
+        .limit(1)
+        .maybeSingle(),
+      (supabase.from('users') as any).select('name').eq('id', adminId).single(),
+    ]);
+
+    if (category) {
+      const CASH_ID = '10000000-0000-0000-0000-000000000002';
+      await (supabase.from('transactions') as any).insert({
+        direction: 'transfer',
+        amount: body.amount,
+        category_id: category.id,
+        from_wallet_id: driverWallet?.id ?? null,
+        to_wallet_id: CASH_ID,
+        lifecycle_status: 'approved',
+        settlement_status: 'completed',
+        description: `Инкассация: ${adminUser?.name ?? 'Админ'} принял нал у водителя`,
+        created_by: adminId,
+        idempotency_key: crypto.randomUUID(),
+      });
+    }
+  } catch (err) {
+    console.error('Failed to create transfer transaction for cash collection:', err);
+    // Не прерываем ответ, так как основная запись в cash_collections создана
+  }
+
+  return NextResponse.json(collection, { status: 201 });
 }

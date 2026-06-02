@@ -54,8 +54,10 @@ type PayrollResponse = {
   loaders: PayrollUser[];
   mechanics: PayrollUser[];
   office: PayrollUser[];
-  total_debt: string;
-  total_payout: string;
+  total_earned_month: string;
+  total_paid_month: string;
+  total_debt_alltime: string;
+  total_payout_alltime: string;
   total_paid_alltime: string;
 };
 
@@ -1567,15 +1569,14 @@ export default function StaffPage() {
     });
   };
 
-  const totalDebt = payroll ? parseFloat(payroll.total_debt) : 0;
+  const totalDebt = payroll ? parseFloat(payroll.total_debt_alltime) : 0;
+  const totalFundMonth = payroll ? parseFloat(payroll.total_earned_month) : 0;
+  const totalPaidMonth = payroll ? parseFloat(payroll.total_paid_month) : 0;
   const totalStaff =
     (payroll?.drivers.length ?? 0) +
     (payroll?.loaders.length ?? 0) +
     (payroll?.mechanics.length ?? 0) +
     (payroll?.office.length ?? 0);
-
-  const totalFund = payroll ? parseFloat(payroll.total_payout ?? '0') : 0;
-  const totalPaidAllTime = payroll ? parseFloat(payroll.total_paid_alltime ?? '0') : 0;
 
   const cfg = GROUP_CONFIG[activeGroup];
   const activeUsers = payroll ? cfg.getUsers(payroll) : [];
@@ -1622,17 +1623,17 @@ export default function StaffPage() {
         {[
           { label: 'Сотрудников', value: totalStaff, color: 'text-slate-900' },
           {
-            label: 'Фонд ЗП',
-            value: isLoading ? '—' : <Money amount={totalFund.toFixed(2)} />,
+            label: 'Фонд ЗП (мес)',
+            value: isLoading ? '—' : <Money amount={totalFundMonth.toFixed(2)} />,
             color: 'text-slate-800',
           },
           {
-            label: 'Выплачено',
-            value: isLoading ? '—' : <Money amount={totalPaidAllTime.toFixed(2)} />,
+            label: 'Выплачено (мес)',
+            value: isLoading ? '—' : <Money amount={totalPaidMonth.toFixed(2)} />,
             color: 'text-emerald-600',
           },
           {
-            label: 'Долг по ЗП',
+            label: 'Долг (всего)',
             value: isLoading ? '—' : <Money amount={totalDebt.toFixed(2)} />,
             color: totalDebt > 0 ? 'text-amber-600' : 'text-slate-400',
           },

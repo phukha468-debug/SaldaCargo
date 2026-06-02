@@ -182,9 +182,10 @@ function StaffContent() {
   };
 
   const totalEarned = payroll.reduce((s, u) => s + parseFloat(u.earned), 0);
+  const totalPaid = payroll.reduce((s, u) => s + parseFloat(u.paid), 0);
   const totalDebt = payroll.reduce((s, u) => s + parseFloat(u.debt), 0);
 
-  const walletList = wallets ? [wallets.cash, wallets.bank, wallets.card] : [];
+  const walletList = wallets ? [wallets.cash, wallets.bank] : [];
 
   const openSettle = (entry: PayrollEntry) => {
     setSettleTarget(entry);
@@ -234,23 +235,31 @@ function StaffContent() {
 
       <div className="p-4 space-y-4">
         {/* Summary cards */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-zinc-200">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">
-              Начислено
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-white rounded-xl p-3 border border-zinc-200">
+            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1 truncate">
+              Фонд ЗП
             </p>
-            <p className="text-xl font-black text-zinc-900">
-              <Money amount={totalEarned.toFixed(2)} />
+            <p className="text-sm font-black text-zinc-900">
+              <Money amount={totalEarned.toFixed(0)} />
             </p>
           </div>
-          <div className="bg-white rounded-2xl p-4 border border-zinc-200">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">
+          <div className="bg-white rounded-xl p-3 border border-zinc-200">
+            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1 truncate">
+              Выплачено
+            </p>
+            <p className="text-sm font-black text-emerald-600">
+              <Money amount={totalPaid.toFixed(0)} />
+            </p>
+          </div>
+          <div className="bg-white rounded-xl p-3 border border-zinc-200">
+            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1 truncate">
               Долг
             </p>
             <p
-              className={`text-xl font-black ${totalDebt > 0 ? 'text-rose-600' : 'text-zinc-900'}`}
+              className={`text-sm font-black ${totalDebt > 0 ? 'text-rose-600' : 'text-zinc-900'}`}
             >
-              <Money amount={totalDebt.toFixed(2)} />
+              <Money amount={totalDebt.toFixed(0)} />
             </p>
           </div>
         </div>

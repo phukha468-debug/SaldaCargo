@@ -3,75 +3,235 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const PAYROLL_CATEGORIES: Record<string, string> = {
-  driver: 'd79213ee-3bc6-4433-b58a-ca7ea1040d00',
-  loader: '18792fa8-fda8-472d-8e04-e19d2c6c053c',
-  mechanic: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
-  mechanic_lead: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
-};
-const FALLBACK_CATEGORY = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
+const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
+const PAYROLL_CATEGORY_IDS = [
+  'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
+  '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
+  '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
+];
+
+/**
+ * GET /api/admin/staff-settle?user_id=...
+ * Возвращает сводку: сколько pending ЗП, сколько аванса, сколько к выплате
+ * (Синхронизировано с WebApp)
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('user_id');
+  if (!userId) return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
+
+  const supabase = createAdminClient();
+
+  const [{ data: pendingPayroll }, { data: advanceGiven }, { data: advanceOffset }] =
+    await Promise.all([
+      // Начисленная, но не выплаченная ЗП
+      (supabase.from('transactions') as any)
+        .select('id, amount, description, created_at, category_id')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .eq('related_user_id', userId)
+        .in('category_id', PAYROLL_CATEGORY_IDS)
+        .order('created_at', { ascending: true }),
+
+      // Всего выдано авансов
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', userId),
+
+      // Уже зачтено авансов (через выплату ЗП)
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'income')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', userId),
+    ]);
+
+  const salaryTotal = ((pendingPayroll as any[]) ?? []).reduce(
+    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+    0,
+  );
+  const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
+    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+    0,
+  );
+  const offsetTotal = ((advanceOffset as any[]) ?? []).reduce(
+    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+    0,
+  );
+
+  const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
+  const offset = Math.min(salaryTotal, advanceBalance);
+  const payout = salaryTotal - offset;
+
+  return NextResponse.json({
+    salary_total: salaryTotal.toFixed(2),
+    advance_balance: advanceBalance.toFixed(2),
+    offset: offset.toFixed(2),
+    payout: payout.toFixed(2),
+    pending_transactions: pendingPayroll ?? [],
+  });
+}
+
+/**
+ * POST /api/admin/staff-settle — выплатить ЗП сотруднику
+ * (Синхронизировано с логикой WebApp: закрывает pending транзакции)
+ */
 export async function POST(request: Request) {
   try {
+    const body = (await request.json()) as {
+      user_id: string;
+      from_wallet_id: string;
+      partial_offset?: string;
+      partial_amount?: string;
+    };
+
+    if (!body.user_id || !body.from_wallet_id) {
+      return NextResponse.json({ error: 'user_id и from_wallet_id обязательны' }, { status: 400 });
+    }
+
     const cookieStore = await cookies();
     const adminId = cookieStore.get('salda_user_id')?.value;
     if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const body = (await request.json()) as {
-      user_id: string;
-      amount: string;
-      from_wallet_id: string;
-      description?: string;
-    };
+    const supabase = createAdminClient();
 
-    if (!body.user_id || !body.amount || !body.from_wallet_id) {
-      return NextResponse.json(
-        { error: 'user_id, amount, from_wallet_id обязательны' },
-        { status: 400 },
+    const [
+      { data: pendingPayroll },
+      { data: advanceGiven },
+      { data: advanceOffset },
+      { data: userRow },
+    ] = await Promise.all([
+      (supabase.from('transactions') as any)
+        .select('id, amount, description, created_at')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .eq('related_user_id', body.user_id)
+        .in('category_id', PAYROLL_CATEGORY_IDS)
+        .order('created_at', { ascending: true }),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', body.user_id),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('direction', 'income')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', body.user_id),
+
+      (supabase.from('users') as any).select('name').eq('id', body.user_id).single(),
+    ]);
+
+    if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
+      return NextResponse.json({ error: 'Нет начисленной ЗП к выплате' }, { status: 400 });
+    }
+
+    const salaryTotal = (pendingPayroll as any[]).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const offsetTotal = ((advanceOffset as any[]) ?? []).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+
+    const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
+    const maxOffset = Math.min(salaryTotal, advanceBalance);
+    const offset =
+      body.partial_offset !== undefined
+        ? Math.min(Math.max(0, parseFloat(body.partial_offset)), maxOffset)
+        : maxOffset;
+
+    // Logic for partial payment or full payment
+    let idsToSettle: string[];
+    let actualPayout: number;
+    let actualOffset: number;
+
+    if (body.partial_amount !== undefined) {
+      const requestedAmount = Math.min(
+        Math.max(0, parseFloat(body.partial_amount) || 0),
+        salaryTotal,
+      );
+      let accumulated = 0;
+      idsToSettle = [];
+      for (const t of pendingPayroll as any[]) {
+        const amt = parseFloat(t.amount ?? '0');
+        if (accumulated + amt <= requestedAmount + 0.001) {
+          idsToSettle.push(t.id);
+          accumulated += amt;
+        }
+      }
+      if (idsToSettle.length === 0 && requestedAmount > 0) {
+        idsToSettle = [pendingPayroll[0].id];
+        accumulated = parseFloat(pendingPayroll[0].amount ?? '0');
+      }
+      const settledSalary = accumulated;
+      const usedOffset = Math.min(offset, settledSalary);
+      actualOffset = usedOffset;
+      actualPayout = Math.max(0, settledSalary - usedOffset);
+    } else {
+      idsToSettle = (pendingPayroll as any[]).map((t: any) => t.id);
+      actualOffset = offset;
+      actualPayout = salaryTotal - offset;
+    }
+
+    const employeeName = userRow?.name ?? 'Сотрудник';
+    const dateLabel = new Date().toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const ops: Promise<any>[] = [
+      // Переводим выбранные начисления в completed
+      (supabase.from('transactions') as any)
+        .update({
+          settlement_status: 'completed',
+          from_wallet_id: actualPayout > 0 ? body.from_wallet_id : null,
+        })
+        .in('id', idsToSettle),
+    ];
+
+    if (actualOffset > 0) {
+      // Регистрируем зачёт аванса
+      ops.push(
+        (supabase.from('transactions') as any).insert({
+          direction: 'income',
+          category_id: ADVANCE_CATEGORY_ID,
+          amount: actualOffset.toFixed(2),
+          description: `Зачёт аванса в счёт ЗП: ${employeeName} — ${dateLabel}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          related_user_id: body.user_id,
+          created_by: adminId,
+          idempotency_key: crypto.randomUUID(),
+        }),
       );
     }
 
-    const amount = parseFloat(body.amount);
-    if (isNaN(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
-    }
+    await Promise.all(ops);
 
-    const supabase = createAdminClient();
-
-    const { data: user } = await (supabase as any)
-      .from('users')
-      .select('name, roles')
-      .eq('id', body.user_id)
-      .single();
-
-    if (!user) return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 });
-
-    const operationalRole = (user.roles as string[]).find((r) => r in PAYROLL_CATEGORIES);
-    const categoryId = operationalRole ? PAYROLL_CATEGORIES[operationalRole] : FALLBACK_CATEGORY;
-
-    const description =
-      body.description?.trim() ||
-      `ЗП: ${user.name} — ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-
-    const { data, error } = await (supabase as any)
-      .from('transactions')
-      .insert({
-        direction: 'expense',
-        category_id: categoryId,
-        amount: amount.toFixed(2),
-        description,
-        lifecycle_status: 'approved',
-        settlement_status: 'completed',
-        related_user_id: body.user_id,
-        from_wallet_id: body.from_wallet_id,
-        created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
-      })
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({
+      ok: true,
+      payout: actualPayout.toFixed(2),
+      offset: actualOffset.toFixed(2),
+      settled_count: idsToSettle.length,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

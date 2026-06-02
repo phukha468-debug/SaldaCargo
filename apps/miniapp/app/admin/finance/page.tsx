@@ -1207,7 +1207,6 @@ const EXPENSE_CATEGORIES = [
 const PAYMENT_METHODS = [
   { value: 'cash', label: '💵 Нал' },
   { value: 'bank_transfer', label: '🏦 Безнал' },
-  { value: 'card', label: '💳 Карта' },
 ];
 
 function AddTransactionForm({

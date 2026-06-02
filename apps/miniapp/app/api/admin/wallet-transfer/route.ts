@@ -8,7 +8,6 @@ const WALLET_TRANSFER_CAT = 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93';
 const WALLET_NAMES: Record<string, string> = {
   '10000000-0000-0000-0000-000000000001': 'Расчётный счёт',
   '10000000-0000-0000-0000-000000000002': 'Сейф (Наличные)',
-  '10000000-0000-0000-0000-000000000003': 'Карта',
 };
 
 export async function POST(request: Request) {

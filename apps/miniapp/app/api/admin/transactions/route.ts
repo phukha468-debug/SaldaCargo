@@ -33,12 +33,10 @@ export async function GET(request: Request) {
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
-const CARD_ID = '10000000-0000-0000-0000-000000000003';
 
 function walletIdByMethod(method: string): string | null {
   if (method === 'cash') return CASH_ID;
   if (method === 'bank_transfer') return BANK_ID;
-  if (method === 'card') return CARD_ID;
   return null;
 }
 

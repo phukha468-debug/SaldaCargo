@@ -170,6 +170,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           category_id: TRIP_REVENUE_CATEGORY,
           amount: cashTotal.toFixed(2),
           to_wallet_id: CASH_ID,
+          trip_id: id, // Добавлено: привязка к рейсу
           description: buildOrderDescription(cashOrders, 'Нал'),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
@@ -189,6 +190,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           category_id: TRIP_REVENUE_CATEGORY,
           amount: qrTotal.toFixed(2),
           to_wallet_id: BANK_ID,
+          trip_id: id, // Добавлено: привязка к рейсу
           description: buildOrderDescription(qrOrders, 'QR/Безнал'),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
@@ -215,6 +217,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           lifecycle_status: 'approved',
           settlement_status: 'pending',
           related_user_id: trip.driver_id,
+          trip_id: id, // Добавлено: привязка к рейсу
           created_by: adminId,
           idempotency_key: crypto.randomUUID(),
         });
@@ -248,6 +251,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         lifecycle_status: 'approved',
         settlement_status: 'pending',
         related_user_id: userId,
+        trip_id: id, // Добавлено: привязка к рейсу
         created_by: adminId,
         idempotency_key: crypto.randomUUID(),
       });
@@ -263,6 +267,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'return') {
+    // При возврате рейса — удаляем связанные транзакции, чтобы избежать дублей при повторном апруве
+    await (supabase.from('transactions') as any).delete().eq('trip_id', id);
+
     const { error } = await (supabase.from('trips') as any)
       .update({
         status: 'in_progress',
