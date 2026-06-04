@@ -27,7 +27,13 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
 
   const queryPending = (supabase.from('transactions') as any)
-    .select('id, amount, description, created_at, category_id')
+    .select(
+      `
+      id, amount, description, created_at, category_id,
+      trip:trips(trip_number, started_at, driver:users!trips_driver_id_fkey(name)),
+      service_order:service_orders(order_number, created_at)
+    `,
+    )
     .eq('direction', 'expense')
     .eq('lifecycle_status', 'approved')
     .eq('settlement_status', 'pending')

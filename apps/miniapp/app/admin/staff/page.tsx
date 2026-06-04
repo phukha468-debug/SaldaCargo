@@ -15,6 +15,7 @@ type PayrollEntry = {
   paid: string;
   debt: string;
   is_management: boolean;
+  shifts: number;
 };
 
 type Wallet = {
@@ -124,6 +125,7 @@ function StaffContent() {
   const [settleWallet, setSettleWallet] = useState('');
   const [settleOffset, setSettleOffset] = useState('');
   const [maxAdvance, setMaxAdvance] = useState(0);
+  const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
 
   // Details modal state
   const [detailsTarget, setDetailsTarget] = useState<PayrollEntry | null>(null);
@@ -214,6 +216,7 @@ function StaffContent() {
       setSettleOffset(initialOffset.toFixed(0));
       setMaxAdvance(advanceBalance);
       setSettleWallet(wallets?.cash.id ?? '');
+      setPendingTransactions(data.pending_transactions ?? []);
     } catch (e) {
       console.error('Failed to load settle data', e);
     }
@@ -356,15 +359,27 @@ function StaffContent() {
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <p className="font-black text-zinc-900">{entry.name}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          {primaryRoleLabel(entry.roles)}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-zinc-400">
+                            {primaryRoleLabel(entry.roles)}
+                          </p>
+                          {entry.shifts > 0 && (
+                            <span className="text-[10px] font-black bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
+                              {entry.shifts} {entry.shifts === 1 ? 'смена' : entry.shifts < 5 ? 'смены' : 'смен'}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {entry.auto_settle && (
-                        <span className="text-[10px] font-bold bg-sky-100 text-sky-600 px-2 py-0.5 rounded-full">
-                          Авто
+                      <div className="flex flex-col items-end gap-1">
+                        {entry.auto_settle && (
+                          <span className="text-[10px] font-bold bg-sky-100 text-sky-600 px-2 py-0.5 rounded-full">
+                            Авто
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black text-orange-500 uppercase tracking-tighter">
+                          подробнее ›
                         </span>
-                      )}
+                      </div>
                     </div>
 
                     {/* Stats */}
@@ -494,6 +509,39 @@ function StaffContent() {
                 </p>
               </div>
             </div>
+
+            {/* Pending Details inside Settle Modal */}
+            {pendingTransactions.length > 0 && (
+              <div className="space-y-3 bg-zinc-50 rounded-[2rem] p-5">
+                <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">
+                  Что оплачиваем ({pendingTransactions.length})
+                </h3>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {pendingTransactions.map((t) => (
+                    <div key={t.id} className="flex justify-between items-start text-xs border-b border-zinc-100 pb-2 last:border-0">
+                      <div className="flex-1 pr-2">
+                        <p className="font-bold text-zinc-900 leading-tight">
+                          {t.description.replace('ЗП: ', '').split(' — ')[0]}
+                        </p>
+                        <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">
+                          {new Date(t.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                          {t.trip && ` · Рейс №${t.trip.trip_number}`}
+                          {t.service_order && ` · Наряд №${t.service_order.order_number}`}
+                        </p>
+                        {t.trip?.driver?.name && t.trip.driver.name !== settleTarget.name && (
+                          <p className="text-[8px] font-black text-sky-600 uppercase mt-0.5">
+                            Водитель: {t.trip.driver.name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right font-black text-zinc-800">
+                        <Money amount={t.amount} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Wallet selector */}
             <div className="space-y-3">

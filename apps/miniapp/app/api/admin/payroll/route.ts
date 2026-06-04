@@ -70,17 +70,21 @@ export async function GET(request: Request) {
     ]);
 
     const sumByUser = (rows: any[] | null) => {
-      const map = new Map<string, number>();
+      const amounts = new Map<string, number>();
+      const counts = new Map<string, number>();
       for (const r of rows ?? []) {
         const uid = r.related_user_id;
-        if (uid) map.set(uid, (map.get(uid) ?? 0) + parseFloat(r.amount ?? '0'));
+        if (uid) {
+          amounts.set(uid, (amounts.get(uid) ?? 0) + parseFloat(r.amount ?? '0'));
+          counts.set(uid, (counts.get(uid) ?? 0) + 1);
+        }
       }
-      return map;
+      return { amounts, counts };
     };
 
-    const earnedMap = sumByUser(earnedThisMonth);
-    const paidMap = sumByUser(paidThisMonth);
-    const pendingMap = sumByUser(pendingAllTime);
+    const earned = sumByUser(earnedThisMonth);
+    const paid = sumByUser(paidThisMonth);
+    const pending = sumByUser(pendingAllTime);
 
     const result = ((users as any[]) ?? [])
       .map((u: any) => {
@@ -90,9 +94,10 @@ export async function GET(request: Request) {
         const isOp = (u.roles as string[]).some((r: string) => OPERATIONAL_ROLES.includes(r));
         if (!isOp && !isManagement) return null;
 
-        const earned = earnedMap.get(u.id) ?? 0;
-        const paid = paidMap.get(u.id) ?? 0;
-        const debt = u.auto_settle ? 0 : (pendingMap.get(u.id) ?? 0);
+        const earnedAmt = earned.amounts.get(u.id) ?? 0;
+        const earnedCount = earned.counts.get(u.id) ?? 0;
+        const paidAmt = paid.amounts.get(u.id) ?? 0;
+        const debtAmt = u.auto_settle ? 0 : (pending.amounts.get(u.id) ?? 0);
 
         return {
           id: u.id,
@@ -100,9 +105,10 @@ export async function GET(request: Request) {
           roles: u.roles,
           auto_settle: u.auto_settle,
           is_management: isManagement && !isOp,
-          earned: earned.toFixed(2),
-          paid: paid.toFixed(2),
-          debt: debt.toFixed(2),
+          earned: earnedAmt.toFixed(2),
+          paid: paidAmt.toFixed(2),
+          debt: debtAmt.toFixed(2),
+          shifts: earnedCount,
         };
       })
       .filter((u): u is NonNullable<typeof u> => u !== null)
