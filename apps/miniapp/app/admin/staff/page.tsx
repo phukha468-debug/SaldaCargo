@@ -45,13 +45,12 @@ const ROLE_LABELS: Record<string, string> = {
   handyman: 'Разнорабочий',
 };
 
-type RoleGroup = 'drivers' | 'loaders' | 'mechanics' | 'office';
+type RoleGroup = 'drivers' | 'loaders' | 'workshop';
 
 function getRoleGroup(roles: string[]): RoleGroup {
   if (roles.includes('driver')) return 'drivers';
   if (roles.includes('loader')) return 'loaders';
-  if (roles.includes('mechanic') || roles.includes('mechanic_lead')) return 'mechanics';
-  return 'office';
+  return 'workshop';
 }
 
 function primaryRoleLabel(roles: string[]): string {
@@ -91,9 +90,8 @@ const MONTH_NAMES = [
 
 const GROUP_TABS: { key: RoleGroup; label: string }[] = [
   { key: 'drivers', label: 'Водители' },
-  { key: 'mechanics', label: 'Механики' },
   { key: 'loaders', label: 'Грузчики' },
-  { key: 'office', label: 'Цех/Офис' },
+  { key: 'workshop', label: 'Цех' },
 ];
 
 // ── Page ───────────────────────────────────────────────────────
@@ -124,6 +122,9 @@ function StaffContent() {
   const [settleTarget, setSettleTarget] = useState<PayrollEntry | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settleWallet, setSettleWallet] = useState('');
+
+  // Details modal state
+  const [detailsTarget, setDetailsTarget] = useState<PayrollEntry | null>(null);
 
   const shiftMonth = (delta: number) => {
     let m = month + delta;
@@ -168,6 +169,7 @@ function StaffContent() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-payroll'] });
+      qc.invalidateQueries({ queryKey: ['staff-settle-details'] });
       setSettleTarget(null);
       setSettleAmount('');
       setSettleWallet('');
@@ -177,8 +179,7 @@ function StaffContent() {
   const grouped = {
     drivers: payroll.filter((u) => getRoleGroup(u.roles) === 'drivers'),
     loaders: payroll.filter((u) => getRoleGroup(u.roles) === 'loaders'),
-    mechanics: payroll.filter((u) => getRoleGroup(u.roles) === 'mechanics'),
-    office: payroll.filter((u) => getRoleGroup(u.roles) === 'office'),
+    workshop: payroll.filter((u) => getRoleGroup(u.roles) === 'workshop'),
   };
 
   const totalEarned = payroll.reduce((s, u) => s + parseFloat(u.earned), 0);
@@ -208,7 +209,7 @@ function StaffContent() {
 
   // Lock scroll when modal is open
   useEffect(() => {
-    if (settleTarget) {
+    if (settleTarget || detailsTarget) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -216,7 +217,7 @@ function StaffContent() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [settleTarget]);
+  }, [settleTarget, detailsTarget]);
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -318,7 +319,8 @@ function StaffContent() {
               return (
                 <div
                   key={entry.id}
-                  className="bg-white rounded-2xl border border-zinc-200 overflow-hidden"
+                  onClick={() => setDetailsTarget(entry)}
+                  className="bg-white rounded-2xl border border-zinc-200 overflow-hidden active:scale-[0.98] transition-all"
                 >
                   <div className="px-4 pt-4 pb-3">
                     {/* Name + role */}
@@ -364,7 +366,10 @@ function StaffContent() {
                   {/* Action */}
                   {hasDebt && !entry.auto_settle && (
                     <button
-                      onClick={() => openSettle(entry)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openSettle(entry);
+                      }}
                       className="w-full bg-orange-500 text-white font-black text-sm py-3 hover:bg-orange-600 active:bg-orange-700 transition-colors"
                     >
                       Рассчитаться — <Money amount={entry.debt} />
@@ -470,6 +475,194 @@ function StaffContent() {
           </div>
         </div>
       )}
+
+      {/* Details Modal */}
+      {detailsTarget && (
+        <StaffDetailsModal
+          user={detailsTarget}
+          year={year}
+          month={month}
+          onClose={() => setDetailsTarget(null)}
+          onSettle={() => {
+            setDetailsTarget(null);
+            openSettle(detailsTarget);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function StaffDetailsModal({
+  user,
+  year,
+  month,
+  onClose,
+  onSettle,
+}: {
+  user: PayrollEntry;
+  year: number;
+  month: number;
+  onClose: () => void;
+  onSettle: () => void;
+}) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ['staff-settle-details', user.id, year, month],
+    queryFn: () =>
+      fetch(`/api/admin/staff-settle?user_id=${user.id}&year=${year}&month=${month}`).then((r) =>
+        r.json(),
+      ),
+  });
+
+  const history = data?.history ?? [];
+  const accruals = history.filter((t: any) => t.direction === 'expense' && t.is_payroll);
+  const payments = history.filter(
+    (t: any) => (t.direction === 'expense' && t.is_advance) || (t.direction === 'income' && t.is_advance),
+  );
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] p-6 space-y-6 shadow-2xl animate-in slide-in-from-bottom duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+              Детализация за {MONTH_NAMES[month - 1]}
+            </p>
+            <p className="text-xl font-black text-zinc-900 mt-1">{user.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 text-zinc-500 font-bold active:scale-90 transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Monthly Summary */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-zinc-50 rounded-2xl p-4">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+              Начислено (мес)
+            </p>
+            <p className="text-xl font-black text-zinc-900 mt-1">
+              <Money amount={user.earned} />
+            </p>
+          </div>
+          <div className="bg-zinc-50 rounded-2xl p-4">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+              Выплачено (мес)
+            </p>
+            <p className="text-xl font-black text-emerald-600 mt-1">
+              <Money amount={user.paid} />
+            </p>
+          </div>
+        </div>
+
+        {/* Accruals List */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">
+            Начисления за месяц
+          </h3>
+          {isLoading ? (
+            <div className="space-y-2">
+              <div className="h-16 bg-zinc-50 rounded-xl animate-pulse" />
+              <div className="h-16 bg-zinc-50 rounded-xl animate-pulse" />
+            </div>
+          ) : accruals.length === 0 ? (
+            <p className="text-sm text-zinc-400 font-bold text-center py-4">Нет начислений</p>
+          ) : (
+            <div className="space-y-2">
+              {accruals.map((t: any) => (
+                <div key={t.id} className="bg-zinc-50 rounded-xl p-3 flex justify-between items-start">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">
+                      {new Date(t.created_at).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                      {t.trip && ` · Рейс №${t.trip.trip_number}`}
+                      {t.service_order && ` · Наряд №${t.service_order.order_number}`}
+                    </p>
+                    <p className="text-sm font-bold text-zinc-800 leading-tight">
+                      {t.description.replace('ЗП: ', '')}
+                    </p>
+                    {t.trip?.driver?.name && t.trip.driver.name !== user.name && (
+                      <p className="text-[10px] font-bold text-sky-600 mt-1 uppercase">
+                        Водитель: {t.trip.driver.name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <Money amount={t.amount} className="font-black text-zinc-900" />
+                    <p className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                      {t.settlement_status === 'completed' ? 'Выплачено' : 'Долг'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Payments List */}
+        {payments.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">
+              Выплаты и авансы
+            </h3>
+            <div className="space-y-2">
+              {payments.map((t: any) => {
+                const isAdvanceGiven = t.direction === 'expense'; // Выдан аванс
+                const isOffset = t.direction === 'income'; // Зачтен аванс
+                return (
+                  <div key={t.id} className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">
+                        {new Date(t.created_at).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </p>
+                      <p className="text-sm font-bold text-zinc-800">{t.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <Money
+                        amount={t.amount}
+                        className={`font-black ${isAdvanceGiven ? 'text-rose-600' : 'text-emerald-600'}`}
+                        prefix={isAdvanceGiven ? '−' : '+'}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="pt-4 pb-10">
+          {parseFloat(user.debt) > 0 ? (
+            <button
+              onClick={onSettle}
+              className="w-full bg-orange-500 text-white font-black text-base py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-orange-100"
+            >
+              Выплатить долг — <Money amount={user.debt} />
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
+            >
+              Закрыть
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

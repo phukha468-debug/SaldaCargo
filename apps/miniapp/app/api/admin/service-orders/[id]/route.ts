@@ -91,6 +91,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         category_id: payrollCategoryId,
         amount: salary,
         service_order_id: id,
+        related_user_id: mech.id,
         lifecycle_status: 'approved',
         settlement_status: 'pending',
         description: `ЗП механика: наряд #${id.slice(0, 6)}`,

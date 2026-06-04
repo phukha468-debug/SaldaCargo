@@ -37,6 +37,7 @@ export async function GET(request: Request) {
     `,
     )
     .eq('direction', 'expense')
+    .eq('related_user_id', userId)
     .eq('category_id', payrollCat?.id)
     .gte('created_at', periodStart)
     .lte('created_at', periodEnd)

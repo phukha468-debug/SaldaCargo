@@ -12,45 +12,71 @@ const PAYROLL_CATEGORY_IDS = [
 ];
 
 /**
- * GET /api/admin/staff-settle?user_id=...
- * Возвращает сводку: сколько pending ЗП, сколько аванса, сколько к выплате
- * (Синхронизировано с WebApp)
+ * GET /api/admin/staff-settle?user_id=...&year=...&month=...
+ * Возвращает сводку: сколько pending ЗП, сколько аванса, сколько к выплате.
+ * Если указаны year/month — возвращает историю начислений и выплат за этот период.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('user_id');
   if (!userId) return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
 
+  const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : null;
+  const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : null;
+
   const supabase = createAdminClient();
 
-  const [{ data: pendingPayroll }, { data: advanceGiven }, { data: advanceOffset }] =
-    await Promise.all([
-      // Начисленная, но не выплаченная ЗП
-      (supabase.from('transactions') as any)
-        .select('id, amount, description, created_at, category_id')
-        .eq('direction', 'expense')
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'pending')
-        .eq('related_user_id', userId)
-        .in('category_id', PAYROLL_CATEGORY_IDS)
-        .order('created_at', { ascending: true }),
+  const queryPending = (supabase.from('transactions') as any)
+    .select('id, amount, description, created_at, category_id')
+    .eq('direction', 'expense')
+    .eq('lifecycle_status', 'approved')
+    .eq('settlement_status', 'pending')
+    .eq('related_user_id', userId)
+    .in('category_id', PAYROLL_CATEGORY_IDS)
+    .order('created_at', { ascending: true });
 
-      // Всего выдано авансов
-      (supabase.from('transactions') as any)
-        .select('amount')
-        .eq('direction', 'expense')
-        .eq('lifecycle_status', 'approved')
-        .eq('category_id', ADVANCE_CATEGORY_ID)
-        .eq('related_user_id', userId),
+  const queryAdvanceGiven = (supabase.from('transactions') as any)
+    .select('amount')
+    .eq('direction', 'expense')
+    .eq('lifecycle_status', 'approved')
+    .eq('category_id', ADVANCE_CATEGORY_ID)
+    .eq('related_user_id', userId);
 
-      // Уже зачтено авансов (через выплату ЗП)
-      (supabase.from('transactions') as any)
-        .select('amount')
-        .eq('direction', 'income')
-        .eq('lifecycle_status', 'approved')
-        .eq('category_id', ADVANCE_CATEGORY_ID)
-        .eq('related_user_id', userId),
-    ]);
+  const queryAdvanceOffset = (supabase.from('transactions') as any)
+    .select('amount')
+    .eq('direction', 'income')
+    .eq('lifecycle_status', 'approved')
+    .eq('category_id', ADVANCE_CATEGORY_ID)
+    .eq('related_user_id', userId);
+
+  const promises: Promise<any>[] = [queryPending, queryAdvanceGiven, queryAdvanceOffset];
+
+  let historyPromise = Promise.resolve({ data: null });
+  if (year && month) {
+    const start = new Date(year, month - 1, 1).toISOString();
+    const end = new Date(year, month, 0, 23, 59, 59).toISOString();
+    historyPromise = (supabase.from('transactions') as any)
+      .select(
+        `
+        id, amount, direction, description, created_at, category_id, settlement_status,
+        trip:trips(trip_number, started_at, driver:users!trips_driver_id_fkey(name)),
+        service_order:service_orders(order_number, created_at)
+      `,
+      )
+      .eq('lifecycle_status', 'approved')
+      .eq('related_user_id', userId)
+      .or(`category_id.in.(${[...PAYROLL_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
+      .gte('created_at', start)
+      .lte('created_at', end)
+      .order('created_at', { ascending: false });
+    promises.push(historyPromise);
+  }
+
+  const results = await Promise.all(promises);
+  const pendingPayroll = results[0].data;
+  const advanceGiven = results[1].data;
+  const advanceOffset = results[2].data;
+  const history = results[3]?.data ?? [];
 
   const salaryTotal = ((pendingPayroll as any[]) ?? []).reduce(
     (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
@@ -75,6 +101,11 @@ export async function GET(request: Request) {
     offset: offset.toFixed(2),
     payout: payout.toFixed(2),
     pending_transactions: pendingPayroll ?? [],
+    history: history.map((t: any) => ({
+      ...t,
+      is_payroll: PAYROLL_CATEGORY_IDS.includes(t.category_id),
+      is_advance: t.category_id === ADVANCE_CATEGORY_ID,
+    })),
   });
 }
 

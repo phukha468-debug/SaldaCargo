@@ -101,7 +101,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === 'approve') {
     const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
       .select(
-        `id, trip_number, driver_id,
+        `id, trip_number, driver_id, lifecycle_status,
          driver:users!trips_driver_id_fkey(id, name),
          trip_orders(
            amount, payment_method, lifecycle_status, description,
@@ -115,6 +115,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .single();
 
     if (fetchErr || !trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
+    if (trip.lifecycle_status === 'approved') {
+      return NextResponse.json({ error: 'Рейс уже утверждён' }, { status: 400 });
+    }
 
     const { error: tripError } = await (supabase.from('trips') as any)
       .update({ lifecycle_status: 'approved' })

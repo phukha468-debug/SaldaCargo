@@ -44,7 +44,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { error: ordersError } = await (supabase.from('trip_orders') as any)
     .update({ lifecycle_status: 'approved' })
     .eq('trip_id', id)
-    .eq('lifecycle_status', 'draft');
+    .neq('lifecycle_status', 'cancelled');
 
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
 
@@ -89,6 +89,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         lifecycle_status: 'approved',
         settlement_status: 'pending',
         related_user_id: trip.driver_id,
+        trip_id: id,
         created_by: adminId,
         idempotency_key: crypto.randomUUID(),
       });
@@ -116,6 +117,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       lifecycle_status: 'approved',
       settlement_status: 'pending',
       related_user_id: userId,
+      trip_id: id,
       created_by: adminId,
       idempotency_key: crypto.randomUUID(),
     });
@@ -135,6 +137,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         category_id: TRIP_REVENUE_CATEGORY,
         amount: cashTotal.toFixed(2),
         to_wallet_id: CASH_ID,
+        trip_id: id,
         description: buildOrderDescription(cashOrders, 'Нал'),
         lifecycle_status: 'approved',
         settlement_status: 'completed',
@@ -154,6 +157,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         category_id: TRIP_REVENUE_CATEGORY,
         amount: qrTotal.toFixed(2),
         to_wallet_id: BANK_ID,
+        trip_id: id,
         description: buildOrderDescription(qrOrders, 'QR/Безнал'),
         lifecycle_status: 'approved',
         settlement_status: 'completed',
