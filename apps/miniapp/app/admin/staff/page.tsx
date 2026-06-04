@@ -122,6 +122,8 @@ function StaffContent() {
   const [settleTarget, setSettleTarget] = useState<PayrollEntry | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settleWallet, setSettleWallet] = useState('');
+  const [settleOffset, setSettleOffset] = useState('');
+  const [maxAdvance, setMaxAdvance] = useState(0);
 
   // Details modal state
   const [detailsTarget, setDetailsTarget] = useState<PayrollEntry | null>(null);
@@ -157,7 +159,12 @@ function StaffContent() {
   });
 
   const settleMutation = useMutation({
-    mutationFn: (body: { user_id: string; amount: string; from_wallet_id: string }) =>
+    mutationFn: (body: {
+      user_id: string;
+      partial_amount: string;
+      from_wallet_id: string;
+      partial_offset: string;
+    }) =>
       fetch('/api/admin/staff-settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -173,6 +180,7 @@ function StaffContent() {
       setSettleTarget(null);
       setSettleAmount('');
       setSettleWallet('');
+      setSettleOffset('');
     },
   });
 
@@ -188,19 +196,40 @@ function StaffContent() {
 
   const walletList = wallets ? [wallets.cash, wallets.bank] : [];
 
-  const openSettle = (entry: PayrollEntry) => {
-    setSettleTarget(entry);
-    setSettleAmount(entry.debt);
-    setSettleWallet(wallets?.cash.id ?? '');
+  const openSettle = async (entry: PayrollEntry) => {
+    // Fetch fresh advance data
+    try {
+      const r = await fetch(`/api/admin/staff-settle?user_id=${entry.id}`);
+      const data = await r.json();
+      const advanceBalance = parseFloat(data.advance_balance || '0');
+      const salaryTotal = parseFloat(data.salary_total || '0');
+
+      setSettleTarget(entry);
+      // Logic from WebApp:
+      // Initial payout amount (what goes from wallet) = salary - automatic offset
+      const initialOffset = Math.min(salaryTotal, advanceBalance);
+      const initialPayout = Math.max(0, salaryTotal - initialOffset);
+
+      setSettleAmount(initialPayout.toFixed(0));
+      setSettleOffset(initialOffset.toFixed(0));
+      setMaxAdvance(advanceBalance);
+      setSettleWallet(wallets?.cash.id ?? '');
+    } catch (e) {
+      console.error('Failed to load settle data', e);
+    }
   };
 
   const handleSettle = () => {
-    if (!settleTarget || !settleWallet || !settleAmount) return;
-    const amt = parseFloat(settleAmount);
-    if (isNaN(amt) || amt <= 0) return;
+    if (!settleTarget || !settleWallet) return;
+    const payoutAmt = parseFloat(settleAmount) || 0;
+    const offsetAmt = parseFloat(settleOffset) || 0;
+
+    if (payoutAmt === 0 && offsetAmt === 0) return;
+
     settleMutation.mutate({
       user_id: settleTarget.id,
-      amount: amt.toFixed(2),
+      partial_amount: (payoutAmt + offsetAmt).toFixed(2),
+      partial_offset: offsetAmt.toFixed(2),
       from_wallet_id: settleWallet,
     });
   };
@@ -407,20 +436,63 @@ function StaffContent() {
               </button>
             </div>
 
-            {/* Amount */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
-                Сумма к выплате, ₽
-              </label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={settleAmount}
-                onChange={(e) => setSettleAmount(e.target.value)}
-                className="w-full border-2 border-zinc-100 bg-zinc-50 rounded-2xl px-5 py-4 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:bg-white focus:outline-none transition-all"
-                placeholder="0"
-                min="1"
-              />
+            {/* Amounts */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                  На руки, ₽
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                  className="w-full border-2 border-zinc-100 bg-zinc-50 rounded-2xl px-4 py-3 text-xl font-black text-zinc-900 focus:border-orange-500 focus:bg-white focus:outline-none transition-all"
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                  Зачесть аванс, ₽
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={settleOffset}
+                  onChange={(e) => setSettleOffset(e.target.value)}
+                  className={`w-full border-2 rounded-2xl px-4 py-3 text-xl font-black focus:outline-none transition-all ${
+                    parseFloat(settleOffset) > 0
+                      ? 'border-sky-100 bg-sky-50 text-sky-700 focus:border-sky-500'
+                      : 'border-zinc-100 bg-zinc-50 text-zinc-400 focus:border-orange-500'
+                  }`}
+                  placeholder="0"
+                />
+                {maxAdvance > 0 && (
+                  <p className="text-[9px] font-bold text-zinc-400 ml-1 uppercase">
+                    Доступно: <Money amount={maxAdvance.toString()} />
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Total Row */}
+            <div className="bg-zinc-900 rounded-2xl p-4 flex justify-between items-center text-white">
+              <div>
+                <p className="text-[10px] font-bold uppercase opacity-50">Итого списание долга</p>
+                <p className="text-sm font-black">
+                  <Money
+                    amount={((parseFloat(settleAmount) || 0) + (parseFloat(settleOffset) || 0)).toFixed(
+                      2,
+                    )}
+                  />
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase opacity-50">На руки</p>
+                <p className="text-xl font-black text-orange-400">
+                  <Money amount={(parseFloat(settleAmount) || 0).toFixed(2)} />
+                </p>
+              </div>
             </div>
 
             {/* Wallet selector */}
@@ -458,8 +530,7 @@ function StaffContent() {
                 disabled={
                   settleMutation.isPending ||
                   !settleWallet ||
-                  !settleAmount ||
-                  parseFloat(settleAmount) <= 0
+                  (parseFloat(settleAmount || '0') <= 0 && parseFloat(settleOffset || '0') <= 0)
                 }
                 className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
               >
@@ -493,6 +564,10 @@ function StaffContent() {
   );
 }
 
+interface StaffSettleDetails {
+  history: any[];
+}
+
 function StaffDetailsModal({
   user,
   year,
@@ -506,7 +581,7 @@ function StaffDetailsModal({
   onClose: () => void;
   onSettle: () => void;
 }) {
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading } = useQuery<StaffSettleDetails>({
     queryKey: ['staff-settle-details', user.id, year, month],
     queryFn: () =>
       fetch(`/api/admin/staff-settle?user_id=${user.id}&year=${year}&month=${month}`).then((r) =>
@@ -515,9 +590,12 @@ function StaffDetailsModal({
   });
 
   const history = data?.history ?? [];
-  const accruals = history.filter((t: any) => t.direction === 'expense' && t.is_payroll);
+  const accruals = history.filter(
+    (t: any) => t.direction === 'expense' && t.is_payroll,
+  );
   const payments = history.filter(
-    (t: any) => (t.direction === 'expense' && t.is_advance) || (t.direction === 'income' && t.is_advance),
+    (t: any) =>
+      (t.direction === 'expense' && t.is_advance) || (t.direction === 'income' && t.is_advance),
   );
 
   return (
@@ -600,7 +678,9 @@ function StaffDetailsModal({
                   </div>
                   <div className="text-right">
                     <Money amount={t.amount} className="font-black text-zinc-900" />
-                    <p className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                    <p
+                      className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}
+                    >
                       {t.settlement_status === 'completed' ? 'Выплачено' : 'Долг'}
                     </p>
                   </div>
@@ -619,9 +699,11 @@ function StaffDetailsModal({
             <div className="space-y-2">
               {payments.map((t: any) => {
                 const isAdvanceGiven = t.direction === 'expense'; // Выдан аванс
-                const isOffset = t.direction === 'income'; // Зачтен аванс
                 return (
-                  <div key={t.id} className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center">
+                  <div
+                    key={t.id}
+                    className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center"
+                  >
                     <div>
                       <p className="text-[10px] font-bold text-zinc-400 uppercase">
                         {new Date(t.created_at).toLocaleDateString('ru-RU', {
