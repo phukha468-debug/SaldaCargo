@@ -763,9 +763,9 @@ function StaffDetailsModal({
                     </div>
                     <div className="text-right">
                       <Money
-                        amount={t.amount}
+                        amount={isAdvanceGiven ? -parseFloat(t.amount) : parseFloat(t.amount)}
                         className={`font-black ${isAdvanceGiven ? 'text-rose-600' : 'text-emerald-600'}`}
-                        prefix={isAdvanceGiven ? '−' : '+'}
+                        showSign={true}
                       />
                     </div>
                   </div>
