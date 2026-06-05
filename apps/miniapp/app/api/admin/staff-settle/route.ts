@@ -247,9 +247,16 @@ export async function POST(request: Request) {
           accumulated += amt;
         }
       }
-      if (idsToSettle.length === 0 && requestedAmount > 0) {
-        idsToSettle = [pendingPayroll[0].id];
-        accumulated = parseFloat(pendingPayroll[0].amount ?? '0');
+      if (idsToSettle.length === 0) {
+        const minAmount = Math.min(
+          ...(pendingPayroll as any[]).map((t: any) => parseFloat(t.amount ?? '0')),
+        );
+        return NextResponse.json(
+          {
+            error: `Сумма слишком маленькая. Минимальное начисление: ${minAmount.toFixed(2)} ₽.`,
+          },
+          { status: 400 },
+        );
       }
       const settledSalary = accumulated;
       const usedOffset = Math.min(offset, settledSalary);
