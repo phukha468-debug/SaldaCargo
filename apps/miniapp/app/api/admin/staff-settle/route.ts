@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const queryPending = (supabase.from('transactions') as any)
     .select(
       `
-      id, amount, description, created_at, category_id,
+      id, amount, description, created_at, transaction_date, category_id,
       trip:trips(trip_number, started_at, driver:users!trips_driver_id_fkey(name)),
       service_order:service_orders(order_number, created_at)
     `,
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     historyPromise = (supabase.from('transactions') as any)
       .select(
         `
-        id, amount, direction, description, created_at, category_id, settlement_status,
+        id, amount, direction, description, created_at, transaction_date, category_id, settlement_status,
         trip:trips(trip_number, started_at, driver:users!trips_driver_id_fkey(name)),
         service_order:service_orders(order_number, created_at)
       `,
@@ -72,9 +72,9 @@ export async function GET(request: Request) {
       .eq('lifecycle_status', 'approved')
       .eq('related_user_id', userId)
       .or(`category_id.in.(${[...PAYROLL_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
-      .gte('created_at', start)
-      .lte('created_at', end)
-      .order('created_at', { ascending: false });
+      .gte('transaction_date', start)
+      .lte('transaction_date', end)
+      .order('transaction_date', { ascending: false });
     promises.push(historyPromise);
   }
 

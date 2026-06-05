@@ -19,18 +19,18 @@
 
 ## 1. РЕЙСЫ (TRIPS)
 
-| Фича                      | MiniApp файл                          | WebApp файл                                    | Статус | Примечание                                                                                                |
-| ------------------------- | ------------------------------------- | ---------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
-| Список рейсов на ревью    | `api/admin/trips?filter=review`       | `api/trips?lifecycle=draft`                    | ✅     | Разные param-имена, логика одинакова: `status=completed + lifecycle=draft`                                |
-| Список активных рейсов    | `api/admin/trips?filter=active`       | `api/trips?lifecycle=draft&status=in_progress` | ✅     |                                                                                                           |
-| История рейсов            | `api/admin/trips?filter=history`      | `api/trips?lifecycle=approved`                 | ✅     |                                                                                                           |
-| Детали рейса (админ)      | `api/admin/trips/[id]`                | —                                              | —      | Web видит через список                                                                                    |
-| Одобрить рейс             | `api/admin/trips/[id]` action=approve | `api/trips/[id]/approve`                       | ✅     | Оба: trip→approved + orders→approved + **автотранзакция cash в Сейф** + **pending PAYROLL_DRIVER/LOADER** |
-| Вернуть рейс              | `api/admin/trips/[id]` action=return  | `api/trips/[id]/return`                        | ✅     | Оба: trip→returned + orders→draft + очистка одометра                                                      |
-| Отменить рейс             | —                                     | `api/trips/[id]` DELETE                        | ⚠️     | В webapp отмена через DELETE, miniapp не нужен                                                            |
-| Создать рейс (водитель)   | `api/trips` POST                      | `api/trips` POST (ретро)                       | ⚠️     | Miniapp: активный рейс. WebApp: ретро-ввод завершённого                                                   |
-| Завершить рейс (водитель) | `api/trips/[id]/finish`               | —                                              | —      | Только водитель в MiniApp                                                                                 |
-| История водителя          | `api/driver/trips`                    | —                                              | —      | Фильтр: `neq lifecycle_status=cancelled`                                                                  |
+| Фича                      | MiniApp файл                          | WebApp файл                                    | Статус | Примечание                                                                                                                                     |
+| ------------------------- | ------------------------------------- | ---------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Список рейсов на ревью    | `api/admin/trips?filter=review`       | `api/trips?lifecycle=draft`                    | ✅     | Разные param-имена, логика одинакова: `status=completed + lifecycle=draft`                                                                     |
+| Список активных рейсов    | `api/admin/trips?filter=active`       | `api/trips?lifecycle=draft&status=in_progress` | ✅     |                                                                                                                                                |
+| История рейсов            | `api/admin/trips?filter=history`      | `api/trips?lifecycle=approved`                 | ✅     |                                                                                                                                                |
+| Детали рейса (админ)      | `api/admin/trips/[id]`                | —                                              | —      | Web видит через список                                                                                                                         |
+| Одобрить рейс             | `api/admin/trips/[id]` action=approve | `api/trips/[id]/approve`                       | ✅     | Оба: trip→approved + orders→approved + **автотранзакция cash в Сейф** + **pending PAYROLL_DRIVER/LOADER** + `transaction_date=trip.started_at` |
+| Вернуть рейс              | `api/admin/trips/[id]` action=return  | `api/trips/[id]/return`                        | ✅     | Оба: trip→returned + orders→draft + очистка одометра + **DELETE transactions** (по trip_id и легаси по описанию)                               |
+| Отменить рейс             | —                                     | `api/trips/[id]` DELETE                        | ⚠️     | В webapp отмена через DELETE, miniapp не нужен                                                                                                 |
+| Создать рейс (водитель)   | `api/trips` POST                      | `api/trips` POST (ретро)                       | ⚠️     | Miniapp: активный рейс. WebApp: ретро-ввод завершённого                                                                                        |
+| Завершить рейс (водитель) | `api/trips/[id]/finish`               | —                                              | —      | Только водитель в MiniApp                                                                                                                      |
+| История водителя          | `api/driver/trips`                    | —                                              | —      | Фильтр: `neq lifecycle_status=cancelled`                                                                                                       |
 
 ---
 
@@ -104,12 +104,12 @@
 
 ## 6. ПЕРСОНАЛ И ЗП (PAYROLL / STAFF)
 
-| Фича                          | MiniApp файл                  | WebApp файл                                  | Статус | Примечание                                                                                      |
-| ----------------------------- | ----------------------------- | -------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
-| Расчёт ЗП                     | `api/admin/payroll` GET       | `api/staff/payroll` GET                      | ✅     | Web: pending PAYROLL-транзакции + счётчик смен за месяц (`shifts`). MiniApp — пока старая схема |
-| Выплатить ЗП                  | `api/admin/staff-settle` POST | `api/staff/settle` POST                      | ⚠️     | Web: pending→completed + частичный зачёт аванса (`partial_offset`). MiniApp — старая схема      |
-| История транзакций сотрудника | —                             | `api/staff/transactions/[txId]` PATCH/DELETE | —      | Только WebApp. Редактирование суммы и удаление PAYROLL/ADVANCE транзакций                       |
-| Подотчёт наличных             | —                             | —                                            | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса                         |
+| Фича                          | MiniApp файл                  | WebApp файл                                  | Статус | Примечание                                                                                        |
+| ----------------------------- | ----------------------------- | -------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| Расчёт ЗП                     | `api/admin/payroll` GET       | `api/staff/payroll` GET                      | ✅     | Оба: фильтр `earned`/`paid` за месяц по `transaction_date` (= дата старта рейса, не дата аппрува) |
+| Выплатить ЗП                  | `api/admin/staff-settle` POST | `api/staff/settle` POST                      | ⚠️     | Web: pending→completed + частичный зачёт аванса (`partial_offset`). MiniApp — старая схема        |
+| История транзакций сотрудника | —                             | `api/staff/transactions/[txId]` PATCH/DELETE | —      | Только WebApp. Редактирование суммы и удаление PAYROLL/ADVANCE транзакций                         |
+| Подотчёт наличных             | —                             | —                                            | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса                           |
 
 ---
 

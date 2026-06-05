@@ -101,7 +101,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === 'approve') {
     const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
       .select(
-        `id, trip_number, driver_id, lifecycle_status,
+        `id, trip_number, driver_id, lifecycle_status, started_at,
          driver:users!trips_driver_id_fkey(id, name),
          trip_orders(
            amount, payment_method, lifecycle_status, description,
@@ -220,7 +220,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           lifecycle_status: 'approved',
           settlement_status: 'pending',
           related_user_id: trip.driver_id,
-          trip_id: id, // Добавлено: привязка к рейсу
+          trip_id: id,
+          transaction_date: trip.started_at,
           created_by: adminId,
           idempotency_key: crypto.randomUUID(),
         });
@@ -254,7 +255,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         lifecycle_status: 'approved',
         settlement_status: 'pending',
         related_user_id: userId,
-        trip_id: id, // Добавлено: привязка к рейсу
+        trip_id: id,
+        transaction_date: trip.started_at,
         created_by: adminId,
         idempotency_key: crypto.randomUUID(),
       });
@@ -270,8 +272,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'return') {
-    // При возврате рейса — удаляем связанные транзакции, чтобы избежать дублей при повторном апруве
-    await (supabase.from('transactions') as any).delete().eq('trip_id', id);
+    // Удаляем транзакции рейса, чтобы избежать дублей при повторном апруве
+    const { data: tripForReturn } = await (supabase.from('trips') as any)
+      .select('trip_number')
+      .eq('id', id)
+      .single();
+
+    await Promise.all([
+      // Новые транзакции (с trip_id)
+      (supabase.from('transactions') as any).delete().eq('trip_id', id),
+      // Легаси: транзакции ЗП без trip_id (созданные до добавления FK)
+      ...(tripForReturn?.trip_number
+        ? [
+            (supabase.from('transactions') as any)
+              .delete()
+              .ilike('description', `%рейс №${tripForReturn.trip_number}%`)
+              .in('category_id', [PAYROLL_DRIVER_CAT, PAYROLL_LOADER_CAT])
+              .is('trip_id', null),
+          ]
+        : []),
+    ]);
 
     const { error } = await (supabase.from('trips') as any)
       .update({

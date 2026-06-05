@@ -19,7 +19,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
     .select(
       `
-      id, trip_number, driver_id,
+      id, trip_number, driver_id, started_at,
       driver:users!trips_driver_id_fkey(id, name),
       trip_orders(
         amount, payment_method, lifecycle_status, description,
@@ -90,6 +90,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         settlement_status: 'pending',
         related_user_id: trip.driver_id,
         trip_id: id,
+        transaction_date: trip.started_at,
         created_by: adminId,
         idempotency_key: crypto.randomUUID(),
       });
@@ -118,6 +119,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       settlement_status: 'pending',
       related_user_id: userId,
       trip_id: id,
+      transaction_date: trip.started_at,
       created_by: adminId,
       idempotency_key: crypto.randomUUID(),
     });

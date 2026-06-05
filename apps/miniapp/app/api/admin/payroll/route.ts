@@ -45,8 +45,8 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd),
+        .gte('transaction_date', monthStart)
+        .lte('transaction_date', monthEnd),
 
       (supabase as any)
         .from('transactions')
@@ -56,8 +56,8 @@ export async function GET(request: Request) {
         .eq('settlement_status', 'completed')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd),
+        .gte('transaction_date', monthStart)
+        .lte('transaction_date', monthEnd),
 
       (supabase as any)
         .from('transactions')
