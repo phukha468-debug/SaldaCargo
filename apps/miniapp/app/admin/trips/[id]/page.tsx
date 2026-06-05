@@ -219,16 +219,29 @@ export default function AdminTripDetailPage() {
                 </div>
               </div>
             ) : hasActivePayroll ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
                 <p className="text-xs font-bold text-amber-700">
                   ⏳ ЗП ожидает подтверждения сотрудника
                 </p>
-                <button
-                  onClick={() => setShowReissueForm(true)}
-                  className="text-[10px] font-black text-amber-700 underline"
-                >
-                  Изменить
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setActionError('');
+                      action.mutate({ action: 'confirm_payroll' });
+                    }}
+                    disabled={action.isPending}
+                    className="flex-1 bg-amber-600 text-white font-black text-[10px] px-3 py-2.5 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    Подтвердить за сотрудника
+                  </button>
+                  <button
+                    onClick={() => setShowReissueForm(true)}
+                    disabled={action.isPending}
+                    className="text-[10px] font-black text-amber-700 border border-amber-300 rounded-xl px-3 py-2.5 disabled:opacity-50"
+                  >
+                    Изменить
+                  </button>
+                </div>
               </div>
             ) : hasConfirmedPayroll ? (
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">

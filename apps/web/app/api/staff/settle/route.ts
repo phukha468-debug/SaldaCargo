@@ -37,6 +37,7 @@ export async function GET(request: Request) {
         .eq('settlement_status', 'pending')
         .eq('related_user_id', userId)
         .in('category_id', PAYROLL_CATEGORY_IDS)
+        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .order('created_at', { ascending: true }),
 
       // Всего выдано авансов
@@ -117,12 +118,14 @@ export async function POST(request: Request) {
       { data: userRow },
     ] = await Promise.all([
       (supabase.from('transactions') as any)
-        .select('id, amount, description')
+        .select('id, amount, description, created_at')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'pending')
         .eq('related_user_id', body.user_id)
-        .in('category_id', PAYROLL_CATEGORY_IDS),
+        .in('category_id', PAYROLL_CATEGORY_IDS)
+        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
+        .order('created_at', { ascending: true }),
 
       (supabase.from('transactions') as any)
         .select('amount')

@@ -2,23 +2,14 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { useState } from 'react';
 import { Money } from '@saldacargo/ui';
 
 export default function FinancePage() {
-  return (
-    <Suspense fallback={<Skeleton />}>
-      <FinanceContent />
-    </Suspense>
-  );
+  return <FinanceContent />;
 }
 
 function FinanceContent() {
-  const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'pay' ? 'pay' : 'accountable';
-  const [activeTab, setActiveTab] = useState<'accountable' | 'pay'>(initialTab);
-
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: ['driver-finance'],
     queryFn: async () => {
@@ -42,44 +33,10 @@ function FinanceContent() {
       </div>
     );
 
-  const pendingCount = data?.salary?.pending_confirmation?.length ?? 0;
-
   return (
     <div className="min-h-screen bg-zinc-50">
-      <div className="bg-white border-b-2 border-zinc-200 p-2 flex sticky top-0 z-50">
-        <button
-          onClick={() => setActiveTab('accountable')}
-          className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${
-            activeTab === 'accountable'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-400 active:bg-zinc-100'
-          }`}
-        >
-          💳 Подотчёт
-        </button>
-        <button
-          onClick={() => setActiveTab('pay')}
-          className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-lg transition-all relative ${
-            activeTab === 'pay'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-400 active:bg-zinc-100'
-          }`}
-        >
-          💰 Зарплата
-          {pendingCount > 0 && activeTab !== 'pay' && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">
-              {pendingCount}
-            </span>
-          )}
-        </button>
-      </div>
-
       <main className="p-4 space-y-6">
-        {activeTab === 'accountable' ? (
-          <AccountableTab data={data?.accountable} />
-        ) : (
-          <SalaryTab salary={data?.salary} />
-        )}
+        <SalaryTab salary={data?.salary} />
       </main>
     </div>
   );
@@ -94,52 +51,6 @@ function Skeleton() {
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="bg-zinc-200 rounded-lg h-16" />
         ))}
-      </div>
-    </div>
-  );
-}
-
-function AccountableTab({ data }: { data: any }) {
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-lg border-2 border-zinc-200 p-6 text-center shadow-sm">
-        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
-          На руках сейчас (нал + карта)
-        </p>
-        <Money amount={data?.balance ?? '0'} className="text-4xl font-black text-zinc-900" />
-        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-3">
-          Сумма всех наличных заказов · нужно сдать в конце смены
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
-          Наличные заказы
-        </h2>
-        {(data?.transactions ?? []).length === 0 ? (
-          <p className="text-center py-10 text-zinc-400 font-bold uppercase text-xs">
-            Наличных заказов нет
-          </p>
-        ) : (
-          data?.transactions?.map((tx: any) => (
-            <div
-              key={tx.id}
-              className="bg-white rounded-lg p-4 border border-zinc-200 flex justify-between items-center shadow-sm"
-            >
-              <div>
-                <p className="font-bold text-zinc-900 text-sm">{tx.description}</p>
-                <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-                  {tx.payment_method === 'cash' ? '💵 Наличные' : '💳 Карта водителя'} ·{' '}
-                  {new Date(tx.created_at).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </p>
-              </div>
-              <Money amount={tx.amount} className="font-black text-sm text-zinc-900" />
-            </div>
-          ))
-        )}
       </div>
     </div>
   );

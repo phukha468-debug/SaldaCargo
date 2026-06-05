@@ -57,7 +57,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const cookieStore = await cookies();
   const adminId = cookieStore.get('salda_user_id')?.value ?? null;
   const body = (await request.json()) as {
-    action: 'approve' | 'return' | 'edit_orders' | 'reissue_salary';
+    action: 'approve' | 'return' | 'edit_orders' | 'reissue_salary' | 'confirm_payroll';
     note?: string;
     driver_pay?: string;
     loader_pays?: Array<{ user_id: string; name: string; amount: string }>;
@@ -395,6 +395,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     return NextResponse.json({ ok: true, action: 'salary_reissued' });
+  }
+
+  if (body.action === 'confirm_payroll') {
+    await (supabase.from('transactions') as any)
+      .update({ employee_confirmed: true })
+      .eq('trip_id', id)
+      .in('category_id', PAYROLL_CATS)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'pending')
+      .eq('employee_confirmed', false);
+    return NextResponse.json({ ok: true, action: 'payroll_confirmed' });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

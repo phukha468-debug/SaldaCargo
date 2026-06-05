@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -126,6 +127,7 @@ function StaffContent() {
   const [settleOffset, setSettleOffset] = useState('');
   const [maxAdvance, setMaxAdvance] = useState(0);
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+  const [unconfirmedCount, setUnconfirmedCount] = useState(0);
 
   // Details modal state
   const [detailsTarget, setDetailsTarget] = useState<PayrollEntry | null>(null);
@@ -186,6 +188,22 @@ function StaffContent() {
     },
   });
 
+  const confirmUnconfirmedMutation = useMutation({
+    mutationFn: (userId: string) =>
+      fetch('/api/admin/staff-settle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'confirm_unconfirmed', user_id: userId }),
+      }).then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+        return json;
+      }),
+    onSuccess: () => {
+      if (settleTarget) openSettle(settleTarget);
+    },
+  });
+
   const grouped = {
     drivers: payroll.filter((u) => getRoleGroup(u.roles) === 'drivers'),
     loaders: payroll.filter((u) => getRoleGroup(u.roles) === 'loaders'),
@@ -217,6 +235,7 @@ function StaffContent() {
       setMaxAdvance(advanceBalance);
       setSettleWallet(wallets?.cash.id ?? '');
       setPendingTransactions(data.pending_transactions ?? []);
+      setUnconfirmedCount(data.unconfirmed_count ?? 0);
     } catch (e) {
       console.error('Failed to load settle data', e);
     }
@@ -360,12 +379,11 @@ function StaffContent() {
                       <div>
                         <p className="font-black text-zinc-900">{entry.name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-xs text-zinc-400">
-                            {primaryRoleLabel(entry.roles)}
-                          </p>
+                          <p className="text-xs text-zinc-400">{primaryRoleLabel(entry.roles)}</p>
                           {entry.shifts > 0 && (
                             <span className="text-[10px] font-black bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
-                              {entry.shifts} {entry.shifts === 1 ? 'смена' : entry.shifts < 5 ? 'смены' : 'смен'}
+                              {entry.shifts}{' '}
+                              {entry.shifts === 1 ? 'смена' : entry.shifts < 5 ? 'смены' : 'смен'}
                             </span>
                           )}
                         </div>
@@ -496,9 +514,9 @@ function StaffContent() {
                 <p className="text-[10px] font-bold uppercase opacity-50">Итого списание долга</p>
                 <p className="text-sm font-black">
                   <Money
-                    amount={((parseFloat(settleAmount) || 0) + (parseFloat(settleOffset) || 0)).toFixed(
-                      2,
-                    )}
+                    amount={(
+                      (parseFloat(settleAmount) || 0) + (parseFloat(settleOffset) || 0)
+                    ).toFixed(2)}
                   />
                 </p>
               </div>
@@ -517,29 +535,61 @@ function StaffContent() {
                   Что оплачиваем ({pendingTransactions.length})
                 </h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {pendingTransactions.map((t) => (
-                    <div key={t.id} className="flex justify-between items-start text-xs border-b border-zinc-100 pb-2 last:border-0">
-                      <div className="flex-1 pr-2">
-                        <p className="font-bold text-zinc-900 leading-tight">
-                          {t.description.replace('ЗП: ', '').split(' — ')[0]}
-                        </p>
-                        <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">
-                          {new Date(t.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-                          {t.trip && ` · Рейс №${t.trip.trip_number}`}
-                          {t.service_order && ` · Наряд №${t.service_order.order_number}`}
-                        </p>
-                        {t.trip?.driver?.name && t.trip.driver.name !== settleTarget.name && (
-                          <p className="text-[8px] font-black text-sky-600 uppercase mt-0.5">
-                            Водитель: {t.trip.driver.name}
+                  {pendingTransactions.map((t) => {
+                    const displayDate = t.trip?.started_at || t.transaction_date || t.created_at;
+                    return (
+                      <div
+                        key={t.id}
+                        className="flex justify-between items-start text-xs border-b border-zinc-100 pb-2 last:border-0"
+                      >
+                        <div className="flex-1 pr-2">
+                          <p className="font-bold text-zinc-900 leading-tight">
+                            {t.description.replace('ЗП: ', '').split(' — ')[0]}
                           </p>
-                        )}
+                          <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">
+                            {new Date(displayDate).toLocaleDateString('ru-RU', {
+                              day: 'numeric',
+                              month: 'short',
+                            })}
+                            {t.trip && ` · Рейс №${t.trip.trip_number}`}
+                            {t.service_order && ` · Наряд №${t.service_order.order_number}`}
+                          </p>
+                          {t.trip?.driver?.name && t.trip.driver.name !== settleTarget.name && (
+                            <p className="text-[8px] font-black text-sky-600 uppercase mt-0.5">
+                              Водитель: {t.trip.driver.name}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right font-black text-zinc-800">
+                          <Money amount={t.amount} />
+                        </div>
                       </div>
-                      <div className="text-right font-black text-zinc-800">
-                        <Money amount={t.amount} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              </div>
+            )}
+
+            {/* Unconfirmed salary warning */}
+            {unconfirmedCount > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-black text-amber-800">
+                    ⚠️ {unconfirmedCount}{' '}
+                    {unconfirmedCount === 1 ? 'начисление ожидает' : 'начислений ожидают'}{' '}
+                    подтверждения
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Не включены в расчёт выше — сотрудник не подтвердил сумму.
+                  </p>
+                </div>
+                <button
+                  onClick={() => settleTarget && confirmUnconfirmedMutation.mutate(settleTarget.id)}
+                  disabled={confirmUnconfirmedMutation.isPending}
+                  className="w-full bg-amber-600 text-white font-black text-sm py-3 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {confirmUnconfirmedMutation.isPending ? '...' : 'Подтвердить за сотрудника'}
+                </button>
               </div>
             )}
 
@@ -638,9 +688,7 @@ function StaffDetailsModal({
   });
 
   const history = data?.history ?? [];
-  const accruals = history.filter(
-    (t: any) => t.direction === 'expense' && t.is_payroll,
-  );
+  const accruals = history.filter((t: any) => t.direction === 'expense' && t.is_payroll);
   const payments = history.filter(
     (t: any) =>
       (t.direction === 'expense' && t.is_advance) || (t.direction === 'income' && t.is_advance),
@@ -704,36 +752,42 @@ function StaffDetailsModal({
             <p className="text-sm text-zinc-400 font-bold text-center py-4">Нет начислений</p>
           ) : (
             <div className="space-y-2">
-              {accruals.map((t: any) => (
-                <div key={t.id} className="bg-zinc-50 rounded-xl p-3 flex justify-between items-start">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">
-                      {new Date(t.created_at).toLocaleDateString('ru-RU', {
-                        day: 'numeric',
-                        month: 'short',
-                      })}
-                      {t.trip && ` · Рейс №${t.trip.trip_number}`}
-                      {t.service_order && ` · Наряд №${t.service_order.order_number}`}
-                    </p>
-                    <p className="text-sm font-bold text-zinc-800 leading-tight">
-                      {t.description.replace('ЗП: ', '')}
-                    </p>
-                    {t.trip?.driver?.name && t.trip.driver.name !== user.name && (
-                      <p className="text-[10px] font-bold text-sky-600 mt-1 uppercase">
-                        Водитель: {t.trip.driver.name}
+              {accruals.map((t: any) => {
+                const displayDate = t.trip?.started_at || t.transaction_date || t.created_at;
+                return (
+                  <div
+                    key={t.id}
+                    className="bg-zinc-50 rounded-xl p-3 flex justify-between items-start"
+                  >
+                    <div className="flex-1 min-w-0 pr-2">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">
+                        {new Date(displayDate).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                        {t.trip && ` · Рейс №${t.trip.trip_number}`}
+                        {t.service_order && ` · Наряд №${t.service_order.order_number}`}
                       </p>
-                    )}
+                      <p className="text-sm font-bold text-zinc-800 leading-tight">
+                        {t.description.replace('ЗП: ', '')}
+                      </p>
+                      {t.trip?.driver?.name && t.trip.driver.name !== user.name && (
+                        <p className="text-[10px] font-bold text-sky-600 mt-1 uppercase">
+                          Водитель: {t.trip.driver.name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <Money amount={t.amount} className="font-black text-zinc-900" />
+                      <p
+                        className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}
+                      >
+                        {t.settlement_status === 'completed' ? 'Выплачено' : 'Долг'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Money amount={t.amount} className="font-black text-zinc-900" />
-                    <p
-                      className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}
-                    >
-                      {t.settlement_status === 'completed' ? 'Выплачено' : 'Долг'}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

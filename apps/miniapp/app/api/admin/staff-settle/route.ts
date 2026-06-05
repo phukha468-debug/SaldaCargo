@@ -140,13 +140,14 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       user_id: string;
-      from_wallet_id: string;
+      from_wallet_id?: string;
       partial_offset?: string;
       partial_amount?: string;
+      action?: string;
     };
 
-    if (!body.user_id || !body.from_wallet_id) {
-      return NextResponse.json({ error: 'user_id и from_wallet_id обязательны' }, { status: 400 });
+    if (!body.user_id) {
+      return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
     }
 
     const cookieStore = await cookies();
@@ -154,6 +155,21 @@ export async function POST(request: Request) {
     if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const supabase = createAdminClient();
+
+    if (body.action === 'confirm_unconfirmed') {
+      await (supabase.from('transactions') as any)
+        .update({ employee_confirmed: true })
+        .eq('related_user_id', body.user_id)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .eq('employee_confirmed', false)
+        .in('category_id', PAYROLL_CATEGORY_IDS);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!body.from_wallet_id) {
+      return NextResponse.json({ error: 'from_wallet_id обязателен' }, { status: 400 });
+    }
 
     const [
       { data: pendingPayroll },
