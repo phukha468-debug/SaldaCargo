@@ -204,10 +204,16 @@ export async function POST(request: Request) {
           accumulated += amt;
         }
       }
-      // Если ничего не вошло но сумма > 0 — берём первую транзакцию (наименьшую)
-      if (idsToSettle.length === 0 && requestedAmount > 0 && sorted.length > 0) {
-        idsToSettle = [sorted[0]!.id];
-        accumulated = parseFloat(sorted[0]!.amount ?? '0');
+      if (idsToSettle.length === 0) {
+        const minAmount = Math.min(
+          ...(sorted as any[]).map((t: any) => parseFloat(t.amount ?? '0')),
+        );
+        return NextResponse.json(
+          {
+            error: `Сумма слишком маленькая. Минимальное начисление: ${minAmount.toFixed(2)} ₽. Введите эту сумму или нажмите «Всё».`,
+          },
+          { status: 400 },
+        );
       }
 
       const settledSalary = accumulated;
