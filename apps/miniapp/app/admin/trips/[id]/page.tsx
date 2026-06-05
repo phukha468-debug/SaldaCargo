@@ -13,6 +13,7 @@ export default function AdminTripDetailPage() {
   const queryClient = useQueryClient();
   const [returnNote, setReturnNote] = useState('');
   const [showReturnForm, setShowReturnForm] = useState(false);
+  const [showReissueForm, setShowReissueForm] = useState(false);
   const [actionError, setActionError] = useState('');
 
   const { data: trip, isLoading } = useQuery<any>({
@@ -22,7 +23,7 @@ export default function AdminTripDetailPage() {
   });
 
   const action = useMutation({
-    mutationFn: async (body: { action: 'approve' | 'return'; note?: string }) => {
+    mutationFn: async (body: any) => {
       const r = await fetch(`/api/admin/trips/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -32,11 +33,16 @@ export default function AdminTripDetailPage() {
       if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       setActionError('');
+      queryClient.invalidateQueries({ queryKey: ['admin-trip', id] });
       queryClient.invalidateQueries({ queryKey: ['admin-trips'] });
       queryClient.invalidateQueries({ queryKey: ['admin-summary'] });
-      router.push('/admin/trips?filter=review');
+      if (variables.action === 'approve' || variables.action === 'return') {
+        router.push('/admin/trips?filter=review');
+      } else {
+        setShowReissueForm(false);
+      }
     },
     onError: (e: Error) => setActionError(e.message),
   });
@@ -74,6 +80,52 @@ export default function AdminTripDetailPage() {
     trip.odometer_end && trip.odometer_start ? trip.odometer_end - trip.odometer_start : null;
 
   const isPendingReview = trip.status === 'completed' && trip.lifecycle_status === 'draft';
+  const isApproved = trip.lifecycle_status === 'approved';
+
+  // Анализ статуса ЗП
+  const payrollTxns: any[] = trip.payroll_txns ?? [];
+  const hasDisputed = payrollTxns.some(
+    (t: any) =>
+      t.lifecycle_status === 'cancelled' &&
+      (t.cancelled_reason ?? '').includes('Отклонено сотрудником'),
+  );
+  const hasActivePayroll = payrollTxns.some(
+    (t: any) =>
+      t.lifecycle_status === 'approved' &&
+      t.settlement_status === 'pending' &&
+      t.employee_confirmed === false,
+  );
+  const hasConfirmedPayroll = payrollTxns.some(
+    (t: any) =>
+      t.lifecycle_status === 'approved' &&
+      (t.employee_confirmed === null || t.employee_confirmed === true),
+  );
+  const salaryDisputed = hasDisputed && !hasActivePayroll && !hasConfirmedPayroll;
+
+  // Уникальные грузчики из trip_orders для формы переназначения
+  const loaderMap = new Map<string, { id: string; name: string; pay: number }>();
+  for (const o of activeOrders) {
+    if (o.loader_id) {
+      const prev = loaderMap.get(o.loader_id) ?? {
+        id: o.loader_id,
+        name: o.loader?.name ?? 'Грузчик',
+        pay: 0,
+      };
+      loaderMap.set(o.loader_id, { ...prev, pay: prev.pay + parseFloat(o.loader_pay ?? '0') });
+    }
+    if (o.loader2_id) {
+      const prev = loaderMap.get(o.loader2_id) ?? {
+        id: o.loader2_id,
+        name: o.loader2?.name ?? 'Грузчик',
+        pay: 0,
+      };
+      loaderMap.set(o.loader2_id, {
+        ...prev,
+        pay: prev.pay + parseFloat(o.loader2_pay ?? '0'),
+      });
+    }
+  }
+  const loaders = [...loaderMap.values()];
 
   const PAYMENT_LABELS: Record<string, string> = {
     cash: '💵 Нал',
@@ -145,6 +197,79 @@ export default function AdminTripDetailPage() {
             <Money amount={expenses.toString()} className="text-base font-black text-red-500" />
           </div>
         </section>
+
+        {/* Статус ЗП (для утверждённых рейсов) */}
+        {isApproved && (
+          <section className="space-y-2">
+            {salaryDisputed ? (
+              <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black text-red-700 text-sm">⚠️ ЗП оспорена сотрудником</p>
+                    <p className="text-xs text-red-600 mt-1">
+                      Сотрудник не согласен с назначенной суммой. Скорректируйте ЗП.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowReissueForm(true)}
+                    className="bg-red-600 text-white font-black text-[10px] px-3 py-2 rounded-xl uppercase tracking-wide active:scale-95 transition-all shrink-0"
+                  >
+                    Переназначить
+                  </button>
+                </div>
+              </div>
+            ) : hasActivePayroll ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                <p className="text-xs font-bold text-amber-700">
+                  ⏳ ЗП ожидает подтверждения сотрудника
+                </p>
+                <button
+                  onClick={() => setShowReissueForm(true)}
+                  className="text-[10px] font-black text-amber-700 underline"
+                >
+                  Изменить
+                </button>
+              </div>
+            ) : hasConfirmedPayroll ? (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                <p className="text-xs font-bold text-green-700">✓ ЗП подтверждена сотрудником</p>
+              </div>
+            ) : driverPay === 0 ? null : (
+              <div className="bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                <p className="text-xs font-bold text-zinc-500">ЗП не назначена</p>
+                <button
+                  onClick={() => setShowReissueForm(true)}
+                  className="text-[10px] font-black text-zinc-600 underline"
+                >
+                  Назначить
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Форма переназначения ЗП */}
+        {showReissueForm && (
+          <ReissueSalaryForm
+            driverName={(trip.driver as any)?.name ?? 'Водитель'}
+            defaultDriverPay={driverPay}
+            loaders={loaders}
+            isPending={action.isPending}
+            error={actionError}
+            onSubmit={(driverPayStr, loaderPays) => {
+              setActionError('');
+              action.mutate({
+                action: 'reissue_salary',
+                driver_pay: driverPayStr,
+                loader_pays: loaderPays,
+              });
+            }}
+            onCancel={() => {
+              setShowReissueForm(false);
+              setActionError('');
+            }}
+          />
+        )}
 
         {/* Заказы */}
         <section className="space-y-2">
@@ -263,6 +388,110 @@ export default function AdminTripDetailPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ReissueSalaryForm({
+  driverName,
+  defaultDriverPay,
+  loaders,
+  isPending,
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  driverName: string;
+  defaultDriverPay: number;
+  loaders: Array<{ id: string; name: string; pay: number }>;
+  isPending: boolean;
+  error: string;
+  onSubmit: (
+    driverPay: string,
+    loaderPays: Array<{ user_id: string; name: string; amount: string }>,
+  ) => void;
+  onCancel: () => void;
+}) {
+  const [driverPayInput, setDriverPayInput] = useState(String(defaultDriverPay));
+  const [loaderPayInputs, setLoaderPayInputs] = useState<Record<string, string>>(
+    Object.fromEntries(loaders.map((l) => [l.id, String(l.pay)])),
+  );
+
+  const inputCls =
+    'w-full border-2 border-zinc-200 rounded-xl px-3 py-3 text-base font-bold focus:outline-none focus:border-orange-400 transition-all';
+
+  const handleSubmit = () => {
+    const loaderPays = loaders
+      .map((l) => ({ user_id: l.id, name: l.name, amount: loaderPayInputs[l.id] ?? '0' }))
+      .filter((l) => parseFloat(l.amount) > 0);
+    onSubmit(driverPayInput, loaderPays);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="bg-white rounded-t-3xl w-full p-6 space-y-4 max-w-lg">
+        <div className="w-10 h-1 bg-zinc-200 rounded-full mx-auto" />
+        <p className="font-black text-zinc-900 text-base">Переназначить ЗП</p>
+        <p className="text-xs text-zinc-500">
+          Новое начисление будет создано с запросом подтверждения сотруднику.
+        </p>
+
+        <div>
+          <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
+            ЗП {driverName}
+          </label>
+          <input
+            type="number"
+            value={driverPayInput}
+            onChange={(e) => setDriverPayInput(e.target.value)}
+            className={inputCls}
+            placeholder="0"
+          />
+        </div>
+
+        {loaders.map((loader) => (
+          <div key={loader.id}>
+            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
+              ЗП грузчик {loader.name}
+            </label>
+            <input
+              type="number"
+              value={loaderPayInputs[loader.id] ?? ''}
+              onChange={(e) =>
+                setLoaderPayInputs((prev) => ({ ...prev, [loader.id]: e.target.value }))
+              }
+              className={inputCls}
+              placeholder="0"
+            />
+          </div>
+        ))}
+
+        {error && (
+          <p className="text-sm text-red-600 font-bold bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 border-2 border-zinc-200 text-zinc-600 font-black py-3 rounded-xl text-sm uppercase active:scale-95 transition-all"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isPending}
+            className="flex-1 bg-orange-600 text-white font-black py-3 rounded-xl text-sm uppercase active:scale-95 transition-all disabled:opacity-50"
+          >
+            {isPending ? '...' : 'Переназначить'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

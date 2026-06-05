@@ -74,7 +74,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const payrollTxns: any[] = [];
 
-  // Начисляем ЗП водителю (pending — выплатится через /staff)
+  // Начисляем ЗП водителю (pending, ожидает подтверждения)
   if (trip.driver_id) {
     const driverPay = activeOrders.reduce(
       (s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'),
@@ -88,6 +88,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         description: `ЗП: ${trip.driver?.name ?? 'Водитель'} — рейс №${trip.trip_number}`,
         lifecycle_status: 'approved',
         settlement_status: 'pending',
+        employee_confirmed: false,
         related_user_id: trip.driver_id,
         trip_id: id,
         transaction_date: trip.started_at,
@@ -97,7 +98,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  // Начисляем ЗП грузчикам (pending)
+  // Начисляем ЗП грузчикам (pending, ожидает подтверждения)
   const loaderPayMap = new Map<string, { name: string; pay: number }>();
   for (const o of activeOrders) {
     if (o.loader_id && parseFloat(o.loader_pay ?? '0') > 0) {
@@ -117,6 +118,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       description: `ЗП: ${name} — рейс №${trip.trip_number}`,
       lifecycle_status: 'approved',
       settlement_status: 'pending',
+      employee_confirmed: false,
       related_user_id: userId,
       trip_id: id,
       transaction_date: trip.started_at,

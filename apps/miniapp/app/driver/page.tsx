@@ -32,6 +32,7 @@ interface DriverSummary {
   accountableBalance: string;
   monthPayApproved: string;
   monthPayDraft: string;
+  pendingPayrollCount: number;
 }
 
 // ── Форма заявки на ремонт ───────────────────────────────────
@@ -432,7 +433,11 @@ export default function RootPage() {
       <AccountableCard balance={data?.accountableBalance ?? '0'} />
 
       {/* Карточка ЗП */}
-      <PayCard approved={data?.monthPayApproved ?? '0'} draft={data?.monthPayDraft ?? '0'} />
+      <PayCard
+        approved={data?.monthPayApproved ?? '0'}
+        draft={data?.monthPayDraft ?? '0'}
+        pendingCount={data?.pendingPayrollCount ?? 0}
+      />
 
       {/* Кнопки действий */}
       <div className="flex gap-3">
@@ -524,11 +529,24 @@ function AccountableCard({ balance }: { balance: string }) {
   );
 }
 
-function PayCard({ approved, draft }: { approved: string; draft: string }) {
+function PayCard({
+  approved,
+  draft,
+  pendingCount,
+}: {
+  approved: string;
+  draft: string;
+  pendingCount: number;
+}) {
   const hasDraft = parseFloat(draft) > 0;
   return (
     <Link href="/driver/finance?tab=pay">
-      <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 active:bg-zinc-50 transition-colors">
+      <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 active:bg-zinc-50 transition-colors relative">
+        {pendingCount > 0 && (
+          <div className="absolute top-3 right-3 bg-amber-500 text-white text-[9px] font-black rounded-full px-2 py-0.5 uppercase tracking-wide">
+            {pendingCount} ожидает подтв.
+          </div>
+        )}
         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">ЗП за месяц</p>
         <Money amount={approved} className="text-2xl font-black text-green-600 mt-1" />
         {hasDraft && (
@@ -536,7 +554,9 @@ function PayCard({ approved, draft }: { approved: string; draft: string }) {
             В черновиках: <Money amount={draft} />
           </div>
         )}
-        <p className="text-xs text-zinc-400 mt-1 font-medium">Детализация →</p>
+        <p className="text-xs text-zinc-400 mt-1 font-medium">
+          {pendingCount > 0 ? '⚠️ Требует подтверждения →' : 'Детализация →'}
+        </p>
       </div>
     </Link>
   );

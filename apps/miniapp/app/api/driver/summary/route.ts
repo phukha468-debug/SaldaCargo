@@ -16,6 +16,8 @@ export async function GET() {
   }
 
   const supabase = createAdminClient();
+  const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
+  const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
 
   // Активный рейс (только in_progress и не отменённые)
   const { data: activeTrip } = await (supabase
@@ -112,6 +114,15 @@ export async function GET() {
     )
     .reduce((sum: number, o: any) => sum + parseFloat(o.driver_pay), 0);
 
+  // Количество ЗП-транзакций, ожидающих подтверждения сотрудника
+  const { count: pendingPayrollCount } = await (supabase.from('transactions') as any)
+    .select('*', { count: 'exact', head: true })
+    .eq('related_user_id', driverId)
+    .eq('lifecycle_status', 'approved')
+    .eq('settlement_status', 'pending')
+    .eq('employee_confirmed', false)
+    .in('category_id', [PAYROLL_DRIVER_CAT, PAYROLL_LOADER_CAT]);
+
   return NextResponse.json({
     activeTrip,
     reviewTrips: reviewTrips ?? [],
@@ -119,5 +130,6 @@ export async function GET() {
     accountableBalance,
     monthPayApproved: approvedPay.toFixed(2),
     monthPayDraft: draftPay.toFixed(2),
+    pendingPayrollCount: pendingPayrollCount ?? 0,
   });
 }

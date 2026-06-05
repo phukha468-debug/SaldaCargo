@@ -8,32 +8,47 @@ const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
 const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
+const PAYROLL_CATS = [PAYROLL_DRIVER_CAT, PAYROLL_LOADER_CAT];
 
 /** GET /api/admin/trips/:id — полная информация о рейсе */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { data, error } = await (supabase
-    .from('trips')
-    .select(
-      `
-      id, trip_number, status, lifecycle_status, started_at, ended_at,
-      odometer_start, odometer_end, trip_type, driver_note,
-      driver:users!trips_driver_id_fkey(id, name),
-      asset:assets(short_name, reg_number),
-      loader:users!trips_loader_id_fkey(name),
-      trip_orders(id, amount, driver_pay, loader_pay, payment_method, settlement_status, lifecycle_status, description,
-        counterparty:counterparties(name)),
-      trip_expenses(id, amount, payment_method, description,
-        category:transaction_categories(name))
-    `,
-    )
-    .eq('id', id)
-    .single() as any);
+  const [{ data, error }, { data: payrollTxns }] = await Promise.all([
+    supabase
+      .from('trips')
+      .select(
+        `
+        id, trip_number, status, lifecycle_status, started_at, ended_at,
+        odometer_start, odometer_end, trip_type, driver_note,
+        driver:users!trips_driver_id_fkey(id, name),
+        asset:assets(short_name, reg_number),
+        loader:users!trips_loader_id_fkey(name),
+        trip_orders(
+          id, amount, driver_pay, loader_id, loader_pay, loader2_id, loader2_pay,
+          payment_method, settlement_status, lifecycle_status, description,
+          counterparty:counterparties(name),
+          loader:users!trip_orders_loader_id_fkey(id, name),
+          loader2:users!trip_orders_loader2_id_fkey(id, name)
+        ),
+        trip_expenses(id, amount, payment_method, description,
+          category:transaction_categories(name))
+      `,
+      )
+      .eq('id', id)
+      .single() as any,
+
+    (supabase.from('transactions') as any)
+      .select(
+        'id, amount, lifecycle_status, settlement_status, employee_confirmed, cancelled_reason, category_id, related_user_id, user:users!transactions_related_user_id_fkey(name)',
+      )
+      .eq('trip_id', id)
+      .in('category_id', PAYROLL_CATS),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json({ ...data, payroll_txns: payrollTxns ?? [] });
 }
 
 /** PATCH /api/admin/trips/:id — одобрить, вернуть или отредактировать заказы */
@@ -42,8 +57,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const cookieStore = await cookies();
   const adminId = cookieStore.get('salda_user_id')?.value ?? null;
   const body = (await request.json()) as {
-    action: 'approve' | 'return' | 'edit_orders';
+    action: 'approve' | 'return' | 'edit_orders' | 'reissue_salary';
     note?: string;
+    driver_pay?: string;
+    loader_pays?: Array<{ user_id: string; name: string; amount: string }>;
     orders?: Array<{
       id: string;
       amount?: string;
@@ -205,7 +222,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const payrollTxns: any[] = [];
 
-    // ЗП водителю (pending)
+    // ЗП водителю (pending, ожидает подтверждения водителем)
     if (trip.driver_id) {
       const driverPay = activeOrders.reduce(
         (s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'),
@@ -219,6 +236,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           description: `ЗП: ${(trip.driver as any)?.name ?? 'Водитель'} — рейс №${trip.trip_number}`,
           lifecycle_status: 'approved',
           settlement_status: 'pending',
+          employee_confirmed: false,
           related_user_id: trip.driver_id,
           trip_id: id,
           transaction_date: trip.started_at,
@@ -254,6 +272,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         description: `ЗП: ${name} — рейс №${trip.trip_number}`,
         lifecycle_status: 'approved',
         settlement_status: 'pending',
+        employee_confirmed: false,
         related_user_id: userId,
         trip_id: id,
         transaction_date: trip.started_at,
@@ -312,6 +331,70 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .neq('lifecycle_status', 'cancelled');
 
     return NextResponse.json({ ok: true, action: 'returned' });
+  }
+
+  if (body.action === 'reissue_salary') {
+    const { data: tripInfo } = await (supabase.from('trips') as any)
+      .select('driver_id, trip_number, started_at, driver:users!trips_driver_id_fkey(name)')
+      .eq('id', id)
+      .single();
+
+    if (!tripInfo) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
+
+    // Отменяем только неподтверждённые pending ЗП-транзакции
+    await (supabase.from('transactions') as any)
+      .update({ lifecycle_status: 'cancelled', cancelled_reason: 'Переназначено администратором' })
+      .eq('trip_id', id)
+      .in('category_id', PAYROLL_CATS)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'pending')
+      .eq('employee_confirmed', false);
+
+    const newTxns: any[] = [];
+
+    const driverPay = parseFloat(body.driver_pay ?? '0');
+    if (driverPay > 0 && tripInfo.driver_id) {
+      newTxns.push({
+        direction: 'expense',
+        category_id: PAYROLL_DRIVER_CAT,
+        amount: driverPay.toFixed(2),
+        description: `ЗП: ${(tripInfo.driver as any)?.name ?? 'Водитель'} — рейс №${tripInfo.trip_number}`,
+        lifecycle_status: 'approved',
+        settlement_status: 'pending',
+        employee_confirmed: false,
+        related_user_id: tripInfo.driver_id,
+        trip_id: id,
+        transaction_date: tripInfo.started_at,
+        created_by: adminId,
+        idempotency_key: crypto.randomUUID(),
+      });
+    }
+
+    for (const loader of body.loader_pays ?? []) {
+      const amt = parseFloat(loader.amount ?? '0');
+      if (amt > 0 && loader.user_id) {
+        newTxns.push({
+          direction: 'expense',
+          category_id: PAYROLL_LOADER_CAT,
+          amount: amt.toFixed(2),
+          description: `ЗП: ${loader.name ?? 'Грузчик'} — рейс №${tripInfo.trip_number}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'pending',
+          employee_confirmed: false,
+          related_user_id: loader.user_id,
+          trip_id: id,
+          transaction_date: tripInfo.started_at,
+          created_by: adminId,
+          idempotency_key: crypto.randomUUID(),
+        });
+      }
+    }
+
+    if (newTxns.length > 0) {
+      await (supabase.from('transactions') as any).insert(newTxns);
+    }
+
+    return NextResponse.json({ ok: true, action: 'salary_reissued' });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { cn } from '@saldacargo/ui';
 
@@ -18,8 +18,16 @@ interface Accrual {
   };
 }
 
+interface PendingItem {
+  id: string;
+  amount: string;
+  context: string;
+}
+
 interface SalaryData {
   accruals: Accrual[];
+  pending_confirmation: PendingItem[];
+  pending_confirmation_count: number;
   summary: {
     total_accrued: string;
     total_paid: string;
@@ -46,6 +54,24 @@ export default function MechanicSalaryPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const confirmMutation = useMutation({
+    mutationFn: async (body: { action: 'confirm' | 'reject'; ids?: string[]; id?: string }) => {
+      const res = await fetch('/api/employee/payroll', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Ошибка');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-salary-preview'] });
+      setRejecting(null);
+    },
+  });
 
   const { data, isLoading } = useQuery<SalaryData>({
     queryKey: ['mechanic-salary', year, month],
@@ -110,6 +136,102 @@ export default function MechanicSalaryPage() {
         </div>
       ) : (
         <>
+          {/* Подтверждение ЗП */}
+          {(data?.pending_confirmation ?? []).length > 0 && (
+            <div className="mx-4 mt-4 bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden">
+              <div className="bg-amber-400 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest">
+                    ⏳ Ожидает подтверждения
+                  </p>
+                  <p className="text-[10px] text-amber-800 font-bold mt-0.5">
+                    {data!.pending_confirmation.length} начислений
+                  </p>
+                </div>
+                {data!.pending_confirmation.length > 1 && (
+                  <button
+                    onClick={() => confirmMutation.mutate({ action: 'confirm' })}
+                    disabled={confirmMutation.isPending}
+                    className="bg-amber-900 text-white text-[10px] font-black px-3 py-2 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    Подтвердить всё
+                  </button>
+                )}
+              </div>
+              <div className="divide-y divide-amber-200">
+                {data!.pending_confirmation.map((item) => (
+                  <div key={item.id} className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1">
+                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">
+                          ЗП механика
+                        </p>
+                        <p className="text-xs text-amber-900 font-bold mt-0.5">{item.context}</p>
+                      </div>
+                      <p className="text-xl font-black text-amber-900 shrink-0">
+                        +{formatMoney(item.amount)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          confirmMutation.mutate({ action: 'confirm', ids: [item.id] })
+                        }
+                        disabled={confirmMutation.isPending}
+                        className="flex-1 bg-green-600 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                      >
+                        ✓ Подтвердить
+                      </button>
+                      <button
+                        onClick={() => setRejecting(item.id)}
+                        disabled={confirmMutation.isPending}
+                        className="px-4 border-2 border-amber-400 text-amber-800 font-black text-xs py-2.5 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                      >
+                        ✗ Не согласен
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Диалог отклонения */}
+          {rejecting && (
+            <div
+              className="fixed inset-0 z-50 flex items-end justify-center"
+              style={{ background: 'rgba(0,0,0,0.5)' }}
+              onClick={(e) => e.target === e.currentTarget && setRejecting(null)}
+            >
+              <div className="bg-white rounded-t-3xl w-full p-6 space-y-4">
+                <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
+                <p className="font-black text-slate-900 text-base">Не согласны с суммой?</p>
+                <p className="text-sm text-slate-600">
+                  Начисление будет отклонено. Администратор увидит уведомление и скорректирует
+                  сумму.
+                </p>
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  Наряд остаётся утверждённым — только ЗП вернётся на пересмотр.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setRejecting(null)}
+                    className="flex-1 border-2 border-slate-200 text-slate-600 font-black py-3 rounded-xl text-sm uppercase active:scale-95 transition-all"
+                  >
+                    Вернуться
+                  </button>
+                  <button
+                    onClick={() => confirmMutation.mutate({ action: 'reject', id: rejecting })}
+                    disabled={confirmMutation.isPending}
+                    className="flex-1 bg-red-500 text-white font-black py-3 rounded-xl text-sm uppercase active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {confirmMutation.isPending ? '...' : 'Отклонить'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Сводка */}
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-3 gap-3">

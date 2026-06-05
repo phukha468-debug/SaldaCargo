@@ -73,6 +73,7 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'pending')
         .in('category_id', SALARY_CATEGORY_IDS)
+        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .not('related_user_id', 'is', null),
 
       (supabase as any)

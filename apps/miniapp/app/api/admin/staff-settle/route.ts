@@ -39,7 +39,17 @@ export async function GET(request: Request) {
     .eq('settlement_status', 'pending')
     .eq('related_user_id', userId)
     .in('category_id', PAYROLL_CATEGORY_IDS)
+    .or('employee_confirmed.is.null,employee_confirmed.eq.true')
     .order('created_at', { ascending: true });
+
+  const queryUnconfirmedCount = (supabase.from('transactions') as any)
+    .select('*', { count: 'exact', head: true })
+    .eq('direction', 'expense')
+    .eq('lifecycle_status', 'approved')
+    .eq('settlement_status', 'pending')
+    .eq('related_user_id', userId)
+    .eq('employee_confirmed', false)
+    .in('category_id', PAYROLL_CATEGORY_IDS);
 
   const queryAdvanceGiven = (supabase.from('transactions') as any)
     .select('amount')
@@ -55,7 +65,12 @@ export async function GET(request: Request) {
     .eq('category_id', ADVANCE_CATEGORY_ID)
     .eq('related_user_id', userId);
 
-  const promises: Promise<any>[] = [queryPending, queryAdvanceGiven, queryAdvanceOffset];
+  const promises: Promise<any>[] = [
+    queryPending,
+    queryAdvanceGiven,
+    queryAdvanceOffset,
+    queryUnconfirmedCount,
+  ];
 
   let historyPromise = Promise.resolve({ data: null });
   if (year && month) {
@@ -82,7 +97,8 @@ export async function GET(request: Request) {
   const pendingPayroll = results[0].data;
   const advanceGiven = results[1].data;
   const advanceOffset = results[2].data;
-  const history = results[3]?.data ?? [];
+  const unconfirmedCount = results[3]?.count ?? 0;
+  const history = results[4]?.data ?? [];
 
   const salaryTotal = ((pendingPayroll as any[]) ?? []).reduce(
     (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
@@ -106,6 +122,7 @@ export async function GET(request: Request) {
     advance_balance: advanceBalance.toFixed(2),
     offset: offset.toFixed(2),
     payout: payout.toFixed(2),
+    unconfirmed_count: unconfirmedCount,
     pending_transactions: pendingPayroll ?? [],
     history: history.map((t: any) => ({
       ...t,
@@ -151,6 +168,7 @@ export async function POST(request: Request) {
         .eq('settlement_status', 'pending')
         .eq('related_user_id', body.user_id)
         .in('category_id', PAYROLL_CATEGORY_IDS)
+        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .order('created_at', { ascending: true }),
 
       (supabase.from('transactions') as any)

@@ -3,6 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
+const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
+const DRIVER_PAYROLL_CATS = [PAYROLL_DRIVER_CAT, PAYROLL_LOADER_CAT];
+
 /** GET /api/driver/finance — финансовая информация текущего водителя */
 export async function GET() {
   const cookieStore = await cookies();
@@ -13,8 +17,6 @@ export async function GET() {
   const supabase = createAdminClient();
 
   // 1. Подотчёт: нал на руках у водителя
-  // Считаем напрямую из заказов — нал получен сразу, не ждём ревью от админа.
-  // cash = наличные заказы; card_driver не считается — деньги не проходят через руки водителя
   const CASH_METHODS = ['cash'];
 
   const { data: cashTrips } = await (supabase
@@ -30,7 +32,6 @@ export async function GET() {
     .order('started_at', { ascending: false })
     .limit(60) as any);
 
-  // Дата последней инкассации — считаем только рейсы ПОСЛЕ неё
   const { data: collections } = await (supabase
     .from('cash_collections')
     .select('amount, created_at')
@@ -54,8 +55,6 @@ export async function GET() {
   );
 
   const cashIn = freshCashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount), 0);
-
-  // Наличные расходы водителя (только свежие рейсы)
   const cashSpent = freshTrips
     .flatMap((trip: any) => (trip.trip_expenses as any[]) ?? [])
     .filter((e: any) => CASH_METHODS.includes(e.payment_method))
@@ -63,26 +62,60 @@ export async function GET() {
 
   const cashBalance = Math.max(0, cashIn - cashSpent).toFixed(2);
 
-  // 2. ЗП по рейсам (текущий месяц)
+  // 2. ЗП: транзакционная модель (обе роли: водитель и грузчик)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const { data: salaryTrips } = await (supabase
-    .from('trips')
-    .select(
-      `id, trip_number, started_at, lifecycle_status,
-       asset:assets(short_name),
-       trip_orders(driver_pay, lifecycle_status)`,
-    )
-    .eq('driver_id', driverId)
-    .gte('started_at', monthStart)
-    .neq('lifecycle_status', 'cancelled')
-    .order('started_at', { ascending: false }) as any);
+  const [{ data: pendingConfirmation }, { data: accumulatedRows }, { data: monthlyAccruals }] =
+    await Promise.all([
+      // Ожидают подтверждения
+      (supabase.from('transactions') as any)
+        .select(
+          `id, amount, description, category_id, transaction_date,
+         trip:trips(id, trip_number, started_at, asset:assets(short_name))`,
+        )
+        .eq('related_user_id', driverId)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .eq('employee_confirmed', false)
+        .in('category_id', DRIVER_PAYROLL_CATS)
+        .order('transaction_date', { ascending: true }),
+
+      // Подтверждено, к выплате (all-time)
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('related_user_id', driverId)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
+        .in('category_id', DRIVER_PAYROLL_CATS),
+
+      // История начислений за текущий месяц (подтверждённые)
+      (supabase.from('transactions') as any)
+        .select(
+          `id, amount, description, category_id, settlement_status, transaction_date,
+         trip:trips(trip_number, started_at, asset:assets(short_name))`,
+        )
+        .eq('related_user_id', driverId)
+        .eq('lifecycle_status', 'approved')
+        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
+        .in('category_id', DRIVER_PAYROLL_CATS)
+        .gte('transaction_date', monthStart)
+        .order('transaction_date', { ascending: false }),
+    ]);
+
+  const accumulated_total = (accumulatedRows ?? [])
+    .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0)
+    .toFixed(2);
+
+  const PAYROLL_LABELS: Record<string, string> = {
+    [PAYROLL_DRIVER_CAT]: 'ЗП водителя',
+    [PAYROLL_LOADER_CAT]: 'ЗП грузчика',
+  };
 
   return NextResponse.json({
     accountable: {
       balance: cashBalance,
-      // Показываем последние 20 наличных заказов как историю
       transactions: freshCashOrders.slice(0, 20).map((o: any) => ({
         id: o.id,
         amount: o.amount,
@@ -91,6 +124,37 @@ export async function GET() {
         created_at: o.created_at,
       })),
     },
-    salary: { trips: salaryTrips ?? [] },
+    salary: {
+      pending_confirmation: (pendingConfirmation ?? []).map((t: any) => {
+        const d = t.trip?.started_at ?? t.transaction_date;
+        const dateStr = d
+          ? new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+          : null;
+        return {
+          id: t.id,
+          amount: t.amount,
+          category_id: t.category_id,
+          label: PAYROLL_LABELS[t.category_id] ?? 'ЗП',
+          context: [
+            t.trip ? `Рейс №${t.trip.trip_number}` : null,
+            t.trip?.asset?.short_name ?? null,
+            dateStr,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        };
+      }),
+      accumulated_total,
+      accruals: (monthlyAccruals ?? []).map((t: any) => ({
+        id: t.id,
+        amount: t.amount,
+        category_id: t.category_id,
+        label: PAYROLL_LABELS[t.category_id] ?? 'ЗП',
+        settlement_status: t.settlement_status,
+        date: t.trip?.started_at ?? t.transaction_date,
+        trip_number: t.trip?.trip_number ?? null,
+        asset_name: t.trip?.asset?.short_name ?? null,
+      })),
+    },
   });
 }

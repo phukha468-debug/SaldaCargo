@@ -40,7 +40,7 @@ export default function MechanicHomePage() {
   });
 
   const nowDate = new Date();
-  const { data: salary } = useQuery<SalarySummary>({
+  const { data: salary } = useQuery<SalarySummary & { pending_confirmation_count?: number }>({
     queryKey: ['mechanic-salary-preview', nowDate.getFullYear(), nowDate.getMonth() + 1],
     queryFn: async () => {
       const res = await fetch(
@@ -77,7 +77,12 @@ export default function MechanicHomePage() {
 
       {/* ЗП за текущий месяц */}
       <Link href="/mechanic/salary">
-        <div className="bg-gradient-to-r from-zinc-900 to-zinc-700 text-white rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-transform">
+        <div className="bg-gradient-to-r from-zinc-900 to-zinc-700 text-white rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-transform relative">
+          {(salary?.pending_confirmation_count ?? 0) > 0 && (
+            <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black rounded-full px-2 py-0.5 uppercase tracking-wide">
+              {salary!.pending_confirmation_count} ожидает
+            </div>
+          )}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
               ЗП за текущий месяц
@@ -85,11 +90,13 @@ export default function MechanicHomePage() {
             <p className="text-2xl font-black mt-1">
               {formatMoneyPreview(salary?.summary.total_accrued ?? '0')}
             </p>
-            {parseFloat(salary?.summary.to_pay ?? '0') > 0 && (
+            {(salary?.pending_confirmation_count ?? 0) > 0 ? (
+              <p className="text-xs text-amber-400 font-bold mt-0.5">⚠️ Требует подтверждения</p>
+            ) : parseFloat(salary?.summary.to_pay ?? '0') > 0 ? (
               <p className="text-xs text-amber-400 font-bold mt-0.5">
                 К выплате: {formatMoneyPreview(salary?.summary.to_pay ?? '0')}
               </p>
-            )}
+            ) : null}
           </div>
           <div className="text-3xl opacity-40">💰</div>
         </div>
