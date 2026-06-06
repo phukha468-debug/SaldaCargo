@@ -11,12 +11,23 @@ export async function GET(request: Request) {
 
   const query = (supabase.from('repair_requests') as any)
     .select(
-      'id, status, custom_description, admin_note, created_at, reviewed_at, asset:assets(id, short_name, reg_number), driver:users!repair_requests_driver_id_fkey(id, name), fault:fault_catalog(id, name, category), service_order:service_orders(id, order_number, status)',
+      'id, status, custom_description, admin_note, service_json, created_at, reviewed_at, asset:assets(id, short_name, reg_number), driver:users!repair_requests_driver_id_fkey(id, name), fault:fault_catalog(id, name, category), service_order:service_orders(id, order_number, status)',
     )
     .order('created_at', { ascending: false });
 
-  const { data, error } =
+  let { data, error } =
     status === 'all' ? await query.limit(50) : await query.eq('status', status).limit(50);
+
+  // pending_json — новые + все одобренные (для вкладки Заявки)
+  if (status === 'pending_json') {
+    ({ data, error } = await (supabase.from('repair_requests') as any)
+      .select(
+        'id, status, custom_description, admin_note, service_json, created_at, reviewed_at, asset:assets(id, short_name, reg_number), driver:users!repair_requests_driver_id_fkey(id, name), fault:fault_catalog(id, name, category), service_order:service_orders(id, order_number, status)',
+      )
+      .in('status', ['new', 'approved'])
+      .order('created_at', { ascending: false })
+      .limit(50));
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

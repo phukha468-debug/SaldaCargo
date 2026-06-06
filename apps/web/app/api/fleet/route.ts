@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       { data: payRows },
       { data: tripCountRows },
       { data: orderCountRows },
-      { data: partCostRows },
+      { data: partsTransactions },
       { data: mechanicPayRows },
     ] = await Promise.all([
       // Все машины
@@ -87,7 +87,6 @@ export async function GET(request: Request) {
         .from('trips')
         .select('asset_id, odometer_start, odometer_end')
         .eq('lifecycle_status', 'approved')
-        .eq('status', 'completed')
         .not('odometer_end', 'is', null)
         .gte('started_at', periodStart)
         .lte('started_at', periodEnd),
@@ -106,7 +105,6 @@ export async function GET(request: Request) {
         .from('trips')
         .select('asset_id')
         .eq('lifecycle_status', 'approved')
-        .eq('status', 'completed')
         .gte('started_at', periodStart)
         .lte('started_at', periodEnd),
 
@@ -119,16 +117,15 @@ export async function GET(request: Request) {
         .gte('trips.started_at', periodStart)
         .lte('trips.started_at', periodEnd),
 
-      // Расходы на запчасти из нарядов СТО по своим машинам
+      // Общие расходы на запчасти за период (из транзакций) — распределяются поровну по активным машинам
       (supabase as any)
-        .from('part_movements')
-        .select(
-          'quantity, unit_price, service_order:service_orders!inner(asset_id, machine_type, status)',
-        )
-        .eq('direction', 'out')
-        .eq('service_orders.machine_type', 'own')
-        .eq('service_orders.status', 'completed')
-        .not('service_orders.asset_id', 'is', null),
+        .from('transactions')
+        .select('amount')
+        .eq('category_id', '9d18370d-3228-4f2a-8530-52b168cfa8d7')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed')
+        .gte('transaction_date', periodStart)
+        .lte('transaction_date', periodEnd),
 
       // ЗП механиков за ремонт своих машин
       (supabase as any)
@@ -191,14 +188,14 @@ export async function GET(request: Request) {
       }
     }
 
-    const maintenanceMap = new Map<string, number>();
-    for (const m of (partCostRows as any[]) ?? []) {
-      const id = m.service_order?.asset_id;
-      if (id) {
-        const cost = parseFloat(m.unit_price ?? '0') * parseFloat(m.quantity ?? '0');
-        maintenanceMap.set(id, (maintenanceMap.get(id) ?? 0) + cost);
-      }
-    }
+    // Общая сумма расходов на запчасти за период — делим поровну на машины с >3 рейсами
+    const totalPartsCost = ((partsTransactions as any[]) ?? []).reduce(
+      (s, t) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+    const activeAssetIds = ((assets as any[]) ?? []).map((a: any) => a.id);
+    const qualifyingCount = activeAssetIds.filter((id) => (tripCountMap.get(id) ?? 0) > 3).length;
+    const partsPerVehicle = qualifyingCount > 0 ? totalPartsCost / qualifyingCount : 0;
 
     // ── Построение строк ───────────────────────────────────────────────────────
 
@@ -206,14 +203,14 @@ export async function GET(request: Request) {
       const revenue = revenueMap.get(a.id) ?? 0;
       const tripExpenses = expenseMap.get(a.id) ?? 0;
       const pay = payMap.get(a.id) ?? 0;
-      const maintenanceParts = maintenanceMap.get(a.id) ?? 0;
+      const tripCount = tripCountMap.get(a.id) ?? 0;
+      const maintenanceParts = tripCount > 3 ? partsPerVehicle : 0;
       const maintenanceLabor = mechanicPayMap.get(a.id) ?? 0;
-      const maintenance = maintenanceParts + maintenanceLabor; // запчасти + ЗП механиков
+      const maintenance = maintenanceParts + maintenanceLabor; // запчасти (распределённые) + ЗП механиков
       const fixedCost = parseFloat(a.monthly_fixed_cost ?? '0') * periodMonths;
       const operationalCosts = tripExpenses + pay; // операционные (на рейс)
       const totalCosts = operationalCosts + maintenance + fixedCost; // полные
       const km = kmMap.get(a.id) ?? 0;
-      const tripCount = tripCountMap.get(a.id) ?? 0;
       const orderCount = orderCountMap.get(a.id) ?? 0;
 
       return {

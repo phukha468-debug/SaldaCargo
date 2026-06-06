@@ -42,11 +42,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  const fleetAlertCount = alerts?.fleet.length ?? 0;
-  const fleetHasOverdue = alerts?.fleet.some((i) => i.overdue) ?? false;
-  const financeAlertCount = (alerts?.receivables.length ?? 0) + (alerts?.loans.length ?? 0);
+  const fleetAlertCount = alerts?.fleet?.length ?? 0;
+  const fleetHasOverdue = alerts?.fleet?.some((i) => i.overdue) ?? false;
+  const financeAlertCount = (alerts?.receivables?.length ?? 0) + (alerts?.loans?.length ?? 0);
   const financeHasOverdue =
-    (alerts?.loans.some((i) => i.overdue) ?? false) || (alerts?.receivables.length ?? 0) > 0;
+    (alerts?.loans?.some((i) => i.overdue) ?? false) || (alerts?.receivables?.length ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-surface-bright flex flex-col">

@@ -118,7 +118,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       description: `ЗП: ${name} — рейс №${trip.trip_number}`,
       lifecycle_status: 'approved',
       settlement_status: 'pending',
-      employee_confirmed: false,
+      employee_confirmed: true, // Авто-подтверждение: у грузчиков нет приложения
       related_user_id: userId,
       trip_id: id,
       transaction_date: trip.started_at,
