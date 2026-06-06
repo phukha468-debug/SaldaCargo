@@ -425,12 +425,14 @@ function HistoryTripCard({
   onEdit,
   onApprove,
   onReturn,
+  onDelete,
   approving,
 }: {
   trip: any;
   onEdit: (t: any) => void;
   onApprove: (id: string) => void;
   onReturn: (id: string) => void;
+  onDelete: (id: string) => void;
   approving: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -653,6 +655,14 @@ function HistoryTripCard({
             >
               ✏️ Изменить
             </button>
+            <button
+              onClick={() => onDelete(trip.id)}
+              disabled={approving}
+              className="w-10 h-10 flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-500 active:bg-rose-100 disabled:opacity-50 shrink-0"
+              title="Удалить рейс"
+            >
+              🗑️
+            </button>
             {canReview && (
               <>
                 <button
@@ -815,6 +825,27 @@ function TripsContent() {
     }
   }
 
+  async function handleDelete(tripId: string) {
+    if (
+      !confirm(
+        'ВНИМАНИЕ: Это полностью удалит рейс и ВСЕ связанные с ним доходы, расходы и начисления ЗП! Вы уверены?',
+      )
+    )
+      return;
+    setApprovingId(tripId);
+    try {
+      const res = await fetch(`/api/admin/trips/${tripId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Ошибка удаления');
+      refresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
   const FILTERS = [
     { key: 'review', label: '📋 На ревью' },
     { key: 'active', label: '🚛 Активные' },
@@ -876,6 +907,7 @@ function TripsContent() {
                 onEdit={(t) => setEditTrip(t)}
                 onApprove={handleApprove}
                 onReturn={handleReturn}
+                onDelete={handleDelete}
                 approving={approvingId === trip.id}
               />
             ))}
@@ -892,6 +924,7 @@ function TripsContent() {
                 onEdit={(t) => setEditTrip(t)}
                 onApprove={handleApprove}
                 onReturn={handleReturn}
+                onDelete={handleDelete}
                 approving={approvingId === trip.id}
               />
             ) : (

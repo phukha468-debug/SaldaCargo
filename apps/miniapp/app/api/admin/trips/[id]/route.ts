@@ -410,3 +410,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
+
+/** DELETE /api/admin/trips/:id — полное удаление рейса со всеми следами */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = createAdminClient();
+
+  // Мы полагаемся на ON DELETE CASCADE в базе данных для trip_orders, trip_expenses и transactions.
+  const { error } = await supabase.from('trips').delete().eq('id', id);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

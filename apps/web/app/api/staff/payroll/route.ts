@@ -28,6 +28,8 @@ export async function GET(request: Request) {
       { data: paidThisMonth },
       // Всего pending ЗП (all-time) — "долг к выплате"
       { data: pendingAllTime },
+      // Всего ЗП, ожидающая подтверждения сотрудником
+      { data: unconfirmedAllTime },
       // Всего выплачено ЗП (all-time completed) — для общей статистики
       { data: paidAllTime },
       // Авансы выданные (all-time expense)
@@ -73,7 +75,16 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'pending')
         .in('category_id', SALARY_CATEGORY_IDS)
-        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
+        .not('related_user_id', 'is', null),
+
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .in('category_id', SALARY_CATEGORY_IDS)
+        .eq('employee_confirmed', false)
         .not('related_user_id', 'is', null),
 
       (supabase as any)
@@ -105,7 +116,7 @@ export async function GET(request: Request) {
       (supabase as any)
         .from('transactions')
         .select(
-          'id, related_user_id, amount, direction, description, created_at, settlement_status, category_id',
+          'id, related_user_id, amount, direction, description, created_at, settlement_status, category_id, employee_confirmed',
         )
         .eq('lifecycle_status', 'approved')
         .or(`category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
@@ -150,6 +161,7 @@ export async function GET(request: Request) {
     const shiftsThisMonthMap = countByUser(earnedThisMonth);
     const paidThisMonthMap = sumByUser(paidThisMonth);
     const pendingMap = sumByUser(pendingAllTime);
+    const unconfirmedMap = sumByUser(unconfirmedAllTime);
     const paidAllTimeMap = sumByUser(paidAllTime);
     const advanceGivenMap = sumByUser(advanceGiven);
     const advanceOffsetMap = sumByUser(advanceOffset);
@@ -168,6 +180,7 @@ export async function GET(request: Request) {
       const earnedMonth = earnedThisMonthMap.get(u.id) ?? 0;
       const paidMonth = paidThisMonthMap.get(u.id) ?? 0;
       const pendingDebt = pendingMap.get(u.id) ?? 0; // долг к выплате (all-time)
+      const unconfirmedDebt = unconfirmedMap.get(u.id) ?? 0; // ожидает подтверждения
       const paidAlltime = paidAllTimeMap.get(u.id) ?? 0;
       const advGiven = advanceGivenMap.get(u.id) ?? 0;
       const advOffset = advanceOffsetMap.get(u.id) ?? 0;
@@ -192,6 +205,7 @@ export async function GET(request: Request) {
         paid: paidMonth.toFixed(2), // выплачено за месяц (completed)
         // All-time долги
         debt: pendingDebt.toFixed(2), // всего pending к выплате
+        unconfirmed_debt: unconfirmedDebt.toFixed(2), // ожидает подтверждения
         advance_balance: advanceBalance.toFixed(2), // остаток долга по авансу
         advance_offset: offsetNow.toFixed(2), // сколько зачтётся
         payout: payoutNow.toFixed(2), // сколько реально выплатить деньгами

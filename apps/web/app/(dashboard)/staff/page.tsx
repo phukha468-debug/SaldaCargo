@@ -34,6 +34,7 @@ type PayrollUser = {
   earned: string; // начислено за месяц
   paid: string; // выплачено за месяц
   debt: string; // всего pending к выплате (all-time)
+  unconfirmed_debt: string; // ожидает подтверждения сотрудником
   advance_balance: string; // остаток долга по авансу
   advance_offset: string; // сколько зачтётся при выплате
   payout: string; // сколько реально выплатить деньгами
@@ -46,6 +47,7 @@ type PayrollUser = {
     created_at: string;
     settlement_status: string;
     category_id: string;
+    employee_confirmed: boolean | null;
   }>;
 };
 
@@ -564,6 +566,21 @@ function SettleModal({
             </div>
           )}
 
+          {parseFloat(user.unconfirmed_debt) > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+              <span className="text-amber-500 material-symbols-outlined shrink-0">warning</span>
+              <div>
+                <p className="text-[11px] font-bold text-amber-900 leading-tight">
+                  Есть неподтверждённые начисления: <Money amount={user.unconfirmed_debt} />
+                </p>
+                <p className="text-[10px] text-amber-700 mt-0.5 leading-tight">
+                  Сотрудник ещё не подтвердил их в своём приложении. Рекомендуется выплачивать
+                  только подтверждённую ЗП.
+                </p>
+              </div>
+            </div>
+          )}
+
           {salaryTotal <= 0 && (
             <p className="text-sm text-slate-400 text-center py-2">Нет начисленной ЗП к выплате</p>
           )}
@@ -735,6 +752,18 @@ function PayrollHistoryModal({
                         {tx.description && (
                           <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">
                             {tx.description}
+                          </p>
+                        )}
+                        {isPayroll && tx.employee_confirmed === false && (
+                          <p className="text-[9px] text-amber-600 font-bold mt-0.5 flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[10px]">timer</span>
+                            ожидает подтверждения водителем
+                          </p>
+                        )}
+                        {isPayroll && tx.employee_confirmed === true && (
+                          <p className="text-[9px] text-emerald-600 font-bold mt-0.5 flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[10px]">done_all</span>
+                            подтверждено водителем
                           </p>
                         )}
                       </td>
@@ -970,6 +999,19 @@ function PayrollRow({
             </>
           ) : (
             <p className="text-xs text-slate-300">—</p>
+          )}
+
+          {/* Unconfirmed debt warning */}
+          {parseFloat(user.unconfirmed_debt) > 0 && (
+            <div
+              className="mt-1 flex items-center justify-end gap-1 text-rose-500"
+              title="Сотрудник ещё не подтвердил это начисление в приложении"
+            >
+              <span className="text-[10px] font-bold">
+                <Money amount={user.unconfirmed_debt} />
+              </span>
+              <span className="material-symbols-outlined text-[14px]">pending_actions</span>
+            </div>
           )}
         </div>
 
