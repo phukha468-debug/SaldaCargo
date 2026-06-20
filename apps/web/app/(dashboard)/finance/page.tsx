@@ -2652,6 +2652,12 @@ function ReceivablesPanel() {
 
 function LoansPanel() {
   const [activeChip, setActiveChip] = useState('all');
+  const [payLoan, setPayLoan] = useState<Loan | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payWallet, setPayWallet] = useState<'bank' | 'cash'>('bank');
+  const [payDesc, setPayDesc] = useState('');
+  const [payPending, setPayPending] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
     queryKey: ['loans-all'],
@@ -2695,8 +2701,172 @@ function LoansPanel() {
     };
   });
 
+  const WALLET_IDS = {
+    bank: '10000000-0000-0000-0000-000000000001',
+    cash: '10000000-0000-0000-0000-000000000002',
+  };
+
+  async function handlePayLoan() {
+    if (!payLoan) return;
+    const amt = parseFloat(payAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert('Введите корректную сумму');
+      return;
+    }
+    setPayPending(true);
+    try {
+      const r = await fetch(`/api/loans/${payLoan.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amt.toFixed(2),
+          from_wallet_id: WALLET_IDS[payWallet],
+          description: payDesc.trim() || undefined,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
+      setPayLoan(null);
+      setPayAmount('');
+      setPayDesc('');
+      await queryClient.invalidateQueries({ queryKey: ['loans-all'] });
+      if (json.fully_repaid) alert('Кредит полностью погашен!');
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPayPending(false);
+    }
+  }
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+      {payLoan && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setPayLoan(null)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              borderRadius: 16,
+              padding: 24,
+              width: 360,
+              color: '#f1f5f9',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Погасить кредит</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>
+              {payLoan.lender_name}
+              {payLoan.monthly_payment && <> · платёж {rub(n(payLoan.monthly_payment))}</>}
+            </div>
+            <label style={{ fontSize: 12, color: '#94a3b8' }}>Сумма платежа (₽)</label>
+            <input
+              type="number"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder={payLoan.monthly_payment ? String(n(payLoan.monthly_payment)) : '0'}
+              autoFocus
+              style={{
+                width: '100%',
+                marginTop: 4,
+                marginBottom: 12,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid #334155',
+                background: '#0f172a',
+                color: '#f1f5f9',
+                fontSize: 14,
+                boxSizing: 'border-box',
+              }}
+            />
+            <label style={{ fontSize: 12, color: '#94a3b8' }}>Списать со счёта</label>
+            <select
+              value={payWallet}
+              onChange={(e) => setPayWallet(e.target.value as 'bank' | 'cash')}
+              style={{
+                width: '100%',
+                marginTop: 4,
+                marginBottom: 12,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid #334155',
+                background: '#0f172a',
+                color: '#f1f5f9',
+                fontSize: 14,
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="bank">Банк (р/с)</option>
+              <option value="cash">Касса (наличные)</option>
+            </select>
+            <label style={{ fontSize: 12, color: '#94a3b8' }}>Описание (необязательно)</label>
+            <input
+              type="text"
+              value={payDesc}
+              onChange={(e) => setPayDesc(e.target.value)}
+              placeholder={`Платёж по кредиту: ${payLoan.lender_name}`}
+              style={{
+                width: '100%',
+                marginTop: 4,
+                marginBottom: 20,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid #334155',
+                background: '#0f172a',
+                color: '#f1f5f9',
+                fontSize: 14,
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setPayLoan(null)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: '1px solid #334155',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handlePayLoan}
+                disabled={payPending || !payAmount}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  cursor: payPending || !payAmount ? 'default' : 'pointer',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  opacity: payPending || !payAmount ? 0.5 : 1,
+                }}
+              >
+                {payPending ? '...' : 'Провести платёж'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         <Chip
           label="Все"
@@ -2974,6 +3144,30 @@ function LoansPanel() {
                     color={loanColor(loan.loan_type)}
                     height={8}
                   />
+                  <button
+                    onClick={() => {
+                      setPayLoan(loan);
+                      setPayAmount(loan.monthly_payment ? String(n(loan.monthly_payment)) : '');
+                      setPayWallet('bank');
+                      setPayDesc('');
+                    }}
+                    style={{
+                      marginTop: 10,
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: 8,
+                      border: 'none',
+                      background: isLeasing
+                        ? 'linear-gradient(90deg,#0891b2,#10b981)'
+                        : 'linear-gradient(90deg,#3b82f6,#6366f1)',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Погасить кредит
+                  </button>
                 </div>
               </Card>
             );
