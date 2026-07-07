@@ -28,6 +28,7 @@ interface Counterparty {
   id: string;
   name: string;
   is_legal_entity: boolean;
+  is_top?: boolean;
 }
 
 interface Loader {
@@ -136,27 +137,34 @@ export default function AddOrderPage() {
   const amount = amountRaw ? Number(amountRaw) : 0;
   const suggestedPay = amount ? Math.round((amount * SUGGEST_PERCENT) / 100) : 0;
 
-  // Filter counterparties by selected type
+  // Filter counterparties by search term (ignore type)
   const filteredCounterparties =
     searchTerm.length > 0
-      ? counterparties.filter(
-          (c) =>
-            c.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            (clientType === null || c.is_legal_entity === (clientType === 'legal')),
-        )
+      ? counterparties.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
       : [];
+
+  const topCounterparties = counterparties.filter((c) => c.is_top);
 
   const availableLoaders = allLoaders.filter((l) => !loaders.find((s) => s.id === l.id));
   const isDebt = selectedPaymentMethod === 'debt_cash';
   const paymentMethods = clientType === 'legal' ? METHODS_LEGAL : METHODS_INDIVIDUAL;
 
-  // When client type switches, reset payment method to appropriate default
-  function selectClientType(type: 'individual' | 'legal') {
-    setClientType(type);
-    setValue('payment_method', type === 'legal' ? 'debt_cash' : 'cash');
-    setValue('counterparty_id', undefined);
+  function selectCounterparty(c: Counterparty) {
+    setValue('counterparty_id', c.id);
     setSearchTerm('');
     setError('');
+
+    const newType = c.is_legal_entity ? 'legal' : 'individual';
+    setClientType(newType);
+
+    if (c.is_legal_entity) {
+      setValue('payment_method', 'debt_cash');
+    } else {
+      const current = watch('payment_method');
+      if (!current || current === 'debt_cash') {
+        setValue('payment_method', 'cash');
+      }
+    }
   }
 
   function addLoader(loader: Loader) {
@@ -185,13 +193,12 @@ export default function AddOrderPage() {
           is_legal_entity: clientType === 'legal',
         }),
       });
-      const json = await res.json();
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ['driver', 'counterparties'] });
-        setValue('counterparty_id', json.id);
+        const newClient = await res.json();
+        selectCounterparty(newClient);
         setShowNewClient(false);
         setNewClientName('');
-        setSearchTerm('');
       } else if (res.status === 409 && json.existing?.length > 0) {
         setShowNewClient(false);
         setSearchTerm(newClientName);
@@ -212,6 +219,12 @@ export default function AddOrderPage() {
       setError('Укажите клиента перед добавлением заказа');
       return;
     }
+    const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
+    if (isGenericClient && !isDebt && !data.description?.trim()) {
+      setError('Укажите имя и детали разового заказа в описании');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -254,99 +267,86 @@ export default function AddOrderPage() {
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
-        {/* ── Тип клиента ── */}
+        {/* ── Клиент ── */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Тип клиента
+            Клиент
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => selectClientType('individual')}
-              className={`rounded-2xl p-4 flex flex-col items-center gap-1.5 border-2 transition-all active:scale-[0.97] ${
-                clientType === 'individual'
-                  ? 'border-orange-500 bg-orange-50'
-                  : 'border-zinc-200 bg-white'
+
+          {selectedCounterparty ? (
+            <div
+              className={`flex items-center justify-between border-2 rounded-xl px-4 h-14 ${
+                clientType === 'legal'
+                  ? 'bg-blue-50 border-blue-200'
+                  : 'bg-orange-50 border-orange-200'
               }`}
             >
-              <span className="text-2xl">👤</span>
-              <span
-                className={`text-[11px] font-black uppercase tracking-widest ${clientType === 'individual' ? 'text-orange-700' : 'text-zinc-600'}`}
+              <div>
+                <span
+                  className={`font-black text-sm ${clientType === 'legal' ? 'text-blue-900' : 'text-orange-900'}`}
+                >
+                  {selectedCounterparty.name}
+                </span>
+                <span
+                  className={`ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                    clientType === 'legal'
+                      ? 'bg-blue-100 text-blue-600'
+                      : 'bg-orange-100 text-orange-600'
+                  }`}
+                >
+                  {clientType === 'legal' ? 'ЮЛ' : 'ФЛ'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setValue('counterparty_id', undefined);
+                  setClientType(null);
+                }}
+                className={`font-black text-lg ${clientType === 'legal' ? 'text-blue-400' : 'text-orange-400'}`}
               >
-                Физлицо
-              </span>
-              <span className="text-[9px] text-zinc-400 font-bold text-center leading-tight">
-                Нал · QR · Долг
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectClientType('legal')}
-              className={`rounded-2xl p-4 flex flex-col items-center gap-1.5 border-2 transition-all active:scale-[0.97] ${
-                clientType === 'legal' ? 'border-blue-500 bg-blue-50' : 'border-zinc-200 bg-white'
-              }`}
-            >
-              <span className="text-2xl">🏢</span>
-              <span
-                className={`text-[11px] font-black uppercase tracking-widest ${clientType === 'legal' ? 'text-blue-700' : 'text-zinc-600'}`}
-              >
-                Юрлицо
-              </span>
-              <span className="text-[9px] text-zinc-400 font-bold text-center leading-tight">
-                Оплата по счёту
-              </span>
-            </button>
-          </div>
-        </div>
+                ✕
+              </button>
+            </div>
+          ) : showNewClient ? (
+            <div className="space-y-3 p-3 border-2 border-orange-200 bg-orange-50 rounded-xl">
+              <label className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest">
+                Новый клиент
+              </label>
 
-        {/* ── Клиент (показывается после выбора типа) ── */}
-        {clientType && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              Клиент
-            </label>
-
-            {selectedCounterparty ? (
-              <div
-                className={`flex items-center justify-between border-2 rounded-xl px-4 h-14 ${
-                  clientType === 'legal'
-                    ? 'bg-blue-50 border-blue-200'
-                    : 'bg-orange-50 border-orange-200'
-                }`}
-              >
-                <div>
-                  <span
-                    className={`font-black text-sm ${clientType === 'legal' ? 'text-blue-900' : 'text-orange-900'}`}
-                  >
-                    {selectedCounterparty.name}
-                  </span>
-                  <span
-                    className={`ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
-                      clientType === 'legal'
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-orange-100 text-orange-600'
-                    }`}
-                  >
-                    {clientType === 'legal' ? 'ЮЛ' : 'ФЛ'}
-                  </span>
-                </div>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setValue('counterparty_id', undefined)}
-                  className={`font-black text-lg ${clientType === 'legal' ? 'text-blue-400' : 'text-orange-400'}`}
+                  onClick={() => setClientType('individual')}
+                  className={`rounded-lg p-2 font-bold text-xs uppercase tracking-wider border-2 ${
+                    clientType === 'individual'
+                      ? 'border-orange-500 bg-white text-orange-600'
+                      : 'border-orange-200 text-orange-400'
+                  }`}
                 >
-                  ✕
+                  👤 Физлицо
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientType('legal')}
+                  className={`rounded-lg p-2 font-bold text-xs uppercase tracking-wider border-2 ${
+                    clientType === 'legal'
+                      ? 'border-blue-500 bg-white text-blue-600'
+                      : 'border-orange-200 text-orange-400'
+                  }`}
+                >
+                  🏢 Юрлицо
                 </button>
               </div>
-            ) : showNewClient ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
+
+              {clientType && (
+                <div className="flex gap-2 pt-1">
                   <input
                     type="text"
                     value={newClientName}
                     onChange={(e) => setNewClientName(e.target.value)}
                     placeholder={clientType === 'legal' ? 'Название организации' : 'Имя клиента'}
-                    className="flex-1 rounded-xl border-2 border-orange-500 px-4 h-14 font-bold text-zinc-900 focus:outline-none"
+                    className="flex-1 rounded-xl border-2 border-orange-400 px-4 h-12 font-bold text-zinc-900 focus:outline-none"
                     autoFocus
                   />
                   <button
@@ -356,22 +356,45 @@ export default function AddOrderPage() {
                   >
                     OK
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewClient(false)}
-                    className="bg-zinc-200 text-zinc-600 rounded-xl px-4 font-bold"
-                  >
-                    ✕
-                  </button>
                 </div>
+              )}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewClient(false);
+                    setClientType(null);
+                  }}
+                  className="text-zinc-500 font-bold text-xs"
+                >
+                  Отмена
+                </button>
               </div>
-            ) : (
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {topCounterparties.length > 0 && searchTerm === '' && (
+                <div className="flex flex-wrap gap-2">
+                  {topCounterparties.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => selectCounterparty(c)}
+                      className="px-3 py-1.5 rounded-lg border-2 border-zinc-200 bg-white text-xs font-bold text-zinc-700 active:scale-95 flex items-center gap-1.5 shadow-sm"
+                    >
+                      <span className="text-sm">{c.is_legal_entity ? '🏢' : '👤'}</span>
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="relative">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={clientType === 'legal' ? 'Поиск организации...' : 'Поиск клиента...'}
+                  placeholder="Поиск клиента..."
                   className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-zinc-900 font-bold focus:border-orange-500 focus:outline-none transition-colors"
                 />
                 {searchTerm.length > 0 && (
@@ -380,11 +403,7 @@ export default function AddOrderPage() {
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => {
-                          setValue('counterparty_id', c.id);
-                          setSearchTerm('');
-                          setError('');
-                        }}
+                        onClick={() => selectCounterparty(c)}
                         className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0 flex items-center gap-2"
                       >
                         <span>{c.name}</span>
@@ -408,80 +427,75 @@ export default function AddOrderPage() {
                         }}
                         className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
                       >
-                        + Создать нового {clientType === 'legal' ? 'юрлицо' : 'клиента'} &quot;
-                        {searchTerm}&quot;
+                        + Создать нового клиента &quot;{searchTerm}&quot;
                       </button>
                     )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
         {/* ── Сумма ── */}
-        {clientType && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              Сумма заказа, ₽
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              {...register('amount')}
-              placeholder="2 700"
-              className="w-full rounded-xl border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-            />
-            {errors.amount && (
-              <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>
-            )}
-          </div>
-        )}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Сумма заказа, ₽
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            {...register('amount')}
+            placeholder="2 700"
+            className="w-full rounded-xl border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+          />
+          {errors.amount && (
+            <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>
+          )}
+        </div>
 
         {/* ── Способ оплаты ── */}
-        {clientType && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              Способ оплаты
-            </label>
-            <div
-              className="grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${paymentMethods.length}, 1fr)` }}
-            >
-              {paymentMethods.map((m) => (
-                <label key={m.value} className="cursor-pointer">
-                  <input
-                    type="radio"
-                    value={m.value}
-                    {...register('payment_method')}
-                    className="sr-only peer"
-                  />
-                  <div
-                    className={`flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-2xl p-3 h-24 transition-all active:scale-[0.97] ${m.color}`}
-                  >
-                    <span className="text-2xl">{m.icon}</span>
-                    <span className="text-[10px] font-black text-center leading-tight uppercase tracking-tight">
-                      {m.label}
-                    </span>
-                    <span className="text-[8px] font-bold text-zinc-400 text-center leading-tight">
-                      {m.wallet}
-                    </span>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            {/* Подсказка для юрлиц */}
-            {clientType === 'legal' && (
-              <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide px-1">
-                🏢 Юрлицо оплачивает по счёту → деньги придут на Р/С
-              </p>
-            )}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Способ оплаты
+          </label>
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${paymentMethods.length}, 1fr)` }}
+          >
+            {paymentMethods.map((m) => (
+              <label key={m.value} className="cursor-pointer">
+                <input
+                  type="radio"
+                  value={m.value}
+                  {...register('payment_method')}
+                  className="sr-only peer"
+                />
+                <div
+                  className={`flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-2xl p-3 h-24 transition-all active:scale-[0.97] ${m.color}`}
+                >
+                  <span className="text-2xl">{m.icon}</span>
+                  <span className="text-[10px] font-black text-center leading-tight uppercase tracking-tight">
+                    {m.label}
+                  </span>
+                  <span className="text-[8px] font-bold text-zinc-400 text-center leading-tight">
+                    {m.wallet}
+                  </span>
+                </div>
+              </label>
+            ))}
           </div>
-        )}
+
+          {/* Подсказка для юрлиц */}
+          {clientType === 'legal' && (
+            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide px-1">
+              🏢 Юрлицо оплачивает по счёту → деньги придут на Р/С
+            </p>
+          )}
+        </div>
 
         {/* ── Комментарий к долгу ── */}
-        {clientType && isDebt && (
+        {isDebt && (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest pl-1">
               ⏳ Что обещал клиент? (важно!)
@@ -501,82 +515,88 @@ export default function AddOrderPage() {
         )}
 
         {/* ── ЗП водителя ── */}
-        {clientType && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              ЗП водителя, ₽
-              <span className="ml-2 text-zinc-400 normal-case font-medium">
-                ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)
-              </span>
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              {...register('driver_pay')}
-              placeholder={String(suggestedPay)}
-              className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-            />
-          </div>
-        )}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            ЗП водителя, ₽
+            <span className="ml-2 text-zinc-400 normal-case font-medium">
+              ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)
+            </span>
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            {...register('driver_pay')}
+            placeholder={String(suggestedPay)}
+            className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+          />
+        </div>
 
         {/* ── Грузчики ── */}
-        {clientType && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              Грузчики
-            </label>
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Грузчики
+          </label>
 
-            {loaders.map((loader, idx) => (
-              <div
-                key={loader.id}
-                className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-900 text-sm">
-                    {idx + 1}. {loader.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeLoader(loader.id)}
-                    className="text-blue-400 font-black text-lg leading-none"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={loader.pay}
-                  onChange={(e) => setLoaderPay(loader.id, e.target.value)}
-                  placeholder="ЗП грузчика, ₽"
-                  className="w-full rounded-lg border-2 border-blue-200 px-4 h-12 text-xl font-black text-zinc-900 focus:border-blue-500 focus:outline-none"
-                />
+          {loaders.map((loader, idx) => (
+            <div
+              key={loader.id}
+              className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-900 text-sm">
+                  {idx + 1}. {loader.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeLoader(loader.id)}
+                  className="text-blue-400 font-black text-lg leading-none"
+                >
+                  ✕
+                </button>
               </div>
-            ))}
+              <input
+                type="number"
+                inputMode="numeric"
+                value={loader.pay}
+                onChange={(e) => setLoaderPay(loader.id, e.target.value)}
+                placeholder="ЗП грузчика, ₽"
+                className="w-full rounded-lg border-2 border-blue-200 px-4 h-12 text-xl font-black text-zinc-900 focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+          ))}
 
-            {loaders.length < 2 && (
-              <button
-                type="button"
-                onClick={() => setShowLoaderPicker(true)}
-                className="w-full text-left px-4 h-12 border-2 border-dashed border-blue-300 rounded-xl text-blue-500 font-bold"
-              >
-                + Добавить грузчика
-              </button>
-            )}
-          </div>
-        )}
+          {loaders.length < 2 && (
+            <button
+              type="button"
+              onClick={() => setShowLoaderPicker(true)}
+              className="w-full text-left px-4 h-12 border-2 border-dashed border-blue-300 rounded-xl text-blue-500 font-bold"
+            >
+              + Добавить грузчика
+            </button>
+          )}
+        </div>
 
         {/* ── Описание (не долг) ── */}
-        {clientType && !isDebt && (
+        {!isDebt && (
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              Описание (опционально)
+            <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
+              {selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                ? 'Имя клиента и детали (обязательно)*'
+                : 'Описание (опционально)'}
             </label>
             <input
               type="text"
               {...register('description')}
-              placeholder="Переезд, доставка плитки..."
-              className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+              placeholder={
+                selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                  ? 'Иван, переезд мебели, +7999...'
+                  : 'Переезд, доставка плитки...'
+              }
+              className={`w-full rounded-xl border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
+                selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                  ? 'border-orange-400 focus:border-orange-600 bg-orange-50 placeholder:text-orange-300'
+                  : 'border-zinc-200 focus:border-orange-500'
+              }`}
             />
           </div>
         )}
@@ -591,14 +611,10 @@ export default function AddOrderPage() {
           <Button
             type="submit"
             size="hero"
-            disabled={submitting || !clientType}
+            disabled={submitting}
             className="font-black uppercase tracking-widest"
           >
-            {!clientType
-              ? 'Выберите тип клиента'
-              : submitting
-                ? 'Сохраняем...'
-                : '✅ Добавить заказ'}
+            {submitting ? 'Сохраняем...' : '✅ Добавить заказ'}
           </Button>
         </div>
       </form>

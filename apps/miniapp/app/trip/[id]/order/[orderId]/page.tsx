@@ -141,9 +141,9 @@ export default function EditOrderPage() {
 
   const selectedCounterpartyId = watch('counterparty_id');
   const selectedCounterparty =
-    counterparties.find((c) => c.id === selectedCounterpartyId) ??
+    counterparties.find((c: any) => c.id === selectedCounterpartyId) ??
     (order?.counterparty && selectedCounterpartyId === order.counterparty_id
-      ? { id: order.counterparty_id!, name: order.counterparty!.name }
+      ? { id: order.counterparty_id!, name: order.counterparty!.name, is_legal_entity: false }
       : null);
 
   const amountRaw = watch('amount');
@@ -152,8 +152,10 @@ export default function EditOrderPage() {
 
   const filteredCounterparties =
     searchTerm.length > 0
-      ? counterparties.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      : counterparties;
+      ? counterparties.filter((c: any) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      : [];
+
+  const topCounterparties = counterparties.filter((c: any) => c.is_top);
 
   const availableLoaders = allLoaders.filter((l) => !loaders.find((s) => s.id === l.id));
 
@@ -203,6 +205,12 @@ export default function EditOrderPage() {
       setError('Укажите клиента перед сохранением');
       return;
     }
+    const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
+    if (isGenericClient && data.payment_method !== 'debt_cash' && !data.description?.trim()) {
+      setError('Укажите имя и детали разового заказа в описании');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -341,52 +349,76 @@ export default function EditOrderPage() {
               </div>
             </div>
           ) : (
-            <div className="relative">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Поиск клиента..."
-                className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-zinc-900 font-bold focus:border-orange-500 focus:outline-none transition-colors"
-                onFocus={() => {
-                  if (searchBlurTimer.current) clearTimeout(searchBlurTimer.current);
-                  setSearchFocused(true);
-                }}
-                onBlur={() => {
-                  searchBlurTimer.current = setTimeout(() => setSearchFocused(false), 150);
-                }}
-              />
-              {searchFocused && (
-                <div className="absolute top-full left-0 right-0 bg-white border-2 border-zinc-200 rounded-lg mt-1 shadow-xl z-10 max-h-60 overflow-y-auto">
-                  {filteredCounterparties.map((c) => (
+            <div className="space-y-3">
+              {topCounterparties.length > 0 && searchTerm === '' && (
+                <div className="flex flex-wrap gap-2">
+                  {topCounterparties.map((c: any) => (
                     <button
                       key={c.id}
                       type="button"
-                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setValue('counterparty_id', c.id);
                         setSearchTerm('');
                         setSearchFocused(false);
                       }}
-                      className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0"
+                      className="px-3 py-1.5 rounded-lg border-2 border-zinc-200 bg-white text-xs font-bold text-zinc-700 active:scale-95 flex items-center gap-1.5 shadow-sm"
                     >
+                      <span className="text-sm">{c.is_legal_entity ? '🏢' : '👤'}</span>
                       {c.name}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      setNewClientName(searchTerm);
-                      setShowNewClient(true);
-                      setSearchFocused(false);
-                    }}
-                    className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
-                  >
-                    + Новый клиент{searchTerm ? ` "${searchTerm}"` : ''}
-                  </button>
                 </div>
               )}
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Поиск клиента..."
+                  className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-zinc-900 font-bold focus:border-orange-500 focus:outline-none transition-colors"
+                  onFocus={() => {
+                    if (searchBlurTimer.current) clearTimeout(searchBlurTimer.current);
+                    setSearchFocused(true);
+                  }}
+                  onBlur={() => {
+                    searchBlurTimer.current = setTimeout(() => setSearchFocused(false), 150);
+                  }}
+                />
+                {searchFocused && searchTerm.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border-2 border-zinc-200 rounded-lg mt-1 shadow-xl z-10 max-h-60 overflow-y-auto">
+                    {filteredCounterparties.map((c: any) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setValue('counterparty_id', c.id);
+                          setSearchTerm('');
+                          setSearchFocused(false);
+                        }}
+                        className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0"
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                    {filteredCounterparties.length === 0 && (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setNewClientName(searchTerm);
+                          setShowNewClient(true);
+                          setSearchFocused(false);
+                        }}
+                        className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
+                      >
+                        + Новый клиент{searchTerm ? ` "${searchTerm}"` : ''}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -502,14 +534,24 @@ export default function EditOrderPage() {
 
         {/* Описание */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Описание (опционально)
+          <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
+            {selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+              ? 'Имя клиента и детали (обязательно)*'
+              : 'Описание (опционально)'}
           </label>
           <input
             type="text"
             {...register('description')}
-            placeholder="Переезд, доставка плитки..."
-            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+            placeholder={
+              selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                ? 'Иван, переезд мебели, +7999...'
+                : 'Переезд, доставка плитки...'
+            }
+            className={`w-full rounded-lg border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
+              selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                ? 'border-orange-400 focus:border-orange-600 bg-orange-50 placeholder:text-orange-300'
+                : 'border-zinc-200 focus:border-orange-500'
+            }`}
           />
         </div>
 
