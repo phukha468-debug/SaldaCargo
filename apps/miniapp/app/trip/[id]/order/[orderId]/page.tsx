@@ -181,16 +181,19 @@ export default function EditOrderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newClientName, type: 'client' }),
       });
+      const data = await res.json();
       if (res.ok) {
-        const newClient = await res.json();
         queryClient.invalidateQueries({ queryKey: ['driver', 'counterparties'] });
-        setValue('counterparty_id', newClient.id);
+        setValue('counterparty_id', data.id);
         setShowNewClient(false);
         setNewClientName('');
         setSearchTerm('');
+      } else if (res.status === 409 && data.existing?.length > 0) {
+        setShowNewClient(false);
+        setSearchTerm(newClientName);
+        setError(`Клиент «${data.existing[0].name}» уже есть — выберите из списка`);
       } else {
-        const err = await res.json();
-        setError(err.error || 'Ошибка при добавлении клиента');
+        setError(data.error || 'Ошибка при добавлении клиента');
       }
     } catch {
       setError('Ошибка сети');

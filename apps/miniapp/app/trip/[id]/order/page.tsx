@@ -193,18 +193,18 @@ export default function AddOrderPage() {
           is_legal_entity: clientType === 'legal',
         }),
       });
+      const data = await res.json();
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ['driver', 'counterparties'] });
-        const newClient = await res.json();
-        selectCounterparty(newClient);
+        selectCounterparty(data);
         setShowNewClient(false);
         setNewClientName('');
-      } else if (res.status === 409 && json.existing?.length > 0) {
+      } else if (res.status === 409 && data.existing?.length > 0) {
         setShowNewClient(false);
         setSearchTerm(newClientName);
-        setError(`Клиент «${json.existing[0].name}» уже есть — выберите из списка`);
+        setError(`Клиент «${data.existing[0].name}» уже есть — выберите из списка`);
       } else {
-        setError(json.error || 'Ошибка при добавлении клиента');
+        setError(data.error || 'Ошибка при добавлении клиента');
       }
     } catch {
       setError('Ошибка сети');
