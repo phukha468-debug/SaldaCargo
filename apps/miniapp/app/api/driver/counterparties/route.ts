@@ -65,7 +65,7 @@ export async function GET() {
   // 5. Пометить топ-10 (для чипов)
   const result = enriched.map((c: any, idx: number) => ({
     ...c,
-    is_top: idx < 10 && c.order_count > 0,
+    is_top: idx < 10,
   }));
 
   return NextResponse.json(result);
