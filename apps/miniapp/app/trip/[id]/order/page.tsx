@@ -48,7 +48,7 @@ const METHODS_INDIVIDUAL = [
   {
     value: 'cash' as const,
     label: 'Наличные',
-    sublabel: 'Нал / Карта при водителе',
+    sublabel: 'Сдаст в конце смены',
     icon: '💵',
     wallet: '→ Касса',
     color: 'peer-checked:border-green-600 peer-checked:bg-green-50',
@@ -56,7 +56,7 @@ const METHODS_INDIVIDUAL = [
   {
     value: 'qr' as const,
     label: 'QR / Безнал',
-    sublabel: 'Оплата при водителе',
+    sublabel: 'Водитель видел эти деньги',
     icon: '📱',
     wallet: '→ Р/С',
     color: 'peer-checked:border-blue-600 peer-checked:bg-blue-50',
@@ -64,7 +64,7 @@ const METHODS_INDIVIDUAL = [
   {
     value: 'debt_cash' as const,
     label: 'Долг',
-    sublabel: 'Заплатит потом',
+    sublabel: 'Заплатит позднее',
     icon: '⏳',
     wallet: '→ Дебиторка → Касса',
     color: 'peer-checked:border-orange-500 peer-checked:bg-orange-50',
@@ -219,8 +219,15 @@ export default function AddOrderPage() {
       setError('Укажите клиента перед добавлением заказа');
       return;
     }
+    const isDebt = data.payment_method === 'debt_cash';
     const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
-    if (isGenericClient && !isDebt && !data.description?.trim()) {
+
+    if (isDebt && !data.description?.trim()) {
+      setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
+      return;
+    }
+
+    if (isGenericClient && !data.description?.trim()) {
       setError('Укажите имя и детали разового заказа в описании');
       return;
     }

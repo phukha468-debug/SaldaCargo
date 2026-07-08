@@ -31,8 +31,8 @@ interface SelectedLoader {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Наличные', icon: '💵' },
-  { value: 'qr', label: 'QR на р/с', icon: '📱' },
+  { value: 'cash', label: 'Наличные (сдаст)', icon: '💵' },
+  { value: 'qr', label: 'QR / Безнал (видел)', icon: '📱' },
   { value: 'card_driver', label: 'На карту', icon: '💳' },
   { value: 'debt_cash', label: 'Долг', icon: '⏳' },
 ] as const;
@@ -208,8 +208,15 @@ export default function EditOrderPage() {
       setError('Укажите клиента перед сохранением');
       return;
     }
+    const isDebt = data.payment_method === 'debt_cash';
     const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
-    if (isGenericClient && data.payment_method !== 'debt_cash' && !data.description?.trim()) {
+
+    if (isDebt && !data.description?.trim()) {
+      setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
+      return;
+    }
+
+    if (isGenericClient && !data.description?.trim()) {
       setError('Укажите имя и детали разового заказа в описании');
       return;
     }
