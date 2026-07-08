@@ -695,11 +695,19 @@ function OrderDetailModal({
   const [confirmDeleteWorkId, setConfirmDeleteWorkId] = useState<string | null>(null);
   const [addWorkError, setAddWorkError] = useState<string | null>(null);
   const [addWorkQty, setAddWorkQty] = useState(1);
+  const [isCustomWork, setIsCustomWork] = useState(false);
+  const [customWorkName, setCustomWorkName] = useState('');
+  const [customWorkPrice, setCustomWorkPrice] = useState('');
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
   const [editWorkDesc, setEditWorkDesc] = useState('');
   const [editWorkQty, setEditWorkQty] = useState(1);
   const [editWorkPrice, setEditWorkPrice] = useState('');
   const [partPricesDraft, setPartPricesDraft] = useState<Record<string, string>>({});
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [addPartName, setAddPartName] = useState('');
+  const [addPartQty, setAddPartQty] = useState(1);
+  const [addPartPrice, setAddPartPrice] = useState('');
+  const [addPartError, setAddPartError] = useState<string | null>(null);
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['garage-order', orderId],
@@ -794,11 +802,21 @@ function OrderDetailModal({
   });
 
   const addWorkMutation = useMutation({
-    mutationFn: ({ work_catalog_id, quantity }: { work_catalog_id: string; quantity: number }) =>
+    mutationFn: ({
+      work_catalog_id,
+      custom_work_name,
+      price_client,
+      quantity,
+    }: {
+      work_catalog_id?: string;
+      custom_work_name?: string;
+      price_client?: string;
+      quantity: number;
+    }) =>
       fetch(`/api/garage/orders/${orderId}/works`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ work_catalog_id, quantity }),
+        body: JSON.stringify({ work_catalog_id, custom_work_name, price_client, quantity }),
       }).then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
@@ -808,6 +826,9 @@ function OrderDetailModal({
       setAddWorkError(null);
       setWorkSearch('');
       setAddWorkQty(1);
+      setIsCustomWork(false);
+      setCustomWorkName('');
+      setCustomWorkPrice('');
       setShowAddWork(false);
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
     },
@@ -867,6 +888,41 @@ function OrderDetailModal({
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
         return d;
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+    },
+  });
+
+  const addPartMutation = useMutation({
+    mutationFn: (body: { custom_part_name: string; quantity: number; client_price?: string }) =>
+      fetch(`/api/garage/orders/${orderId}/parts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess: () => {
+      setAddPartError(null);
+      setAddPartName('');
+      setAddPartQty(1);
+      setAddPartPrice('');
+      setShowAddPart(false);
+      queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+    },
+    onError: (err: Error) => setAddPartError(err.message),
+  });
+
+  const deletePartMutation = useMutation({
+    mutationFn: (partId: string) =>
+      fetch(`/api/garage/orders/${orderId}/parts/${partId}`, { method: 'DELETE' }).then(
+        async (r) => {
+          if (!r.ok) throw new Error('Ошибка');
+          return r.json();
+        },
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
     },
@@ -1178,18 +1234,78 @@ function OrderDetailModal({
 
                 {showAddWork && (
                   <div className="mb-3 border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 items-center">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={workSearch}
-                        onChange={(e) => {
-                          setWorkSearch(e.target.value);
-                          setAddWorkError(null);
-                        }}
-                        placeholder="Поиск по названию..."
-                        className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400"
-                      />
+                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 items-center flex-wrap">
+                      {!isCustomWork ? (
+                        <>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={workSearch}
+                            onChange={(e) => {
+                              setWorkSearch(e.target.value);
+                              setAddWorkError(null);
+                            }}
+                            placeholder="Поиск по названию..."
+                            className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400 min-w-[150px]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsCustomWork(true)}
+                            className="text-xs font-semibold text-blue-600 hover:underline shrink-0"
+                          >
+                            Ввести вручную
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={customWorkName}
+                            onChange={(e) => {
+                              setCustomWorkName(e.target.value);
+                              setAddWorkError(null);
+                            }}
+                            placeholder="Название работы..."
+                            className="flex-1 text-sm bg-white border border-slate-200 rounded px-2 py-1 outline-none min-w-[150px]"
+                          />
+                          <input
+                            type="number"
+                            value={customWorkPrice}
+                            onChange={(e) => {
+                              setCustomWorkPrice(e.target.value);
+                              setAddWorkError(null);
+                            }}
+                            placeholder="Цена (₽)"
+                            className="w-20 text-sm bg-white border border-slate-200 rounded px-2 py-1 outline-none shrink-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!customWorkName.trim()) {
+                                setAddWorkError('Введите название работы');
+                                return;
+                              }
+                              addWorkMutation.mutate({
+                                custom_work_name: customWorkName,
+                                price_client: customWorkPrice || undefined,
+                                quantity: addWorkQty,
+                              });
+                            }}
+                            disabled={addWorkMutation.isPending}
+                            className="text-xs bg-blue-600 text-white px-2 py-1.5 rounded font-semibold disabled:opacity-50 shrink-0"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsCustomWork(false)}
+                            className="text-xs text-slate-500 hover:text-slate-700 shrink-0"
+                          >
+                            Отмена
+                          </button>
+                        </>
+                      )}
                       <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
                         <button
                           type="button"
@@ -1209,9 +1325,6 @@ function OrderDetailModal({
                           +
                         </button>
                       </div>
-                      {addWorkMutation.isPending && (
-                        <span className="text-xs text-slate-400 shrink-0">Добавляем...</span>
-                      )}
                     </div>
                     {addWorkError && (
                       <div className="px-3 py-2 bg-red-50 border-b border-red-200">
@@ -1236,39 +1349,43 @@ function OrderDetailModal({
                         ))}
                       </div>
                     )}
-                    <div className="max-h-60 overflow-y-auto">
-                      {!workSearch.trim() && !workCatFilter ? (
-                        <p className="text-xs text-slate-400 px-3 py-4 italic text-center">
-                          Выберите категорию или введите название для поиска
-                        </p>
-                      ) : filteredCatalog.length === 0 ? (
-                        <p className="text-xs text-slate-400 px-3 py-3 italic">Ничего не найдено</p>
-                      ) : (
-                        filteredCatalog.map((w) => (
-                          <button
-                            key={w.id}
-                            onClick={() =>
-                              addWorkMutation.mutate({
-                                work_catalog_id: w.id,
-                                quantity: addWorkQty,
-                              })
-                            }
-                            disabled={addWorkMutation.isPending}
-                            className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
-                          >
-                            <span className="text-sm text-slate-800 group-hover:text-blue-700">
-                              {w.name}
-                            </span>
-                            <span className="text-xs text-slate-400 shrink-0 ml-2">
-                              {(w.norm_minutes / 60).toFixed(1)} нч
-                              {w.default_price_client
-                                ? ` · ${parseInt(w.default_price_client).toLocaleString('ru-RU')} ₽`
-                                : ''}
-                            </span>
-                          </button>
-                        ))
-                      )}
-                    </div>
+                    {!isCustomWork && (
+                      <div className="max-h-60 overflow-y-auto">
+                        {!workSearch.trim() && !workCatFilter ? (
+                          <p className="text-xs text-slate-400 px-3 py-4 italic text-center">
+                            Выберите категорию или введите название для поиска
+                          </p>
+                        ) : filteredCatalog.length === 0 ? (
+                          <p className="text-xs text-slate-400 px-3 py-3 italic">
+                            Ничего не найдено
+                          </p>
+                        ) : (
+                          filteredCatalog.map((w) => (
+                            <button
+                              key={w.id}
+                              onClick={() =>
+                                addWorkMutation.mutate({
+                                  work_catalog_id: w.id,
+                                  quantity: addWorkQty,
+                                })
+                              }
+                              disabled={addWorkMutation.isPending}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
+                            >
+                              <span className="text-sm text-slate-800 group-hover:text-blue-700">
+                                {w.name}
+                              </span>
+                              <span className="text-xs text-slate-400 shrink-0 ml-2">
+                                {(w.norm_minutes / 60).toFixed(1)} нч
+                                {w.default_price_client
+                                  ? ` · ${parseInt(w.default_price_client).toLocaleString('ru-RU')} ₽`
+                                  : ''}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1534,73 +1651,166 @@ function OrderDetailModal({
                   </div>
                 )}
               </div>
-              {order.parts.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
+              {/* Parts section regardless of length, so we can add to empty order */}
+              <div className={order.parts.length === 0 && !showAddPart ? 'mb-2' : 'mb-0'}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
                     <p className="text-xs text-slate-500 font-semibold uppercase">
                       Запчасти ({order.parts.length})
                     </p>
-                    <p className="text-[10px] text-slate-400 italic">
-                      — укажите цену, если запчасть наша; оставьте пустым если клиентская
-                    </p>
+                    {order.parts.length > 0 && (
+                      <p className="text-[10px] text-slate-400 italic hidden sm:block">
+                        — цена пустая = запчасть клиента
+                      </p>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    {order.parts.map((p) => {
-                      const partName = p.part?.name ?? p.custom_part_name ?? '—';
-                      const partUnit = p.part?.unit ?? p.unit ?? 'шт';
-                      const draft = partPricesDraft[p.id] ?? '';
-                      const savedPrice = parseFloat(p.client_price ?? '0');
-                      return (
-                        <div
-                          key={p.id}
-                          className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
-                        >
-                          <span className="text-sm text-slate-800 flex-1 truncate">{partName}</span>
-                          <span className="text-xs text-slate-500 shrink-0">
-                            {p.quantity} {partUnit}
-                          </span>
-                          <div className="flex items-center shrink-0">
-                            <input
-                              type="number"
-                              min="0"
-                              value={draft}
-                              onChange={(e) =>
-                                setPartPricesDraft((prev) => ({ ...prev, [p.id]: e.target.value }))
-                              }
-                              onBlur={() => {
-                                const newVal = parseFloat(draft || '0');
-                                if (Math.abs(newVal - savedPrice) > 0.01) {
-                                  patchPartMutation.mutate({
-                                    partId: p.id,
-                                    client_price: newVal.toFixed(2),
-                                  });
-                                }
-                              }}
-                              placeholder="Клиент"
-                              className="w-24 text-right text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-                            />
-                            <span className="text-xs text-slate-400 ml-1.5">₽</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {order.parts.some((p) => parseFloat(p.client_price ?? '0') > 0) && (
-                    <div className="mt-1.5 flex justify-end text-xs text-slate-500">
-                      Итого запчасти:{' '}
-                      <span className="font-semibold text-slate-700 ml-1">
-                        {order.parts
-                          .reduce(
-                            (s, p) => s + parseFloat(p.client_price ?? '0') * (p.quantity ?? 1),
-                            0,
-                          )
-                          .toLocaleString('ru-RU')}{' '}
-                        ₽
-                      </span>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => setShowAddPart((v) => !v)}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+                  >
+                    {showAddPart ? '✕ Закрыть' : '+ Добавить'}
+                  </button>
                 </div>
-              )}
+                {showAddPart && (
+                  <div className="mb-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl flex gap-2 items-center flex-wrap">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={addPartName}
+                      onChange={(e) => {
+                        setAddPartName(e.target.value);
+                        setAddPartError(null);
+                      }}
+                      placeholder="Название запчасти..."
+                      className="flex-1 text-sm bg-white border border-slate-200 rounded px-2 py-1.5 outline-none min-w-[150px]"
+                    />
+                    <input
+                      type="number"
+                      value={addPartPrice}
+                      onChange={(e) => {
+                        setAddPartPrice(e.target.value);
+                        setAddPartError(null);
+                      }}
+                      placeholder="Цена (₽)"
+                      className="w-20 text-sm bg-white border border-slate-200 rounded px-2 py-1.5 outline-none shrink-0"
+                    />
+                    <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
+                      <button
+                        type="button"
+                        onClick={() => setAddPartQty((q) => Math.max(1, q - 1))}
+                        className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                      >
+                        −
+                      </button>
+                      <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
+                        {addPartQty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAddPartQty((q) => q + 1)}
+                        className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!addPartName.trim()) {
+                          setAddPartError('Введите название');
+                          return;
+                        }
+                        addPartMutation.mutate({
+                          custom_part_name: addPartName,
+                          client_price: addPartPrice || undefined,
+                          quantity: addPartQty,
+                        });
+                      }}
+                      disabled={addPartMutation.isPending}
+                      className="text-xs bg-slate-900 text-white px-3 py-2 rounded-lg font-semibold disabled:opacity-50 shrink-0"
+                    >
+                      Добавить
+                    </button>
+                    {addPartError && (
+                      <div className="w-full mt-1">
+                        <p className="text-xs text-red-600 font-medium">{addPartError}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {order.parts.length > 0 && (
+                  <>
+                    <div className="space-y-1">
+                      {order.parts.map((p) => {
+                        const partName = p.part?.name ?? p.custom_part_name ?? '—';
+                        const partUnit = p.part?.unit ?? p.unit ?? 'шт';
+                        const draft = partPricesDraft[p.id] ?? '';
+                        const savedPrice = parseFloat(p.client_price ?? '0');
+                        return (
+                          <div
+                            key={p.id}
+                            className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 group"
+                          >
+                            <span className="text-sm text-slate-800 flex-1 truncate">
+                              {partName}
+                            </span>
+                            <span className="text-xs text-slate-500 shrink-0">
+                              {p.quantity} {partUnit}
+                            </span>
+                            <div className="flex items-center shrink-0">
+                              <input
+                                type="number"
+                                min="0"
+                                value={draft}
+                                onChange={(e) =>
+                                  setPartPricesDraft((prev) => ({
+                                    ...prev,
+                                    [p.id]: e.target.value,
+                                  }))
+                                }
+                                onBlur={() => {
+                                  const newVal = parseFloat(draft || '0');
+                                  if (Math.abs(newVal - savedPrice) > 0.01) {
+                                    patchPartMutation.mutate({
+                                      partId: p.id,
+                                      client_price: newVal.toFixed(2),
+                                    });
+                                  }
+                                }}
+                                placeholder="Клиент"
+                                className="w-24 text-right text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                              />
+                              <span className="text-xs text-slate-400 ml-1.5">₽</span>
+                              <button
+                                onClick={() => deletePartMutation.mutate(p.id)}
+                                disabled={deletePartMutation.isPending}
+                                className="ml-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Удалить"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {order.parts.some((p) => parseFloat(p.client_price ?? '0') > 0) && (
+                      <div className="mt-1.5 flex justify-end text-xs text-slate-500">
+                        Итого запчасти:{' '}
+                        <span className="font-semibold text-slate-700 ml-1">
+                          {order.parts
+                            .reduce(
+                              (s, p) => s + parseFloat(p.client_price ?? '0') * (p.quantity ?? 1),
+                              0,
+                            )
+                            .toLocaleString('ru-RU')}{' '}
+                          ₽
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
               <div>
                 <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
                   Заметка (admin)

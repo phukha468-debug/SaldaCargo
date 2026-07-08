@@ -35,3 +35,16 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
+
+/** DELETE /api/garage/orders/[id]/parts/[partId] — удалить запчасть */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string; partId: string }> },
+) {
+  const { partId } = await params;
+  const supabase = createAdminClient();
+  const { error } = await (supabase.from('service_order_parts') as any).delete().eq('id', partId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
