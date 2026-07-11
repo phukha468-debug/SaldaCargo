@@ -293,187 +293,118 @@ function AddWorkModal({
   );
 }
 
-// ─── ExtraWorkModal ───────────────────────────────────────────────────────────
+// ─── CompleteWorkModal ────────────────────────────────────────────────────────
 
-function ExtraWorkModal({
+function CompleteWorkModal({
   open,
   onClose,
-  orderId,
+  work,
+  onComplete,
 }: {
   open: boolean;
   onClose: () => void;
-  orderId: string;
+  work: WorkItem | null;
+  onComplete: (minutes: number) => void;
 }) {
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'catalog' | 'custom'>('catalog');
-  const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null);
-  const [customName, setCustomName] = useState('');
-  const [mechanicNote, setMechanicNote] = useState('');
-  const [error, setError] = useState('');
+  const [hours, setHours] = useState('0');
+  const [minutes, setMinutes] = useState('0');
 
+  // Default to norm_minutes if available when opening
   useEffect(() => {
-    if (!open) {
-      setSelectedCatalogId(null);
-      setCustomName('');
-      setMechanicNote('');
-      setError('');
-      setTab('catalog');
-    }
-  }, [open]);
-
-  const { data: catalog = [] } = useQuery<CatalogItem[]>({
-    queryKey: ['work-catalog'],
-    queryFn: async () => {
-      const r = await fetch('/api/mechanic/catalog');
-      if (!r.ok) return [];
-      return r.json();
-    },
-    enabled: open,
-  });
-
-  const requestMutation = useMutation({
-    mutationFn: async (body: object) => {
-      const r = await fetch(`/api/mechanic/orders/${orderId}/extra-work`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) {
-        const err = await r.json();
-        throw new Error(err.error || 'Ошибка');
+    if (open && work) {
+      const norm = work.work_catalog?.norm_minutes || 0;
+      if (norm > 0) {
+        setHours(Math.floor(norm / 60).toString());
+        setMinutes((norm % 60).toString());
+      } else {
+        setHours('0');
+        setMinutes('0');
       }
-      return r.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
-      onClose();
-    },
-    onError: (e: Error) => setError(e.message),
-  });
+    }
+  }, [open, work]);
 
-  const handleSend = () => {
-    setError('');
-    if (!mechanicNote.trim()) {
-      setError('Опишите что обнаружили — это обязательно');
-      return;
-    }
-    if (tab === 'catalog' && !selectedCatalogId) {
-      setError('Выберите вид работы из каталога');
-      return;
-    }
-    if (tab === 'custom' && !customName.trim()) {
-      setError('Введите название работы');
-      return;
-    }
-    requestMutation.mutate({
-      work_catalog_id: tab === 'catalog' ? selectedCatalogId : undefined,
-      custom_work_name: tab === 'custom' ? customName.trim() : undefined,
-      mechanic_note: mechanicNote.trim(),
-    });
+  if (!work) return null;
+  const workName = work.work_catalog?.name || work.custom_work_name || 'Без названия';
+
+  const handleSave = () => {
+    const h = parseInt(hours || '0', 10);
+    const m = parseInt(minutes || '0', 10);
+    onComplete(h * 60 + m);
   };
 
   return (
-    <BottomSheet
-      open={open}
-      onClose={onClose}
-      title="Доп. работа → Согласование"
-      footer={
-        <div>
-          {error && <p className="text-xs text-red-500 font-bold mb-2 text-center">{error}</p>}
-          <button
-            onClick={handleSend}
-            disabled={requestMutation.isPending}
-            className="w-full bg-amber-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-amber-400"
-          >
-            {requestMutation.isPending ? 'Отправляем...' : '📤 Отправить на согласование'}
-          </button>
-        </div>
-      }
-    >
+    <BottomSheet open={open} onClose={onClose} title="Завершение работы">
       <div className="space-y-4">
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-          <p className="text-xs text-amber-800 font-medium leading-relaxed">
-            Обнаружили дополнительную работу? Выберите тип и опишите что нашли — администратор
-            получит уведомление и одобрит или откажет.
-          </p>
-        </div>
+        <p className="text-sm text-slate-500 text-center mb-4">{workName}</p>
 
-        <div className="flex gap-2">
-          {(['catalog', 'custom'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                setTab(t);
-                setError('');
-              }}
-              className={cn(
-                'flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-colors',
-                tab === t ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-500',
-              )}
-            >
-              {t === 'catalog' ? 'Из каталога' : 'Описать'}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'catalog' ? (
-          <div className="space-y-2 max-h-44 overflow-y-auto">
-            {catalog.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setSelectedCatalogId(item.id === selectedCatalogId ? null : item.id);
-                  setError('');
-                }}
-                className={cn(
-                  'w-full text-left p-3 rounded-xl border-2 transition-all active:scale-[0.98]',
-                  selectedCatalogId === item.id
-                    ? 'border-amber-500 bg-amber-50'
-                    : 'border-slate-100 bg-white',
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-slate-900">{item.name}</p>
-                  {selectedCatalogId === item.id && <span className="text-amber-600">✓</span>}
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
-                  Норма: {item.norm_minutes} мин
-                </p>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-              Название работы *
-            </label>
-            <input
-              value={customName}
-              onChange={(e) => {
-                setCustomName(e.target.value);
-                setError('');
-              }}
-              placeholder="Например: Замена шаровой опоры"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-            Что обнаружили? *
+        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
+          <label className="block text-[10px] font-black text-orange-800 uppercase tracking-widest mb-3 text-center">
+            Сколько времени вы потратили?
           </label>
-          <textarea
-            value={mechanicNote}
-            onChange={(e) => {
-              setMechanicNote(e.target.value);
-              setError('');
-            }}
-            placeholder="Опишите подробно что нашли и почему это нужно сделать..."
-            rows={3}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
-          />
+          <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+                min="0"
+                className="w-20 text-center bg-white border-2 border-orange-200 rounded-xl py-3 text-2xl font-black focus:outline-none focus:border-orange-500"
+              />
+              <span className="text-xs font-bold text-orange-600 uppercase mt-2">Часов</span>
+            </div>
+            <span className="text-2xl font-black text-orange-300 mb-6">:</span>
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+                min="0"
+                max="59"
+                className="w-20 text-center bg-white border-2 border-orange-200 rounded-xl py-3 text-2xl font-black focus:outline-none focus:border-orange-500"
+              />
+              <span className="text-xs font-bold text-orange-600 uppercase mt-2">Минут</span>
+            </div>
+          </div>
         </div>
+
+        <div className="flex gap-2 justify-center mb-2">
+          <button
+            onClick={() => {
+              setHours('0');
+              setMinutes('30');
+            }}
+            className="bg-slate-100 text-slate-600 text-xs font-black px-4 py-2 rounded-lg active:bg-slate-200"
+          >
+            + 30 мин
+          </button>
+          <button
+            onClick={() => {
+              setHours('1');
+              setMinutes('0');
+            }}
+            className="bg-slate-100 text-slate-600 text-xs font-black px-4 py-2 rounded-lg active:bg-slate-200"
+          >
+            + 1 час
+          </button>
+          {work.work_catalog?.norm_minutes ? (
+            <button
+              onClick={() => {
+                setHours(Math.floor(work.work_catalog!.norm_minutes / 60).toString());
+                setMinutes((work.work_catalog!.norm_minutes % 60).toString());
+              }}
+              className="bg-slate-100 text-slate-600 text-xs font-black px-4 py-2 rounded-lg active:bg-slate-200"
+            >
+              По норме
+            </button>
+          ) : null}
+        </div>
+
+        <button
+          onClick={handleSave}
+          className="w-full bg-green-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform"
+        >
+          ✓ Сохранить и завершить
+        </button>
       </div>
     </BottomSheet>
   );
@@ -697,76 +628,24 @@ function AddPartModal({
 
 // ─── WorkCard ─────────────────────────────────────────────────────────────────
 
-function WorkCard({
-  work,
-  now,
-  onStart,
-  onStop,
-  isStarting,
-  isStopping,
-}: {
-  work: WorkItem;
-  now: number;
-  onStart: () => void;
-  onStop: (status: 'paused' | 'completed') => void;
-  isStarting: boolean;
-  isStopping: boolean;
-}) {
-  const activeLog = work.time_logs.find((l) => l.status === 'running');
-  const isRunning = !!activeLog;
-
-  let totalMinutes = work.actual_minutes || 0;
-  if (isRunning) {
-    const activeMs = now - new Date(activeLog.started_at).getTime();
-    totalMinutes += Math.floor(activeMs / 60000);
-  }
-
+function WorkCard({ work, onCompleteClick }: { work: WorkItem; onCompleteClick: () => void }) {
   const workName = work.work_catalog?.name || work.custom_work_name || 'Без названия';
   const normMins = work.work_catalog?.norm_minutes ?? 0;
-  const isExtraWork = work.extra_work_status != null;
-  const isPendingApproval = work.extra_work_status === 'pending_approval';
-  const isRejected = work.extra_work_status === 'rejected';
-  const canWork =
-    !isPendingApproval && !isRejected && work.status !== 'completed' && work.status !== 'cancelled';
-
-  const extraStatusLabel = () => {
-    if (!isExtraWork) return null;
-    const map: Record<string, { label: string; cls: string }> = {
-      pending_approval: { label: 'На согласовании', cls: 'bg-amber-100 text-amber-700' },
-      approved: { label: 'Согласовано', cls: 'bg-green-100 text-green-700' },
-      rejected: { label: 'Отклонено', cls: 'bg-red-100 text-red-500' },
-    };
-    const entry = map[work.extra_work_status ?? ''];
-    if (!entry) return null;
-    return (
-      <span className={cn('text-[8px] font-black uppercase px-1.5 py-0.5 rounded', entry.cls)}>
-        {entry.label}
-      </span>
-    );
-  };
+  const isDone = work.status === 'completed';
 
   return (
     <div
       className={cn(
         'bg-white rounded-xl border-2 p-4 transition-all',
-        isRunning
-          ? 'border-orange-500 shadow-lg shadow-orange-100'
-          : isPendingApproval
-            ? 'border-amber-300 bg-amber-50/30'
-            : isRejected
-              ? 'border-red-200 bg-red-50/30 opacity-60'
-              : 'border-slate-100',
+        isDone
+          ? 'border-slate-100 bg-slate-50/50'
+          : 'border-orange-500 shadow-lg shadow-orange-100',
       )}
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <p className="text-sm font-black text-slate-900 leading-tight">{workName}</p>
-            {isExtraWork && (
-              <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
-                Доп.
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {normMins > 0 && (
@@ -796,46 +675,23 @@ function WorkCard({
         </span>
       </div>
 
-      {canWork && (
-        <div className="flex gap-2 mt-3">
-          {isRunning ? (
-            <>
-              <button
-                onClick={() => onStop('paused')}
-                disabled={isStopping}
-                className="flex-1 bg-slate-100 text-slate-900 rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
-              >
-                ⏸ Пауза
-              </button>
-              <button
-                onClick={() => onStop('completed')}
-                disabled={isStopping}
-                className="flex-[1.5] bg-green-600 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
-              >
-                ✓ Завершить
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={onStart}
-              disabled={isStarting}
-              className="flex-1 bg-zinc-900 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-zinc-400"
-            >
-              ▶ Начать работу
-            </button>
-          )}
+      {!isDone && (
+        <div className="mt-3">
+          <button
+            onClick={onCompleteClick}
+            className="w-full bg-green-600 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+          >
+            ✓ Указать время и завершить
+          </button>
         </div>
       )}
 
-      {isPendingApproval && (
-        <div className="mt-3 bg-amber-100 rounded-lg px-3 py-2 text-xs font-bold text-amber-700 text-center">
-          ⏳ Ожидаем одобрения администратора
-        </div>
-      )}
-
-      {work.status === 'completed' && !isRunning && !isPendingApproval && (
-        <div className="mt-2 text-center py-1 text-green-600 font-black text-xs uppercase">
-          ✓ Работа выполнена
+      {isDone && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400 font-bold uppercase">Потрачено времени</span>
+            <span className="font-black text-slate-900">{work.actual_minutes || 0} мин</span>
+          </div>
         </div>
       )}
     </div>
@@ -868,10 +724,9 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [now, setNow] = useState(() => Date.now());
   const [showAddWork, setShowAddWork] = useState(false);
   const [showAddPart, setShowAddPart] = useState(false);
-  const [showExtraWork, setShowExtraWork] = useState(false);
+  const [workToComplete, setWorkToComplete] = useState<WorkItem | null>(null);
   const [acceptError, setAcceptError] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
@@ -884,35 +739,20 @@ export default function OrderDetailPage() {
     refetchInterval: 15000,
   });
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const startMutation = useMutation({
-    mutationFn: async (workId: string) => {
-      const res = await fetch(`/api/mechanic/orders/${id}/work/${workId}/start`, {
+  const completeWorkMutation = useMutation({
+    mutationFn: async ({ workId, actual_minutes }: { workId: string; actual_minutes: number }) => {
+      const res = await fetch(`/api/mechanic/orders/${id}/work/${workId}/complete`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actual_minutes }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка запуска');
-      }
+      if (!res.ok) throw new Error('Ошибка завершения');
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-detail', id] }),
-  });
-
-  const stopMutation = useMutation({
-    mutationFn: async ({ workId, status }: { workId: string; status: 'paused' | 'completed' }) => {
-      const res = await fetch(`/api/mechanic/orders/${id}/work/${workId}/stop`, {
-        method: 'POST',
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error('Ошибка остановки');
-      return res.json();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      setWorkToComplete(null);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-detail', id] }),
   });
 
   const acceptMutation = useMutation({
@@ -955,16 +795,10 @@ export default function OrderDetailPage() {
   if (isLoading) return <div className="p-4 animate-pulse text-sm text-slate-400">Загрузка...</div>;
   if (!order) return <div className="p-4 text-sm text-red-500">Наряд не найден</div>;
 
-  const activeWorks = order.works.filter(
-    (w) => w.status !== 'cancelled' && w.extra_work_status !== 'rejected',
-  );
-  const hasPendingExtraWork = order.works.some((w) => w.extra_work_status === 'pending_approval');
-  const allWorksComplete =
-    activeWorks.length > 0 &&
-    activeWorks.every(
-      (w) => w.status === 'completed' || w.extra_work_status === 'pending_approval',
-    );
-  const canComplete = allWorksComplete && !hasPendingExtraWork && order.status === 'in_progress';
+  const canComplete =
+    order.works.length > 0 &&
+    order.works.every((w) => w.status === 'completed') &&
+    order.status === 'in_progress';
   const needsAccept = order.status === 'created';
   const inProgress = order.status === 'in_progress';
   const isApproved = order.lifecycle_status === 'approved' && order.status === 'completed';
@@ -1042,14 +876,6 @@ export default function OrderDetailPage() {
               Работы ({activeWorks.length})
             </h2>
             <div className="flex gap-2">
-              {inProgress && (
-                <button
-                  onClick={() => setShowExtraWork(true)}
-                  className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform"
-                >
-                  ⚡ Доп. работа
-                </button>
-              )}
               {order.status !== 'completed' && (
                 <button
                   onClick={() => setShowAddWork(true)}
@@ -1078,15 +904,7 @@ export default function OrderDetailPage() {
           )}
 
           {order.works.map((work) => (
-            <WorkCard
-              key={work.id}
-              work={work}
-              now={now}
-              onStart={() => startMutation.mutate(work.id)}
-              onStop={(status) => stopMutation.mutate({ workId: work.id, status })}
-              isStarting={startMutation.isPending}
-              isStopping={stopMutation.isPending}
-            />
+            <WorkCard key={work.id} work={work} onCompleteClick={() => setWorkToComplete(work)} />
           ))}
         </section>
 
@@ -1154,22 +972,16 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {hasPendingExtraWork && inProgress && (
-        <div className="fixed bottom-0 left-0 right-0 z-[55] bg-amber-50 border-t border-amber-200 px-4 pt-3 pb-6">
-          <div className="text-center">
-            <p className="text-xs font-black text-amber-700 uppercase">
-              ⏳ Ожидаем одобрения доп. работы
-            </p>
-            <p className="text-[10px] text-amber-600 mt-0.5">
-              Наряд нельзя закрыть до ответа администратора
-            </p>
-          </div>
-        </div>
-      )}
-
       <AddWorkModal open={showAddWork} onClose={() => setShowAddWork(false)} orderId={id} />
       <AddPartModal open={showAddPart} onClose={() => setShowAddPart(false)} orderId={id} />
-      <ExtraWorkModal open={showExtraWork} onClose={() => setShowExtraWork(false)} orderId={id} />
+      <CompleteWorkModal
+        open={!!workToComplete}
+        work={workToComplete}
+        onClose={() => setWorkToComplete(null)}
+        onComplete={(minutes) =>
+          completeWorkMutation.mutate({ workId: workToComplete!.id, actual_minutes: minutes })
+        }
+      />
     </>
   );
 }
