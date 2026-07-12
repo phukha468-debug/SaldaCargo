@@ -650,28 +650,20 @@ function WorkCard({ work, onCompleteClick }: { work: WorkItem; onCompleteClick: 
           <div className="flex items-center gap-2 flex-wrap">
             {normMins > 0 && (
               <p className="text-[10px] font-bold text-slate-400 uppercase">
-                Норма: {normMins}м · Факт: {totalMinutes}м
+                Норма: {normMins}м {work.actual_minutes ? `· Факт: ${work.actual_minutes}м` : ''}
               </p>
             )}
-            {extraStatusLabel()}
           </div>
-          {isPendingApproval && work.extra_work_mechanic_note && (
-            <p className="text-[10px] text-amber-700 mt-1 italic">
-              «{work.extra_work_mechanic_note}»
-            </p>
-          )}
         </div>
         <span
           className={cn(
             'text-[9px] font-black uppercase px-2 py-1 rounded-full ml-2 shrink-0',
-            isRunning
-              ? 'bg-orange-600 text-white animate-pulse'
-              : work.status === 'completed'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-slate-100 text-slate-400',
+            work.status === 'completed'
+              ? 'bg-green-100 text-green-700'
+              : 'bg-slate-100 text-slate-500',
           )}
         >
-          {isRunning ? 'В работе' : work.status === 'completed' ? 'Готово' : 'В очереди'}
+          {work.status === 'completed' ? '✓ Готово' : 'В очереди'}
         </span>
       </div>
 
@@ -873,7 +865,7 @@ export default function OrderDetailPage() {
         <section className="px-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Работы ({activeWorks.length})
+              Работы ({order.works.length})
             </h2>
             <div className="flex gap-2">
               {order.status !== 'completed' && (

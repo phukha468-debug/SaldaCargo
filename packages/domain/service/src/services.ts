@@ -7,7 +7,7 @@ type Client = SupabaseClient<any>;
  * Получает сводку для главного экрана механика.
  */
 export async function getMechanicSummary(supabase: Client, mechanicId: string) {
-  // 1. Ищем активный наряд (где есть запущенный таймер)
+  // 1. Ищем активный наряд (должен быть один активный наряд)
   const { data: activeOrder } = await supabase
     .from('service_orders')
     .select(
@@ -17,11 +17,11 @@ export async function getMechanicSummary(supabase: Client, mechanicId: string) {
       client_vehicle_brand, client_vehicle_reg
     `,
     )
-    .eq('assigned_mechanic_id', mechanicId)
+    .or(`assigned_mechanic_id.eq.${mechanicId},status.eq.in_progress`)
     .eq('status', 'in_progress')
     .maybeSingle();
 
-  // 2. Считаем количество назначенных нарядов (не начатых)
+  // 2. Считаем количество назначенных нарядов (в очереди)
   const { count: assignedCount } = await supabase
     .from('service_orders')
     .select('*', { count: 'exact', head: true })
@@ -37,6 +37,7 @@ export async function getMechanicSummary(supabase: Client, mechanicId: string) {
     .from('service_orders')
     .select('*', { count: 'exact', head: true })
     .eq('assigned_mechanic_id', mechanicId)
+    .eq('lifecycle_status', 'approved')
     .eq('status', 'completed')
     .gte('updated_at', today.toISOString());
 
@@ -60,7 +61,7 @@ export async function getMechanicOrders(supabase: Client, mechanicId: string, st
       client_vehicle_brand, client_vehicle_reg
     `,
     )
-    .eq('assigned_mechanic_id', mechanicId)
+    .or(`assigned_mechanic_id.eq.${mechanicId},status.eq.in_progress`)
     .order('priority', { ascending: false })
     .order('created_at', { ascending: false });
 
