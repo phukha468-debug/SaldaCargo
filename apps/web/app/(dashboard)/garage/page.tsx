@@ -685,7 +685,6 @@ function OrderDetailModal({
   const backdropMouseDownOnSelf = useRef(false);
   const [editNote, setEditNote] = useState<string | null>(null);
   const [editMechanic, setEditMechanic] = useState<string | null>(null);
-  const [editSecondMechanic, setEditSecondMechanic] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
@@ -722,13 +721,6 @@ function OrderDetailModal({
     staleTime: 30000,
   });
 
-  const { data: stoSettings } = useQuery<SettingsData>({
-    queryKey: ['garage-settings'],
-    queryFn: () => fetch('/api/garage/settings').then((r) => r.json()),
-    staleTime: 300000,
-    enabled: showCloseDialog,
-  });
-
   const patchMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
       const r = await fetch(`/api/garage/orders/${orderId}`, {
@@ -755,38 +747,6 @@ function OrderDetailModal({
   });
 
   const isClosed = order?.lifecycle_status === 'approved';
-
-  // Заполняем поля ЗП расчётными значениями, когда открывается диалог закрытия
-  useEffect(() => {
-    if (!showCloseDialog || !order || !stoSettings) return;
-    const hourlyRate = parseFloat(
-      order.machine_type === 'own'
-        ? (stoSettings.sto.hourly_rate_own ?? '1600')
-        : (stoSettings.sto.hourly_rate ?? '2000'),
-    );
-    const unpaidMinutes = order.works
-      .filter((w) => w.status === 'completed' && !w.salary_paid)
-      .reduce((s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0)), 0);
-    const unpaidHours = unpaidMinutes / 60;
-    const mech1 =
-      editMechanic !== null
-        ? (mechanics.find((m) => m.id === editMechanic) ?? null)
-        : order.mechanic;
-    const mech2 =
-      editSecondMechanic !== null
-        ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
-        : order.second_mechanic;
-    const hasTwo = !!(mech1 && mech2);
-    const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
-
-    const getPct = (mechId: string | undefined) => {
-      const fromSettings = stoSettings.mechanics.find((m) => m.id === mechId);
-      return parseFloat(fromSettings?.mechanic_salary_pct ?? '50');
-    };
-
-    if (mech1) setClosePay1(Math.round((hours * hourlyRate * getPct(mech1.id)) / 100).toString());
-    if (mech2) setClosePay2(Math.round((hours * hourlyRate * getPct(mech2.id)) / 100).toString());
-  }, [showCloseDialog, stoSettings]);
 
   const { data: workCatalog = [] } = useQuery<
     Array<{
@@ -1985,8 +1945,6 @@ function OrderDetailModal({
               {!isClosed && allWorksCompleted && (
                 <button
                   onClick={() => {
-                    setClosePay1('');
-                    setClosePay2('');
                     setShowCloseDialog(true);
                   }}
                   disabled={patchMutation.isPending}
@@ -3418,7 +3376,7 @@ function AiImportModal({
   const [pasted, setPasted] = useState('');
   const [parsed, setParsed] = useState<AiParsed | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [selectedMechanic, setSelectedMechanic] = useState('');
+
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
   const [creating, setCreating] = useState(false);
@@ -3446,10 +3404,7 @@ function AiImportModal({
       setCreateError('Выберите или создайте автомобиль клиента');
       return;
     }
-    if (!selectedMechanic) {
-      setCreateError('Назначьте исполнителя');
-      return;
-    }
+
     setCreating(true);
     setCreateError(null);
     try {
@@ -3459,7 +3414,7 @@ function AiImportModal({
         body: JSON.stringify({
           order: {
             ...parsed.order,
-            assigned_mechanic_id: selectedMechanic || undefined,
+
             asset_id: parsed.order.machine_type === 'own' ? selectedAssetId : undefined,
             client_vehicle_id:
               parsed.order.machine_type === 'client' ? selectedClientVehicle?.id : undefined,
@@ -3490,8 +3445,7 @@ function AiImportModal({
   const canCreate =
     !creating &&
     !!parsed &&
-    (parsed.order.machine_type === 'own' ? !!selectedAssetId : !!selectedClientVehicle) &&
-    !!selectedMechanic;
+    (parsed.order.machine_type === 'own' ? !!selectedAssetId : !!selectedClientVehicle);
 
   return (
     <div
@@ -3779,29 +3733,6 @@ function AiImportModal({
                     )}
                   </div>
                 )}
-
-                {/* Механик */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                    Исполнитель *
-                  </label>
-                  <select
-                    value={selectedMechanic}
-                    onChange={(e) => setSelectedMechanic(e.target.value)}
-                    className={cn(
-                      'w-full border rounded-xl px-3 py-2.5 text-sm bg-white',
-                      !selectedMechanic ? 'border-red-300 bg-red-50' : 'border-slate-200',
-                    )}
-                  >
-                    <option value="">— Выберите механика —</option>
-                    {mechanics.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!selectedMechanic && <p className="text-xs text-red-500 mt-1">Обязательно</p>}
-                </div>
 
                 {createError && (
                   <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
@@ -4907,7 +4838,6 @@ function WorkOrdersSection() {
       {showAiImport && (
         <AiImportModal
           onClose={() => setShowAiImport(false)}
-          mechanics={mechanics}
           assets={assets}
           onCreated={(id) => {
             qc.invalidateQueries({ queryKey: ['garage-orders'] });
