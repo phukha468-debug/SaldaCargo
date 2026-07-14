@@ -787,9 +787,10 @@ export default function OrderDetailPage() {
   if (isLoading) return <div className="p-4 animate-pulse text-sm text-slate-400">Загрузка...</div>;
   if (!order) return <div className="p-4 text-sm text-red-500">Наряд не найден</div>;
 
+  const safeWorks = order.works || [];
   const canComplete =
-    order.works.length > 0 &&
-    order.works.every((w) => w.status === 'completed') &&
+    safeWorks.length > 0 &&
+    safeWorks.every((w) => w.status === 'completed') &&
     order.status === 'in_progress';
   const needsAccept = order.status === 'created';
   const inProgress = order.status === 'in_progress';
@@ -865,7 +866,7 @@ export default function OrderDetailPage() {
         <section className="px-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Работы ({order.works.length})
+              Работы ({safeWorks.length})
             </h2>
             <div className="flex gap-2">
               {order.status !== 'completed' && (
@@ -879,12 +880,12 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {order.works.length === 0 && !inProgress && (
+          {safeWorks.length === 0 && !inProgress && (
             <p className="text-center text-xs text-slate-400 font-bold italic py-4">
               Работы не добавлены
             </p>
           )}
-          {inProgress && order.works.length === 0 && (
+          {inProgress && safeWorks.length === 0 && (
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-xs font-black text-blue-600 uppercase tracking-wide mb-1">
                 Что делать дальше
@@ -895,7 +896,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {order.works.map((work) => (
+          {safeWorks.map((work) => (
             <WorkCard key={work.id} work={work} onCompleteClick={() => setWorkToComplete(work)} />
           ))}
         </section>
@@ -904,7 +905,7 @@ export default function OrderDetailPage() {
         <section className="px-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Запчасти ({order.parts.length})
+              Запчасти ({(order.parts || []).length})
             </h2>
             {order.status !== 'completed' && (
               <button
@@ -916,12 +917,12 @@ export default function OrderDetailPage() {
             )}
           </div>
           <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-            {order.parts.length === 0 ? (
+            {(order.parts || []).length === 0 ? (
               <p className="p-4 text-center text-xs text-slate-400 font-bold italic">
                 Запчасти не списаны
               </p>
             ) : (
-              order.parts.map((p) => (
+              (order.parts || []).map((p) => (
                 <div key={p.id} className="p-3 flex items-center justify-between">
                   <span className="text-sm font-bold text-slate-700">{p.part.name}</span>
                   <span className="text-sm font-black text-slate-900">
