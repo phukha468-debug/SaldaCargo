@@ -84,6 +84,47 @@ function SalaryTab({ salary }: { salary: any }) {
     },
   });
 
+  const unpaidAccruals = accruals.filter((a: any) => a.settlement_status !== 'completed');
+  const paidAccruals = accruals.filter((a: any) => a.settlement_status === 'completed');
+
+  const renderAccrual = (accrual: any) => {
+    const isPaid = accrual.settlement_status === 'completed';
+    const dateStr = accrual.date
+      ? new Date(accrual.date).toLocaleDateString('ru-RU', {
+          day: 'numeric',
+          month: 'long',
+        })
+      : '—';
+    return (
+      <div
+        key={accrual.id}
+        className="bg-white rounded-lg p-4 border border-zinc-200 flex justify-between items-center shadow-sm relative overflow-hidden"
+      >
+        <div
+          className={`absolute left-0 top-0 bottom-0 w-1 ${isPaid ? 'bg-green-500' : 'bg-zinc-400'}`}
+        />
+        <div className="pl-2">
+          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+            {accrual.label}
+          </p>
+          <p className="font-bold text-zinc-900 text-sm mt-0.5">
+            {accrual.trip_number ? `Рейс №${accrual.trip_number}` : '—'}
+            {accrual.asset_name ? ` · ${accrual.asset_name}` : ''}
+          </p>
+          <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">{dateStr}</p>
+        </div>
+        <div className="text-right">
+          <Money amount={accrual.amount} className="font-black text-sm text-zinc-900" />
+          <p
+            className={`text-[9px] font-black uppercase mt-1 ${isPaid ? 'text-green-600' : 'text-zinc-400'}`}
+          >
+            {isPaid ? '✓ Выплачено' : 'К выплате'}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Секция подтверждения ЗП */}
@@ -187,53 +228,35 @@ function SalaryTab({ salary }: { salary: any }) {
         )}
       </div>
 
-      {/* История начислений за месяц */}
-      <div className="space-y-3">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
-          Начислено в этом месяце
-        </h2>
-        {accruals.length === 0 ? (
-          <p className="text-center py-10 text-zinc-400 font-bold uppercase text-xs">
-            Начислений нет
-          </p>
-        ) : (
-          accruals.map((accrual: any) => {
-            const isPaid = accrual.settlement_status === 'completed';
-            const dateStr = accrual.date
-              ? new Date(accrual.date).toLocaleDateString('ru-RU', {
-                  day: 'numeric',
-                  month: 'long',
-                })
-              : '—';
-            return (
-              <div
-                key={accrual.id}
-                className="bg-white rounded-lg p-4 border border-zinc-200 flex justify-between items-center shadow-sm relative overflow-hidden"
-              >
-                <div
-                  className={`absolute left-0 top-0 bottom-0 w-1 ${isPaid ? 'bg-green-500' : 'bg-zinc-400'}`}
-                />
-                <div className="pl-2">
-                  <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                    {accrual.label}
-                  </p>
-                  <p className="font-bold text-zinc-900 text-sm mt-0.5">
-                    {accrual.trip_number ? `Рейс №${accrual.trip_number}` : '—'}
-                    {accrual.asset_name ? ` · ${accrual.asset_name}` : ''}
-                  </p>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">{dateStr}</p>
-                </div>
-                <div className="text-right">
-                  <Money amount={accrual.amount} className="font-black text-sm text-zinc-900" />
-                  <p
-                    className={`text-[9px] font-black uppercase mt-1 ${isPaid ? 'text-green-600' : 'text-zinc-400'}`}
-                  >
-                    {isPaid ? '✓ Выплачено' : 'К выплате'}
-                  </p>
-                </div>
-              </div>
-            );
-          })
+      {/* История начислений */}
+      <div className="space-y-6">
+        {unpaidAccruals.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
+              Ожидает выплаты
+            </h2>
+            {unpaidAccruals.map(renderAccrual)}
+          </div>
+        )}
+
+        {paidAccruals.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-[10px] font-black text-green-600 uppercase tracking-widest border-b-2 border-green-100 pb-2">
+              Уже выплачено
+            </h2>
+            {paidAccruals.map(renderAccrual)}
+          </div>
+        )}
+
+        {accruals.length === 0 && (
+          <div className="space-y-3">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
+              История начислений
+            </h2>
+            <p className="text-center py-10 text-zinc-400 font-bold uppercase text-xs">
+              За последние 10 дней начислений нет
+            </p>
+          </div>
         )}
       </div>
     </div>

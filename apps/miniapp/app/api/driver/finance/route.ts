@@ -64,7 +64,6 @@ export async function GET() {
 
   // 2. ЗП: транзакционная модель (обе роли: водитель и грузчик)
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   const [{ data: pendingConfirmation }, { data: accumulatedRows }, { data: monthlyAccruals }] =
     await Promise.all([
@@ -90,7 +89,7 @@ export async function GET() {
         .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .in('category_id', DRIVER_PAYROLL_CATS),
 
-      // История начислений за текущий месяц (подтверждённые)
+      // История начислений за последние 10 дней (подтверждённые)
       (supabase.from('transactions') as any)
         .select(
           `id, amount, description, category_id, settlement_status, transaction_date,
@@ -100,7 +99,7 @@ export async function GET() {
         .eq('lifecycle_status', 'approved')
         .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .in('category_id', DRIVER_PAYROLL_CATS)
-        .gte('transaction_date', monthStart)
+        .gte('transaction_date', new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
         .order('transaction_date', { ascending: false }),
     ]);
 
