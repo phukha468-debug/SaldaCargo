@@ -35,6 +35,7 @@ type DetailWork = {
   price_client: string | null;
   work_description: string | null;
   custom_work_name: string | null;
+  mechanic_id: string | null;
   work_catalog: { id: string; name: string; norm_minutes: number } | null;
   time_logs: Array<{ id: string; started_at: string; stopped_at: string | null; status: string }>;
 };
@@ -702,6 +703,7 @@ function OrderDetailModal({
   const [editWorkDesc, setEditWorkDesc] = useState('');
   const [editWorkQty, setEditWorkQty] = useState(1);
   const [editWorkPrice, setEditWorkPrice] = useState('');
+  const [editWorkMechanic, setEditWorkMechanic] = useState<string | null>(null);
   const [partPricesDraft, setPartPricesDraft] = useState<Record<string, string>>({});
   const [showAddPart, setShowAddPart] = useState(false);
   const [addPartName, setAddPartName] = useState('');
@@ -860,6 +862,7 @@ function OrderDetailModal({
         status?: string;
         work_description?: string | null;
         quantity?: number;
+        mechanic_id?: string | null;
       };
     }) =>
       fetch(`/api/garage/orders/${orderId}/works/${workId}`, {
@@ -1464,6 +1467,7 @@ function OrderDetailModal({
                                     (workCode ? (DEFAULT_WORK_DESCRIPTIONS[workCode] ?? '') : ''),
                                 );
                                 setEditWorkQty(w.quantity ?? 1);
+                                setEditWorkMechanic(w.mechanic_id ?? null);
                               }}
                               className="shrink-0 text-slate-300 group-hover:text-blue-500 transition-all duration-150 text-base hover:text-2xl hover:text-blue-700"
                               title="Редактировать"
@@ -1584,6 +1588,25 @@ function OrderDetailModal({
                                     />
                                   </div>
 
+                                  {/* Mechanic */}
+                                  <div>
+                                    <label className="text-xs text-slate-500 block mb-1">
+                                      Исполнитель
+                                    </label>
+                                    <select
+                                      value={editWorkMechanic ?? ''}
+                                      onChange={(e) => setEditWorkMechanic(e.target.value)}
+                                      className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white"
+                                    >
+                                      <option value="">— Не назначен —</option>
+                                      {mechanics.map((m) => (
+                                        <option key={m.id} value={m.id}>
+                                          {m.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
                                   {/* Actions */}
                                   <div className="flex gap-2">
                                     {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
@@ -1601,6 +1624,7 @@ function OrderDetailModal({
                                               price_client:
                                                 editPrice > 0 ? editPrice.toFixed(2) : undefined,
                                               work_description: editWorkDesc || null,
+                                              mechanic_id: editWorkMechanic || null,
                                               status: 'completed',
                                             },
                                           })
@@ -1626,6 +1650,7 @@ function OrderDetailModal({
                                               price_client:
                                                 editPrice > 0 ? editPrice.toFixed(2) : undefined,
                                               work_description: editWorkDesc || null,
+                                              mechanic_id: editWorkMechanic || null,
                                             },
                                           })
                                         }
