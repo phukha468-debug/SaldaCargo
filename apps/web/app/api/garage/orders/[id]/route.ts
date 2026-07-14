@@ -185,8 +185,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const unpaidWorks = (order.works ?? []).filter(
         (w: any) => w.status === 'completed' && !w.salary_paid,
       );
-      const hasManualPay =
-        body.mechanic_pay !== undefined || body.second_mechanic_pay !== undefined;
+      const manualPays = body.mechanic_pays as Record<string, number> | undefined;
+      const hasManualPay = manualPays && Object.keys(manualPays).length > 0;
 
       if (hasManualPay || unpaidWorks.length > 0) {
         const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
@@ -198,30 +198,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           .single();
         const createdBy = adminUser?.id ?? null;
         const txns: any[] = [];
-        const payMap: Record<string, string> = {};
+        const payMap: Record<string, string> = {}; // Keep empty unless needed for legacy
 
         if (hasManualPay) {
-          // Ручной ввод ЗП — использовать значения из запроса
-          for (const [mechData, payField, rawAmt] of [
-            [order.mechanic, 'mechanic_pay', body.mechanic_pay],
-            [order.second_mechanic, 'second_mechanic_pay', body.second_mechanic_pay],
-          ] as [any, string, unknown][]) {
-            if (!mechData?.id || rawAmt === undefined) continue;
-            const salary = parseFloat(rawAmt as string);
-            if (salary <= 0) continue;
-            payMap[payField] = salary.toFixed(2);
-            txns.push({
-              direction: 'expense',
-              lifecycle_status: 'approved',
-              settlement_status: 'pending',
-              amount: salary.toFixed(2),
-              category_id: CAT_PAYROLL_MECHANIC,
-              related_user_id: mechData.id,
-              service_order_id: id,
-              created_by: createdBy,
-              description: `ЗП механика ${mechData.name} — наряд #${order.order_number}`,
-              idempotency_key: crypto.randomUUID(),
-            });
+          const mechanicIds = Object.keys(manualPays);
+          if (mechanicIds.length > 0) {
+            const { data: mechs } = await (supabase as any)
+              .from('users')
+              .select('id, name')
+              .in('id', mechanicIds);
+
+            for (const mech of mechs || []) {
+              const salary = parseFloat(String(manualPays[mech.id]));
+              if (isNaN(salary) || salary <= 0) continue;
+
+              txns.push({
+                direction: 'expense',
+                lifecycle_status: 'approved',
+                settlement_status: 'pending',
+                amount: salary.toFixed(2),
+                category_id: CAT_PAYROLL_MECHANIC,
+                related_user_id: mech.id,
+                service_order_id: id,
+                created_by: createdBy,
+                description: `ЗП механика ${mech.name} — наряд #${order.order_number}`,
+                idempotency_key: crypto.randomUUID(),
+              });
+            }
           }
         } else {
           // Автоматический расчёт на основе нормо-часов для каждой неоплаченной работы отдельно

@@ -740,11 +740,38 @@ function OrderDetailModal({
       }
       setEditNote(null);
       setEditMechanic(null);
-      setEditSecondMechanic(null);
+
       setEditStatus(null);
       setEditPriority(null);
     },
   });
+
+  const [closePays, setClosePays] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!showCloseDialog || !order) return;
+    const defaults: Record<string, number> = {};
+    order.works.forEach((w) => {
+      if (w.status === 'cancelled' || w.salary_paid) return;
+      const mechs = [w.mechanic_id, w.second_mechanic_id].filter((x): x is string => !!x);
+      if (mechs.length === 0) return;
+      const workPrice = parseFloat(w.price_client ?? '0');
+      if (workPrice <= 0) return;
+      const basePrice = mechs.length === 2 ? workPrice / 2 : workPrice;
+      for (const mechId of mechs) {
+        const mech = mechanics.find((m) => m.id === mechId);
+        if (mech) {
+          const pct = parseFloat((mech as MechanicWithPct).mechanic_salary_pct ?? '50');
+          defaults[mechId] = (defaults[mechId] || 0) + (basePrice * pct) / 100;
+        }
+      }
+    });
+    const formatted: Record<string, string> = {};
+    for (const [id, val] of Object.entries(defaults)) {
+      formatted[id] = Math.round(val).toString();
+    }
+    setClosePays(formatted);
+  }, [showCloseDialog, order, mechanics]);
 
   const isClosed = order?.lifecycle_status === 'approved';
 
@@ -2120,10 +2147,37 @@ function OrderDetailModal({
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       Зарплата исполнителей
                     </p>
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm">
-                      Зарплата исполнителям рассчитывается и начисляется автоматически по каждой
-                      выполненной работе. Ручной ввод при закрытии наряда больше не требуется.
-                    </div>
+                    {Object.keys(closePays).length === 0 ? (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm">
+                        Нет неоплаченных работ для начисления зарплаты.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {Object.entries(closePays).map(([mechId, amount]) => {
+                          const mech = mechanics.find((m) => m.id === mechId);
+                          return (
+                            <div key={mechId} className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-semibold text-slate-700">
+                                {mech?.name ?? 'Исполнитель'}
+                              </span>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={amount}
+                                  onChange={(e) =>
+                                    setClosePays((prev) => ({ ...prev, [mechId]: e.target.value }))
+                                  }
+                                  className="w-32 border border-slate-200 rounded-lg px-3 py-1.5 text-right font-bold text-slate-900 focus:ring-2 focus:ring-slate-300 outline-none pr-8"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">
+                                  ₽
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2139,6 +2193,7 @@ function OrderDetailModal({
                     onClick={() => {
                       const updates: Record<string, unknown> = {
                         lifecycle_status: 'approved',
+                        mechanic_pays: closePays,
                       };
                       patchMutation.mutate(updates);
                       setShowCloseDialog(false);
