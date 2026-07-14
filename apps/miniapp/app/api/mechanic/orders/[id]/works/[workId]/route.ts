@@ -27,7 +27,7 @@ export async function PATCH(
   const supabase = createAdminClient();
 
   if (action === 'complete') {
-    const update: Record<string, any> = { status: 'completed' };
+    const update: Record<string, any> = { status: 'completed', mechanic_id: userId };
     if (actual_minutes !== undefined) update.actual_minutes = actual_minutes;
     if (mechanic_note) update.notes = mechanic_note;
 

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
@@ -16,6 +17,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (cat) normMinutes = cat.norm_minutes;
   }
 
+  const cookieStore = await cookies();
+  const userId = cookieStore.get('salda_user_id')?.value;
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
       service_order_id: orderId,
@@ -23,6 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       custom_work_name: body.custom_work_name ?? null,
       norm_minutes: normMinutes,
       status: 'pending',
+      mechanic_id: userId,
     })
     .select()
     .single();

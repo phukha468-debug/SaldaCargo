@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   const { data: orders } = await (supabase.from('service_orders') as any)
     .select(
-      'id, order_number, created_at, machine_type, assigned_mechanic_id, second_mechanic_id, asset:assets(short_name, reg_number), mechanic:users!service_orders_assigned_mechanic_id_fkey(name), second_mechanic:users!service_orders_second_mechanic_id_fkey(name), works:service_order_works(norm_minutes, actual_minutes, price_client, status, work_catalog:work_catalog(name)), parts:service_order_parts(quantity, unit_price, part:parts(name, unit))',
+      'id, order_number, created_at, machine_type, assigned_mechanic_id, second_mechanic_id, asset:assets(short_name, reg_number), mechanic:users!service_orders_assigned_mechanic_id_fkey(name), second_mechanic:users!service_orders_second_mechanic_id_fkey(name), works:service_order_works(mechanic_id, norm_minutes, actual_minutes, price_client, status, work_catalog:work_catalog(name)), parts:service_order_parts(quantity, unit_price, part:parts(name, unit))',
     )
     .eq('lifecycle_status', 'approved')
     .gte('created_at', `${startDate}T00:00:00Z`)
@@ -38,12 +38,32 @@ export async function GET(request: Request) {
       totalWorksCost = 0;
 
     for (const order of mechanicOrders) {
-      // Split hours/cost equally when two mechanics worked on the same order
-      const factor = order.second_mechanic_id ? 0.5 : 1;
+      // For legacy orders (no mechanic_id on works), split hours/cost equally when two mechanics worked
+      const legacyFactor = order.second_mechanic_id ? 0.5 : 1;
+
       for (const work of order.works ?? []) {
-        planNormHours += ((work.norm_minutes ?? 0) / 60) * factor;
-        factNormHours += ((work.actual_minutes ?? 0) / 60) * factor;
-        totalWorksCost += parseFloat(work.price_client ?? '0') * factor;
+        let isMyWork = false;
+        let factor = 0;
+
+        if (work.mechanic_id) {
+          // New way: specific mechanic assigned to this work
+          if (work.mechanic_id === m.id) {
+            isMyWork = true;
+            factor = 1;
+          }
+        } else {
+          // Legacy way: if I'm assigned to the order, I get a share
+          if (order.assigned_mechanic_id === m.id || order.second_mechanic_id === m.id) {
+            isMyWork = true;
+            factor = legacyFactor;
+          }
+        }
+
+        if (isMyWork) {
+          planNormHours += ((work.norm_minutes ?? 0) / 60) * factor;
+          factNormHours += ((work.actual_minutes ?? 0) / 60) * factor;
+          totalWorksCost += parseFloat(work.price_client ?? '0') * factor;
+        }
       }
     }
 
