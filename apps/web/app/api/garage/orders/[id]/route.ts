@@ -116,7 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           `id, lifecycle_status, order_number, machine_type,
            mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
            second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes)`,
+           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, mechanic_id, second_mechanic_id, price_client, custom_work_name, work_catalog:work_catalog(name))`,
         )
         .eq('id', id)
         .single();
@@ -224,45 +224,57 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             });
           }
         } else {
-          // Автоматический расчёт на основе нормо-часов
-          const { data: sto } = await (supabase as any)
-            .from('sto_settings')
-            .select('hourly_rate, hourly_rate_own')
-            .limit(1)
-            .single();
-          const hourlyRate = parseFloat(
-            order.machine_type === 'own'
-              ? (sto?.hourly_rate_own ?? '1600')
-              : (sto?.hourly_rate ?? '2000'),
-          );
-          const unpaidMinutes = unpaidWorks.reduce((s: number, w: any) => {
-            return s + (w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0));
-          }, 0);
-          const unpaidHours = unpaidMinutes / 60;
-          const hasTwo = !!order.second_mechanic;
+          // Автоматический расчёт на основе нормо-часов для каждой неоплаченной работы отдельно
+          // Сначала получим данные механиков для этих работ
+          const mechanicIds = [
+            ...new Set(
+              unpaidWorks
+                .flatMap((w: any) => [w.mechanic_id, w.second_mechanic_id])
+                .filter(Boolean),
+            ),
+          ];
 
-          for (const [mechData, payField] of [
-            [order.mechanic, 'mechanic_pay'],
-            [order.second_mechanic, 'second_mechanic_pay'],
-          ] as [any, string][]) {
-            if (!mechData?.id) continue;
-            const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
-            const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
-            const salary = (hours * hourlyRate * pct) / 100;
-            if (salary <= 0) continue;
-            payMap[payField] = salary.toFixed(2);
-            txns.push({
-              direction: 'expense',
-              lifecycle_status: 'approved',
-              settlement_status: 'pending',
-              amount: salary.toFixed(2),
-              category_id: CAT_PAYROLL_MECHANIC,
-              related_user_id: mechData.id,
-              service_order_id: id,
-              created_by: createdBy,
-              description: `ЗП механика ${mechData.name} — наряд #${order.order_number} (${hours.toFixed(1)} нч × ${hourlyRate} ₽ × ${pct}%)`,
-              idempotency_key: crypto.randomUUID(),
-            });
+          let specificMechanics: any[] = [];
+          if (mechanicIds.length > 0) {
+            const { data: mechs } = await (supabase as any)
+              .from('users')
+              .select('id, name, mechanic_salary_pct')
+              .in('id', mechanicIds);
+            if (mechs) specificMechanics = mechs;
+          }
+
+          for (const work of unpaidWorks) {
+            const workMechs = [work.mechanic_id, work.second_mechanic_id].filter(Boolean);
+            if (workMechs.length === 0) continue;
+
+            const workPrice = parseFloat(work.price_client ?? '0');
+            if (workPrice <= 0) continue;
+
+            const basePrice = workMechs.length === 2 ? workPrice / 2 : workPrice;
+            const workName = work.work_catalog?.name ?? work.custom_work_name ?? 'работа';
+
+            for (const mechId of workMechs) {
+              const mechData = specificMechanics.find((m) => m.id === mechId);
+              if (!mechData) continue;
+
+              const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
+              const salary = (basePrice * pct) / 100;
+
+              if (salary <= 0) continue;
+
+              txns.push({
+                direction: 'expense',
+                lifecycle_status: 'approved',
+                settlement_status: 'pending',
+                amount: salary.toFixed(2),
+                category_id: CAT_PAYROLL_MECHANIC,
+                related_user_id: mechData.id,
+                service_order_id: id,
+                created_by: createdBy,
+                description: `ЗП механика ${mechData.name} — наряд #${order.order_number}: ${workName} (${pct}% от ${basePrice.toLocaleString('ru-RU')} ₽)`,
+                idempotency_key: crypto.randomUUID(),
+              });
+            }
           }
         }
 

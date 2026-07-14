@@ -20,6 +20,7 @@ export async function PATCH(
     'work_description',
     'quantity',
     'mechanic_id',
+    'second_mechanic_id',
   ];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
@@ -76,7 +77,7 @@ export async function PATCH(
     .update(updates)
     .eq('id', workId)
     .select(
-      'id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name, work_catalog:work_catalog(id, name)',
+      'id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name, mechanic_id, second_mechanic_id, work_catalog:work_catalog(id, name)',
     )
     .single();
 
@@ -108,27 +109,32 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
   const txns: any[] = [];
   const workName = work.work_catalog?.name ?? work.custom_work_name ?? 'работа';
 
-  if (work.mechanic_id) {
-    // New logic: work is assigned to a specific mechanic
-    const { data: specificMech } = await (supabase.from('users') as any)
+  if (work.mechanic_id || work.second_mechanic_id) {
+    // New logic: work is assigned to specific mechanics
+    const specificMechIds = [work.mechanic_id, work.second_mechanic_id].filter(Boolean);
+    const { data: specificMechs } = await (supabase.from('users') as any)
       .select('id, name, mechanic_salary_pct')
-      .eq('id', work.mechanic_id)
-      .single();
+      .in('id', specificMechIds);
 
-    if (specificMech) {
-      const pct = parseFloat(specificMech.mechanic_salary_pct ?? '50');
-      const salary = (workPrice * pct) / 100;
-      if (salary > 0) {
-        txns.push({
-          direction: 'expense',
-          lifecycle_status: 'approved',
-          settlement_status: 'pending',
-          amount: salary.toFixed(2),
-          category_id: CAT_PAYROLL_MECHANIC,
-          related_user_id: specificMech.id,
-          description: `Долг механику — наряд #${order?.order_number}: ${workName} (${pct}% от ${workPrice.toLocaleString('ru-RU')} ₽)`,
-          idempotency_key: crypto.randomUUID(),
-        });
+    if (specificMechs && specificMechs.length > 0) {
+      const hasTwo = specificMechs.length === 2;
+      const basePrice = hasTwo ? workPrice / 2 : workPrice;
+
+      for (const specificMech of specificMechs) {
+        const pct = parseFloat(specificMech.mechanic_salary_pct ?? '50');
+        const salary = (basePrice * pct) / 100;
+        if (salary > 0) {
+          txns.push({
+            direction: 'expense',
+            lifecycle_status: 'approved',
+            settlement_status: 'pending',
+            amount: salary.toFixed(2),
+            category_id: CAT_PAYROLL_MECHANIC,
+            related_user_id: specificMech.id,
+            description: `Долг механику — наряд #${order?.order_number}: ${workName} (${pct}% от ${basePrice.toLocaleString('ru-RU')} ₽)`,
+            idempotency_key: crypto.randomUUID(),
+          });
+        }
       }
     }
   } else {

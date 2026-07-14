@@ -36,6 +36,7 @@ type DetailWork = {
   work_description: string | null;
   custom_work_name: string | null;
   mechanic_id: string | null;
+  second_mechanic_id: string | null;
   work_catalog: { id: string; name: string; norm_minutes: number } | null;
   time_logs: Array<{ id: string; started_at: string; stopped_at: string | null; status: string }>;
 };
@@ -688,8 +689,7 @@ function OrderDetailModal({
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
-  const [closePay1, setClosePay1] = useState('');
-  const [closePay2, setClosePay2] = useState('');
+
   const [showAddWork, setShowAddWork] = useState(false);
   const [workSearch, setWorkSearch] = useState('');
   const [workCatFilter, setWorkCatFilter] = useState<string | null>(null);
@@ -704,6 +704,7 @@ function OrderDetailModal({
   const [editWorkQty, setEditWorkQty] = useState(1);
   const [editWorkPrice, setEditWorkPrice] = useState('');
   const [editWorkMechanic, setEditWorkMechanic] = useState<string | null>(null);
+  const [editWorkSecondMechanic, setEditWorkSecondMechanic] = useState<string | null>(null);
   const [partPricesDraft, setPartPricesDraft] = useState<Record<string, string>>({});
   const [showAddPart, setShowAddPart] = useState(false);
   const [addPartName, setAddPartName] = useState('');
@@ -863,6 +864,7 @@ function OrderDetailModal({
         work_description?: string | null;
         quantity?: number;
         mechanic_id?: string | null;
+        second_mechanic_id?: string | null;
       };
     }) =>
       fetch(`/api/garage/orders/${orderId}/works/${workId}`, {
@@ -1168,60 +1170,7 @@ function OrderDetailModal({
                   )}
                 </div>
               </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Исполнитель 1</p>
-                <select
-                  value={editMechanic ?? order.mechanic?.id ?? ''}
-                  onChange={(e) => setEditMechanic(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">— Не назначен —</option>
-                  {mechanics.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                {editMechanic !== null && editMechanic !== (order.mechanic?.id ?? '') && (
-                  <button
-                    onClick={() =>
-                      patchMutation.mutate({ assigned_mechanic_id: editMechanic || null })
-                    }
-                    disabled={patchMutation.isPending}
-                    className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
-                  >
-                    Сохранить
-                  </button>
-                )}
-              </div>
 
-              <div>
-                <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">Исполнитель 2</p>
-                <select
-                  value={editSecondMechanic ?? order.second_mechanic?.id ?? ''}
-                  onChange={(e) => setEditSecondMechanic(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">— Не назначен —</option>
-                  {mechanics.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                {editSecondMechanic !== null &&
-                  editSecondMechanic !== (order.second_mechanic?.id ?? '') && (
-                    <button
-                      onClick={() =>
-                        patchMutation.mutate({ second_mechanic_id: editSecondMechanic || null })
-                      }
-                      disabled={patchMutation.isPending}
-                      className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
-                    >
-                      Сохранить
-                    </button>
-                  )}
-              </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-slate-500 font-semibold uppercase">
@@ -1468,6 +1417,7 @@ function OrderDetailModal({
                                 );
                                 setEditWorkQty(w.quantity ?? 1);
                                 setEditWorkMechanic(w.mechanic_id ?? null);
+                                setEditWorkSecondMechanic(w.second_mechanic_id ?? null);
                               }}
                               className="shrink-0 text-slate-300 group-hover:text-blue-500 transition-all duration-150 text-base hover:text-2xl hover:text-blue-700"
                               title="Редактировать"
@@ -1589,22 +1539,46 @@ function OrderDetailModal({
                                   </div>
 
                                   {/* Mechanic */}
-                                  <div>
-                                    <label className="text-xs text-slate-500 block mb-1">
-                                      Исполнитель
-                                    </label>
-                                    <select
-                                      value={editWorkMechanic ?? ''}
-                                      onChange={(e) => setEditWorkMechanic(e.target.value)}
-                                      className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white"
-                                    >
-                                      <option value="">— Не назначен —</option>
-                                      {mechanics.map((m) => (
-                                        <option key={m.id} value={m.id}>
-                                          {m.name}
-                                        </option>
-                                      ))}
-                                    </select>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-xs text-slate-500 block mb-1">
+                                        Исполнитель
+                                      </label>
+                                      <select
+                                        value={editWorkMechanic ?? ''}
+                                        onChange={(e) => setEditWorkMechanic(e.target.value)}
+                                        className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white"
+                                      >
+                                        <option value="">— Не назначен —</option>
+                                        {mechanics.map((m) => (
+                                          <option key={m.id} value={m.id}>
+                                            {m.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-slate-500 block mb-1">
+                                        2-й исполнитель (опц.)
+                                      </label>
+                                      <select
+                                        value={editWorkSecondMechanic ?? ''}
+                                        onChange={(e) => setEditWorkSecondMechanic(e.target.value)}
+                                        className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white"
+                                        disabled={!editWorkMechanic}
+                                      >
+                                        <option value="">— Нет —</option>
+                                        {mechanics.map((m) => (
+                                          <option
+                                            key={m.id}
+                                            value={m.id}
+                                            disabled={m.id === editWorkMechanic}
+                                          >
+                                            {m.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
                                   </div>
 
                                   {/* Actions */}
@@ -1625,6 +1599,7 @@ function OrderDetailModal({
                                                 editPrice > 0 ? editPrice.toFixed(2) : undefined,
                                               work_description: editWorkDesc || null,
                                               mechanic_id: editWorkMechanic || null,
+                                              second_mechanic_id: editWorkSecondMechanic || null,
                                               status: 'completed',
                                             },
                                           })
@@ -1651,6 +1626,7 @@ function OrderDetailModal({
                                                 editPrice > 0 ? editPrice.toFixed(2) : undefined,
                                               work_description: editWorkDesc || null,
                                               mechanic_id: editWorkMechanic || null,
+                                              second_mechanic_id: editWorkSecondMechanic || null,
                                             },
                                           })
                                         }
@@ -1667,6 +1643,14 @@ function OrderDetailModal({
                                       Отмена
                                     </button>
                                   </div>
+                                  {patchWorkMutation.isError && (
+                                    <div className="text-xs text-red-600 font-semibold bg-red-50 px-3 py-2 rounded-lg border border-red-100">
+                                      Ошибка:{' '}
+                                      {patchWorkMutation.error instanceof Error
+                                        ? patchWorkMutation.error.message
+                                        : 'Неизвестная ошибка'}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}
@@ -2019,14 +2003,6 @@ function OrderDetailModal({
         {showCloseDialog &&
           order &&
           (() => {
-            const mech1 =
-              editMechanic !== null
-                ? (mechanics.find((m) => m.id === editMechanic) ?? null)
-                : order.mechanic;
-            const mech2 =
-              editSecondMechanic !== null
-                ? (mechanics.find((m) => m.id === editSecondMechanic) ?? null)
-                : order.second_mechanic;
             const worksTotal = order.works
               .filter((w) => w.status !== 'cancelled')
               .reduce((s, w) => s + parseFloat(w.price_client ?? '0'), 0);
@@ -2038,9 +2014,23 @@ function OrderDetailModal({
             const totalActMin = order.works
               .filter((w) => w.status === 'completed')
               .reduce((s, w) => s + (w.actual_minutes > 0 ? w.actual_minutes : w.norm_minutes), 0);
-            const pay1 = parseFloat(closePay1 || '0');
-            const pay2 = parseFloat(closePay2 || '0');
-            const totalPay = pay1 + pay2;
+
+            let totalPay = 0;
+            order.works.forEach((w) => {
+              if (w.status === 'cancelled') return;
+              const mechs = [w.mechanic_id, w.second_mechanic_id].filter(Boolean);
+              if (mechs.length === 0) return;
+              const workPrice = parseFloat(w.price_client ?? '0');
+              if (workPrice <= 0) return;
+              const basePrice = mechs.length === 2 ? workPrice / 2 : workPrice;
+              for (const mechId of mechs) {
+                const mech = mechanics.find((m) => m.id === mechId);
+                if (mech) {
+                  const pct = parseFloat((mech as MechanicWithPct).mechanic_salary_pct ?? '50');
+                  totalPay += (basePrice * pct) / 100;
+                }
+              }
+            });
             const margin = orderTotal - totalPay;
             const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
 
@@ -2172,83 +2162,11 @@ function OrderDetailModal({
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       Зарплата исполнителей
                     </p>
-                    {mech1 ? (
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
-                          {mech1.name}
-                        </label>
-                        <div className="flex items-center gap-0 border border-slate-300 rounded-xl overflow-hidden focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-300">
-                          <input
-                            type="number"
-                            min="0"
-                            value={closePay1}
-                            onChange={(e) => setClosePay1(e.target.value)}
-                            onFocus={(e) => {
-                              if (e.target.value === '0') setClosePay1('');
-                            }}
-                            placeholder="0"
-                            className="flex-1 px-4 py-3 text-base font-bold outline-none bg-white"
-                          />
-                          <span className="px-4 py-3 text-slate-400 font-semibold bg-slate-50 border-l border-slate-200 text-sm select-none">
-                            ₽
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-amber-600 bg-amber-50 rounded-xl px-4 py-3">
-                        Исполнитель не назначен — зарплата не будет начислена.
-                      </p>
-                    )}
-                    {mech2 && (
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
-                          {mech2.name}
-                        </label>
-                        <div className="flex items-center gap-0 border border-slate-300 rounded-xl overflow-hidden focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-300">
-                          <input
-                            type="number"
-                            min="0"
-                            value={closePay2}
-                            onChange={(e) => setClosePay2(e.target.value)}
-                            onFocus={(e) => {
-                              if (e.target.value === '0') setClosePay2('');
-                            }}
-                            placeholder="0"
-                            className="flex-1 px-4 py-3 text-base font-bold outline-none bg-white"
-                          />
-                          <span className="px-4 py-3 text-slate-400 font-semibold bg-slate-50 border-l border-slate-200 text-sm select-none">
-                            ₽
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Итоговый расчёт */}
-                  {(mech1 || mech2) && (
-                    <div className="bg-slate-900 rounded-xl p-4 space-y-2 text-sm">
-                      {mech1 && pay1 > 0 && (
-                        <div className="flex justify-between text-slate-300">
-                          <span>{mech1.name}</span>
-                          <span className="font-bold text-white">{fmt(pay1)} ₽</span>
-                        </div>
-                      )}
-                      {mech2 && pay2 > 0 && (
-                        <div className="flex justify-between text-slate-300">
-                          <span>{mech2.name}</span>
-                          <span className="font-bold text-white">{fmt(pay2)} ₽</span>
-                        </div>
-                      )}
-                      {totalPay > 0 && (
-                        <div className="flex justify-between border-t border-slate-700 pt-2 mt-1">
-                          <span className="text-slate-400 text-xs uppercase tracking-wide font-semibold">
-                            Итого ЗП
-                          </span>
-                          <span className="font-black text-white text-base">{fmt(totalPay)} ₽</span>
-                        </div>
-                      )}
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm">
+                      Зарплата исполнителям рассчитывается и начисляется автоматически по каждой
+                      выполненной работе. Ручной ввод при закрытии наряда больше не требуется.
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Кнопки */}
@@ -2263,10 +2181,6 @@ function OrderDetailModal({
                     onClick={() => {
                       const updates: Record<string, unknown> = {
                         lifecycle_status: 'approved',
-                        assigned_mechanic_id: mech1?.id ?? null,
-                        second_mechanic_id: mech2?.id ?? null,
-                        mechanic_pay: closePay1 || '0',
-                        second_mechanic_pay: closePay2 || '0',
                       };
                       patchMutation.mutate(updates);
                       setShowCloseDialog(false);
@@ -2617,15 +2531,7 @@ function ClientVehicleSelector({
   );
 }
 
-function CreateOrderModal({
-  onClose,
-  mechanics,
-  assets,
-}: {
-  onClose: () => void;
-  mechanics: Mechanic[];
-  assets: Asset[];
-}) {
+function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: Asset[] }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
@@ -2638,9 +2544,7 @@ function CreateOrderModal({
       if (form.machine_type === 'client' && !selectedClientVehicle) {
         throw new Error('Выберите или создайте клиентский автомобиль');
       }
-      if (!form.assigned_mechanic_id) {
-        throw new Error('Назначьте исполнителя');
-      }
+
       const r = await fetch('/api/garage/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2750,29 +2654,6 @@ function CreateOrderModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Исполнитель *
-              </label>
-              <select
-                value={form.assigned_mechanic_id}
-                onChange={(e) => set('assigned_mechanic_id', e.target.value)}
-                className={cn(
-                  'w-full border rounded-lg px-3 py-2 text-sm',
-                  !form.assigned_mechanic_id ? 'border-red-400 bg-red-50' : 'border-slate-200',
-                )}
-              >
-                <option value="">— Выберите механика —</option>
-                {mechanics.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              {!form.assigned_mechanic_id && (
-                <p className="text-xs text-red-500 mt-0.5">Обязательно</p>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
                 Приоритет
               </label>
               <select
@@ -2812,7 +2693,6 @@ function CreateOrderModal({
               disabled={
                 createMutation.isPending ||
                 (form.machine_type === 'own' ? !form.asset_id : !selectedClientVehicle) ||
-                !form.assigned_mechanic_id ||
                 !form.problem_description.trim()
               }
               className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
@@ -3527,12 +3407,10 @@ function parseAiResponse(text: string): AiParsed | null {
 
 function AiImportModal({
   onClose,
-  mechanics,
   assets,
   onCreated,
 }: {
   onClose: () => void;
-  mechanics: Mechanic[];
   assets: Asset[];
   onCreated: (id: string) => void;
 }) {
@@ -5025,13 +4903,7 @@ function WorkOrdersSection() {
           </div>
         ))}
 
-      {showCreate && (
-        <CreateOrderModal
-          onClose={() => setShowCreate(false)}
-          mechanics={mechanics}
-          assets={assets}
-        />
-      )}
+      {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} assets={assets} />}
       {showAiImport && (
         <AiImportModal
           onClose={() => setShowAiImport(false)}
@@ -6487,11 +6359,6 @@ export default function GaragePage() {
     staleTime: 30000,
   });
 
-  const { data: mechanics = [] } = useQuery<Mechanic[]>({
-    queryKey: ['mechanics-list'],
-    queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
-    staleTime: 300000,
-  });
   const { data: assets = [] } = useQuery<Asset[]>({
     queryKey: ['assets-select'],
     queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
@@ -6517,13 +6384,7 @@ export default function GaragePage() {
         {section === 'clients' && <ClientsSection />}
         {section === 'settings' && <SettingsSection />}
       </main>
-      {showCreate && (
-        <CreateOrderModal
-          onClose={() => setShowCreate(false)}
-          mechanics={mechanics}
-          assets={assets}
-        />
-      )}
+      {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} assets={assets} />}
     </div>
   );
 }

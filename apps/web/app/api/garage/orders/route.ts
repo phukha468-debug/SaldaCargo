@@ -53,12 +53,16 @@ export async function GET(request: Request) {
       if (date) {
         q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
       } else if (month) {
-        const [y, m] = month.split('-').map(Number);
-        const start = `${month}-01T00:00:00.000Z`;
-        const nextM = m === 12 ? 1 : m + 1;
-        const nextY = m === 12 ? y + 1 : y;
-        const end = `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000Z`;
-        q = q.gte('created_at', start).lt('created_at', end);
+        const [yStr, mStr] = month.split('-');
+        const y = Number(yStr);
+        const m = Number(mStr);
+        if (!isNaN(y) && !isNaN(m)) {
+          const start = `${month}-01T00:00:00.000Z`;
+          const nextM = m === 12 ? 1 : m + 1;
+          const nextY = m === 12 ? y + 1 : y;
+          const end = `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000Z`;
+          q = q.gte('created_at', start).lt('created_at', end);
+        }
       }
 
       const { data, error } = await q;
@@ -121,9 +125,6 @@ export async function POST(request: Request) {
         { error: 'Выберите или создайте клиентский автомобиль' },
         { status: 400 },
       );
-    }
-    if (!body.assigned_mechanic_id) {
-      return NextResponse.json({ error: 'Назначьте исполнителя' }, { status: 400 });
     }
 
     const supabase = createAdminClient();
