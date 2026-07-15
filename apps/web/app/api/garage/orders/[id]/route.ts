@@ -29,6 +29,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         parts:service_order_parts(
           id, quantity, custom_part_name, unit, unit_price, client_price,
           part:parts(id, name, unit)
+        ),
+        transactions:transactions(
+          id, amount, description, category_id, related_user_id,
+          related_user:users!transactions_related_user_id_fkey(name)
         )
       `,
       )

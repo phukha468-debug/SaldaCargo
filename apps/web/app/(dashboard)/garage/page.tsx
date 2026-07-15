@@ -65,6 +65,14 @@ type OrderDetail = Omit<OrderRow, 'works' | 'mechanic'> & {
     client_price: string | null;
     part: { id: string; name: string; unit: string } | null;
   }>;
+  transactions?: Array<{
+    id: string;
+    amount: string;
+    description: string;
+    category_id: string;
+    related_user_id: string | null;
+    related_user: { name: string } | null;
+  }>;
 };
 
 type DashboardData = {
@@ -1859,32 +1867,61 @@ function OrderDetailModal({
                   <p className="text-sm text-slate-700">{order.mechanic_note}</p>
                 </div>
               )}
-              {order.lifecycle_status === 'approved' &&
-                (order.mechanic_pay || order.second_mechanic_pay) && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
-                      ЗП начислено
-                    </p>
-                    {order.mechanic_pay && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-700">{order.mechanic?.name ?? 'Механик'}</span>
-                        <span className="font-black text-emerald-700">
-                          <Money amount={order.mechanic_pay} />
-                        </span>
+              {order.lifecycle_status === 'approved' && (
+                <>
+                  {/* Старый формат ЗП (совместимость) */}
+                  {(order.mechanic_pay || order.second_mechanic_pay) && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
+                        ЗП начислено (стар. формат)
+                      </p>
+                      {order.mechanic_pay && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-700">
+                            {order.mechanic?.name ?? 'Механик'}
+                          </span>
+                          <span className="font-black text-emerald-700">
+                            <Money amount={order.mechanic_pay} />
+                          </span>
+                        </div>
+                      )}
+                      {order.second_mechanic_pay && (
+                        <div className="flex justify-between text-sm mt-1">
+                          <span className="text-slate-700">
+                            {order.second_mechanic?.name ?? 'Механик 2'}
+                          </span>
+                          <span className="font-black text-emerald-700">
+                            <Money amount={order.second_mechanic_pay} />
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Новый формат ЗП через транзакции */}
+                  {order.transactions &&
+                    order.transactions.filter(
+                      (tx) => tx.category_id === '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+                    ).length > 0 && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                        <p className="text-xs text-slate-500 mb-2 font-semibold uppercase">
+                          ЗП НАЧИСЛЕНО
+                        </p>
+                        {order.transactions
+                          .filter((tx) => tx.category_id === '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6')
+                          .map((tx) => (
+                            <div key={tx.id} className="flex justify-between text-sm mt-1">
+                              <span className="text-slate-700">
+                                {tx.related_user?.name ?? 'Исполнитель'}
+                              </span>
+                              <span className="font-black text-emerald-700">
+                                <Money amount={tx.amount} />
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     )}
-                    {order.second_mechanic_pay && (
-                      <div className="flex justify-between text-sm mt-1">
-                        <span className="text-slate-700">
-                          {order.second_mechanic?.name ?? 'Механик 2'}
-                        </span>
-                        <span className="font-black text-emerald-700">
-                          <Money amount={order.second_mechanic_pay} />
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                </>
+              )}
               <div className="border border-red-100 rounded-xl p-4 space-y-2">
                 {!showDeleteConfirm ? (
                   <div className="flex gap-2">
