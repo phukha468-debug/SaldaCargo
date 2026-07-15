@@ -13,9 +13,10 @@ const ALLOWED_CATEGORY_IDS = [
 export async function PATCH(req: Request, { params }: { params: Promise<{ txId: string }> }) {
   const { txId } = await params;
   const body = await req.json();
-  const amount = parseFloat(body.amount);
+  const amount = body.amount !== undefined ? parseFloat(body.amount) : undefined;
+  const employeeConfirmed = body.employee_confirmed;
 
-  if (isNaN(amount) || amount < 0) {
+  if (amount !== undefined && (isNaN(amount) || amount < 0)) {
     return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
   }
 
@@ -36,9 +37,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ txId: 
     );
   }
 
-  const { error } = await (supabase.from('transactions') as any)
-    .update({ amount: amount.toFixed(2) })
-    .eq('id', txId);
+  const updateData: any = {};
+  if (amount !== undefined) updateData.amount = amount.toFixed(2);
+  if (employeeConfirmed !== undefined) updateData.employee_confirmed = employeeConfirmed;
+
+  const { error } = await (supabase.from('transactions') as any).update(updateData).eq('id', txId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

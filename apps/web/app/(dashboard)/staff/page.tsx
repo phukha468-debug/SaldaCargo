@@ -661,6 +661,25 @@ function PayrollHistoryModal({
     }
   }
 
+  async function handleConfirmAdmin(txId: string) {
+    if (!confirm('Подтвердить это начисление за водителя?')) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`/api/staff/transactions/${txId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_confirmed: true }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      onChanged();
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDelete(txId: string, label: string) {
     if (!confirm(`Удалить запись «${label}»? Это действие необратимо.`)) return;
     setSaving(true);
@@ -755,10 +774,20 @@ function PayrollHistoryModal({
                           </p>
                         )}
                         {isPayroll && tx.employee_confirmed === false && (
-                          <p className="text-[9px] text-amber-600 font-bold mt-0.5 flex items-center gap-0.5">
-                            <span className="material-symbols-outlined text-[10px]">timer</span>
-                            ожидает подтверждения водителем
-                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="text-[9px] text-amber-600 font-bold flex items-center gap-0.5">
+                              <span className="material-symbols-outlined text-[10px]">timer</span>
+                              ожидает подтверждения
+                            </p>
+                            <button
+                              onClick={() => handleConfirmAdmin(tx.id)}
+                              disabled={saving}
+                              className="text-[9px] text-emerald-600 border border-emerald-200 rounded px-1.5 py-0.5 hover:bg-emerald-50 transition-colors"
+                              title="Подтвердить за водителя"
+                            >
+                              Подтвердить
+                            </button>
+                          </div>
                         )}
                         {isPayroll && tx.employee_confirmed === true && (
                           <p className="text-[9px] text-emerald-600 font-bold mt-0.5 flex items-center gap-0.5">

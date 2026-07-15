@@ -37,7 +37,6 @@ export async function GET(request: Request) {
         .eq('settlement_status', 'pending')
         .eq('related_user_id', userId)
         .in('category_id', PAYROLL_CATEGORY_IDS)
-        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .order('created_at', { ascending: true }),
 
       // Всего выдано авансов
@@ -124,7 +123,6 @@ export async function POST(request: Request) {
         .eq('settlement_status', 'pending')
         .eq('related_user_id', body.user_id)
         .in('category_id', PAYROLL_CATEGORY_IDS)
-        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .order('created_at', { ascending: true }),
 
       (supabase.from('transactions') as any)
