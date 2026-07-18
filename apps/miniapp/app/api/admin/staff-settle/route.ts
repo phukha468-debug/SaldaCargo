@@ -10,6 +10,7 @@ const PAYROLL_CATEGORY_IDS = [
   '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
 ];
+const WALLET_TRANSFER_CAT = 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93';
 
 /**
  * GET /api/admin/staff-settle?user_id=...&year=...&month=...
@@ -178,7 +179,7 @@ export async function POST(request: Request) {
       { data: userRow },
     ] = await Promise.all([
       (supabase.from('transactions') as any)
-        .select('id, amount, description, created_at')
+        .select('*')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'pending')
@@ -230,6 +231,8 @@ export async function POST(request: Request) {
 
     // Logic for partial payment or full payment
     let idsToSettle: string[];
+    let splitTxn: any = null;
+    let splitNeeded = 0;
     let actualPayout: number;
     let actualOffset: number;
 
@@ -240,21 +243,26 @@ export async function POST(request: Request) {
       );
       let accumulated = 0;
       idsToSettle = [];
-      for (const t of pendingPayroll as any[]) {
+      
+      const sorted = [...(pendingPayroll as any[])].sort(
+        (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
+      );
+
+      for (const t of sorted) {
         const amt = parseFloat(t.amount ?? '0');
         if (accumulated + amt <= requestedAmount + 0.001) {
           idsToSettle.push(t.id);
           accumulated += amt;
+        } else if (accumulated < requestedAmount) {
+          splitTxn = t;
+          splitNeeded = requestedAmount - accumulated;
+          accumulated += splitNeeded;
+          break;
         }
       }
-      if (idsToSettle.length === 0) {
-        const minAmount = Math.min(
-          ...(pendingPayroll as any[]).map((t: any) => parseFloat(t.amount ?? '0')),
-        );
+      if (idsToSettle.length === 0 && !splitTxn) {
         return NextResponse.json(
-          {
-            error: `Сумма слишком маленькая. Минимальное начисление: ${minAmount.toFixed(2)} ₽.`,
-          },
+          { error: 'Сумма выплаты слишком мала или равна нулю.' },
           { status: 400 },
         );
       }
@@ -275,15 +283,58 @@ export async function POST(request: Request) {
       year: 'numeric',
     });
 
-    const ops: Promise<any>[] = [
-      // Переводим выбранные начисления в completed
-      (supabase.from('transactions') as any)
-        .update({
+    const ops: Promise<any>[] = [];
+    
+    if (idsToSettle.length > 0) {
+      ops.push(
+        (supabase.from('transactions') as any)
+          .update({
+            settlement_status: 'completed',
+          })
+          .in('id', idsToSettle)
+      );
+    }
+
+    if (splitTxn) {
+      ops.push(
+        (supabase.from('transactions') as any)
+          .update({
+            amount: splitNeeded.toFixed(2),
+            settlement_status: 'completed',
+          })
+          .eq('id', splitTxn.id)
+      );
+
+      const remainder = parseFloat(splitTxn.amount ?? '0') - splitNeeded;
+      if (remainder > 0.001) {
+        const { id, created_at, updated_at, from_wallet_id, to_wallet_id, idempotency_key, settlement_status, amount, ...restFields } = splitTxn;
+        ops.push(
+          (supabase.from('transactions') as any).insert({
+            ...restFields,
+            amount: remainder.toFixed(2),
+            settlement_status: 'pending',
+            idempotency_key: crypto.randomUUID(),
+          })
+        );
+      }
+    }
+
+    if (actualPayout > 0 && body.from_wallet_id) {
+      ops.push(
+        (supabase.from('transactions') as any).insert({
+          direction: 'transfer',
+          category_id: WALLET_TRANSFER_CAT,
+          amount: actualPayout.toFixed(2),
+          from_wallet_id: body.from_wallet_id,
+          description: `Выплата зарплаты: ${employeeName} — ${dateLabel}`,
+          lifecycle_status: 'approved',
           settlement_status: 'completed',
-          from_wallet_id: actualPayout > 0 ? body.from_wallet_id : null,
+          related_user_id: body.user_id,
+          created_by: adminId,
+          idempotency_key: crypto.randomUUID(),
         })
-        .in('id', idsToSettle),
-    ];
+      );
+    }
 
     if (actualOffset > 0) {
       // Регистрируем зачёт аванса

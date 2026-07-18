@@ -4,6 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, Suspense, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
+import { DriverDocuments } from '@/components/DriverDocuments';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -737,6 +738,8 @@ function StaffDetailsModal({
             </p>
           </div>
         </div>
+
+        <DriverDocuments driverId={user.id} />
 
         {/* Accruals List */}
         <div className="space-y-3">

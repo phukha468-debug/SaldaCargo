@@ -5,7 +5,7 @@ import { useState, useRef } from 'react';
 import { Money } from '@saldacargo/ui';
 import { formatPhone } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
-
+import { DriverDocuments } from '@/components/DriverDocuments';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type UserRole =
@@ -334,6 +334,7 @@ function StaffModal({
               onChange={f('notes')}
             />
           </div>
+          {editUser && <DriverDocuments driverId={editUser.id} />}
           {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
         </div>
         <div className="px-6 pb-6 flex gap-3">
