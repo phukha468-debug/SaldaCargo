@@ -39,16 +39,6 @@ export async function POST(req: Request) {
 
     if (uploadError) throw uploadError;
 
-    // Insert to database using service role key (bypasses RLS)
-    const { error: dbError } = await supabase.from('driver_documents').insert({
-      driver_id: driverId,
-      file_name: file.name,
-      file_path: filePath,
-      file_type: fileExt,
-    });
-
-    if (dbError) throw dbError;
-
     return cors(NextResponse.json({ success: true }));
   } catch (err: any) {
     console.error('Upload error:', err);

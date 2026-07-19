@@ -34,14 +34,6 @@ export async function POST(req: Request) {
 
     if (storageError) throw storageError;
 
-    // Delete from DB
-    const { error: dbError } = await supabase
-      .from('driver_documents')
-      .delete()
-      .eq('id', id);
-
-    if (dbError) throw dbError;
-
     return cors(NextResponse.json({ success: true }));
   } catch (err: any) {
     console.error('Delete error:', err);

@@ -18,15 +18,16 @@ export function DriverDocuments({ driverId }: { driverId: string }) {
 
   const fetchDocuments = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('driver_documents')
-      .select('*')
-      .eq('driver_id', driverId)
-      .order('created_at', { ascending: false });
-    
-    if (data) setDocuments(data);
+    try {
+      const res = await fetch(`/api/driver-documents/list?driverId=${driverId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments(data);
+      }
+    } catch (e) {
+      console.error('Fetch docs error', e);
+    }
     setLoading(false);
-  };
 
   useEffect(() => {
     fetchDocuments();

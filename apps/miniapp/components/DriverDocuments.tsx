@@ -18,13 +18,16 @@ export function DriverDocuments({ driverId }: { driverId: string }) {
 
   const fetchDocuments = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('driver_documents')
-      .select('*')
-      .eq('driver_id', driverId)
-      .order('created_at', { ascending: false });
-    
-    if (data) setDocuments(data);
+    try {
+      const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+      const res = await fetch(`${webUrl}/api/driver-documents/list?driverId=${driverId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
     setLoading(false);
   };
 
