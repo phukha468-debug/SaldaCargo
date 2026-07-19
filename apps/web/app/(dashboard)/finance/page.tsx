@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Money } from '@saldacargo/ui';
 import { formatDate, formatPhone } from '@saldacargo/shared';
 
@@ -2867,25 +2868,44 @@ function LoansPanel() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        <Chip
-          label="Все"
-          active={activeChip === 'all'}
-          color="#3b82f6"
-          onClick={() => setActiveChip('all')}
-        />
-        <Chip
-          label="🏦 Кредиты"
-          active={activeChip === 'credit'}
-          color="#3b82f6"
-          onClick={() => setActiveChip('credit')}
-        />
-        <Chip
-          label="🚛 Лизинг"
-          active={activeChip === 'leasing'}
-          color="#0891b2"
-          onClick={() => setActiveChip('leasing')}
-        />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Chip
+            label="Все"
+            active={activeChip === 'all'}
+            color="#3b82f6"
+            onClick={() => setActiveChip('all')}
+          />
+          <Chip
+            label="🏦 Кредиты"
+            active={activeChip === 'credit'}
+            color="#3b82f6"
+            onClick={() => setActiveChip('credit')}
+          />
+          <Chip
+            label="🚛 Лизинг"
+            active={activeChip === 'leasing'}
+            color="#0891b2"
+            onClick={() => setActiveChip('leasing')}
+          />
+        </div>
+        <Link
+          href="/loans"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            background: '#0f172a',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 700,
+            padding: '6px 14px',
+            borderRadius: 8,
+            textDecoration: 'none',
+          }}
+        >
+          Управление кредитами
+        </Link>
       </div>
 
       <div
