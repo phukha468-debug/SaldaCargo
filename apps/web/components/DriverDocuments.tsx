@@ -38,28 +38,19 @@ export function DriverDocuments({ driverId }: { driverId: string }) {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${driverId}-${Date.now()}.${fileExt}`;
-      const filePath = `${driverId}/${fileName}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('driverId', driverId);
 
-      const { error: uploadError } = await supabase.storage
-        .from('driver-documents')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = await supabase.storage
-        .from('driver-documents')
-        .createSignedUrl(filePath, 315360000); // 10 years
-
-      if (!urlData) throw new Error('Could not generate URL');
-
-      await supabase.from('driver_documents').insert({
-        driver_id: driverId,
-        file_name: file.name,
-        file_path: filePath,
-        file_type: fileExt,
+      const res = await fetch('/api/driver-documents/upload', {
+        method: 'POST',
+        body: formData,
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
 
       await fetchDocuments();
     } catch (err: any) {
@@ -70,17 +61,14 @@ export function DriverDocuments({ driverId }: { driverId: string }) {
   };
 
   const handleDownload = async (filePath: string, fileName: string) => {
-    const { data, error } = await supabase.storage
-      .from('driver-documents')
-      .createSignedUrl(filePath, 60);
-
-    if (error || !data) {
-      alert('Ошибка получения ссылки');
-      return;
+    try {
+      const res = await fetch(`/api/driver-documents/url?filePath=${encodeURIComponent(filePath)}&expiresIn=60`);
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'Ошибка получения ссылки');
+      window.open(data.url, '_blank');
+    } catch (err: any) {
+      alert(err.message);
     }
-    
-    // Open in new tab (can view PDF/JPG or download)
-    window.open(data.signedUrl, '_blank');
   };
 
   const handleSendEmail = async () => {
@@ -105,20 +93,26 @@ export function DriverDocuments({ driverId }: { driverId: string }) {
   };
 
   const openEmailModal = async (filePath: string, fileName: string) => {
-    const { data, error } = await supabase.storage
-      .from('driver-documents')
-      .createSignedUrl(filePath, 3600); // valid for 1h for sending
-    
-    if (data) {
-      setEmailModal({ isOpen: true, docUrl: data.signedUrl, docName: fileName });
+    try {
+      const res = await fetch(`/api/driver-documents/url?filePath=${encodeURIComponent(filePath)}&expiresIn=3600`);
+      const data = await res.json();
+      if (data.url) {
+        setEmailModal({ isOpen: true, docUrl: data.url, docName: fileName });
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleDelete = async (id: string, filePath: string) => {
     if (!confirm('Удалить документ?')) return;
     try {
-      await supabase.storage.from('driver-documents').remove([filePath]);
-      await supabase.from('driver_documents').delete().eq('id', id);
+      const res = await fetch('/api/driver-documents/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, filePath }),
+      });
+      if (!res.ok) throw new Error('Delete failed');
       fetchDocuments();
     } catch (err) {
       console.error(err);
