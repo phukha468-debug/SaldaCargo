@@ -284,12 +284,14 @@ export async function POST(request: Request) {
     });
 
     const ops: Promise<any>[] = [];
+    const batchId = crypto.randomUUID();
     
     if (idsToSettle.length > 0) {
       ops.push(
         (supabase.from('transactions') as any)
           .update({
             settlement_status: 'completed',
+            idempotency_key: batchId,
           })
           .in('id', idsToSettle)
       );
@@ -301,6 +303,7 @@ export async function POST(request: Request) {
           .update({
             amount: splitNeeded.toFixed(2),
             settlement_status: 'completed',
+            idempotency_key: batchId,
           })
           .eq('id', splitTxn.id)
       );
@@ -331,7 +334,7 @@ export async function POST(request: Request) {
           settlement_status: 'completed',
           related_user_id: body.user_id,
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: batchId,
         })
       );
     }
@@ -348,7 +351,7 @@ export async function POST(request: Request) {
           settlement_status: 'completed',
           related_user_id: body.user_id,
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: batchId,
         }),
       );
     }
