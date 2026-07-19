@@ -198,6 +198,7 @@ export async function GET(request: Request) {
         max_user_id: u.max_user_id,
         phone: u.phone,
         notes: u.notes,
+        current_asset_id: u.current_asset_id,
         asset: u.current_asset_id ? (assetMap[u.current_asset_id] ?? null) : null,
         // Этот месяц
         shifts: shiftsThisMonthMap.get(u.id) ?? 0, // количество начислений за месяц
