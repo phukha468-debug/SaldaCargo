@@ -2904,7 +2904,7 @@ function LoansPanel() {
             textDecoration: 'none',
           }}
         >
-          Управление кредитами
+          + Добавить кредит
         </Link>
       </div>
 
