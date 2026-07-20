@@ -35,7 +35,8 @@ export async function GET() {
 
     for (const order of orders ?? []) {
       // counterparty takes priority over description — once linked, must group under counterparty
-      const hasCounterparty = !!order.counterparty?.id;
+      const isGenericClient = order.counterparty?.name === 'Частное лицо (разовый заказ)';
+      const hasCounterparty = !!order.counterparty?.id && !isGenericClient;
       const hasDescription = !hasCounterparty && !!order.description?.trim();
       const groupKey = hasCounterparty
         ? order.counterparty!.id

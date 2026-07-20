@@ -86,10 +86,25 @@ function calcTrip(trip: TripForReview) {
     (s, o) => s + parseFloat(o.loader_pay) + parseFloat(o.loader2_pay ?? '0'),
     0,
   );
+  const totalPayroll = driverPay + loaderPay;
+  const fuelExpense = expenses
+    .filter((e) => e.category?.name === 'ГСМ')
+    .reduce((s, e) => s + parseFloat(e.amount), 0);
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
   const mileage = trip.odometer_end ? trip.odometer_end - trip.odometer_start : 0;
   const profit = revenue - driverPay - loaderPay - totalExpenses;
-  return { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit };
+  return {
+    activeOrders,
+    expenses,
+    revenue,
+    driverPay,
+    loaderPay,
+    totalPayroll,
+    fuelExpense,
+    totalExpenses,
+    mileage,
+    profit,
+  };
 }
 
 function getWeekDates(dateStr: string) {
@@ -961,6 +976,7 @@ export default function ReviewPage() {
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('day');
   const queryClient = useQueryClient();
 
   const { data: trips = [], isLoading } = useQuery<TripForReview[]>({
@@ -1001,25 +1017,13 @@ export default function ReviewPage() {
     enabled: mode === 'history',
     staleTime: 120000,
     queryFn: async () => {
-      const res = await fetch(`/api/trips?lifecycle=approved&weekStart=${weekStart}&weekEnd=${weekEnd}`);
+      const res = await fetch(
+        `/api/trips?lifecycle=approved&weekStart=${weekStart}&weekEnd=${weekEnd}`,
+      );
       if (!res.ok) throw new Error('Ошибка загрузки');
       return res.json();
     },
   });
-
-  const weekRevenue = weekTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-  const weekCosts = weekTrips.reduce((s, t) => {
-    const c = calcTrip(t);
-    return s + c.driverPay + c.loaderPay + c.totalExpenses;
-  }, 0);
-  const weekProfit = weekTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
-
-  const monthRevenue = monthTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-  const monthCosts = monthTrips.reduce((s, t) => {
-    const c = calcTrip(t);
-    return s + c.driverPay + c.loaderPay + c.totalExpenses;
-  }, 0);
-  const monthProfit = monthTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -1085,10 +1089,6 @@ export default function ReviewPage() {
 
   // Aggregate stats
   const totalRevenue = trips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-  const totalCostsAll = trips.reduce((s, t) => {
-    const c = calcTrip(t);
-    return s + c.driverPay + c.loaderPay + c.totalExpenses;
-  }, 0);
   const totalProfit = trips.reduce((s, t) => s + calcTrip(t).profit, 0);
 
   return (
@@ -1250,182 +1250,154 @@ export default function ReviewPage() {
                 />
               ))}
 
-              {/* Daily totals strip */}
-              <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white">
-                <div className="px-4 py-2 border-b border-slate-700 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-slate-400 text-[16px]">
-                    summarize
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    Итого за день · {trips.length} рейс
-                    {trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}
-                  </span>
+              {/* Unified Stats Strip */}
+              <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
+                <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-slate-400 text-[16px]">
+                      summarize
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {mode === 'history'
+                        ? 'Итоговая статистика'
+                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}`}
+                    </span>
+                  </div>
+                  {mode === 'history' && (
+                    <div className="flex bg-slate-700 p-0.5 rounded-lg">
+                      <button
+                        onClick={() => setStatsPeriod('day')}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
+                          statsPeriod === 'day'
+                            ? 'bg-slate-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200',
+                        )}
+                      >
+                        День
+                      </button>
+                      <button
+                        onClick={() => setStatsPeriod('week')}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
+                          statsPeriod === 'week'
+                            ? 'bg-slate-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200',
+                        )}
+                      >
+                        Неделя
+                      </button>
+                      <button
+                        onClick={() => setStatsPeriod('month')}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
+                          statsPeriod === 'month'
+                            ? 'bg-slate-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200',
+                        )}
+                      >
+                        Месяц
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center px-4 py-3">
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="flex items-center">
-                      <div className="w-[100px] text-center">
-                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
-                          Выручка
-                        </span>
-                        <span className="text-base font-black text-white">
-                          <Money amount={totalRevenue.toFixed(2)} />
-                        </span>
-                      </div>
-                      <span className="w-5 text-center text-slate-600 text-sm">−</span>
-                      <div className="w-[100px] text-center">
-                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
-                          Расходы
-                        </span>
-                        <span className="text-base font-black text-rose-400">
-                          <Money amount={totalCostsAll.toFixed(2)} />
-                        </span>
-                      </div>
-                      <span className="w-5 text-center text-slate-600 text-sm">=</span>
-                      <div className="w-[100px] text-center">
-                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">
-                          Прибыль
-                        </span>
-                        <span
-                          className={cn(
-                            'text-lg font-black',
-                            totalProfit > 0
-                              ? 'text-emerald-400'
-                              : totalProfit < 0
-                                ? 'text-rose-400'
-                                : 'text-slate-400',
-                          )}
-                        >
-                          {totalProfit < 0 ? '−' : ''}
-                          <Money amount={Math.abs(totalProfit).toFixed(2)} />
-                        </span>
+
+                {(() => {
+                  const targetTrips =
+                    mode === 'history'
+                      ? statsPeriod === 'day'
+                        ? trips
+                        : statsPeriod === 'week'
+                          ? weekTrips
+                          : monthTrips
+                      : trips;
+
+                  const targetRevenue = targetTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
+                  const targetCosts = targetTrips.reduce((s, t) => {
+                    const c = calcTrip(t);
+                    return s + c.driverPay + c.loaderPay + c.totalExpenses;
+                  }, 0);
+                  const targetProfit = targetTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
+                  const targetFuel = targetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
+                  const targetPayroll = targetTrips.reduce(
+                    (s, t) => s + calcTrip(t).totalPayroll,
+                    0,
+                  );
+
+                  return (
+                    <div className="flex items-center px-4 py-3">
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="flex items-center gap-1 sm:gap-3 flex-wrap justify-center">
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Выручка
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-white">
+                              <Money amount={targetRevenue.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Зарплаты
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-amber-400">
+                              <Money amount={targetPayroll.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Топливо
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-blue-400">
+                              <Money amount={targetFuel.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">−</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Все расходы
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-rose-400">
+                              <Money amount={targetCosts.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">=</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Прибыль
+                            </span>
+                            <span
+                              className={cn(
+                                'text-base sm:text-lg font-black',
+                                targetProfit > 0
+                                  ? 'text-emerald-400'
+                                  : targetProfit < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-400',
+                              )}
+                            >
+                              {targetProfit < 0 ? '−' : ''}
+                              <Money amount={Math.abs(targetProfit).toFixed(2)} />
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {/* Weekly totals strip — history mode only */}
-      {mode === 'history' && weekTrips.length > 0 && (
-        <div className="rounded-2xl overflow-hidden border border-indigo-900/40 shadow-sm bg-indigo-950 text-white">
-          <div className="px-4 py-2 border-b border-indigo-900/60 flex items-center gap-2">
-            <span className="material-symbols-outlined text-indigo-500 text-[16px]">
-              date_range
-            </span>
-            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
-              Итого за неделю · {weekTrips.length} рейс
-              {weekTrips.length === 1 ? '' : weekTrips.length < 5 ? 'а' : 'ов'} ·{' '}
-              {new Date(weekStart + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} —{' '}
-              {new Date(weekEnd + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-            </span>
-          </div>
-          <div className="flex items-center px-4 py-3">
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center">
-                <div className="w-[100px] text-center">
-                  <span className="text-[8px] font-bold text-indigo-700 uppercase tracking-widest block">
-                    Выручка
-                  </span>
-                  <span className="text-base font-black text-white">
-                    <Money amount={weekRevenue.toFixed(2)} />
-                  </span>
-                </div>
-                <span className="w-5 text-center text-indigo-800 text-sm">−</span>
-                <div className="w-[100px] text-center">
-                  <span className="text-[8px] font-bold text-indigo-700 uppercase tracking-widest block">
-                    Расходы
-                  </span>
-                  <span className="text-base font-black text-rose-400">
-                    <Money amount={weekCosts.toFixed(2)} />
-                  </span>
-                </div>
-                <span className="w-5 text-center text-indigo-800 text-sm">=</span>
-                <div className="w-[100px] text-center">
-                  <span className="text-[8px] font-bold text-indigo-700 uppercase tracking-widest block">
-                    Прибыль
-                  </span>
-                  <span
-                    className={cn(
-                      'text-lg font-black',
-                      weekProfit > 0
-                        ? 'text-emerald-400'
-                        : weekProfit < 0
-                          ? 'text-rose-400'
-                          : 'text-indigo-400',
-                    )}
-                  >
-                    {weekProfit < 0 ? '−' : ''}
-                    <Money amount={Math.abs(weekProfit).toFixed(2)} />
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Monthly totals strip — history mode only */}
-      {mode === 'history' && monthTrips.length > 0 && (
-        <div className="rounded-2xl overflow-hidden border border-sky-900/40 shadow-sm bg-sky-950 text-white">
-          <div className="px-4 py-2 border-b border-sky-900/60 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sky-600 text-[16px]">
-              calendar_month
-            </span>
-            <span className="text-[10px] font-bold text-sky-700 uppercase tracking-widest">
-              Итого за месяц · {monthTrips.length} рейс
-              {monthTrips.length === 1 ? '' : monthTrips.length < 5 ? 'а' : 'ов'} ·{' '}
-              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ru-RU', {
-                month: 'long',
-                year: 'numeric',
-              })}
-            </span>
-          </div>
-          <div className="flex items-center px-4 py-3">
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center">
-                <div className="w-[100px] text-center">
-                  <span className="text-[8px] font-bold text-sky-800 uppercase tracking-widest block">
-                    Выручка
-                  </span>
-                  <span className="text-base font-black text-white">
-                    <Money amount={monthRevenue.toFixed(2)} />
-                  </span>
-                </div>
-                <span className="w-5 text-center text-sky-900 text-sm">−</span>
-                <div className="w-[100px] text-center">
-                  <span className="text-[8px] font-bold text-sky-800 uppercase tracking-widest block">
-                    Расходы
-                  </span>
-                  <span className="text-base font-black text-rose-400">
-                    <Money amount={monthCosts.toFixed(2)} />
-                  </span>
-                </div>
-                <span className="w-5 text-center text-sky-900 text-sm">=</span>
-                <div className="w-[100px] text-center">
-                  <span className="text-[8px] font-bold text-sky-800 uppercase tracking-widest block">
-                    Прибыль
-                  </span>
-                  <span
-                    className={cn(
-                      'text-lg font-black',
-                      monthProfit > 0
-                        ? 'text-emerald-400'
-                        : monthProfit < 0
-                          ? 'text-rose-400'
-                          : 'text-sky-500',
-                    )}
-                  >
-                    {monthProfit < 0 ? '−' : ''}
-                    <Money amount={Math.abs(monthProfit).toFixed(2)} />
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

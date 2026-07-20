@@ -15,7 +15,7 @@ import { Button } from '@saldacargo/ui';
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
   driver_pay: z.coerce.number().min(0),
-  payment_method: z.enum(['cash', 'qr', 'debt_cash']),
+  payment_method: z.enum(['cash', 'debt_cash']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
 });
@@ -52,14 +52,6 @@ const METHODS_INDIVIDUAL = [
     icon: '💵',
     wallet: '→ Касса',
     color: 'peer-checked:border-green-600 peer-checked:bg-green-50',
-  },
-  {
-    value: 'qr' as const,
-    label: 'QR / Безнал',
-    sublabel: 'Водитель видел эти деньги',
-    icon: '📱',
-    wallet: '→ Р/С',
-    color: 'peer-checked:border-blue-600 peer-checked:bg-blue-50',
   },
   {
     value: 'debt_cash' as const,

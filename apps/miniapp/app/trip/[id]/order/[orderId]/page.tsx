@@ -12,7 +12,7 @@ import { Button } from '@saldacargo/ui';
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
   driver_pay: z.coerce.number().min(0),
-  payment_method: z.enum(['cash', 'qr', 'debt_cash', 'card_driver']),
+  payment_method: z.enum(['cash', 'debt_cash', 'card_driver']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
 });
@@ -32,7 +32,6 @@ interface SelectedLoader {
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Наличные (сдаст)', icon: '💵' },
-  { value: 'qr', label: 'QR / Безнал (видел)', icon: '📱' },
   { value: 'card_driver', label: 'На карту', icon: '💳' },
   { value: 'debt_cash', label: 'Долг', icon: '⏳' },
 ] as const;
