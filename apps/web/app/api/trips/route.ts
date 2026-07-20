@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   const status = searchParams.get('status');
   const date = searchParams.get('date'); // YYYY-MM-DD
   const month = searchParams.get('month'); // YYYY-MM
+  const weekStart = searchParams.get('weekStart'); // YYYY-MM-DD
+  const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD
 
   const supabase = createAdminClient();
 
@@ -53,6 +55,10 @@ export async function GET(request: Request) {
     const start = new Date(Date.UTC(y, m - 1, 1)).toISOString();
     const end = new Date(Date.UTC(y, m, 1)).toISOString();
     query = query.gte('started_at', start).lt('started_at', end);
+  } else if (weekStart && weekEnd) {
+    const start = `${weekStart}T00:00:00Z`;
+    const end = `${weekEnd}T23:59:59Z`;
+    query = query.gte('started_at', start).lte('started_at', end);
   } else if (date) {
     const start = `${date}T00:00:00Z`;
     const end = `${date}T23:59:59Z`;

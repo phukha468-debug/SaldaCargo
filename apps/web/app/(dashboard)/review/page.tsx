@@ -92,6 +92,17 @@ function calcTrip(trip: TripForReview) {
   return { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit };
 }
 
+function getWeekDates(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dow = d.getDay();
+  const monOffset = dow === 0 ? -6 : 1 - dow;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + monOffset);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
+}
+
 // ── Date Navigation ─────────────────────────────────────────
 
 function DateNav({ date, onChange }: { date: string; onChange: (d: string) => void }) {
@@ -984,6 +995,25 @@ export default function ReviewPage() {
     },
   });
 
+  const { weekStart, weekEnd } = getWeekDates(selectedDate);
+  const { data: weekTrips = [] } = useQuery<TripForReview[]>({
+    queryKey: ['trips-week', weekStart, weekEnd],
+    enabled: mode === 'history',
+    staleTime: 120000,
+    queryFn: async () => {
+      const res = await fetch(`/api/trips?lifecycle=approved&weekStart=${weekStart}&weekEnd=${weekEnd}`);
+      if (!res.ok) throw new Error('Ошибка загрузки');
+      return res.json();
+    },
+  });
+
+  const weekRevenue = weekTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
+  const weekCosts = weekTrips.reduce((s, t) => {
+    const c = calcTrip(t);
+    return s + c.driverPay + c.loaderPay + c.totalExpenses;
+  }, 0);
+  const weekProfit = weekTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
+
   const monthRevenue = monthTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
   const monthCosts = monthTrips.reduce((s, t) => {
     const c = calcTrip(t);
@@ -1276,6 +1306,65 @@ export default function ReviewPage() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Weekly totals strip — history mode only */}
+      {mode === 'history' && weekTrips.length > 0 && (
+        <div className="rounded-2xl overflow-hidden border border-indigo-900/40 shadow-sm bg-indigo-950 text-white">
+          <div className="px-4 py-2 border-b border-indigo-900/60 flex items-center gap-2">
+            <span className="material-symbols-outlined text-indigo-500 text-[16px]">
+              date_range
+            </span>
+            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
+              Итого за неделю · {weekTrips.length} рейс
+              {weekTrips.length === 1 ? '' : weekTrips.length < 5 ? 'а' : 'ов'} ·{' '}
+              {new Date(weekStart + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} —{' '}
+              {new Date(weekEnd + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+          <div className="flex items-center px-4 py-3">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center">
+                <div className="w-[100px] text-center">
+                  <span className="text-[8px] font-bold text-indigo-700 uppercase tracking-widest block">
+                    Выручка
+                  </span>
+                  <span className="text-base font-black text-white">
+                    <Money amount={weekRevenue.toFixed(2)} />
+                  </span>
+                </div>
+                <span className="w-5 text-center text-indigo-800 text-sm">−</span>
+                <div className="w-[100px] text-center">
+                  <span className="text-[8px] font-bold text-indigo-700 uppercase tracking-widest block">
+                    Расходы
+                  </span>
+                  <span className="text-base font-black text-rose-400">
+                    <Money amount={weekCosts.toFixed(2)} />
+                  </span>
+                </div>
+                <span className="w-5 text-center text-indigo-800 text-sm">=</span>
+                <div className="w-[100px] text-center">
+                  <span className="text-[8px] font-bold text-indigo-700 uppercase tracking-widest block">
+                    Прибыль
+                  </span>
+                  <span
+                    className={cn(
+                      'text-lg font-black',
+                      weekProfit > 0
+                        ? 'text-emerald-400'
+                        : weekProfit < 0
+                          ? 'text-rose-400'
+                          : 'text-indigo-400',
+                    )}
+                  >
+                    {weekProfit < 0 ? '−' : ''}
+                    <Money amount={Math.abs(weekProfit).toFixed(2)} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
