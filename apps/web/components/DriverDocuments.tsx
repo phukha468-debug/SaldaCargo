@@ -28,6 +28,7 @@ export function DriverDocuments({ driverId }: { driverId: string }) {
       console.error('Fetch docs error', e);
     }
     setLoading(false);
+  };
 
   useEffect(() => {
     fetchDocuments();
