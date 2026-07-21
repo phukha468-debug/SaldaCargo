@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   const { data: orders } = await (supabase.from('service_orders') as any)
     .select(
-      'id, order_number, created_at, machine_type, assigned_mechanic_id, second_mechanic_id, asset:assets(short_name, reg_number), mechanic:users!service_orders_assigned_mechanic_id_fkey(name), second_mechanic:users!service_orders_second_mechanic_id_fkey(name), works:service_order_works(mechanic_id, norm_minutes, actual_minutes, price_client, status, work_catalog:work_catalog(name)), parts:service_order_parts(quantity, unit_price, part:parts(name, unit))',
+      'id, order_number, created_at, machine_type, assigned_mechanic_id, second_mechanic_id, asset:assets(short_name, reg_number), mechanic:users!service_orders_assigned_mechanic_id_fkey(name), second_mechanic:users!service_orders_second_mechanic_id_fkey(name), works:service_order_works(mechanic_id, second_mechanic_id, norm_minutes, actual_minutes, price_client, status, work_catalog:work_catalog(name), custom_work_name), parts:service_order_parts(quantity, unit_price, part:parts(name, unit))',
     )
     .eq('lifecycle_status', 'approved')
     .gte('created_at', `${startDate}T00:00:00Z`)
@@ -31,7 +31,10 @@ export async function GET(request: Request) {
 
   const stats = mechanics.map((m: any) => {
     const mechanicOrders = (orders ?? []).filter(
-      (o: any) => o.assigned_mechanic_id === m.id || o.second_mechanic_id === m.id,
+      (o: any) =>
+        o.assigned_mechanic_id === m.id ||
+        o.second_mechanic_id === m.id ||
+        (o.works ?? []).some((w: any) => w.mechanic_id === m.id || w.second_mechanic_id === m.id),
     );
     let planNormHours = 0,
       factNormHours = 0,
@@ -45,11 +48,11 @@ export async function GET(request: Request) {
         let isMyWork = false;
         let factor = 0;
 
-        if (work.mechanic_id) {
+        if (work.mechanic_id || work.second_mechanic_id) {
           // New way: specific mechanic assigned to this work
-          if (work.mechanic_id === m.id) {
+          if (work.mechanic_id === m.id || work.second_mechanic_id === m.id) {
             isMyWork = true;
-            factor = 1;
+            factor = work.mechanic_id && work.second_mechanic_id ? 0.5 : 1;
           }
         } else {
           // Legacy way: if I'm assigned to the order, I get a share
