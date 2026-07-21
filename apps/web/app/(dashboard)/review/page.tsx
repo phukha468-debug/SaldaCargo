@@ -124,10 +124,12 @@ function DateNav({
   date,
   period = 'day',
   onChange,
+  setPeriod,
 }: {
   date: string;
   period?: 'day' | 'week' | 'month';
   onChange: (d: string) => void;
+  setPeriod?: (p: 'day' | 'week' | 'month') => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -166,12 +168,65 @@ function DateNav({
     }
   };
 
+  const weeks = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (4 - i) * 7);
+    const { weekStart, weekEnd } = getWeekDates(d.toISOString().slice(0, 10));
+    const ws = new Date(weekStart + 'T12:00:00');
+    const we = new Date(weekEnd + 'T12:00:00');
+    return {
+      date: weekStart,
+      label: `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`,
+    };
+  });
+
   const curMonth = new Date(date).getMonth();
   const curYear = new Date(date).getFullYear();
   const isToday = date === today;
 
   return (
-    <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+      {/* Top Toggle */}
+      {setPeriod && (
+        <div className="flex border-b border-slate-700 bg-slate-800/50 p-2">
+          <div className="flex bg-slate-700 p-1 rounded-lg mx-auto w-full max-w-sm">
+            <button
+              onClick={() => setPeriod('day')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                period === 'day'
+                  ? 'bg-slate-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              День
+            </button>
+            <button
+              onClick={() => setPeriod('week')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                period === 'week'
+                  ? 'bg-slate-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              Неделя
+            </button>
+            <button
+              onClick={() => setPeriod('month')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                period === 'month'
+                  ? 'bg-slate-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              Месяц
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Day nav — compact single row, dark theme */}
       <div className="flex items-stretch h-14">
         <button
@@ -239,26 +294,48 @@ function DateNav({
         </button>
       </div>
 
-      {/* Month quick buttons */}
-      <div className="flex border-t border-slate-700">
-        {months.map((m) => {
-          const active = m.month === curMonth && m.year === curYear;
-          return (
-            <button
-              key={`${m.year}-${m.month}`}
-              onClick={() => goMonth(m.year, m.month)}
-              className={cn(
-                'flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-700 last:border-r-0',
-                active
-                  ? 'bg-sky-500 text-white'
-                  : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200',
-              )}
-            >
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Quick buttons */}
+      {period !== 'week' ? (
+        <div className="flex border-t border-slate-700 overflow-x-auto">
+          {months.map((m) => {
+            const active = m.month === curMonth && m.year === curYear;
+            return (
+              <button
+                key={`${m.year}-${m.month}`}
+                onClick={() => goMonth(m.year, m.month)}
+                className={cn(
+                  'flex-1 py-2 px-2 min-w-[70px] text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-700 last:border-r-0 whitespace-nowrap',
+                  active
+                    ? 'bg-sky-500 text-white'
+                    : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200',
+                )}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex border-t border-slate-700 overflow-x-auto">
+          {weeks.map((w) => {
+            const active = getWeekDates(date).weekStart === w.date;
+            return (
+              <button
+                key={w.date}
+                onClick={() => onChange(w.date)}
+                className={cn(
+                  'flex-1 py-2 px-3 min-w-[120px] text-[11px] font-bold tracking-wide transition-all border-r border-slate-700 last:border-r-0 whitespace-nowrap',
+                  active
+                    ? 'bg-sky-500 text-white'
+                    : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200',
+                )}
+              >
+                {w.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1194,7 +1271,12 @@ export default function ReviewPage() {
 
       {/* Date navigation — history only */}
       {mode === 'history' && (
-        <DateNav date={selectedDate} period={statsPeriod} onChange={setSelectedDate} />
+        <DateNav
+          date={selectedDate}
+          period={statsPeriod}
+          onChange={setSelectedDate}
+          setPeriod={setStatsPeriod}
+        />
       )}
 
       {/* Summary line */}
@@ -1304,43 +1386,6 @@ export default function ReviewPage() {
                         : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}`}
                     </span>
                   </div>
-                  {mode === 'history' && (
-                    <div className="flex bg-slate-700 p-0.5 rounded-lg">
-                      <button
-                        onClick={() => setStatsPeriod('day')}
-                        className={cn(
-                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
-                          statsPeriod === 'day'
-                            ? 'bg-slate-500 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-slate-200',
-                        )}
-                      >
-                        День
-                      </button>
-                      <button
-                        onClick={() => setStatsPeriod('week')}
-                        className={cn(
-                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
-                          statsPeriod === 'week'
-                            ? 'bg-slate-500 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-slate-200',
-                        )}
-                      >
-                        Неделя
-                      </button>
-                      <button
-                        onClick={() => setStatsPeriod('month')}
-                        className={cn(
-                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
-                          statsPeriod === 'month'
-                            ? 'bg-slate-500 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-slate-200',
-                        )}
-                      >
-                        Месяц
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {(() => {
