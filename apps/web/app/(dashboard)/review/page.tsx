@@ -1080,6 +1080,17 @@ export default function ReviewPage() {
     modeFromUrl && VALID_MODES.includes(modeFromUrl) ? modeFromUrl : 'review',
   );
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (assetKey: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(assetKey)) next.delete(assetKey);
+      else next.add(assetKey);
+      return next;
+    });
+  };
+
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1207,6 +1218,20 @@ export default function ReviewPage() {
           : monthTrips
       : trips;
 
+  const groupedTrips = listTrips.reduce(
+    (acc, trip) => {
+      const assetKey = trip.asset
+        ? `${trip.asset.short_name} (${trip.asset.reg_number})`
+        : 'Без машины';
+      if (!acc[assetKey]) acc[assetKey] = [];
+      acc[assetKey].push(trip);
+      return acc;
+    },
+    {} as Record<string, TripForReview[]>,
+  );
+
+  const assetGroups = Object.entries(groupedTrips).sort(([a], [b]) => a.localeCompare(b));
+
   return (
     <div className="space-y-5 max-w-4xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
@@ -1305,19 +1330,32 @@ export default function ReviewPage() {
               'Нет рейсов на ревью — всё проверено!'
             ) : null}
           </p>
-          {trips.length > 0 && (
+          {listTrips.length > 0 && (
             <button
-              onClick={() =>
-                setExpandedIds((prev) =>
-                  prev.size === trips.length ? new Set() : new Set(trips.map((t) => t.id)),
-                )
-              }
+              onClick={() => {
+                const allIds = listTrips.map((t) => t.id);
+                const allGroups = assetGroups.map(([k]) => k);
+                const isAllExpanded =
+                  expandedIds.size === allIds.length && expandedGroups.size === allGroups.length;
+
+                if (isAllExpanded) {
+                  setExpandedIds(new Set());
+                  setExpandedGroups(new Set());
+                } else {
+                  setExpandedIds(new Set(allIds));
+                  setExpandedGroups(new Set(allGroups));
+                }
+              }}
               className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-1"
             >
               <span className="material-symbols-outlined text-[14px]">
-                {expandedIds.size === trips.length ? 'unfold_less' : 'unfold_more'}
+                {expandedIds.size === listTrips.length && expandedGroups.size === assetGroups.length
+                  ? 'unfold_less'
+                  : 'unfold_more'}
               </span>
-              {expandedIds.size === trips.length ? 'Свернуть все' : 'Развернуть все'}
+              {expandedIds.size === listTrips.length && expandedGroups.size === assetGroups.length
+                ? 'Свернуть все'
+                : 'Развернуть все'}
             </button>
           )}
         </div>
@@ -1357,21 +1395,78 @@ export default function ReviewPage() {
             </div>
           ) : (
             <>
-              {listTrips.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  mode={mode}
-                  expanded={expandedIds.has(trip.id)}
-                  onToggle={() => toggleExpand(trip.id)}
-                  onEdit={() => setEditTrip(trip)}
-                  onApprove={() => handleApprove(trip.id)}
-                  onReturn={() => handleReturn(trip.id)}
-                  onDelete={() => handleDelete(trip.id)}
-                  approving={approvingId === trip.id}
-                  deleting={deletingId === trip.id}
-                />
-              ))}
+              <div className="space-y-4">
+                {assetGroups.map(([assetKey, assetTrips]) => {
+                  const groupFuel = assetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
+                  const isExpanded = expandedGroups.has(assetKey);
+
+                  return (
+                    <div
+                      key={assetKey}
+                      className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
+                    >
+                      {/* Group Header */}
+                      <div
+                        onClick={() => toggleGroup(assetKey)}
+                        className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="bg-sky-100 p-2 rounded-xl text-sky-600">
+                            <span className="material-symbols-outlined block">local_shipping</span>
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-800">{assetKey}</h3>
+                            <p className="text-xs text-slate-500 font-medium">
+                              {assetTrips.length} рейс
+                              {assetTrips.length === 1 ? '' : assetTrips.length < 5 ? 'а' : 'ов'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <div className="text-right hidden sm:block">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              ГСМ
+                            </span>
+                            <span className="text-sm font-black text-rose-500">
+                              <Money amount={groupFuel.toFixed(2)} />
+                            </span>
+                          </div>
+                          <span
+                            className={cn(
+                              'material-symbols-outlined text-slate-400 transition-transform duration-300',
+                              isExpanded ? 'rotate-180' : '',
+                            )}
+                          >
+                            expand_more
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Group Content (Trips) */}
+                      {isExpanded && (
+                        <div className="p-3 bg-slate-50/50 border-t border-slate-100 space-y-3">
+                          {assetTrips.map((trip) => (
+                            <TripCard
+                              key={trip.id}
+                              trip={trip}
+                              mode={mode}
+                              expanded={expandedIds.has(trip.id)}
+                              onToggle={() => toggleExpand(trip.id)}
+                              onEdit={() => setEditTrip(trip)}
+                              onApprove={() => handleApprove(trip.id)}
+                              onReturn={() => handleReturn(trip.id)}
+                              onDelete={() => handleDelete(trip.id)}
+                              approving={approvingId === trip.id}
+                              deleting={deletingId === trip.id}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Unified Stats Strip */}
               <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
