@@ -1578,7 +1578,7 @@ function OrderDetailModal({
 
                                   {/* Actions */}
                                   <div className="flex gap-2">
-                                    {!order.mechanic && !(editMechanic && editMechanic !== '') ? (
+                                    {!order.mechanic && !editMechanic && !editWorkMechanic ? (
                                       <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-2 rounded-lg text-center">
                                         Сначала назначьте механика
                                       </div>
