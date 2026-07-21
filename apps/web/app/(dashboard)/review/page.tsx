@@ -118,6 +118,25 @@ function getWeekDates(dateStr: string) {
   return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
 }
 
+function formatPeriod(dateStr: string, period: 'day' | 'week' | 'month') {
+  if (period === 'day') {
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('ru-RU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long',
+    });
+  }
+  if (period === 'week') {
+    const { weekStart, weekEnd } = getWeekDates(dateStr);
+    const ws = new Date(weekStart + 'T12:00:00');
+    const we = new Date(weekEnd + 'T12:00:00');
+    return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`;
+  }
+  const d = new Date(dateStr + 'T12:00:00');
+  let monthStr = d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+  return monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
+}
+
 // ── Date Navigation ─────────────────────────────────────────
 
 function DateNav({
@@ -1316,14 +1335,10 @@ export default function ReviewPage() {
             ) : mode === 'history' ? (
               <>
                 <span className="font-semibold text-slate-700">
-                  {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ru-RU', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'long',
-                  })}
+                  {formatPeriod(selectedDate, statsPeriod)}
                 </span>
-                {trips.length > 0
-                  ? ` · ${trips.length} рейс${trips.length < 5 ? (trips.length === 1 ? '' : 'а') : 'ов'}`
+                {listTrips.length > 0
+                  ? ` · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 ? 'а' : 'ов'}`
                   : ' · нет рейсов'}
               </>
             ) : trips.length === 0 ? (
@@ -1398,6 +1413,7 @@ export default function ReviewPage() {
               <div className="space-y-4">
                 {assetGroups.map(([assetKey, assetTrips]) => {
                   const groupFuel = assetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
+                  const groupPayroll = assetTrips.reduce((s, t) => s + calcTrip(t).totalPayroll, 0);
                   const isExpanded = expandedGroups.has(assetKey);
 
                   return (
@@ -1424,6 +1440,14 @@ export default function ReviewPage() {
                         </div>
 
                         <div className="flex items-center gap-4">
+                          <div className="text-right hidden sm:block">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              ЗП
+                            </span>
+                            <span className="text-sm font-black text-amber-500">
+                              <Money amount={groupPayroll.toFixed(2)} />
+                            </span>
+                          </div>
                           <div className="text-right hidden sm:block">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                               ГСМ
@@ -1477,8 +1501,8 @@ export default function ReviewPage() {
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       {mode === 'history'
-                        ? 'Итоговая статистика'
-                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}`}
+                        ? `Итоговая статистика · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}`
+                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
                     </span>
                   </div>
                 </div>
