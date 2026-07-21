@@ -131,6 +131,7 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
             amount: salary.toFixed(2),
             category_id: CAT_PAYROLL_MECHANIC,
             related_user_id: specificMech.id,
+            service_order_id: orderId,
             description: `Долг механику — наряд #${order?.order_number}: ${workName} (${pct}% от ${basePrice.toLocaleString('ru-RU')} ₽)`,
             idempotency_key: crypto.randomUUID(),
           });
@@ -155,6 +156,7 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
         amount: salary.toFixed(2),
         category_id: CAT_PAYROLL_MECHANIC,
         related_user_id: mechData.id,
+        service_order_id: orderId,
         description: `Долг механику — наряд #${order.order_number}: ${workName} (${pct}% от ${workPrice.toLocaleString('ru-RU')} ₽)`,
         idempotency_key: crypto.randomUUID(),
       });
