@@ -1121,6 +1121,15 @@ export default function ReviewPage() {
   const totalRevenue = trips.reduce((s, t) => s + calcTrip(t).revenue, 0);
   const totalProfit = trips.reduce((s, t) => s + calcTrip(t).profit, 0);
 
+  const listTrips =
+    mode === 'history'
+      ? statsPeriod === 'day'
+        ? trips
+        : statsPeriod === 'week'
+          ? weekTrips
+          : monthTrips
+      : trips;
+
   return (
     <div className="space-y-5 max-w-4xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
@@ -1242,208 +1251,189 @@ export default function ReviewPage() {
       )}
 
       {/* Trip cards */}
-      {!isLoading &&
-        (() => {
-          const listTrips =
-            mode === 'history'
-              ? statsPeriod === 'day'
-                ? trips
-                : statsPeriod === 'week'
-                  ? weekTrips
-                  : monthTrips
-              : trips;
-
-          return (
-            <div className="space-y-3">
-              {listTrips.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
-                  <span className="material-symbols-outlined text-slate-200 text-[72px] mb-4 block">
-                    {mode === 'review'
-                      ? 'check_circle'
-                      : mode === 'active'
-                        ? 'local_shipping'
-                        : 'search'}
-                  </span>
-                  <p className="text-slate-500 font-semibold text-lg">
-                    {mode === 'review'
-                      ? 'Всё проверено'
-                      : mode === 'active'
-                        ? 'Нет активных рейсов'
-                        : 'Нет рейсов за эту дату'}
-                  </p>
-                  {mode === 'review' && (
-                    <p className="text-slate-400 text-sm mt-1">Новые рейсы появятся здесь</p>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {listTrips.map((trip) => (
-                    <TripCard
-                      key={trip.id}
-                      trip={trip}
-                      mode={mode}
-                      expanded={expandedIds.has(trip.id)}
-                      onToggle={() => toggleExpand(trip.id)}
-                      onEdit={() => setEditTrip(trip)}
-                      onApprove={() => handleApprove(trip.id)}
-                      onReturn={() => handleReturn(trip.id)}
-                      onDelete={() => handleDelete(trip.id)}
-                      approving={approvingId === trip.id}
-                      deleting={deletingId === trip.id}
-                    />
-                  ))}
-
-                  {/* Unified Stats Strip */}
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
-                    <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-slate-400 text-[16px]">
-                          summarize
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          {mode === 'history'
-                            ? 'Итоговая статистика'
-                            : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}`}
-                        </span>
-                      </div>
-                      {mode === 'history' && (
-                        <div className="flex bg-slate-700 p-0.5 rounded-lg">
-                          <button
-                            onClick={() => setStatsPeriod('day')}
-                            className={cn(
-                              'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
-                              statsPeriod === 'day'
-                                ? 'bg-slate-500 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200',
-                            )}
-                          >
-                            День
-                          </button>
-                          <button
-                            onClick={() => setStatsPeriod('week')}
-                            className={cn(
-                              'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
-                              statsPeriod === 'week'
-                                ? 'bg-slate-500 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200',
-                            )}
-                          >
-                            Неделя
-                          </button>
-                          <button
-                            onClick={() => setStatsPeriod('month')}
-                            className={cn(
-                              'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
-                              statsPeriod === 'month'
-                                ? 'bg-slate-500 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200',
-                            )}
-                          >
-                            Месяц
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {(() => {
-                      const targetTrips = listTrips;
-
-                      const targetRevenue = targetTrips.reduce(
-                        (s, t) => s + calcTrip(t).revenue,
-                        0,
-                      );
-                      const targetCosts = targetTrips.reduce((s, t) => {
-                        const c = calcTrip(t);
-                        return s + c.driverPay + c.loaderPay + c.totalExpenses;
-                      }, 0);
-                      const targetProfit = targetTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
-                      const targetFuel = targetTrips.reduce(
-                        (s, t) => s + calcTrip(t).fuelExpense,
-                        0,
-                      );
-                      const targetPayroll = targetTrips.reduce(
-                        (s, t) => s + calcTrip(t).totalPayroll,
-                        0,
-                      );
-
-                      return (
-                        <div className="flex items-center px-4 py-3">
-                          <div className="flex-1 flex items-center justify-center">
-                            <div className="flex items-center gap-1 sm:gap-3 flex-wrap justify-center">
-                              <div className="w-[85px] sm:w-[100px] text-center">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                                  Выручка
-                                </span>
-                                <span className="text-sm sm:text-base font-black text-white">
-                                  <Money amount={targetRevenue.toFixed(2)} />
-                                </span>
-                              </div>
-
-                              <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                              <div className="w-[85px] sm:w-[100px] text-center">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                                  Зарплаты
-                                </span>
-                                <span className="text-sm sm:text-base font-black text-amber-400">
-                                  <Money amount={targetPayroll.toFixed(2)} />
-                                </span>
-                              </div>
-
-                              <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                              <div className="w-[85px] sm:w-[100px] text-center">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                                  Топливо
-                                </span>
-                                <span className="text-sm sm:text-base font-black text-blue-400">
-                                  <Money amount={targetFuel.toFixed(2)} />
-                                </span>
-                              </div>
-
-                              <span className="text-slate-600 text-sm hidden sm:block">−</span>
-
-                              <div className="w-[85px] sm:w-[100px] text-center">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                                  Все расходы
-                                </span>
-                                <span className="text-sm sm:text-base font-black text-rose-400">
-                                  <Money amount={targetCosts.toFixed(2)} />
-                                </span>
-                              </div>
-
-                              <span className="text-slate-600 text-sm hidden sm:block">=</span>
-
-                              <div className="w-[85px] sm:w-[100px] text-center">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                                  Прибыль
-                                </span>
-                                <span
-                                  className={cn(
-                                    'text-base sm:text-lg font-black',
-                                    targetProfit > 0
-                                      ? 'text-emerald-400'
-                                      : targetProfit < 0
-                                        ? 'text-rose-400'
-                                        : 'text-slate-400',
-                                  )}
-                                >
-                                  {targetProfit < 0 ? '−' : ''}
-                                  <Money amount={Math.abs(targetProfit).toFixed(2)} />
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </>
+      {!isLoading && (
+        <div className="space-y-3">
+          {listTrips.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
+              <span className="material-symbols-outlined text-slate-200 text-[72px] mb-4 block">
+                {mode === 'review'
+                  ? 'check_circle'
+                  : mode === 'active'
+                    ? 'local_shipping'
+                    : 'search'}
+              </span>
+              <p className="text-slate-500 font-semibold text-lg">
+                {mode === 'review'
+                  ? 'Всё проверено'
+                  : mode === 'active'
+                    ? 'Нет активных рейсов'
+                    : 'Нет рейсов за эту дату'}
+              </p>
+              {mode === 'review' && (
+                <p className="text-slate-400 text-sm mt-1">Новые рейсы появятся здесь</p>
               )}
             </div>
-          );
-        })}
+          ) : (
+            <>
+              {listTrips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  mode={mode}
+                  expanded={expandedIds.has(trip.id)}
+                  onToggle={() => toggleExpand(trip.id)}
+                  onEdit={() => setEditTrip(trip)}
+                  onApprove={() => handleApprove(trip.id)}
+                  onReturn={() => handleReturn(trip.id)}
+                  onDelete={() => handleDelete(trip.id)}
+                  approving={approvingId === trip.id}
+                  deleting={deletingId === trip.id}
+                />
+              ))}
 
+              {/* Unified Stats Strip */}
+              <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
+                <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-slate-400 text-[16px]">
+                      summarize
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {mode === 'history'
+                        ? 'Итоговая статистика'
+                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}`}
+                    </span>
+                  </div>
+                  {mode === 'history' && (
+                    <div className="flex bg-slate-700 p-0.5 rounded-lg">
+                      <button
+                        onClick={() => setStatsPeriod('day')}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
+                          statsPeriod === 'day'
+                            ? 'bg-slate-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200',
+                        )}
+                      >
+                        День
+                      </button>
+                      <button
+                        onClick={() => setStatsPeriod('week')}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
+                          statsPeriod === 'week'
+                            ? 'bg-slate-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200',
+                        )}
+                      >
+                        Неделя
+                      </button>
+                      <button
+                        onClick={() => setStatsPeriod('month')}
+                        className={cn(
+                          'px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors',
+                          statsPeriod === 'month'
+                            ? 'bg-slate-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200',
+                        )}
+                      >
+                        Месяц
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {(() => {
+                  const targetTrips = listTrips;
+
+                  const targetRevenue = targetTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
+                  const targetCosts = targetTrips.reduce((s, t) => {
+                    const c = calcTrip(t);
+                    return s + c.driverPay + c.loaderPay + c.totalExpenses;
+                  }, 0);
+                  const targetProfit = targetTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
+                  const targetFuel = targetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
+                  const targetPayroll = targetTrips.reduce(
+                    (s, t) => s + calcTrip(t).totalPayroll,
+                    0,
+                  );
+
+                  return (
+                    <div className="flex items-center px-4 py-3">
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="flex items-center gap-1 sm:gap-3 flex-wrap justify-center">
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Выручка
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-white">
+                              <Money amount={targetRevenue.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Зарплаты
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-amber-400">
+                              <Money amount={targetPayroll.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Топливо
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-blue-400">
+                              <Money amount={targetFuel.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">−</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Все расходы
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-rose-400">
+                              <Money amount={targetCosts.toFixed(2)} />
+                            </span>
+                          </div>
+
+                          <span className="text-slate-600 text-sm hidden sm:block">=</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Прибыль
+                            </span>
+                            <span
+                              className={cn(
+                                'text-base sm:text-lg font-black',
+                                targetProfit > 0
+                                  ? 'text-emerald-400'
+                                  : targetProfit < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-400',
+                              )}
+                            >
+                              {targetProfit < 0 ? '−' : ''}
+                              <Money amount={Math.abs(targetProfit).toFixed(2)} />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {/* Edit modal */}
       {editTrip && (
         <EditModal
