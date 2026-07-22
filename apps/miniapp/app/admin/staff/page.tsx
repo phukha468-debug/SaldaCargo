@@ -182,6 +182,8 @@ function StaffContent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-payroll'] });
       qc.invalidateQueries({ queryKey: ['staff-settle-details'] });
+      qc.invalidateQueries({ queryKey: ['wallets'] });
+      qc.invalidateQueries({ queryKey: ['admin-transactions'] });
       setSettleTarget(null);
       setSettleAmount('');
       setSettleWallet('');

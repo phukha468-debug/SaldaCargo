@@ -229,6 +229,7 @@ function FinanceContent() {
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-payroll'] });
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              queryClient.invalidateQueries({ queryKey: ['wallets'] });
               setShowForm(null);
             }}
           />
