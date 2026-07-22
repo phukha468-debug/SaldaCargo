@@ -58,8 +58,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
-
     const { data: user } = await (supabase.from('users') as any)
       .select('name, roles')
       .eq('id', body.user_id)
