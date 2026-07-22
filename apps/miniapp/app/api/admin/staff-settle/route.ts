@@ -39,7 +39,6 @@ export async function GET(request: Request) {
     .eq('settlement_status', 'pending')
     .eq('related_user_id', userId)
     .in('category_id', PAYROLL_CATEGORY_IDS)
-    .or('employee_confirmed.is.null,employee_confirmed.eq.true')
     .order('created_at', { ascending: true });
 
   const queryUnconfirmedCount = (supabase.from('transactions') as any)
@@ -167,10 +166,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (!body.from_wallet_id) {
-      return NextResponse.json({ error: 'from_wallet_id обязателен' }, { status: 400 });
-    }
-
     const partialAmountRaw = body.partial_amount ?? (body as any).amount;
 
     const [
@@ -180,13 +175,17 @@ export async function POST(request: Request) {
       { data: userRow },
     ] = await Promise.all([
       (supabase.from('transactions') as any)
-        .select('*')
+        .select(
+          `
+          id, amount, description, created_at, category_id,
+          trip:trips(trip_number, started_at)
+        `,
+        )
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'pending')
         .eq('related_user_id', body.user_id)
         .in('category_id', PAYROLL_CATEGORY_IDS)
-        .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .order('created_at', { ascending: true }),
 
       (supabase.from('transactions') as any)
@@ -223,29 +222,31 @@ export async function POST(request: Request) {
     );
     const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
 
+    const operationalRole = (userRow?.roles as string[] | undefined)?.find(
+      (r: string) => r === 'driver' || r === 'loader' || r === 'mechanic',
+    );
+    const categoryId =
+      operationalRole === 'driver'
+        ? 'd79213ee-3bc6-4433-b58a-ca7ea1040d00'
+        : operationalRole === 'loader'
+          ? '18792fa8-fda8-472d-8e04-e19d2c6c053c'
+          : operationalRole === 'mechanic'
+            ? '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'
+            : 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
+
     if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
       if (partialAmountRaw && parseFloat(partialAmountRaw) > 0) {
         const directAmount = parseFloat(partialAmountRaw);
         if (!body.from_wallet_id) {
           return NextResponse.json({ error: 'from_wallet_id обязателен' }, { status: 400 });
         }
-        const operationalRole = (userRow?.roles as string[] | undefined)?.find(
-          (r: string) => r === 'driver' || r === 'loader' || r === 'mechanic',
-        );
-        const categoryId =
-          operationalRole === 'driver'
-            ? 'd79213ee-3bc6-4433-b58a-ca7ea1040d00'
-            : operationalRole === 'loader'
-              ? '18792fa8-fda8-472d-8e04-e19d2c6c053c'
-              : operationalRole === 'mechanic'
-                ? '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'
-                : 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 
         const { error: insErr } = await (supabase.from('transactions') as any).insert({
           direction: 'expense',
           category_id: categoryId,
           amount: directAmount.toFixed(2),
           description: `Выплата зарплаты: ${employeeName} — ${dateLabel}`,
+          transaction_date: new Date().toISOString(),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           related_user_id: body.user_id,
@@ -276,7 +277,6 @@ export async function POST(request: Request) {
         ? Math.min(Math.max(0, parseFloat(body.partial_offset)), maxOffset)
         : maxOffset;
 
-    // Logic for partial payment or full payment
     let idsToSettle: string[];
     let splitTxn: any = null;
     let splitNeeded = 0;
@@ -320,16 +320,49 @@ export async function POST(request: Request) {
       actualPayout = salaryTotal - offset;
     }
 
+    const settledTxns =
+      (pendingPayroll as any[])?.filter((t: any) => idsToSettle.includes(t.id)) ?? [];
+    if (splitTxn) settledTxns.push(splitTxn);
+
+    const tripItems = settledTxns
+      .map((t: any) => {
+        const tripNum = t.trip?.trip_number;
+        const amt = parseFloat(t.amount ?? '0').toFixed(0);
+        return tripNum ? `Рейс №${tripNum} (${amt} ₽)` : null;
+      })
+      .filter(Boolean);
+
+    const breakdownText = tripItems.length > 0 ? ` (${tripItems.join(', ')})` : '';
+    const payoutDescription = `Выплата зарплаты: ${employeeName}${breakdownText}`;
+
     const ops: Promise<any>[] = [];
     const batchId = crypto.randomUUID();
+
+    if (actualPayout > 0 && body.from_wallet_id) {
+      ops.push(
+        (supabase.from('transactions') as any).insert({
+          direction: 'expense',
+          category_id: categoryId,
+          amount: actualPayout.toFixed(2),
+          from_wallet_id: body.from_wallet_id,
+          description: payoutDescription,
+          transaction_date: new Date().toISOString(),
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          related_user_id: body.user_id,
+          created_by: adminId,
+          idempotency_key: batchId,
+        }),
+      );
+    }
 
     if (idsToSettle.length > 0) {
       ops.push(
         (supabase.from('transactions') as any)
           .update({
             settlement_status: 'completed',
-            from_wallet_id: body.from_wallet_id || null,
-            idempotency_key: batchId,
+            employee_confirmed: true,
+            updated_at: new Date().toISOString(),
           })
           .in('id', idsToSettle),
       );
@@ -341,8 +374,8 @@ export async function POST(request: Request) {
           .update({
             amount: splitNeeded.toFixed(2),
             settlement_status: 'completed',
-            from_wallet_id: body.from_wallet_id || null,
-            idempotency_key: batchId,
+            employee_confirmed: true,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', splitTxn.id),
       );
@@ -358,6 +391,7 @@ export async function POST(request: Request) {
         delete restFields.idempotency_key;
         delete restFields.settlement_status;
         delete restFields.amount;
+        delete restFields.trip;
         ops.push(
           (supabase.from('transactions') as any).insert({
             ...restFields,
@@ -370,13 +404,13 @@ export async function POST(request: Request) {
     }
 
     if (actualOffset > 0) {
-      // Регистрируем зачёт аванса
       ops.push(
         (supabase.from('transactions') as any).insert({
           direction: 'income',
           category_id: ADVANCE_CATEGORY_ID,
           amount: actualOffset.toFixed(2),
           description: `Зачёт аванса в счёт ЗП: ${employeeName} — ${dateLabel}`,
+          transaction_date: new Date().toISOString(),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           to_wallet_id: body.from_wallet_id || null,
