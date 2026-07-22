@@ -1368,7 +1368,7 @@ function OrderDetailModal({
                             />
 
                             {/* Name + hours */}
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
                               <p className="text-sm font-medium text-slate-800 leading-snug">
                                 {name}
                                 {(w.quantity ?? 1) > 1 && (
@@ -1377,12 +1377,34 @@ function OrderDetailModal({
                                   </span>
                                 )}
                               </p>
-                              <p className="text-xs text-slate-400">
-                                {normHours.toFixed(1)} нч
-                                {w.actual_minutes
-                                  ? ` · факт ${(w.actual_minutes / 60).toFixed(1)} нч`
-                                  : ''}
-                              </p>
+                              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                <p className="text-xs text-slate-400">
+                                  {normHours.toFixed(1)} нч
+                                  {w.actual_minutes
+                                    ? ` · факт ${(w.actual_minutes / 60).toFixed(1)} нч`
+                                    : ''}
+                                </p>
+                                {(() => {
+                                  const mechs = [w.mechanic_id, w.second_mechanic_id]
+                                    .filter(Boolean)
+                                    .map((id) => mechanics.find((m) => m.id === id))
+                                    .filter(Boolean) as Mechanic[];
+                                  if (mechs.length === 0) return null;
+                                  const basePrice = mechs.length === 2 ? priceNum / 2 : priceNum;
+                                  return mechs.map((m) => {
+                                    const pct = parseFloat(m.mechanic_salary_pct ?? '50');
+                                    const salary = (basePrice * pct) / 100;
+                                    return (
+                                      <span
+                                        key={m.id}
+                                        className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded leading-none"
+                                      >
+                                        {m.name.split(' ')[0]} {salary > 0 ? `+${salary}₽` : ''}
+                                      </span>
+                                    );
+                                  });
+                                })()}
+                              </div>
                             </div>
 
                             {/* Price — prominent */}
