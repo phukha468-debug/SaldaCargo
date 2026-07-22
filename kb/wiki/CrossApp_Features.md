@@ -105,13 +105,13 @@
 
 ## 6. ПЕРСОНАЛ И ЗП (PAYROLL / STAFF)
 
-| Фича                          | MiniApp файл                                       | WebApp файл                                  | Статус | Примечание                                                                                                                  |
-| ----------------------------- | -------------------------------------------------- | -------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Расчёт ЗП                     | `api/admin/payroll` GET                            | `api/staff/payroll` GET                      | ✅     | Оба: фильтр `earned`/`paid` за месяц по `transaction_date`. «К выплате» = только `employee_confirmed IS NULL OR TRUE`       |
-| Выплатить ЗП                  | `api/admin/staff-settle` POST                      | `api/staff/settle` POST                      | ⚠️     | Web: pending→completed + частичный зачёт аванса. Оба: settling только подтверждённых (`employee_confirmed IS NULL OR TRUE`) |
-| Подтверждение ЗП сотрудником  | `api/employee/payroll` PATCH action=confirm/reject | —                                            | ⚠️     | Только MiniApp. confirm → `employee_confirmed=true`. reject → `lifecycle=cancelled`. Доступно водителю, грузчику, механику  |
-| История транзакций сотрудника | —                                                  | `api/staff/transactions/[txId]` PATCH/DELETE | —      | Только WebApp. Редактирование суммы и удаление PAYROLL/ADVANCE транзакций                                                   |
-| Подотчёт наличных             | —                                                  | —                                            | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса                                                     |
+| Фича                          | MiniApp файл                                       | WebApp файл                                  | Статус | Примечание                                                                                                                            |
+| ----------------------------- | -------------------------------------------------- | -------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Расчёт ЗП                     | `api/admin/payroll` GET                            | `api/staff/payroll` GET                      | ✅     | Оба: фильтр `earned`/`paid` за месяц по `transaction_date`. «К выплате» = только `employee_confirmed IS NULL OR TRUE`                 |
+| Выплатить ЗП                  | `api/admin/staff-settle` POST                      | `api/staff/settle` POST                      | ✅     | Синхронизировано. Оба: pending→completed c привязкой from_wallet_id, зачёт аванса to_wallet_id, прямые выплаты при отсутствии pending |
+| Подтверждение ЗП сотрудником  | `api/employee/payroll` PATCH action=confirm/reject | —                                            | ⚠️     | Только MiniApp. confirm → `employee_confirmed=true`. reject → `lifecycle=cancelled`. Доступно водителю, грузчику, механику            |
+| История транзакций сотрудника | —                                                  | `api/staff/transactions/[txId]` PATCH/DELETE | —      | Только WebApp. Редактирование суммы и удаление PAYROLL/ADVANCE транзакций                                                             |
+| Подотчёт наличных             | —                                                  | —                                            | —      | **Удалено.** Наличные зачисляются в Сейф автоматически при апруве рейса                                                               |
 
 ---
 

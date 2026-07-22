@@ -10,12 +10,11 @@ const PAYROLL_CATEGORY_IDS = [
   '18792fa8-fda8-472d-8e04-e19d2c6c053c', // PAYROLL_LOADER
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
 ];
-const WALLET_TRANSFER_CAT = 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93';
 
 async function getAdminId(request: Request): Promise<string | null> {
   const authHeader = request.headers.get('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.split('Bearer ')[1];
+    return authHeader.split('Bearer ')[1] ?? null;
   }
   const cookieStore = await cookies();
   const token = cookieStore.get('salda_auth_token')?.value;
@@ -124,6 +123,8 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const adminId = await getAdminId(request);
 
+    const partialAmountRaw = body.partial_amount ?? (body as any).amount;
+
     const [
       { data: pendingPayroll },
       { data: advanceGiven },
@@ -153,17 +154,16 @@ export async function POST(request: Request) {
         .eq('category_id', ADVANCE_CATEGORY_ID)
         .eq('related_user_id', body.user_id),
 
-      (supabase.from('users') as any).select('name').eq('id', body.user_id).single(),
+      (supabase.from('users') as any).select('name, roles').eq('id', body.user_id).single(),
     ]);
 
-    if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
-      return NextResponse.json({ error: 'Нет начисленной ЗП к выплате' }, { status: 400 });
-    }
+    const employeeName = userRow?.name ?? 'Сотрудник';
+    const dateLabel = new Date().toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
 
-    const salaryTotal = (pendingPayroll as any[]).reduce(
-      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
-      0,
-    );
     const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
       (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
       0,
@@ -172,8 +172,57 @@ export async function POST(request: Request) {
       (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
       0,
     );
-
     const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
+
+    if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
+      if (partialAmountRaw && parseFloat(partialAmountRaw) > 0) {
+        const directAmount = parseFloat(partialAmountRaw);
+        if (!body.from_wallet_id) {
+          return NextResponse.json({ error: 'Укажите кошелёк для выплаты' }, { status: 400 });
+        }
+        const operationalRole = (userRow?.roles as string[] | undefined)?.find(
+          (r: string) => r === 'driver' || r === 'loader' || r === 'mechanic',
+        );
+        const categoryId =
+          operationalRole === 'driver'
+            ? 'd79213ee-3bc6-4433-b58a-ca7ea1040d00'
+            : operationalRole === 'loader'
+              ? '18792fa8-fda8-472d-8e04-e19d2c6c053c'
+              : operationalRole === 'mechanic'
+                ? '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'
+                : 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
+
+        const { error: insErr } = await (supabase.from('transactions') as any).insert({
+          direction: 'expense',
+          category_id: categoryId,
+          amount: directAmount.toFixed(2),
+          description: `Выплата зарплаты: ${employeeName} — ${dateLabel}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          related_user_id: body.user_id,
+          from_wallet_id: body.from_wallet_id,
+          created_by: adminId,
+          idempotency_key: crypto.randomUUID(),
+        });
+        if (insErr) throw new Error(insErr.message);
+
+        return NextResponse.json({
+          ok: true,
+          salary_total: directAmount.toFixed(2),
+          advance_balance: advanceBalance.toFixed(2),
+          offset: '0.00',
+          payout: directAmount.toFixed(2),
+          settled_count: 0,
+        });
+      }
+      return NextResponse.json({ error: 'Нет начисленной ЗП к выплате' }, { status: 400 });
+    }
+
+    const salaryTotal = (pendingPayroll as any[]).reduce(
+      (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+      0,
+    );
+
     const maxOffset = Math.min(salaryTotal, advanceBalance);
     const offset =
       body.partial_offset !== undefined
@@ -181,8 +230,7 @@ export async function POST(request: Request) {
         : maxOffset;
     const payout = salaryTotal - offset;
 
-    const needsWalletCheck =
-      body.partial_amount === undefined && payout > 0 && !body.from_wallet_id;
+    const needsWalletCheck = partialAmountRaw === undefined && payout > 0 && !body.from_wallet_id;
     if (needsWalletCheck) {
       return NextResponse.json(
         { error: 'Укажите кошелёк для выплаты', payout: payout.toFixed(2) },
@@ -196,11 +244,8 @@ export async function POST(request: Request) {
     let actualPayout: number;
     let actualOffset: number;
 
-    if (body.partial_amount !== undefined) {
-      const requestedAmount = Math.min(
-        Math.max(0, parseFloat(body.partial_amount) || 0),
-        salaryTotal,
-      );
+    if (partialAmountRaw !== undefined) {
+      const requestedAmount = Math.min(Math.max(0, parseFloat(partialAmountRaw) || 0), salaryTotal);
 
       const sorted = [...(pendingPayroll as any[])].sort(
         (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
@@ -239,26 +284,19 @@ export async function POST(request: Request) {
       actualPayout = payout;
     }
 
-    const employeeName = userRow?.name ?? 'Сотрудник';
-    const dateLabel = new Date().toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-
     if (actualPayout > 0 && !body.from_wallet_id) {
       return NextResponse.json({ error: 'Укажите кошелёк для выплаты' }, { status: 400 });
     }
 
     const ops: Promise<any>[] = [];
-    const batchId = crypto.randomUUID();
 
     if (idsToSettle.length > 0) {
       ops.push(
         (supabase.from('transactions') as any)
           .update({
             settlement_status: 'completed',
-            idempotency_key: batchId,
+            from_wallet_id: body.from_wallet_id || null,
+            updated_at: new Date().toISOString(),
           })
           .in('id', idsToSettle),
       );
@@ -270,7 +308,8 @@ export async function POST(request: Request) {
           .update({
             amount: splitNeeded.toFixed(2),
             settlement_status: 'completed',
-            idempotency_key: batchId,
+            from_wallet_id: body.from_wallet_id || null,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', splitTxn.id),
       );
@@ -297,25 +336,8 @@ export async function POST(request: Request) {
       }
     }
 
-    if (actualPayout > 0 && body.from_wallet_id) {
-      ops.push(
-        (supabase.from('transactions') as any).insert({
-          direction: 'transfer',
-          category_id: WALLET_TRANSFER_CAT,
-          amount: actualPayout.toFixed(2),
-          from_wallet_id: body.from_wallet_id,
-          description: `Выплата зарплаты: ${employeeName} — ${dateLabel}`,
-          lifecycle_status: 'approved',
-          settlement_status: 'completed',
-          related_user_id: body.user_id,
-          created_by: adminId,
-          idempotency_key: batchId,
-        }),
-      );
-    }
-
     if (actualOffset > 0) {
-      // Запись о зачёте аванса (income = уменьшает остаток долга)
+      // Запись о зачёте аванса (income = уменьшает остаток долга, плюсует кошелёк для баланса выплаты)
       ops.push(
         (supabase.from('transactions') as any).insert({
           direction: 'income',
@@ -324,14 +346,20 @@ export async function POST(request: Request) {
           description: `Зачёт аванса в счёт ЗП: ${employeeName} — ${dateLabel}`,
           lifecycle_status: 'approved',
           settlement_status: 'completed',
+          to_wallet_id: body.from_wallet_id || null,
           related_user_id: body.user_id,
           created_by: adminId,
-          idempotency_key: batchId,
+          idempotency_key: crypto.randomUUID(),
         }),
       );
     }
 
-    await Promise.all(ops);
+    const results = await Promise.all(ops);
+    const errors = results.filter((r) => r && r.error);
+    if (errors.length > 0) {
+      console.error('Errors in settle:', errors);
+      throw new Error(`Transaction failed: ${errors[0].error.message}`);
+    }
 
     return NextResponse.json({
       ok: true,

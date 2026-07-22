@@ -975,6 +975,7 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: selected.id,
+          partial_amount: amount,
           amount,
           from_wallet_id: walletId,
           description: note || undefined,
