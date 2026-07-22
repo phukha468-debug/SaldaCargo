@@ -106,6 +106,13 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
   const workPrice = parseFloat(work.price_client ?? '0');
   if (workPrice <= 0) return;
 
+  const { data: adminUser } = await (supabase.from('users') as any)
+    .select('id')
+    .filter('roles', 'cs', '{"admin"}')
+    .limit(1)
+    .single();
+  const createdBy = adminUser?.id;
+
   const txns: any[] = [];
   const workName = work.work_catalog?.name ?? work.custom_work_name ?? 'работа';
 
@@ -132,6 +139,7 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
             category_id: CAT_PAYROLL_MECHANIC,
             related_user_id: specificMech.id,
             service_order_id: orderId,
+            created_by: createdBy,
             description: `Долг механику — наряд #${order?.order_number}: ${workName} (${pct}% от ${basePrice.toLocaleString('ru-RU')} ₽)`,
             idempotency_key: crypto.randomUUID(),
           });
@@ -157,6 +165,7 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
         category_id: CAT_PAYROLL_MECHANIC,
         related_user_id: mechData.id,
         service_order_id: orderId,
+        created_by: createdBy,
         description: `Долг механику — наряд #${order.order_number}: ${workName} (${pct}% от ${workPrice.toLocaleString('ru-RU')} ₽)`,
         idempotency_key: crypto.randomUUID(),
       });
@@ -164,7 +173,11 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
   }
 
   if (txns.length > 0) {
-    await (supabase.from('transactions') as any).insert(txns);
+    const { error: insertError } = await (supabase.from('transactions') as any).insert(txns);
+    if (insertError) {
+      console.error('Failed to insert payroll transaction', insertError);
+      throw new Error('Не удалось начислить зарплату: ' + insertError.message);
+    }
     await (supabase.from('service_order_works') as any)
       .update({ salary_paid: true })
       .eq('id', work.id);
