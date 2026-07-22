@@ -53,6 +53,7 @@ function FinanceContent() {
                   : null,
   );
   const queryClient = useQueryClient();
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
 
   const [txDate, setTxDate] = useState(() => new Date().toISOString().split('T')[0]);
   const isTxToday = txDate === new Date().toISOString().split('T')[0];
@@ -360,7 +361,8 @@ function FinanceContent() {
                 return (
                   <div
                     key={tx.id}
-                    className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex justify-between items-start shadow-sm gap-2"
+                    onClick={() => setSelectedTx(tx)}
+                    className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex justify-between items-start shadow-sm gap-2 cursor-pointer active:bg-zinc-50 transition-all"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-zinc-900 text-sm">
@@ -395,6 +397,11 @@ function FinanceContent() {
               })
             )}
           </section>
+        )}
+
+        {/* Transaction Detail Modal (Requirement 3: trip breakdown popup) */}
+        {selectedTx && (
+          <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
         )}
       </div>
     </div>
@@ -1358,6 +1365,118 @@ function AddTransactionForm({
       >
         {mutation.isPending ? 'Сохраняем...' : '✓ Сохранить'}
       </button>
+    </div>
+  );
+}
+
+function parseTripsFromDescription(description?: string): string[] {
+  if (!description) return [];
+  const match = description.match(/\(([Рр]ейс[^\)]+)\)/);
+  if (!match || !match[1]) return [];
+  return match[1].split(', ').map((s) => s.trim());
+}
+
+function TransactionDetailModal({ tx, onClose }: { tx: any; onClose: () => void }) {
+  const isIncome = tx.direction === 'income';
+  const walletName = isIncome ? tx.to_wallet?.name : tx.from_wallet?.name;
+  const trips = parseTripsFromDescription(tx.description);
+  const employeeOrCounterparty = tx.related_user?.name || tx.counterparty?.name;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-h-[85vh] overflow-y-auto rounded-t-[2.5rem] p-6 space-y-5 shadow-2xl animate-in slide-in-from-bottom duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              Детали операции
+            </p>
+            <h2 className="text-xl font-black text-zinc-900 mt-0.5">
+              {tx.category?.name || (isIncome ? 'Доход' : 'Расход')}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 text-zinc-500 font-bold active:scale-90 transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="bg-zinc-50 rounded-2xl p-4 text-center">
+          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">
+            Сумма операции
+          </p>
+          <p className={`text-3xl font-black ${isIncome ? 'text-emerald-600' : 'text-zinc-900'}`}>
+            <Money amount={tx.amount} showSign={isIncome} />
+          </p>
+        </div>
+
+        <div className="space-y-2.5 text-sm">
+          {tx.description && (
+            <div className="bg-zinc-50 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase">Описание</p>
+              <p className="font-bold text-zinc-800 mt-0.5">{tx.description}</p>
+            </div>
+          )}
+
+          {walletName && (
+            <div className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center">
+              <span className="text-xs font-bold text-zinc-400 uppercase">Кошелёк</span>
+              <span className="font-bold text-zinc-800">{walletName}</span>
+            </div>
+          )}
+
+          <div className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center">
+            <span className="text-xs font-bold text-zinc-400 uppercase">Дата и время</span>
+            <span className="font-bold text-zinc-800">
+              {new Date(tx.created_at || tx.transaction_date).toLocaleString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+          </div>
+
+          {employeeOrCounterparty && (
+            <div className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center">
+              <span className="text-xs font-bold text-zinc-400 uppercase">
+                Получатель / Участник
+              </span>
+              <span className="font-bold text-zinc-800">{employeeOrCounterparty}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Входящие в выплату рейсы */}
+        {trips.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-zinc-100">
+            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+              Входящие в эту сумму рейсы ({trips.length})
+            </h3>
+            <div className="space-y-1.5">
+              {trips.map((item: string, idx: number) => (
+                <div
+                  key={idx}
+                  className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🚛</span>
+                    <span className="text-xs font-black text-emerald-950">{item}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

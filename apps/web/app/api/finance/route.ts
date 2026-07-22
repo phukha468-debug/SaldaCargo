@@ -48,6 +48,7 @@ export async function GET(request: Request) {
           .eq('direction', 'expense')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
+          .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
           .or('description.is.null,description.neq.Корректировка остатка')
           .gte('created_at', monthStart)
           .lte('created_at', monthEnd)
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
           .eq('direction', 'income')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
+          .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
           .or('description.is.null,description.neq.Корректировка остатка')
           .gte('created_at', monthStart)
           .lte('created_at', monthEnd)
@@ -114,13 +116,14 @@ export async function GET(request: Request) {
           .eq('trips.lifecycle_status', 'approved')
           .gte('trips.started_at', sixMonthsAgo),
 
-        // Expenses: все approved транзакции включая ФОТ (без корректировок остатков)
+        // Expenses: все approved транзакции с кошельком включая ФОТ (без корректировок остатков)
         (supabase as any)
           .from('transactions')
           .select('amount, created_at')
           .eq('direction', 'expense')
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed')
+          .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
           .or('description.is.null,description.neq.Корректировка остатка')
           .gte('created_at', sixMonthsAgo),
 
@@ -134,6 +137,7 @@ export async function GET(request: Request) {
             )
             .eq('lifecycle_status', 'approved')
             .eq('settlement_status', 'completed')
+            .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
             .or('description.is.null,description.neq.Корректировка остатка')
             .order('created_at', { ascending: false });
           if (direction) q = q.eq('direction', direction);

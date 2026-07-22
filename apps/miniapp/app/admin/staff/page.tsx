@@ -694,7 +694,9 @@ function StaffDetailsModal({
   const accruals = history.filter((t: any) => t.direction === 'expense' && t.is_payroll);
   const payments = history.filter(
     (t: any) =>
-      (t.direction === 'expense' && t.is_advance) || (t.direction === 'income' && t.is_advance),
+      (t.direction === 'expense' && t.is_advance) ||
+      (t.direction === 'income' && t.is_advance) ||
+      (t.description && t.description.startsWith('Выплата зарплаты')),
   );
 
   return (
@@ -805,28 +807,53 @@ function StaffDetailsModal({
             </h3>
             <div className="space-y-2">
               {payments.map((t: any) => {
-                const isAdvanceGiven = t.direction === 'expense'; // Выдан аванс
+                const isExpense = t.direction === 'expense';
+                const match = t.description?.match(/\(([Рр]ейс[^\)]+)\)/);
+                const trips =
+                  match && match[1] ? match[1].split(', ').map((s: string) => s.trim()) : [];
                 return (
-                  <div
-                    key={t.id}
-                    className="bg-zinc-50 rounded-xl p-3 flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">
-                        {new Date(t.created_at).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                        })}
-                      </p>
-                      <p className="text-sm font-bold text-zinc-800">{t.description}</p>
+                  <div key={t.id} className="bg-zinc-50 rounded-xl p-3.5 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">
+                          {new Date(t.created_at || t.transaction_date).toLocaleDateString(
+                            'ru-RU',
+                            {
+                              day: 'numeric',
+                              month: 'short',
+                            },
+                          )}
+                        </p>
+                        <p className="text-sm font-bold text-zinc-800 leading-snug">
+                          {t.description}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <Money
+                          amount={isExpense ? -parseFloat(t.amount) : parseFloat(t.amount)}
+                          className={`font-black text-sm ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}
+                          showSign={true}
+                        />
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Money
-                        amount={isAdvanceGiven ? -parseFloat(t.amount) : parseFloat(t.amount)}
-                        className={`font-black ${isAdvanceGiven ? 'text-rose-600' : 'text-emerald-600'}`}
-                        showSign={true}
-                      />
-                    </div>
+                    {trips.length > 0 && (
+                      <div className="pt-2 border-t border-zinc-200/60 space-y-1.5">
+                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">
+                          Входящие в эту сумму рейсы ({trips.length}):
+                        </p>
+                        <div className="space-y-1">
+                          {trips.map((item: string, idx: number) => (
+                            <div
+                              key={idx}
+                              className="bg-white rounded-lg p-2 text-xs font-bold text-zinc-700 border border-zinc-200/60 flex items-center gap-1.5"
+                            >
+                              <span>🚛</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

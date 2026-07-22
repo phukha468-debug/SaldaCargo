@@ -13,10 +13,11 @@ export async function GET(request: Request) {
 
   let q = (supabase.from('transactions') as any)
     .select(
-      'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code), to_wallet:wallets!to_wallet_id(name), from_wallet:wallets!from_wallet_id(name), counterparty:counterparties(name)',
+      'id, amount, direction, description, created_at, lifecycle_status, category:transaction_categories(name, code), to_wallet:wallets!to_wallet_id(name), from_wallet:wallets!from_wallet_id(name), counterparty:counterparties(name), related_user:users!transactions_related_user_id_fkey(name)',
     )
     .eq('lifecycle_status', 'approved')
     .eq('settlement_status', 'completed')
+    .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
     .or('description.is.null,description.neq.Корректировка остатка')
     .order('created_at', { ascending: false });
 
