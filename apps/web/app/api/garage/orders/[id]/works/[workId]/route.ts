@@ -189,9 +189,33 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string; workId: string }> },
 ) {
-  const { workId } = await params;
+  const { id: orderId, workId } = await params;
   const supabase = createAdminClient();
+
+  const { data: work } = await (supabase.from('service_order_works') as any)
+    .select('id, custom_work_name, work_catalog(name)')
+    .eq('id', workId)
+    .single();
+
+  const { data: order } = await (supabase.from('service_orders') as any)
+    .select('order_number')
+    .eq('id', orderId)
+    .single();
+
+  const workName = work?.work_catalog?.name ?? work?.custom_work_name ?? 'работа';
+  const desc = `Наряд #${order?.order_number}: ${workName}`;
+
   const { error } = await (supabase.from('service_order_works') as any).delete().eq('id', workId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await (supabase.from('transactions') as any)
+    .update({
+      lifecycle_status: 'cancelled',
+      cancelled_reason: 'Удалена работа в заказ-наряде',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('service_order_id', orderId)
+    .eq('description', desc);
+
   return NextResponse.json({ ok: true });
 }

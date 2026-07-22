@@ -12,9 +12,22 @@ const PAYROLL_CATEGORY_IDS = [
 ];
 const WALLET_TRANSFER_CAT = 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93';
 
-async function getAdminId(): Promise<string | null> {
+async function getAdminId(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.split('Bearer ')[1];
+  }
   const cookieStore = await cookies();
-  return cookieStore.get('salda_auth_token')?.value ?? null;
+  const token = cookieStore.get('salda_auth_token')?.value;
+  if (token) return token;
+
+  const supabase = createAdminClient();
+  const { data: adminUser } = await (supabase.from('users') as any)
+    .select('id')
+    .filter('roles', 'cs', '{"admin"}')
+    .limit(1)
+    .single();
+  return adminUser?.id ?? null;
 }
 
 /**
@@ -109,7 +122,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient();
-    const adminId = await getAdminId();
+    const adminId = await getAdminId(request);
 
     const [
       { data: pendingPayroll },
@@ -239,7 +252,7 @@ export async function POST(request: Request) {
 
     const ops: Promise<any>[] = [];
     const batchId = crypto.randomUUID();
-    
+
     if (idsToSettle.length > 0) {
       ops.push(
         (supabase.from('transactions') as any)
@@ -247,7 +260,7 @@ export async function POST(request: Request) {
             settlement_status: 'completed',
             idempotency_key: batchId,
           })
-          .in('id', idsToSettle)
+          .in('id', idsToSettle),
       );
     }
 
@@ -259,19 +272,27 @@ export async function POST(request: Request) {
             settlement_status: 'completed',
             idempotency_key: batchId,
           })
-          .eq('id', splitTxn.id)
+          .eq('id', splitTxn.id),
       );
 
       const remainder = parseFloat(splitTxn.amount ?? '0') - splitNeeded;
       if (remainder > 0.001) {
-        const { id, created_at, updated_at, from_wallet_id, to_wallet_id, idempotency_key, settlement_status, amount, ...restFields } = splitTxn;
+        const restFields = { ...splitTxn };
+        delete restFields.id;
+        delete restFields.created_at;
+        delete restFields.updated_at;
+        delete restFields.from_wallet_id;
+        delete restFields.to_wallet_id;
+        delete restFields.idempotency_key;
+        delete restFields.settlement_status;
+        delete restFields.amount;
         ops.push(
           (supabase.from('transactions') as any).insert({
             ...restFields,
             amount: remainder.toFixed(2),
             settlement_status: 'pending',
             idempotency_key: crypto.randomUUID(),
-          })
+          }),
         );
       }
     }
@@ -289,7 +310,7 @@ export async function POST(request: Request) {
           related_user_id: body.user_id,
           created_by: adminId,
           idempotency_key: batchId,
-        })
+        }),
       );
     }
 

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, status, actual_minutes, price_client, norm_minutes,
+        id, custom_work_name, status, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg, client_name,
       works:service_order_works(
-        id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes,
+        id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       )
     `;

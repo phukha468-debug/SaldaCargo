@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
         works:service_order_works(
           id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description,
-          custom_work_name,
+          custom_work_name, mechanic_id, second_mechanic_id,
           work_catalog:work_catalog(id, name, norm_minutes),
           time_logs:work_time_logs(id, started_at, stopped_at, status)
         ),
