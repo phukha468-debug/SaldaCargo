@@ -25,6 +25,11 @@ const PAYMENT_METHODS = [
   { value: 'fuel_card', label: 'Топливная', icon: '⛽' },
 ] as const;
 
+const PAYMENT_METHODS_FUEL = [
+  { value: 'cash', label: 'Наличные', icon: '💵' },
+  { value: 'fuel_card', label: 'Топливная ТК', icon: '⛽' },
+] as const;
+
 export default function AddExpensePage() {
   const params = useParams();
   const tripId = params.id as string;
@@ -43,6 +48,7 @@ export default function AddExpensePage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
@@ -51,7 +57,20 @@ export default function AddExpensePage() {
     },
   });
 
+  const selectedCategoryId = watch('category_id');
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
+  const isFuelCategory =
+    selectedCategory?.code === 'FUEL' ||
+    selectedCategory?.name?.toUpperCase().includes('ГСМ') ||
+    selectedCategory?.name?.toUpperCase().includes('ТОПЛИВО');
+
   const selectedPaymentMethod = watch('payment_method');
+
+  const availablePaymentMethods = isFuelCategory ? PAYMENT_METHODS_FUEL : PAYMENT_METHODS;
+
+  if (isFuelCategory && selectedPaymentMethod === 'card_driver') {
+    setValue('payment_method', 'cash');
+  }
 
   async function onSubmit(data: FormData) {
     if (submitting) return;
@@ -135,10 +154,10 @@ export default function AddExpensePage() {
         {/* Способ оплаты */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Способ оплаты
+            Способ оплаты {isFuelCategory && '(для ГСМ: Наличные или Топливная карта ТК)'}
           </label>
           <div className="flex gap-2">
-            {PAYMENT_METHODS.map((m) => (
+            {availablePaymentMethods.map((m) => (
               <label key={m.value} className="flex-1">
                 <input
                   type="radio"

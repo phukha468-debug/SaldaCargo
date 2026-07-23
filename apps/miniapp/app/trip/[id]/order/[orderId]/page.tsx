@@ -85,7 +85,9 @@ export default function EditOrderPage() {
     staleTime: 60000,
   });
 
-  const { data: counterparties = [] } = useQuery<Array<{ id: string; name: string }>>({
+  const { data: counterparties = [] } = useQuery<
+    Array<{ id: string; name: string; is_legal_entity?: boolean; is_top?: boolean }>
+  >({
     queryKey: ['driver', 'counterparties'],
     queryFn: () => fetch('/api/driver/counterparties').then((r) => r.json()),
     staleTime: 5 * 60 * 1000,
@@ -208,9 +210,10 @@ export default function EditOrderPage() {
       return;
     }
     const isDebt = data.payment_method === 'debt_cash';
+    const isLegal = selectedCounterparty?.is_legal_entity;
     const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
 
-    if (isDebt && !data.description?.trim()) {
+    if (isDebt && !isLegal && !data.description?.trim()) {
       setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
       return;
     }
@@ -541,28 +544,30 @@ export default function EditOrderPage() {
           )}
         </div>
 
-        {/* Описание */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
-            {selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
-              ? 'Имя клиента и детали (обязательно)*'
-              : 'Описание (опционально)'}
-          </label>
-          <input
-            type="text"
-            {...register('description')}
-            placeholder={
-              selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
-                ? 'Иван, переезд мебели, +7999...'
-                : 'Переезд, доставка плитки...'
-            }
-            className={`w-full rounded-lg border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
-              selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
-                ? 'border-orange-400 focus:border-orange-600 bg-orange-50 placeholder:text-orange-300'
-                : 'border-zinc-200 focus:border-orange-500'
-            }`}
-          />
-        </div>
+        {/* Описание (не выводится для юрлиц) */}
+        {!selectedCounterparty?.is_legal_entity && (
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
+              {selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                ? 'Имя клиента и детали (обязательно)*'
+                : 'Описание (опционально)'}
+            </label>
+            <input
+              type="text"
+              {...register('description')}
+              placeholder={
+                selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                  ? 'Иван, переезд мебели, +7999...'
+                  : 'Переезд, доставка плитки...'
+              }
+              className={`w-full rounded-lg border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
+                selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
+                  ? 'border-orange-400 focus:border-orange-600 bg-orange-50 placeholder:text-orange-300'
+                  : 'border-zinc-200 focus:border-orange-500'
+              }`}
+            />
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">

@@ -212,9 +212,10 @@ export default function AddOrderPage() {
       return;
     }
     const isDebt = data.payment_method === 'debt_cash';
+    const isLegal = clientType === 'legal' || selectedCounterparty?.is_legal_entity;
     const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
 
-    if (isDebt && !data.description?.trim()) {
+    if (isDebt && !isLegal && !data.description?.trim()) {
       setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
       return;
     }
@@ -493,8 +494,8 @@ export default function AddOrderPage() {
           )}
         </div>
 
-        {/* ── Комментарий к долгу ── */}
-        {isDebt && (
+        {/* ── Комментарий к долгу (только для физлиц в долг) ── */}
+        {isDebt && clientType !== 'legal' && !selectedCounterparty?.is_legal_entity && (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest pl-1">
               ⏳ Что обещал клиент? (важно!)
@@ -502,11 +503,7 @@ export default function AddOrderPage() {
             <input
               type="text"
               {...register('description')}
-              placeholder={
-                clientType === 'legal'
-                  ? 'Счёт выставлен, оплатит до 10 числа...'
-                  : 'Обещал заплатить в пятницу, наличными...'
-              }
+              placeholder="Обещал заплатить в пятницу, наличными..."
               autoFocus
               className="w-full rounded-xl border-2 border-orange-400 bg-orange-50 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-600 focus:outline-none transition-colors placeholder:text-orange-300"
             />
@@ -575,8 +572,8 @@ export default function AddOrderPage() {
           )}
         </div>
 
-        {/* ── Описание (не долг) ── */}
-        {!isDebt && (
+        {/* ── Описание (только для физлиц при оплате не в долг) ── */}
+        {!isDebt && clientType !== 'legal' && !selectedCounterparty?.is_legal_entity && (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
               {selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
