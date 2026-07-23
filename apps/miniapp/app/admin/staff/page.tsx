@@ -669,6 +669,37 @@ interface StaffSettleDetails {
   history: any[];
 }
 
+type ParsedTrip = {
+  label: string;
+  amount: string;
+};
+
+function parseTripsFromDescription(description?: string | null): {
+  cleanTitle: string;
+  trips: ParsedTrip[];
+} {
+  if (!description) return { cleanTitle: 'Без описания', trips: [] };
+  const firstParen = description.indexOf('(');
+  const lastParen = description.lastIndexOf(')');
+  if (firstParen === -1 || lastParen === -1 || firstParen >= lastParen) {
+    return { cleanTitle: description, trips: [] };
+  }
+
+  const cleanTitle = description.slice(0, firstParen).trim();
+  const innerStr = description.slice(firstParen + 1, lastParen).trim();
+
+  const rawItems = innerStr.split(/,\s*(?=[Рр]ейс)/);
+  const trips: ParsedTrip[] = rawItems.map((item) => {
+    const m = item.match(/^(Рейс\s*№?\s*\d+)\s*\(([^)]+)\)/i);
+    if (m && m[1]) {
+      return { label: m[1].trim(), amount: (m[2] ?? '').trim() };
+    }
+    return { label: item.trim(), amount: '' };
+  });
+
+  return { cleanTitle, trips };
+}
+
 function StaffDetailsModal({
   user,
   year,
@@ -808,9 +839,7 @@ function StaffDetailsModal({
             <div className="space-y-2">
               {payments.map((t: any) => {
                 const isExpense = t.direction === 'expense';
-                const match = t.description?.match(/\(([Рр]ейс[^\)]+)\)/);
-                const trips =
-                  match && match[1] ? match[1].split(', ').map((s: string) => s.trim()) : [];
+                const { cleanTitle, trips } = parseTripsFromDescription(t.description);
                 return (
                   <div key={t.id} className="bg-zinc-50 rounded-xl p-3.5 space-y-2">
                     <div className="flex justify-between items-start gap-2">
@@ -824,9 +853,7 @@ function StaffDetailsModal({
                             },
                           )}
                         </p>
-                        <p className="text-sm font-bold text-zinc-800 leading-snug">
-                          {t.description}
-                        </p>
+                        <p className="text-sm font-bold text-zinc-800 leading-snug">{cleanTitle}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <Money
@@ -837,18 +864,28 @@ function StaffDetailsModal({
                       </div>
                     </div>
                     {trips.length > 0 && (
-                      <div className="pt-2 border-t border-zinc-200/60 space-y-1.5">
-                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">
-                          Входящие в эту сумму рейсы ({trips.length}):
-                        </p>
-                        <div className="space-y-1">
-                          {trips.map((item: string, idx: number) => (
+                      <div className="pt-2 border-t border-zinc-200/60 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">
+                            Входящие в эту сумму рейсы
+                          </p>
+                          <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                            {trips.length} рейсов
+                          </span>
+                        </div>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {trips.map((item, idx: number) => (
                             <div
                               key={idx}
-                              className="bg-white rounded-lg p-2 text-xs font-bold text-zinc-700 border border-zinc-200/60 flex items-center gap-1.5"
+                              className="bg-white rounded-lg p-2.5 text-xs font-bold text-zinc-800 border border-zinc-200/60 flex items-center justify-between gap-2"
                             >
-                              <span>🚛</span>
-                              <span>{item}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span>🚛</span>
+                                <span>{item.label}</span>
+                              </div>
+                              {item.amount && (
+                                <span className="text-emerald-600 font-black">{item.amount}</span>
+                              )}
                             </div>
                           ))}
                         </div>

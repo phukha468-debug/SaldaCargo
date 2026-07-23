@@ -919,7 +919,10 @@ function ExpensesPanel() {
           ) : (
             <div>
               {filteredTimeline.map((tx) => {
-                const name = tx.description || tx.category?.name || 'Без категории';
+                const { cleanTitle, trips } = parseTripsFromDescription(
+                  tx.description || tx.category?.name,
+                );
+                const name = cleanTitle || tx.category?.name || 'Без категории';
                 const catName = tx.category?.name ?? null;
                 const group = getExpenseGroup(tx);
                 const color = group.color;
@@ -964,9 +967,27 @@ function ExpensesPanel() {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
                       >
-                        {name}
+                        <span>{name}</span>
+                        {trips.length > 0 && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 800,
+                              background: '#dbeafe',
+                              color: '#1d4ed8',
+                              padding: '1px 6px',
+                              borderRadius: 6,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {trips.length} рейсов
+                          </span>
+                        )}
                       </p>
                       <span
                         style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', flexShrink: 0 }}
@@ -1213,16 +1234,39 @@ function ExpensesPanel() {
   );
 }
 
-function parseTripsFromDescription(description?: string | null): string[] {
-  if (!description) return [];
-  const match = description.match(/\(([Рр]ейс[^\)]+)\)/);
-  if (!match || !match[1]) return [];
-  return match[1].split(', ').map((s) => s.trim());
+type ParsedTrip = {
+  label: string;
+  amount: string;
+};
+
+function parseTripsFromDescription(description?: string | null): {
+  cleanTitle: string;
+  trips: ParsedTrip[];
+} {
+  if (!description) return { cleanTitle: 'Без описания', trips: [] };
+  const firstParen = description.indexOf('(');
+  const lastParen = description.lastIndexOf(')');
+  if (firstParen === -1 || lastParen === -1 || firstParen >= lastParen) {
+    return { cleanTitle: description, trips: [] };
+  }
+
+  const cleanTitle = description.slice(0, firstParen).trim();
+  const innerStr = description.slice(firstParen + 1, lastParen).trim();
+
+  const rawItems = innerStr.split(/,\s*(?=[Рр]ейс)/);
+  const trips: ParsedTrip[] = rawItems.map((item) => {
+    const m = item.match(/^(Рейс\s*№?\s*\d+)\s*\(([^)]+)\)/i);
+    if (m && m[1]) {
+      return { label: m[1].trim(), amount: (m[2] ?? '').trim() };
+    }
+    return { label: item.trim(), amount: '' };
+  });
+
+  return { cleanTitle, trips };
 }
 
 function ExpenseDetailModal({ tx, onClose }: { tx: ExpenseTx; onClose: () => void }) {
-  const trips = parseTripsFromDescription(tx.description);
-  const name = tx.description || tx.category?.name || 'Без категории';
+  const { cleanTitle, trips } = parseTripsFromDescription(tx.description);
 
   return (
     <div
@@ -1320,7 +1364,7 @@ function ExpenseDetailModal({ tx, onClose }: { tx: ExpenseTx; onClose: () => voi
             >
               Описание
             </span>
-            <span style={{ fontWeight: 700, color: '#1e293b' }}>{name}</span>
+            <span style={{ fontWeight: 700, color: '#1e293b' }}>{cleanTitle}</span>
           </div>
 
           <div
@@ -1360,46 +1404,71 @@ function ExpenseDetailModal({ tx, onClose }: { tx: ExpenseTx; onClose: () => voi
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 8,
-              paddingTop: 12,
+              gap: 10,
+              paddingTop: 14,
               borderTop: '1px solid #f1f5f9',
             }}
           >
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 800,
-                color: '#64748b',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              Входящие в эту сумму рейсы ({trips.length}):
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Входящие в эту сумму рейсы
+              </p>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 900,
+                  background: '#dbeafe',
+                  color: '#1d4ed8',
+                  padding: '2px 8px',
+                  borderRadius: 8,
+                }}
+              >
+                {trips.length} рейсов
+              </span>
+            </div>
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 6,
-                maxHeight: 220,
+                maxHeight: 260,
                 overflowY: 'auto',
+                paddingRight: 4,
               }}
             >
               {trips.map((item, idx) => (
                 <div
                   key={idx}
                   style={{
-                    background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: 10,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
                     padding: '10px 14px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
+                    justifyContent: 'space-between',
+                    gap: 12,
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>🚛</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#14532d' }}>{item}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 16 }}>🚛</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                      {item.label}
+                    </span>
+                  </div>
+                  {item.amount && (
+                    <span style={{ fontSize: 13, fontWeight: 900, color: '#16a34a' }}>
+                      {item.amount}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

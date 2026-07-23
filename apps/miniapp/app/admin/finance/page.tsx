@@ -358,6 +358,9 @@ function FinanceContent() {
               transactions.map((tx: any) => {
                 const walletName =
                   tx.direction === 'income' ? tx.to_wallet?.name : tx.from_wallet?.name;
+                const { cleanTitle, trips } = parseTripsFromDescription(
+                  tx.description || tx.category?.name,
+                );
                 return (
                   <div
                     key={tx.id}
@@ -365,12 +368,19 @@ function FinanceContent() {
                     className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex justify-between items-start shadow-sm gap-2 cursor-pointer active:bg-zinc-50 transition-all"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-zinc-900 text-sm">
-                        {tx.category?.name ?? tx.description ?? '—'}
-                      </p>
-                      {tx.description && tx.description !== tx.category?.name && (
-                        <p className="text-[10px] text-zinc-500 font-bold mt-0.5 truncate">
-                          {tx.description}
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-zinc-900 text-sm truncate">
+                          {cleanTitle || tx.category?.name || '—'}
+                        </p>
+                        {trips.length > 0 && (
+                          <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded shrink-0">
+                            {trips.length} рейсов
+                          </span>
+                        )}
+                      </div>
+                      {tx.category?.name && (
+                        <p className="text-[10px] text-zinc-400 font-bold mt-0.5 truncate">
+                          {tx.category.name}
                         </p>
                       )}
                       {tx.counterparty?.name && (
@@ -1369,17 +1379,41 @@ function AddTransactionForm({
   );
 }
 
-function parseTripsFromDescription(description?: string): string[] {
-  if (!description) return [];
-  const match = description.match(/\(([Рр]ейс[^\)]+)\)/);
-  if (!match || !match[1]) return [];
-  return match[1].split(', ').map((s) => s.trim());
+type ParsedTrip = {
+  label: string;
+  amount: string;
+};
+
+function parseTripsFromDescription(description?: string | null): {
+  cleanTitle: string;
+  trips: ParsedTrip[];
+} {
+  if (!description) return { cleanTitle: 'Без описания', trips: [] };
+  const firstParen = description.indexOf('(');
+  const lastParen = description.lastIndexOf(')');
+  if (firstParen === -1 || lastParen === -1 || firstParen >= lastParen) {
+    return { cleanTitle: description, trips: [] };
+  }
+
+  const cleanTitle = description.slice(0, firstParen).trim();
+  const innerStr = description.slice(firstParen + 1, lastParen).trim();
+
+  const rawItems = innerStr.split(/,\s*(?=[Рр]ейс)/);
+  const trips: ParsedTrip[] = rawItems.map((item) => {
+    const m = item.match(/^(Рейс\s*№?\s*\d+)\s*\(([^)]+)\)/i);
+    if (m && m[1]) {
+      return { label: m[1].trim(), amount: (m[2] ?? '').trim() };
+    }
+    return { label: item.trim(), amount: '' };
+  });
+
+  return { cleanTitle, trips };
 }
 
 function TransactionDetailModal({ tx, onClose }: { tx: any; onClose: () => void }) {
   const isIncome = tx.direction === 'income';
   const walletName = isIncome ? tx.to_wallet?.name : tx.from_wallet?.name;
-  const trips = parseTripsFromDescription(tx.description);
+  const { cleanTitle, trips } = parseTripsFromDescription(tx.description);
   const employeeOrCounterparty = tx.related_user?.name || tx.counterparty?.name;
 
   return (
@@ -1421,7 +1455,7 @@ function TransactionDetailModal({ tx, onClose }: { tx: any; onClose: () => void 
           {tx.description && (
             <div className="bg-zinc-50 rounded-xl p-3">
               <p className="text-[10px] font-bold text-zinc-400 uppercase">Описание</p>
-              <p className="font-bold text-zinc-800 mt-0.5">{tx.description}</p>
+              <p className="font-bold text-zinc-800 mt-0.5">{cleanTitle}</p>
             </div>
           )}
 
@@ -1457,20 +1491,28 @@ function TransactionDetailModal({ tx, onClose }: { tx: any; onClose: () => void 
 
         {/* Входящие в выплату рейсы */}
         {trips.length > 0 && (
-          <div className="space-y-2 pt-2 border-t border-zinc-100">
-            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest">
-              Входящие в эту сумму рейсы ({trips.length})
-            </h3>
-            <div className="space-y-1.5">
-              {trips.map((item: string, idx: number) => (
+          <div className="space-y-2 pt-3 border-t border-zinc-100">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+                Входящие в эту сумму рейсы
+              </h3>
+              <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">
+                {trips.length} рейсов
+              </span>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {trips.map((item, idx) => (
                 <div
                   key={idx}
-                  className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 flex items-center justify-between"
+                  className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base">🚛</span>
-                    <span className="text-xs font-black text-emerald-950">{item}</span>
+                    <span className="text-xs font-bold text-zinc-900">{item.label}</span>
                   </div>
+                  {item.amount && (
+                    <span className="text-xs font-black text-emerald-600">{item.amount}</span>
+                  )}
                 </div>
               ))}
             </div>
