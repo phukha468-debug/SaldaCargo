@@ -592,6 +592,7 @@ function ExpensesPanel() {
   const [activeCatFilter, setActiveCatFilter] = useState<string | null>(null);
   const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [selectedTx, setSelectedTx] = useState<ExpenseTx | null>(null);
   const queryClient = useQueryClient();
 
   const selectedMonth = anchorDate.slice(0, 7);
@@ -927,13 +928,14 @@ function ExpensesPanel() {
                   <div key={tx.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                     <div
                       className="group"
+                      onClick={() => setSelectedTx(tx)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
                         padding: '6px 14px',
                         transition: 'background .1s',
-                        cursor: 'default',
+                        cursor: 'pointer',
                         background: isConfirming ? '#fef2f2' : undefined,
                       }}
                       onMouseOver={(e) => {
@@ -1009,7 +1011,8 @@ function ExpensesPanel() {
                       </span>
                       <button
                         title="Аннулировать"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setPendingCancelId(isConfirming ? null : tx.id);
                           setCancelReason('');
                         }}
@@ -1203,6 +1206,205 @@ function ExpensesPanel() {
             </div>
           </Card>
         </div>
+      </div>
+
+      {selectedTx && <ExpenseDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />}
+    </div>
+  );
+}
+
+function parseTripsFromDescription(description?: string | null): string[] {
+  if (!description) return [];
+  const match = description.match(/\(([Рр]ейс[^\)]+)\)/);
+  if (!match || !match[1]) return [];
+  return match[1].split(', ').map((s) => s.trim());
+}
+
+function ExpenseDetailModal({ tx, onClose }: { tx: ExpenseTx; onClose: () => void }) {
+  const trips = parseTripsFromDescription(tx.description);
+  const name = tx.description || tx.category?.name || 'Без категории';
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: 20,
+          width: '100%',
+          maxWidth: 520,
+          padding: 24,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}
+            >
+              Детали финансовой операции
+            </p>
+            <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', marginTop: 2 }}>
+              {tx.category?.name || 'Расход'}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: '#f1f5f9',
+              border: 'none',
+              color: '#64748b',
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ background: '#f8fafc', borderRadius: 16, padding: 16, textAlign: 'center' }}>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#94a3b8',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              marginBottom: 4,
+            }}
+          >
+            Сумма списания
+          </p>
+          <p style={{ fontSize: 28, fontWeight: 900, color: '#ef4444' }}>
+            {parseFloat(tx.amount || '0').toLocaleString('ru-RU')} ₽
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+          <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12 }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                display: 'block',
+                marginBottom: 2,
+              }}
+            >
+              Описание
+            </span>
+            <span style={{ fontWeight: 700, color: '#1e293b' }}>{name}</span>
+          </div>
+
+          <div
+            style={{
+              background: '#f8fafc',
+              borderRadius: 12,
+              padding: 12,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+              }}
+            >
+              Дата проведения
+            </span>
+            <span style={{ fontWeight: 700, color: '#1e293b' }}>
+              {new Date(tx.created_at).toLocaleString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+          </div>
+        </div>
+
+        {trips.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              paddingTop: 12,
+              borderTop: '1px solid #f1f5f9',
+            }}
+          >
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Входящие в эту сумму рейсы ({trips.length}):
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                maxHeight: 220,
+                overflowY: 'auto',
+              }}
+            >
+              {trips.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>🚛</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#14532d' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2868,7 +3070,14 @@ function LoansPanel() {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
         <div style={{ display: 'flex', gap: 6 }}>
           <Chip
             label="Все"
