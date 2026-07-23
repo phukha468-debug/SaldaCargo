@@ -16,8 +16,8 @@ export async function GET() {
     { data: activeOrders },
     { data: pendingApproval },
     { data: maintenanceAlerts },
-    { data: completedThisMonth },
-    { data: salaryThisMonth },
+    { data: allServiceOrders },
+    { data: salaryTxs },
   ] = await Promise.all([
     (supabase.from('repair_requests') as any)
       .select(
@@ -31,7 +31,7 @@ export async function GET() {
         'id, order_number, status, created_at, machine_type, asset:assets(short_name, reg_number), mechanic:users!service_orders_assigned_mechanic_id_fkey(name), second_mechanic:users!service_orders_second_mechanic_id_fkey(name)',
       )
       .in('status', ['created', 'in_progress'])
-      .eq('lifecycle_status', 'draft')
+      .neq('lifecycle_status', 'cancelled')
       .order('created_at', { ascending: false }),
 
     (supabase.from('service_orders') as any)
@@ -50,39 +50,73 @@ export async function GET() {
       .order('alert_status', { ascending: false })
       .order('next_due_km', { ascending: true }),
 
-    // Наряды, закрытые в этом месяце (lifecycle=approved)
-    (supabase.from('service_orders') as any)
-      .select('id, service_order_works(price_client, status)')
-      .eq('lifecycle_status', 'approved')
-      .gte('updated_at', monthStart),
+    // Все наряды с работами для детализированной финансовой статистики
+    (supabase.from('service_orders') as any).select(
+      'id, client_vehicle_id, status, lifecycle_status, created_at, updated_at, service_order_works(price_client, status)',
+    ),
 
-    // Начисленная ЗП механикам за этот месяц (approved PAYROLL_MECHANIC)
+    // Начислено / выплачено ЗП механикам
     (supabase.from('transactions') as any)
-      .select('amount')
+      .select('amount, created_at')
       .eq('category_id', PAYROLL_MECHANIC_CAT)
-      .eq('lifecycle_status', 'approved')
-      .gte('created_at', monthStart),
+      .eq('lifecycle_status', 'approved'),
   ]);
 
   const activeArr = activeOrders ?? [];
   const uniqueVehicles = new Set(activeArr.map((o: any) => o.asset?.reg_number).filter(Boolean))
     .size;
 
-  // Выручка за месяц = сумма price_client завершённых работ в закрытых нарядах
-  const closedArr = (completedThisMonth ?? []) as any[];
-  const revenueThisMonth = closedArr.reduce((total: number, order: any) => {
-    const worksRevenue = (order.service_order_works ?? [])
-      .filter((w: any) => w.status === 'completed')
-      .reduce((s: number, w: any) => s + parseFloat(w.price_client ?? '0'), 0);
-    return total + worksRevenue;
-  }, 0);
+  let clientRevenueThisMonth = 0;
+  let clientRevenueAllTime = 0;
+  let clientActiveSum = 0;
+  let clientActiveCount = 0;
 
-  // ЗП начислено механикам за месяц
-  const salaryArr = (salaryThisMonth ?? []) as any[];
-  const salaryAccruedThisMonth = salaryArr.reduce(
-    (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
-    0,
-  );
+  let ownFleetThisMonth = 0;
+  let ownFleetAllTime = 0;
+
+  let completedOrdersThisMonth = 0;
+  let completedOrdersAllTime = 0;
+  let inProgressOrdersCount = 0;
+
+  (allServiceOrders || []).forEach((o: any) => {
+    const isClient = o.client_vehicle_id != null;
+    const isApproved = o.lifecycle_status === 'approved';
+    const isCompletedOrApproved = o.status === 'completed' || isApproved;
+    const isThisMonth = (o.updated_at || o.created_at) >= monthStart;
+    const isActive = o.status === 'created' || o.status === 'in_progress';
+
+    if (isActive) inProgressOrdersCount++;
+    if (isCompletedOrApproved) {
+      completedOrdersAllTime++;
+      if (isThisMonth) completedOrdersThisMonth++;
+    }
+
+    const worksSum = (o.service_order_works ?? [])
+      .filter((w: any) => w.status === 'completed' || isCompletedOrApproved || isActive)
+      .reduce((s: number, w: any) => s + parseFloat(w.price_client ?? '0'), 0);
+
+    if (isClient) {
+      if (isCompletedOrApproved) {
+        clientRevenueAllTime += worksSum;
+        if (isThisMonth) clientRevenueThisMonth += worksSum;
+      }
+      if (isActive) {
+        clientActiveSum += worksSum;
+        clientActiveCount++;
+      }
+    } else {
+      if (isCompletedOrApproved) {
+        ownFleetAllTime += worksSum;
+        if (isThisMonth) ownFleetThisMonth += worksSum;
+      }
+    }
+  });
+
+  const salaryArr = (salaryTxs ?? []) as any[];
+  const salaryThisMonth = salaryArr
+    .filter((t: any) => t.created_at >= monthStart)
+    .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
+  const salaryAllTime = salaryArr.reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
 
   return NextResponse.json({
     repairRequests: repairRequests ?? [],
@@ -97,9 +131,22 @@ export async function GET() {
       vehiclesInRepair: uniqueVehicles,
     },
     month: {
-      completedOrders: closedArr.length,
-      revenue: revenueThisMonth.toFixed(2),
-      salaryAccrued: salaryAccruedThisMonth.toFixed(2),
+      completedOrders: completedOrdersThisMonth,
+      revenue: clientRevenueThisMonth.toFixed(2),
+      salaryAccrued: salaryThisMonth.toFixed(2),
+    },
+    stats: {
+      clientRevenueThisMonth: clientRevenueThisMonth,
+      clientRevenueAllTime: clientRevenueAllTime,
+      clientActiveSum: clientActiveSum,
+      clientActiveCount: clientActiveCount,
+      salaryThisMonth: salaryThisMonth,
+      salaryAllTime: salaryAllTime,
+      ownFleetThisMonth: ownFleetThisMonth,
+      ownFleetAllTime: ownFleetAllTime,
+      completedOrdersThisMonth: completedOrdersThisMonth,
+      completedOrdersAllTime: completedOrdersAllTime,
+      inProgressOrdersCount: inProgressOrdersCount,
     },
   });
 }

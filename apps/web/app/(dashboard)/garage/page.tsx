@@ -2953,6 +2953,8 @@ function DashboardSection({
       </div>
     );
 
+  const [showStatsModal, setShowStatsModal] = useState(false);
+
   const c = data?.counts ?? {
     repairRequests: 0,
     pendingApproval: 0,
@@ -2961,6 +2963,19 @@ function DashboardSection({
     vehiclesInRepair: 0,
   };
   const m = data?.month ?? { completedOrders: 0, revenue: '0.00', salaryAccrued: '0.00' };
+  const st = data?.stats ?? {
+    clientRevenueThisMonth: parseFloat(m.revenue || '0'),
+    clientRevenueAllTime: parseFloat(m.revenue || '0'),
+    clientActiveSum: 0,
+    clientActiveCount: 0,
+    salaryThisMonth: parseFloat(m.salaryAccrued || '0'),
+    salaryAllTime: parseFloat(m.salaryAccrued || '0'),
+    ownFleetThisMonth: 0,
+    ownFleetAllTime: 0,
+    completedOrdersThisMonth: m.completedOrders,
+    completedOrdersAllTime: m.completedOrders,
+    inProgressOrdersCount: c.activeOrders,
+  };
   const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
 
   return (
@@ -2979,6 +2994,47 @@ function DashboardSection({
           </svg>
           Новый наряд
         </button>
+      </div>
+
+      {/* 💰 Главный блок: Заработок с клиентских машин */}
+      <div
+        onClick={() => setShowStatsModal(true)}
+        className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl cursor-pointer hover:shadow-2xl transition-all border border-indigo-500/20 group"
+      >
+        <div className="absolute -top-12 -right-12 w-56 h-56 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-indigo-500/25 border border-indigo-400/30 text-indigo-200 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                💰 ЗАРАБОТАЛИ С КЛИЕНТОВ ({monthName.toUpperCase()})
+              </span>
+              {st.clientActiveCount > 0 && (
+                <span className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold px-3 py-1 rounded-full">
+                  ⏳ В работе: <Money amount={st.clientActiveSum} /> ({st.clientActiveCount}{' '}
+                  нарядов)
+                </span>
+              )}
+            </div>
+            <div className="text-4xl md:text-5xl font-black tracking-tight text-white pt-1">
+              <Money amount={st.clientRevenueThisMonth} />
+            </div>
+            <p className="text-xs text-indigo-200/80 font-medium">
+              Главный доход гаража от ремонта клиентских машин · Нажмите для подробной статистики
+            </p>
+          </div>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowStatsModal(true);
+            }}
+            className="self-start md:self-center bg-white hover:bg-slate-100 text-slate-900 text-xs font-black px-5 py-3 rounded-2xl transition-all flex items-center gap-2 shrink-0 shadow-lg active:scale-95"
+          >
+            <span>📊 Вся статистика</span>
+            <span className="text-sm">➔</span>
+          </button>
+        </div>
       </div>
 
       {/* 5 KPI tiles */}
@@ -3025,34 +3081,59 @@ function DashboardSection({
         </div>
       </div>
 
-      {/* Статистика за месяц */}
+      {/* Быстрая сводка за месяц */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+        <div
+          onClick={() => setShowStatsModal(true)}
+          className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 cursor-pointer hover:bg-emerald-100/60 transition-all"
+        >
           <div className="text-xs text-emerald-600 font-semibold mb-1 uppercase tracking-wide">
-            Завершено за {monthName}
+            Выручка с клиентов ({monthName})
           </div>
-          <div className="text-3xl font-bold text-emerald-700">{m.completedOrders}</div>
-          <div className="text-xs text-emerald-500 mt-1">нарядов закрыто</div>
+          <div className="text-2xl font-bold text-emerald-700">
+            <Money amount={st.clientRevenueThisMonth} />
+          </div>
+          <div className="text-xs text-emerald-600 mt-1 font-medium">
+            Всего: <Money amount={st.clientRevenueAllTime} />
+          </div>
         </div>
-        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
-          <div className="text-xs text-sky-600 font-semibold mb-1 uppercase tracking-wide">
-            Выручка за {monthName}
-          </div>
-          <div className="text-2xl font-bold text-sky-700">
-            <Money amount={m.revenue} />
-          </div>
-          <div className="text-xs text-sky-500 mt-1">по закрытым нарядам</div>
-        </div>
-        <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4">
+        <div
+          onClick={() => setShowStatsModal(true)}
+          className="bg-violet-50/80 border border-violet-200 rounded-2xl p-4 cursor-pointer hover:bg-violet-100/60 transition-all"
+        >
           <div className="text-xs text-violet-600 font-semibold mb-1 uppercase tracking-wide">
-            Начислено механикам
+            Выплачено ЗП механикам ({monthName})
           </div>
           <div className="text-2xl font-bold text-violet-700">
-            <Money amount={m.salaryAccrued} />
+            <Money amount={st.salaryThisMonth} />
           </div>
-          <div className="text-xs text-violet-500 mt-1">ЗП за {monthName}</div>
+          <div className="text-xs text-violet-600 mt-1 font-medium">
+            Всего: <Money amount={st.salaryAllTime} />
+          </div>
+        </div>
+        <div
+          onClick={() => setShowStatsModal(true)}
+          className="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 cursor-pointer hover:bg-sky-100/60 transition-all"
+        >
+          <div className="text-xs text-sky-600 font-semibold mb-1 uppercase tracking-wide">
+            Со своих машин ({monthName})
+          </div>
+          <div className="text-2xl font-bold text-sky-700">
+            <Money amount={st.ownFleetThisMonth} />
+          </div>
+          <div className="text-xs text-sky-600 mt-1 font-medium">
+            Всего: <Money amount={st.ownFleetAllTime} />
+          </div>
         </div>
       </div>
+
+      {showStatsModal && (
+        <GarageStatsModal
+          stats={st}
+          monthName={monthName}
+          onClose={() => setShowStatsModal(false)}
+        />
+      )}
 
       {/* 3-column grid */}
       <div className="grid grid-cols-3 gap-4">
@@ -8056,6 +8137,168 @@ function CreateVehicleModal({
           >
             {createMutation.isPending ? '...' : 'Добавить автомобиль'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type GarageStats = {
+  clientRevenueThisMonth: number;
+  clientRevenueAllTime: number;
+  clientActiveSum: number;
+  clientActiveCount: number;
+  salaryThisMonth: number;
+  salaryAllTime: number;
+  ownFleetThisMonth: number;
+  ownFleetAllTime: number;
+  completedOrdersThisMonth: number;
+  completedOrdersAllTime: number;
+  inProgressOrdersCount: number;
+};
+
+function GarageStatsModal({
+  stats,
+  monthName,
+  onClose,
+}: {
+  stats: GarageStats;
+  monthName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl w-full max-w-2xl p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div>
+            <p className="text-xs font-extrabold text-indigo-600 uppercase tracking-widest">
+              Сводная аналитика
+            </p>
+            <h2 className="text-2xl font-black text-slate-900 mt-0.5">
+              📊 Финансовые показатели гаража
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 active:scale-95 transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* 1. Заработано с клиентов */}
+          <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">💰</span>
+              <h3 className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider">
+                Заработано с клиентов
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-emerald-900">
+                <Money amount={stats.clientRevenueThisMonth} />
+              </p>
+              <p className="text-[11px] font-medium text-emerald-700 mt-0.5">за {monthName}</p>
+            </div>
+            <div className="pt-2 border-t border-emerald-200/60 space-y-1 text-xs font-semibold text-emerald-900">
+              <div className="flex justify-between">
+                <span className="text-emerald-700">Всего за всё время:</span>
+                <span>
+                  <Money amount={stats.clientRevenueAllTime} />
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-700">
+                  В работе сейчас ({stats.clientActiveCount}):
+                </span>
+                <span>
+                  <Money amount={stats.clientActiveSum} />
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Выплачено зарплаты */}
+          <div className="bg-violet-50/80 border border-violet-200/80 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">👨‍🔧</span>
+              <h3 className="text-xs font-extrabold text-violet-800 uppercase tracking-wider">
+                Выплачено зарплаты
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-violet-900">
+                <Money amount={stats.salaryThisMonth} />
+              </p>
+              <p className="text-[11px] font-medium text-violet-700 mt-0.5">
+                механикам за {monthName}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-violet-200/60 flex justify-between text-xs font-semibold text-violet-900">
+              <span className="text-violet-700">Всего за всё время:</span>
+              <span>
+                <Money amount={stats.salaryAllTime} />
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Заработано со своих машин */}
+          <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🚛</span>
+              <h3 className="text-xs font-extrabold text-sky-800 uppercase tracking-wider">
+                Со своих машин
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-sky-900">
+                <Money amount={stats.ownFleetThisMonth} />
+              </p>
+              <p className="text-[11px] font-medium text-sky-700 mt-0.5">автопарк за {monthName}</p>
+            </div>
+            <div className="pt-2 border-t border-sky-200/60 flex justify-between text-xs font-semibold text-sky-900">
+              <span className="text-sky-700">Всего за всё время:</span>
+              <span>
+                <Money amount={stats.ownFleetAllTime} />
+              </span>
+            </div>
+          </div>
+
+          {/* 4. Всего нарядов сделано */}
+          <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📋</span>
+              <h3 className="text-xs font-extrabold text-amber-800 uppercase tracking-wider">
+                Всего сделано нарядов
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-amber-900">
+                {stats.completedOrdersThisMonth}{' '}
+                <span className="text-sm font-bold text-amber-700">нарядов</span>
+              </p>
+              <p className="text-[11px] font-medium text-amber-700 mt-0.5">
+                завершено за {monthName}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-amber-200/60 space-y-1 text-xs font-semibold text-amber-900">
+              <div className="flex justify-between">
+                <span className="text-amber-700">Завершено за всё время:</span>
+                <span>{stats.completedOrdersAllTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-amber-700">Сейчас в процессе:</span>
+                <span>{stats.inProgressOrdersCount}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

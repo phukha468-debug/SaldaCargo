@@ -82,6 +82,19 @@ interface GarageData {
   extraWorkPending: ExtraWork[];
   maintenanceAlerts: MaintenanceAlert[];
   counts: Record<string, number>;
+  stats?: {
+    clientRevenueThisMonth: number;
+    clientRevenueAllTime: number;
+    clientActiveSum: number;
+    clientActiveCount: number;
+    salaryThisMonth: number;
+    salaryAllTime: number;
+    ownFleetThisMonth: number;
+    ownFleetAllTime: number;
+    completedOrdersThisMonth: number;
+    completedOrdersAllTime: number;
+    inProgressOrdersCount: number;
+  };
 }
 
 interface Mechanic {
@@ -1398,6 +1411,7 @@ type Modal =
 export default function AdminGaragePage() {
   const [tab, setTab] = useState<TabId>('home');
   const [modal, setModal] = useState<Modal | null>(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery<GarageData>({
@@ -1443,6 +1457,20 @@ export default function AdminGaragePage() {
   });
 
   const counts = data?.counts ?? {};
+  const stats = data?.stats ?? {
+    clientRevenueThisMonth: 0,
+    clientRevenueAllTime: 0,
+    clientActiveSum: 0,
+    clientActiveCount: 0,
+    salaryThisMonth: 0,
+    salaryAllTime: 0,
+    ownFleetThisMonth: 0,
+    ownFleetAllTime: 0,
+    completedOrdersThisMonth: 0,
+    completedOrdersAllTime: 0,
+    inProgressOrdersCount: counts.activeOrders ?? 0,
+  };
+  const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
 
   if (isLoading) {
     return (
@@ -1514,6 +1542,28 @@ export default function AdminGaragePage() {
         {/* ── Главная ── */}
         {tab === 'home' && (
           <>
+            {/* 💰 Главный блок: Заработок с клиентских машин */}
+            <div
+              onClick={() => setShowStatsModal(true)}
+              className="bg-gradient-to-br from-zinc-900 via-indigo-950 to-zinc-900 text-white rounded-2xl p-4 shadow-lg cursor-pointer active:scale-[0.99] transition-all space-y-2 border border-indigo-500/20"
+            >
+              <div className="flex justify-between items-start">
+                <span className="bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  💰 С КЛИЕНТОВ ({monthName.toUpperCase()})
+                </span>
+                <span className="text-[10px] font-extrabold text-indigo-300">Вся статистика ➔</span>
+              </div>
+              <div className="text-3xl font-black text-white">
+                {formatRub(stats.clientRevenueThisMonth)}
+              </div>
+              {stats.clientActiveCount > 0 && (
+                <div className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-lg inline-block">
+                  ⏳ В работе: {formatRub(stats.clientActiveSum)} ({stats.clientActiveCount}{' '}
+                  нарядов)
+                </div>
+              )}
+            </div>
+
             {/* KPI grid 2×2 */}
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -1985,6 +2035,153 @@ export default function AdminGaragePage() {
           onSuccess={invalidate}
         />
       )}
+
+      {showStatsModal && (
+        <GarageStatsModal
+          stats={stats}
+          monthName={monthName}
+          onClose={() => setShowStatsModal(false)}
+        />
+      )}
     </>
+  );
+}
+
+function formatRub(amount: number | string): string {
+  const num = typeof amount === 'number' ? amount : parseFloat(amount || '0');
+  return Math.round(num).toLocaleString('ru-RU') + ' ₽';
+}
+
+function GarageStatsModal({
+  stats,
+  monthName,
+  onClose,
+}: {
+  stats: NonNullable<GarageData['stats']>;
+  monthName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-h-[90vh] overflow-y-auto rounded-t-[2.5rem] p-6 space-y-5 shadow-2xl animate-in slide-in-from-bottom duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+          <div>
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+              Сводная аналитика
+            </p>
+            <h2 className="text-xl font-black text-zinc-900 mt-0.5">📊 Финансы и наряды гаража</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 text-zinc-500 font-bold active:scale-90 transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {/* 1. Заработано с клиентов */}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💰</span>
+              <h3 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
+                Заработано с клиентов
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-emerald-950">
+                {formatRub(stats.clientRevenueThisMonth)}
+              </p>
+              <p className="text-[10px] font-bold text-emerald-700">за {monthName}</p>
+            </div>
+            <div className="pt-2 border-t border-emerald-200/60 space-y-1 text-xs font-bold text-emerald-900">
+              <div className="flex justify-between">
+                <span className="text-emerald-700">Всего за всё время:</span>
+                <span>{formatRub(stats.clientRevenueAllTime)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-700">
+                  В работе сейчас ({stats.clientActiveCount}):
+                </span>
+                <span>{formatRub(stats.clientActiveSum)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Выплачено зарплаты */}
+          <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">👨‍🔧</span>
+              <h3 className="text-xs font-black text-violet-900 uppercase tracking-wider">
+                Выплачено ЗП механикам
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-violet-950">
+                {formatRub(stats.salaryThisMonth)}
+              </p>
+              <p className="text-[10px] font-bold text-violet-700">за {monthName}</p>
+            </div>
+            <div className="pt-2 border-t border-violet-200/60 flex justify-between text-xs font-bold text-violet-900">
+              <span className="text-violet-700">Всего за всё время:</span>
+              <span>{formatRub(stats.salaryAllTime)}</span>
+            </div>
+          </div>
+
+          {/* 3. Заработано со своих машин */}
+          <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🚛</span>
+              <h3 className="text-xs font-black text-sky-900 uppercase tracking-wider">
+                Со своих машин (автопарк)
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-sky-950">
+                {formatRub(stats.ownFleetThisMonth)}
+              </p>
+              <p className="text-[10px] font-bold text-sky-700">за {monthName}</p>
+            </div>
+            <div className="pt-2 border-t border-sky-200/60 flex justify-between text-xs font-bold text-sky-900">
+              <span className="text-sky-700">Всего за всё время:</span>
+              <span>{formatRub(stats.ownFleetAllTime)}</span>
+            </div>
+          </div>
+
+          {/* 4. Всего нарядов сделано */}
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📋</span>
+              <h3 className="text-xs font-black text-amber-900 uppercase tracking-wider">
+                Всего сделано нарядов
+              </h3>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-amber-950">
+                {stats.completedOrdersThisMonth}{' '}
+                <span className="text-xs font-bold text-amber-800">нарядов</span>
+              </p>
+              <p className="text-[10px] font-bold text-amber-700">завершено за {monthName}</p>
+            </div>
+            <div className="pt-2 border-t border-amber-200/60 space-y-1 text-xs font-bold text-amber-900">
+              <div className="flex justify-between">
+                <span className="text-amber-700">Завершено за всё время:</span>
+                <span>{stats.completedOrdersAllTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-amber-700">Сейчас в работе:</span>
+                <span>{stats.inProgressOrdersCount}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
