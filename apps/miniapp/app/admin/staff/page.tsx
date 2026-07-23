@@ -688,14 +688,19 @@ function parseTripsFromDescription(description?: string | null): {
   const cleanTitle = description.slice(0, firstParen).trim();
   const innerStr = description.slice(firstParen + 1, lastParen).trim();
 
-  const rawItems = innerStr.split(/,\s*(?=[Рр]ейс)/);
-  const trips: ParsedTrip[] = rawItems.map((item) => {
-    const m = item.match(/^(Рейс\s*№?\s*\d+)\s*\(([^)]+)\)/i);
-    if (m && m[1]) {
-      return { label: m[1].trim(), amount: (m[2] ?? '').trim() };
+  const regex = /([^,\(\)]+?(?:\s*—\s*[^,\(\)]+)?)\s*\(([^)]+)\)/g;
+  const trips: ParsedTrip[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(innerStr)) !== null) {
+    if (m[1]) {
+      trips.push({ label: m[1].trim(), amount: (m[2] ?? '').trim() });
     }
-    return { label: item.trim(), amount: '' };
-  });
+  }
+
+  if (trips.length === 0 && innerStr) {
+    const rawItems = innerStr.split(', ');
+    rawItems.forEach((item) => trips.push({ label: item.trim(), amount: '' }));
+  }
 
   return { cleanTitle, trips };
 }
