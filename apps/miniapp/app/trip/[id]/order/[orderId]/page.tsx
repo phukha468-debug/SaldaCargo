@@ -141,6 +141,7 @@ export default function EditOrderPage() {
   }, [order, initialized, setValue]);
 
   const selectedCounterpartyId = watch('counterparty_id');
+  const selectedPaymentMethod = watch('payment_method');
   const selectedCounterparty =
     counterparties.find((c: any) => c.id === selectedCounterpartyId) ??
     (order?.counterparty && selectedCounterpartyId === order.counterparty_id
@@ -475,6 +476,17 @@ export default function EditOrderPage() {
               </label>
             ))}
           </div>
+
+          {/* Подсказка для налички */}
+          {selectedPaymentMethod === 'cash' && !selectedCounterparty?.is_legal_entity && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
+              <span className="text-sm leading-none">💡</span>
+              <span>
+                Деньги физически у вас или вы лично своими глазами видели перевод. Описание можно не
+                заполнять.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ЗП водителя */}
