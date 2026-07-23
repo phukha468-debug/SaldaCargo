@@ -6,7 +6,7 @@ import { cn, Money } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Mechanic = { id: string; name: string };
+type Mechanic = { id: string; name: string; mechanic_salary_pct?: string | null };
 type Asset = { id: string; short_name: string; reg_number: string };
 
 type OrderRow = {
@@ -123,6 +123,7 @@ type DashboardData = {
     revenue: string;
     salaryAccrued: string;
   };
+  stats?: GarageStats;
 };
 
 type ServiceJson = {
@@ -2942,6 +2943,8 @@ function DashboardSection({
     },
   });
 
+  const [showStatsModal, setShowStatsModal] = useState(false);
+
   if (isLoading)
     return (
       <div className="space-y-4">
@@ -2952,8 +2955,6 @@ function DashboardSection({
         </div>
       </div>
     );
-
-  const [showStatsModal, setShowStatsModal] = useState(false);
 
   const c = data?.counts ?? {
     repairRequests: 0,
