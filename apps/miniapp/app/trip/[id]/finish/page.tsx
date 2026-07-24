@@ -45,18 +45,9 @@ export default function FinishTripPage() {
     },
   });
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<FormData>({
+  const { register, handleSubmit } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
   });
-
-  const odometerEndRaw = watch('odometer_end');
-  const odometerEnd = odometerEndRaw ? Number(odometerEndRaw) : 0;
-  const mileage = odometerEnd && trip?.odometer_start ? odometerEnd - trip.odometer_start : 0;
 
   const activeOrders = (trip?.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
   const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
@@ -120,26 +111,6 @@ export default function FinishTripPage() {
                 </span>
               }
             />
-          )}
-          {mileage > 0 && <SummaryRow label="Пробег" value={`${mileage} км`} />}
-        </div>
-
-        {/* Конечный одометр (необязательно) */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Конечный одометр, км (необязательно)
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            {...register('odometer_end')}
-            placeholder="Необязательно (если работает)"
-            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-          />
-          {errors.odometer_end && (
-            <p className="text-red-500 text-xs font-bold mt-1 pl-1">
-              {errors.odometer_end.message}
-            </p>
           )}
         </div>
 
