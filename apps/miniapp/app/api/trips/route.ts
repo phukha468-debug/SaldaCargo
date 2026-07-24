@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         asset_id: body.asset_id,
         loaders_count: body.loaders_count ?? 0,
         trip_type: body.trip_type as any,
-        odometer_start: body.odometer_start,
+        odometer_start: body.odometer_start ?? 0,
         status: 'in_progress',
         lifecycle_status: 'draft',
         started_at: new Date().toISOString(),

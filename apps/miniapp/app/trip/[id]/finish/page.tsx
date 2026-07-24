@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { Button, Money } from '@saldacargo/ui';
 
 const schema = z.object({
-  odometer_end: z.coerce.number().positive('Введите одометр'),
+  odometer_end: z.coerce.number().optional(),
   driver_note: z.string().optional(),
 });
 
@@ -65,11 +65,6 @@ export default function FinishTripPage() {
   const debtOrders = activeOrders.filter((o) => o.settlement_status === 'pending');
 
   async function onSubmit(data: FormData) {
-    if (mileage < 0) {
-      setError('Конечный одометр не может быть меньше начального');
-      return;
-    }
-
     setSubmitting(true);
     setError('');
 
@@ -129,28 +124,17 @@ export default function FinishTripPage() {
           {mileage > 0 && <SummaryRow label="Пробег" value={`${mileage} км`} />}
         </div>
 
-        {/* Конечный одометр */}
+        {/* Конечный одометр (необязательно) */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Конечный одометр (км)
+            Конечный одометр, км (необязательно)
           </label>
-          {trip && (
-            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-1 pl-1 mb-2">
-              Начальный: {trip.odometer_start.toLocaleString('ru-RU')} км
-            </p>
-          )}
           <input
             type="number"
             inputMode="numeric"
             {...register('odometer_end')}
-            placeholder="340 160"
-            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-            onFocus={(e) =>
-              setTimeout(
-                () => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-                300,
-              )
-            }
+            placeholder="Необязательно (если работает)"
+            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
           />
           {errors.odometer_end && (
             <p className="text-red-500 text-xs font-bold mt-1 pl-1">
