@@ -49,5 +49,16 @@ export async function PATCH(request: Request) {
     .eq('id', driverId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+
+  let asset = null;
+  if (asset_id) {
+    const { data: assetData } = await (supabase
+      .from('assets')
+      .select('id, short_name, reg_number, odometer_current')
+      .eq('id', asset_id)
+      .single() as any);
+    asset = assetData;
+  }
+
+  return NextResponse.json({ ok: true, current_asset_id: asset_id, asset });
 }

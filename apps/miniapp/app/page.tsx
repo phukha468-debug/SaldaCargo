@@ -158,6 +158,11 @@ export default function RootDispatcher() {
 
   const handleVehicleSelect = (vehicleId: string) => {
     localStorage.setItem('active_vehicle_id', vehicleId);
+    fetch('/api/driver/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asset_id: vehicleId }),
+    }).catch((err) => console.error('Failed to sync active vehicle to DB:', err));
     router.push('/driver');
   };
 

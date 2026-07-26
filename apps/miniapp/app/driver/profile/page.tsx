@@ -28,9 +28,15 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ asset_id }),
       }).then((r) => r.json()),
-    onSuccess: (_, asset_id) => {
+    onSuccess: (data, asset_id) => {
       localStorage.setItem('active_vehicle_id', asset_id ?? '');
+      queryClient.setQueryData(['me'], (old: any) =>
+        old ? { ...old, current_asset_id: asset_id } : old,
+      );
       queryClient.invalidateQueries({ queryKey: ['driver-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-assets'] });
       setShowVehiclePicker(false);
     },
   });

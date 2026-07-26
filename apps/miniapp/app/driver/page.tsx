@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -325,6 +326,8 @@ export default function RootPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showRepairForm, setShowRepairForm] = useState(false);
+  const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
   const [startTripError, setStartTripError] = useState('');
 
@@ -337,6 +340,18 @@ export default function RootPage() {
       return res.json();
     },
     retry: false,
+  });
+
+  // Загружаем список всех активных машин
+  const { data: vehicles = [] } = useQuery<
+    Array<{ id: string; short_name: string; reg_number: string; odometer_current: number | null }>
+  >({
+    queryKey: ['driver-assets'],
+    queryFn: () =>
+      fetch('/api/driver/assets')
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : [])),
+    staleTime: 300000,
   });
 
   useEffect(() => {
@@ -371,31 +386,61 @@ export default function RootPage() {
         (user.roles || []).includes('admin')),
   });
 
-  if (isUserLoading || isDataLoading) {
-    return <DriverHomeSkeleton />;
-  }
+  const activeAssetId =
+    user?.current_asset_id ||
+    (typeof window !== 'undefined' ? localStorage.getItem('active_vehicle_id') : null);
 
-  if (error) {
-    return (
-      <div className="p-4 text-center text-red-600">
-        Ошибка загрузки. Потяните вниз для обновления.
-      </div>
-    );
+  const activeAsset = vehicles.find((v) => v.id === activeAssetId);
+
+  async function handleSwitchVehicle(assetId: string) {
+    setUpdatingVehicle(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('active_vehicle_id', assetId);
+      }
+      queryClient.setQueryData(['me'], (old: any) =>
+        old ? { ...old, current_asset_id: assetId } : old,
+      );
+
+      const res = await fetch('/api/driver/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: assetId }),
+      });
+
+      if (res.ok) {
+        setShowVehiclePicker(false);
+        setStartTripError('');
+        queryClient.invalidateQueries({ queryKey: ['me'] });
+        queryClient.invalidateQueries({ queryKey: ['driver-profile'] });
+        queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['driver-assets'] });
+      }
+    } catch (e) {
+      console.error('Failed to switch vehicle', e);
+    } finally {
+      setUpdatingVehicle(false);
+    }
   }
 
   async function handleStartTrip() {
     if (startingTrip) return;
-    setStartingTrip(true);
     setStartTripError('');
+
+    const currentVehicleId =
+      user?.current_asset_id ||
+      (typeof window !== 'undefined' ? localStorage.getItem('active_vehicle_id') : null);
+
+    const asset = vehicles.find((a) => a.id === currentVehicleId);
+
+    if (!asset) {
+      setShowVehiclePicker(true);
+      setStartTripError('Выберите автомобиль перед началом рейса.');
+      return;
+    }
+
+    setStartingTrip(true);
     try {
-      type AssetRow = { id: string; odometer_current: number | null };
-      const assets: AssetRow[] = await fetch('/api/driver/assets').then((r) => r.json());
-      const asset = assets.find((a) => a.id === user?.current_asset_id);
-      if (!asset) {
-        setStartTripError('Машина не выбрана — укажи её в профиле.');
-        setStartingTrip(false);
-        return;
-      }
       const res = await fetch('/api/trips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -420,6 +465,18 @@ export default function RootPage() {
     }
   }
 
+  if (isUserLoading || isDataLoading) {
+    return <DriverHomeSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-center text-red-600">
+        Ошибка загрузки. Потяните вниз для обновления.
+      </div>
+    );
+  }
+
   if (!user) return null;
 
   return (
@@ -438,6 +495,41 @@ export default function RootPage() {
         draft={data?.monthPayDraft ?? '0'}
         pendingCount={data?.pendingPayrollCount ?? 0}
       />
+
+      {/* Карточка активного автомобиля с быстрой сменой */}
+      {!data?.activeTrip && (
+        <div className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">
+              🚚
+            </div>
+            <div>
+              <div className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider">
+                Активный автомобиль
+              </div>
+              <div className="text-sm font-black text-zinc-900">
+                {activeAsset ? (
+                  <>
+                    {activeAsset.short_name}{' '}
+                    <span className="text-xs text-zinc-500 font-bold">
+                      · {activeAsset.reg_number}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-orange-600">Не выбран</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowVehiclePicker(true)}
+            className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-orange-700 text-xs font-black uppercase tracking-wider active:scale-95 transition-all"
+          >
+            🔄 Сменить
+          </button>
+        </div>
+      )}
 
       {/* Кнопки действий */}
       <div className="flex gap-3">
@@ -465,6 +557,70 @@ export default function RootPage() {
       {startTripError && (
         <div className="bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm font-bold">
           {startTripError}
+        </div>
+      )}
+
+      {/* Модалка выбора авто */}
+      {showVehiclePicker && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{
+            background: 'rgba(0,0,0,0.5)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowVehiclePicker(false)}
+        >
+          <div className="bg-white rounded-t-3xl shadow-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-zinc-200 rounded-full" />
+            </div>
+            <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-black text-zinc-900 text-base">Выбрать автомобиль</h2>
+                <p className="text-xs text-zinc-400">На каком авто вы сегодня едете?</p>
+              </div>
+              <button
+                onClick={() => setShowVehiclePicker(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              {vehicles.length === 0 ? (
+                <p className="text-zinc-400 font-bold text-sm text-center py-4">
+                  Загрузка машин...
+                </p>
+              ) : (
+                vehicles.map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => handleSwitchVehicle(v.id)}
+                    disabled={updatingVehicle}
+                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all active:scale-[0.98] flex items-center justify-between ${
+                      activeAssetId === v.id
+                        ? 'border-orange-500 bg-orange-50 shadow-sm'
+                        : 'border-zinc-100 hover:border-orange-200 bg-white'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-black text-zinc-900 text-sm uppercase">
+                        {v.short_name}
+                      </div>
+                      <div className="text-xs font-bold text-zinc-400 tracking-wider uppercase mt-0.5">
+                        {v.reg_number}
+                      </div>
+                    </div>
+                    {activeAssetId === v.id && (
+                      <span className="text-xs font-extrabold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
+                        Активен
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
