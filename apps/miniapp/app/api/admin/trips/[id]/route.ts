@@ -2,6 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { generateDeterministicUuid } from '@saldacargo/shared';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
@@ -195,7 +196,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: generateDeterministicUuid(`trip-income-cash-${id}`),
         }),
       );
     }
@@ -215,7 +216,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: generateDeterministicUuid(`trip-income-qr-${id}`),
         }),
       );
     }
@@ -241,7 +242,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           trip_id: id,
           transaction_date: trip.started_at,
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: generateDeterministicUuid(`trip-payroll-driver-${id}-${trip.driver_id}`),
         });
       }
     }
@@ -277,7 +278,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         trip_id: id,
         transaction_date: trip.started_at,
         created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: generateDeterministicUuid(`trip-payroll-loader-${id}-${userId}`),
       });
     }
 
@@ -366,7 +367,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         trip_id: id,
         transaction_date: tripInfo.started_at,
         created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: generateDeterministicUuid(
+          `trip-payroll-reissue-driver-${id}-${tripInfo.driver_id}-${Date.now()}`,
+        ),
       });
     }
 
@@ -385,7 +388,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           trip_id: id,
           transaction_date: tripInfo.started_at,
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: generateDeterministicUuid(
+            `trip-payroll-reissue-loader-${id}-${loader.user_id}-${Date.now()}`,
+          ),
         });
       }
     }

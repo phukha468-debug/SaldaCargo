@@ -212,15 +212,9 @@ export default function EditOrderPage() {
     }
     const isDebt = data.payment_method === 'debt_cash';
     const isLegal = selectedCounterparty?.is_legal_entity;
-    const isGenericClient = selectedCounterparty?.name === 'Частное лицо (разовый заказ)';
 
     if (isDebt && !isLegal && !data.description?.trim()) {
       setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
-      return;
-    }
-
-    if (isGenericClient && !data.description?.trim()) {
-      setError('Укажите имя и детали разового заказа в описании');
       return;
     }
 
@@ -560,23 +554,13 @@ export default function EditOrderPage() {
         {!selectedCounterparty?.is_legal_entity && (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
-              {selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
-                ? 'Имя клиента и детали (обязательно)*'
-                : 'Описание (опционально)'}
+              Описание (опционально)
             </label>
             <input
               type="text"
               {...register('description')}
-              placeholder={
-                selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
-                  ? 'Иван, переезд мебели, +7999...'
-                  : 'Переезд, доставка плитки...'
-              }
-              className={`w-full rounded-lg border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
-                selectedCounterparty?.name === 'Частное лицо (разовый заказ)'
-                  ? 'border-orange-400 focus:border-orange-600 bg-orange-50 placeholder:text-orange-300'
-                  : 'border-zinc-200 focus:border-orange-500'
-              }`}
+              placeholder="Переезд, доставка плитки..."
+              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
             />
           </div>
         )}

@@ -2967,6 +2967,8 @@ function DashboardSection({
   const st = data?.stats ?? {
     clientRevenueThisMonth: parseFloat(m.revenue || '0'),
     clientRevenueAllTime: parseFloat(m.revenue || '0'),
+    clientProfitThisMonth: parseFloat(m.revenue || '0') - parseFloat(m.salaryAccrued || '0'),
+    clientProfitAllTime: parseFloat(m.revenue || '0') - parseFloat(m.salaryAccrued || '0'),
     clientActiveSum: 0,
     clientActiveCount: 0,
     salaryThisMonth: parseFloat(m.salaryAccrued || '0'),
@@ -2978,6 +2980,7 @@ function DashboardSection({
     inProgressOrdersCount: c.activeOrders,
   };
   const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
+  const clientProfit = st.clientProfitThisMonth ?? st.clientRevenueThisMonth - st.salaryThisMonth;
 
   return (
     <div className="space-y-5">
@@ -2991,13 +2994,13 @@ function DashboardSection({
           className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8" />
           </svg>
           Новый наряд
         </button>
       </div>
 
-      {/* 💰 Главный блок: Заработок с клиентских машин */}
+      {/* 💰 Главный блок: Чистая прибыль с клиентов */}
       <div
         onClick={() => setShowStatsModal(true)}
         className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl cursor-pointer hover:shadow-2xl transition-all border border-indigo-500/20 group"
@@ -3007,21 +3010,21 @@ function DashboardSection({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-indigo-500/25 border border-indigo-400/30 text-indigo-200 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
-                💰 ЗАРАБОТАЛИ С КЛИЕНТОВ ({monthName.toUpperCase()})
+              <span className="bg-emerald-500/25 border border-emerald-400/30 text-emerald-200 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                💰 ЗАРАБОТАЛИ С КЛИЕНТОВ (ЧИСТАЯ ПРИБЫЛЬ ЗА {monthName.toUpperCase()})
               </span>
               {st.clientActiveCount > 0 && (
-                <span className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold px-3 py-1 rounded-full">
+                <span className="bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[11px] font-bold px-3 py-1 rounded-full">
                   ⏳ В работе: <Money amount={st.clientActiveSum} /> ({st.clientActiveCount}{' '}
                   нарядов)
                 </span>
               )}
             </div>
             <div className="text-4xl md:text-5xl font-black tracking-tight text-white pt-1">
-              <Money amount={st.clientRevenueThisMonth} />
+              <Money amount={clientProfit} />
             </div>
             <p className="text-xs text-indigo-200/80 font-medium">
-              Главный доход гаража от ремонта клиентских машин · Нажмите для подробной статистики
+              Доход за вычетом ЗП механикам · Нажмите для подробной статистики
             </p>
           </div>
 
@@ -8147,6 +8150,8 @@ function CreateVehicleModal({
 type GarageStats = {
   clientRevenueThisMonth: number;
   clientRevenueAllTime: number;
+  clientProfitThisMonth?: number;
+  clientProfitAllTime?: number;
   clientActiveSum: number;
   clientActiveCount: number;
   salaryThisMonth: number;
@@ -8167,6 +8172,11 @@ function GarageStatsModal({
   monthName: string;
   onClose: () => void;
 }) {
+  const profitMonth =
+    stats.clientProfitThisMonth ?? stats.clientRevenueThisMonth - stats.salaryThisMonth;
+  const profitAllTime =
+    stats.clientProfitAllTime ?? stats.clientRevenueAllTime - stats.salaryAllTime;
+
   return (
     <div
       className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
@@ -8194,25 +8204,39 @@ function GarageStatsModal({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* 1. Заработано с клиентов */}
+          {/* 1. Заработано с клиентов (Чистая прибыль) */}
           <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-5 space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-xl">💰</span>
               <h3 className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider">
-                Заработано с клиентов
+                Заработано с клиентов (Чистая прибыль)
               </h3>
             </div>
             <div>
               <p className="text-2xl font-black text-emerald-900">
-                <Money amount={stats.clientRevenueThisMonth} />
+                <Money amount={profitMonth} />
               </p>
-              <p className="text-[11px] font-medium text-emerald-700 mt-0.5">за {monthName}</p>
+              <p className="text-[11px] font-medium text-emerald-700 mt-0.5">
+                чистая прибыль за {monthName}
+              </p>
             </div>
             <div className="pt-2 border-t border-emerald-200/60 space-y-1 text-xs font-semibold text-emerald-900">
               <div className="flex justify-between">
-                <span className="text-emerald-700">Всего за всё время:</span>
+                <span className="text-emerald-700">Выручка брутто:</span>
                 <span>
-                  <Money amount={stats.clientRevenueAllTime} />
+                  <Money amount={stats.clientRevenueThisMonth} />
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-700">Выплачено ЗП:</span>
+                <span className="text-violet-700">
+                  -<Money amount={stats.salaryThisMonth} />
+                </span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-emerald-200/40">
+                <span className="text-emerald-700">Чистая прибыль за всё время:</span>
+                <span>
+                  <Money amount={profitAllTime} />
                 </span>
               </div>
               <div className="flex justify-between">

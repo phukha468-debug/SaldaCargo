@@ -85,6 +85,8 @@ interface GarageData {
   stats?: {
     clientRevenueThisMonth: number;
     clientRevenueAllTime: number;
+    clientProfitThisMonth?: number;
+    clientProfitAllTime?: number;
     clientActiveSum: number;
     clientActiveCount: number;
     salaryThisMonth: number;
@@ -1455,11 +1457,12 @@ export default function AdminGaragePage() {
     },
     onSuccess: invalidate,
   });
-
   const counts = data?.counts ?? {};
   const stats = data?.stats ?? {
     clientRevenueThisMonth: 0,
     clientRevenueAllTime: 0,
+    clientProfitThisMonth: 0,
+    clientProfitAllTime: 0,
     clientActiveSum: 0,
     clientActiveCount: 0,
     salaryThisMonth: 0,
@@ -1471,6 +1474,8 @@ export default function AdminGaragePage() {
     inProgressOrdersCount: counts.activeOrders ?? 0,
   };
   const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
+  const clientProfit =
+    stats.clientProfitThisMonth ?? stats.clientRevenueThisMonth - stats.salaryThisMonth;
 
   if (isLoading) {
     return (
@@ -1542,22 +1547,20 @@ export default function AdminGaragePage() {
         {/* ── Главная ── */}
         {tab === 'home' && (
           <>
-            {/* 💰 Главный блок: Заработок с клиентских машин */}
+            {/* 💰 Главный блок: Чистая прибыль с клиентов */}
             <div
               onClick={() => setShowStatsModal(true)}
               className="bg-gradient-to-br from-zinc-900 via-indigo-950 to-zinc-900 text-white rounded-2xl p-4 shadow-lg cursor-pointer active:scale-[0.99] transition-all space-y-2 border border-indigo-500/20"
             >
               <div className="flex justify-between items-start">
-                <span className="bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  💰 С КЛИЕНТОВ ({monthName.toUpperCase()})
+                <span className="bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  💰 С КЛИЕНТОВ (ЧИСТАЯ ПРИБЫЛЬ ЗА {monthName.toUpperCase()})
                 </span>
                 <span className="text-[10px] font-extrabold text-indigo-300">Вся статистика ➔</span>
               </div>
-              <div className="text-3xl font-black text-white">
-                {formatRub(stats.clientRevenueThisMonth)}
-              </div>
+              <div className="text-3xl font-black text-white">{formatRub(clientProfit)}</div>
               {stats.clientActiveCount > 0 && (
-                <div className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-lg inline-block">
+                <div className="text-[10px] font-bold text-indigo-300 bg-indigo-950/60 border border-indigo-500/30 px-2.5 py-1 rounded-lg inline-block">
                   ⏳ В работе: {formatRub(stats.clientActiveSum)} ({stats.clientActiveCount}{' '}
                   нарядов)
                 </div>
@@ -2061,6 +2064,11 @@ function GarageStatsModal({
   monthName: string;
   onClose: () => void;
 }) {
+  const profitMonth =
+    stats.clientProfitThisMonth ?? stats.clientRevenueThisMonth - stats.salaryThisMonth;
+  const profitAllTime =
+    stats.clientProfitAllTime ?? stats.clientRevenueAllTime - stats.salaryAllTime;
+
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center animate-in fade-in duration-200"
@@ -2086,24 +2094,32 @@ function GarageStatsModal({
         </div>
 
         <div className="space-y-3">
-          {/* 1. Заработано с клиентов */}
+          {/* 1. Заработано с клиентов (Чистая прибыль) */}
           <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-lg">💰</span>
               <h3 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
-                Заработано с клиентов
+                Заработано с клиентов (Чистая прибыль)
               </h3>
             </div>
             <div>
-              <p className="text-2xl font-black text-emerald-950">
-                {formatRub(stats.clientRevenueThisMonth)}
+              <p className="text-2xl font-black text-emerald-950">{formatRub(profitMonth)}</p>
+              <p className="text-[10px] font-bold text-emerald-700">
+                чистая прибыль за {monthName}
               </p>
-              <p className="text-[10px] font-bold text-emerald-700">за {monthName}</p>
             </div>
             <div className="pt-2 border-t border-emerald-200/60 space-y-1 text-xs font-bold text-emerald-900">
               <div className="flex justify-between">
-                <span className="text-emerald-700">Всего за всё время:</span>
-                <span>{formatRub(stats.clientRevenueAllTime)}</span>
+                <span className="text-emerald-700">Выручка брутто:</span>
+                <span>{formatRub(stats.clientRevenueThisMonth)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-700">Выплачено ЗП:</span>
+                <span className="text-violet-700">-{formatRub(stats.salaryThisMonth)}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-emerald-200/40">
+                <span className="text-emerald-700">Чистая прибыль за всё время:</span>
+                <span>{formatRub(profitAllTime)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-emerald-700">

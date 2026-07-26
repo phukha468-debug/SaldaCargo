@@ -154,6 +154,9 @@ export async function GET() {
     .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
   const salaryAllTime = salaryArr.reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
 
+  const clientProfitThisMonth = clientRevenueThisMonth - salaryThisMonth;
+  const clientProfitAllTime = clientRevenueAllTime - salaryAllTime;
+
   return NextResponse.json({
     repairRequests: repairRequests ?? [],
     activeOrders: activeOrders ?? [],
@@ -170,6 +173,8 @@ export async function GET() {
     stats: {
       clientRevenueThisMonth,
       clientRevenueAllTime,
+      clientProfitThisMonth,
+      clientProfitAllTime,
       clientActiveSum,
       clientActiveCount,
       salaryThisMonth,

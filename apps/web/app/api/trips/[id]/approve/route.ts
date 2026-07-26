@@ -2,6 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { generateDeterministicUuid } from '@saldacargo/shared';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
@@ -19,7 +20,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
     .select(
       `
-      id, trip_number, driver_id, started_at,
+      id, trip_number, driver_id, started_at, lifecycle_status,
       driver:users!trips_driver_id_fkey(id, name),
       trip_orders(
         amount, payment_method, lifecycle_status, description,
@@ -34,6 +35,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .single();
 
   if (fetchErr || !trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
+  if (trip.lifecycle_status === 'approved') {
+    return NextResponse.json({ error: 'Рейс уже утверждён' }, { status: 400 });
+  }
 
   const { error: tripError } = await (supabase.from('trips') as any)
     .update({ lifecycle_status: 'approved' })
@@ -93,7 +97,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         trip_id: id,
         transaction_date: trip.started_at,
         created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: generateDeterministicUuid(`trip-payroll-driver-${id}-${trip.driver_id}`),
       });
     }
   }
@@ -123,7 +127,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       trip_id: id,
       transaction_date: trip.started_at,
       created_by: adminId,
-      idempotency_key: crypto.randomUUID(),
+      idempotency_key: generateDeterministicUuid(`trip-payroll-loader-${id}-${userId}`),
     });
   }
 
@@ -146,7 +150,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: generateDeterministicUuid(`trip-income-cash-${id}`),
       }),
     );
   }
@@ -166,7 +170,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: generateDeterministicUuid(`trip-income-qr-${id}`),
       }),
     );
   }

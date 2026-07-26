@@ -118,6 +118,9 @@ export async function GET() {
     .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
   const salaryAllTime = salaryArr.reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
 
+  const clientProfitThisMonth = clientRevenueThisMonth - salaryThisMonth;
+  const clientProfitAllTime = clientRevenueAllTime - salaryAllTime;
+
   return NextResponse.json({
     repairRequests: repairRequests ?? [],
     activeOrders: activeArr,
@@ -132,21 +135,23 @@ export async function GET() {
     },
     month: {
       completedOrders: completedOrdersThisMonth,
-      revenue: clientRevenueThisMonth.toFixed(2),
+      revenue: clientProfitThisMonth.toFixed(2),
       salaryAccrued: salaryThisMonth.toFixed(2),
     },
     stats: {
-      clientRevenueThisMonth: clientRevenueThisMonth,
-      clientRevenueAllTime: clientRevenueAllTime,
-      clientActiveSum: clientActiveSum,
-      clientActiveCount: clientActiveCount,
-      salaryThisMonth: salaryThisMonth,
-      salaryAllTime: salaryAllTime,
-      ownFleetThisMonth: ownFleetThisMonth,
-      ownFleetAllTime: ownFleetAllTime,
-      completedOrdersThisMonth: completedOrdersThisMonth,
-      completedOrdersAllTime: completedOrdersAllTime,
-      inProgressOrdersCount: inProgressOrdersCount,
+      clientRevenueThisMonth,
+      clientRevenueAllTime,
+      clientProfitThisMonth,
+      clientProfitAllTime,
+      clientActiveSum,
+      clientActiveCount,
+      salaryThisMonth,
+      salaryAllTime,
+      ownFleetThisMonth,
+      ownFleetAllTime,
+      completedOrdersThisMonth,
+      completedOrdersAllTime,
+      inProgressOrdersCount,
     },
   });
 }
