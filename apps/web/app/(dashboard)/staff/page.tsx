@@ -1522,7 +1522,7 @@ function AdvanceModal({
 
 // ─── Group config ─────────────────────────────────────────────────────────────
 
-type GroupKey = 'drivers' | 'loaders' | 'workshop';
+type GroupKey = 'drivers' | 'loaders' | 'workshop' | 'debts';
 
 const GROUP_CONFIG: Record<
   GroupKey,
@@ -1574,7 +1574,244 @@ const GROUP_CONFIG: Record<
     getUsers: (p) => [...p.mechanics, ...p.office],
     getCount: (p) => p.mechanics.length + p.office.length,
   },
+  debts: {
+    label: 'Долги сотрудников',
+    headerBg: 'bg-violet-600',
+    headerTextColor: 'text-violet-100',
+    tabActive: 'bg-violet-600 text-white shadow-sm',
+    tabInactive:
+      'bg-white border border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700',
+    countActive: 'bg-white/25 text-white',
+    countInactive: 'bg-slate-100 text-slate-500',
+    getUsers: (p) => {
+      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office];
+      return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0);
+    },
+    getCount: (p) => {
+      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office];
+      return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0).length;
+    },
+  },
 };
+
+// ─── AddStaffDebtModal ────────────────────────────────────────────────────────
+
+function AddStaffDebtModal({
+  allUsers,
+  initialUserId,
+  initialAction = 'add',
+  onClose,
+  onSuccess,
+}: {
+  allUsers: PayrollUser[];
+  initialUserId?: string;
+  initialAction?: 'add' | 'repay';
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [action, setAction] = useState<'add' | 'repay'>(initialAction);
+  const [userId, setUserId] = useState(initialUserId || (allUsers[0]?.id ?? ''));
+  const [amount, setAmount] = useState('');
+  const [walletId, setWalletId] = useState('10000000-0000-0000-0000-000000000002'); // Касса по умолчанию
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const selectedUser = allUsers.find((u) => u.id === userId);
+  const currentDebt = selectedUser ? parseFloat(selectedUser.advance_balance ?? '0') : 0;
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      fetch('/api/staff/debt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          user_id: userId,
+          amount: parseFloat(amount.replace(',', '.')).toFixed(2),
+          ...(action === 'add' ? { from_wallet_id: walletId } : { to_wallet_id: walletId }),
+          note: note.trim() || undefined,
+        }),
+      }).then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? 'Ошибка');
+        return d;
+      }),
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const handleSubmit = () => {
+    if (!userId) {
+      setError('Выберите сотрудника');
+      return;
+    }
+    const val = parseFloat(amount.replace(',', '.'));
+    if (isNaN(val) || val <= 0) {
+      setError('Введите корректную сумму');
+      return;
+    }
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-slate-900">
+              {action === 'add' ? '💳 Записать долг сотруднику' : '📥 Погашение долга сотрудником'}
+            </h2>
+            <p className="text-xs text-slate-500">Учёт авансов и внутренних займов</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Режим: Выдать долг / Погасить */}
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setAction('add')}
+              className={cn(
+                'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
+                action === 'add'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800',
+              )}
+            >
+              + Выдать / Записать долг
+            </button>
+            <button
+              type="button"
+              onClick={() => setAction('repay')}
+              className={cn(
+                'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
+                action === 'repay'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800',
+              )}
+            >
+              ✓ Внесение денег (Погашение)
+            </button>
+          </div>
+
+          {/* Выбор сотрудника */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Сотрудник *</label>
+            <select
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            >
+              {allUsers.map((u) => {
+                const adv = parseFloat(u.advance_balance ?? '0');
+                return (
+                  <option key={u.id} value={u.id}>
+                    {u.name} {adv > 0 ? `(Долг: ${adv.toLocaleString('ru-RU')} ₽)` : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {currentDebt > 0 && (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5 flex justify-between items-center">
+              <span className="text-xs text-violet-700 font-medium">Текущий долг сотрудника:</span>
+              <span className="text-sm font-black text-violet-800">
+                <Money amount={currentDebt.toFixed(2)} />
+              </span>
+            </div>
+          )}
+
+          {/* Сумма */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">
+              Сумма {action === 'add' ? 'долга' : 'внесения'}, ₽ *
+            </label>
+            <input
+              autoFocus
+              type="number"
+              min="1"
+              step="500"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setError('');
+              }}
+              placeholder="0"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-lg font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+          </div>
+
+          {/* Источник / Касса */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">
+              {action === 'add' ? 'Списать из' : 'Внести в'}
+            </label>
+            <select
+              value={walletId}
+              onChange={(e) => setWalletId(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+            >
+              <option value="10000000-0000-0000-0000-000000000002">💵 Касса (Наличные)</option>
+              <option value="10000000-0000-0000-0000-000000000001">🏦 Расчётный счёт</option>
+              <option value="none">🚫 Без списания с кошелька (внутренний долг)</option>
+            </select>
+          </div>
+
+          {/* Примечание */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">
+              Причина / Комментарий
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={
+                action === 'add' ? 'На личные нужды, ремонт авто...' : 'Возврат наличными...'
+              }
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+            />
+          </div>
+
+          {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className={cn(
+              'flex-1 text-white font-bold text-sm py-3 rounded-xl disabled:opacity-50 transition-colors',
+              action === 'add'
+                ? 'bg-violet-600 hover:bg-violet-700'
+                : 'bg-emerald-600 hover:bg-emerald-700',
+            )}
+          >
+            {mutation.isPending
+              ? 'Сохранение...'
+              : action === 'add'
+                ? '✓ Записать долг'
+                : '✓ Внести погашение'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-sm text-slate-500 px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -1589,6 +1826,10 @@ export default function StaffPage() {
   const [manualPayUser, setManualPayUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
   const [historyUser, setHistoryUser] = useState<PayrollUser | null>(null);
+  const [debtModalUser, setDebtModalUser] = useState<{
+    user?: PayrollUser;
+    action?: 'add' | 'repay';
+  } | null>(null);
 
   const shiftMonth = (delta: number) => {
     const d = new Date(year, month - 1 + delta, 1);
@@ -1641,14 +1882,16 @@ export default function StaffPage() {
     });
   };
 
+  const allStaffUsers = payroll
+    ? [...payroll.drivers, ...payroll.loaders, ...payroll.mechanics, ...payroll.office].sort(
+        (a, b) => a.name.localeCompare(b.name, 'ru'),
+      )
+    : [];
+
   const totalDebt = payroll ? parseFloat(payroll.total_debt_alltime) : 0;
   const totalFundMonth = payroll ? parseFloat(payroll.total_earned_month) : 0;
   const totalPaidMonth = payroll ? parseFloat(payroll.total_paid_month) : 0;
-  const totalStaff =
-    (payroll?.drivers.length ?? 0) +
-    (payroll?.loaders.length ?? 0) +
-    (payroll?.mechanics.length ?? 0) +
-    (payroll?.office.length ?? 0);
+  const totalStaff = allStaffUsers.length;
 
   const cfg = GROUP_CONFIG[activeGroup];
   const activeUsers = payroll ? cfg.getUsers(payroll) : [];
@@ -1722,9 +1965,9 @@ export default function StaffPage() {
         ))}
       </div>
 
-      {/* Табы + кнопка добавить */}
+      {/* Табы + кнопки действий */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(Object.keys(GROUP_CONFIG) as GroupKey[]).map((key) => {
             const g = GROUP_CONFIG[key];
             const isActive = activeGroup === key;
@@ -1734,7 +1977,7 @@ export default function StaffPage() {
                 key={key}
                 onClick={() => setActiveGroup(key)}
                 className={cn(
-                  'flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all',
+                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all',
                   isActive ? g.tabActive : g.tabInactive,
                 )}
               >
@@ -1751,12 +1994,20 @@ export default function StaffPage() {
             );
           })}
         </div>
-        <button
-          onClick={() => setEditUser('new')}
-          className="bg-slate-900 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors shrink-0"
-        >
-          + Добавить сотрудника
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setDebtModalUser({ action: 'add' })}
+            className="bg-violet-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-violet-700 transition-colors shadow-sm"
+          >
+            + Записать долг сотрудника
+          </button>
+          <button
+            onClick={() => setEditUser('new')}
+            className="bg-slate-900 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors"
+          >
+            + Сотрудник
+          </button>
+        </div>
       </div>
 
       {/* Таблица активной группы */}
@@ -1788,7 +2039,7 @@ export default function StaffPage() {
         />
       )}
 
-      {/* Модал выплаты */}
+      {/* Модал зачёта/выплаты */}
       {settleUser && (
         <SettleModal
           user={settleUser}
@@ -1826,7 +2077,22 @@ export default function StaffPage() {
         />
       )}
 
-      {/* Модал редактирования */}
+      {/* Модал универсальной записи/погашения долга */}
+      {debtModalUser && (
+        <AddStaffDebtModal
+          allUsers={allStaffUsers}
+          initialUserId={debtModalUser.user?.id}
+          initialAction={debtModalUser.action}
+          onClose={() => setDebtModalUser(null)}
+          onSuccess={() => {
+            setDebtModalUser(null);
+            qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
+          }}
+        />
+      )}
+
+      {/* Модал редактирования сотрудника */}
       {editUser !== null && (
         <StaffModal
           editUser={editUser === 'new' ? null : editUser}
