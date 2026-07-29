@@ -1678,6 +1678,79 @@ function OrderDetailModal({
                   </div>
                 )}
               </div>
+
+              {/* Итог ЗП по исполнителям за заказ-наряд */}
+              {(() => {
+                const mechSummaryMap: Record<
+                  string,
+                  { name: string; count: number; salary: number; pct: number }
+                > = {};
+                order.works.forEach((w) => {
+                  if (w.status === 'cancelled') return;
+                  const mechs = [w.mechanic_id, w.second_mechanic_id].filter(
+                    (x): x is string => !!x,
+                  );
+                  if (mechs.length === 0) return;
+                  const workPrice = parseFloat(w.price_client ?? '0');
+                  const basePrice = mechs.length === 2 ? workPrice / 2 : workPrice;
+                  for (const mechId of mechs) {
+                    const mech = mechanics.find((m) => m.id === mechId);
+                    const name = mech?.name ?? 'Исполнитель';
+                    const pct = parseFloat((mech as MechanicWithPct)?.mechanic_salary_pct ?? '50');
+                    const salary = (basePrice * pct) / 100;
+                    if (!mechSummaryMap[mechId]) {
+                      mechSummaryMap[mechId] = { name, count: 0, salary: 0, pct };
+                    }
+                    mechSummaryMap[mechId].count += 1;
+                    mechSummaryMap[mechId].salary += salary;
+                  }
+                });
+
+                const mechEntries = Object.entries(mechSummaryMap);
+                if (mechEntries.length === 0) return null;
+                const totalMechsSalary = mechEntries.reduce(
+                  (sum, [, data]) => sum + data.salary,
+                  0,
+                );
+
+                return (
+                  <div className="mb-4 border border-emerald-200 bg-emerald-50/50 rounded-xl overflow-hidden">
+                    <div className="bg-emerald-100/70 px-3 py-2 text-[10px] font-black text-emerald-900 uppercase tracking-widest flex items-center justify-between">
+                      <span>Итог ЗП по исполнителям ({mechEntries.length})</span>
+                      <span className="font-bold normal-case text-emerald-800 text-xs">
+                        Всего ЗП: {Math.round(totalMechsSalary).toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <div className="divide-y divide-emerald-100/80">
+                      {mechEntries.map(([mId, data]) => (
+                        <div
+                          key={mId}
+                          className="flex items-center justify-between px-3 py-2 text-xs"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <span className="font-semibold text-slate-800">{data.name}</span>
+                            <span className="text-slate-500 text-[11px] ml-1.5 font-normal">
+                              ({data.count}{' '}
+                              {data.count === 1
+                                ? 'операция'
+                                : data.count < 5
+                                  ? 'операции'
+                                  : 'операций'}
+                              )
+                            </span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-emerald-700 text-sm">
+                              {Math.round(data.salary).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Parts section regardless of length, so we can add to empty order */}
               <div className={order.parts.length === 0 && !showAddPart ? 'mb-2' : 'mb-0'}>
                 <div className="flex items-center justify-between mb-2">
@@ -2204,9 +2277,20 @@ function OrderDetailModal({
 
                   {/* ЗП механиков */}
                   <div className="space-y-3">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Зарплата исполнителей
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Зарплата исполнителей
+                      </p>
+                      {Object.keys(closePays).length > 0 && (
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                          Всего ЗП:{' '}
+                          {Object.values(closePays)
+                            .reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
+                            .toLocaleString('ru-RU')}{' '}
+                          ₽
+                        </span>
+                      )}
+                    </div>
                     {Object.keys(closePays).length === 0 ? (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm">
                         Нет неоплаченных работ для начисления зарплаты.
@@ -2215,23 +2299,60 @@ function OrderDetailModal({
                       <div className="space-y-2">
                         {Object.entries(closePays).map(([mechId, amount]) => {
                           const mech = mechanics.find((m) => m.id === mechId);
+                          let mechWorksCount = 0;
+                          let calcSalary = 0;
+                          order.works.forEach((w) => {
+                            if (w.status === 'cancelled' || w.salary_paid) return;
+                            const mechs = [w.mechanic_id, w.second_mechanic_id].filter(
+                              (x): x is string => !!x,
+                            );
+                            if (!mechs.includes(mechId)) return;
+                            mechWorksCount += 1;
+                            const workPrice = parseFloat(w.price_client ?? '0');
+                            if (workPrice <= 0) return;
+                            const basePrice = mechs.length === 2 ? workPrice / 2 : workPrice;
+                            const pct = parseFloat(
+                              (mech as MechanicWithPct)?.mechanic_salary_pct ?? '50',
+                            );
+                            calcSalary += (basePrice * pct) / 100;
+                          });
+
                           return (
-                            <div key={mechId} className="flex items-center justify-between gap-3">
-                              <span className="text-sm font-semibold text-slate-700">
-                                {mech?.name ?? 'Исполнитель'}
-                              </span>
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  value={amount}
-                                  onChange={(e) =>
-                                    setClosePays((prev) => ({ ...prev, [mechId]: e.target.value }))
-                                  }
-                                  className="w-32 border border-slate-200 rounded-lg px-3 py-1.5 text-right font-bold text-slate-900 focus:ring-2 focus:ring-slate-300 outline-none pr-8"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">
-                                  ₽
-                                </span>
+                            <div
+                              key={mechId}
+                              className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-sm font-bold text-slate-800 block truncate">
+                                    {mech?.name ?? 'Исполнитель'}
+                                  </span>
+                                  <span className="text-xs text-slate-500 font-normal">
+                                    {mechWorksCount}{' '}
+                                    {mechWorksCount === 1
+                                      ? 'операция'
+                                      : mechWorksCount < 5
+                                        ? 'операции'
+                                        : 'операций'}{' '}
+                                    (расчёт: {Math.round(calcSalary).toLocaleString('ru-RU')} ₽)
+                                  </span>
+                                </div>
+                                <div className="relative shrink-0">
+                                  <input
+                                    type="number"
+                                    value={amount}
+                                    onChange={(e) =>
+                                      setClosePays((prev) => ({
+                                        ...prev,
+                                        [mechId]: e.target.value,
+                                      }))
+                                    }
+                                    className="w-32 border border-slate-300 rounded-lg px-3 py-1.5 text-right font-bold text-slate-900 focus:ring-2 focus:ring-emerald-400 outline-none pr-8 bg-white"
+                                  />
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">
+                                    ₽
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           );
