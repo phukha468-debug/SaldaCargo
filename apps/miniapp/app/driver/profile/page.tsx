@@ -2,17 +2,24 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
 
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ['driver-profile'],
     queryFn: () => fetch('/api/driver/profile').then((r) => r.json()),
     staleTime: 60000,
   });
+
+  useEffect(() => {
+    if (showVehiclePicker) {
+      setSelectedVehicleId(user?.current_asset_id ?? null);
+    }
+  }, [showVehiclePicker, user?.current_asset_id]);
 
   const { data: vehicles = [] } = useQuery<any[]>({
     queryKey: ['vehicles-public'],
@@ -95,24 +102,52 @@ export default function ProfilePage() {
           </div>
 
           {showVehiclePicker && (
-            <div className="mt-3 border-t border-zinc-100 pt-3 space-y-2 max-h-64 overflow-y-auto">
-              {vehicles.map((v: any) => (
-                <button
-                  key={v.id}
-                  onClick={() => updateVehicle.mutate(v.id)}
-                  disabled={updateVehicle.isPending}
-                  className={`w-full text-left p-3 rounded-lg border-2 transition-all active:scale-[0.98] ${
-                    user?.current_asset_id === v.id
-                      ? 'border-orange-500 bg-orange-50'
-                      : 'border-zinc-100 hover:border-orange-200'
-                  }`}
-                >
-                  <div className="font-black text-zinc-800 text-sm uppercase">{v.short_name}</div>
-                  <div className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                    {v.reg_number}
-                  </div>
-                </button>
-              ))}
+            <div className="mt-3 border-t border-zinc-100 pt-3 space-y-3">
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {vehicles.map((v: any) => {
+                  const isSelected = (selectedVehicleId ?? user?.current_asset_id) === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVehicleId(v.id)}
+                      disabled={updateVehicle.isPending}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition-all active:scale-[0.98] flex items-center justify-between ${
+                        isSelected
+                          ? 'border-orange-500 bg-orange-50 shadow-sm'
+                          : 'border-zinc-100 hover:border-orange-200 bg-white'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-black text-zinc-800 text-sm uppercase">
+                          {v.short_name}
+                        </div>
+                        <div className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+                          {v.reg_number}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="text-[10px] font-extrabold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full uppercase">
+                          {v.id === user?.current_asset_id ? 'Текущая' : 'Выбрана'}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetId = selectedVehicleId || user?.current_asset_id;
+                  if (targetId) updateVehicle.mutate(targetId);
+                }}
+                disabled={
+                  updateVehicle.isPending || (!selectedVehicleId && !user?.current_asset_id)
+                }
+                className="w-full py-3 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white rounded-xl font-black uppercase tracking-wider text-sm shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {updateVehicle.isPending ? 'Сохранение...' : 'ОК'}
+              </button>
             </div>
           )}
         </div>

@@ -327,6 +327,7 @@ export default function RootPage() {
   const queryClient = useQueryClient();
   const [showRepairForm, setShowRepairForm] = useState(false);
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
   const [startTripError, setStartTripError] = useState('');
@@ -391,6 +392,12 @@ export default function RootPage() {
     (typeof window !== 'undefined' ? localStorage.getItem('active_vehicle_id') : null);
 
   const activeAsset = vehicles.find((v) => v.id === activeAssetId);
+
+  useEffect(() => {
+    if (showVehiclePicker) {
+      setSelectedVehicleId(activeAssetId || null);
+    }
+  }, [showVehiclePicker, activeAssetId]);
 
   async function handleSwitchVehicle(assetId: string) {
     setUpdatingVehicle(true);
@@ -570,11 +577,11 @@ export default function RootPage() {
           }}
           onClick={(e) => e.target === e.currentTarget && setShowVehiclePicker(false)}
         >
-          <div className="bg-white rounded-t-3xl shadow-2xl max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-center pt-3 pb-1">
+          <div className="bg-white rounded-t-3xl shadow-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
               <div className="w-10 h-1 bg-zinc-200 rounded-full" />
             </div>
-            <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
+            <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
               <div>
                 <h2 className="font-black text-zinc-900 text-base">Выбрать автомобиль</h2>
                 <p className="text-xs text-zinc-400">На каком авто вы сегодня едете?</p>
@@ -586,40 +593,59 @@ export default function RootPage() {
                 ×
               </button>
             </div>
-            <div className="p-4 space-y-2">
+            <div className="p-4 space-y-2 overflow-y-auto max-h-[50vh]">
               {vehicles.length === 0 ? (
                 <p className="text-zinc-400 font-bold text-sm text-center py-4">
                   Загрузка машин...
                 </p>
               ) : (
-                vehicles.map((v) => (
-                  <button
-                    key={v.id}
-                    onClick={() => handleSwitchVehicle(v.id)}
-                    disabled={updatingVehicle}
-                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all active:scale-[0.98] flex items-center justify-between ${
-                      activeAssetId === v.id
-                        ? 'border-orange-500 bg-orange-50 shadow-sm'
-                        : 'border-zinc-100 hover:border-orange-200 bg-white'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-black text-zinc-900 text-sm uppercase">
-                        {v.short_name}
+                vehicles.map((v) => {
+                  const isSelected = (selectedVehicleId ?? activeAssetId) === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVehicleId(v.id)}
+                      disabled={updatingVehicle}
+                      className={`w-full text-left p-4 rounded-2xl border-2 transition-all active:scale-[0.98] flex items-center justify-between ${
+                        isSelected
+                          ? 'border-orange-500 bg-orange-50 shadow-sm'
+                          : 'border-zinc-100 hover:border-orange-200 bg-white'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-black text-zinc-900 text-sm uppercase">
+                          {v.short_name}
+                        </div>
+                        <div className="text-xs font-bold text-zinc-400 tracking-wider uppercase mt-0.5">
+                          {v.reg_number}
+                        </div>
                       </div>
-                      <div className="text-xs font-bold text-zinc-400 tracking-wider uppercase mt-0.5">
-                        {v.reg_number}
-                      </div>
-                    </div>
-                    {activeAssetId === v.id && (
-                      <span className="text-xs font-extrabold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
-                        Активен
-                      </span>
-                    )}
-                  </button>
-                ))
+                      {isSelected && (
+                        <span className="text-xs font-extrabold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
+                          {v.id === activeAssetId ? 'Активен' : 'Выбран'}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
               )}
             </div>
+            {vehicles.length > 0 && (
+              <div className="p-4 border-t border-zinc-100 bg-white flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetId = selectedVehicleId || activeAssetId;
+                    if (targetId) handleSwitchVehicle(targetId);
+                  }}
+                  disabled={updatingVehicle || (!selectedVehicleId && !activeAssetId)}
+                  className="w-full py-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white rounded-2xl font-black uppercase tracking-wider text-base shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {updatingVehicle ? 'Сохранение...' : 'ОК'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

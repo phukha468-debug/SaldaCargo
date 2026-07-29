@@ -29,6 +29,7 @@ export default function RootDispatcher() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
   const [pinValue, setPinValue] = useState('');
@@ -269,22 +270,50 @@ export default function RootDispatcher() {
                 Выберите машину
               </h2>
             </div>
-            <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-              {vehicles.map((v) => (
-                <button
-                  key={v.id}
-                  onClick={() => handleVehicleSelect(v.id)}
-                  className="w-full p-5 bg-white border border-zinc-100 rounded-3xl shadow-sm text-left active:scale-[0.98] transition-all hover:border-orange-200"
-                >
-                  <div className="font-black text-zinc-800 uppercase">{v.short_name}</div>
-                  <div className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                    {v.reg_number}
-                  </div>
-                </button>
-              ))}
+            <div className="grid gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+              {vehicles.map((v) => {
+                const isSelected = selectedVehicleId === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedVehicleId(v.id)}
+                    className={`w-full p-5 border rounded-3xl shadow-sm text-left active:scale-[0.98] transition-all flex items-center justify-between ${
+                      isSelected
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'bg-white border-zinc-100 hover:border-orange-200'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-black text-zinc-800 uppercase">{v.short_name}</div>
+                      <div className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+                        {v.reg_number}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="text-xs font-extrabold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
+                        Выбрана
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="space-y-2 pt-2">
               <button
+                type="button"
+                onClick={() => {
+                  if (selectedVehicleId) handleVehicleSelect(selectedVehicleId);
+                }}
+                disabled={!selectedVehicleId}
+                className="w-full p-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white rounded-3xl font-black uppercase tracking-wider text-base shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                ОК
+              </button>
+              <button
+                type="button"
                 onClick={() => router.push('/driver')}
-                className="w-full p-5 bg-zinc-50 border border-dashed border-zinc-200 rounded-3xl text-center text-zinc-400 font-bold uppercase tracking-widest hover:border-orange-200"
+                className="w-full p-4 bg-zinc-50 border border-dashed border-zinc-200 rounded-3xl text-center text-zinc-400 font-bold uppercase tracking-widest hover:border-orange-200 text-xs"
               >
                 Пропустить выбор машины
               </button>
