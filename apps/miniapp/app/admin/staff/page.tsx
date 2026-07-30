@@ -16,6 +16,7 @@ type PayrollEntry = {
   earned: string;
   paid: string;
   debt: string;
+  advance_balance?: string;
   is_management: boolean;
   shifts: number;
 };
@@ -48,7 +49,7 @@ const ROLE_LABELS: Record<string, string> = {
   handyman: 'Разнорабочий',
 };
 
-type RoleGroup = 'drivers' | 'loaders' | 'workshop';
+type RoleGroup = 'drivers' | 'loaders' | 'workshop' | 'debts';
 
 function getRoleGroup(roles: string[]): RoleGroup {
   if (roles.includes('driver')) return 'drivers';
@@ -95,6 +96,7 @@ const GROUP_TABS: { key: RoleGroup; label: string }[] = [
   { key: 'drivers', label: 'Водители' },
   { key: 'loaders', label: 'Грузчики' },
   { key: 'workshop', label: 'Цех' },
+  { key: 'debts', label: 'Долги' },
 ];
 
 // ── Page ───────────────────────────────────────────────────────
@@ -211,6 +213,7 @@ function StaffContent() {
     drivers: payroll.filter((u) => getRoleGroup(u.roles) === 'drivers'),
     loaders: payroll.filter((u) => getRoleGroup(u.roles) === 'loaders'),
     workshop: payroll.filter((u) => getRoleGroup(u.roles) === 'workshop'),
+    debts: payroll.filter((u) => parseFloat(u.advance_balance || '0') > 0),
   };
 
   const totalEarned = payroll.reduce((s, u) => s + parseFloat(u.earned), 0);

@@ -33,6 +33,7 @@ function FinanceContent() {
     | 'expense'
     | 'debts'
     | 'supplier_debt'
+    | 'staff_debt'
     | 'salary'
     | null
   >(
@@ -48,9 +49,11 @@ function FinanceContent() {
               ? 'debts'
               : initialAction === 'supplier_debt'
                 ? 'supplier_debt'
-                : initialAction === 'salary'
-                  ? 'salary'
-                  : null,
+                : initialAction === 'staff_debt'
+                  ? 'staff_debt'
+                  : initialAction === 'salary'
+                    ? 'salary'
+                    : null,
   );
   const queryClient = useQueryClient();
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
@@ -169,6 +172,15 @@ function FinanceContent() {
                 </span>
               </button>
               <button
+                onClick={() => setShowForm('staff_debt')}
+                className="bg-purple-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+              >
+                <span className="text-xl">👤</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  Долг сотрудника
+                </span>
+              </button>
+              <button
                 onClick={() => setShowForm('debts')}
                 className="bg-rose-600 text-white rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
               >
@@ -207,6 +219,19 @@ function FinanceContent() {
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-payables'] });
               queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              setShowForm(null);
+            }}
+          />
+        )}
+
+        {/* Форма записи долга сотруднику */}
+        {showForm === 'staff_debt' && (
+          <StaffDebtMiniappForm
+            onClose={() => setShowForm('expense_menu')}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin-payroll'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+              queryClient.invalidateQueries({ queryKey: ['wallets'] });
               setShowForm(null);
             }}
           />
@@ -535,6 +560,165 @@ function SupplierDebtForm({ onClose, onSuccess }: { onClose: () => void; onSucce
         onClick={handleSubmit}
         disabled={mutation.isPending}
         className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-amber-600 active:scale-[0.97] transition-all disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Записываем...' : '✓ Записать долг'}
+      </button>
+    </div>
+  );
+}
+
+function StaffDebtMiniappForm({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [userId, setUserId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [walletId, setWalletId] = useState(WALLET_OPTIONS[1]?.id ?? ''); // Касса по умолчанию
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const { data: staff = [], isLoading } = useQuery<any[]>({
+    queryKey: ['admin-payroll', year, month],
+    queryFn: async () => {
+      const r = await fetch(`/api/admin/payroll?year=${year}&month=${month}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
+      return data;
+    },
+    staleTime: 0,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch('/api/staff/debt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add',
+          user_id: userId,
+          amount,
+          from_wallet_id: walletId,
+          note: description || undefined,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      return json;
+    },
+    onSuccess,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const handleSubmit = () => {
+    if (!userId) return setError('Выберите сотрудника');
+    if (!amount || parseFloat(amount) <= 0) return setError('Введите сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black uppercase text-sm text-purple-600">👤 Долг / Аванс сотруднику</h2>
+        <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+          ✕
+        </button>
+      </div>
+
+      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">
+        Выдача аванса или фиксация внутреннего долга
+      </p>
+
+      {/* Выбор сотрудника */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Сотрудник
+        </label>
+        {isLoading ? (
+          <div className="h-12 bg-zinc-100 rounded-lg animate-pulse" />
+        ) : (
+          <select
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            className="w-full rounded-lg border-2 border-zinc-200 px-4 h-12 text-sm font-bold text-zinc-900 focus:border-purple-500 focus:outline-none"
+          >
+            <option value="">— Выберите сотрудника —</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}{' '}
+                {parseFloat(s.advance_balance || '0') > 0
+                  ? `(Долг: ${parseFloat(s.advance_balance).toLocaleString('ru-RU')} ₽)`
+                  : ''}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Сумма */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Сумма, ₽
+        </label>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0"
+          className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-purple-500 focus:outline-none"
+          onFocus={(e) =>
+            setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+          }
+        />
+      </div>
+
+      {/* Источник */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Списать с
+        </label>
+        <select
+          value={walletId}
+          onChange={(e) => setWalletId(e.target.value)}
+          className="w-full rounded-lg border-2 border-zinc-200 px-4 h-12 text-xs font-bold text-zinc-900 focus:border-purple-500 focus:outline-none"
+        >
+          {WALLET_OPTIONS.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.label}
+            </option>
+          ))}
+          <option value="none">🚫 Без списания с кошелька (внутренний долг)</option>
+        </select>
+      </div>
+
+      {/* Описание */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Причина / Комментарий
+        </label>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Аванс, ремонт личного авто..."
+          className="w-full rounded-lg border-2 border-zinc-200 px-4 h-12 text-sm font-bold text-zinc-900 focus:border-purple-500 focus:outline-none"
+        />
+      </div>
+
+      {error && <p className="text-red-600 text-xs font-bold uppercase">{error}</p>}
+
+      <button
+        onClick={handleSubmit}
+        disabled={mutation.isPending}
+        className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-white bg-purple-600 active:scale-[0.97] transition-all disabled:opacity-50"
       >
         {mutation.isPending ? 'Записываем...' : '✓ Записать долг'}
       </button>

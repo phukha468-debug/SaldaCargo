@@ -11,6 +11,8 @@ const SALARY_CATEGORY_IDS = [
 const MANAGEMENT_ROLES = ['owner', 'admin'];
 const OPERATIONAL_ROLES = ['driver', 'loader', 'mechanic', 'mechanic_lead'];
 
+const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -31,6 +33,10 @@ export async function GET(request: Request) {
       { data: paidThisMonth },
       // Долг: all-time pending payroll-транзакции
       { data: pendingAllTime },
+      // Выданные авансы / долги (expense)
+      { data: advanceGiven },
+      // Зачтённые/возвращённые авансы / долги (income)
+      { data: advanceOffset },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
@@ -67,6 +73,22 @@ export async function GET(request: Request) {
         .eq('settlement_status', 'pending')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null),
+
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .not('related_user_id', 'is', null),
+
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('direction', 'income')
+        .eq('lifecycle_status', 'approved')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .not('related_user_id', 'is', null),
     ]);
 
     const sumByUser = (rows: any[] | null) => {
@@ -85,6 +107,8 @@ export async function GET(request: Request) {
     const earned = sumByUser(earnedThisMonth);
     const paid = sumByUser(paidThisMonth);
     const pending = sumByUser(pendingAllTime);
+    const advGiven = sumByUser(advanceGiven);
+    const advOffset = sumByUser(advanceOffset);
 
     const result = ((users as any[]) ?? [])
       .map((u: any) => {
@@ -92,12 +116,15 @@ export async function GET(request: Request) {
           MANAGEMENT_ROLES.includes(r),
         );
         const isOp = (u.roles as string[]).some((r: string) => OPERATIONAL_ROLES.includes(r));
-        if (!isOp && !isManagement) return null;
 
         const earnedAmt = earned.amounts.get(u.id) ?? 0;
         const earnedCount = earned.counts.get(u.id) ?? 0;
         const paidAmt = paid.amounts.get(u.id) ?? 0;
         const debtAmt = u.auto_settle ? 0 : (pending.amounts.get(u.id) ?? 0);
+        const advanceBalance = Math.max(
+          0,
+          (advGiven.amounts.get(u.id) ?? 0) - (advOffset.amounts.get(u.id) ?? 0),
+        );
 
         return {
           id: u.id,
@@ -108,11 +135,18 @@ export async function GET(request: Request) {
           earned: earnedAmt.toFixed(2),
           paid: paidAmt.toFixed(2),
           debt: debtAmt.toFixed(2),
+          advance_balance: advanceBalance.toFixed(2),
           shifts: earnedCount,
         };
       })
       .filter((u): u is NonNullable<typeof u> => u !== null)
-      .filter((u) => u.is_management || parseFloat(u.earned) > 0 || parseFloat(u.debt) > 0);
+      .filter(
+        (u) =>
+          u.is_management ||
+          parseFloat(u.earned) > 0 ||
+          parseFloat(u.debt) > 0 ||
+          parseFloat(u.advance_balance) > 0,
+      );
 
     return NextResponse.json(result);
   } catch (err: any) {
