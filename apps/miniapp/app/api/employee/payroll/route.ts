@@ -45,12 +45,13 @@ export async function GET() {
       .in('category_id', ALL_PAYROLL_CATS),
 
     (supabase.from('transactions') as any)
-      .select('amount')
+      .select('amount, description')
       .eq('related_user_id', userId)
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'completed')
       .or('employee_confirmed.is.null,employee_confirmed.eq.true')
-      .in('category_id', ALL_PAYROLL_CATS),
+      .in('category_id', ALL_PAYROLL_CATS)
+      .is('from_wallet_id', null),
   ]);
 
   const accumulated_total = (accumulatedRows ?? [])

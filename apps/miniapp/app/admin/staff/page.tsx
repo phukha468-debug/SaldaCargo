@@ -730,9 +730,16 @@ function StaffDetailsModal({
   });
 
   const history = data?.history ?? [];
-  const accruals = history.filter((t: any) => t.direction === 'expense' && t.is_payroll);
+  const accruals = history.filter(
+    (t: any) =>
+      t.direction === 'expense' &&
+      t.is_payroll &&
+      !t.from_wallet_id &&
+      (!t.description || !t.description.startsWith('Выплата зарплаты')),
+  );
   const payments = history.filter(
     (t: any) =>
+      t.is_payout ||
       (t.direction === 'expense' && t.is_advance) ||
       (t.direction === 'income' && t.is_advance) ||
       (t.description && t.description.startsWith('Выплата зарплаты')),

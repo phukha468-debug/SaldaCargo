@@ -99,6 +99,7 @@ export async function GET() {
         .eq('lifecycle_status', 'approved')
         .or('employee_confirmed.is.null,employee_confirmed.eq.true')
         .in('category_id', DRIVER_PAYROLL_CATS)
+        .is('from_wallet_id', null)
         .gte('transaction_date', new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
         .order('transaction_date', { ascending: false }),
     ]);

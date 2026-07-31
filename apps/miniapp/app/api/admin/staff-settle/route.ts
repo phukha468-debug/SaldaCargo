@@ -123,11 +123,17 @@ export async function GET(request: Request) {
     payout: payout.toFixed(2),
     unconfirmed_count: unconfirmedCount,
     pending_transactions: pendingPayroll ?? [],
-    history: history.map((t: any) => ({
-      ...t,
-      is_payroll: PAYROLL_CATEGORY_IDS.includes(t.category_id),
-      is_advance: t.category_id === ADVANCE_CATEGORY_ID,
-    })),
+    history: history.map((t: any) => {
+      const isPayoutTx =
+        t.from_wallet_id !== null ||
+        (t.description && t.description.startsWith('Выплата зарплаты'));
+      return {
+        ...t,
+        is_payroll: PAYROLL_CATEGORY_IDS.includes(t.category_id) && !isPayoutTx,
+        is_payout: isPayoutTx,
+        is_advance: t.category_id === ADVANCE_CATEGORY_ID,
+      };
+    }),
   });
 }
 

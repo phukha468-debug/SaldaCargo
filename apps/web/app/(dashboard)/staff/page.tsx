@@ -48,6 +48,7 @@ type PayrollUser = {
     settlement_status: string;
     category_id: string;
     employee_confirmed: boolean | null;
+    from_wallet_id?: string | null;
   }>;
 };
 
@@ -620,7 +621,10 @@ function txLabel(tx: PayrollUser['history'][number]): string {
   if (tx.category_id === ADVANCE_CAT) {
     return tx.direction === 'expense' ? 'Аванс выдан' : 'Аванс зачтён';
   }
-  return tx.settlement_status === 'pending' ? 'ЗП начислена' : 'ЗП выплачена';
+  if (tx.from_wallet_id || (tx.description && tx.description.startsWith('Выплата зарплаты'))) {
+    return 'Выплата ЗП';
+  }
+  return tx.settlement_status === 'pending' ? 'ЗП начислена' : 'ЗП закрыта';
 }
 
 function PayrollHistoryModal({

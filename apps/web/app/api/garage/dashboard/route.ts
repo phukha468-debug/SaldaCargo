@@ -55,11 +55,12 @@ export async function GET() {
       'id, client_vehicle_id, status, lifecycle_status, created_at, updated_at, service_order_works(price_client, status)',
     ),
 
-    // Начислено / выплачено ЗП механикам
+    // Начислено ЗП механикам (без транзакций выплат)
     (supabase.from('transactions') as any)
-      .select('amount, created_at')
+      .select('amount, created_at, description, from_wallet_id')
       .eq('category_id', PAYROLL_MECHANIC_CAT)
-      .eq('lifecycle_status', 'approved'),
+      .eq('lifecycle_status', 'approved')
+      .is('from_wallet_id', null),
   ]);
 
   const activeArr = activeOrders ?? [];
@@ -112,7 +113,10 @@ export async function GET() {
     }
   });
 
-  const salaryArr = (salaryTxs ?? []) as any[];
+  const salaryArr = ((salaryTxs ?? []) as any[]).filter(
+    (t: any) =>
+      !t.from_wallet_id && (!t.description || !t.description.startsWith('Выплата зарплаты')),
+  );
   const salaryThisMonth = salaryArr
     .filter((t: any) => t.created_at >= monthStart)
     .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);

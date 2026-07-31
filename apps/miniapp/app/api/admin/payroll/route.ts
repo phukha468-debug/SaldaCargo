@@ -46,33 +46,36 @@ export async function GET(request: Request) {
 
       (supabase as any)
         .from('transactions')
-        .select('related_user_id, amount')
+        .select('related_user_id, amount, description, from_wallet_id')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
+        .is('from_wallet_id', null)
         .gte('transaction_date', monthStart)
         .lte('transaction_date', monthEnd),
 
       (supabase as any)
         .from('transactions')
-        .select('related_user_id, amount')
+        .select('related_user_id, amount, description, from_wallet_id')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
+        .is('from_wallet_id', null)
         .gte('transaction_date', monthStart)
         .lte('transaction_date', monthEnd),
 
       (supabase as any)
         .from('transactions')
-        .select('related_user_id, amount')
+        .select('related_user_id, amount, description, from_wallet_id')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'pending')
         .in('category_id', SALARY_CATEGORY_IDS)
-        .not('related_user_id', 'is', null),
+        .not('related_user_id', 'is', null)
+        .is('from_wallet_id', null),
 
       (supabase as any)
         .from('transactions')
@@ -95,6 +98,7 @@ export async function GET(request: Request) {
       const amounts = new Map<string, number>();
       const counts = new Map<string, number>();
       for (const r of rows ?? []) {
+        if (r.description && r.description.startsWith('Выплата зарплаты')) continue;
         const uid = r.related_user_id;
         if (uid) {
           amounts.set(uid, (amounts.get(uid) ?? 0) + parseFloat(r.amount ?? '0'));
