@@ -3,7 +3,6 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Money } from '@saldacargo/ui';
 import { formatDate, formatPhone } from '@saldacargo/shared';
 
@@ -2934,6 +2933,20 @@ function LoansPanel() {
   const [payWallet, setPayWallet] = useState<'bank' | 'cash'>('bank');
   const [payDesc, setPayDesc] = useState('');
   const [payPending, setPayPending] = useState(false);
+  const [showAddLoan, setShowAddLoan] = useState(false);
+  const [addLoanPending, setAddLoanPending] = useState(false);
+  const [addForm, setAddForm] = useState({
+    lender_name: '',
+    loan_type: 'credit',
+    purpose: '',
+    original_amount: '',
+    remaining_amount: '',
+    annual_rate: '',
+    monthly_payment: '',
+    started_at: '',
+    next_payment_date: '',
+    notes: '',
+  });
   const queryClient = useQueryClient();
 
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
@@ -3015,8 +3028,259 @@ function LoansPanel() {
     }
   }
 
+  async function handleCreateLoan() {
+    if (!addForm.lender_name.trim()) return alert('Укажите кредитора');
+    if (!addForm.original_amount) return alert('Укажите первоначальную сумму');
+    setAddLoanPending(true);
+    try {
+      const r = await fetch('/api/loans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...addForm,
+          remaining_amount: addForm.remaining_amount || addForm.original_amount,
+          started_at: addForm.started_at || new Date().toISOString().split('T')[0],
+        }),
+      });
+      if (!r.ok) {
+        const json = await r.json();
+        throw new Error(json.error || 'Ошибка при сохранении');
+      }
+      setShowAddLoan(false);
+      setAddForm({
+        lender_name: '',
+        loan_type: 'credit',
+        purpose: '',
+        original_amount: '',
+        remaining_amount: '',
+        annual_rate: '',
+        monthly_payment: '',
+        started_at: '',
+        next_payment_date: '',
+        notes: '',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['loans-all'] });
+    } catch (e: unknown) {
+      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setAddLoanPending(false);
+    }
+  }
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+      {showAddLoan && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowAddLoan(false)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              borderRadius: 16,
+              padding: 24,
+              width: 440,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              color: '#f1f5f9',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 16 }}>
+              Новый кредит / лизинг
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Кредитор / Банк *</label>
+                <input
+                  type="text"
+                  placeholder="Сбербанк"
+                  value={addForm.lender_name}
+                  onChange={(e) => setAddForm({ ...addForm, lender_name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Тип обязательства</label>
+                <select
+                  value={addForm.loan_type}
+                  onChange={(e) => setAddForm({ ...addForm, loan_type: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="credit">Кредит</option>
+                  <option value="leasing">Лизинг</option>
+                  <option value="borrow">Займ</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Исходная сумма (₽) *</label>
+                <input
+                  type="number"
+                  placeholder="1500000"
+                  value={addForm.original_amount}
+                  onChange={(e) => setAddForm({ ...addForm, original_amount: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Остаток долга (₽)</label>
+                <input
+                  type="number"
+                  placeholder="1500000"
+                  value={addForm.remaining_amount}
+                  onChange={(e) => setAddForm({ ...addForm, remaining_amount: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Ежемесячный платёж (₽)</label>
+                <input
+                  type="number"
+                  placeholder="45000"
+                  value={addForm.monthly_payment}
+                  onChange={(e) => setAddForm({ ...addForm, monthly_payment: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Дата следующего платежа</label>
+                <input
+                  type="date"
+                  value={addForm.next_payment_date}
+                  onChange={(e) => setAddForm({ ...addForm, next_payment_date: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Назначение / Цель</label>
+                <input
+                  type="text"
+                  placeholder="Валдай 2022, оборотные средства..."
+                  value={addForm.purpose}
+                  onChange={(e) => setAddForm({ ...addForm, purpose: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button
+                onClick={() => setShowAddLoan(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: '1px solid #334155',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateLoan}
+                disabled={addLoanPending}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  cursor: addLoanPending ? 'default' : 'pointer',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  opacity: addLoanPending ? 0.5 : 1,
+                }}
+              >
+                {addLoanPending ? 'Сохранение...' : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {payLoan && (
         <div
           style={{
@@ -3172,8 +3436,8 @@ function LoansPanel() {
             onClick={() => setActiveChip('leasing')}
           />
         </div>
-        <Link
-          href="/loans"
+        <button
+          onClick={() => setShowAddLoan(true)}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -3184,11 +3448,12 @@ function LoansPanel() {
             fontWeight: 700,
             padding: '6px 14px',
             borderRadius: 8,
-            textDecoration: 'none',
+            border: 'none',
+            cursor: 'pointer',
           }}
         >
           + Добавить кредит
-        </Link>
+        </button>
       </div>
 
       <div

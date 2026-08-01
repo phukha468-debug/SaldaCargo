@@ -162,7 +162,7 @@ export default function DashboardHome() {
       description: `Платёж ${formatDate(loan.next_payment_date)} · ${daysLabel}`,
       amount: loan.monthly_payment,
       dateLabel: daysLabel,
-      href: '/loans',
+      href: '/finance?tab=loans',
     });
   }
 
