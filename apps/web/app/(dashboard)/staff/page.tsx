@@ -1013,9 +1013,15 @@ function PayrollRow({
                 <Money amount={user.debt} />
               </p>
               {hasAdvance && (
-                <p className="text-[9px] text-violet-500">
-                  аванс −<Money amount={user.advance_offset} />
-                </p>
+                <>
+                  <p className="text-[9px] text-violet-600 font-bold">
+                    аванс: <Money amount={user.advance_balance} />
+                  </p>
+                  <p className="text-[8px] text-slate-400">
+                    зачёт <Money amount={user.advance_offset} /> · к выдаче{' '}
+                    <Money amount={user.payout} />
+                  </p>
+                </>
               )}
               {!hasAdvance && <p className="text-[9px] text-slate-400">к выплате</p>}
             </>

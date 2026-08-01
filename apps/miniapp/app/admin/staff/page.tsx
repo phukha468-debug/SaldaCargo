@@ -17,6 +17,8 @@ type PayrollEntry = {
   paid: string;
   debt: string;
   advance_balance?: string;
+  advance_offset?: string;
+  payout?: string;
   is_management: boolean;
   shifts: number;
 };
@@ -420,15 +422,27 @@ function StaffContent() {
                           <Money amount={entry.paid} />
                         </p>
                       </div>
-                      <div className={`rounded-xl py-2 ${hasDebt ? 'bg-rose-50' : 'bg-zinc-50'}`}>
-                        <p className="text-[10px] font-semibold text-zinc-400 mb-0.5">Долг</p>
+                      <div className={`rounded-xl py-2 ${hasDebt ? 'bg-amber-50' : 'bg-zinc-50'}`}>
+                        <p className="text-[10px] font-semibold text-zinc-400 mb-0.5">
+                          ЗП к расчёту
+                        </p>
                         <p
-                          className={`text-sm font-black ${hasDebt ? 'text-rose-600' : 'text-zinc-800'}`}
+                          className={`text-sm font-black ${hasDebt ? 'text-amber-600' : 'text-zinc-800'}`}
                         >
                           <Money amount={entry.debt} />
                         </p>
                       </div>
                     </div>
+
+                    {/* Advance debt info if exists */}
+                    {parseFloat(entry.advance_balance || '0') > 0 && (
+                      <div className="mt-2.5 bg-purple-50 border border-purple-100 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs">
+                        <span className="font-bold text-purple-700">Долг по авансу:</span>
+                        <span className="font-black text-purple-900">
+                          <Money amount={entry.advance_balance!} />
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action */}
@@ -438,9 +452,12 @@ function StaffContent() {
                         e.stopPropagation();
                         openSettle(entry);
                       }}
-                      className="w-full bg-orange-500 text-white font-black text-sm py-3 hover:bg-orange-600 active:bg-orange-700 transition-colors"
+                      className="w-full bg-orange-500 text-white font-black text-xs py-3 hover:bg-orange-600 active:bg-orange-700 transition-colors"
                     >
-                      Рассчитаться — <Money amount={entry.debt} />
+                      Рассчитаться (ЗП: <Money amount={entry.debt} />
+                      {parseFloat(entry.advance_balance || '0') > 0 &&
+                        ` · аванс: ${entry.advance_balance} ₽`}
+                      )
                     </button>
                   )}
                 </div>

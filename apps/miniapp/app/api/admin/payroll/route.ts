@@ -129,6 +129,8 @@ export async function GET(request: Request) {
           0,
           (advGiven.amounts.get(u.id) ?? 0) - (advOffset.amounts.get(u.id) ?? 0),
         );
+        const offsetNow = Math.min(debtAmt, advanceBalance);
+        const payoutNow = Math.max(0, debtAmt - offsetNow);
 
         return {
           id: u.id,
@@ -140,6 +142,8 @@ export async function GET(request: Request) {
           paid: paidAmt.toFixed(2),
           debt: debtAmt.toFixed(2),
           advance_balance: advanceBalance.toFixed(2),
+          advance_offset: offsetNow.toFixed(2),
+          payout: payoutNow.toFixed(2),
           shifts: earnedCount,
         };
       })
