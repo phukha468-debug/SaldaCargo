@@ -34,19 +34,25 @@ export async function GET() {
     const grouped = new Map<string, any>();
 
     for (const order of ordersRes.data ?? []) {
-      const hasDescription = !!order.description?.trim();
-      const groupKey = hasDescription
-        ? `__individual__${order.id}`
-        : (order.counterparty?.id ?? '__unknown__');
-      const displayName = hasDescription
-        ? order.description.trim()
-        : (order.counterparty?.name ?? 'Без контрагента');
+      const isGenericClient = order.counterparty?.name === 'Частное лицо (разовый заказ)';
+      const hasCounterparty = !!order.counterparty?.id && !isGenericClient;
+      const hasDescription = !hasCounterparty && !!order.description?.trim();
+      const groupKey = hasCounterparty
+        ? order.counterparty!.id
+        : hasDescription
+          ? `__individual__${order.id}`
+          : '__unknown__';
+      const displayName = hasCounterparty
+        ? (order.counterparty!.name ?? 'Без контрагента')
+        : hasDescription
+          ? order.description!.trim()
+          : 'Без контрагента';
 
       if (!grouped.has(groupKey)) {
         grouped.set(groupKey, {
           counterparty_id: groupKey,
           counterparty_name: displayName,
-          counterparty_phone: hasDescription ? null : (order.counterparty?.phone ?? null),
+          counterparty_phone: hasCounterparty ? (order.counterparty?.phone ?? null) : null,
           counterparty_subname: hasDescription ? (order.counterparty?.name ?? null) : null,
           is_individual: hasDescription,
           total: 0,
