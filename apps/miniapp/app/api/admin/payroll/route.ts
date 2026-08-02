@@ -147,14 +147,7 @@ export async function GET(request: Request) {
           shifts: earnedCount,
         };
       })
-      .filter((u): u is NonNullable<typeof u> => u !== null)
-      .filter(
-        (u) =>
-          u.is_management ||
-          parseFloat(u.earned) > 0 ||
-          parseFloat(u.debt) > 0 ||
-          parseFloat(u.advance_balance) > 0,
-      );
+      .filter((u): u is NonNullable<typeof u> => u !== null);
 
     return NextResponse.json(result);
   } catch (err: any) {
