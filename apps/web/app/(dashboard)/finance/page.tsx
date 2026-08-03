@@ -2225,10 +2225,24 @@ function ReceivablesPanel() {
             onClick={() => setAgingFilter(c.id)}
           />
         ))}
+        <Link
+          href="/receivables"
+          style={{
+            marginLeft: 'auto',
+            padding: '7px 14px',
+            borderRadius: 24,
+            fontSize: 11,
+            fontWeight: 700,
+            textDecoration: 'none',
+            background: '#4f46e5',
+            color: '#fff',
+          }}
+        >
+          📋 Расширенный выбор / Автоподбор →
+        </Link>
         <button
           onClick={() => setShowAddForm(true)}
           style={{
-            marginLeft: 'auto',
             padding: '7px 16px',
             borderRadius: 24,
             fontSize: 11,
@@ -2903,7 +2917,7 @@ function ReceivablesPanel() {
                                         opacity: markingId === order.id ? 0.5 : 1,
                                       }}
                                     >
-                                      {markingId === order.id ? '...' : '✓ Оплачено'}
+                                      {markingId === order.id ? '...' : 'Погасить'}
                                     </button>
                                   </div>
                                 </td>

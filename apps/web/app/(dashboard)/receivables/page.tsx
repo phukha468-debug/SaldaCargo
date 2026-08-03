@@ -1350,7 +1350,7 @@ export default function ReceivablesPage() {
                                         disabled={markingId === order.id}
                                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded uppercase tracking-wide transition-colors disabled:opacity-50"
                                       >
-                                        {markingId === order.id ? '...' : '✓ Оплачено'}
+                                        {markingId === order.id ? '...' : 'Погасить'}
                                       </button>
                                     </div>
                                   </td>
