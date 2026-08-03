@@ -876,7 +876,7 @@ export default function ReceivablesPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <span
                           className={`text-base font-black ${isOverdue ? 'text-rose-600' : 'text-amber-600'}`}
                         >
@@ -888,7 +888,7 @@ export default function ReceivablesPage() {
                             setExpandedId(debtor.counterparty_id);
                             setLinkingOrderId(debtor.counterparty_id);
                           }}
-                          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
+                          className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
                           title="Привязать к контрагенту"
                         >
                           <span className="material-symbols-outlined text-xs">link</span>
@@ -897,17 +897,37 @@ export default function ReceivablesPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            setExpandedId(isExpanded ? null : debtor.counterparty_id);
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
+                          title="Раскрыть список рейсов для выбора или автоподбора"
+                        >
+                          <span className="material-symbols-outlined text-xs">checklist</span>
+                          {isExpanded
+                            ? 'Свернуть'
+                            : `Выбрать / Автоподбор (${debtor.orders.length})`}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const sel = debtor.orders.filter((o) => selectedOrderIds.has(o.id));
                             setCloseAllModal({
                               debtor,
-                              orders: debtor.orders,
+                              orders: sel.length > 0 ? sel : debtor.orders,
                               walletId: '10000000-0000-0000-0000-000000000001',
                             });
                           }}
                           disabled={closingAllId === debtor.counterparty_id}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors disabled:opacity-50 shrink-0"
-                          title="Закрыть весь долг одной кнопкой"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors disabled:opacity-50 shrink-0 shadow-sm"
+                          title="Погасить все или выбранные рейсы"
                         >
-                          {closingAllId === debtor.counterparty_id ? '...' : 'Закрыть всё'}
+                          {(() => {
+                            const selCount = debtor.orders.filter((o) =>
+                              selectedOrderIds.has(o.id),
+                            ).length;
+                            if (selCount > 0) return `✓ Погасить выбр. (${selCount})`;
+                            return closingAllId === debtor.counterparty_id ? '...' : 'Закрыть всё';
+                          })()}
                         </button>
                         <span
                           className="material-symbols-outlined text-slate-400 text-lg transition-transform duration-200"
