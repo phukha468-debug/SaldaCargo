@@ -103,6 +103,40 @@ function followUpColor(fu: FollowUp | null, promiseOverdue: boolean): string {
   );
 }
 
+function selectByAmount(
+  orders: ReceivableOrder[],
+  targetAmount: number,
+): { selectedIds: string[]; info: string } {
+  if (isNaN(targetAmount) || targetAmount <= 0) {
+    return { selectedIds: [], info: 'Введите корректную сумму' };
+  }
+  const sorted = [...orders].sort((a, b) => {
+    const da = new Date(a.started_at || a.created_at).getTime();
+    const db = new Date(b.started_at || b.created_at).getTime();
+    return da - db;
+  });
+
+  let remaining = targetAmount;
+  const selected: string[] = [];
+  let sumSelected = 0;
+
+  for (const o of sorted) {
+    const amt = parseFloat(o.amount || '0');
+    if (amt <= 0) continue;
+    if (remaining >= amt) {
+      selected.push(o.id);
+      remaining -= amt;
+      sumSelected += amt;
+    }
+  }
+
+  let infoMsg = `Отмечено ${selected.length} записей на ${sumSelected.toLocaleString('ru-RU')} ₽`;
+  if (remaining > 0) {
+    infoMsg += ` (нераспределено: ${remaining.toLocaleString('ru-RU')} ₽)`;
+  }
+  return { selectedIds: selected, info: infoMsg };
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ReceivablesPage() {
@@ -116,6 +150,36 @@ export default function ReceivablesPage() {
   const [closeAllError, setCloseAllError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Bulk selection & lump-sum auto-selection states
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [lumpSumAmounts, setLumpSumAmounts] = useState<Record<string, string>>({});
+  const [lumpSumInfo, setLumpSumInfo] = useState<Record<string, string>>({});
+
+  function toggleOrderSelection(orderId: string) {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }
+
+  function selectAllDebtorOrders(debtor: Debtor) {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      debtor.orders.forEach((o) => next.add(o.id));
+      return next;
+    });
+  }
+
+  function deselectAllDebtorOrders(debtor: Debtor) {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      debtor.orders.forEach((o) => next.delete(o.id));
+      return next;
+    });
+  }
 
   // Follow-up form state
   const [fuStatus, setFuStatus] = useState('active');
@@ -167,7 +231,10 @@ export default function ReceivablesPage() {
     onError: (e: Error) => setSettleError(e.message),
   });
 
-  async function handleCloseAll(debtor: Debtor) {
+  async function handleCloseAll(debtor: Debtor, ordersToClose?: ReceivableOrder[]) {
+    const list = ordersToClose ?? debtor.orders.filter((o) => selectedOrderIds.has(o.id));
+    const targetOrders = list.length > 0 ? list : debtor.orders;
+
     setClosingAllId(debtor.counterparty_id);
     setCloseAllError('');
     try {
@@ -175,13 +242,18 @@ export default function ReceivablesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orders: debtor.orders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
+          orders: targetOrders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
           to_wallet_id: closeAllWallet,
           counterparty_name: debtor.counterparty_name,
         }),
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      setSelectedOrderIds((prev) => {
+        const next = new Set(prev);
+        targetOrders.forEach((o) => next.delete(o.id));
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ['receivables-page'] });
       queryClient.invalidateQueries({ queryKey: ['admin-receivables'] });
       setExpandedId(null);
@@ -589,146 +661,269 @@ export default function ReceivablesPage() {
                     </div>
                   )}
 
-                  {/* Settle ALL */}
-                  <div className="p-4 bg-green-50 rounded-2xl border-2 border-green-200 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <p className="text-[10px] font-black text-green-700 uppercase tracking-widest">
-                        Погасить весь долг
-                      </p>
-                      <p className="font-black text-green-700 text-lg">{fmt(debtor.total)} ₽</p>
-                    </div>
+                  {/* Settle panel with Lump sum auto-selection & Multi-select */}
+                  {(() => {
+                    const selectedOrders = debtor.orders.filter((o) => selectedOrderIds.has(o.id));
+                    const targetOrders = selectedOrders.length > 0 ? selectedOrders : debtor.orders;
+                    const targetSum = targetOrders.reduce(
+                      (s, o) => s + parseFloat(o.amount || '0'),
+                      0,
+                    );
+                    const isPartial =
+                      selectedOrders.length > 0 && selectedOrders.length < debtor.orders.length;
 
-                    <div className="flex gap-2">
-                      {WALLET_OPTIONS.map((w) => (
+                    return (
+                      <div className="p-4 bg-green-50 rounded-2xl border-2 border-green-200 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-[10px] font-black text-green-700 uppercase tracking-widest">
+                              {isPartial
+                                ? `Погасить выбранные (${selectedOrders.length})`
+                                : 'Погасить долг'}
+                            </p>
+                            {isPartial && (
+                              <p className="text-[9px] text-green-600 font-bold">
+                                из {debtor.orders.length} записей
+                              </p>
+                            )}
+                          </div>
+                          <p className="font-black text-green-700 text-lg">
+                            {fmt(String(targetSum))} ₽
+                          </p>
+                        </div>
+
+                        {/* Lump sum auto-select input */}
+                        <div className="space-y-1.5 pt-1">
+                          <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+                            Автоподбор по сумме:
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder="Сумма оплаты (₽)"
+                              value={lumpSumAmounts[debtor.counterparty_id] ?? ''}
+                              onChange={(e) =>
+                                setLumpSumAmounts((prev) => ({
+                                  ...prev,
+                                  [debtor.counterparty_id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = parseFloat(
+                                    lumpSumAmounts[debtor.counterparty_id] || '0',
+                                  );
+                                  const res = selectByAmount(debtor.orders, val);
+                                  setSelectedOrderIds((prev) => {
+                                    const next = new Set(prev);
+                                    debtor.orders.forEach((o) => next.delete(o.id));
+                                    res.selectedIds.forEach((id) => next.add(id));
+                                    return next;
+                                  });
+                                  setLumpSumInfo((prev) => ({
+                                    ...prev,
+                                    [debtor.counterparty_id]: res.info,
+                                  }));
+                                }
+                              }}
+                              className="flex-1 rounded-xl border-2 border-zinc-200 bg-white px-3 h-10 text-xs font-bold text-zinc-900 focus:border-green-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = parseFloat(
+                                  lumpSumAmounts[debtor.counterparty_id] || '0',
+                                );
+                                const res = selectByAmount(debtor.orders, val);
+                                setSelectedOrderIds((prev) => {
+                                  const next = new Set(prev);
+                                  debtor.orders.forEach((o) => next.delete(o.id));
+                                  res.selectedIds.forEach((id) => next.add(id));
+                                  return next;
+                                });
+                                setLumpSumInfo((prev) => ({
+                                  ...prev,
+                                  [debtor.counterparty_id]: res.info,
+                                }));
+                              }}
+                              className="px-3 h-10 rounded-xl bg-zinc-800 text-white font-black text-[10px] uppercase tracking-wider active:scale-[0.97]"
+                            >
+                              Подобрать
+                            </button>
+                          </div>
+                          {lumpSumInfo[debtor.counterparty_id] && (
+                            <p className="text-[10px] text-blue-600 font-bold">
+                              ℹ {lumpSumInfo[debtor.counterparty_id]}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Quick select toggles */}
+                        <div className="flex justify-between items-center text-[10px] font-black uppercase pt-1">
+                          <button
+                            type="button"
+                            onClick={() => selectAllDebtorOrders(debtor)}
+                            className="text-blue-600 active:opacity-70"
+                          >
+                            ✓ Выбрать все ({debtor.orders.length})
+                          </button>
+                          {selectedOrders.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => deselectAllDebtorOrders(debtor)}
+                              className="text-zinc-400 active:opacity-70"
+                            >
+                              ✕ Снять выбор
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          {WALLET_OPTIONS.map((w) => (
+                            <button
+                              key={w.id}
+                              type="button"
+                              onClick={() => setCloseAllWallet(w.id)}
+                              className={`flex-1 py-2.5 rounded-xl border-2 text-[10px] font-black transition-all active:scale-[0.97] ${
+                                closeAllWallet === w.id
+                                  ? w.color
+                                  : 'border-zinc-200 bg-white text-zinc-500'
+                              }`}
+                            >
+                              {w.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {closeAllError && (
+                          <p className="text-red-600 text-xs font-bold">{closeAllError}</p>
+                        )}
+
                         <button
-                          key={w.id}
                           type="button"
-                          onClick={() => setCloseAllWallet(w.id)}
-                          className={`flex-1 py-2.5 rounded-xl border-2 text-[10px] font-black transition-all active:scale-[0.97] ${
-                            closeAllWallet === w.id
-                              ? w.color
-                              : 'border-zinc-200 bg-white text-zinc-500'
-                          }`}
+                          onClick={() => handleCloseAll(debtor, targetOrders)}
+                          disabled={closingAllId === debtor.counterparty_id}
+                          className="w-full h-13 rounded-xl font-black uppercase tracking-widest text-white bg-green-600 active:scale-[0.97] transition-all disabled:opacity-50 py-3 text-sm shadow-md"
                         >
-                          {w.label}
+                          {closingAllId === debtor.counterparty_id
+                            ? '⏳ Проводим...'
+                            : `✓ Погасить ${fmt(String(targetSum))} ₽ · ${targetOrders.length} ${targetOrders.length === 1 ? 'запись' : 'записей'}`}
                         </button>
-                      ))}
-                    </div>
-
-                    {closeAllError && (
-                      <p className="text-red-600 text-xs font-bold">{closeAllError}</p>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleCloseAll(debtor)}
-                      disabled={closingAllId === debtor.counterparty_id}
-                      className="w-full h-13 rounded-xl font-black uppercase tracking-widest text-white bg-green-600 active:scale-[0.97] transition-all disabled:opacity-50 py-3 text-sm"
-                    >
-                      {closingAllId === debtor.counterparty_id
-                        ? '⏳ Проводим...'
-                        : `✓ Погасить ${fmt(debtor.total)} ₽ · ${debtor.orders.length} записей`}
-                    </button>
-                  </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Individual orders */}
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
-                      Отдельные записи
+                      Отдельные записи (галочка для выбора нескольких)
                     </p>
                     {expandedDebtor.orders.map((order) => {
                       const isOrderSelected = selectedOrder?.id === order.id;
+                      const isChecked = selectedOrderIds.has(order.id);
                       const orderDays = daysAgo(order.created_at);
 
                       return (
-                        <div key={order.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedOrder(isOrderSelected ? null : order);
-                              setSettleNote('');
-                              setSettleError('');
-                            }}
-                            className={`w-full p-3 rounded-xl border-2 flex justify-between items-center transition-all active:scale-[0.98] ${
-                              isOrderSelected
-                                ? 'border-orange-400 bg-orange-50'
-                                : 'border-zinc-100 bg-white'
-                            }`}
-                          >
-                            <div className="text-left flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                {order.type === 'manual' ? (
-                                  <span className="text-[10px] font-black text-blue-600 uppercase">
-                                    Ручная запись
+                        <div key={order.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleOrderSelection(order.id)}
+                            className="w-5 h-5 rounded border-2 border-zinc-300 accent-orange-500 cursor-pointer shrink-0 ml-1"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedOrder(isOrderSelected ? null : order);
+                                setSettleNote('');
+                                setSettleError('');
+                              }}
+                              className={`w-full p-3 rounded-xl border-2 flex justify-between items-center transition-all active:scale-[0.98] ${
+                                isChecked
+                                  ? 'border-green-400 bg-green-50/80'
+                                  : isOrderSelected
+                                    ? 'border-orange-400 bg-orange-50'
+                                    : 'border-zinc-100 bg-white'
+                              }`}
+                            >
+                              <div className="text-left flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {order.type === 'manual' ? (
+                                    <span className="text-[10px] font-black text-blue-600 uppercase">
+                                      Ручная запись
+                                    </span>
+                                  ) : order.trip_number ? (
+                                    <span className="text-[10px] font-black text-zinc-700 uppercase">
+                                      Рейс №{order.trip_number}
+                                    </span>
+                                  ) : null}
+                                  <span
+                                    className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${ageBadge(orderDays)}`}
+                                  >
+                                    {orderDays === 0 ? 'сегодня' : `${orderDays} дн.`}
                                   </span>
-                                ) : order.trip_number ? (
-                                  <span className="text-[10px] font-black text-zinc-700 uppercase">
-                                    Рейс №{order.trip_number}
-                                  </span>
-                                ) : null}
-                                <span
-                                  className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${ageBadge(orderDays)}`}
-                                >
-                                  {orderDays === 0 ? 'сегодня' : `${orderDays} дн.`}
-                                </span>
+                                </div>
+                                <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
+                                  {order.payment_method
+                                    ? (PM_LABELS[order.payment_method] ?? order.payment_method)
+                                    : 'Ручная запись'}
+                                  {order.driver_name ? ` · ${order.driver_name}` : ''}
+                                </p>
+                                {order.description && (
+                                  <p className="text-[9px] text-zinc-400 mt-0.5 truncate">
+                                    {order.description}
+                                  </p>
+                                )}
                               </div>
-                              <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
-                                {order.payment_method
-                                  ? (PM_LABELS[order.payment_method] ?? order.payment_method)
-                                  : 'Ручная запись'}
-                                {order.driver_name ? ` · ${order.driver_name}` : ''}
-                              </p>
-                              {order.description && (
-                                <p className="text-[9px] text-zinc-400 mt-0.5 truncate">
-                                  {order.description}
+                              <div className="text-right shrink-0 ml-2">
+                                <p
+                                  className={`font-black text-base ${isChecked ? 'text-green-700' : isOrderSelected ? 'text-orange-600' : 'text-zinc-700'}`}
+                                >
+                                  {fmt(order.amount)} ₽
                                 </p>
-                              )}
-                            </div>
-                            <div className="text-right shrink-0 ml-2">
-                              <p
-                                className={`font-black text-base ${isOrderSelected ? 'text-orange-600' : 'text-zinc-700'}`}
-                              >
-                                {fmt(order.amount)} ₽
-                              </p>
-                            </div>
-                          </button>
+                              </div>
+                            </button>
 
-                          {/* Settle panel for individual order */}
-                          {isOrderSelected && (
-                            <div className="mt-1 ml-2 p-3 bg-orange-50 rounded-xl border-2 border-orange-200 space-y-3">
-                              {order.payment_method && PM_WALLET_LABEL[order.payment_method] && (
-                                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                  {PM_WALLET_LABEL[order.payment_method]}
-                                </p>
-                              )}
-                              {order.type === 'manual' && (
-                                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                  → 💵 Сейф
-                                </p>
-                              )}
-                              <input
-                                type="text"
-                                value={settleNote}
-                                onChange={(e) => setSettleNote(e.target.value)}
-                                placeholder="Комментарий (необязательно)"
-                                className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-orange-400 focus:outline-none"
-                              />
-                              {settleError && (
-                                <p className="text-red-600 text-xs font-bold uppercase">
-                                  {settleError}
-                                </p>
-                              )}
-                              <button
-                                onClick={() => settleMutation.mutate()}
-                                disabled={settleMutation.isPending}
-                                className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-white bg-orange-500 active:scale-[0.97] transition-all disabled:opacity-50 text-sm"
-                              >
-                                {settleMutation.isPending
-                                  ? '⏳ Проводим...'
-                                  : `✓ Погасить ${fmt(order.amount)} ₽`}
-                              </button>
-                            </div>
-                          )}
+                            {/* Settle panel for individual order */}
+                            {isOrderSelected && (
+                              <div className="mt-1 ml-2 p-3 bg-orange-50 rounded-xl border-2 border-orange-200 space-y-3">
+                                {order.payment_method && PM_WALLET_LABEL[order.payment_method] && (
+                                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                                    {PM_WALLET_LABEL[order.payment_method]}
+                                  </p>
+                                )}
+                                {order.type === 'manual' && (
+                                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                                    → 💵 Сейф
+                                  </p>
+                                )}
+                                <input
+                                  type="text"
+                                  value={settleNote}
+                                  onChange={(e) => setSettleNote(e.target.value)}
+                                  placeholder="Комментарий (необязательно)"
+                                  className="w-full rounded-lg border-2 border-zinc-200 bg-white px-3 h-11 text-sm font-bold text-zinc-900 focus:border-orange-400 focus:outline-none"
+                                />
+                                {settleError && (
+                                  <p className="text-red-600 text-xs font-bold uppercase">
+                                    {settleError}
+                                  </p>
+                                )}
+                                <button
+                                  onClick={() => settleMutation.mutate()}
+                                  disabled={settleMutation.isPending}
+                                  className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-white bg-orange-500 active:scale-[0.97] transition-all disabled:opacity-50 text-sm"
+                                >
+                                  {settleMutation.isPending
+                                    ? '⏳ Проводим...'
+                                    : `✓ Погасить ${fmt(order.amount)} ₽`}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

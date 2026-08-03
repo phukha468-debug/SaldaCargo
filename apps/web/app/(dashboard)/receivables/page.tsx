@@ -372,7 +372,50 @@ function AddDebtForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   );
 }
 
-type CloseAllModal = { debtor: Debtor; walletId: string };
+type CloseAllModal = { debtor: Debtor; orders: Order[]; walletId: string };
+
+function selectByAmount(
+  orders: Order[],
+  targetAmount: number,
+): { selectedIds: string[]; info: string } {
+  if (isNaN(targetAmount) || targetAmount <= 0) {
+    return { selectedIds: [], info: 'Введите корректную сумму' };
+  }
+  const sorted = [...orders].sort((a, b) => {
+    const da = new Date(a.started_at || a.created_at).getTime();
+    const db = new Date(b.started_at || b.created_at).getTime();
+    return da - db;
+  });
+
+  let remaining = targetAmount;
+  const selected: string[] = [];
+  let sumSelected = 0;
+
+  for (const o of sorted) {
+    const amt = parseFloat(o.amount || '0');
+    if (amt <= 0) continue;
+    if (remaining >= amt) {
+      selected.push(o.id);
+      remaining -= amt;
+      sumSelected += amt;
+    }
+  }
+
+  const remainderStr = remaining.toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  const sumStr = sumSelected.toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
+  let infoMsg = `Отмечено ${selected.length} записей на ${sumStr} ₽`;
+  if (remaining > 0) {
+    infoMsg += ` (остаток нераспределен: ${remainderStr} ₽)`;
+  }
+  return { selectedIds: selected, info: infoMsg };
+}
 
 export default function ReceivablesPage() {
   const queryClient = useQueryClient();
@@ -387,6 +430,36 @@ export default function ReceivablesPage() {
   const [linkingOrderId, setLinkingOrderId] = useState<string | null>(null);
   const [linkCpSearch, setLinkCpSearch] = useState('');
   const [linkingPending, setLinkingPending] = useState(false);
+
+  // Bulk selection & lump-sum auto-selection states
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [lumpSumAmounts, setLumpSumAmounts] = useState<Record<string, string>>({});
+  const [lumpSumInfo, setLumpSumInfo] = useState<Record<string, string>>({});
+
+  function toggleOrderSelection(orderId: string) {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }
+
+  function selectAllDebtorOrders(debtor: Debtor) {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      debtor.orders.forEach((o) => next.add(o.id));
+      return next;
+    });
+  }
+
+  function deselectAllDebtorOrders(debtor: Debtor) {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      debtor.orders.forEach((o) => next.delete(o.id));
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!expandedId) return;
@@ -455,14 +528,14 @@ export default function ReceivablesPage() {
     }
   }
 
-  async function handleCloseAll(debtor: Debtor, walletId: string) {
+  async function handleCloseAll(debtor: Debtor, ordersToClose: Order[], walletId: string) {
     setClosingAllId(debtor.counterparty_id);
     try {
       const r = await fetch('/api/receivables/close-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orders: debtor.orders.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
+          orders: ordersToClose.map((o) => ({ id: o.id, type: o.type, amount: o.amount })),
           to_wallet_id: walletId,
           counterparty_name: debtor.counterparty_name,
         }),
@@ -470,6 +543,11 @@ export default function ReceivablesPage() {
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
       setCloseAllModal(null);
+      setSelectedOrderIds((prev) => {
+        const next = new Set(prev);
+        ordersToClose.forEach((o) => next.delete(o.id));
+        return next;
+      });
       await queryClient.invalidateQueries({ queryKey: ['receivables'] });
       await queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
     } catch (e: unknown) {
@@ -531,7 +609,11 @@ export default function ReceivablesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-900">Закрыть весь долг</h2>
+              <h2 className="text-base font-bold text-slate-900">
+                {closeAllModal.orders.length === closeAllModal.debtor.orders.length
+                  ? 'Закрыть весь долг'
+                  : `Погасить ${closeAllModal.orders.length} выбр. записей`}
+              </h2>
               <button
                 onClick={() => setCloseAllModal(null)}
                 className="text-slate-400 hover:text-slate-600"
@@ -542,10 +624,16 @@ export default function ReceivablesPage() {
             <div className="bg-slate-50 rounded-lg p-3 space-y-1">
               <p className="text-xs text-slate-500">{closeAllModal.debtor.counterparty_name}</p>
               <p className="text-2xl font-black text-emerald-600">
-                <Money amount={closeAllModal.debtor.total} />
+                <Money
+                  amount={closeAllModal.orders
+                    .reduce((s, o) => s + parseFloat(o.amount || '0'), 0)
+                    .toFixed(2)}
+                />
               </p>
               <p className="text-[10px] text-slate-400">
-                {closeAllModal.debtor.orders.length} записей будут закрыты
+                {closeAllModal.orders.length}{' '}
+                {closeAllModal.orders.length === 1 ? 'запись' : 'записей'} из{' '}
+                {closeAllModal.debtor.orders.length} будут закрыты
               </p>
             </div>
             <div>
@@ -579,13 +667,15 @@ export default function ReceivablesPage() {
                 Отмена
               </button>
               <button
-                onClick={() => handleCloseAll(closeAllModal.debtor, closeAllModal.walletId)}
+                onClick={() =>
+                  handleCloseAll(closeAllModal.debtor, closeAllModal.orders, closeAllModal.walletId)
+                }
                 disabled={closingAllId === closeAllModal.debtor.counterparty_id}
                 className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
               >
                 {closingAllId === closeAllModal.debtor.counterparty_id
                   ? 'Закрываем...'
-                  : '✓ Закрыть долг'}
+                  : '✓ Погасить'}
               </button>
             </div>
           </div>
@@ -809,6 +899,7 @@ export default function ReceivablesPage() {
                             e.stopPropagation();
                             setCloseAllModal({
                               debtor,
+                              orders: debtor.orders,
                               walletId: '10000000-0000-0000-0000-000000000001',
                             });
                           }}
@@ -998,11 +1089,154 @@ export default function ReceivablesPage() {
                           </div>
                         )}
 
+                        {/* Batch actions & Lump sum auto-selection bar */}
+                        <div className="px-6 py-3 bg-slate-100/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-700">
+                              Погасить на сумму:
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder="Сумма, ₽"
+                              value={lumpSumAmounts[debtor.counterparty_id] ?? ''}
+                              onChange={(e) =>
+                                setLumpSumAmounts((prev) => ({
+                                  ...prev,
+                                  [debtor.counterparty_id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = parseFloat(
+                                    lumpSumAmounts[debtor.counterparty_id] || '0',
+                                  );
+                                  const res = selectByAmount(debtor.orders, val);
+                                  setSelectedOrderIds((prev) => {
+                                    const next = new Set(prev);
+                                    debtor.orders.forEach((o) => next.delete(o.id));
+                                    res.selectedIds.forEach((id) => next.add(id));
+                                    return next;
+                                  });
+                                  setLumpSumInfo((prev) => ({
+                                    ...prev,
+                                    [debtor.counterparty_id]: res.info,
+                                  }));
+                                }
+                              }}
+                              className="w-32 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = parseFloat(
+                                  lumpSumAmounts[debtor.counterparty_id] || '0',
+                                );
+                                const res = selectByAmount(debtor.orders, val);
+                                setSelectedOrderIds((prev) => {
+                                  const next = new Set(prev);
+                                  debtor.orders.forEach((o) => next.delete(o.id));
+                                  res.selectedIds.forEach((id) => next.add(id));
+                                  return next;
+                                });
+                                setLumpSumInfo((prev) => ({
+                                  ...prev,
+                                  [debtor.counterparty_id]: res.info,
+                                }));
+                              }}
+                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors"
+                            >
+                              Подобрать
+                            </button>
+
+                            <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const allSelected = debtor.orders.every((o) =>
+                                  selectedOrderIds.has(o.id),
+                                );
+                                if (allSelected) deselectAllDebtorOrders(debtor);
+                                else selectAllDebtorOrders(debtor);
+                              }}
+                              className="text-xs font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                            >
+                              {debtor.orders.every((o) => selectedOrderIds.has(o.id))
+                                ? 'Снять выбор'
+                                : `Выбрать все (${debtor.orders.length})`}
+                            </button>
+                          </div>
+
+                          {(() => {
+                            const selectedOrders = debtor.orders.filter((o) =>
+                              selectedOrderIds.has(o.id),
+                            );
+                            const sumSelected = selectedOrders.reduce(
+                              (s, o) => s + parseFloat(o.amount || '0'),
+                              0,
+                            );
+                            const sumSelectedStr = sumSelected.toFixed(2);
+
+                            if (selectedOrders.length === 0) return null;
+
+                            return (
+                              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                                <span className="text-xs font-extrabold text-emerald-900">
+                                  Выбрано {selectedOrders.length} из {debtor.orders.length}:{' '}
+                                  <Money amount={sumSelectedStr} />
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCloseAllModal({
+                                      debtor,
+                                      orders: selectedOrders,
+                                      walletId: '10000000-0000-0000-0000-000000000001',
+                                    })
+                                  }
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-md shadow-sm transition-colors flex items-center gap-1"
+                                >
+                                  <span className="material-symbols-outlined text-sm">
+                                    done_all
+                                  </span>
+                                  Погасить выбранные ({selectedOrders.length})
+                                </button>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {lumpSumInfo[debtor.counterparty_id] && (
+                          <div className="px-6 py-2 bg-blue-50/80 border-b border-blue-100 text-xs font-semibold text-blue-800 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-base text-blue-600">
+                              info
+                            </span>
+                            {lumpSumInfo[debtor.counterparty_id]}
+                          </div>
+                        )}
+
                         {/* Orders table */}
                         <table className="w-full text-left">
                           <thead className="bg-slate-100/50">
                             <tr>
-                              <th className="px-8 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                              <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest w-10 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    debtor.orders.length > 0 &&
+                                    debtor.orders.every((o) => selectedOrderIds.has(o.id))
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) selectAllDebtorOrders(debtor);
+                                    else deselectAllDebtorOrders(debtor);
+                                  }}
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                  title="Выбрать все"
+                                />
+                              </th>
+                              <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                                 Рейс / Запись
                               </th>
                               <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
@@ -1021,70 +1255,88 @@ export default function ReceivablesPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {debtor.orders.map((order) => (
-                              <tr key={order.id} className="hover:bg-white transition-colors">
-                                <td className="px-8 py-3 text-xs font-semibold text-slate-700">
-                                  {order.type === 'manual' ? (
-                                    <span className="text-blue-600">Ручная запись</span>
-                                  ) : (
-                                    `№${order.trip_number}`
-                                  )}
-                                  {order.description && !debtor.is_individual && (
-                                    <span className="block text-xs text-slate-600 font-normal mt-0.5">
-                                      <span className="material-symbols-outlined text-[11px] align-middle mr-0.5 text-slate-400">
-                                        chat_bubble
-                                      </span>
-                                      {order.description}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-slate-600">
-                                  {order.driver_name ?? '—'}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                                  {order.started_at ? formatDate(order.started_at) : '—'}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {order.type === 'manual' ? (
-                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold uppercase">
-                                      Ист. долг
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold uppercase">
-                                      {PAYMENT_LABELS[order.payment_method ?? ''] ??
-                                        order.payment_method ??
-                                        '—'}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 text-right text-xs font-black text-slate-800">
-                                  <Money amount={order.amount} />
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    {order.type === 'manual' && (
-                                      <button
-                                        onClick={() => handleDeleteManual(order.id)}
-                                        disabled={deletingId === order.id}
-                                        className="px-2 py-1.5 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                                        title="Удалить запись"
-                                      >
-                                        <span className="material-symbols-outlined text-base">
-                                          delete
-                                        </span>
-                                      </button>
+                            {debtor.orders.map((order) => {
+                              const isSelected = selectedOrderIds.has(order.id);
+                              return (
+                                <tr
+                                  key={order.id}
+                                  className={`transition-colors ${
+                                    isSelected
+                                      ? 'bg-emerald-50/60 hover:bg-emerald-50'
+                                      : 'hover:bg-white'
+                                  }`}
+                                >
+                                  <td className="px-4 py-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleOrderSelection(order.id)}
+                                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 text-xs font-semibold text-slate-700">
+                                    {order.type === 'manual' ? (
+                                      <span className="text-blue-600">Ручная запись</span>
+                                    ) : (
+                                      `№${order.trip_number}`
                                     )}
-                                    <button
-                                      onClick={() => handleMarkPaid(order)}
-                                      disabled={markingId === order.id}
-                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded uppercase tracking-wide transition-colors disabled:opacity-50"
-                                    >
-                                      {markingId === order.id ? '...' : '✓ Оплачено'}
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                                    {order.description && !debtor.is_individual && (
+                                      <span className="block text-xs text-slate-600 font-normal mt-0.5">
+                                        <span className="material-symbols-outlined text-[11px] align-middle mr-0.5 text-slate-400">
+                                          chat_bubble
+                                        </span>
+                                        {order.description}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-slate-600">
+                                    {order.driver_name ?? '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                                    {order.started_at ? formatDate(order.started_at) : '—'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {order.type === 'manual' ? (
+                                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold uppercase">
+                                        Ист. долг
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold uppercase">
+                                        {PAYMENT_LABELS[order.payment_method ?? ''] ??
+                                          order.payment_method ??
+                                          '—'}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-xs font-black text-slate-800">
+                                    <Money amount={order.amount} />
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      {order.type === 'manual' && (
+                                        <button
+                                          onClick={() => handleDeleteManual(order.id)}
+                                          disabled={deletingId === order.id}
+                                          className="px-2 py-1.5 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                                          title="Удалить запись"
+                                        >
+                                          <span className="material-symbols-outlined text-base">
+                                            delete
+                                          </span>
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => handleMarkPaid(order)}
+                                        disabled={markingId === order.id}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded uppercase tracking-wide transition-colors disabled:opacity-50"
+                                      >
+                                        {markingId === order.id ? '...' : '✓ Оплачено'}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
