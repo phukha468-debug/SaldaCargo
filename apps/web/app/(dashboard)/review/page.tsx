@@ -1412,8 +1412,10 @@ export default function ReviewPage() {
             <>
               <div className="space-y-4">
                 {assetGroups.map(([assetKey, assetTrips]) => {
-                  const groupFuel = assetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
+                  const groupRevenue = assetTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
                   const groupPayroll = assetTrips.reduce((s, t) => s + calcTrip(t).totalPayroll, 0);
+                  const groupFuel = assetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
+                  const groupProfit = assetTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
                   const isExpanded = expandedGroups.has(assetKey);
 
                   return (
@@ -1432,14 +1434,38 @@ export default function ReviewPage() {
                           </div>
                           <div>
                             <h3 className="font-bold text-slate-800">{assetKey}</h3>
-                            <p className="text-xs text-slate-500 font-medium">
-                              {assetTrips.length} рейс
-                              {assetTrips.length === 1 ? '' : assetTrips.length < 5 ? 'а' : 'ов'}
+                            <p className="text-xs text-slate-500 font-medium flex items-center gap-1 flex-wrap">
+                              <span>
+                                {assetTrips.length} рейс
+                                {assetTrips.length === 1 ? '' : assetTrips.length < 5 ? 'а' : 'ов'}
+                              </span>
+                              <span className="sm:hidden text-slate-300">·</span>
+                              <span className="sm:hidden text-slate-700 font-bold">
+                                Выручка: <Money amount={groupRevenue.toFixed(2)} />
+                              </span>
+                              <span className="sm:hidden text-slate-300">·</span>
+                              <span
+                                className={cn(
+                                  'sm:hidden font-bold',
+                                  groupProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                                )}
+                              >
+                                Прибыль: {groupProfit < 0 ? '−' : ''}
+                                <Money amount={Math.abs(groupProfit).toFixed(2)} />
+                              </span>
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="text-right hidden sm:block">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              Выручка
+                            </span>
+                            <span className="text-sm font-black text-slate-800">
+                              <Money amount={groupRevenue.toFixed(2)} />
+                            </span>
+                          </div>
                           <div className="text-right hidden sm:block">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                               ЗП
@@ -1454,6 +1480,20 @@ export default function ReviewPage() {
                             </span>
                             <span className="text-sm font-black text-rose-500">
                               <Money amount={groupFuel.toFixed(2)} />
+                            </span>
+                          </div>
+                          <div className="text-right hidden sm:block">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              Прибыль
+                            </span>
+                            <span
+                              className={cn(
+                                'text-sm font-black',
+                                groupProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                              )}
+                            >
+                              {groupProfit < 0 ? '−' : ''}
+                              <Money amount={Math.abs(groupProfit).toFixed(2)} />
                             </span>
                           </div>
                           <span

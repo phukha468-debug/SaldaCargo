@@ -431,6 +431,54 @@ export default function ReceivablesPage() {
   const [linkCpSearch, setLinkCpSearch] = useState('');
   const [linkingPending, setLinkingPending] = useState(false);
 
+  // Partial payment state
+  const [partialModalOrder, setPartialModalOrder] = useState<Order | null>(null);
+  const [partialAmount, setPartialAmount] = useState('');
+  const [partialWallet, setPartialWallet] = useState<string>(
+    '10000000-0000-0000-0000-000000000001',
+  );
+  const [partialSaving, setPartialSaving] = useState(false);
+  const [partialError, setPartialError] = useState('');
+
+  async function handlePartialPay() {
+    if (!partialModalOrder) return;
+    const amt = parseFloat(partialAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setPartialError('Введите корректную сумму');
+      return;
+    }
+    if (amt >= parseFloat(partialModalOrder.amount)) {
+      setPartialError('Сумма частичной оплаты должна быть меньше суммы долга');
+      return;
+    }
+    setPartialSaving(true);
+    setPartialError('');
+    try {
+      const url =
+        partialModalOrder.type === 'manual'
+          ? `/api/receivables/manual/${partialModalOrder.id}`
+          : `/api/receivables/${partialModalOrder.id}`;
+      const r = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partial_amount: amt.toFixed(2),
+          to_wallet_id: partialWallet,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+      setPartialModalOrder(null);
+      setPartialAmount('');
+      queryClient.invalidateQueries({ queryKey: ['receivables-page'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+    } catch (e) {
+      setPartialError((e as Error).message ?? 'Ошибка');
+    } finally {
+      setPartialSaving(false);
+    }
+  }
+
   // Bulk selection & lump-sum auto-selection states
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [lumpSumAmounts, setLumpSumAmounts] = useState<Record<string, string>>({});
@@ -676,6 +724,94 @@ export default function ReceivablesPage() {
                 {closingAllId === closeAllModal.debtor.counterparty_id
                   ? 'Закрываем...'
                   : '✓ Погасить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {partialModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">Частичная оплата</h2>
+              <button
+                onClick={() => setPartialModalOrder(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Текущий остаток долга
+              </p>
+              <p className="text-xl font-black text-slate-900">
+                <Money amount={partialModalOrder.amount} />
+              </p>
+            </div>
+
+            {partialError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold text-rose-600">
+                {partialError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
+                  Сумма оплаты (₽)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={partialAmount}
+                  onChange={(e) => setPartialAmount(e.target.value)}
+                  placeholder="Например, 5000"
+                  autoFocus
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
+                  Зачислить в кошелёк
+                </label>
+                <div className="space-y-2">
+                  {WALLET_OPTIONS.map((w) => (
+                    <label
+                      key={w.id}
+                      className="flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
+                    >
+                      <input
+                        type="radio"
+                        name="partialWallet"
+                        value={w.id}
+                        checked={partialWallet === w.id}
+                        onChange={() => setPartialWallet(w.id)}
+                        className="accent-blue-600"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">{w.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPartialModalOrder(null)}
+                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handlePartialPay}
+                disabled={partialSaving}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {partialSaving ? '...' : 'Зачислить'}
               </button>
             </div>
           </div>
@@ -1333,6 +1469,17 @@ export default function ReceivablesPage() {
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        onClick={() => {
+                                          setPartialModalOrder(order);
+                                          setPartialAmount('');
+                                          setPartialError('');
+                                        }}
+                                        className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded uppercase tracking-wide transition-colors shrink-0"
+                                        title="Частичная оплата"
+                                      >
+                                        Частично
+                                      </button>
                                       {order.type === 'manual' && (
                                         <button
                                           onClick={() => handleDeleteManual(order.id)}

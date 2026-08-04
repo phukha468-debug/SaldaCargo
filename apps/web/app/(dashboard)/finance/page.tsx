@@ -2005,7 +2005,11 @@ function ReceivablesPanel() {
       cash: '10000000-0000-0000-0000-000000000002',
     };
     try {
-      const r = await fetch(`/api/receivables/manual/${partialOrder.id}`, {
+      const url =
+        partialOrder.type === 'manual'
+          ? `/api/receivables/manual/${partialOrder.id}`
+          : `/api/receivables/${partialOrder.id}`;
+      const r = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
