@@ -998,6 +998,15 @@ function OrderDetailModal({
     onError: (err: Error) => setDeleteError(err.message),
   });
 
+  function printAgreement() {
+    if (!order) return;
+    window.open(
+      `/api/garage/orders/${orderId}/print?doc=agreement`,
+      '_blank',
+      'width=900,height=1000',
+    );
+  }
+
   function printWorks() {
     if (!order) return;
     window.open(`/api/garage/orders/${orderId}/print?doc=works`, '_blank', 'width=900,height=1000');
@@ -1022,14 +1031,14 @@ function OrderDetailModal({
         className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl flex-wrap gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
               Наряд #{order?.order_number ?? '...'}
             </h2>
             {order && <p className="text-xs text-slate-400">{fmtDate(order.created_at)}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {isClosed && (
               <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
                 Закрыт
@@ -1038,50 +1047,31 @@ function OrderDetailModal({
             {order && (
               <>
                 <button
-                  onClick={printWorks}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"
-                  title="Заказ-наряд на работы (клиентский документ)"
+                  onClick={printAgreement}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 flex items-center gap-1 shrink-0"
+                  title="Предварительный заказ-наряд на согласование (до выполнения, без описания)"
                 >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                    />
-                  </svg>
-                  Наряд
+                  📄 1. На согласование
+                </button>
+                <button
+                  onClick={printWorks}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 flex items-center gap-1 shrink-0"
+                  title="Окончательный Акт выполненных работ (после выполнения, с полным описанием)"
+                >
+                  🖨 2. Акт работ
                 </button>
                 <button
                   onClick={printParts}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 flex items-center gap-1.5"
+                  className="text-xs font-medium px-2 py-1.5 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 flex items-center gap-1 shrink-0"
                   title="Перечень запчастей (внутренний документ)"
                 >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
-                  </svg>
-                  Запчасти
+                  📦 Запчасти
                 </button>
               </>
             )}
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-700 text-2xl leading-none"
+              className="text-slate-400 hover:text-slate-700 text-2xl leading-none ml-2"
             >
               ×
             </button>

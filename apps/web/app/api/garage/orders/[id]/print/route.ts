@@ -195,7 +195,84 @@ ${order.problem_description ? `<div class="note-box"><div class="note-label">О�
     });
   }
 
-  // doc === 'works' — основной заказ-наряд на работы (без цен на запчасти)
+  // 2. Документ "На согласование" (до выполнения — ТОЛЬКО наименования работ, БЕЗ подробного описания)
+  if (doc === 'agreement' || doc === 'preliminary') {
+    const agreementRows = works
+      .map((w: any, i: number) => {
+        const name = w.work_catalog?.name ?? w.custom_work_name ?? '—';
+        const qty: number = w.quantity ?? 1;
+        const minutes = (w.norm_minutes ?? 0) * qty;
+        const hours = (minutes / 60).toFixed(2);
+        const price = parseFloat(w.price_client ?? '0');
+        return `<tr>
+        <td class="center">${i + 1}</td>
+        <td><div class="bold">${name}</div></td>
+        <td class="center">${qty}</td>
+        <td class="center">${hours} н/ч</td>
+        <td class="right">${hourlyRate.toLocaleString('ru-RU')}</td>
+        <td class="right bold">${price > 0 ? price.toLocaleString('ru-RU') + ' ₽' : '—'}</td>
+      </tr>`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<title>На согласование НЗ-${order.order_number}</title>
+<style>${baseStyles}
+  th { background: #d97706; }
+</style>
+</head>
+<body>
+${headerHtml('ЗАКАЗ-НАРЯД НА СОГЛАСОВАНИЕ', 'Предварительный документ')}
+
+<div class="section-title">Планируемый перечень работ</div>
+<table>
+  <thead><tr>
+    <th style="width:28px">№</th>
+    <th>Наименование работы</th>
+    <th class="center" style="width:40px">Кол-во</th>
+    <th class="center" style="width:56px">Н/ч всего</th>
+    <th class="right" style="width:70px">Ставка</th>
+    <th class="right" style="width:90px">Предв. сумма</th>
+  </tr></thead>
+  <tbody>${agreementRows || '<tr><td colspan="6" style="color:#aaa;font-style:italic;text-align:center;padding:12px">Работы не указаны</td></tr>'}</tbody>
+</table>
+
+<div class="totals">
+  <table class="totals-table">
+    <tr><td class="grand">ПРЕДВАРИТЕЛЬНО к оплате:</td><td class="right grand">${worksTotal.toLocaleString('ru-RU')} ₽</td></tr>
+  </table>
+</div>
+
+${order.problem_description ? `<div class="note-box"><div class="note-label">Заявленная неисправность (со слов клиента):</div>${order.problem_description}</div>` : ''}
+
+<div class="note-box" style="background:#fffbe0;border:1px solid #fde047;margin-top:14px;padding:10px 12px;font-size:10px;line-height:1.45;color:#713f12;">
+  <div style="font-weight:700;color:#854d0e;margin-bottom:4px;font-size:10.5px;">Согласование условий выполнения работ:</div>
+  <div>С планируемым объемом, перечнем и предварительной стоимостью работ ознакомлен и согласен. Настоящим Клиент дает согласие на то, что возникшие в процессе дефектовки и ремонта попутные (сопутствующие) и дополнительные работы подлежат устному согласованию с Клиентом (в том числе по телефону).</div>
+</div>
+
+<div class="signatures" style="margin-top:20px">
+  <div>
+    <div class="sig-line">Согласовано (Подпись заказчика): _______________________</div>
+    <div style="font-size:10px;color:#888;margin-top:2px">${order.client_name || '&nbsp;'}</div>
+  </div>
+  <div>
+    <div class="sig-line">Заказ-наряд оформил (Мастер / Исполнитель): ________________________</div>
+    <div style="font-size:10px;color:#888;margin-top:2px">${mechanics || '&nbsp;'}</div>
+  </div>
+</div>
+
+</body>
+</html>`;
+
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+
+  // 3. Документ "Акт выполненных работ" (после выполнения — С ПОЛНЫМ описанием проведенных работ и возникших трудностей)
   const worksRows = works
     .map((w: any, i: number) => {
       const name = w.work_catalog?.name ?? w.custom_work_name ?? '—';
@@ -209,7 +286,7 @@ ${order.problem_description ? `<div class="note-box"><div class="note-label">О�
         <td class="center">${i + 1}</td>
         <td>
           <div class="bold">${name}</div>
-          ${desc ? `<div class="muted">${desc}</div>` : ''}
+          ${desc ? `<div class="muted" style="color:#475569;margin-top:3px">${desc}</div>` : ''}
         </td>
         <td class="center">${qty}</td>
         <td class="center">${hours} н/ч</td>
@@ -224,17 +301,17 @@ ${order.problem_description ? `<div class="note-box"><div class="note-label">О�
 <html lang="ru">
 <head>
 <meta charset="UTF-8"/>
-<title>Заказ-наряд НЗ-${order.order_number}</title>
+<title>Акт выполненных работ НЗ-${order.order_number}</title>
 <style>${baseStyles}</style>
 </head>
 <body>
-${headerHtml('ЗАКАЗ-НАРЯД', 'Предпросмотр заказ-наряда')}
+${headerHtml('АКТ ВЫПОЛНЕННЫХ РАБОТ', 'После выполнения работ')}
 
-<div class="section-title">Перечень работ</div>
+<div class="section-title">Выполненные работы</div>
 <table>
   <thead><tr>
     <th style="width:28px">№</th>
-    <th>Наименование работы / Описание</th>
+    <th>Наименование работы / Подробное описание выполненных работ</th>
     <th class="center" style="width:40px">Кол-во</th>
     <th class="center" style="width:56px">Н/ч всего</th>
     <th class="right" style="width:70px">Ставка</th>
@@ -251,22 +328,22 @@ ${headerHtml('ЗАКАЗ-НАРЯД', 'Предпросмотр заказ-на�
   </table>
 </div>
 
-${order.problem_description ? `<div class="note-box"><div class="note-label">Описание проблемы (со слов клиента):</div>${order.problem_description}</div>` : ''}
-${order.mechanic_note ? `<div class="note-box"><div class="note-label">Заметка исполнителя:</div>${order.mechanic_note}</div>` : ''}
+${order.problem_description ? `<div class="note-box"><div class="note-label">Заявленная неисправность:</div>${order.problem_description}</div>` : ''}
+${order.mechanic_note ? `<div class="note-box"><div class="note-label">Детали выполнения (заметки мастера):</div>${order.mechanic_note}</div>` : ''}
 ${order.admin_note ? `<div class="note-box"><div class="note-label">Примечание администратора:</div>${order.admin_note}</div>` : ''}
 
 <div class="note-box" style="background:#f8fafc;border:1px solid #cbd5e1;margin-top:14px;padding:10px 12px;font-size:10px;line-height:1.45;color:#334155;">
-  <div style="font-weight:700;color:#0f172a;margin-bottom:4px;font-size:10.5px;">Согласование выполнения работ и условия:</div>
-  <div>С объемом, перечнем и предварительной стоимостью работ ознакомлен и согласен. Настоящим Клиент дает согласие на то, что попутные (сопутствующие) и дополнительные работы, возникающие в процессе дефектовки и ремонта, подлежат устному согласованию с Клиентом (в том числе по телефону).</div>
+  <div style="font-weight:700;color:#0f172a;margin-bottom:4px;font-size:10.5px;">Приемка выполненных работ:</div>
+  <div>Работы выполнены в полном объеме, в установленные сроки и с надлежащим качеством. Претензий по объему, качеству и стоимости выполненных работ Клиент не имеет.</div>
 </div>
 
-<div class="signatures" style="margin-top:18px">
+<div class="signatures" style="margin-top:20px">
   <div>
-    <div class="sig-line">Согласовано (Подпись заказчика): _______________________</div>
+    <div class="sig-line">Работы принял (Подпись заказчика): _______________________</div>
     <div style="font-size:10px;color:#888;margin-top:2px">${order.client_name || '&nbsp;'}</div>
   </div>
   <div>
-    <div class="sig-line">Заказ-наряд принял (Мастер / Исполнитель): ________________________</div>
+    <div class="sig-line">Работы сдал (Мастер / Исполнитель): ________________________</div>
     <div style="font-size:10px;color:#888;margin-top:2px">${mechanics || '&nbsp;'}</div>
   </div>
 </div>
