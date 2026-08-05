@@ -7,8 +7,10 @@ export async function GET() {
   const [{ data: sto }, { data: mechanics }] = await Promise.all([
     (supabase.from('sto_settings') as any).select('*').limit(1).single(),
     (supabase.from('users') as any)
-      .select('id, name, mechanic_salary_pct')
-      .contains('roles', ['mechanic'])
+      .select('id, name, mechanic_salary_pct, roles')
+      .or(
+        'roles.cs.{mechanic},roles.cs.{mechanic_lead},roles.cs.{welder},roles.cs.{electrician},roles.cs.{painter}',
+      )
       .eq('is_active', true)
       .order('name'),
   ]);

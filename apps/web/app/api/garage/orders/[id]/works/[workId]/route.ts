@@ -21,10 +21,23 @@ export async function PATCH(
     'quantity',
     'mechanic_id',
     'second_mechanic_id',
+    'custom_salary_pct',
+    'custom_salary_amount',
+    'notes',
   ];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
+  }
+  if ('custom_salary_pct' in body && body.custom_salary_pct != null) {
+    const pctVal = Number(body.custom_salary_pct);
+    if (!isNaN(pctVal)) {
+      const existingNotes = String(body.notes || updates.notes || '');
+      const cleanedNotes = existingNotes.replace(/\[salary_pct:\d+(?:\.\d+)?\]/g, '').trim();
+      updates.notes = cleanedNotes
+        ? `${cleanedNotes} [salary_pct:${pctVal}]`
+        : `[salary_pct:${pctVal}]`;
+    }
   }
 
   if (Object.keys(updates).length === 0) {
@@ -128,7 +141,7 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
       const basePrice = hasTwo ? workPrice / 2 : workPrice;
 
       for (const specificMech of specificMechs) {
-        const pct = parseFloat(specificMech.mechanic_salary_pct ?? '50');
+        const pct = getWorkPct(work, specificMech.mechanic_salary_pct);
         const salary = (basePrice * pct) / 100;
         if (salary > 0) {
           txns.push({

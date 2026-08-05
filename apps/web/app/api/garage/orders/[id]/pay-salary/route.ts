@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       mechanic_pay, second_mechanic_pay,
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
       second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes)
+      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, custom_salary_pct, notes)
     `,
     )
     .eq('id', orderId)
@@ -54,15 +54,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     order.machine_type === 'own' ? (sto?.hourly_rate_own ?? '1600') : (sto?.hourly_rate ?? '2000'),
   );
 
-  // Calculate minutes from unpaid works
-  const unpaidMinutes = unpaidWorks.reduce((s: number, w: any) => {
-    const mins =
-      w.actual_minutes != null && w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0);
-    return s + mins;
-  }, 0);
-  const unpaidHours = unpaidMinutes / 60;
+  const getWorkPct = (w: any, defaultUserPct: string | null | undefined): number => {
+    if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
+      return Number(w.custom_salary_pct);
+    }
+    if (w.notes) {
+      const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
+      if (match) return parseFloat(match[1]);
+    }
+    if (defaultUserPct != null && !isNaN(Number(defaultUserPct))) {
+      return Number(defaultUserPct);
+    }
+    return 50;
+  };
+
   const hasTwo = !!order.second_mechanic;
 
+  // Calculate total salary for each mechanic accounting for individual work salary rates
   const txns: any[] = [];
   const payMap: Record<string, string> = {};
 
@@ -71,24 +79,37 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     [order.second_mechanic, 'second_mechanic_pay'],
   ] as [any, string][]) {
     if (!mechData) continue;
-    const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
-    const hours = hasTwo ? unpaidHours / 2 : unpaidHours;
-    const salary = (hours * hourlyRate * pct) / 100;
-    if (salary <= 0) continue;
+    const defaultUserPct = mechData.mechanic_salary_pct;
+
+    let totalMechSalary = 0;
+    let totalMins = 0;
+
+    for (const w of unpaidWorks) {
+      const mins =
+        w.actual_minutes != null && w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0);
+      const hours = (hasTwo ? mins / 2 : mins) / 60;
+      const pct = getWorkPct(w, defaultUserPct);
+      const salary = (hours * hourlyRate * pct) / 100;
+      totalMechSalary += salary;
+      totalMins += mins;
+    }
+
+    if (totalMechSalary <= 0) continue;
 
     const prev = parseFloat(order[payField] ?? '0');
-    payMap[payField] = (prev + salary).toFixed(2);
+    payMap[payField] = (prev + totalMechSalary).toFixed(2);
+    const avgHours = totalMins / 60;
 
     txns.push({
       direction: 'expense',
       lifecycle_status: 'approved',
       settlement_status: 'completed',
-      amount: salary.toFixed(2),
+      amount: totalMechSalary.toFixed(2),
       category_id: CAT_PAYROLL_MECHANIC,
       related_user_id: mechData.id,
-      service_order_id: orderId, // Добавлено: привязка к наряду
+      service_order_id: orderId,
       created_by: userId,
-      description: `ЗП механик — наряд #${order.order_number} (${hours.toFixed(1)} нч × ${hourlyRate} ₽ × ${pct}%)`,
+      description: `ЗП механик ${mechData.name} — наряд #${order.order_number} (${avgHours.toFixed(1)} нч × ${hourlyRate} ₽)`,
       idempotency_key: crypto.randomUUID(),
     });
   }
@@ -104,13 +125,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .update({ salary_paid: true })
     .in('id', workIds);
 
-  // Save accumulated mechanic_pay to order
-  if (Object.keys(payMap).length) {
-    await (supabase as any)
-      .from('service_orders')
-      .update({ ...payMap, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
-  }
+  // Auto-complete order status when salary is calculated/paid
+  await (supabase as any)
+    .from('service_orders')
+    .update({
+      ...payMap,
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId);
 
   // Create salary transactions
   await (supabase as any).from('transactions').insert(txns);
