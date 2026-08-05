@@ -46,9 +46,9 @@ export async function PATCH(
 
   const supabase = createAdminClient();
 
-  // Auto-recalculate price when actual_minutes or quantity changed and price_client not explicitly set
+  // Auto-recalculate price when actual_minutes or quantity changed and price_client not explicitly set in body
   const needsRecalc =
-    ('actual_minutes' in updates || 'quantity' in updates) && !('price_client' in updates);
+    ('actual_minutes' in updates || 'quantity' in updates) && !('price_client' in body);
 
   if (needsRecalc) {
     const { data: currentWork } = await (supabase.from('service_order_works') as any)
@@ -96,8 +96,35 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // When work is marked completed and salary not yet paid → auto-accrue as debt (pending)
-  if (updates.status === 'completed' && !updatedWork.salary_paid) {
+  // If work was already completed and salary paid, but parameters changed -> re-accrue salary
+  if (
+    updatedWork.salary_paid &&
+    ('price_client' in body ||
+      'mechanic_id' in body ||
+      'second_mechanic_id' in body ||
+      'custom_salary_pct' in body ||
+      'quantity' in body)
+  ) {
+    const workName = updatedWork.work_catalog?.name ?? updatedWork.custom_work_name ?? 'работа';
+    const { data: order } = await (supabase.from('service_orders') as any)
+      .select('order_number')
+      .eq('id', orderId)
+      .single();
+    const descPrefix = `Наряд #${order?.order_number}: ${workName}`;
+    await (supabase.from('transactions') as any)
+      .update({
+        lifecycle_status: 'cancelled',
+        cancelled_reason: 'Пересчёт ЗП при изменении цены/параметров работы',
+      })
+      .eq('service_order_id', orderId)
+      .filter('description', 'ilike', `%${descPrefix}%`);
+
+    await (supabase.from('service_order_works') as any)
+      .update({ salary_paid: false })
+      .eq('id', workId);
+    updatedWork.salary_paid = false;
+    await accrueWorkSalary(supabase, orderId, updatedWork);
+  } else if (updates.status === 'completed' && !updatedWork.salary_paid) {
     await accrueWorkSalary(supabase, orderId, updatedWork);
   }
 

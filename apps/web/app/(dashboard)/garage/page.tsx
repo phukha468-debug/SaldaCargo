@@ -694,7 +694,6 @@ function OrderDetailModal({
   const queryClient = useQueryClient();
   const backdropMouseDownOnSelf = useRef(false);
   const [editNote, setEditNote] = useState<string | null>(null);
-  const [editMechanic, setEditMechanic] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
@@ -714,6 +713,7 @@ function OrderDetailModal({
   const [editWorkPrice, setEditWorkPrice] = useState('');
   const [editWorkMechanic, setEditWorkMechanic] = useState<string | null>(null);
   const [editWorkSecondMechanic, setEditWorkSecondMechanic] = useState<string | null>(null);
+  const [editWorkCustomPct, setEditWorkCustomPct] = useState<string>('');
   const [partPricesDraft, setPartPricesDraft] = useState<Record<string, string>>({});
   const [showAddPart, setShowAddPart] = useState(false);
   const [addPartName, setAddPartName] = useState('');
@@ -749,8 +749,6 @@ function OrderDetailModal({
         queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
       }
       setEditNote(null);
-      setEditMechanic(null);
-
       setEditStatus(null);
       setEditPriority(null);
     },
@@ -831,6 +829,8 @@ function OrderDetailModal({
       setCustomWorkPrice('');
       setShowAddWork(false);
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
     onError: (err: Error) => {
       setAddWorkError(err.message);
@@ -845,6 +845,8 @@ function OrderDetailModal({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
@@ -876,6 +878,8 @@ function OrderDetailModal({
     onSuccess: () => {
       setEditingWorkId(null);
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
@@ -892,6 +896,8 @@ function OrderDetailModal({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
@@ -913,6 +919,8 @@ function OrderDetailModal({
       setAddPartPrice('');
       setShowAddPart(false);
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
     onError: (err: Error) => setAddPartError(err.message),
   });
@@ -927,6 +935,8 @@ function OrderDetailModal({
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
@@ -1437,6 +1447,9 @@ function OrderDetailModal({
                                 setEditWorkQty(w.quantity ?? 1);
                                 setEditWorkMechanic(w.mechanic_id ?? null);
                                 setEditWorkSecondMechanic(w.second_mechanic_id ?? null);
+                                setEditWorkCustomPct(
+                                  w.custom_salary_pct != null ? String(w.custom_salary_pct) : '',
+                                );
                               }}
                               className="shrink-0 text-slate-300 group-hover:text-blue-500 transition-all duration-150 text-base hover:text-2xl hover:text-blue-700"
                               title="Редактировать"
@@ -1488,7 +1501,7 @@ function OrderDetailModal({
                                 <div className="mx-1 mb-1 border border-blue-200 bg-blue-50 rounded-b-xl px-4 py-3 space-y-3">
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs font-black text-blue-800 uppercase tracking-wide">
-                                      {isDone ? 'Редактировать работу' : 'Отметить выполненной'}
+                                      Редактировать параметры работы
                                     </p>
                                     <span className="text-xs text-blue-500">
                                       Тариф: {hourlyRate.toLocaleString('ru-RU')} ₽/ч
@@ -1512,7 +1525,7 @@ function OrderDetailModal({
                                       />
                                     </div>
                                     <div className="shrink-0 pb-1 text-right">
-                                      <p className="text-xs text-slate-400">автоматически</p>
+                                      <p className="text-xs text-slate-400">расчетное время</p>
                                       <p className="text-lg font-black text-blue-700">
                                         {computedHours.toFixed(1)} нч
                                       </p>
@@ -1557,8 +1570,8 @@ function OrderDetailModal({
                                     />
                                   </div>
 
-                                  {/* Mechanic */}
-                                  <div className="grid grid-cols-2 gap-2">
+                                  {/* Mechanic & Custom Salary Pct */}
+                                  <div className="grid grid-cols-3 gap-2">
                                     <div>
                                       <label className="text-xs text-slate-500 block mb-1">
                                         Исполнитель
@@ -1578,7 +1591,7 @@ function OrderDetailModal({
                                     </div>
                                     <div>
                                       <label className="text-xs text-slate-500 block mb-1">
-                                        2-й исполнитель (опц.)
+                                        2-й исполнитель
                                       </label>
                                       <select
                                         value={editWorkSecondMechanic ?? ''}
@@ -1598,66 +1611,78 @@ function OrderDetailModal({
                                         ))}
                                       </select>
                                     </div>
+                                    <div>
+                                      <label className="text-xs text-slate-500 block mb-1">
+                                        Ставка ЗП мастера (%)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        placeholder="По умолчанию (50%)"
+                                        value={editWorkCustomPct}
+                                        onChange={(e) => setEditWorkCustomPct(e.target.value)}
+                                        className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white font-semibold"
+                                      />
+                                    </div>
                                   </div>
 
                                   {/* Actions */}
-                                  <div className="flex gap-2">
-                                    {!order.mechanic && !editMechanic && !editWorkMechanic ? (
-                                      <div className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-2 rounded-lg text-center">
-                                        Сначала назначьте механика
-                                      </div>
-                                    ) : (
-                                      <button
-                                        onClick={() =>
-                                          patchWorkMutation.mutate({
-                                            workId: w.id,
-                                            body: {
-                                              quantity: editWorkQty,
-                                              actual_minutes: computedMinutes,
-                                              price_client:
-                                                editPrice > 0 ? editPrice.toFixed(2) : undefined,
-                                              work_description: editWorkDesc || null,
-                                              mechanic_id: editWorkMechanic || null,
-                                              second_mechanic_id: editWorkSecondMechanic || null,
-                                              status: 'completed',
-                                            },
-                                          })
-                                        }
-                                        disabled={patchWorkMutation.isPending}
-                                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 rounded-lg disabled:opacity-50 uppercase tracking-wide"
-                                      >
-                                        {patchWorkMutation.isPending
-                                          ? '...'
-                                          : isDone
-                                            ? '✓ Обновить'
-                                            : '✓ Выполнено'}
-                                      </button>
-                                    )}
-                                    {isDone && (
-                                      <button
-                                        onClick={() =>
-                                          patchWorkMutation.mutate({
-                                            workId: w.id,
-                                            body: {
-                                              quantity: editWorkQty,
-                                              actual_minutes: computedMinutes,
-                                              price_client:
-                                                editPrice > 0 ? editPrice.toFixed(2) : undefined,
-                                              work_description: editWorkDesc || null,
-                                              mechanic_id: editWorkMechanic || null,
-                                              second_mechanic_id: editWorkSecondMechanic || null,
-                                            },
-                                          })
-                                        }
-                                        disabled={patchWorkMutation.isPending}
-                                        className="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-black py-2 rounded-lg disabled:opacity-50 uppercase tracking-wide"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
+                                  <div className="flex gap-2 pt-1">
+                                    <button
+                                      onClick={() =>
+                                        patchWorkMutation.mutate({
+                                          workId: w.id,
+                                          body: {
+                                            quantity: editWorkQty,
+                                            actual_minutes: computedMinutes,
+                                            price_client:
+                                              editPrice > 0 ? editPrice.toFixed(2) : undefined,
+                                            work_description: editWorkDesc || null,
+                                            mechanic_id: editWorkMechanic || null,
+                                            second_mechanic_id: editWorkSecondMechanic || null,
+                                            custom_salary_pct: editWorkCustomPct
+                                              ? parseFloat(editWorkCustomPct)
+                                              : null,
+                                          },
+                                        })
+                                      }
+                                      disabled={patchWorkMutation.isPending}
+                                      className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 rounded-lg disabled:opacity-50 uppercase tracking-wide"
+                                    >
+                                      {patchWorkMutation.isPending ? '...' : 'Сохранить изменения'}
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        patchWorkMutation.mutate({
+                                          workId: w.id,
+                                          body: {
+                                            quantity: editWorkQty,
+                                            actual_minutes: computedMinutes,
+                                            price_client:
+                                              editPrice > 0 ? editPrice.toFixed(2) : undefined,
+                                            work_description: editWorkDesc || null,
+                                            mechanic_id: editWorkMechanic || null,
+                                            second_mechanic_id: editWorkSecondMechanic || null,
+                                            custom_salary_pct: editWorkCustomPct
+                                              ? parseFloat(editWorkCustomPct)
+                                              : null,
+                                            status: 'completed',
+                                          },
+                                        })
+                                      }
+                                      disabled={patchWorkMutation.isPending}
+                                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2.5 rounded-lg disabled:opacity-50 uppercase tracking-wide"
+                                    >
+                                      {patchWorkMutation.isPending
+                                        ? '...'
+                                        : isDone
+                                          ? '✓ Обновить'
+                                          : '✓ Отметить выполненной'}
+                                    </button>
                                     <button
                                       onClick={() => setEditingWorkId(null)}
-                                      className="px-3 text-xs text-slate-500 hover:text-slate-700"
+                                      className="px-3 text-xs text-slate-500 hover:text-slate-700 font-semibold"
                                     >
                                       Отмена
                                     </button>
@@ -4025,27 +4050,67 @@ function AiImportModal({
                   <div
                     key={i}
                     className={cn(
-                      'flex items-start gap-3 px-3 py-2.5',
+                      'flex items-center gap-3 px-3 py-2.5',
                       i > 0 && 'border-t border-slate-100',
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">
-                        {w.custom_work_name}
-                      </p>
-                      {w.work_description && (
-                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
-                          {w.work_description}
-                        </p>
-                      )}
+                      <input
+                        type="text"
+                        value={w.custom_work_name}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setParsed((prev) => {
+                            if (!prev) return prev;
+                            const nextWorks = [...prev.works];
+                            nextWorks[i] = { ...nextWorks[i], custom_work_name: val };
+                            return { ...prev, works: nextWorks };
+                          });
+                        }}
+                        className="text-sm font-semibold text-slate-800 w-full border border-slate-200 rounded px-2 py-0.5"
+                      />
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {(w.norm_minutes / 60).toFixed(1)} нч
-                      </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="w-20">
+                        <input
+                          type="number"
+                          value={w.price_client}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setParsed((prev) => {
+                              if (!prev) return prev;
+                              const nextWorks = [...prev.works];
+                              nextWorks[i] = { ...nextWorks[i], price_client: val };
+                              return { ...prev, works: nextWorks };
+                            });
+                          }}
+                          className="text-sm font-bold text-slate-900 w-full border border-slate-200 rounded px-2 py-0.5 text-right"
+                          placeholder="Цена"
+                        />
+                      </div>
+                      <span className="text-xs text-slate-400">₽</span>
+                      <div className="w-16">
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={(w.norm_minutes / 60).toFixed(1)}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value || '0');
+                            setParsed((prev) => {
+                              if (!prev) return prev;
+                              const nextWorks = [...prev.works];
+                              nextWorks[i] = {
+                                ...nextWorks[i],
+                                norm_minutes: Math.max(1, Math.round(val * 60)),
+                              };
+                              return { ...prev, works: nextWorks };
+                            });
+                          }}
+                          className="text-xs text-slate-700 w-full border border-slate-200 rounded px-1.5 py-0.5 text-center"
+                          placeholder="Часы"
+                        />
+                      </div>
+                      <span className="text-xs text-slate-400">ч</span>
                     </div>
                   </div>
                 ))}
