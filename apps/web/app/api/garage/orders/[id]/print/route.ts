@@ -230,7 +230,7 @@ ${order.problem_description ? `<div class="note-box"><div class="note-label">О�
 <body>
 ${headerHtml('ЗАКАЗ-НАРЯД', 'Предпросмотр заказ-наряда')}
 
-<div class="section-title">Выполненные работы</div>
+<div class="section-title">Перечень работ</div>
 <table>
   <thead><tr>
     <th style="width:28px">№</th>
@@ -255,13 +255,18 @@ ${order.problem_description ? `<div class="note-box"><div class="note-label">О�
 ${order.mechanic_note ? `<div class="note-box"><div class="note-label">Заметка исполнителя:</div>${order.mechanic_note}</div>` : ''}
 ${order.admin_note ? `<div class="note-box"><div class="note-label">Примечание администратора:</div>${order.admin_note}</div>` : ''}
 
-<div class="signatures">
+<div class="note-box" style="background:#f8fafc;border:1px solid #cbd5e1;margin-top:14px;padding:10px 12px;font-size:10px;line-height:1.45;color:#334155;">
+  <div style="font-weight:700;color:#0f172a;margin-bottom:4px;font-size:10.5px;">Согласование выполнения работ и условия:</div>
+  <div>С объемом, перечнем и предварительной стоимостью работ ознакомлен и согласен. Настоящим Клиент дает согласие на то, что попутные (сопутствующие) и дополнительные работы, возникающие в процессе дефектовки и ремонта, подлежат устному согласованию с Клиентом (в том числе по телефону).</div>
+</div>
+
+<div class="signatures" style="margin-top:18px">
   <div>
-    <div class="sig-line">Подпись заказчика: _______________________</div>
+    <div class="sig-line">Согласовано (Подпись заказчика): _______________________</div>
     <div style="font-size:10px;color:#888;margin-top:2px">${order.client_name || '&nbsp;'}</div>
   </div>
   <div>
-    <div class="sig-line">Подпись мастера: ________________________</div>
+    <div class="sig-line">Заказ-наряд принял (Мастер / Исполнитель): ________________________</div>
     <div style="font-size:10px;color:#888;margin-top:2px">${mechanics || '&nbsp;'}</div>
   </div>
 </div>
