@@ -51,12 +51,9 @@ export async function POST(request: Request) {
     if (body.order.machine_type === 'client' && !body.order.client_vehicle_id) {
       return NextResponse.json({ error: 'Выберите автомобиль клиента' }, { status: 400 });
     }
-    if (!body.order.assigned_mechanic_id) {
-      return NextResponse.json({ error: 'Назначьте исполнителя' }, { status: 400 });
-    }
-    if (!Array.isArray(body.works) || body.works.length === 0) {
-      return NextResponse.json({ error: 'Список работ пуст' }, { status: 400 });
-    }
+    // Works and parts are optional during import
+    const worksList = Array.isArray(body.works) ? body.works : [];
+    const partsList = Array.isArray(body.parts) ? body.parts : [];
 
     const supabase = createAdminClient();
 
@@ -121,28 +118,32 @@ export async function POST(request: Request) {
     if (orderErr) throw orderErr;
 
     // Создаём работы
-    if (body.works.length > 0) {
-      const worksToInsert = body.works.map((w) => ({
-        service_order_id: order.id,
-        custom_work_name: w.custom_work_name.trim(),
-        work_description: w.work_description?.trim() || null,
-        norm_minutes: Math.max(1, Math.round(w.norm_minutes)),
-        price_client: parseFloat(w.price_client || '0').toFixed(2),
-        status: 'pending',
-        manual_entry: true,
-        requires_admin_review: false,
-      }));
+    if (worksList.length > 0) {
+      const worksToInsert = worksList
+        .filter((w) => w.custom_work_name?.trim())
+        .map((w) => ({
+          service_order_id: order.id,
+          custom_work_name: w.custom_work_name.trim(),
+          work_description: w.work_description?.trim() || null,
+          norm_minutes: Math.max(1, Math.round(Number(w.norm_minutes) || 60)),
+          price_client: parseFloat(String(w.price_client || '0')).toFixed(2),
+          status: 'pending',
+          manual_entry: true,
+          requires_admin_review: false,
+        }));
 
-      const { error: worksErr } = await (supabase as any)
-        .from('service_order_works')
-        .insert(worksToInsert);
+      if (worksToInsert.length > 0) {
+        const { error: worksErr } = await (supabase as any)
+          .from('service_order_works')
+          .insert(worksToInsert);
 
-      if (worksErr) throw worksErr;
+        if (worksErr) throw worksErr;
+      }
     }
 
     // Создаём запчасти (без привязки к каталогу — свободный текст)
-    if (Array.isArray(body.parts) && body.parts.length > 0) {
-      const partsToInsert = body.parts
+    if (partsList.length > 0) {
+      const partsToInsert = partsList
         .filter((p) => p.name?.trim())
         .map((p) => ({
           service_order_id: order.id,
@@ -150,8 +151,8 @@ export async function POST(request: Request) {
           custom_part_name: p.name.trim(),
           unit: p.unit || 'шт',
           quantity: parseFloat(String(p.quantity)) || 1,
-          unit_price: parseFloat(p.unit_price || '0').toFixed(2),
-          client_price: parseFloat(p.unit_price || '0').toFixed(2),
+          unit_price: parseFloat(String(p.unit_price || '0')).toFixed(2),
+          client_price: parseFloat(String(p.unit_price || '0')).toFixed(2),
           status: 'reserved',
         }));
 

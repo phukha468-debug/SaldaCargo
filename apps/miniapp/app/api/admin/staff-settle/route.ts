@@ -149,6 +149,7 @@ export async function POST(request: Request) {
       partial_offset?: string;
       partial_amount?: string;
       action?: string;
+      idempotency_key?: string;
     };
 
     if (!body.user_id) {
@@ -160,6 +161,22 @@ export async function POST(request: Request) {
     if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const supabase = createAdminClient();
+
+    if (body.idempotency_key) {
+      const { data: existingTx } = await (supabase.from('transactions') as any)
+        .select('id, amount, settlement_status')
+        .eq('idempotency_key', body.idempotency_key)
+        .maybeSingle();
+
+      if (existingTx) {
+        return NextResponse.json({
+          ok: true,
+          idempotent: true,
+          payout: existingTx.amount,
+          message: 'Выплата уже проведена (idempotent)',
+        });
+      }
+    }
 
     if (body.action === 'confirm_unconfirmed') {
       await (supabase.from('transactions') as any)
@@ -174,6 +191,32 @@ export async function POST(request: Request) {
 
     const partialAmountRaw = body.partial_amount ?? (body as any).amount;
 
+    if (partialAmountRaw && parseFloat(partialAmountRaw) > 0) {
+      const requestedAmount = parseFloat(partialAmountRaw);
+      const fifteenSecAgo = new Date(Date.now() - 15000).toISOString();
+      const { data: recentDuplicate } = await (supabase.from('transactions') as any)
+        .select('id, amount, created_at')
+        .eq('direction', 'expense')
+        .eq('related_user_id', body.user_id)
+        .eq('lifecycle_status', 'approved')
+        .gte('created_at', fifteenSecAgo)
+        .limit(5);
+
+      if (recentDuplicate && recentDuplicate.length > 0) {
+        const match = recentDuplicate.find(
+          (t: any) => Math.abs(parseFloat(t.amount ?? '0') - requestedAmount) < 0.01,
+        );
+        if (match) {
+          return NextResponse.json({
+            ok: true,
+            duplicate_prevented: true,
+            payout: requestedAmount.toFixed(2),
+            message: 'Выплата на эту сумму уже была проведена несколько секунд назад',
+          });
+        }
+      }
+    }
+
     const [
       { data: pendingPayroll },
       { data: advanceGiven },
@@ -183,7 +226,7 @@ export async function POST(request: Request) {
       (supabase.from('transactions') as any)
         .select(
           `
-          id, amount, description, created_at, category_id,
+          id, amount, description, created_at, category_id, service_order_id, trip_id, direction, lifecycle_status, related_user_id,
           trip:trips(trip_number, started_at)
         `,
         )
@@ -258,7 +301,7 @@ export async function POST(request: Request) {
           related_user_id: body.user_id,
           from_wallet_id: body.from_wallet_id,
           created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: body.idempotency_key || crypto.randomUUID(),
         });
         if (insErr) throw new Error(insErr.message);
 
@@ -278,10 +321,13 @@ export async function POST(request: Request) {
     );
 
     const maxOffset = Math.min(salaryTotal, advanceBalance);
-    const offset =
-      body.partial_offset !== undefined
-        ? Math.min(Math.max(0, parseFloat(body.partial_offset)), maxOffset)
-        : maxOffset;
+    const hasExplicitOffset =
+      body.partial_offset !== undefined &&
+      body.partial_offset !== null &&
+      body.partial_offset !== '';
+    const offset = hasExplicitOffset
+      ? Math.min(Math.max(0, parseFloat(body.partial_offset!)), maxOffset)
+      : maxOffset;
 
     let idsToSettle: string[];
     let splitTxn: any = null;
@@ -342,7 +388,7 @@ export async function POST(request: Request) {
     const payoutDescription = `Выплата зарплаты: ${employeeName}${breakdownText}`;
 
     const ops: Promise<any>[] = [];
-    const batchId = crypto.randomUUID();
+    const batchId = body.idempotency_key || crypto.randomUUID();
 
     if (actualPayout > 0 && body.from_wallet_id) {
       ops.push(

@@ -377,6 +377,8 @@ function SettleModal({
   const [offsetInput, setOffsetInput] = useState(maxOffset.toFixed(2));
   const [partialInput, setPartialInput] = useState(salaryTotal.toFixed(2));
   const [error, setError] = useState('');
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isPartial = parseFloat(partialInput) < salaryTotal - 0.001;
   const partialVal = Math.min(Math.max(0, parseFloat(partialInput) || 0), salaryTotal);
@@ -398,6 +400,7 @@ function SettleModal({
           user_id: user.id,
           from_wallet_id: needsWallet ? walletId : undefined,
           partial_offset: effectiveOffset.toFixed(2),
+          idempotency_key: idempotencyKey,
           ...(isPartial ? { partial_amount: partialVal.toFixed(2) } : {}),
         }),
       }).then(async (r) => {
@@ -407,6 +410,7 @@ function SettleModal({
       }),
     onSuccess,
     onError: (e: Error) => setError(e.message),
+    onSettled: () => setIsSubmitting(false),
   });
 
   return (
@@ -590,11 +594,15 @@ function SettleModal({
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || salaryTotal <= 0}
+            onClick={() => {
+              if (isSubmitting || mutation.isPending) return;
+              setIsSubmitting(true);
+              mutation.mutate();
+            }}
+            disabled={mutation.isPending || isSubmitting || salaryTotal <= 0}
             className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
-            {mutation.isPending ? 'Проводим...' : '✓ Подтвердить'}
+            {mutation.isPending || isSubmitting ? 'Проводим...' : '✓ Подтвердить'}
           </button>
           <button
             onClick={onClose}
@@ -896,6 +904,7 @@ function PayrollRow({
   onAdvance,
   onManualPay,
   onHistory,
+  onAdjustDebt,
 }: {
   user: PayrollUser;
   onSettle: () => void;
@@ -904,6 +913,7 @@ function PayrollRow({
   onAdvance: () => void;
   onManualPay: () => void;
   onHistory: () => void;
+  onAdjustDebt?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
@@ -1089,6 +1099,18 @@ function PayrollRow({
           >
             Аванс
           </button>
+          {onAdjustDebt && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdjustDebt();
+              }}
+              className="text-xs font-black px-2.5 py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0"
+              title="Редактировать целевую сумму долга"
+            >
+              ✏️ Долг
+            </button>
+          )}
           <span
             className={cn(
               'material-symbols-outlined text-slate-300 text-[18px] shrink-0 transition-transform duration-200',
@@ -1169,6 +1191,7 @@ function PayrollSection({
   onAdvance,
   onManualPay,
   onHistory,
+  onAdjustDebt,
 }: {
   users: PayrollUser[];
   headerBg: string;
@@ -1179,6 +1202,7 @@ function PayrollSection({
   onAdvance: (u: PayrollUser) => void;
   onManualPay: (u: PayrollUser) => void;
   onHistory: (u: PayrollUser) => void;
+  onAdjustDebt?: (u: PayrollUser) => void;
 }) {
   if (users.length === 0)
     return (
@@ -1244,6 +1268,7 @@ function PayrollSection({
           onAdvance={() => onAdvance(u)}
           onManualPay={() => onManualPay(u)}
           onHistory={() => onHistory(u)}
+          onAdjustDebt={onAdjustDebt ? () => onAdjustDebt(u) : undefined}
         />
       ))}
     </div>
@@ -1615,19 +1640,19 @@ function AddStaffDebtModal({
 }: {
   allUsers: PayrollUser[];
   initialUserId?: string;
-  initialAction?: 'add' | 'repay';
+  initialAction?: 'add' | 'repay' | 'adjust';
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [action, setAction] = useState<'add' | 'repay'>(initialAction);
+  const [action, setAction] = useState<'add' | 'repay' | 'adjust'>(initialAction);
   const [userId, setUserId] = useState(initialUserId || (allUsers[0]?.id ?? ''));
-  const [amount, setAmount] = useState('');
+  const selectedUser = allUsers.find((u) => u.id === userId);
+  const currentDebt = selectedUser ? parseFloat(selectedUser.advance_balance ?? '0') : 0;
+
+  const [amount, setAmount] = useState(initialAction === 'adjust' ? currentDebt.toFixed(0) : '');
   const [walletId, setWalletId] = useState('10000000-0000-0000-0000-000000000002'); // Касса по умолчанию
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-
-  const selectedUser = allUsers.find((u) => u.id === userId);
-  const currentDebt = selectedUser ? parseFloat(selectedUser.advance_balance ?? '0') : 0;
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -1637,8 +1662,14 @@ function AddStaffDebtModal({
         body: JSON.stringify({
           action,
           user_id: userId,
-          amount: parseFloat(amount.replace(',', '.')).toFixed(2),
-          ...(action === 'add' ? { from_wallet_id: walletId } : { to_wallet_id: walletId }),
+          ...(action === 'adjust'
+            ? { target_amount: parseFloat(amount.replace(',', '.')).toFixed(2) }
+            : { amount: parseFloat(amount.replace(',', '.')).toFixed(2) }),
+          ...(action === 'add'
+            ? { from_wallet_id: walletId }
+            : action === 'repay'
+              ? { to_wallet_id: walletId }
+              : {}),
           note: note.trim() || undefined,
         }),
       }).then(async (r) => {
@@ -1656,7 +1687,7 @@ function AddStaffDebtModal({
       return;
     }
     const val = parseFloat(amount.replace(',', '.'));
-    if (isNaN(val) || val <= 0) {
+    if (isNaN(val) || val < 0) {
       setError('Введите корректную сумму');
       return;
     }
@@ -1670,7 +1701,11 @@ function AddStaffDebtModal({
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-slate-900">
-              {action === 'add' ? '💳 Записать долг сотруднику' : '📥 Погашение долга сотрудником'}
+              {action === 'add'
+                ? '💳 Записать долг сотруднику'
+                : action === 'repay'
+                  ? '📥 Погашение долга сотрудником'
+                  : '✏️ Редактирование суммы долга'}
             </h2>
             <p className="text-xs text-slate-500">Учёт авансов и внутренних займов</p>
           </div>
@@ -1683,31 +1718,52 @@ function AddStaffDebtModal({
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Режим: Выдать долг / Погасить */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+          {/* Режим: Выдать долг / Погасить / Редактировать */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
             <button
               type="button"
-              onClick={() => setAction('add')}
+              onClick={() => {
+                setAction('add');
+                setAmount('');
+              }}
               className={cn(
-                'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
+                'flex-1 py-2 text-[11px] font-bold rounded-lg transition-all',
                 action === 'add'
                   ? 'bg-violet-600 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-800',
               )}
             >
-              + Выдать / Записать долг
+              + Записать
             </button>
             <button
               type="button"
-              onClick={() => setAction('repay')}
+              onClick={() => {
+                setAction('repay');
+                setAmount('');
+              }}
               className={cn(
-                'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
+                'flex-1 py-2 text-[11px] font-bold rounded-lg transition-all',
                 action === 'repay'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-800',
               )}
             >
-              ✓ Внесение денег (Погашение)
+              ✓ Погашение
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAction('adjust');
+                setAmount(currentDebt.toFixed(0));
+              }}
+              className={cn(
+                'flex-1 py-2 text-[11px] font-bold rounded-lg transition-all',
+                action === 'adjust'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800',
+              )}
+            >
+              ✏️ Задать долг
             </button>
           </div>
 
@@ -1716,7 +1772,14 @@ function AddStaffDebtModal({
             <label className="text-xs font-medium text-slate-500 block mb-1">Сотрудник *</label>
             <select
               value={userId}
-              onChange={(e) => setUserId(e.target.value)}
+              onChange={(e) => {
+                const id = e.target.value;
+                setUserId(id);
+                const u = allUsers.find((x) => x.id === id);
+                if (action === 'adjust' && u) {
+                  setAmount(parseFloat(u.advance_balance ?? '0').toFixed(0));
+                }
+              }}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
             >
               {allUsers.map((u) => {
@@ -1730,7 +1793,7 @@ function AddStaffDebtModal({
             </select>
           </div>
 
-          {currentDebt > 0 && (
+          {currentDebt > 0 && action !== 'adjust' && (
             <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5 flex justify-between items-center">
               <span className="text-xs text-violet-700 font-medium">Текущий долг сотрудника:</span>
               <span className="text-sm font-black text-violet-800">
@@ -1742,12 +1805,16 @@ function AddStaffDebtModal({
           {/* Сумма */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">
-              Сумма {action === 'add' ? 'долга' : 'внесения'}, ₽ *
+              {action === 'add'
+                ? 'Сумма выдачи/долга, ₽ *'
+                : action === 'repay'
+                  ? 'Сумма погашения, ₽ *'
+                  : 'Новый целевой баланс долга, ₽ *'}
             </label>
             <input
               autoFocus
               type="number"
-              min="1"
+              min="0"
               step="500"
               value={amount}
               onChange={(e) => {
@@ -1757,23 +1824,36 @@ function AddStaffDebtModal({
               placeholder="0"
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-lg font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
             />
+            {action === 'adjust' && (
+              <p className="text-[11px] text-slate-500 mt-1">
+                Текущий долг: <b>{currentDebt.toLocaleString('ru-RU')} ₽</b>. Баланс будет
+                откорректирован на{' '}
+                <b>
+                  {(parseFloat(amount || '0') - currentDebt > 0 ? '+' : '') +
+                    (parseFloat(amount || '0') - currentDebt).toLocaleString('ru-RU')}{' '}
+                  ₽
+                </b>
+              </p>
+            )}
           </div>
 
           {/* Источник / Касса */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              {action === 'add' ? 'Списать из' : 'Внести в'}
-            </label>
-            <select
-              value={walletId}
-              onChange={(e) => setWalletId(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
-            >
-              <option value="10000000-0000-0000-0000-000000000002">💵 Касса (Наличные)</option>
-              <option value="10000000-0000-0000-0000-000000000001">🏦 Расчётный счёт</option>
-              <option value="none">🚫 Без списания с кошелька (внутренний долг)</option>
-            </select>
-          </div>
+          {action !== 'adjust' && (
+            <div>
+              <label className="text-xs font-medium text-slate-500 block mb-1">
+                {action === 'add' ? 'Списать из' : 'Внести в'}
+              </label>
+              <select
+                value={walletId}
+                onChange={(e) => setWalletId(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+              >
+                <option value="10000000-0000-0000-0000-000000000002">💵 Касса (Наличные)</option>
+                <option value="10000000-0000-0000-0000-000000000001">🏦 Расчётный счёт</option>
+                <option value="none">🚫 Без списания с кошелька (внутренний долг)</option>
+              </select>
+            </div>
+          )}
 
           {/* Примечание */}
           <div>
@@ -2034,6 +2114,7 @@ export default function StaffPage() {
           onAdvance={setAdvanceUser}
           onManualPay={setManualPayUser}
           onHistory={setHistoryUser}
+          onAdjustDebt={(u) => setDebtModalUser({ user: u, action: 'adjust' })}
         />
       )}
 

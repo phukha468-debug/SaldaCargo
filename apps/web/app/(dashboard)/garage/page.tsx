@@ -305,6 +305,7 @@ const emptyForm = {
   client_phone: '',
   problem_description: '',
   assigned_mechanic_id: '',
+  odometer_start: '',
   priority: 'normal',
   admin_note: '',
 };
@@ -2725,7 +2726,17 @@ function ClientVehicleSelector({
   );
 }
 
-function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: Asset[] }) {
+function CreateOrderModal({
+  onClose,
+  assets,
+  mechanics = [],
+  onCreated,
+}: {
+  onClose: () => void;
+  assets: Asset[];
+  mechanics?: Mechanic[];
+  onCreated?: (id: string) => void;
+}) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
@@ -2738,6 +2749,9 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
       if (form.machine_type === 'client' && !selectedClientVehicle) {
         throw new Error('Выберите или создайте клиентский автомобиль');
       }
+      if (!form.problem_description.trim()) {
+        throw new Error('Укажите описание проблемы');
+      }
 
       const r = await fetch('/api/garage/orders', {
         method: 'POST',
@@ -2745,15 +2759,19 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
         body: JSON.stringify({
           ...form,
           client_vehicle_id: form.machine_type === 'client' ? selectedClientVehicle?.id : undefined,
+          assigned_mechanic_id: form.assigned_mechanic_id || undefined,
+          odometer_start: form.odometer_start ? parseInt(form.odometer_start) : undefined,
         }),
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? 'Ошибка');
       return json;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
       onClose();
+      if (data?.id) onCreated?.(data.id);
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -2761,7 +2779,7 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
     setForm((f) => ({ ...f, [field]: value }));
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs"
       onClick={onClose}
     >
       <div
@@ -2788,10 +2806,10 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
                   key={t}
                   onClick={() => set('machine_type', t)}
                   className={cn(
-                    'flex-1 py-2 rounded-lg text-sm font-semibold',
+                    'flex-1 py-2 rounded-lg text-sm font-semibold transition-colors',
                     form.machine_type === t
                       ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600',
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                   )}
                 >
                   {t === 'own' ? 'Своя машина' : 'Клиентская'}
@@ -2808,7 +2826,7 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
                 value={form.asset_id}
                 onChange={(e) => set('asset_id', e.target.value)}
                 className={cn(
-                  'w-full border rounded-lg px-3 py-2 text-sm',
+                  'w-full border rounded-lg px-3 py-2 text-sm bg-white',
                   !form.asset_id ? 'border-red-400 bg-red-50' : 'border-slate-200',
                 )}
               >
@@ -2848,12 +2866,43 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                Исполнитель (опционально)
+              </label>
+              <select
+                value={form.assigned_mechanic_id}
+                onChange={(e) => set('assigned_mechanic_id', e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="">— Не выбран —</option>
+                {mechanics.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                Пробег (км)
+              </label>
+              <input
+                type="number"
+                value={form.odometer_start}
+                onChange={(e) => set('odometer_start', e.target.value)}
+                placeholder="Одометр..."
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
                 Приоритет
               </label>
               <select
                 value={form.priority}
                 onChange={(e) => set('priority', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
               >
                 {Object.entries(PRIORITY_LABEL).map(([v, l]) => (
                   <option key={v} value={v}>
@@ -2878,7 +2927,7 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
           <div className="flex gap-3 pt-2">
             <button
               onClick={onClose}
-              className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold"
+              className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-50"
             >
               Отмена
             </button>
@@ -2889,7 +2938,7 @@ function CreateOrderModal({ onClose, assets }: { onClose: () => void; assets: As
                 (form.machine_type === 'own' ? !form.asset_id : !selectedClientVehicle) ||
                 !form.problem_description.trim()
               }
-              className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+              className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50 hover:bg-slate-800 transition-colors"
             >
               {createMutation.isPending ? 'Создаём...' : 'Создать наряд'}
             </button>
@@ -3686,10 +3735,12 @@ function parseAiResponse(text: string): AiParsed | null {
 function AiImportModal({
   onClose,
   assets,
+  mechanics = [],
   onCreated,
 }: {
   onClose: () => void;
   assets: Asset[];
+  mechanics?: Mechanic[];
   onCreated: (id: string) => void;
 }) {
   const aiBackdropDown = useRef(false);
@@ -3699,6 +3750,7 @@ function AiImportModal({
 
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
+  const [selectedMechanicId, setSelectedMechanicId] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -3712,6 +3764,24 @@ function AiImportModal({
       return;
     }
     setParsed(result);
+
+    // Авто-подбор машины из автопарка по госномеру или модели
+    if (result.order.machine_type === 'own') {
+      const reg = (result.order.client_vehicle_reg || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9а-я]/g, '');
+      const model = (result.order.client_vehicle_model || '').toLowerCase().trim();
+      const matched = assets.find((a) => {
+        const aReg = (a.reg_number || '').toLowerCase().replace(/[^a-z0-9а-я]/g, '');
+        const aName = (a.short_name || '').toLowerCase().trim();
+        return (reg && aReg && aReg.includes(reg)) || (model && aName && aName.includes(model));
+      });
+      if (matched) {
+        setSelectedAssetId(matched.id);
+      } else if (assets.length === 1 && assets[0]) {
+        setSelectedAssetId(assets[0].id);
+      }
+    }
   }
 
   async function handleCreate() {
@@ -3738,6 +3808,7 @@ function AiImportModal({
             asset_id: parsed.order.machine_type === 'own' ? selectedAssetId : undefined,
             client_vehicle_id:
               parsed.order.machine_type === 'client' ? selectedClientVehicle?.id : undefined,
+            assigned_mechanic_id: selectedMechanicId || undefined,
           },
           works: parsed.works,
           parts: parsed.parts ?? [],
@@ -4054,6 +4125,25 @@ function AiImportModal({
                   </div>
                 )}
 
+                {/* Исполнитель */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                    Исполнитель (опционально)
+                  </label>
+                  <select
+                    value={selectedMechanicId}
+                    onChange={(e) => setSelectedMechanicId(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+                  >
+                    <option value="">— Выберите исполнителя —</option>
+                    {mechanics.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {createError && (
                   <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
                     <span className="text-red-500 shrink-0 mt-0.5">✕</span>
@@ -4067,9 +4157,20 @@ function AiImportModal({
                 <button
                   onClick={handleCreate}
                   disabled={!canCreate}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm disabled:opacity-40 transition-colors"
+                  className={cn(
+                    'w-full font-bold py-3.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2',
+                    canCreate
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 active:scale-[0.98]'
+                      : 'bg-amber-100 border border-amber-300 text-amber-800 cursor-not-allowed',
+                  )}
                 >
-                  {creating ? 'Создаём...' : 'Создать наряд →'}
+                  {creating
+                    ? 'Создаём наряд...'
+                    : parsed.order.machine_type === 'own' && !selectedAssetId
+                      ? '⚠️ Выберите машину из автопарка'
+                      : parsed.order.machine_type === 'client' && !selectedClientVehicle
+                        ? '⚠️ Выберите клиентский автомобиль'
+                        : '✅ Создать наряд →'}
                 </button>
                 <button
                   onClick={() => {
@@ -5159,6 +5260,7 @@ function WorkOrdersSection() {
         <AiImportModal
           onClose={() => setShowAiImport(false)}
           assets={assets}
+          mechanics={mechanics}
           onCreated={(id) => {
             qc.invalidateQueries({ queryKey: ['garage-orders'] });
             setShowAiImport(false);
@@ -6602,6 +6704,8 @@ function SettingsSection() {
 export default function GaragePage() {
   const [section, setSection] = useState<GarageSection>('dashboard');
   const [showCreate, setShowCreate] = useState(false);
+  const [showAiImport, setShowAiImport] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const { data: dashData } = useQuery<DashboardData>({
     queryKey: ['garage-dashboard'],
@@ -6615,12 +6719,59 @@ export default function GaragePage() {
     staleTime: 300000,
   });
 
+  const { data: mechanics = [] } = useQuery<Mechanic[]>({
+    queryKey: ['mechanics-list'],
+    queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
+    staleTime: 300000,
+  });
+
+  const qc = useQueryClient();
   const counts = dashData?.counts ?? null;
 
   return (
     <div className="flex -mx-6 -mt-4" style={{ minHeight: 'calc(100vh - 64px - 32px)' }}>
       <Sidebar section={section} onChange={setSection} counts={counts} />
-      <main className="flex-1 overflow-auto p-6">
+      <main className="flex-1 overflow-auto p-6 space-y-5">
+        {/* ── PERMANENT ACTION BAR (ВСЕГДА НА ЭКРАНЕ ГАРАЖА) ── */}
+        <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">🛠️ Гараж и СТО</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Быстрое создание заказ-нарядов вручную или с помощью ИИ
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button
+              onClick={() => setShowAiImport(true)}
+              className="flex-1 sm:flex-initial bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
+              </svg>
+              ✨ ИИ наряд
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              + Новый наряд
+            </button>
+          </div>
+        </div>
+
         {section === 'dashboard' && (
           <DashboardSection onNav={setSection} onCreateOrder={() => setShowCreate(true)} />
         )}
@@ -6634,7 +6785,40 @@ export default function GaragePage() {
         {section === 'clients' && <ClientsSection />}
         {section === 'settings' && <SettingsSection />}
       </main>
-      {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} assets={assets} />}
+
+      {showCreate && (
+        <CreateOrderModal
+          onClose={() => setShowCreate(false)}
+          assets={assets}
+          mechanics={mechanics}
+          onCreated={(id) => {
+            qc.invalidateQueries({ queryKey: ['garage-orders'] });
+            qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
+            setShowCreate(false);
+            setSelectedOrderId(id);
+          }}
+        />
+      )}
+      {showAiImport && (
+        <AiImportModal
+          onClose={() => setShowAiImport(false)}
+          assets={assets}
+          mechanics={mechanics}
+          onCreated={(id) => {
+            qc.invalidateQueries({ queryKey: ['garage-orders'] });
+            qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
+            setShowAiImport(false);
+            setSelectedOrderId(id);
+          }}
+        />
+      )}
+      {selectedOrderId && (
+        <OrderDetailModal
+          orderId={selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          mechanics={mechanics}
+        />
+      )}
     </div>
   );
 }

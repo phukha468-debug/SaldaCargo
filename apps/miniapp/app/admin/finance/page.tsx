@@ -1178,6 +1178,7 @@ function SalaryPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucc
         body: JSON.stringify({
           user_id: selected.id,
           partial_amount: amount,
+          partial_offset: '0.00',
           amount,
           from_wallet_id: walletId,
           description: note || undefined,

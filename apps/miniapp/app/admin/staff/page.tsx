@@ -133,6 +133,13 @@ function StaffContent() {
   const [maxAdvance, setMaxAdvance] = useState(0);
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
   const [unconfirmedCount, setUnconfirmedCount] = useState(0);
+  const [settleIdempotencyKey, setSettleIdempotencyKey] = useState('');
+  const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
+
+  // Adjust debt modal state
+  const [adjustTarget, setAdjustTarget] = useState<PayrollEntry | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustNote, setAdjustNote] = useState('');
 
   // Details modal state
   const [detailsTarget, setDetailsTarget] = useState<PayrollEntry | null>(null);
@@ -173,6 +180,7 @@ function StaffContent() {
       partial_amount: string;
       from_wallet_id: string;
       partial_offset: string;
+      idempotency_key?: string;
     }) =>
       fetch('/api/admin/staff-settle', {
         method: 'POST',
@@ -211,6 +219,33 @@ function StaffContent() {
     },
   });
 
+  const adjustDebtMutation = useMutation({
+    mutationFn: (body: { user_id: string; target_amount: string; note?: string }) =>
+      fetch('/api/staff/debt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'adjust', ...body }),
+      }).then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Ошибка');
+        return json;
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-payroll'] });
+      qc.invalidateQueries({ queryKey: ['staff-settle-details'] });
+      qc.invalidateQueries({ queryKey: ['wallets'] });
+      setAdjustTarget(null);
+      setAdjustAmount('');
+      setAdjustNote('');
+    },
+  });
+
+  const openAdjust = (entry: PayrollEntry) => {
+    setAdjustTarget(entry);
+    setAdjustAmount(parseFloat(entry.advance_balance || '0').toFixed(0));
+    setAdjustNote('');
+  };
+
   const grouped = {
     drivers: payroll.filter((u) => getRoleGroup(u.roles) === 'drivers'),
     loaders: payroll.filter((u) => getRoleGroup(u.roles) === 'loaders'),
@@ -244,24 +279,32 @@ function StaffContent() {
       setSettleWallet(wallets?.cash.id ?? '');
       setPendingTransactions(data.pending_transactions ?? []);
       setUnconfirmedCount(data.unconfirmed_count ?? 0);
+      setSettleIdempotencyKey(crypto.randomUUID());
     } catch (e) {
       console.error('Failed to load settle data', e);
     }
   };
 
   const handleSettle = () => {
-    if (!settleTarget || !settleWallet) return;
+    if (!settleTarget || !settleWallet || isSubmittingSettle || settleMutation.isPending) return;
     const payoutAmt = parseFloat(settleAmount) || 0;
     const offsetAmt = parseFloat(settleOffset) || 0;
 
     if (payoutAmt === 0 && offsetAmt === 0) return;
 
-    settleMutation.mutate({
-      user_id: settleTarget.id,
-      partial_amount: (payoutAmt + offsetAmt).toFixed(2),
-      partial_offset: offsetAmt.toFixed(2),
-      from_wallet_id: settleWallet,
-    });
+    setIsSubmittingSettle(true);
+    settleMutation.mutate(
+      {
+        user_id: settleTarget.id,
+        partial_amount: (payoutAmt + offsetAmt).toFixed(2),
+        partial_offset: offsetAmt.toFixed(2),
+        from_wallet_id: settleWallet,
+        idempotency_key: settleIdempotencyKey,
+      },
+      {
+        onSettled: () => setIsSubmittingSettle(false),
+      },
+    );
   };
 
   const activeList = grouped[activeGroup];
@@ -435,12 +478,24 @@ function StaffContent() {
                     </div>
 
                     {/* Advance debt info if exists */}
-                    {parseFloat(entry.advance_balance || '0') > 0 && (
+                    {(parseFloat(entry.advance_balance || '0') > 0 || activeGroup === 'debts') && (
                       <div className="mt-2.5 bg-purple-50 border border-purple-100 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs">
                         <span className="font-bold text-purple-700">Долг по авансу:</span>
-                        <span className="font-black text-purple-900">
-                          <Money amount={entry.advance_balance!} />
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-purple-900">
+                            <Money amount={entry.advance_balance || '0'} />
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openAdjust(entry);
+                            }}
+                            className="bg-purple-200 hover:bg-purple-300 text-purple-900 text-[10px] font-black px-2 py-0.5 rounded-lg active:scale-95 transition-all"
+                            title="Редактировать целевую сумму долга"
+                          >
+                            ✏️ Изменить
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -650,12 +705,15 @@ function StaffContent() {
                 onClick={handleSettle}
                 disabled={
                   settleMutation.isPending ||
+                  isSubmittingSettle ||
                   !settleWallet ||
                   (parseFloat(settleAmount || '0') <= 0 && parseFloat(settleOffset || '0') <= 0)
                 }
                 className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
               >
-                {settleMutation.isPending ? 'Проводим выплату...' : 'Подтвердить и выплатить'}
+                {settleMutation.isPending || isSubmittingSettle
+                  ? 'Проводим выплату...'
+                  : 'Подтвердить и выплатить'}
               </button>
 
               {settleMutation.isError && (
@@ -680,6 +738,91 @@ function StaffContent() {
             openSettle(detailsTarget);
           }}
         />
+      )}
+
+      {/* Adjust debt modal */}
+      {adjustTarget && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setAdjustTarget(null)}
+        >
+          <div
+            className="bg-white w-full max-w-sm rounded-[2rem] p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black text-purple-600 uppercase tracking-widest">
+                  ✏️ Редактирование долга
+                </p>
+                <p className="text-xl font-black text-zinc-900 mt-1">{adjustTarget.name}</p>
+              </div>
+              <button
+                onClick={() => setAdjustTarget(null)}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 text-zinc-500 font-bold active:scale-90 transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-purple-50 rounded-2xl p-4 text-xs flex justify-between items-center">
+              <span className="text-purple-700 font-bold">Текущий авансовый долг:</span>
+              <span className="font-black text-purple-900 text-base">
+                <Money amount={adjustTarget.advance_balance || '0'} />
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                Новый целевой баланс долга, ₽
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={adjustAmount}
+                onChange={(e) => setAdjustAmount(e.target.value)}
+                className="w-full border-2 border-purple-100 bg-purple-50/30 rounded-2xl px-4 py-3.5 text-2xl font-black text-zinc-900 focus:border-purple-500 focus:bg-white focus:outline-none transition-all"
+                placeholder="0"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                Причина / Комментарий
+              </label>
+              <input
+                type="text"
+                value={adjustNote}
+                onChange={(e) => setAdjustNote(e.target.value)}
+                className="w-full border-2 border-zinc-100 bg-zinc-50 rounded-2xl px-4 py-3 text-xs font-bold text-zinc-900 focus:border-purple-500 focus:outline-none"
+                placeholder="Пример: Перерасчёт за месяц"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  if (!adjustTarget) return;
+                  adjustDebtMutation.mutate({
+                    user_id: adjustTarget.id,
+                    target_amount: adjustAmount,
+                    note: adjustNote,
+                  });
+                }}
+                disabled={adjustDebtMutation.isPending || !adjustAmount}
+                className="w-full bg-purple-600 text-white font-black text-base py-4 rounded-2xl disabled:opacity-30 active:scale-[0.98] transition-all shadow-xl shadow-purple-200"
+              >
+                {adjustDebtMutation.isPending ? 'Сохраняем...' : 'Сохранить новый долг'}
+              </button>
+
+              {adjustDebtMutation.isError && (
+                <p className="text-xs text-rose-600 font-bold text-center mt-3 bg-rose-50 p-2.5 rounded-xl">
+                  {(adjustDebtMutation.error as Error).message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
