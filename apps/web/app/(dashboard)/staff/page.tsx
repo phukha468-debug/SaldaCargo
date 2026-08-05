@@ -910,7 +910,7 @@ function PayrollRow({
   onSettle: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
-  onAdvance: () => void;
+  onAdvance?: () => void;
   onManualPay: () => void;
   onHistory: () => void;
   onAdjustDebt?: () => void;
@@ -1089,16 +1089,18 @@ function PayrollRow({
               Выплатить ЗП
             </button>
           )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdvance();
-            }}
-            className="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0"
-            title="Выдать аванс"
-          >
-            Аванс
-          </button>
+          {onAdvance && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdvance();
+              }}
+              className="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0"
+              title="Выдать аванс"
+            >
+              Аванс
+            </button>
+          )}
           {onAdjustDebt && (
             <button
               onClick={(e) => {
@@ -1199,7 +1201,7 @@ function PayrollSection({
   onSettle: (u: PayrollUser) => void;
   onEdit: (u: PayrollUser) => void;
   onDeactivate: (u: PayrollUser) => void;
-  onAdvance: (u: PayrollUser) => void;
+  onAdvance?: (u: PayrollUser) => void;
   onManualPay: (u: PayrollUser) => void;
   onHistory: (u: PayrollUser) => void;
   onAdjustDebt?: (u: PayrollUser) => void;
@@ -1265,7 +1267,7 @@ function PayrollSection({
           onSettle={() => onSettle(u)}
           onEdit={() => onEdit(u)}
           onDeactivate={() => onDeactivate(u)}
-          onAdvance={() => onAdvance(u)}
+          onAdvance={onAdvance ? () => onAdvance(u) : undefined}
           onManualPay={() => onManualPay(u)}
           onHistory={() => onHistory(u)}
           onAdjustDebt={onAdjustDebt ? () => onAdjustDebt(u) : undefined}
@@ -2111,10 +2113,14 @@ export default function StaffPage() {
           onSettle={setSettleUser}
           onEdit={handleEdit}
           onDeactivate={handleDeactivate}
-          onAdvance={setAdvanceUser}
+          onAdvance={activeTab === 'debts' ? setAdvanceUser : undefined}
           onManualPay={setManualPayUser}
           onHistory={setHistoryUser}
-          onAdjustDebt={(u) => setDebtModalUser({ user: u, action: 'adjust' })}
+          onAdjustDebt={
+            activeTab === 'debts'
+              ? (u) => setDebtModalUser({ user: u, action: 'adjust' })
+              : undefined
+          }
         />
       )}
 

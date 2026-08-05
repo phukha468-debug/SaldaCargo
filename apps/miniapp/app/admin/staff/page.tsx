@@ -477,8 +477,8 @@ function StaffContent() {
                       </div>
                     </div>
 
-                    {/* Advance debt info if exists */}
-                    {(parseFloat(entry.advance_balance || '0') > 0 || activeGroup === 'debts') && (
+                    {/* Advance debt info - ONLY in debts tab */}
+                    {activeGroup === 'debts' && (
                       <div className="mt-2.5 bg-purple-50 border border-purple-100 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs">
                         <span className="font-bold text-purple-700">Долг по авансу:</span>
                         <div className="flex items-center gap-2">
@@ -493,7 +493,7 @@ function StaffContent() {
                             className="bg-purple-200 hover:bg-purple-300 text-purple-900 text-[10px] font-black px-2 py-0.5 rounded-lg active:scale-95 transition-all"
                             title="Редактировать целевую сумму долга"
                           >
-                            ✏️ Изменить
+                            ✏️ Изменить долг
                           </button>
                         </div>
                       </div>
