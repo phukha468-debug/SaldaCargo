@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       mechanic_pay, second_mechanic_pay,
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
       second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, custom_salary_pct, notes)
+      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, notes)
     `,
     )
     .eq('id', orderId)

@@ -21,8 +21,6 @@ export async function PATCH(
     'quantity',
     'mechanic_id',
     'second_mechanic_id',
-    'custom_salary_pct',
-    'custom_salary_amount',
     'notes',
   ];
   const updates: Record<string, unknown> = {};
@@ -39,6 +37,9 @@ export async function PATCH(
         : `[salary_pct:${pctVal}]`;
     }
   }
+
+  delete updates.custom_salary_pct;
+  delete updates.custom_salary_amount;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Нет данных для обновления' }, { status: 400 });
@@ -90,7 +91,7 @@ export async function PATCH(
     .update(updates)
     .eq('id', workId)
     .select(
-      'id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name, mechanic_id, second_mechanic_id, work_catalog:work_catalog(id, name)',
+      'id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name, mechanic_id, second_mechanic_id, notes, work_catalog:work_catalog(id, name)',
     )
     .single();
 
