@@ -2113,11 +2113,11 @@ export default function StaffPage() {
           onSettle={setSettleUser}
           onEdit={handleEdit}
           onDeactivate={handleDeactivate}
-          onAdvance={activeTab === 'debts' ? setAdvanceUser : undefined}
+          onAdvance={activeGroup === 'debts' ? setAdvanceUser : undefined}
           onManualPay={setManualPayUser}
           onHistory={setHistoryUser}
           onAdjustDebt={
-            activeTab === 'debts'
+            activeGroup === 'debts'
               ? (u) => setDebtModalUser({ user: u, action: 'adjust' })
               : undefined
           }
