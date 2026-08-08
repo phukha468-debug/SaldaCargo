@@ -2248,19 +2248,19 @@ function GarageStatsModal({
             </div>
           </div>
 
-          {/* 3. Заработано со своих машин */}
+          {/* 3. Обслуживание своего автопарка */}
           <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-lg">🚛</span>
               <h3 className="text-xs font-black text-sky-900 uppercase tracking-wider">
-                Со своих машин (автопарк)
+                Затраты на свой автопарк
               </h3>
             </div>
             <div>
               <p className="text-2xl font-black text-sky-950">
                 {formatRub(stats.ownFleetThisMonth)}
               </p>
-              <p className="text-[10px] font-bold text-sky-700">за {monthName}</p>
+              <p className="text-[10px] font-bold text-sky-700">затраты на ремонт за {monthName}</p>
             </div>
             <div className="pt-2 border-t border-sky-200/60 flex justify-between text-xs font-bold text-sky-900">
               <span className="text-sky-700">Всего за всё время:</span>

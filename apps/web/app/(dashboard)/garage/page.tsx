@@ -3404,7 +3404,7 @@ function DashboardSection({
           className="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 cursor-pointer hover:bg-sky-100/60 transition-all"
         >
           <div className="text-xs text-sky-600 font-semibold mb-1 uppercase tracking-wide">
-            Со своих машин ({monthName})
+            Обслуживание своего автопарка ({monthName})
           </div>
           <div className="text-2xl font-bold text-sky-700">
             <Money amount={st.ownFleetThisMonth} />
@@ -8851,14 +8851,16 @@ function GarageStatsModal({
             <div className="flex items-center gap-2">
               <span className="text-xl">🚛</span>
               <h3 className="text-xs font-extrabold text-sky-800 uppercase tracking-wider">
-                Со своих машин
+                Обслуживание своего автопарка
               </h3>
             </div>
             <div>
               <p className="text-2xl font-black text-sky-900">
                 <Money amount={stats.ownFleetThisMonth} />
               </p>
-              <p className="text-[11px] font-medium text-sky-700 mt-0.5">автопарк за {monthName}</p>
+              <p className="text-[11px] font-medium text-sky-700 mt-0.5">
+                затраты на ремонт за {monthName}
+              </p>
             </div>
             <div className="pt-2 border-t border-sky-200/60 flex justify-between text-xs font-semibold text-sky-900">
               <span className="text-sky-700">Всего за всё время:</span>

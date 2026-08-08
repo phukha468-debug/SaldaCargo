@@ -90,9 +90,9 @@ export async function GET() {
       .order('alert_status', { ascending: false })
       .order('next_due_km', { ascending: true }),
 
-    // Все наряды с работами
+    // Все наряды с работами и запчастями
     (supabase.from('service_orders') as any).select(
-      'id, client_vehicle_id, status, lifecycle_status, created_at, updated_at, service_order_works(price_client, status)',
+      'id, machine_type, client_vehicle_id, status, lifecycle_status, created_at, service_order_works(price_client, status), service_order_parts(client_price, quantity)',
     ),
 
     // Начислено ЗП механикам (без транзакций выплат)
@@ -116,35 +116,44 @@ export async function GET() {
   let inProgressOrdersCount = 0;
 
   (allServiceOrders || []).forEach((o: any) => {
-    const isClient = o.client_vehicle_id != null;
+    if (o.lifecycle_status === 'cancelled') return;
+
+    const isClient = o.machine_type === 'client' || o.client_vehicle_id != null;
     const isApproved = o.lifecycle_status === 'approved';
-    const isCompletedOrApproved = o.status === 'completed' || isApproved;
-    const isThisMonth = (o.updated_at || o.created_at) >= monthStart;
-    const isActive = o.status === 'created' || o.status === 'in_progress';
+    const isThisMonth = o.created_at >= monthStart;
+    const isActive = o.lifecycle_status === 'draft' && o.status !== 'completed';
 
     if (isActive) inProgressOrdersCount++;
-    if (isCompletedOrApproved) {
+    if (isApproved) {
       completedOrdersAllTime++;
       if (isThisMonth) completedOrdersThisMonth++;
     }
 
     const worksSum = (o.service_order_works ?? [])
-      .filter((w: any) => w.status === 'completed' || isCompletedOrApproved || isActive)
+      .filter((w: any) => w.status !== 'cancelled')
       .reduce((s: number, w: any) => s + parseFloat(w.price_client ?? '0'), 0);
 
+    const partsSum = (o.service_order_parts ?? []).reduce(
+      (s: number, p: any) =>
+        s + parseFloat(p.client_price ?? '0') * (parseFloat(p.quantity ?? '1') || 1),
+      0,
+    );
+
+    const orderTotal = worksSum + partsSum;
+
     if (isClient) {
-      if (isCompletedOrApproved) {
-        clientRevenueAllTime += worksSum;
-        if (isThisMonth) clientRevenueThisMonth += worksSum;
+      if (isApproved) {
+        clientRevenueAllTime += orderTotal;
+        if (isThisMonth) clientRevenueThisMonth += orderTotal;
       }
       if (isActive) {
-        clientActiveSum += worksSum;
+        clientActiveSum += orderTotal;
         clientActiveCount++;
       }
     } else {
-      if (isCompletedOrApproved) {
-        ownFleetAllTime += worksSum;
-        if (isThisMonth) ownFleetThisMonth += worksSum;
+      if (isApproved) {
+        ownFleetAllTime += orderTotal;
+        if (isThisMonth) ownFleetThisMonth += orderTotal;
       }
     }
   });
