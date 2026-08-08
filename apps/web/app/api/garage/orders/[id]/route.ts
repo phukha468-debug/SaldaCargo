@@ -131,14 +131,42 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
 
       // Утверждаем наряд; own-машины не требуют оплаты от клиента
-      await (supabase as any)
-        .from('service_orders')
-        .update({
-          lifecycle_status: 'approved',
-          payment_received: order.machine_type === 'own',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
+      const orderUpdatePayload: Record<string, unknown> = {
+        lifecycle_status: 'approved',
+        payment_received: order.machine_type === 'own',
+        updated_at: new Date().toISOString(),
+      };
+      if (typeof body.mechanic_note === 'string') {
+        orderUpdatePayload.mechanic_note = body.mechanic_note;
+      }
+
+      await (supabase as any).from('service_orders').update(orderUpdatePayload).eq('id', id);
+
+      if (typeof body.mechanic_note === 'string' && body.mechanic_note.trim()) {
+        const { data: fullOrder } = await (supabase as any)
+          .from('service_orders')
+          .select('client_vehicle_id, created_by')
+          .eq('id', id)
+          .single();
+
+        if (fullOrder?.client_vehicle_id) {
+          const { data: adminUser } = await (supabase as any)
+            .from('users')
+            .select('id')
+            .filter('roles', 'cs', '{"admin"}')
+            .limit(1)
+            .maybeSingle();
+
+          await (supabase as any).from('client_vehicle_recommendations').insert({
+            client_vehicle_id: fullOrder.client_vehicle_id,
+            service_order_id: id,
+            text: body.mechanic_note.trim(),
+            due_km: body.due_km ? Number(body.due_km) : null,
+            due_date: body.due_date || null,
+            created_by: adminUser?.id ?? fullOrder.created_by,
+          });
+        }
+      }
 
       // Доход с наряда — только для клиентских машин (свои не приносят выручки)
       if (order.machine_type === 'client') {
@@ -338,6 +366,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'assigned_mechanic_id',
       'second_mechanic_id',
       'admin_note',
+      'mechanic_note',
       'odometer_start',
       'odometer_end',
       'is_ready_for_pickup',

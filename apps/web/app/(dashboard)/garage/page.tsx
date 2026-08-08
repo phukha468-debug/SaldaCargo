@@ -133,6 +133,26 @@ type ServiceJson = {
   works?: Array<{ name: string; norm_minutes?: number }>;
 };
 
+interface ReminderItem {
+  id: string;
+  text: string;
+  due_km?: number | null;
+  due_date?: string | null;
+  is_done: boolean;
+  vehicle?: {
+    brand?: string | null;
+    model?: string | null;
+    reg_number?: string | null;
+    counterparty?: {
+      name?: string | null;
+      phone?: string | null;
+    } | null;
+  } | null;
+  order?: {
+    order_number?: number | null;
+  } | null;
+}
+
 type RepairRequest = {
   id: string;
   status: string;
@@ -755,9 +775,15 @@ function OrderDetailModal({
   });
 
   const [closePays, setClosePays] = useState<Record<string, string>>({});
+  const [closeRecommendation, setCloseRecommendation] = useState<string>('');
+  const [closeDueKm, setCloseDueKm] = useState<string>('');
+  const [closeDueDate, setCloseDueDate] = useState<string>('');
 
   useEffect(() => {
     if (!showCloseDialog || !order) return;
+    setCloseRecommendation(order.mechanic_note || '');
+    setCloseDueKm('');
+    setCloseDueDate('');
     const defaults: Record<string, number> = {};
     order.works.forEach((w) => {
       if (w.status === 'cancelled' || w.salary_paid) return;
@@ -1972,11 +1998,13 @@ function OrderDetailModal({
                 )}
               </div>
               {order.mechanic_note && (
-                <div>
-                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
-                    Заметка механика
+                <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3.5 space-y-1">
+                  <p className="text-[10px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>💡</span> Рекомендации механика / мастера
                   </p>
-                  <p className="text-sm text-slate-700">{order.mechanic_note}</p>
+                  <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap">
+                    {order.mechanic_note}
+                  </p>
                 </div>
               )}
               {order.lifecycle_status === 'approved' && (
@@ -2376,6 +2404,74 @@ function OrderDetailModal({
                       </div>
                     )}
                   </div>
+
+                  {/* Рекомендации механика / мастера */}
+                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                      Рекомендации механика / мастера по машине
+                    </label>
+                    <textarea
+                      value={closeRecommendation}
+                      onChange={(e) => setCloseRecommendation(e.target.value)}
+                      placeholder="Укажите рекомендации по авто (например: через 5 000 км замена масла и фильтров...)"
+                      rows={2}
+                      className="w-full border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:ring-2 focus:ring-emerald-400 outline-none resize-none bg-slate-50 focus:bg-white transition-colors"
+                    />
+
+                    {/* Быстрый расчёт напоминания об обслуживании */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Напомнить клиенту об обслуживании (прозвон):
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: '+5 000 км (~1.5 мес)', km: 5000, days: 50 },
+                          { label: '+10 000 км (~3.3 мес)', km: 10000, days: 100 },
+                          { label: '+15 000 км (~5 мес)', km: 15000, days: 150 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.km}
+                            type="button"
+                            onClick={() => {
+                              const baseKm = order.odometer_end || order.odometer_start || 0;
+                              if (baseKm > 0) setCloseDueKm(String(baseKm + preset.km));
+                              const d = new Date();
+                              d.setDate(d.getDate() + preset.days);
+                              setCloseDueDate(d.toISOString().slice(0, 10));
+                            }}
+                            className="bg-white border border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-lg transition-all"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                            Целевой пробег (км)
+                          </label>
+                          <input
+                            type="number"
+                            value={closeDueKm}
+                            onChange={(e) => setCloseDueKm(e.target.value)}
+                            placeholder="например: 256549"
+                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                            Дата напоминания (звонка)
+                          </label>
+                          <input
+                            type="date"
+                            value={closeDueDate}
+                            onChange={(e) => setCloseDueDate(e.target.value)}
+                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Кнопки */}
@@ -2391,6 +2487,9 @@ function OrderDetailModal({
                       const updates: Record<string, unknown> = {
                         lifecycle_status: 'approved',
                         mechanic_pays: closePays,
+                        mechanic_note: closeRecommendation.trim() || null,
+                        due_km: closeDueKm ? Number(closeDueKm) : null,
+                        due_date: closeDueDate || null,
                       };
                       patchMutation.mutate(updates);
                       setShowCloseDialog(false);
@@ -4311,6 +4410,31 @@ function WorkOrdersSection() {
     enabled: activeTab === 'pending_payment',
   });
 
+  const { data: reminders = [] } = useQuery<ReminderItem[]>({
+    queryKey: ['garage-reminders'],
+    queryFn: () =>
+      fetch('/api/garage/reminders')
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : [])),
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  const markReminderDoneMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch('/api/garage/reminders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_done: true }),
+      });
+      if (!r.ok) throw new Error('Ошибка');
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['garage-reminders'] });
+    },
+  });
+
   // ── Repair requests (заявки водителей) ──
   const { data: repairRequests = [] } = useQuery<RepairRequest[]>({
     queryKey: ['garage-repair-requests', 'new'],
@@ -4546,10 +4670,14 @@ function WorkOrdersSection() {
     const cost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
     const normH = works.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
     const factH = works.reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
-    const isReview = o.lifecycle_status === 'draft' && o.status === 'completed';
+    const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
+    const isReview = !isCancelled && o.lifecycle_status === 'draft' && o.status === 'completed';
     const isPendingPayment =
-      o.lifecycle_status === 'approved' && o.machine_type === 'client' && !o.payment_received;
-    const isClosed = o.lifecycle_status === 'approved' && !isPendingPayment;
+      !isCancelled &&
+      o.lifecycle_status === 'approved' &&
+      o.machine_type === 'client' &&
+      !o.payment_received;
+    const isClosed = !isCancelled && o.lifecycle_status === 'approved' && !isPendingPayment;
 
     const vehicleLabel =
       o.machine_type === 'own'
@@ -4563,17 +4691,19 @@ function WorkOrdersSection() {
             .join(' ');
     const clientLabel = o.machine_type === 'client' ? (o.client_name as string | null) : null;
 
-    const statusBadge = isClosed
-      ? { label: 'Закрыт', cls: 'bg-emerald-100 text-emerald-700' }
-      : isPendingPayment
-        ? { label: 'Ждёт оплаты', cls: 'bg-orange-100 text-orange-700' }
-        : isReview
-          ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
-          : o.status === 'in_progress'
-            ? { label: 'В работе', cls: 'bg-blue-100 text-blue-700' }
-            : o.status === 'completed'
-              ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
-              : { label: 'В очереди', cls: 'bg-slate-100 text-slate-500' };
+    const statusBadge = isCancelled
+      ? { label: 'Отменён', cls: 'bg-red-100 text-red-700' }
+      : isClosed
+        ? { label: 'Закрыт', cls: 'bg-emerald-100 text-emerald-700' }
+        : isPendingPayment
+          ? { label: 'Ждёт оплаты', cls: 'bg-orange-100 text-orange-700' }
+          : isReview
+            ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
+            : o.status === 'in_progress'
+              ? { label: 'В работе', cls: 'bg-blue-100 text-blue-700' }
+              : o.status === 'completed'
+                ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
+                : { label: 'В очереди', cls: 'bg-slate-100 text-slate-500' };
 
     return (
       <div
@@ -4765,6 +4895,88 @@ function WorkOrdersSection() {
           </button>
         </div>
       </div>
+
+      {/* ── Reminders Banner ── */}
+      {reminders.length > 0 && (
+        <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔔</span>
+              <div>
+                <h3 className="text-sm font-bold text-amber-950">
+                  Напоминания о прозвоне клиентов по ТО ({reminders.length})
+                </h3>
+                <p className="text-xs text-amber-700">
+                  Срок рекомендаций по обслуживанию наступил или приближается — позвоните клиентам
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {reminders.map((rem: ReminderItem) => {
+              const clientName = rem.vehicle?.counterparty?.name || 'Клиент';
+              const clientPhone = rem.vehicle?.counterparty?.phone || '';
+              const vehicleStr = [rem.vehicle?.brand, rem.vehicle?.model, rem.vehicle?.reg_number]
+                .filter(Boolean)
+                .join(' ');
+              const orderNum = rem.order?.order_number;
+
+              return (
+                <div
+                  key={rem.id}
+                  className="bg-white border border-amber-200/80 rounded-xl p-3 shadow-xs space-y-2 flex flex-col justify-between"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold text-xs text-slate-900 line-clamp-1">
+                        {clientName}
+                      </span>
+                      {rem.due_date && (
+                        <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded shrink-0">
+                          до {new Date(rem.due_date).toLocaleDateString('ru-RU')}
+                        </span>
+                      )}
+                    </div>
+                    {vehicleStr && (
+                      <p className="text-xs text-slate-600 font-medium line-clamp-1">
+                        {vehicleStr}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-100 italic">
+                      «{rem.text}»
+                    </p>
+                    {rem.due_km && (
+                      <p className="text-[10px] text-slate-400">
+                        Целевой пробег: {rem.due_km.toLocaleString('ru-RU')} км
+                        {orderNum ? ` (наряд НЗ-${orderNum})` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 mt-2">
+                    {clientPhone ? (
+                      <a
+                        href={`tel:${clientPhone}`}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        📞 {clientPhone}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-400">Нет телефона</span>
+                    )}
+                    <button
+                      onClick={() => markReminderDoneMutation.mutate(rem.id)}
+                      disabled={markReminderDoneMutation.isPending}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-lg disabled:opacity-50"
+                    >
+                      ✓ Позвонил
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">

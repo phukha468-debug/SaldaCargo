@@ -132,6 +132,20 @@ export async function PATCH(
   return NextResponse.json(updatedWork);
 }
 
+function getWorkPct(w: any, defaultUserPct: string | null | undefined): number {
+  if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
+    return Number(w.custom_salary_pct);
+  }
+  if (w.notes) {
+    const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
+    if (match && match[1]) return parseFloat(match[1]);
+  }
+  if (defaultUserPct != null && !isNaN(Number(defaultUserPct))) {
+    return Number(defaultUserPct);
+  }
+  return 50;
+}
+
 async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
   const { data: order } = await (supabase.from('service_orders') as any)
     .select(

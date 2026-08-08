@@ -1435,6 +1435,36 @@ export default function AdminGaragePage() {
     },
   });
 
+  interface ReminderItem {
+    id: string;
+    text: string;
+    due_km?: number | null;
+    due_date?: string | null;
+    is_done: boolean;
+    vehicle?: {
+      brand?: string | null;
+      model?: string | null;
+      reg_number?: string | null;
+      counterparty?: {
+        name?: string | null;
+        phone?: string | null;
+      } | null;
+    } | null;
+    order?: {
+      order_number?: number | null;
+    } | null;
+  }
+
+  const { data: miniappReminders = [] } = useQuery<ReminderItem[]>({
+    queryKey: ['garage-reminders'],
+    queryFn: async () => {
+      const r = await fetch('/api/garage/reminders');
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 30_000,
+  });
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-garage'] });
 
   const extraWorkMutation = useMutation({
@@ -1566,6 +1596,74 @@ export default function AdminGaragePage() {
                 </div>
               )}
             </div>
+
+            {/* 🔔 Напоминания о прозвоне клиентов по ТО */}
+            {miniappReminders.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 font-black text-xs text-amber-950 uppercase tracking-wider">
+                  <span>🔔</span> Звонки клиентам по ТО ({miniappReminders.length})
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {miniappReminders.map((rem: ReminderItem) => {
+                    const clientName = rem.vehicle?.counterparty?.name || 'Клиент';
+                    const clientPhone = rem.vehicle?.counterparty?.phone || '';
+                    const vehicleStr = [
+                      rem.vehicle?.brand,
+                      rem.vehicle?.model,
+                      rem.vehicle?.reg_number,
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+                    return (
+                      <div
+                        key={rem.id}
+                        className="bg-white border border-amber-200 rounded-xl p-2.5 space-y-1 text-xs"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-slate-900">{clientName}</span>
+                          {rem.due_date && (
+                            <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                              до {new Date(rem.due_date).toLocaleDateString('ru-RU')}
+                            </span>
+                          )}
+                        </div>
+                        {vehicleStr && (
+                          <p className="text-[11px] text-slate-500 font-medium">{vehicleStr}</p>
+                        )}
+                        <p className="text-[11px] text-slate-700 bg-slate-50 p-1.5 rounded border border-slate-100 italic">
+                          «{rem.text}»
+                        </p>
+                        <div className="flex items-center justify-between pt-1">
+                          {clientPhone ? (
+                            <a
+                              href={`tel:${clientPhone}`}
+                              className="font-bold text-blue-600 text-[11px]"
+                            >
+                              📞 {clientPhone}
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">Нет тел.</span>
+                          )}
+                          <button
+                            onClick={async () => {
+                              await fetch('/api/garage/reminders', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: rem.id, is_done: true }),
+                              });
+                              queryClient.invalidateQueries({ queryKey: ['garage-reminders'] });
+                            }}
+                            className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md"
+                          >
+                            ✓ Позвонил
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* KPI grid 2×2 */}
             <div className="grid grid-cols-2 gap-3">
