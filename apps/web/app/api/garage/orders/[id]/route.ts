@@ -139,8 +139,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (typeof body.mechanic_note === 'string') {
         orderUpdatePayload.mechanic_note = body.mechanic_note;
       }
+      if (body.odometer_start != null && !isNaN(Number(body.odometer_start))) {
+        orderUpdatePayload.odometer_start = Number(body.odometer_start);
+      }
+      if (body.odometer_end != null && !isNaN(Number(body.odometer_end))) {
+        orderUpdatePayload.odometer_end = Number(body.odometer_end);
+      }
 
       await (supabase as any).from('service_orders').update(orderUpdatePayload).eq('id', id);
+
+      // Обновляем одометр в карточке автомобиля
+      const finalOdo = body.odometer_end
+        ? Number(body.odometer_end)
+        : body.odometer_start
+          ? Number(body.odometer_start)
+          : null;
+      if (finalOdo && finalOdo > 0) {
+        if (order.client_vehicle_id) {
+          await (supabase as any)
+            .from('client_vehicles')
+            .update({ odometer_last: finalOdo, odometer_updated_at: new Date().toISOString() })
+            .eq('id', order.client_vehicle_id);
+        } else if (order.asset_id) {
+          await (supabase as any)
+            .from('assets')
+            .update({ odometer_current: finalOdo })
+            .eq('id', order.asset_id);
+        }
+      }
 
       if (typeof body.mechanic_note === 'string' && body.mechanic_note.trim()) {
         const { data: fullOrder } = await (supabase as any)

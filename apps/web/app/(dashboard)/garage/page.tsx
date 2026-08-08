@@ -7,7 +7,12 @@ import { cn, Money } from '@saldacargo/ui';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Mechanic = { id: string; name: string; mechanic_salary_pct?: string | null };
-type Asset = { id: string; short_name: string; reg_number: string };
+type Asset = {
+  id: string;
+  short_name: string;
+  reg_number: string;
+  odometer_current?: number | null;
+};
 
 type OrderRow = {
   id: string;
@@ -716,6 +721,8 @@ function OrderDetailModal({
   const [editNote, setEditNote] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string | null>(null);
   const [editPriority, setEditPriority] = useState<string | null>(null);
+  const [editOdometerStart, setEditOdometerStart] = useState<string | null>(null);
+  const [editOdometerEnd, setEditOdometerEnd] = useState<string | null>(null);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   const [showAddWork, setShowAddWork] = useState(false);
@@ -771,6 +778,8 @@ function OrderDetailModal({
       setEditNote(null);
       setEditStatus(null);
       setEditPriority(null);
+      setEditOdometerStart(null);
+      setEditOdometerEnd(null);
     },
   });
 
@@ -778,12 +787,22 @@ function OrderDetailModal({
   const [closeRecommendation, setCloseRecommendation] = useState<string>('');
   const [closeDueKm, setCloseDueKm] = useState<string>('');
   const [closeDueDate, setCloseDueDate] = useState<string>('');
+  const [closeOdometerStart, setCloseOdometerStart] = useState<string>('');
+  const [closeOdometerEnd, setCloseOdometerEnd] = useState<string>('');
 
   useEffect(() => {
     if (!showCloseDialog || !order) return;
     setCloseRecommendation(order.mechanic_note || '');
     setCloseDueKm('');
     setCloseDueDate('');
+    setCloseOdometerStart(order.odometer_start != null ? String(order.odometer_start) : '');
+    setCloseOdometerEnd(
+      order.odometer_end != null
+        ? String(order.odometer_end)
+        : order.odometer_start != null
+          ? String(order.odometer_start)
+          : '',
+    );
     const defaults: Record<string, number> = {};
     order.works.forEach((w) => {
       if (w.status === 'cancelled' || w.salary_paid) return;
@@ -1191,6 +1210,75 @@ function OrderDetailModal({
                       Сохранить
                     </button>
                   )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
+                    Одометр заезда (км)
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={
+                        editOdometerStart ??
+                        (order.odometer_start != null ? String(order.odometer_start) : '')
+                      }
+                      onChange={(e) => setEditOdometerStart(e.target.value)}
+                      placeholder="Заезд км..."
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm"
+                    />
+                    {editOdometerStart !== null &&
+                      editOdometerStart !==
+                        (order.odometer_start != null ? String(order.odometer_start) : '') && (
+                        <button
+                          onClick={() => {
+                            patchMutation.mutate({
+                              odometer_start: editOdometerStart ? Number(editOdometerStart) : null,
+                            });
+                            setEditOdometerStart(null);
+                          }}
+                          disabled={patchMutation.isPending}
+                          className="text-xs bg-blue-600 text-white font-semibold px-2 py-1.5 rounded-lg shrink-0 hover:bg-blue-700"
+                        >
+                          ✓
+                        </button>
+                      )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
+                    Одометр выезда (км)
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={
+                        editOdometerEnd ??
+                        (order.odometer_end != null ? String(order.odometer_end) : '')
+                      }
+                      onChange={(e) => setEditOdometerEnd(e.target.value)}
+                      placeholder="Выезд км..."
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm"
+                    />
+                    {editOdometerEnd !== null &&
+                      editOdometerEnd !==
+                        (order.odometer_end != null ? String(order.odometer_end) : '') && (
+                        <button
+                          onClick={() => {
+                            patchMutation.mutate({
+                              odometer_end: editOdometerEnd ? Number(editOdometerEnd) : null,
+                            });
+                            setEditOdometerEnd(null);
+                          }}
+                          disabled={patchMutation.isPending}
+                          className="text-xs bg-blue-600 text-white font-semibold px-2 py-1.5 rounded-lg shrink-0 hover:bg-blue-700"
+                        >
+                          ✓
+                        </button>
+                      )}
+                  </div>
                 </div>
               </div>
 
@@ -2471,6 +2559,61 @@ function OrderDetailModal({
                         </div>
                       </div>
                     </div>
+
+                    {/* Пробег заезда и выезда (после тестов) */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Пробег при заезде и выезде из сервиса:
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                            Пробег заезда (км)
+                          </label>
+                          <input
+                            type="number"
+                            value={closeOdometerStart}
+                            onChange={(e) => setCloseOdometerStart(e.target.value)}
+                            placeholder="Одометр на входе..."
+                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                            Пробег выезда / после тестов (км)
+                          </label>
+                          <input
+                            type="number"
+                            value={closeOdometerEnd}
+                            onChange={(e) => setCloseOdometerEnd(e.target.value)}
+                            placeholder="Одометр на выходе..."
+                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono font-bold"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          Быстро прибавить тест-драйв:
+                        </span>
+                        {[
+                          { label: '+0 км (без тестов)', add: 0 },
+                          { label: '+5 км (тест-драйв)', add: 5 },
+                          { label: '+10 км', add: 10 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.add}
+                            type="button"
+                            onClick={() => {
+                              const base = Number(closeOdometerStart || 0);
+                              if (base > 0) setCloseOdometerEnd(String(base + preset.add));
+                            }}
+                            className="bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded transition-all"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2491,6 +2634,8 @@ function OrderDetailModal({
                         due_km: closeDueKm ? Number(closeDueKm) : null,
                         due_date: closeDueDate || null,
                       };
+                      if (closeOdometerStart) updates.odometer_start = Number(closeOdometerStart);
+                      if (closeOdometerEnd) updates.odometer_end = Number(closeOdometerEnd);
                       patchMutation.mutate(updates);
                       setShowCloseDialog(false);
                       onClose();
@@ -2938,7 +3083,16 @@ function CreateOrderModal({
               </label>
               <select
                 value={form.asset_id}
-                onChange={(e) => set('asset_id', e.target.value)}
+                onChange={(e) => {
+                  const assetId = e.target.value;
+                  set('asset_id', assetId);
+                  const selectedAsset = assets.find((a) => a.id === assetId) as
+                    | (Asset & { odometer_current?: number | null })
+                    | undefined;
+                  if (selectedAsset?.odometer_current != null) {
+                    set('odometer_start', String(selectedAsset.odometer_current));
+                  }
+                }}
                 className={cn(
                   'w-full border rounded-lg px-3 py-2 text-sm bg-white',
                   !form.asset_id ? 'border-red-400 bg-red-50' : 'border-slate-200',
@@ -2960,7 +3114,12 @@ function CreateOrderModal({
               </label>
               <ClientVehicleSelector
                 value={selectedClientVehicle}
-                onChange={setSelectedClientVehicle}
+                onChange={(v) => {
+                  setSelectedClientVehicle(v);
+                  if (v?.odometer_last != null) {
+                    set('odometer_start', String(v.odometer_last));
+                  }
+                }}
               />
               {!selectedClientVehicle && <p className="text-xs text-red-500 mt-0.5">Обязательно</p>}
             </div>

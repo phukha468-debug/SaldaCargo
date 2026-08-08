@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .select(
         `
-        id, asset_id, machine_type,
+        id, asset_id, client_vehicle_id, machine_type,
         mechanic:users!service_orders_assigned_mechanic_id_fkey(id, mechanic_salary_pct),
         second_mechanic:users!service_orders_second_mechanic_id_fkey(id, mechanic_salary_pct),
         service_order_works(id, norm_minutes, actual_minutes, status, extra_work_status)
@@ -101,14 +101,36 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
     }
 
+    const updatePayload: Record<string, unknown> = {
+      lifecycle_status: 'approved',
+      approved_by: adminId,
+      approved_at: new Date().toISOString(),
+      admin_note: body.admin_note ?? null,
+    };
+    if (body.odometer_start != null && !isNaN(Number(body.odometer_start))) {
+      updatePayload.odometer_start = Number(body.odometer_start);
+    }
+    if (body.odometer_end != null && !isNaN(Number(body.odometer_end))) {
+      updatePayload.odometer_end = Number(body.odometer_end);
+    }
+
     const { error } = await (supabase.from('service_orders') as any)
-      .update({
-        lifecycle_status: 'approved',
-        approved_by: adminId,
-        approved_at: new Date().toISOString(),
-        admin_note: body.admin_note ?? null,
-      })
+      .update(updatePayload)
       .eq('id', id);
+
+    // Обновляем одометр в карточке авто
+    const finalOdo = body.odometer_end ?? body.odometer_start;
+    if (finalOdo && finalOdo > 0) {
+      if (order.client_vehicle_id) {
+        await (supabase.from('client_vehicles') as any)
+          .update({ odometer_last: finalOdo, odometer_updated_at: new Date().toISOString() })
+          .eq('id', order.client_vehicle_id);
+      } else if (order.asset_id) {
+        await (supabase.from('assets') as any)
+          .update({ odometer_current: finalOdo })
+          .eq('id', order.asset_id);
+      }
+    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: 'approved', accruals });

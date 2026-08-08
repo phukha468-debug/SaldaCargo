@@ -123,7 +123,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 <div class="info-grid">
   <div class="info-row"><span class="info-label">Транспортное средство:</span><span class="info-value">${vehicle || '—'}</span></div>
   <div class="info-row"><span class="info-label">Заказчик:</span><span class="info-value">${order.client_name || (isOwn ? 'Собственный ТС' : '—')}</span></div>
-  <div class="info-row"><span class="info-label">Одометр (вход/выход):</span><span class="info-value">${order.odometer_start ? order.odometer_start.toLocaleString('ru-RU') + ' км' : '—'}${order.odometer_end ? ' → ' + order.odometer_end.toLocaleString('ru-RU') + ' км' : ''}</span></div>
+  <div class="info-row"><span class="info-label">Пробег (вход / выход):</span><span class="info-value">${[order.odometer_start ? 'Заезд: ' + order.odometer_start.toLocaleString('ru-RU') + ' км' : null, order.odometer_end ? 'Выезд: ' + order.odometer_end.toLocaleString('ru-RU') + ' км' : null].filter(Boolean).join(' → ') || '—'}</span></div>
   <div class="info-row"><span class="info-label">Телефон:</span><span class="info-value">${order.client_phone || '—'}</span></div>
   <div class="info-row"><span class="info-label">Исполнитель(и):</span><span class="info-value">${mechanics || '—'}</span></div>
   <div class="info-row"><span class="info-label">Ставка нормачаса:</span><span class="info-value">${hourlyRate.toLocaleString('ru-RU')} ₽/н·ч</span></div>
