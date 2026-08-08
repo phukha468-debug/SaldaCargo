@@ -103,7 +103,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     txns.push({
       direction: 'expense',
       lifecycle_status: 'approved',
-      settlement_status: 'completed',
+      settlement_status: 'pending',
+      from_wallet_id: null,
       amount: totalMechSalary.toFixed(2),
       category_id: CAT_PAYROLL_MECHANIC,
       related_user_id: mechData.id,

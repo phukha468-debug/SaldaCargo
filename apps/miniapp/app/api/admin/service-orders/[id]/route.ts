@@ -94,6 +94,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         related_user_id: mech.id,
         lifecycle_status: 'approved',
         settlement_status: 'pending',
+        from_wallet_id: null,
         employee_confirmed: false,
         description: `ЗП механика: наряд #${id.slice(0, 6)}`,
         created_by: adminId,

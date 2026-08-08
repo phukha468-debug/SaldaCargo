@@ -42,12 +42,13 @@ export async function GET(request: Request) {
 
   const [{ data: pendingPayroll }, { data: advanceGiven }, { data: advanceOffset }] =
     await Promise.all([
-      // Начисленная, но не выплаченная ЗП
+      // Начисленная, но не выплаченная ЗП (отсутствует списание из кошелька)
       (supabase.from('transactions') as any)
         .select('id, amount, description, created_at, category_id')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'pending')
+        .is('from_wallet_id', null)
+        .not('description', 'ilike', 'Выплата зарплаты%')
         .eq('related_user_id', userId)
         .in('category_id', PAYROLL_CATEGORY_IDS)
         .order('created_at', { ascending: true }),
@@ -183,7 +184,8 @@ export async function POST(request: Request) {
         )
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'pending')
+        .is('from_wallet_id', null)
+        .not('description', 'ilike', 'Выплата зарплаты%')
         .eq('related_user_id', body.user_id)
         .in('category_id', PAYROLL_CATEGORY_IDS)
         .order('created_at', { ascending: true }),
