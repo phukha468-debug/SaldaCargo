@@ -70,18 +70,16 @@ export async function GET(request: Request) {
         .gte('transaction_date', monthStart)
         .lte('transaction_date', monthEnd),
 
-      // Всего начислено ЗП (all-time, без привязанного кошелька)
       (supabase as any)
         .from('transactions')
         .select('related_user_id, amount, description, from_wallet_id')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
-        .is('from_wallet_id', null)
-        .not('description', 'ilike', 'Выплата зарплаты%'),
+        .is('from_wallet_id', null),
 
-      // Всего ЗП, ожидающая подтверждения сотрудником
       (supabase as any)
         .from('transactions')
         .select('related_user_id, amount, description, from_wallet_id')
@@ -93,15 +91,15 @@ export async function GET(request: Request) {
         .not('related_user_id', 'is', null)
         .is('from_wallet_id', null),
 
-      // Всего выплачено ЗП со списанием из кошелька (all-time)
       (supabase as any)
         .from('transactions')
         .select('related_user_id, amount, description, from_wallet_id')
         .eq('direction', 'expense')
         .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed')
         .in('category_id', SALARY_CATEGORY_IDS)
         .not('related_user_id', 'is', null)
-        .not('from_wallet_id', 'is', null),
+        .is('from_wallet_id', null),
 
       (supabase as any)
         .from('transactions')
@@ -169,7 +167,7 @@ export async function GET(request: Request) {
     const earnedThisMonthMap = sumByUser(earnedThisMonth);
     const shiftsThisMonthMap = countByUser(earnedThisMonth);
     const paidThisMonthMap = sumByUser(paidThisMonth);
-    const accruedAllTimeMap = sumByUser(pendingAllTime);
+    const pendingMap = sumByUser(pendingAllTime);
     const unconfirmedMap = sumByUser(unconfirmedAllTime);
     const paidAllTimeMap = sumByUser(paidAllTime);
     const advanceGivenMap = sumByUser(advanceGiven);
@@ -188,10 +186,9 @@ export async function GET(request: Request) {
     const buildUser = (u: any) => {
       const earnedMonth = earnedThisMonthMap.get(u.id) ?? 0;
       const paidMonth = paidThisMonthMap.get(u.id) ?? 0;
-      const accruedAlltime = accruedAllTimeMap.get(u.id) ?? 0;
-      const paidAlltime = paidAllTimeMap.get(u.id) ?? 0;
-      const pendingDebt = Math.max(0, accruedAlltime - paidAlltime); // настоящий остаток долга (all-time)
+      const pendingDebt = pendingMap.get(u.id) ?? 0; // долг к выплате (all-time)
       const unconfirmedDebt = unconfirmedMap.get(u.id) ?? 0; // ожидает подтверждения
+      const paidAlltime = paidAllTimeMap.get(u.id) ?? 0;
       const advGiven = advanceGivenMap.get(u.id) ?? 0;
       const advOffset = advanceOffsetMap.get(u.id) ?? 0;
       const advanceBalance = Math.max(0, advGiven - advOffset); // остаток долга по авансу
