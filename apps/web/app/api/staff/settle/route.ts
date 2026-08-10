@@ -178,7 +178,7 @@ export async function POST(request: Request) {
       (supabase.from('transactions') as any)
         .select(
           `
-          id, amount, description, created_at, category_id, service_order_id, trip_id, direction, lifecycle_status, related_user_id,
+          id, amount, description, created_at, category_id, service_order_id, trip_id, direction, lifecycle_status, related_user_id, created_by,
           trip:trips(trip_number, started_at)
         `,
         )
@@ -412,6 +412,7 @@ export async function POST(request: Request) {
         ops.push(
           (supabase.from('transactions') as any).insert({
             ...restFields,
+            created_by: splitTxn.created_by || adminId,
             amount: remainder.toFixed(2),
             settlement_status: 'pending',
             idempotency_key: crypto.randomUUID(),
