@@ -146,14 +146,14 @@ export async function POST(request: Request) {
 
     if (partialAmountRaw && parseFloat(partialAmountRaw) > 0) {
       const requestedAmount = parseFloat(partialAmountRaw);
-      const fifteenSecAgo = new Date(Date.now() - 15000).toISOString();
+      const sixtySecAgo = new Date(Date.now() - 60000).toISOString();
       const { data: recentDuplicate } = await (supabase.from('transactions') as any)
         .select('id, amount, created_at')
         .eq('direction', 'expense')
         .eq('related_user_id', body.user_id)
         .eq('lifecycle_status', 'approved')
-        .gte('created_at', fifteenSecAgo)
-        .limit(5);
+        .gte('created_at', sixtySecAgo)
+        .limit(10);
 
       if (recentDuplicate && recentDuplicate.length > 0) {
         const match = recentDuplicate.find(
