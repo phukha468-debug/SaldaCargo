@@ -42,6 +42,7 @@ type DetailWork = {
   custom_work_name: string | null;
   mechanic_id: string | null;
   second_mechanic_id: string | null;
+  custom_salary_pct?: number | string | null;
   work_catalog: { id: string; name: string; norm_minutes: number } | null;
   time_logs: Array<{ id: string; started_at: string; stopped_at: string | null; status: string }>;
 };

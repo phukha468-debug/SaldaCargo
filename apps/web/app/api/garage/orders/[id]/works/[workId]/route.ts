@@ -27,9 +27,15 @@ export async function PATCH(
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
   }
-  if ('custom_salary_pct' in body && body.custom_salary_pct != null) {
-    const pctVal = Number(body.custom_salary_pct);
-    if (!isNaN(pctVal)) {
+  if ('custom_salary_pct' in body) {
+    if (body.custom_salary_pct != null && body.custom_salary_pct !== '') {
+      let pctVal = Number(body.custom_salary_pct);
+      if (pctVal > 100 && 'price_client' in body) {
+        const p = parseFloat(body.price_client);
+        if (p > 0) pctVal = (pctVal / p) * 100;
+      }
+      if (pctVal > 100) pctVal = 100;
+      if (pctVal < 0) pctVal = 0;
       const existingNotes = String(body.notes || updates.notes || '');
       const cleanedNotes = existingNotes.replace(/\[salary_pct:\d+(?:\.\d+)?\]/g, '').trim();
       updates.notes = cleanedNotes
@@ -37,9 +43,6 @@ export async function PATCH(
         : `[salary_pct:${pctVal}]`;
     }
   }
-
-  delete updates.custom_salary_pct;
-  delete updates.custom_salary_amount;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Нет данных для обновления' }, { status: 400 });
@@ -132,16 +135,21 @@ export async function PATCH(
   return NextResponse.json(updatedWork);
 }
 
-function getWorkPct(w: any, defaultUserPct: string | null | undefined): number {
+function getWorkPct(w: any, defaultUserPct: string | number | null | undefined): number {
   if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
-    return Number(w.custom_salary_pct);
+    const pct = Number(w.custom_salary_pct);
+    if (pct >= 0 && pct <= 100) return pct;
   }
   if (w.notes) {
     const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
-    if (match && match[1]) return parseFloat(match[1]);
+    if (match && match[1]) {
+      const pct = parseFloat(match[1]);
+      if (pct >= 0 && pct <= 100) return pct;
+    }
   }
   if (defaultUserPct != null && !isNaN(Number(defaultUserPct))) {
-    return Number(defaultUserPct);
+    const pct = Number(defaultUserPct);
+    if (pct >= 0 && pct <= 100) return pct;
   }
   return 50;
 }
@@ -207,7 +215,7 @@ async function accrueWorkSalary(supabase: any, orderId: string, work: any) {
     const hasTwo = !!order.second_mechanic;
     for (const mechData of [order.mechanic, order.second_mechanic]) {
       if (!mechData) continue;
-      const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
+      const pct = getWorkPct(work, mechData.mechanic_salary_pct);
       const base = hasTwo ? workPrice / 2 : workPrice;
       const salary = (base * pct) / 100;
       if (salary <= 0) continue;

@@ -120,7 +120,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           `id, lifecycle_status, order_number, machine_type,
            mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
            second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, mechanic_id, second_mechanic_id, price_client, custom_work_name, work_catalog:work_catalog(name))`,
+           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, mechanic_id, second_mechanic_id, price_client, custom_work_name, custom_salary_pct, notes, work_catalog:work_catalog(name))`,
         )
         .eq('id', id)
         .single();
@@ -304,21 +304,47 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             if (mechs) specificMechanics = mechs;
           }
 
+          const getWorkPct = (
+            w: any,
+            defaultUserPct: string | number | null | undefined,
+          ): number => {
+            if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
+              const pct = Number(w.custom_salary_pct);
+              if (pct >= 0 && pct <= 100) return pct;
+            }
+            if (w.notes) {
+              const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
+              if (match && match[1]) {
+                const pct = parseFloat(match[1]);
+                if (pct >= 0 && pct <= 100) return pct;
+              }
+            }
+            if (defaultUserPct != null && !isNaN(Number(defaultUserPct))) {
+              const pct = Number(defaultUserPct);
+              if (pct >= 0 && pct <= 100) return pct;
+            }
+            return 50;
+          };
+
           for (const work of unpaidWorks) {
             const workMechs = [work.mechanic_id, work.second_mechanic_id].filter(Boolean);
-            if (workMechs.length === 0) continue;
+            const targetMechs =
+              workMechs.length > 0
+                ? specificMechanics.filter((m) => workMechs.includes(m.id))
+                : [order.mechanic, order.second_mechanic].filter(Boolean);
+
+            if (targetMechs.length === 0) continue;
 
             const workPrice = parseFloat(work.price_client ?? '0');
             if (workPrice <= 0) continue;
 
-            const basePrice = workMechs.length === 2 ? workPrice / 2 : workPrice;
+            const basePrice = targetMechs.length === 2 ? workPrice / 2 : workPrice;
             const workName = work.work_catalog?.name ?? work.custom_work_name ?? 'работа';
 
-            for (const mechId of workMechs) {
-              const mechData = specificMechanics.find((m) => m.id === mechId);
+            for (const mechData of targetMechs) {
               if (!mechData) continue;
 
-              const pct = parseFloat(mechData.mechanic_salary_pct ?? '50');
+              const pct = getWorkPct(work, mechData.mechanic_salary_pct);
               const salary = (basePrice * pct) / 100;
 
               if (salary <= 0) continue;

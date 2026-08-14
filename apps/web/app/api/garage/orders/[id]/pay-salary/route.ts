@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       mechanic_pay, second_mechanic_pay,
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
       second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, notes)
+      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, custom_salary_pct, notes)
     `,
     )
     .eq('id', orderId)
@@ -54,16 +54,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     order.machine_type === 'own' ? (sto?.hourly_rate_own ?? '1600') : (sto?.hourly_rate ?? '2000'),
   );
 
-  const getWorkPct = (w: any, defaultUserPct: string | null | undefined): number => {
+  const getWorkPct = (w: any, defaultUserPct: string | number | null | undefined): number => {
     if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
-      return Number(w.custom_salary_pct);
+      const pct = Number(w.custom_salary_pct);
+      if (pct >= 0 && pct <= 100) return pct;
     }
     if (w.notes) {
       const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
-      if (match) return parseFloat(match[1]);
+      if (match && match[1]) {
+        const pct = parseFloat(match[1]);
+        if (pct >= 0 && pct <= 100) return pct;
+      }
     }
     if (defaultUserPct != null && !isNaN(Number(defaultUserPct))) {
-      return Number(defaultUserPct);
+      const pct = Number(defaultUserPct);
+      if (pct >= 0 && pct <= 100) return pct;
     }
     return 50;
   };
@@ -85,11 +90,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     let totalMins = 0;
 
     for (const w of unpaidWorks) {
-      const mins =
-        w.actual_minutes != null && w.actual_minutes > 0 ? w.actual_minutes : (w.norm_minutes ?? 0);
-      const hours = (hasTwo ? mins / 2 : mins) / 60;
       const pct = getWorkPct(w, defaultUserPct);
-      const salary = (hours * hourlyRate * pct) / 100;
+      const workPrice = parseFloat(w.price_client ?? '0');
+      let salary = 0;
+      let mins = 0;
+
+      if (workPrice > 0) {
+        const basePrice = hasTwo ? workPrice / 2 : workPrice;
+        salary = (basePrice * pct) / 100;
+        mins =
+          w.actual_minutes != null && w.actual_minutes > 0
+            ? w.actual_minutes
+            : (w.norm_minutes ?? 60);
+      } else {
+        mins =
+          w.actual_minutes != null && w.actual_minutes > 0
+            ? w.actual_minutes
+            : (w.norm_minutes ?? 0);
+        const hours = (hasTwo ? mins / 2 : mins) / 60;
+        salary = (hours * hourlyRate * pct) / 100;
+      }
+
       totalMechSalary += salary;
       totalMins += mins;
     }
