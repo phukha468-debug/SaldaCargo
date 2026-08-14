@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
-import { formatTime } from '@saldacargo/shared';
+import { formatDate } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
 interface Counterparty {
@@ -690,7 +690,7 @@ function TripCard({
   deleting,
 }: {
   trip: TripForReview;
-  mode: 'review' | 'history';
+  mode: 'review' | 'history' | 'active';
   expanded: boolean;
   onToggle: () => void;
   onEdit: () => void;
@@ -773,8 +773,7 @@ function TripCard({
               #{trip.trip_number}
             </span>
             <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden sm:block">
-              {formatTime(trip.started_at)}
-              {trip.ended_at && `–${formatTime(trip.ended_at)}`}
+              {formatDate(trip.started_at)}
             </span>
           </div>
 
@@ -1434,11 +1433,31 @@ export default function ReviewPage() {
                           </div>
                           <div>
                             <h3 className="font-bold text-slate-800">{assetKey}</h3>
-                            <p className="text-xs text-slate-500 font-medium flex items-center gap-1 flex-wrap">
+                            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
                               <span>
                                 {assetTrips.length} рейс
-                                {assetTrips.length === 1 ? '' : assetTrips.length < 5 ? 'а' : 'ов'}
+                                {assetTrips.length === 1 ? '' : assetTrips.length < 5 ? 'а' : 'ов'}:
                               </span>
+                              <div className="inline-flex flex-wrap gap-1 items-center">
+                                {assetTrips.map((t) => (
+                                  <span
+                                    key={t.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!expandedGroups.has(assetKey)) {
+                                        toggleGroup(assetKey);
+                                      }
+                                      if (!expandedIds.has(t.id)) {
+                                        toggleExpand(t.id);
+                                      }
+                                    }}
+                                    className="inline-flex items-center bg-sky-50 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-1.5 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                    title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
+                                  >
+                                    #{t.trip_number}
+                                  </span>
+                                ))}
+                              </div>
                               <span className="sm:hidden text-slate-300">·</span>
                               <span className="sm:hidden text-slate-700 font-bold">
                                 Выручка: <Money amount={groupRevenue.toFixed(2)} />
@@ -1453,7 +1472,7 @@ export default function ReviewPage() {
                                 Прибыль: {groupProfit < 0 ? '−' : ''}
                                 <Money amount={Math.abs(groupProfit).toFixed(2)} />
                               </span>
-                            </p>
+                            </div>
                           </div>
                         </div>
 
