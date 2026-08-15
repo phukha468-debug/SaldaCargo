@@ -86,8 +86,16 @@ export async function POST(request: Request) {
       amount: string;
       driver_pay: string;
       loader_pay: string;
+      loader2_pay?: string;
+      payment_method: string;
+      counterparty_id?: string;
+      description?: string;
+    }>;
+    expenses?: Array<{
+      amount: string;
       payment_method: string;
       description?: string;
+      category_id?: string;
     }>;
   };
 
@@ -115,13 +123,15 @@ export async function POST(request: Request) {
   if (tripError) return NextResponse.json({ error: tripError.message }, { status: 500 });
 
   // Создаём заказы
-  if (body.orders.length > 0) {
+  if (body.orders && body.orders.length > 0) {
     const ordersToInsert = body.orders.map((o) => ({
       trip_id: trip.id,
       amount: o.amount,
       driver_pay: o.driver_pay,
       loader_pay: o.loader_pay ?? '0',
+      loader2_pay: o.loader2_pay ?? '0',
       payment_method: o.payment_method,
+      counterparty_id: o.counterparty_id || null,
       settlement_status: ['debt_cash', 'qr', 'card_driver'].includes(o.payment_method)
         ? 'pending'
         : 'completed',
@@ -131,8 +141,30 @@ export async function POST(request: Request) {
     }));
 
     const { error: ordersError } = await supabase.from('trip_orders').insert(ordersToInsert);
-
     if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
+  }
+
+  // Создаём путевые расходы (ГСМ и прочие)
+  if (body.expenses && body.expenses.length > 0) {
+    const defaultFuelCat = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+    const expensesToInsert = body.expenses.map((e) => ({
+      trip_id: trip.id,
+      amount: e.amount,
+      payment_method: e.payment_method || 'fuel_card',
+      category_id: e.category_id || defaultFuelCat,
+      description: e.description || 'ГСМ / Топливо',
+      idempotency_key: crypto.randomUUID(),
+    }));
+
+    await supabase.from('trip_expenses').insert(expensesToInsert);
+  }
+
+  // Обновляем текущий одометр машины если он больше
+  if (body.asset_id && body.odometer_end > 0) {
+    await (supabase.from('assets') as any)
+      .update({ odometer_current: body.odometer_end })
+      .eq('id', body.asset_id)
+      .lt('odometer_current', body.odometer_end);
   }
 
   return NextResponse.json(trip, { status: 201 });
