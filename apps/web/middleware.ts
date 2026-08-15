@@ -1,31 +1,37 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/auth/error', '/auth/callback'];
-const PUBLIC_API_PREFIXES = ['/api/auth/', '/api/cron/'];
+const DEFAULT_ADMIN_ID = 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
 
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
-  // Публичные страницы и API
-  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
-  if (PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
+  // Если пользователь перешел на /login — сразу редиректим на главную без ввода пароля
+  if (pathname === '/login') {
+    const response = NextResponse.redirect(new URL('/', request.url));
+    response.cookies.set('salda_auth_token', DEFAULT_ADMIN_ID, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365, // 1 год
+      path: '/',
+    });
+    return response;
+  }
 
   const token = request.cookies.get('salda_auth_token')?.value;
 
-  // API-роуты без токена → 401 JSON
-  if (pathname.startsWith('/api/')) {
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    return NextResponse.next();
-  }
-
-  // Страницы без токена → редирект на /login
+  // Если токена нет — автоматически авторизуем как Администратора
   if (!token) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
-    return NextResponse.redirect(loginUrl);
+    const response = NextResponse.next();
+    response.cookies.set('salda_auth_token', DEFAULT_ADMIN_ID, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+    });
+    return response;
   }
 
   return NextResponse.next();
