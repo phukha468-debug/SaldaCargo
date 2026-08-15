@@ -76,6 +76,7 @@ export async function POST(request: Request) {
     driver_id: string;
     asset_id: string;
     loader_id?: string;
+    loader2_id?: string;
     trip_type: string;
     odometer_start: number;
     odometer_end: number;
@@ -101,6 +102,8 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  const loadersCount = (body.loader_id ? 1 : 0) + (body.loader2_id ? 1 : 0);
+
   // Создаём рейс
   const { data: trip, error: tripError } = await supabase
     .from('trips')
@@ -108,6 +111,8 @@ export async function POST(request: Request) {
       driver_id: body.driver_id,
       asset_id: body.asset_id,
       loader_id: body.loader_id || null,
+      loader2_id: body.loader2_id || null,
+      loaders_count: loadersCount,
       trip_type: body.trip_type,
       odometer_start: body.odometer_start,
       odometer_end: body.odometer_end,
@@ -131,6 +136,7 @@ export async function POST(request: Request) {
       loader_pay: o.loader_pay || '0',
       loader2_pay: o.loader2_pay || '0',
       loader_id: body.loader_id || null,
+      loader2_id: body.loader2_id || null,
       payment_method: o.payment_method,
       counterparty_id: o.counterparty_id || null,
       settlement_status: ['debt_cash', 'qr', 'card_driver'].includes(o.payment_method)

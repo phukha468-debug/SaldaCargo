@@ -261,6 +261,7 @@ export async function POST(request: Request) {
       email?: string;
       credit_limit?: string;
       notes?: string;
+      is_legal_entity?: boolean;
     };
 
     if (!body.name?.trim()) {
@@ -278,6 +279,7 @@ export async function POST(request: Request) {
         credit_limit: body.credit_limit || null,
         notes: body.notes?.trim() || null,
         is_active: true,
+        is_legal_entity: Boolean(body.is_legal_entity),
       })
       .select()
       .single();

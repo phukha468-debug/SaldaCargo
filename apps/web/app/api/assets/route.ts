@@ -12,6 +12,8 @@ export async function GET() {
       .from('assets')
       .select('id, short_name, reg_number, odometer_current, status, assigned_driver_id')
       .not('status', 'in', '("sold","written_off")')
+      .not('short_name', 'ilike', '%STRESS%')
+      .not('short_name', 'ilike', '%TEST%')
       .order('short_name');
 
     if (error) throw error;
