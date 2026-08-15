@@ -33,47 +33,53 @@ type Summary = {
   alerts: { tripsForReview: number };
 };
 
-type ExpenseDataResponse = {
-  revenue: string;
-  revenue_breakdown: Record<string, string>;
-  transactions: Array<{
-    id: string;
-    amount: string;
-    description: string;
-    created_at: string;
-    category?: { name: string; code: string };
-  }>;
-  income_transactions: Array<{
-    id: string;
-    amount: string;
-    description: string;
-    created_at: string;
-    category?: { name: string; code: string };
-    counterparty?: { name: string };
-  }>;
-};
-
-type ReviewStatsResponse = {
-  tripsCount: number;
-  revenue: number;
-  payroll: number;
-  fuel: number;
-  profit: number;
-  vehicles: Array<{
-    id: string;
-    name: string;
-    reg_number: string;
-    trip_numbers: number[];
+type AnalyticsResponse = {
+  period: Period;
+  periodLabel: string;
+  summary: {
+    totalIncome: number;
+    totalExpenses: number;
+    netSaldo: number;
+    marginPct: number;
+  };
+  reviewStats: {
+    tripsCount: number;
     revenue: number;
-    costs: number;
+    payroll: number;
+    fuel: number;
+    otherExpenses: number;
     profit: number;
+    vehicles: Array<{
+      id: string;
+      name: string;
+      reg_number: string;
+      trip_numbers: number[];
+      revenue: number;
+      costs: number;
+      profit: number;
+    }>;
+  };
+  incomeBreakdown: Array<{
+    id: string;
+    label: string;
+    amount: number;
+    pct: number;
+    count: number;
+    color: string;
+  }>;
+  expenseBreakdown: Array<{
+    id: string;
+    label: string;
+    amount: number;
+    pct: number;
+    color: string;
   }>;
 };
 
 export default function DashboardHome() {
-  const [saldoPeriod, setSaldoPeriod] = useState<Period>('day');
-  const [incPeriod, setIncPeriod] = useState<Period>('day');
-  const [expPeriod, setExpPeriod] = useState<Period>('day');
+  const [saldoPeriod, setSaldoPeriod] = useState<Period>('month');
+  const [incPeriod, setIncPeriod] = useState<Period>('month');
+  const [expPeriod, setExpPeriod] = useState<Period>('month');
   const [revPeriod, setRevPeriod] = useState<Period>('month');
 
   const [incomeExpanded, setIncomeExpanded] = useState(true);
@@ -89,156 +95,66 @@ export default function DashboardHome() {
     refetchInterval: 60000,
   });
 
-  // 2. Dashboard summary
+  // 2. Summary (Alerts)
   const { data: summary } = useQuery<Summary>({
     queryKey: ['dashboard-summary'],
     queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
     staleTime: 30000,
   });
 
-  // 3. Finance Month data
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const { data: financeMonth } = useQuery<ExpenseDataResponse>({
-    queryKey: ['finance-month', currentMonthStr],
-    queryFn: () => fetch(`/api/finance?month=${currentMonthStr}`).then((r) => r.json()),
+  // 3. Analytics for Saldo Period
+  const { data: saldoAnalytics } = useQuery<AnalyticsResponse>({
+    queryKey: ['dashboard-analytics', saldoPeriod],
+    queryFn: () => fetch(`/api/dashboard/analytics?period=${saldoPeriod}`).then((r) => r.json()),
     staleTime: 30000,
   });
 
-  // 4. Review & Fleet analytics
-  const { data: reviewData } = useQuery<ReviewStatsResponse>({
-    queryKey: ['dashboard-review-stats', revPeriod],
-    queryFn: async () => {
-      const res = await fetch(`/api/trips?status=completed&limit=50`);
-      const trips = (await res.json()) as Array<{
-        id: string;
-        trip_number: number;
-        asset?: { id: string; short_name: string; reg_number: string };
-        driver_pay?: string | number;
-        trip_orders?: Array<{ amount: string | number; payment_method: string }>;
-        trip_expenses?: Array<{ amount: string | number; payment_method: string }>;
-        created_at: string;
-      }>;
-
-      let tripsCount = 0;
-      let revenue = 0;
-      let payroll = 0;
-      let fuel = 0;
-
-      const vehicleMap: Record<
-        string,
-        {
-          id: string;
-          name: string;
-          reg_number: string;
-          trip_numbers: number[];
-          revenue: number;
-          costs: number;
-          profit: number;
-        }
-      > = {};
-
-      for (const t of trips || []) {
-        tripsCount++;
-        const tOrders = t.trip_orders ?? [];
-        const tRev = tOrders.reduce((s, o) => s + parseFloat(String(o.amount || 0)), 0);
-        const tPay = parseFloat(String(t.driver_pay || 0));
-        const tExpenses = (t.trip_expenses ?? []).reduce(
-          (s, e) => s + parseFloat(String(e.amount || 0)),
-          0,
-        );
-
-        revenue += tRev;
-        payroll += tPay;
-        fuel += tExpenses;
-
-        const vName = t.asset?.short_name || 'Автомобиль компании';
-        const vReg = t.asset?.reg_number || '';
-        const vKey = t.asset?.id || vName;
-
-        if (!vehicleMap[vKey]) {
-          vehicleMap[vKey] = {
-            id: vKey,
-            name: vName,
-            reg_number: vReg,
-            trip_numbers: [],
-            revenue: 0,
-            costs: 0,
-            profit: 0,
-          };
-        }
-        if (t.trip_number) vehicleMap[vKey].trip_numbers.push(t.trip_number);
-        vehicleMap[vKey].revenue += tRev;
-        vehicleMap[vKey].costs += tPay + tExpenses;
-        vehicleMap[vKey].profit += tRev - (tPay + tExpenses);
-      }
-
-      return {
-        tripsCount,
-        revenue,
-        payroll,
-        fuel,
-        profit: revenue - (payroll + fuel),
-        vehicles: Object.values(vehicleMap),
-      };
-    },
-    staleTime: 60000,
+  // 4. Analytics for Income Period
+  const { data: incAnalytics } = useQuery<AnalyticsResponse>({
+    queryKey: ['dashboard-analytics', incPeriod],
+    queryFn: () => fetch(`/api/dashboard/analytics?period=${incPeriod}`).then((r) => r.json()),
+    staleTime: 30000,
   });
 
-  // Calculate Balances
+  // 5. Analytics for Expense Period
+  const { data: expAnalytics } = useQuery<AnalyticsResponse>({
+    queryKey: ['dashboard-analytics', expPeriod],
+    queryFn: () => fetch(`/api/dashboard/analytics?period=${expPeriod}`).then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  // 6. Analytics for Review Stats Period
+  const { data: revAnalytics } = useQuery<AnalyticsResponse>({
+    queryKey: ['dashboard-analytics', revPeriod],
+    queryFn: () => fetch(`/api/dashboard/analytics?period=${revPeriod}`).then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  // Liquid Balances
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
   const cardNum = parseFloat(wallets?.card?.balance ?? '0');
   const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
   const totalLiquid = bankNum + cashNum + cardNum + fuelNum;
 
-  // Calculate dynamic Saldo / Income / Expenses
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
-  const todayRevenue = parseFloat(summary?.today?.revenue ?? '0');
 
-  // Income calculations by period
-  const monthRevenue = parseFloat(financeMonth?.revenue ?? '0');
-  const incAmount =
-    incPeriod === 'day' ? todayRevenue : incPeriod === 'week' ? todayRevenue * 4.5 : monthRevenue;
+  // Saldo figures
+  const netSaldo = saldoAnalytics?.summary?.netSaldo ?? 0;
+  const saldoIncome = saldoAnalytics?.summary?.totalIncome ?? 0;
+  const saldoExpense = saldoAnalytics?.summary?.totalExpenses ?? 0;
+  const marginPct = saldoAnalytics?.summary?.marginPct ?? 0;
 
-  // Breakdown calculations
-  const breakdownBank = incAmount * 0.65;
-  const breakdownCash = incAmount * 0.22;
-  const breakdownQr = incAmount * 0.08;
-  const breakdownCard = incAmount * 0.05;
+  // Income figures
+  const totalInc = incAnalytics?.summary?.totalIncome ?? 0;
+  const incomeItems = incAnalytics?.incomeBreakdown ?? [];
 
-  // Expense calculations by period
-  const monthExpenses = (financeMonth?.transactions ?? []).reduce(
-    (s, t) => s + parseFloat(t.amount || '0'),
-    0,
-  );
-  const expAmount =
-    expPeriod === 'day'
-      ? todayRevenue * 0.52
-      : expPeriod === 'week'
-        ? todayRevenue * 2.4
-        : monthExpenses || monthRevenue * 0.55;
+  // Expense figures
+  const totalExp = expAnalytics?.summary?.totalExpenses ?? 0;
+  const expenseItems = expAnalytics?.expenseBreakdown ?? [];
 
-  const expFuel = expAmount * 0.42;
-  const expPayroll = expAmount * 0.32;
-  const expParts = expAmount * 0.16;
-  const expOther = expAmount * 0.1;
-
-  // Period Saldo Calculation
-  const currentPeriodInc =
-    saldoPeriod === 'day'
-      ? todayRevenue
-      : saldoPeriod === 'week'
-        ? todayRevenue * 4.5
-        : monthRevenue;
-  const currentPeriodExp =
-    saldoPeriod === 'day'
-      ? todayRevenue * 0.52
-      : saldoPeriod === 'week'
-        ? todayRevenue * 2.4
-        : monthExpenses || monthRevenue * 0.55;
-  const netSaldo = currentPeriodInc - currentPeriodExp;
-  const marginPct =
-    currentPeriodInc > 0 ? Math.round((netSaldo / currentPeriodInc) * 1000) / 10 : 0;
+  // Review Stats
+  const reviewStats = revAnalytics?.reviewStats;
 
   return (
     <div className="space-y-6">
@@ -301,7 +217,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setSaldoPeriod('day')}
                   className={cn(
-                    'px-2 py-0.5 rounded-md transition-all',
+                    'px-2 py-0.5 rounded-md transition-all cursor-pointer',
                     saldoPeriod === 'day'
                       ? 'bg-white shadow-xs text-slate-900 font-extrabold'
                       : 'text-slate-500 hover:text-slate-900',
@@ -312,7 +228,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setSaldoPeriod('week')}
                   className={cn(
-                    'px-2 py-0.5 rounded-md transition-all',
+                    'px-2 py-0.5 rounded-md transition-all cursor-pointer',
                     saldoPeriod === 'week'
                       ? 'bg-white shadow-xs text-slate-900 font-extrabold'
                       : 'text-slate-500 hover:text-slate-900',
@@ -323,7 +239,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setSaldoPeriod('month')}
                   className={cn(
-                    'px-2 py-0.5 rounded-md transition-all',
+                    'px-2 py-0.5 rounded-md transition-all cursor-pointer',
                     saldoPeriod === 'month'
                       ? 'bg-white shadow-xs text-slate-900 font-extrabold'
                       : 'text-slate-500 hover:text-slate-900',
@@ -344,8 +260,8 @@ export default function DashboardHome() {
               {Math.round(netSaldo).toLocaleString('ru-RU')} ₽
             </div>
             <p className="text-xs text-slate-500 font-medium mt-1">
-              Доходы ({Math.round(currentPeriodInc).toLocaleString('ru-RU')} ₽) − Расходы (
-              {Math.round(currentPeriodExp).toLocaleString('ru-RU')} ₽)
+              Доходы ({Math.round(saldoIncome).toLocaleString('ru-RU')} ₽) − Расходы (
+              {Math.round(saldoExpense).toLocaleString('ru-RU')} ₽)
             </p>
           </div>
 
@@ -378,7 +294,7 @@ export default function DashboardHome() {
             </div>
             <p className="text-xs text-slate-600 mt-1">
               {tripsForReview > 0
-                ? 'Проверьте путевые листы и подтвердите расходы водителей.'
+                ? 'Проверьте путевые листы и подтвердите начисления водителей.'
                 : 'Нет нерассмотренных рейсов на текущий момент.'}
             </p>
           </div>
@@ -420,7 +336,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setIncPeriod('day')}
                   className={cn(
-                    'px-2.5 py-1 rounded-lg transition-all',
+                    'px-2.5 py-1 rounded-lg transition-all cursor-pointer',
                     incPeriod === 'day'
                       ? 'bg-white shadow-xs text-emerald-700 font-black'
                       : 'text-slate-500 hover:text-slate-900',
@@ -431,7 +347,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setIncPeriod('week')}
                   className={cn(
-                    'px-2.5 py-1 rounded-lg transition-all',
+                    'px-2.5 py-1 rounded-lg transition-all cursor-pointer',
                     incPeriod === 'week'
                       ? 'bg-white shadow-xs text-emerald-700 font-black'
                       : 'text-slate-500 hover:text-slate-900',
@@ -442,7 +358,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setIncPeriod('month')}
                   className={cn(
-                    'px-2.5 py-1 rounded-lg transition-all',
+                    'px-2.5 py-1 rounded-lg transition-all cursor-pointer',
                     incPeriod === 'month'
                       ? 'bg-white shadow-xs text-emerald-700 font-black'
                       : 'text-slate-500 hover:text-slate-900',
@@ -460,7 +376,7 @@ export default function DashboardHome() {
                   Сумма за период
                 </div>
                 <div className="text-3xl font-black text-emerald-600 tracking-tight">
-                  {Math.round(incAmount).toLocaleString('ru-RU')} ₽
+                  {Math.round(totalInc).toLocaleString('ru-RU')} ₽
                 </div>
               </div>
               <button
@@ -489,49 +405,23 @@ export default function DashboardHome() {
                 </div>
 
                 <div className="space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-sky-500" />
-                      <span className="font-semibold text-slate-700">
-                        Оплаты по безналу (Юрлица)
+                  {incomeItems.length === 0 && (
+                    <div className="text-slate-400 text-center py-2">
+                      Нет поступлений за выбранный период
+                    </div>
+                  )}
+
+                  {incomeItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={cn('w-2.5 h-2.5 rounded-full', item.color)} />
+                        <span className="font-semibold text-slate-700">{item.label}</span>
+                      </div>
+                      <span className="font-bold text-slate-900">
+                        {Math.round(item.amount).toLocaleString('ru-RU')} ₽ ({item.pct}%)
                       </span>
                     </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(breakdownBank).toLocaleString('ru-RU')} ₽ (65.0%)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <span className="font-semibold text-slate-700">Оплаты наличными в кассу</span>
-                    </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(breakdownCash).toLocaleString('ru-RU')} ₽ (22.0%)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                      <span className="font-semibold text-slate-700">
-                        Оплаты по QR-коду / Эквайринг
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(breakdownQr).toLocaleString('ru-RU')} ₽ (8.0%)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                      <span className="font-semibold text-slate-700">Оплаты на карту водителя</span>
-                    </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(breakdownCard).toLocaleString('ru-RU')} ₽ (5.0%)
-                    </span>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -559,7 +449,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setExpPeriod('day')}
                   className={cn(
-                    'px-2.5 py-1 rounded-lg transition-all',
+                    'px-2.5 py-1 rounded-lg transition-all cursor-pointer',
                     expPeriod === 'day'
                       ? 'bg-white shadow-xs text-rose-700 font-black'
                       : 'text-slate-500 hover:text-slate-900',
@@ -570,7 +460,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setExpPeriod('week')}
                   className={cn(
-                    'px-2.5 py-1 rounded-lg transition-all',
+                    'px-2.5 py-1 rounded-lg transition-all cursor-pointer',
                     expPeriod === 'week'
                       ? 'bg-white shadow-xs text-rose-700 font-black'
                       : 'text-slate-500 hover:text-slate-900',
@@ -581,7 +471,7 @@ export default function DashboardHome() {
                 <button
                   onClick={() => setExpPeriod('month')}
                   className={cn(
-                    'px-2.5 py-1 rounded-lg transition-all',
+                    'px-2.5 py-1 rounded-lg transition-all cursor-pointer',
                     expPeriod === 'month'
                       ? 'bg-white shadow-xs text-rose-700 font-black'
                       : 'text-slate-500 hover:text-slate-900',
@@ -599,7 +489,7 @@ export default function DashboardHome() {
                   Сумма за период
                 </div>
                 <div className="text-3xl font-black text-rose-600 tracking-tight">
-                  {Math.round(expAmount).toLocaleString('ru-RU')} ₽
+                  {Math.round(totalExp).toLocaleString('ru-RU')} ₽
                 </div>
               </div>
               <button
@@ -628,51 +518,23 @@ export default function DashboardHome() {
                 </div>
 
                 <div className="space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                      <span className="font-semibold text-slate-700">Топливо / ГСМ</span>
+                  {expenseItems.length === 0 && (
+                    <div className="text-slate-400 text-center py-2">
+                      Нет расходов за выбранный период
                     </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(expFuel).toLocaleString('ru-RU')} ₽ (42.0%)
-                    </span>
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                      <span className="font-semibold text-slate-700">
-                        Зарплата водителям и грузчикам
+                  {expenseItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={cn('w-2.5 h-2.5 rounded-full', item.color)} />
+                        <span className="font-semibold text-slate-700">{item.label}</span>
+                      </div>
+                      <span className="font-bold text-slate-900">
+                        {Math.round(item.amount).toLocaleString('ru-RU')} ₽ ({item.pct}%)
                       </span>
                     </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(expPayroll).toLocaleString('ru-RU')} ₽ (32.0%)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                      <span className="font-semibold text-slate-700">
-                        Запчасти и обслуживание СТО
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(expParts).toLocaleString('ru-RU')} ₽ (16.0%)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-                      <span className="font-semibold text-slate-700">
-                        Прочие операционные расходы
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-900">
-                      {Math.round(expOther).toLocaleString('ru-RU')} ₽ (10.0%)
-                    </span>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -703,7 +565,7 @@ export default function DashboardHome() {
               <button
                 onClick={() => setRevPeriod('day')}
                 className={cn(
-                  'px-3 py-1 rounded-lg transition-all',
+                  'px-3 py-1 rounded-lg transition-all cursor-pointer',
                   revPeriod === 'day'
                     ? 'bg-white shadow-xs text-sky-700 font-black'
                     : 'text-slate-600 hover:text-slate-900',
@@ -714,7 +576,7 @@ export default function DashboardHome() {
               <button
                 onClick={() => setRevPeriod('week')}
                 className={cn(
-                  'px-3 py-1 rounded-lg transition-all',
+                  'px-3 py-1 rounded-lg transition-all cursor-pointer',
                   revPeriod === 'week'
                     ? 'bg-white shadow-xs text-sky-700 font-black'
                     : 'text-slate-600 hover:text-slate-900',
@@ -725,7 +587,7 @@ export default function DashboardHome() {
               <button
                 onClick={() => setRevPeriod('month')}
                 className={cn(
-                  'px-3 py-1 rounded-lg transition-all',
+                  'px-3 py-1 rounded-lg transition-all cursor-pointer',
                   revPeriod === 'month'
                     ? 'bg-white shadow-xs text-sky-700 font-black'
                     : 'text-slate-600 hover:text-slate-900',
@@ -744,9 +606,9 @@ export default function DashboardHome() {
               Выполнено рейсов
             </span>
             <div className="text-2xl font-black text-slate-900 mt-1">
-              {reviewData?.tripsCount ?? 0} рейсов
+              {reviewStats?.tripsCount ?? 0} рейсов
             </div>
-            <span className="text-[11px] text-sky-600 font-bold">100% завершено</span>
+            <span className="text-[11px] text-sky-600 font-bold">100% зафиксировано</span>
           </div>
 
           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
@@ -754,12 +616,12 @@ export default function DashboardHome() {
               Выручка с рейсов
             </span>
             <div className="text-2xl font-black text-slate-900 mt-1">
-              {Math.round(reviewData?.revenue ?? 0).toLocaleString('ru-RU')} ₽
+              {Math.round(reviewStats?.revenue ?? 0).toLocaleString('ru-RU')} ₽
             </div>
             <span className="text-[11px] text-emerald-600 font-bold">
               Ср. чек:{' '}
-              {reviewData?.tripsCount
-                ? Math.round((reviewData.revenue / reviewData.tripsCount) * 10) / 10000 + 'k ₽'
+              {reviewStats?.tripsCount
+                ? Math.round((reviewStats.revenue / reviewStats.tripsCount) * 10) / 10000 + 'k ₽'
                 : '0 ₽'}
             </span>
           </div>
@@ -769,11 +631,11 @@ export default function DashboardHome() {
               ЗП (Водители + Грузчики)
             </span>
             <div className="text-2xl font-black text-amber-600 mt-1">
-              {Math.round(reviewData?.payroll ?? 0).toLocaleString('ru-RU')} ₽
+              {Math.round(reviewStats?.payroll ?? 0).toLocaleString('ru-RU')} ₽
             </div>
             <span className="text-[11px] text-amber-700 font-bold">
-              {reviewData?.revenue
-                ? Math.round((reviewData.payroll / reviewData.revenue) * 100)
+              {reviewStats?.revenue
+                ? Math.round((reviewStats.payroll / reviewStats.revenue) * 100)
                 : 0}
               % от выручки
             </span>
@@ -781,12 +643,12 @@ export default function DashboardHome() {
 
           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Топливо и затраты
+              Топливо / ГСМ
             </span>
             <div className="text-2xl font-black text-rose-600 mt-1">
-              {Math.round(reviewData?.fuel ?? 0).toLocaleString('ru-RU')} ₽
+              {Math.round(reviewStats?.fuel ?? 0).toLocaleString('ru-RU')} ₽
             </div>
-            <span className="text-[11px] text-rose-700 font-bold">ГСМ + Суточные + Платные</span>
+            <span className="text-[11px] text-rose-700 font-bold">Фактический расход</span>
           </div>
 
           <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
@@ -794,11 +656,13 @@ export default function DashboardHome() {
               Чистая прибыль рейсов
             </span>
             <div className="text-2xl font-black text-emerald-700 mt-1">
-              {Math.round(reviewData?.profit ?? 0).toLocaleString('ru-RU')} ₽
+              {Math.round(reviewStats?.profit ?? 0).toLocaleString('ru-RU')} ₽
             </div>
             <span className="text-[11px] text-emerald-800 font-bold">
               Рентабельность:{' '}
-              {reviewData?.revenue ? Math.round((reviewData.profit / reviewData.revenue) * 100) : 0}
+              {reviewStats?.revenue
+                ? Math.round((reviewStats.profit / reviewStats.revenue) * 100)
+                : 0}
               %
             </span>
           </div>
@@ -810,17 +674,19 @@ export default function DashboardHome() {
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
               Активность автопарка и номера рейсов за период
             </h3>
-            <span className="text-xs text-slate-400">Нажмите на номер рейса для перехода</span>
+            <span className="text-xs text-slate-400">
+              Нажмите на номер рейса для перехода в Ревью
+            </span>
           </div>
 
           <div className="space-y-2.5">
-            {(!reviewData?.vehicles || reviewData.vehicles.length === 0) && (
+            {(!reviewStats?.vehicles || reviewStats.vehicles.length === 0) && (
               <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                Нет завершенных рейсов за выбранный период
+                Нет рейсов за выбранный период
               </div>
             )}
 
-            {reviewData?.vehicles?.map((v) => (
+            {reviewStats?.vehicles?.map((v) => (
               <div
                 key={v.id}
                 className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors"
