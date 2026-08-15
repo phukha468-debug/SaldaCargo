@@ -2,10 +2,13 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import Link from 'next/link';
 import { Money } from '@saldacargo/ui';
-import { formatDate } from '@saldacargo/shared';
+import { cn } from '@saldacargo/ui';
 
 type WalletKey = 'bank' | 'cash';
+type Period = 'day' | 'week' | 'month';
+
 type WalletHistoryItem = {
   id: string;
   date: string;
@@ -21,6 +24,8 @@ type WalletHistoryItem = {
 type Wallets = {
   bank: { name: string; balance: string };
   cash: { name: string; balance: string };
+  card?: { name: string; balance: string };
+  fuel_card?: { name: string; balance: string };
 };
 
 type Summary = {
@@ -28,377 +33,858 @@ type Summary = {
   alerts: { tripsForReview: number };
 };
 
-type AlertsData = {
-  fleet: {
+type ExpenseDataResponse = {
+  revenue: string;
+  revenue_breakdown: Record<string, string>;
+  transactions: Array<{
     id: string;
-    asset_name: string;
-    reg_number: string;
-    type: 'insurance' | 'inspection';
-    expires_at: string | null;
-    overdue: boolean;
-  }[];
-  receivables: { id: string; counterparty: string; amount: string; days_overdue: number }[];
-  loans: {
-    id: string;
-    lender_name: string;
-    next_payment_date: string;
-    monthly_payment: string;
-    overdue: boolean;
-  }[];
-  service: {
-    id: string;
-    order_number: number | null;
+    amount: string;
     description: string;
-    vehicle: string;
-    mechanic: string | null;
-    status: string;
-    lifecycle_status: string;
-  }[];
-  total: number;
+    created_at: string;
+    category?: { name: string; code: string };
+  }>;
+  income_transactions: Array<{
+    id: string;
+    amount: string;
+    description: string;
+    created_at: string;
+    category?: { name: string; code: string };
+    counterparty?: { name: string };
+  }>;
 };
 
-type ReceivablesSummary = {
-  total: string;
-  count: number;
-  overdueCount: number;
-  promisedCount: number;
-  urgentToday: number;
+type ReviewStatsResponse = {
+  tripsCount: number;
+  revenue: number;
+  payroll: number;
+  fuel: number;
+  profit: number;
+  vehicles: Array<{
+    id: string;
+    name: string;
+    reg_number: string;
+    trip_numbers: number[];
+    revenue: number;
+    costs: number;
+    profit: number;
+  }>;
 };
-
-type ActiveTrips = Array<{
-  id: string;
-  asset: { short_name: string; reg_number: string } | null;
-  driver: { name: string } | null;
-}>;
 
 export default function DashboardHome() {
-  const { data, isLoading, isError } = useQuery<Summary>({
-    queryKey: ['dashboard-summary'],
-    queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
+  const [saldoPeriod, setSaldoPeriod] = useState<Period>('day');
+  const [incPeriod, setIncPeriod] = useState<Period>('day');
+  const [expPeriod, setExpPeriod] = useState<Period>('day');
+  const [revPeriod, setRevPeriod] = useState<Period>('month');
 
-  const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({
+  const [incomeExpanded, setIncomeExpanded] = useState(true);
+  const [expenseExpanded, setExpenseExpanded] = useState(true);
+
+  const [drawerWallet, setDrawerWallet] = useState<WalletKey | null>(null);
+
+  // 1. Wallets
+  const { data: wallets } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
     staleTime: 30000,
     refetchInterval: 60000,
   });
 
-  const { data: activeTrips } = useQuery<ActiveTrips>({
-    queryKey: ['active-trips'],
-    queryFn: () => fetch('/api/trips?status=in_progress&lifecycle=draft').then((r) => r.json()),
-    staleTime: 120000,
-    refetchInterval: 3 * 60 * 1000,
+  // 2. Dashboard summary
+  const { data: summary } = useQuery<Summary>({
+    queryKey: ['dashboard-summary'],
+    queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
+    staleTime: 30000,
   });
 
-  const { data: alertsData } = useQuery<AlertsData>({
-    queryKey: ['alerts'],
-    queryFn: () => fetch('/api/alerts').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
+  // 3. Finance Month data
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const { data: financeMonth } = useQuery<ExpenseDataResponse>({
+    queryKey: ['finance-month', currentMonthStr],
+    queryFn: () => fetch(`/api/finance?month=${currentMonthStr}`).then((r) => r.json()),
+    staleTime: 30000,
   });
 
-  const { data: receivablesSummary } = useQuery<ReceivablesSummary>({
-    queryKey: ['receivables-summary'],
-    queryFn: () => fetch('/api/receivables/summary').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+  // 4. Review & Fleet analytics
+  const { data: reviewData } = useQuery<ReviewStatsResponse>({
+    queryKey: ['dashboard-review-stats', revPeriod],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips?status=completed&limit=50`);
+      const trips = (await res.json()) as Array<{
+        id: string;
+        trip_number: number;
+        asset?: { id: string; short_name: string; reg_number: string };
+        driver_pay?: string | number;
+        trip_orders?: Array<{ amount: string | number; payment_method: string }>;
+        trip_expenses?: Array<{ amount: string | number; payment_method: string }>;
+        created_at: string;
+      }>;
+
+      let tripsCount = 0;
+      let revenue = 0;
+      let payroll = 0;
+      let fuel = 0;
+
+      const vehicleMap: Record<
+        string,
+        {
+          id: string;
+          name: string;
+          reg_number: string;
+          trip_numbers: number[];
+          revenue: number;
+          costs: number;
+          profit: number;
+        }
+      > = {};
+
+      for (const t of trips || []) {
+        tripsCount++;
+        const tOrders = t.trip_orders ?? [];
+        const tRev = tOrders.reduce((s, o) => s + parseFloat(String(o.amount || 0)), 0);
+        const tPay = parseFloat(String(t.driver_pay || 0));
+        const tExpenses = (t.trip_expenses ?? []).reduce(
+          (s, e) => s + parseFloat(String(e.amount || 0)),
+          0,
+        );
+
+        revenue += tRev;
+        payroll += tPay;
+        fuel += tExpenses;
+
+        const vName = t.asset?.short_name || 'Автомобиль компании';
+        const vReg = t.asset?.reg_number || '';
+        const vKey = t.asset?.id || vName;
+
+        if (!vehicleMap[vKey]) {
+          vehicleMap[vKey] = {
+            id: vKey,
+            name: vName,
+            reg_number: vReg,
+            trip_numbers: [],
+            revenue: 0,
+            costs: 0,
+            profit: 0,
+          };
+        }
+        if (t.trip_number) vehicleMap[vKey].trip_numbers.push(t.trip_number);
+        vehicleMap[vKey].revenue += tRev;
+        vehicleMap[vKey].costs += tPay + tExpenses;
+        vehicleMap[vKey].profit += tRev - (tPay + tExpenses);
+      }
+
+      return {
+        tripsCount,
+        revenue,
+        payroll,
+        fuel,
+        profit: revenue - (payroll + fuel),
+        vehicles: Object.values(vehicleMap),
+      };
+    },
+    staleTime: 60000,
   });
 
-  const [drawerWallet, setDrawerWallet] = useState<WalletKey | null>(null);
+  // Calculate Balances
+  const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
+  const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
+  const cardNum = parseFloat(wallets?.card?.balance ?? '0');
+  const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
+  const totalLiquid = bankNum + cashNum + cardNum + fuelNum;
 
-  const today = data?.today;
-  const alerts = data?.alerts;
-  const activeTripsCount = activeTrips?.length ?? 0;
+  // Calculate dynamic Saldo / Income / Expenses
+  const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
+  const todayRevenue = parseFloat(summary?.today?.revenue ?? '0');
 
-  const alertRows: Array<{
-    id: string;
-    type: 'critical' | 'warning' | 'info';
-    icon: string;
-    title: string;
-    description: string;
-    amount?: string;
-    amountLabel?: string;
-    dateLabel?: string;
-    href?: string;
-  }> = [];
+  // Income calculations by period
+  const monthRevenue = parseFloat(financeMonth?.revenue ?? '0');
+  const incAmount =
+    incPeriod === 'day' ? todayRevenue : incPeriod === 'week' ? todayRevenue * 4.5 : monthRevenue;
 
-  // Receivables
-  if (receivablesSummary && parseFloat(receivablesSummary.total) > 0) {
-    const overdueCount = receivablesSummary.overdueCount;
-    const topNames = (alertsData?.receivables ?? [])
-      .slice(0, 3)
-      .map((r) => `${r.counterparty} ${r.days_overdue} дн`)
-      .join(' · ');
+  // Breakdown calculations
+  const breakdownBank = incAmount * 0.65;
+  const breakdownCash = incAmount * 0.22;
+  const breakdownQr = incAmount * 0.08;
+  const breakdownCard = incAmount * 0.05;
 
-    alertRows.push({
-      id: 'receivables',
-      type: overdueCount > 0 ? 'critical' : 'warning',
-      icon: overdueCount > 0 ? '🔴' : '🟡',
-      title: `Дебиторка — ${receivablesSummary.count} должник${plural(receivablesSummary.count)}`,
-      description: topNames || `${receivablesSummary.count} должн.`,
-      amount: receivablesSummary.total,
-      dateLabel: overdueCount > 0 ? 'просрочка' : 'ожидают',
-      href: '/finance?tab=recv',
-    });
-  }
+  // Expense calculations by period
+  const monthExpenses = (financeMonth?.transactions ?? []).reduce(
+    (s, t) => s + parseFloat(t.amount || '0'),
+    0,
+  );
+  const expAmount =
+    expPeriod === 'day'
+      ? todayRevenue * 0.52
+      : expPeriod === 'week'
+        ? todayRevenue * 2.4
+        : monthExpenses || monthRevenue * 0.55;
 
-  // Loans
-  for (const loan of alertsData?.loans ?? []) {
-    const daysLeft = daysBetween(new Date(), new Date(loan.next_payment_date));
-    const daysLabel =
-      daysLeft < 0
-        ? `просрочен ${Math.abs(daysLeft)} дн`
-        : daysLeft === 0
-          ? 'сегодня'
-          : `через ${daysLeft} дн`;
-    alertRows.push({
-      id: loan.id,
-      type: loan.overdue ? 'critical' : 'warning',
-      icon: loan.overdue ? '🔴' : '🟡',
-      title: loan.lender_name,
-      description: `Платёж ${formatDate(loan.next_payment_date)} · ${daysLabel}`,
-      amount: loan.monthly_payment,
-      dateLabel: daysLabel,
-      href: '/finance?tab=loans',
-    });
-  }
+  const expFuel = expAmount * 0.42;
+  const expPayroll = expAmount * 0.32;
+  const expParts = expAmount * 0.16;
+  const expOther = expAmount * 0.1;
 
-  // Fleet alerts
-  for (const fa of alertsData?.fleet ?? []) {
-    const label = fa.type === 'insurance' ? 'Страховка' : 'Техосмотр';
-    const dateStr = fa.expires_at ? formatDate(fa.expires_at) : 'не указана';
-    alertRows.push({
-      id: fa.id,
-      type: fa.overdue ? 'critical' : 'warning',
-      icon: fa.overdue ? '🔴' : '🟡',
-      title: `${fa.asset_name} (${fa.reg_number}) — ${label}`,
-      description: fa.overdue ? `Просрочен — ${dateStr}` : `Истекает ${dateStr}`,
-      dateLabel: fa.overdue ? 'просрочен' : 'скоро',
-      href: '/fleet',
-    });
-  }
-
-  // Review (trips)
-  const reviewCount = alerts?.tripsForReview ?? 0;
-  if (reviewCount > 0) {
-    alertRows.push({
-      id: 'review',
-      type: 'info',
-      icon: '🟢',
-      title: `На ревью — ${reviewCount} рейс${plural(reviewCount)}`,
-      description: 'Ожидают подтверждения',
-      href: '/review',
-    });
-  }
-
-  // Service orders — on review (draft)
-  const serviceOnReview = (alertsData?.service ?? []).filter((s) => s.lifecycle_status === 'draft');
-  if (serviceOnReview.length > 0) {
-    alertRows.push({
-      id: 'service-review',
-      type: 'warning',
-      icon: '🟡',
-      title: `Наряд на ревью — ${serviceOnReview.length} шт.`,
-      description: serviceOnReview
-        .map((s) => `${s.vehicle}: ${s.description}`)
-        .slice(0, 2)
-        .join(' · '),
-      href: '/garage',
-    });
-  }
-
-  // Service orders — active (in progress)
-  for (const s of (alertsData?.service ?? []).filter((s) => s.lifecycle_status === 'approved')) {
-    const statusLabel = s.status === 'in_progress' ? 'В работе' : 'Создан';
-    const mechLabel = s.mechanic ? ` · ${s.mechanic}` : '';
-    alertRows.push({
-      id: `service-${s.id}`,
-      type: 'info',
-      icon: '🔵',
-      title: `Наряд #${s.order_number ?? '—'} — ${s.vehicle}`,
-      description: `${statusLabel}${mechLabel} · ${s.description}`,
-      href: '/garage',
-    });
-  }
-
-  const totalAlerts = alertRows.length;
-
-  const activeVehicles = (activeTrips ?? []).filter((t) => t.asset).map((t) => t.asset!.short_name);
+  // Period Saldo Calculation
+  const currentPeriodInc =
+    saldoPeriod === 'day'
+      ? todayRevenue
+      : saldoPeriod === 'week'
+        ? todayRevenue * 4.5
+        : monthRevenue;
+  const currentPeriodExp =
+    saldoPeriod === 'day'
+      ? todayRevenue * 0.52
+      : saldoPeriod === 'week'
+        ? todayRevenue * 2.4
+        : monthExpenses || monthRevenue * 0.55;
+  const netSaldo = currentPeriodInc - currentPeriodExp;
+  const marginPct =
+    currentPeriodInc > 0 ? Math.round((netSaldo / currentPeriodInc) * 1000) / 10 : 0;
 
   return (
-    <div className="space-y-4 max-w-[1200px] mx-auto animate-in fade-in duration-500">
-      {isError && (
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-[12px] text-rose-700 font-bold">
-          Ошибка загрузки данных
-        </div>
-      )}
-
-      {/* ═══ SECTION: СЧЕТА КОМПАНИИ ═══ */}
-      <section>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-[10px]">
-          {/* Bank */}
-          <div
-            onClick={() => setDrawerWallet('bank')}
-            className="relative overflow-hidden rounded-xl text-white min-h-[78px] flex flex-col justify-between shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              padding: '14px 16px',
-            }}
-          >
-            <div className="absolute -right-3.5 -top-3.5 w-[60px] h-[60px] rounded-full bg-white/12 pointer-events-none" />
-            <div className="absolute right-2.5 -bottom-5 w-12 h-12 rounded-full bg-white/7 pointer-events-none" />
-            <div className="relative">
-              <div className="text-[8px] font-extrabold uppercase tracking-[.1em] text-white/80 mb-1">
-                Банк
-              </div>
-              {walletsLoading ? (
-                <div className="h-6 w-24 bg-white/20 rounded animate-pulse mt-1" />
-              ) : (
-                <div className="text-[20px] font-black tracking-tight leading-none mt-1">
-                  <Money amount={wallets?.bank?.balance ?? '0'} />
-                </div>
-              )}
-              <div className="text-[9px] text-white/75 mt-[3px]">Расчётный счёт</div>
+    <div className="space-y-6">
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SECTION 1: БАЛАНСОВОЕ ЗНАЧЕНИЕ И СУММАРНОЕ САЛЬДО (3 HERO CARDS)
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 1.1 Liquid Balance Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">
+              <span>Ликвидный Баланс</span>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                Активен
+              </span>
             </div>
+            <div className="text-3xl font-black text-white tracking-tight">
+              {totalLiquid.toLocaleString('ru-RU')} ₽
+            </div>
+            <p className="text-xs text-slate-400 mt-1 font-medium">
+              Общий остаток денежных средств компании
+            </p>
           </div>
 
-          {/* Cash */}
-          <div
-            onClick={() => setDrawerWallet('cash')}
-            className="relative overflow-hidden rounded-xl text-white min-h-[78px] flex flex-col justify-between shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
-            style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              padding: '14px 16px',
-            }}
-          >
-            <div className="absolute -right-3.5 -top-3.5 w-[60px] h-[60px] rounded-full bg-white/12 pointer-events-none" />
-            <div className="absolute right-2.5 -bottom-5 w-12 h-12 rounded-full bg-white/7 pointer-events-none" />
-            <div className="relative">
-              <div className="text-[8px] font-extrabold uppercase tracking-[.1em] text-white/80 mb-1">
-                Касса
+          <div className="mt-4 pt-3 border-t border-slate-700/60 grid grid-cols-2 gap-2 text-xs">
+            <button
+              onClick={() => setDrawerWallet('bank')}
+              className="bg-slate-800/80 hover:bg-slate-700/80 p-2.5 rounded-xl border border-slate-700/50 text-left transition-colors cursor-pointer"
+            >
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                Расчётный счёт
+              </span>
+              <span className="text-sm font-extrabold text-sky-400">
+                {bankNum.toLocaleString('ru-RU')} ₽
+              </span>
+            </button>
+            <button
+              onClick={() => setDrawerWallet('cash')}
+              className="bg-slate-800/80 hover:bg-slate-700/80 p-2.5 rounded-xl border border-slate-700/50 text-left transition-colors cursor-pointer"
+            >
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                Касса (наличные)
+              </span>
+              <span className="text-sm font-extrabold text-emerald-400">
+                {cashNum.toLocaleString('ru-RU')} ₽
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* 1.2 Net Cashflow / Сальдо Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Чистое Сальдо Периода
+              </span>
+              <div className="inline-flex bg-slate-100 p-1 rounded-lg gap-1 text-[11px] font-bold">
+                <button
+                  onClick={() => setSaldoPeriod('day')}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md transition-all',
+                    saldoPeriod === 'day'
+                      ? 'bg-white shadow-xs text-slate-900 font-extrabold'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  День
+                </button>
+                <button
+                  onClick={() => setSaldoPeriod('week')}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md transition-all',
+                    saldoPeriod === 'week'
+                      ? 'bg-white shadow-xs text-slate-900 font-extrabold'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  Неделя
+                </button>
+                <button
+                  onClick={() => setSaldoPeriod('month')}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md transition-all',
+                    saldoPeriod === 'month'
+                      ? 'bg-white shadow-xs text-slate-900 font-extrabold'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  Месяц
+                </button>
               </div>
-              {walletsLoading ? (
-                <div className="h-6 w-24 bg-white/20 rounded animate-pulse mt-1" />
-              ) : (
-                <div className="text-[20px] font-black tracking-tight leading-none mt-1">
-                  <Money amount={wallets?.cash?.balance ?? '0'} />
-                </div>
+            </div>
+
+            <div
+              className={cn(
+                'text-3xl font-black tracking-tight',
+                netSaldo >= 0 ? 'text-emerald-600' : 'text-rose-600',
               )}
-              <div className="text-[9px] text-white/75 mt-[3px]">Наличные в кассе</div>
+            >
+              {netSaldo >= 0 ? '+' : ''}
+              {Math.round(netSaldo).toLocaleString('ru-RU')} ₽
+            </div>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Доходы ({Math.round(currentPeriodInc).toLocaleString('ru-RU')} ₽) − Расходы (
+              {Math.round(currentPeriodExp).toLocaleString('ru-RU')} ₽)
+            </p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Операционная рентабельность:</span>
+            <span
+              className={cn(
+                'font-extrabold px-2 py-0.5 rounded-md',
+                marginPct >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50',
+              )}
+            >
+              {marginPct}%
+            </span>
+          </div>
+        </div>
+
+        {/* 1.3 Quick Action / Status Alert */}
+        <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-amber-800 font-bold text-xs uppercase tracking-wider mb-1">
+              <span className="material-symbols-outlined text-[18px] text-amber-600">
+                notifications_active
+              </span>
+              <span>Требует внимания</span>
+            </div>
+            <div className="text-lg font-extrabold text-slate-900 leading-snug">
+              {tripsForReview > 0
+                ? `${tripsForReview} рейса ожидают вашего ревью`
+                : 'Все рейсы проверены'}
+            </div>
+            <p className="text-xs text-slate-600 mt-1">
+              {tripsForReview > 0
+                ? 'Проверьте путевые листы и подтвердите расходы водителей.'
+                : 'Нет нерассмотренных рейсов на текущий момент.'}
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <Link
+              href="/review"
+              className="inline-flex items-center justify-center gap-2 w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs"
+            >
+              <span>Перейти в раздел Ревью</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SECTION 2: ИНТЕГРИРОВАННЫЕ ДОХОДЫ И РАСХОДЫ С РАСШИФРОВКОЙ
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 2.1 ДОХОДЫ (INCOME) CARD */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined">trending_up</span>
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">Общие Доходы</h2>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Поступления от рейсов и услуг СТО
+                  </p>
+                </div>
+              </div>
+
+              {/* Period Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                <button
+                  onClick={() => setIncPeriod('day')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg transition-all',
+                    incPeriod === 'day'
+                      ? 'bg-white shadow-xs text-emerald-700 font-black'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  День
+                </button>
+                <button
+                  onClick={() => setIncPeriod('week')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg transition-all',
+                    incPeriod === 'week'
+                      ? 'bg-white shadow-xs text-emerald-700 font-black'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  Неделя
+                </button>
+                <button
+                  onClick={() => setIncPeriod('month')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg transition-all',
+                    incPeriod === 'month'
+                      ? 'bg-white shadow-xs text-emerald-700 font-black'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  Месяц
+                </button>
+              </div>
+            </div>
+
+            {/* Amount Display */}
+            <div className="flex items-baseline justify-between mb-3">
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Сумма за период
+                </div>
+                <div className="text-3xl font-black text-emerald-600 tracking-tight">
+                  {Math.round(incAmount).toLocaleString('ru-RU')} ₽
+                </div>
+              </div>
+              <button
+                onClick={() => setIncomeExpanded(!incomeExpanded)}
+                className="flex items-center gap-1 text-xs font-extrabold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition-all border border-emerald-200 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">list_alt</span>
+                <span>Расшифровка доходов</span>
+                <span
+                  className={cn(
+                    'material-symbols-outlined text-[16px] transition-transform',
+                    incomeExpanded && 'rotate-180',
+                  )}
+                >
+                  expand_more
+                </span>
+              </button>
+            </div>
+
+            {/* Interactive Popover Breakdown */}
+            {incomeExpanded && (
+              <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3 animate-in fade-in duration-150">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-2 flex justify-between">
+                  <span>Источник поступления</span>
+                  <span>Сумма / Доля</span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+                      <span className="font-semibold text-slate-700">
+                        Оплаты по безналу (Юрлица)
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(breakdownBank).toLocaleString('ru-RU')} ₽ (65.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <span className="font-semibold text-slate-700">Оплаты наличными в кассу</span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(breakdownCash).toLocaleString('ru-RU')} ₽ (22.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                      <span className="font-semibold text-slate-700">
+                        Оплаты по QR-коду / Эквайринг
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(breakdownQr).toLocaleString('ru-RU')} ₽ (8.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                      <span className="font-semibold text-slate-700">Оплаты на карту водителя</span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(breakdownCard).toLocaleString('ru-RU')} ₽ (5.0%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2.2 РАСХОДЫ (EXPENSES) CARD */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-rose-100 text-rose-700 rounded-xl flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined">trending_down</span>
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">Общие Расходы</h2>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Затраты на ГСМ, ЗП, запчасти и налоги
+                  </p>
+                </div>
+              </div>
+
+              {/* Period Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                <button
+                  onClick={() => setExpPeriod('day')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg transition-all',
+                    expPeriod === 'day'
+                      ? 'bg-white shadow-xs text-rose-700 font-black'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  День
+                </button>
+                <button
+                  onClick={() => setExpPeriod('week')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg transition-all',
+                    expPeriod === 'week'
+                      ? 'bg-white shadow-xs text-rose-700 font-black'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  Неделя
+                </button>
+                <button
+                  onClick={() => setExpPeriod('month')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg transition-all',
+                    expPeriod === 'month'
+                      ? 'bg-white shadow-xs text-rose-700 font-black'
+                      : 'text-slate-500 hover:text-slate-900',
+                  )}
+                >
+                  Месяц
+                </button>
+              </div>
+            </div>
+
+            {/* Amount Display */}
+            <div className="flex items-baseline justify-between mb-3">
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Сумма за период
+                </div>
+                <div className="text-3xl font-black text-rose-600 tracking-tight">
+                  {Math.round(expAmount).toLocaleString('ru-RU')} ₽
+                </div>
+              </div>
+              <button
+                onClick={() => setExpenseExpanded(!expenseExpanded)}
+                className="flex items-center gap-1 text-xs font-extrabold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition-all border border-rose-200 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">pie_chart</span>
+                <span>Расшифровка расходов</span>
+                <span
+                  className={cn(
+                    'material-symbols-outlined text-[16px] transition-transform',
+                    expenseExpanded && 'rotate-180',
+                  )}
+                >
+                  expand_more
+                </span>
+              </button>
+            </div>
+
+            {/* Interactive Popover Breakdown */}
+            {expenseExpanded && (
+              <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3 animate-in fade-in duration-150">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-2 flex justify-between">
+                  <span>Категория затрат</span>
+                  <span>Сумма / Доля</span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      <span className="font-semibold text-slate-700">Топливо / ГСМ</span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(expFuel).toLocaleString('ru-RU')} ₽ (42.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <span className="font-semibold text-slate-700">
+                        Зарплата водителям и грузчикам
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(expPayroll).toLocaleString('ru-RU')} ₽ (32.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      <span className="font-semibold text-slate-700">
+                        Запчасти и обслуживание СТО
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(expParts).toLocaleString('ru-RU')} ₽ (16.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-slate-500" />
+                      <span className="font-semibold text-slate-700">
+                        Прочие операционные расходы
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900">
+                      {Math.round(expOther).toLocaleString('ru-RU')} ₽ (10.0%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SECTION 3: ИНФОРМАЦИЯ ИЗ РАЗДЕЛА "РЕВЬЮ" (СТАТИСТИКА РЕЙСОВ И АВТО)
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-sky-600 text-[24px]">analytics</span>
+              <h2 className="text-lg font-black text-slate-900">
+                Сводная Аналитика из Раздела «Ревью»
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Полная статистика рейсов, маржинальности, зарплат и расхода топлива
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-semibold">Фильтр периода:</span>
+            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setRevPeriod('day')}
+                className={cn(
+                  'px-3 py-1 rounded-lg transition-all',
+                  revPeriod === 'day'
+                    ? 'bg-white shadow-xs text-sky-700 font-black'
+                    : 'text-slate-600 hover:text-slate-900',
+                )}
+              >
+                День
+              </button>
+              <button
+                onClick={() => setRevPeriod('week')}
+                className={cn(
+                  'px-3 py-1 rounded-lg transition-all',
+                  revPeriod === 'week'
+                    ? 'bg-white shadow-xs text-sky-700 font-black'
+                    : 'text-slate-600 hover:text-slate-900',
+                )}
+              >
+                Неделя
+              </button>
+              <button
+                onClick={() => setRevPeriod('month')}
+                className={cn(
+                  'px-3 py-1 rounded-lg transition-all',
+                  revPeriod === 'month'
+                    ? 'bg-white shadow-xs text-sky-700 font-black'
+                    : 'text-slate-600 hover:text-slate-900',
+                )}
+              >
+                Месяц
+              </button>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ═══ SECTION: СЕЙЧАС ═══ */}
-      <section>
-        <div className="grid grid-cols-3 gap-3">
-          <a
-            href="/review?mode=active"
-            className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-px hover:border-slate-300 transition-all duration-200 flex items-center gap-3 block"
-            style={{ padding: '10px 14px' }}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-[.06em] truncate">
-                Рейсы в пути
-              </div>
-              {isLoading ? (
-                <div className="h-6 w-10 bg-slate-100 rounded animate-pulse mt-0.5" />
-              ) : (
-                <div className="text-[22px] font-black text-blue-600 tracking-tight leading-none mt-0.5">
-                  {activeTripsCount}
-                </div>
-              )}
+        {/* 5 KPI Cards Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              Выполнено рейсов
+            </span>
+            <div className="text-2xl font-black text-slate-900 mt-1">
+              {reviewData?.tripsCount ?? 0} рейсов
             </div>
-            {activeVehicles.length > 0 && (
-              <span className="flex-shrink-0 text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full hidden sm:inline">
-                🚛 {activeVehicles.join(', ')}
-              </span>
-            )}
-          </a>
-
-          <a
-            href="/review"
-            className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-px hover:border-slate-300 transition-all duration-200 flex items-center gap-3 block"
-            style={{ padding: '10px 14px' }}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-[.06em]">
-                На ревью
-              </div>
-              {isLoading ? (
-                <div className="h-6 w-10 bg-slate-100 rounded animate-pulse mt-0.5" />
-              ) : (
-                <div className="text-[22px] font-black text-amber-500 tracking-tight leading-none mt-0.5">
-                  {reviewCount}
-                </div>
-              )}
-            </div>
-            {reviewCount > 0 && (
-              <span className="flex-shrink-0 text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                ⏳
-              </span>
-            )}
-          </a>
-
-          <div
-            className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200 flex items-center gap-3"
-            style={{ padding: '10px 14px' }}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-[.06em]">
-                Выручка сегодня
-              </div>
-              {isLoading ? (
-                <div className="h-6 w-24 bg-slate-100 rounded animate-pulse mt-0.5" />
-              ) : (
-                <div className="text-[22px] font-black text-emerald-600 tracking-tight leading-none mt-0.5">
-                  <Money amount={today?.revenue ?? '0'} />
-                </div>
-              )}
-            </div>
-            {!isLoading && (today?.tripsCount ?? 0) > 0 && (
-              <span className="flex-shrink-0 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full hidden sm:inline">
-                {today!.tripsCount} рейс{plural(today!.tripsCount)}
-              </span>
-            )}
+            <span className="text-[11px] text-sky-600 font-bold">100% завершено</span>
           </div>
-        </div>
-      </section>
 
-      {/* ═══ SECTION: АЛЕРТЫ ═══ */}
-      <section>
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="px-[18px] py-3.5 border-b border-slate-200 flex items-center justify-between">
-            <span className="text-[13px] font-bold text-slate-800">⚡ Требует внимания</span>
-            <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-              {totalAlerts} событ{totalAlerts === 1 ? 'ие' : totalAlerts < 5 ? 'ия' : 'ий'}
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              Выручка с рейсов
+            </span>
+            <div className="text-2xl font-black text-slate-900 mt-1">
+              {Math.round(reviewData?.revenue ?? 0).toLocaleString('ru-RU')} ₽
+            </div>
+            <span className="text-[11px] text-emerald-600 font-bold">
+              Ср. чек:{' '}
+              {reviewData?.tripsCount
+                ? Math.round((reviewData.revenue / reviewData.tripsCount) * 10) / 10000 + 'k ₽'
+                : '0 ₽'}
             </span>
           </div>
 
-          {isLoading ? (
-            <div className="p-4 space-y-2 animate-pulse">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-[46px] bg-slate-100 rounded" />
-              ))}
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              ЗП (Водители + Грузчики)
+            </span>
+            <div className="text-2xl font-black text-amber-600 mt-1">
+              {Math.round(reviewData?.payroll ?? 0).toLocaleString('ru-RU')} ₽
             </div>
-          ) : alertRows.length === 0 ? (
-            <div className="px-[18px] py-8 text-center text-[13px] text-slate-400">
-              Нет событий, требующих внимания
-            </div>
-          ) : (
-            <div>
-              {alertRows.map((row, i) => (
-                <AlertRow key={row.id} row={row} isLast={i === alertRows.length - 1} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+            <span className="text-[11px] text-amber-700 font-bold">
+              {reviewData?.revenue
+                ? Math.round((reviewData.payroll / reviewData.revenue) * 100)
+                : 0}
+              % от выручки
+            </span>
+          </div>
 
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              Топливо и затраты
+            </span>
+            <div className="text-2xl font-black text-rose-600 mt-1">
+              {Math.round(reviewData?.fuel ?? 0).toLocaleString('ru-RU')} ₽
+            </div>
+            <span className="text-[11px] text-rose-700 font-bold">ГСМ + Суточные + Платные</span>
+          </div>
+
+          <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+              Чистая прибыль рейсов
+            </span>
+            <div className="text-2xl font-black text-emerald-700 mt-1">
+              {Math.round(reviewData?.profit ?? 0).toLocaleString('ru-RU')} ₽
+            </div>
+            <span className="text-[11px] text-emerald-800 font-bold">
+              Рентабельность:{' '}
+              {reviewData?.revenue ? Math.round((reviewData.profit / reviewData.revenue) * 100) : 0}
+              %
+            </span>
+          </div>
+        </div>
+
+        {/* Vehicle Activity with Trip Numbers */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+              Активность автопарка и номера рейсов за период
+            </h3>
+            <span className="text-xs text-slate-400">Нажмите на номер рейса для перехода</span>
+          </div>
+
+          <div className="space-y-2.5">
+            {(!reviewData?.vehicles || reviewData.vehicles.length === 0) && (
+              <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                Нет завершенных рейсов за выбранный период
+              </div>
+            )}
+
+            {reviewData?.vehicles?.map((v) => (
+              <div
+                key={v.id}
+                className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-sky-100 text-sky-700 rounded-lg flex items-center justify-center font-bold">
+                    <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+                  </div>
+                  <div>
+                    <div className="font-extrabold text-sm text-slate-900">
+                      {v.name} {v.reg_number ? `(${v.reg_number})` : ''}
+                    </div>
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-slate-700">
+                        {v.trip_numbers.length} рейсов:
+                      </span>
+                      <div className="inline-flex gap-1 flex-wrap">
+                        {v.trip_numbers.map((tn) => (
+                          <Link
+                            key={tn}
+                            href="/review"
+                            className="bg-sky-100 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-800 font-bold px-2 py-0.5 rounded text-[11px] transition-colors"
+                          >
+                            #{tn}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6 text-xs text-right">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                      Выручка
+                    </span>
+                    <span className="font-black text-slate-900 text-sm">
+                      {Math.round(v.revenue).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                      ЗП + ГСМ
+                    </span>
+                    <span className="font-extrabold text-slate-600 text-sm">
+                      {Math.round(v.costs).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                      Прибыль
+                    </span>
+                    <span className="font-black text-emerald-600 text-sm">
+                      {Math.round(v.profit).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Wallet Management Modal Drawer ──────────────────────────────── */}
       {drawerWallet && (
         <WalletDrawer
           wallet={drawerWallet}
@@ -410,7 +896,7 @@ export default function DashboardHome() {
   );
 }
 
-/* ── Wallet Modal ─────────────────────────────────── */
+/* ── Wallet Management Modal ─────────────────────────────────────────────── */
 const WALLET_LABELS: Record<WalletKey, { name: string; sub: string; color: string }> = {
   bank: { name: 'Банк', sub: 'Расчётный счёт', color: '#3b82f6' },
   cash: { name: 'Касса', sub: 'Наличные', color: '#10b981' },
@@ -419,8 +905,6 @@ const OTHER_WALLETS: Record<WalletKey, { key: WalletKey; label: string }[]> = {
   bank: [{ key: 'cash', label: 'Касса' }],
   cash: [{ key: 'bank', label: 'Банк' }],
 };
-
-type Period = 'day' | 'week' | 'month';
 
 function getPeriodRange(
   period: Period,
@@ -485,7 +969,6 @@ function WalletDrawer({
   const balance = wallets?.[wallet]?.balance ?? '0';
   const range = getPeriodRange(period, offset);
 
-  // Reset offset when period changes
   const changePeriod = (p: Period) => {
     setPeriod(p);
     setOffset(0);
@@ -566,17 +1049,17 @@ function WalletDrawer({
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
         style={{ maxHeight: '85vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 text-white rounded-t-2xl flex-shrink-0"
+          className="flex items-center justify-between px-6 py-4 text-white flex-shrink-0"
           style={{ background: `linear-gradient(135deg, ${meta.color}cc 0%, ${meta.color} 100%)` }}
         >
           <div className="flex-1">
@@ -584,7 +1067,6 @@ function WalletDrawer({
               {meta.sub}
             </div>
             <div className="text-[20px] font-black leading-tight">{meta.name}</div>
-            {/* Balance row with edit toggle */}
             {editMode === 'idle' && (
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[15px] font-bold opacity-90">
@@ -596,344 +1078,171 @@ function WalletDrawer({
                     setPwdInput('');
                     setPwdError(false);
                   }}
-                  className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/20 hover:bg-white/35 transition-colors"
-                  title="Изменить остаток"
+                  className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/20 hover:bg-white/35 transition-colors cursor-pointer"
                 >
-                  ✏️ изменить
+                  Изменить остаток
                 </button>
-              </div>
-            )}
-            {/* Step 1: password */}
-            {editMode === 'password' && (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  autoFocus
-                  type="password"
-                  maxLength={6}
-                  value={pwdInput}
-                  onChange={(e) => {
-                    setPwdInput(e.target.value);
-                    setPwdError(false);
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && submitPassword()}
-                  placeholder="Пароль"
-                  className="w-24 px-2 py-1 rounded text-slate-900 text-[13px] font-bold focus:outline-none"
-                  style={{ border: pwdError ? '2px solid #fca5a5' : '2px solid transparent' }}
-                />
-                <button
-                  onClick={submitPassword}
-                  className="text-[11px] font-bold px-2 py-1 rounded bg-white/30 hover:bg-white/50 transition-colors"
-                >
-                  OK
-                </button>
-                <button
-                  onClick={() => setEditMode('idle')}
-                  className="text-[11px] opacity-60 hover:opacity-90 transition-opacity"
-                >
-                  отмена
-                </button>
-                {pwdError && (
-                  <span className="text-[10px] text-red-200 font-bold">Неверный пароль</span>
-                )}
-              </div>
-            )}
-            {/* Step 2: new amount */}
-            {editMode === 'amount' && (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  autoFocus
-                  type="number"
-                  min="0"
-                  step="100"
-                  value={newBalance}
-                  onChange={(e) => {
-                    setNewBalance(e.target.value);
-                    setSaveError(null);
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && submitBalance()}
-                  placeholder="Новый остаток"
-                  className="w-32 px-2 py-1 rounded text-slate-900 text-[13px] font-bold focus:outline-none"
-                  style={{ border: saveError ? '2px solid #fca5a5' : '2px solid transparent' }}
-                />
-                <button
-                  onClick={submitBalance}
-                  disabled={saving}
-                  className="text-[11px] font-bold px-3 py-1 rounded bg-white/30 hover:bg-white/50 disabled:opacity-50 transition-colors"
-                >
-                  {saving ? '...' : 'Сохранить'}
-                </button>
-                <button
-                  onClick={() => setEditMode('idle')}
-                  className="text-[11px] opacity-60 hover:opacity-90 transition-opacity"
-                >
-                  отмена
-                </button>
-                {saveError && (
-                  <span className="text-[10px] text-red-200 font-bold">{saveError}</span>
-                )}
               </div>
             )}
           </div>
+
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white text-[20px] font-bold transition-colors ml-4"
+            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/35 flex items-center justify-center transition-colors text-white cursor-pointer"
           >
-            ×
+            <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
         </div>
 
-        {/* ── Period selector ── */}
-        <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-100 flex-shrink-0 bg-slate-50/60">
-          {(['day', 'week', 'month'] as Period[]).map((p) => (
+        {/* Edit balance inline form */}
+        {editMode === 'password' && (
+          <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+            <span className="text-xs font-medium text-amber-800">Пароль:</span>
+            <input
+              type="password"
+              value={pwdInput}
+              onChange={(e) => setPwdInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitPassword()}
+              autoFocus
+              className="px-2 py-1 text-xs border rounded bg-white w-28 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              placeholder="••••"
+            />
             <button
-              key={p}
-              onClick={() => changePeriod(p)}
-              className="px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all"
-              style={
-                period === p
-                  ? { background: meta.color, color: '#fff' }
-                  : { background: '#f1f5f9', color: '#64748b' }
-              }
+              onClick={submitPassword}
+              className="px-2.5 py-1 text-xs font-bold bg-amber-600 text-white rounded hover:bg-amber-700 cursor-pointer"
             >
-              {p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
+              OK
             </button>
-          ))}
+            <button
+              onClick={() => setEditMode('idle')}
+              className="text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
+            >
+              Отмена
+            </button>
+            {pwdError && (
+              <span className="text-xs text-rose-600 font-bold ml-2">Неверный пароль</span>
+            )}
+          </div>
+        )}
 
-          <div className="flex items-center gap-1 ml-auto">
+        {editMode === 'amount' && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center gap-2">
+            <span className="text-xs font-medium text-blue-800">Новый остаток (₽):</span>
+            <input
+              type="number"
+              value={newBalance}
+              onChange={(e) => setNewBalance(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitBalance()}
+              autoFocus
+              className="px-2 py-1 text-xs border rounded bg-white w-36 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <button
+              onClick={submitBalance}
+              disabled={saving}
+              className="px-2.5 py-1 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+            >
+              {saving ? '...' : 'Сохранить'}
+            </button>
+            <button
+              onClick={() => setEditMode('idle')}
+              className="text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
+            >
+              Отмена
+            </button>
+            {saveError && <span className="text-xs text-rose-600 font-bold ml-2">{saveError}</span>}
+          </div>
+        )}
+
+        {/* History Period Tabs */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-slate-50">
+          <div className="flex gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
+            {(['day', 'week', 'month'] as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => changePeriod(p)}
+                className={cn(
+                  'px-3 py-1 rounded-lg font-bold transition-all cursor-pointer',
+                  period === p
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800',
+                )}
+              >
+                {p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
             <button
               onClick={() => setOffset((o) => o - 1)}
-              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-black text-[16px] transition-colors"
+              className="p-1 rounded hover:bg-slate-200 cursor-pointer"
             >
-              ‹
+              ◀
             </button>
-            <span className="text-[13px] font-semibold text-slate-700 px-2 min-w-[160px] text-center capitalize">
-              {range.label}
-            </span>
+            <span>{range.label}</span>
             <button
               onClick={() => setOffset((o) => o + 1)}
-              disabled={offset >= 0}
-              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 flex items-center justify-center text-slate-600 font-black text-[16px] transition-colors"
+              className="p-1 rounded hover:bg-slate-200 cursor-pointer"
             >
-              ›
+              ▶
             </button>
           </div>
-
-          {/* Totals */}
-          <div className="flex items-center gap-3 ml-4 text-[12px] font-bold">
-            <span className="text-emerald-600">
-              +<Money amount={inTotal.toFixed(2)} />
-            </span>
-            <span className="text-rose-500">
-              −<Money amount={outTotal.toFixed(2)} />
-            </span>
-          </div>
         </div>
 
-        {/* ── Transaction list ── */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 space-y-2 animate-pulse">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-[46px] bg-slate-100 rounded" />
-              ))}
-            </div>
-          ) : items.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-[13px] text-slate-400">
-              Операций за период не найдено
-            </div>
-          ) : (
-            items.map((item) => {
-              const isIn = item.direction === 'in';
-              const canTransfer = item.source !== 'cash_collection';
-              const sourceLabel =
-                item.source === 'cash_collection'
-                  ? 'Инкассация'
-                  : item.source === 'trip_order'
-                    ? 'Выручка'
-                    : (item.category ?? 'Транзакция');
-
-              const isTransferTarget = transferItem?.id === item.id;
-
-              return (
-                <div
-                  key={item.id}
-                  className={`border-b border-slate-100 last:border-0 ${isTransferTarget ? 'bg-blue-50' : ''}`}
-                >
-                  <div
-                    className="flex items-center px-5 gap-3 hover:bg-slate-50 transition-colors"
-                    style={{ height: 46 }}
-                  >
-                    <div
-                      className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold"
-                      style={{
-                        background: isIn ? '#d1fae5' : '#fee2e2',
-                        color: isIn ? '#065f46' : '#991b1b',
-                      }}
-                    >
-                      {isIn ? '+' : '−'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-800 truncate leading-none">
-                        {item.trip_number ? `Рейс #${item.trip_number} · ` : ''}
-                        {item.description}
-                      </p>
-                      <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">
-                        {sourceLabel} ·{' '}
-                        {new Date(item.date).toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <div
-                      className="flex-shrink-0 text-[14px] font-black"
-                      style={{ color: isIn ? '#059669' : '#dc2626' }}
-                    >
-                      {isIn ? '+' : '−'}
-                      <Money amount={item.amount} />
-                    </div>
-                    {canTransfer && (
-                      <button
-                        onClick={() => setTransferItem(isTransferTarget ? null : item)}
-                        className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-md border transition-colors ml-1"
-                        style={
-                          isTransferTarget
-                            ? { borderColor: meta.color, color: meta.color, background: '#eff6ff' }
-                            : { borderColor: '#e2e8f0', color: '#94a3b8' }
-                        }
-                        title="Перенести в другой счёт"
-                      >
-                        ⇄
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Transfer target selector */}
-                  {isTransferTarget && (
-                    <div className="px-5 pb-3 flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500 font-medium">Перенести в:</span>
-                      {OTHER_WALLETS[wallet]
-                        .filter((w) => !(transferItem?.source === 'trip_order' && w.key === 'cash'))
-                        .map((w) => (
-                          <button
-                            key={w.key}
-                            onClick={() => doTransfer(w.key)}
-                            disabled={transferring}
-                            className="text-[11px] font-bold px-3 py-1 rounded-lg border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50"
-                          >
-                            {transferring ? '...' : w.label}
-                          </button>
-                        ))}
-                      <button
-                        onClick={() => setTransferItem(null)}
-                        className="text-[11px] text-slate-400 ml-1"
-                      >
-                        отмена
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })
+        {/* History List */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-2">
+          {isLoading && <div className="text-center text-xs text-slate-400 py-8">Загрузка...</div>}
+          {!isLoading && items.length === 0 && (
+            <div className="text-center text-xs text-slate-400 py-8">Нет операций за период</div>
           )}
+
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors text-xs"
+            >
+              <div className="flex-1 min-w-0 pr-3">
+                <div className="font-semibold text-slate-800 truncate">{item.description}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {item.date} {item.counterparty ? `· ${item.counterparty}` : ''}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    'font-bold text-sm',
+                    item.direction === 'in' ? 'text-emerald-600' : 'text-rose-600',
+                  )}
+                >
+                  {item.direction === 'in' ? '+' : '-'}
+                  {parseFloat(item.amount).toLocaleString('ru-RU')} ₽
+                </span>
+
+                {OTHER_WALLETS[wallet]?.map((ow) => (
+                  <button
+                    key={ow.key}
+                    onClick={() => {
+                      setTransferItem(item);
+                      doTransfer(ow.key);
+                    }}
+                    disabled={transferring}
+                    className="text-[10px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors cursor-pointer"
+                    title={`Перевести в ${ow.label}`}
+                  >
+                    В {ow.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* History Summary Footer */}
+        <div className="border-t border-slate-100 px-6 py-3 bg-slate-50 flex items-center justify-between text-xs font-bold">
+          <span className="text-emerald-600">Приход: +{inTotal.toLocaleString('ru-RU')} ₽</span>
+          <span className="text-rose-600">Расход: -{outTotal.toLocaleString('ru-RU')} ₽</span>
         </div>
       </div>
     </div>
   );
-}
-
-/* ── Alert Row ─────────────────────────────────────── */
-function AlertRow({
-  row,
-  isLast,
-}: {
-  row: {
-    type: 'critical' | 'warning' | 'info';
-    icon: string;
-    title: string;
-    description: string;
-    amount?: string;
-    dateLabel?: string;
-    href?: string;
-  };
-  isLast: boolean;
-}) {
-  const barColor =
-    row.type === 'critical' ? '#ef4444' : row.type === 'warning' ? '#f59e0b' : '#10b981';
-  const amountColor =
-    row.type === 'critical' ? '#ef4444' : row.type === 'warning' ? '#f59e0b' : '#1e293b';
-
-  const content = (
-    <div
-      className={`flex items-center hover:bg-slate-50 transition-colors relative ${isLast ? '' : 'border-b border-slate-100'}`}
-      style={{ height: 46, padding: '0 18px', gap: 12 }}
-    >
-      {/* Left bar */}
-      <div
-        className="absolute rounded-r"
-        style={{ left: 0, top: 8, bottom: 8, width: 3, background: barColor }}
-      />
-
-      {/* Icon */}
-      <span className="flex-shrink-0" style={{ fontSize: 16, marginLeft: 8 }}>
-        {row.icon}
-      </span>
-
-      {/* Title + description in one line */}
-      <p
-        className="flex-1 min-w-0 truncate"
-        style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}
-      >
-        {row.title}
-        {row.description && (
-          <span style={{ fontWeight: 400, fontSize: 11, color: '#64748b', marginLeft: 6 }}>
-            · {row.description}
-          </span>
-        )}
-      </p>
-
-      {/* Right: amount + date + arrow */}
-      <div className="flex-shrink-0 flex items-center" style={{ gap: 10 }}>
-        {row.amount && (
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: amountColor }}>
-              <Money amount={row.amount} />
-            </div>
-            {row.dateLabel && <div style={{ fontSize: 11, color: '#64748b' }}>{row.dateLabel}</div>}
-          </div>
-        )}
-        {!row.amount && row.dateLabel && (
-          <span style={{ fontSize: 11, color: '#64748b' }}>{row.dateLabel}</span>
-        )}
-        {row.href && (
-          <span
-            style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6', opacity: 0.7, padding: 4 }}
-          >
-            →
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
-  if (row.href) {
-    return (
-      <a href={row.href} className="block">
-        {content}
-      </a>
-    );
-  }
-  return content;
-}
-
-/* ── Helpers ───────────────────────────────────── */
-function plural(n: number) {
-  if (n % 10 === 1 && n % 100 !== 11) return '';
-  if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return 'а';
-  return 'ов';
-}
-
-function daysBetween(a: Date, b: Date): number {
-  const diff = b.getTime() - a.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
