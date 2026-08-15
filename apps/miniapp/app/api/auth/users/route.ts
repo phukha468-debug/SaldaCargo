@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createAdminClient();
-    
+
     // Маппинг UI-ролей на DB-роли
     const roleMapping: Record<string, string[]> = {
       driver: ['driver'],
@@ -26,6 +27,8 @@ export async function GET(request: Request) {
       .from('users')
       .select('id, name, roles')
       .eq('is_active', true)
+      .not('name', 'ilike', '%STRESS%')
+      .not('name', 'ilike', '%TEST%')
       .order('name');
 
     if (error) {
@@ -35,8 +38,8 @@ export async function GET(request: Request) {
 
     const usersData = (users || []) as any[];
 
-    const filteredUsers = usersData.filter(u => 
-      u.roles && (u.roles as string[]).some((r: string) => targetRoles.includes(r))
+    const filteredUsers = usersData.filter(
+      (u) => u.roles && (u.roles as string[]).some((r: string) => targetRoles.includes(r)),
     );
 
     return NextResponse.json(filteredUsers);

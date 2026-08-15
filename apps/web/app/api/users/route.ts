@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   let query = (supabase.from('users') as any)
     .select('id, name, phone, max_user_id, roles, current_asset_id, is_active, notes, created_at')
+    .not('name', 'ilike', '%STRESS%')
+    .not('name', 'ilike', '%TEST%')
     .order('name');
 
   if (!includeInactive) query = query.eq('is_active', true);

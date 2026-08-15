@@ -9,6 +9,8 @@ export async function GET() {
     .select('id, name, mechanic_salary_pct')
     .filter('roles', 'ov', '{mechanic,mechanic_lead,welder,electrician}')
     .eq('is_active', true)
+    .not('name', 'ilike', '%STRESS%')
+    .not('name', 'ilike', '%TEST%')
     .order('name');
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

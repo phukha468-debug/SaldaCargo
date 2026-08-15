@@ -11,6 +11,8 @@ export async function GET() {
       .select('id, name')
       .filter('roles', 'cs', '{"loader"}')
       .eq('is_active', true)
+      .not('name', 'ilike', '%STRESS%')
+      .not('name', 'ilike', '%TEST%')
       .order('name');
 
     if (error) {
