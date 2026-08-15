@@ -15,6 +15,9 @@ const sumWhere = (rows: any[], key: string, val: string) =>
     .filter((r: any) => r[key] === val)
     .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
+/**
+ * GET /api/finance/reconcile — Полная финансовая ревизия активов, пассивов и капитала
+ */
 export async function GET() {
   try {
     const supabase = createAdminClient();
@@ -25,6 +28,9 @@ export async function GET() {
       { data: collections },
       { data: txIn },
       { data: txOut },
+      { data: loans },
+      { data: receivables },
+      { data: supplierDebts },
     ] = await Promise.all([
       (supabase.from('trip_orders') as any)
         .select('amount')
@@ -51,6 +57,16 @@ export async function GET() {
         .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
+
+      (supabase.from('loans') as any).select('remaining_amount').eq('is_active', true),
+
+      (supabase.from('trip_orders') as any)
+        .select('amount')
+        .eq('payment_method', 'bank_invoice')
+        .eq('settlement_status', 'pending')
+        .eq('lifecycle_status', 'approved'),
+
+      (supabase.from('supplier_debts') as any).select('amount'),
     ]);
 
     const collectionsTotal = sum(collections ?? []);
@@ -74,11 +90,33 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
 
+    const totalLiquid = bankBalance + cashBalance + cardBalance + fuelBalance;
+
+    const loansTotal = (loans ?? []).reduce(
+      (s: number, l: any) => s + parseFloat(l.remaining_amount ?? '0'),
+      0,
+    );
+    const receivablesTotal = sum(receivables ?? []);
+    const supplierDebtsTotal = sum(supplierDebts ?? []);
+
+    const totalLiabilities = loansTotal + supplierDebtsTotal;
+    const netWorth = totalLiquid + receivablesTotal - totalLiabilities;
+
     return NextResponse.json({
-      bank: { name: 'Расчётный счёт', balance: bankBalance.toFixed(2) },
-      cash: { name: 'Сейф (Наличные)', balance: cashBalance.toFixed(2) },
-      card: { name: 'Карта', balance: cardBalance.toFixed(2) },
-      fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
+      liquid_assets: {
+        bank: bankBalance.toFixed(2),
+        cash: cashBalance.toFixed(2),
+        card: cardBalance.toFixed(2),
+        fuel_card: fuelBalance.toFixed(2),
+        total: totalLiquid.toFixed(2),
+      },
+      receivables: receivablesTotal.toFixed(2),
+      liabilities: {
+        loans: loansTotal.toFixed(2),
+        suppliers: supplierDebtsTotal.toFixed(2),
+        total: totalLiabilities.toFixed(2),
+      },
+      net_worth: netWorth.toFixed(2),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

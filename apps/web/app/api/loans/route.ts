@@ -42,7 +42,25 @@ export async function POST(request: Request) {
       })
       .select()
       .single();
+
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // If to_wallet_id is specified, create an income transaction depositing funds to wallet
+    if (body.to_wallet_id) {
+      const LOAN_CATEGORY = '00000000-0000-0000-0000-000000000020';
+      await (supabase.from('transactions') as any).insert({
+        direction: 'income',
+        amount: parseFloat(body.original_amount).toFixed(2),
+        to_wallet_id: body.to_wallet_id,
+        from_wallet_id: null,
+        lifecycle_status: 'approved',
+        settlement_status: 'completed',
+        category_id: LOAN_CATEGORY,
+        description: `Поступление кредита: ${body.lender_name.trim()} (${parseFloat(body.original_amount).toLocaleString('ru-RU')} ₽)`,
+        idempotency_key: crypto.randomUUID(),
+      });
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

@@ -2965,6 +2965,7 @@ function LoansPanel() {
     started_at: '',
     next_payment_date: '',
     notes: '',
+    to_wallet_id: '10000000-0000-0000-0000-000000000001', // Р/С (Банк) default
   });
   const queryClient = useQueryClient();
 
@@ -3077,6 +3078,7 @@ function LoansPanel() {
         started_at: '',
         next_payment_date: '',
         notes: '',
+        to_wallet_id: '10000000-0000-0000-0000-000000000001',
       });
       await queryClient.invalidateQueries({ queryKey: ['loans-all'] });
     } catch (e: unknown) {
@@ -3178,6 +3180,32 @@ function LoansPanel() {
                     boxSizing: 'border-box',
                   }}
                 />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8' }}>Зачислить на кошелёк</label>
+                <select
+                  value={addForm.to_wallet_id}
+                  onChange={(e) => setAddForm({ ...addForm, to_wallet_id: e.target.value })}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #334155',
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="10000000-0000-0000-0000-000000000001">Р/С (Банк)</option>
+                  <option value="10000000-0000-0000-0000-000000000002">Сейф (Наличные)</option>
+                  <option value="10000000-0000-0000-0000-000000000003">Карта</option>
+                  <option value="10000000-0000-0000-0000-000000000004">
+                    Топливная карта (ГСМ)
+                  </option>
+                  <option value="">Без зачисления на кошелёк</option>
+                </select>
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#94a3b8' }}>Остаток долга (₽)</label>
