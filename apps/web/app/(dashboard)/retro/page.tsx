@@ -203,8 +203,10 @@ export default function RetroPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
+          loader_id: data.loader_id || null,
           orders: data.orders.map((o) => ({
             ...o,
+            counterparty_id: o.counterparty_id || null,
             amount: String(o.amount),
             driver_pay: String(o.driver_pay),
             loader_pay: String(o.loader_pay || 0),

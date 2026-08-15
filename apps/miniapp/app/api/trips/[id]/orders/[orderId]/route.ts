@@ -44,14 +44,14 @@ export async function PATCH(
 
     const { error } = await (supabase.from('trip_orders') as any)
       .update({
-        counterparty_id: body.counterparty_id ?? null,
-        description: body.description ?? null,
+        counterparty_id: body.counterparty_id || null,
+        description: body.description || null,
         amount: body.amount,
         driver_pay: body.driver_pay,
-        loader_id: body.loader_id ?? null,
-        loader_pay: body.loader_pay ?? '0',
-        loader2_id: body.loader2_id ?? null,
-        loader2_pay: body.loader2_pay ?? '0',
+        loader_id: body.loader_id || null,
+        loader_pay: body.loader_pay || '0',
+        loader2_id: body.loader2_id || null,
+        loader2_pay: body.loader2_pay || '0',
         payment_method: body.payment_method,
         settlement_status: settlementStatus,
       })

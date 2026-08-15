@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     .insert({
       driver_id: body.driver_id,
       asset_id: body.asset_id,
-      loader_id: body.loader_id ?? null,
+      loader_id: body.loader_id || null,
       trip_type: body.trip_type,
       odometer_start: body.odometer_start,
       odometer_end: body.odometer_end,
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       ended_at: body.ended_at,
       status: 'completed',
       lifecycle_status: 'draft', // сразу на ревью
-      driver_note: body.driver_note ?? null,
+      driver_note: body.driver_note || null,
     })
     .select()
     .single();
@@ -128,15 +128,16 @@ export async function POST(request: Request) {
       trip_id: trip.id,
       amount: o.amount,
       driver_pay: o.driver_pay,
-      loader_pay: o.loader_pay ?? '0',
-      loader2_pay: o.loader2_pay ?? '0',
+      loader_pay: o.loader_pay || '0',
+      loader2_pay: o.loader2_pay || '0',
+      loader_id: body.loader_id || null,
       payment_method: o.payment_method,
       counterparty_id: o.counterparty_id || null,
       settlement_status: ['debt_cash', 'qr', 'card_driver'].includes(o.payment_method)
         ? 'pending'
         : 'completed',
       lifecycle_status: 'draft',
-      description: o.description ?? null,
+      description: o.description || null,
       idempotency_key: crypto.randomUUID(),
     }));
 
@@ -156,7 +157,8 @@ export async function POST(request: Request) {
       idempotency_key: crypto.randomUUID(),
     }));
 
-    await supabase.from('trip_expenses').insert(expensesToInsert);
+    const { error: expensesError } = await supabase.from('trip_expenses').insert(expensesToInsert);
+    if (expensesError) return NextResponse.json({ error: expensesError.message }, { status: 500 });
   }
 
   // Обновляем текущий одометр машины если он больше
