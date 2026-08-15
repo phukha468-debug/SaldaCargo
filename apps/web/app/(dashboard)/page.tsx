@@ -106,28 +106,32 @@ export default function DashboardHome() {
   const { data: saldoAnalytics } = useQuery<AnalyticsResponse>({
     queryKey: ['dashboard-analytics', saldoPeriod],
     queryFn: () => fetch(`/api/dashboard/analytics?period=${saldoPeriod}`).then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 5000,
+    refetchInterval: 30000,
   });
 
   // 4. Analytics for Income Period
   const { data: incAnalytics } = useQuery<AnalyticsResponse>({
     queryKey: ['dashboard-analytics', incPeriod],
     queryFn: () => fetch(`/api/dashboard/analytics?period=${incPeriod}`).then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 5000,
+    refetchInterval: 30000,
   });
 
   // 5. Analytics for Expense Period
   const { data: expAnalytics } = useQuery<AnalyticsResponse>({
     queryKey: ['dashboard-analytics', expPeriod],
     queryFn: () => fetch(`/api/dashboard/analytics?period=${expPeriod}`).then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 5000,
+    refetchInterval: 30000,
   });
 
   // 6. Analytics for Review Stats Period
   const { data: revAnalytics } = useQuery<AnalyticsResponse>({
     queryKey: ['dashboard-analytics', revPeriod],
     queryFn: () => fetch(`/api/dashboard/analytics?period=${revPeriod}`).then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 5000,
+    refetchInterval: 30000,
   });
 
   // Liquid Balances
