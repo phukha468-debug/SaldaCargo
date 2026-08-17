@@ -167,7 +167,7 @@ export async function POST(request: Request) {
         assigned_mechanic_id: body.assigned_mechanic_id || null,
         priority: body.priority ?? 'normal',
         admin_note: body.admin_note?.trim() || null,
-        status: 'created',
+        status: 'in_progress',
         lifecycle_status: 'draft',
         created_by: adminUsers?.id ?? null,
       })

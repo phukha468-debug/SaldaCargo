@@ -41,11 +41,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       // Обновляем наряд
       const updateFields: Record<string, any> = {};
-      if (orderData.problem_description) updateFields.problem_description = orderData.problem_description;
+      if (orderData.problem_description)
+        updateFields.problem_description = orderData.problem_description;
       if (orderData.priority && ['low', 'normal', 'urgent'].includes(orderData.priority)) {
         updateFields.priority = orderData.priority;
       }
-      if (orderData.mechanic_note !== undefined) updateFields.mechanic_note = orderData.mechanic_note;
+      if (orderData.mechanic_note !== undefined)
+        updateFields.mechanic_note = orderData.mechanic_note;
 
       if (Object.keys(updateFields).length > 0) {
         await (supabase.from('service_orders') as any)
@@ -60,7 +62,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           .eq('service_order_id', req.service_order_id);
 
         const existingNames = new Set(
-          ((existingWorks as any[]) ?? []).map((w: any) => w.custom_work_name?.trim().toLowerCase()),
+          ((existingWorks as any[]) ?? []).map((w: any) =>
+            w.custom_work_name?.trim().toLowerCase(),
+          ),
         );
 
         const newWorks = works
@@ -163,7 +167,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         mechanic_note: sjOrder?.mechanic_note ?? null,
         assigned_mechanic_id: mechanic_id ?? null,
         second_mechanic_id: second_mechanic_id ?? null,
-        status: 'created',
+        status: 'in_progress',
         lifecycle_status: 'draft',
         priority: ['low', 'normal', 'urgent'].includes(sjOrder?.priority ?? '')
           ? sjOrder.priority

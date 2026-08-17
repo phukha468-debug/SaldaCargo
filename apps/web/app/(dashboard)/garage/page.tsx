@@ -278,14 +278,12 @@ type ReportTab = 'vehicles' | 'mechanics';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = {
-  created: 'В очереди',
   in_progress: 'В работе',
   completed: 'Завершён',
   cancelled: 'Отменён',
 };
 const STATUS_COLOR: Record<string, string> = {
-  created: 'bg-slate-100 text-slate-600',
-  in_progress: 'bg-amber-100 text-amber-700',
+  in_progress: 'bg-blue-100 text-blue-700',
   completed: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-red-100 text-red-500',
 };
@@ -5520,9 +5518,9 @@ function WorkOrdersSection() {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
   const [filterMechanic, setFilterMechanic] = useState('');
-  const [filterStatus, setFilterStatus] = useState<
-    'all' | 'created' | 'in_progress' | 'completed' | 'review'
-  >('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'in_progress' | 'completed' | 'review'>(
+    'all',
+  );
   const [groupByVehicle, setGroupByVehicle] = useState(false);
   const qc = useQueryClient();
 
@@ -5779,6 +5777,8 @@ function WorkOrdersSection() {
     if (filterStatus !== 'all') {
       if (filterStatus === 'review') {
         result = result.filter((o) => o.lifecycle_status === 'draft' && o.status === 'completed');
+      } else if (filterStatus === 'in_progress') {
+        result = result.filter((o) => o.status === 'in_progress' || o.status === 'created');
       } else {
         result = result.filter((o) => o.status === filterStatus);
       }
@@ -5863,11 +5863,9 @@ function WorkOrdersSection() {
           ? { label: 'Ждёт оплаты', cls: 'bg-orange-100 text-orange-700' }
           : isReview
             ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
-            : o.status === 'in_progress'
-              ? { label: 'В работе', cls: 'bg-blue-100 text-blue-700' }
-              : o.status === 'completed'
-                ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
-                : { label: 'В очереди', cls: 'bg-slate-100 text-slate-500' };
+            : o.status === 'completed'
+              ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
+              : { label: 'В работе', cls: 'bg-blue-100 text-blue-700' };
 
     return (
       <div
@@ -6273,7 +6271,6 @@ function WorkOrdersSection() {
             className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
           >
             <option value="all">Все статусы</option>
-            <option value="created">В очереди</option>
             <option value="in_progress">В работе</option>
             <option value="review">На проверке</option>
             <option value="completed">Завершён</option>

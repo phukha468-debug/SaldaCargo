@@ -107,7 +107,7 @@ export async function POST(request: Request) {
         priority: ['low', 'normal', 'urgent'].includes(body.order.priority ?? '')
           ? body.order.priority
           : 'normal',
-        status: 'created',
+        status: 'in_progress',
         lifecycle_status: 'draft',
         ai_generated_text: body.ai_generated_text || null,
         created_by: adminUser?.id ?? null,
