@@ -6655,8 +6655,8 @@ function WorkOrdersSection() {
         </div>
       )}
 
-      {/* ── List (скрыт на вкладке Заявки) ── */}
-      {activeTab !== 'requests' &&
+      {/* ── List (только для вкладок В работе и Ждёт оплаты) ── */}
+      {(activeTab === 'active' || activeTab === 'pending_payment') &&
         (isLoading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4].map((i) => (
