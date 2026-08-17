@@ -14,16 +14,17 @@ export async function GET(request: Request) {
     const fullSelect = `
       id, order_number, machine_type, status, lifecycle_status, priority, payment_received,
       problem_description, mechanic_note, admin_note, created_at, updated_at,
-      asset:assets(id, short_name, reg_number),
+      mechanic_pay, second_mechanic_pay, odometer_start, odometer_end,
+      asset:assets(id, short_name, reg_number, odometer_current),
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, status, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
+        id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
-        id, quantity, unit_price,
+        id, custom_part_name, quantity, unit_price, unit,
         part:parts(name, unit)
       )
     `;

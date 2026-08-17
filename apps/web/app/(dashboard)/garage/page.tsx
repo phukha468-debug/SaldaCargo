@@ -3228,8 +3228,13 @@ type TabOrder = Omit<OrderRow, 'works'> & {
   payment_received?: boolean;
   mechanic_note?: string | null;
   admin_note?: string | null;
+  mechanic_pay?: string | number | null;
+  second_mechanic_pay?: string | number | null;
+  odometer_start?: number | null;
+  odometer_end?: number | null;
   client_vehicle_model?: string | null;
   client_name?: string | null;
+  client_phone?: string | null;
   works: Array<{
     id: string;
     status: string;
@@ -3242,9 +3247,11 @@ type TabOrder = Omit<OrderRow, 'works'> & {
   }>;
   parts?: Array<{
     id: string;
+    custom_part_name?: string | null;
     quantity: number;
     unit_price?: string | null;
-    part: { name: string; unit: string };
+    unit?: string | null;
+    part?: { name: string; unit: string } | null;
   }>;
 };
 
@@ -4505,6 +4512,992 @@ function AiImportModal({
   );
 }
 
+// ─── Archive Analytics & Review-Style Flow ───────────────────────────────────
+
+function getArchiveWeekDates(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dow = d.getDay();
+  const monOffset = dow === 0 ? -6 : 1 - dow;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + monOffset);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
+}
+
+function calcOrderCosts(o: TabOrder) {
+  const works = o.works ?? [];
+  const parts = o.parts ?? [];
+
+  const partsCost = parts.reduce((s, p) => {
+    const q = p.quantity || 1;
+    const price = parseFloat(p.unit_price ?? '0') || 0;
+    return s + q * price;
+  }, 0);
+
+  const directSalary =
+    (parseFloat(String(o.mechanic_pay ?? '0')) || 0) +
+    (parseFloat(String(o.second_mechanic_pay ?? '0')) || 0);
+  const worksPriceSum = works.reduce((s, w) => s + (parseFloat(w.price_client ?? '0') || 0), 0);
+  const laborSalaryCost = directSalary > 0 ? directSalary : worksPriceSum;
+
+  const totalCost = partsCost + laborSalaryCost;
+
+  return {
+    partsCost,
+    laborSalaryCost,
+    worksPriceSum,
+    totalCost,
+  };
+}
+
+interface VehicleStatGroup {
+  key: string;
+  isOwn: boolean;
+  assetId?: string;
+  name: string;
+  regNumber: string;
+  odometerCurrent?: number | null;
+  clientName?: string | null;
+  clientPhone?: string | null;
+  orders: TabOrder[];
+  repairsCount: number;
+  totalPartsCost: number;
+  totalLaborSalaryCost: number;
+  totalExpenses: number;
+  lastRepairDate: string;
+  mechanicNames: string[];
+}
+
+function GarageArchiveSection({
+  orders,
+  isLoading,
+  mechanics,
+  onSelectOrder,
+  period,
+  setPeriod,
+  date,
+  setDate,
+  month,
+  setMonth,
+}: {
+  orders: TabOrder[];
+  isLoading: boolean;
+  mechanics: Mechanic[];
+  onSelectOrder: (id: string) => void;
+  period: 'day' | 'week' | 'month' | 'all';
+  setPeriod: (p: 'day' | 'week' | 'month' | 'all') => void;
+  date: string;
+  setDate: (d: string) => void;
+  month: string;
+  setMonth: (m: string) => void;
+}) {
+  const today = todayStr();
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
+  const [filterMechanic, setFilterMechanic] = useState('');
+  const [sortBy, setSortBy] = useState<'cost_desc' | 'cost_asc' | 'repairs_desc' | 'name'>(
+    'cost_desc',
+  );
+  const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (key: string) => {
+    setExpandedVehicles((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedVehicles(new Set(vehicleGroups.map((g) => g.key)));
+  };
+
+  const collapseAll = () => {
+    setExpandedVehicles(new Set());
+  };
+
+  // ── Date Navigation Shift Helper ──
+  const shiftDate = (amount: number) => {
+    if (period === 'day') {
+      const d = new Date(date + 'T12:00:00');
+      d.setDate(d.getDate() + amount);
+      const s = d.toISOString().slice(0, 10);
+      if (s <= today) setDate(s);
+      else setDate(today);
+    } else if (period === 'week') {
+      const d = new Date(date + 'T12:00:00');
+      d.setDate(d.getDate() + amount * 7);
+      const s = d.toISOString().slice(0, 10);
+      if (s <= today) setDate(s);
+      else setDate(today);
+    } else if (period === 'month') {
+      const parts = month.split('-').map(Number);
+      const y = parts[0] || new Date().getFullYear();
+      const m = parts[1] || new Date().getMonth() + 1;
+      const d = new Date(y, m - 1 + amount, 1);
+      const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const curM = today.slice(0, 7);
+      if (s <= curM) setMonth(s);
+      else setMonth(curM);
+    }
+  };
+
+  // Quick Month Buttons
+  const monthButtons = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (5 - i));
+    return {
+      label: d.toLocaleDateString('ru-RU', { month: 'short' }),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+    };
+  });
+
+  // Filter orders by period & search & mechanic
+  const filteredOrders = useMemo(() => {
+    let result = orders;
+
+    // Period filter
+    if (period === 'day') {
+      result = result.filter((o) => o.created_at?.startsWith(date));
+    } else if (period === 'week') {
+      const { weekStart, weekEnd } = getArchiveWeekDates(date);
+      result = result.filter((o) => {
+        const d = o.created_at?.slice(0, 10);
+        return d && d >= weekStart && d <= weekEnd;
+      });
+    } else if (period === 'month') {
+      result = result.filter((o) => o.created_at?.startsWith(month));
+    }
+
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((o) => {
+        const orderNum = String(o.order_number);
+        const shortName = o.asset?.short_name?.toLowerCase() ?? '';
+        const regNum = o.asset?.reg_number?.toLowerCase() ?? '';
+        const clientBrand = o.client_vehicle_brand?.toLowerCase() ?? '';
+        const clientModel =
+          (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model?.toLowerCase() ??
+          '';
+        const clientReg = o.client_vehicle_reg?.toLowerCase() ?? '';
+        const clientName = (o.client_name as string | null)?.toLowerCase() ?? '';
+        const desc = o.problem_description?.toLowerCase() ?? '';
+        const mechanicName = o.mechanic?.name?.toLowerCase() ?? '';
+        const worksMatch = (o.works ?? []).some((w) =>
+          (w.work_catalog?.name ?? w.custom_work_name ?? '').toLowerCase().includes(q),
+        );
+        const partsMatch = (o.parts ?? []).some((p) =>
+          (p.custom_part_name ?? p.part?.name ?? '').toLowerCase().includes(q),
+        );
+
+        return (
+          orderNum.includes(q) ||
+          shortName.includes(q) ||
+          regNum.includes(q) ||
+          clientBrand.includes(q) ||
+          clientModel.includes(q) ||
+          clientReg.includes(q) ||
+          clientName.includes(q) ||
+          desc.includes(q) ||
+          mechanicName.includes(q) ||
+          worksMatch ||
+          partsMatch
+        );
+      });
+    }
+
+    // Type filter
+    if (filterType !== 'all') {
+      result = result.filter((o) => o.machine_type === filterType);
+    }
+
+    // Mechanic filter
+    if (filterMechanic) {
+      result = result.filter((o) => o.mechanic?.id === filterMechanic);
+    }
+
+    return result;
+  }, [orders, period, date, month, search, filterType, filterMechanic]);
+
+  // Group by vehicle
+  const vehicleGroups = useMemo(() => {
+    const map = new Map<string, VehicleStatGroup>();
+
+    for (const o of filteredOrders) {
+      const isOwn = o.machine_type === 'own';
+      const key = isOwn
+        ? (o.asset?.id ?? 'own_unknown')
+        : `cl_${o.client_vehicle_reg || o.client_name || o.id}`;
+
+      if (!map.has(key)) {
+        const name = isOwn
+          ? (o.asset?.short_name ?? 'Свой автомобиль')
+          : [
+              o.client_vehicle_brand,
+              (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
+            ]
+              .filter(Boolean)
+              .join(' ') || 'Клиентский автомобиль';
+        const regNumber = isOwn ? (o.asset?.reg_number ?? '—') : (o.client_vehicle_reg ?? '—');
+        const odometerCurrent = isOwn ? o.asset?.odometer_current : null;
+
+        map.set(key, {
+          key,
+          isOwn,
+          assetId: o.asset?.id,
+          name,
+          regNumber,
+          odometerCurrent,
+          clientName: isOwn ? null : (o.client_name as string | null),
+          clientPhone: isOwn ? null : (o.client_phone as string | null),
+          orders: [],
+          repairsCount: 0,
+          totalPartsCost: 0,
+          totalLaborSalaryCost: 0,
+          totalExpenses: 0,
+          lastRepairDate: o.created_at,
+          mechanicNames: [],
+        });
+      }
+
+      const grp = map.get(key)!;
+      grp.orders.push(o);
+      grp.repairsCount++;
+
+      const { partsCost, laborSalaryCost, totalCost } = calcOrderCosts(o);
+      grp.totalPartsCost += partsCost;
+      grp.totalLaborSalaryCost += laborSalaryCost;
+      grp.totalExpenses += totalCost;
+
+      if (new Date(o.created_at) > new Date(grp.lastRepairDate)) {
+        grp.lastRepairDate = o.created_at;
+      }
+
+      if (o.mechanic?.name && !grp.mechanicNames.includes(o.mechanic.name)) {
+        grp.mechanicNames.push(o.mechanic.name);
+      }
+    }
+
+    const list = Array.from(map.values());
+
+    // Sorting
+    list.sort((a, b) => {
+      if (sortBy === 'cost_desc') return b.totalExpenses - a.totalExpenses;
+      if (sortBy === 'cost_asc') return a.totalExpenses - b.totalExpenses;
+      if (sortBy === 'repairs_desc') return b.repairsCount - a.repairsCount;
+      if (sortBy === 'name') return a.name.localeCompare(b.name, 'ru');
+      return 0;
+    });
+
+    return list;
+  }, [filteredOrders, sortBy]);
+
+  // Summary Fleet Metrics for Selected Period
+  const ownGroups = useMemo(() => vehicleGroups.filter((g) => g.isOwn), [vehicleGroups]);
+  const clientGroups = useMemo(() => vehicleGroups.filter((g) => !g.isOwn), [vehicleGroups]);
+
+  const summary = useMemo(() => {
+    // If user filtered only client, summarize client, otherwise summarize own fleet
+    const targetGroups =
+      filterType === 'client' ? clientGroups : filterType === 'own' ? ownGroups : vehicleGroups;
+    const totalOrders = targetGroups.reduce((s, g) => s + g.repairsCount, 0);
+    const totalVehicles = targetGroups.length;
+    const partsCost = targetGroups.reduce((s, g) => s + g.totalPartsCost, 0);
+    const salaryCost = targetGroups.reduce((s, g) => s + g.totalLaborSalaryCost, 0);
+    const totalExpenses = partsCost + salaryCost;
+    const partsPct = totalExpenses > 0 ? Math.round((partsCost / totalExpenses) * 100) : 0;
+    const salaryPct = totalExpenses > 0 ? Math.round((salaryCost / totalExpenses) * 100) : 0;
+
+    return {
+      totalOrders,
+      totalVehicles,
+      partsCost,
+      salaryCost,
+      totalExpenses,
+      partsPct,
+      salaryPct,
+    };
+  }, [vehicleGroups, ownGroups, clientGroups, filterType]);
+
+  const isToday =
+    period === 'day' ? date === today : period === 'month' ? month === today.slice(0, 7) : false;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      {/* ── Review-Style Date Navigation Header ── */}
+      <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col border border-slate-700">
+        {/* Period Switcher Row */}
+        <div className="flex border-b border-slate-700 bg-slate-800/50 p-2">
+          <div className="flex bg-slate-700 p-1 rounded-lg mx-auto w-full max-w-lg text-xs font-bold uppercase tracking-wider">
+            <button
+              onClick={() => setPeriod('day')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md transition-colors',
+                period === 'day'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              День
+            </button>
+            <button
+              onClick={() => setPeriod('week')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md transition-colors',
+                period === 'week'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              Неделя
+            </button>
+            <button
+              onClick={() => setPeriod('month')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md transition-colors',
+                period === 'month'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              Месяц
+            </button>
+            <button
+              onClick={() => setPeriod('all')}
+              className={cn(
+                'flex-1 py-1.5 rounded-md transition-colors',
+                period === 'all'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              За всё время
+            </button>
+          </div>
+        </div>
+
+        {/* Main Date Display & Shift Arrows */}
+        <div className="flex items-stretch h-14">
+          <button
+            onClick={() => shiftDate(-1)}
+            disabled={period === 'all'}
+            className="flex items-center justify-center w-28 sm:w-36 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
+            aria-label="Назад"
+          >
+            <span className="text-2xl font-black group-hover:-translate-x-1 transition-transform select-none">
+              ←
+            </span>
+          </button>
+
+          <label className="flex-1 flex items-center justify-center gap-2.5 px-4 cursor-pointer">
+            <span className="material-symbols-outlined text-sky-400 text-[22px]">
+              calendar_today
+            </span>
+            <span className="text-base sm:text-lg font-black text-white whitespace-nowrap">
+              {period === 'day' &&
+                new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              {period === 'week' &&
+                (() => {
+                  const { weekStart, weekEnd } = getArchiveWeekDates(date);
+                  const ws = new Date(weekStart + 'T12:00:00');
+                  const we = new Date(weekEnd + 'T12:00:00');
+                  return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' })}`;
+                })()}
+              {period === 'month' &&
+                new Date(month + '-01T12:00:00').toLocaleDateString('ru-RU', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              {period === 'all' && 'Вся история ремонтов автопарка'}
+            </span>
+
+            {period === 'day' && (
+              <span className="text-xs font-medium text-slate-400 whitespace-nowrap hidden md:inline">
+                {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', { weekday: 'long' })}
+              </span>
+            )}
+
+            {!isToday && period !== 'all' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDate(today);
+                  setMonth(today.slice(0, 7));
+                }}
+                className="text-[10px] font-bold text-sky-300 bg-sky-500/20 border border-sky-500/40 hover:bg-sky-500 hover:text-white transition-colors px-2 py-0.5 rounded-full whitespace-nowrap"
+              >
+                → сегодня
+              </button>
+            )}
+          </label>
+
+          <button
+            onClick={() => shiftDate(1)}
+            disabled={period === 'all' || isToday}
+            className="flex items-center justify-center w-28 sm:w-36 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-l border-sky-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
+            aria-label="Вперёд"
+          >
+            <span className="text-2xl font-black group-hover:translate-x-1 transition-transform select-none">
+              →
+            </span>
+          </button>
+        </div>
+
+        {/* Quick Month Bar */}
+        {period !== 'all' && (
+          <div className="flex border-t border-slate-700 overflow-x-auto">
+            {monthButtons.map((m) => {
+              const active = period === 'month' && month === m.key;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => {
+                    setMonth(m.key);
+                    setPeriod('month');
+                  }}
+                  className={cn(
+                    'flex-1 py-2 px-2.5 min-w-[70px] text-[11px] font-bold uppercase tracking-wider transition-all border-r border-slate-700 last:border-r-0 whitespace-nowrap',
+                    active
+                      ? 'bg-sky-500 text-white'
+                      : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200',
+                  )}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Summary 4 KPI Cards (Total Fleet Maintenance) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Ремонты */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              Всего ремонтов
+            </span>
+            <div className="text-2xl font-black text-slate-900 mt-1">
+              {summary.totalOrders} наряд
+              {summary.totalOrders === 1
+                ? ''
+                : summary.totalOrders >= 2 && summary.totalOrders <= 4
+                  ? 'а'
+                  : 'ов'}
+            </div>
+            <span className="text-[11px] text-sky-600 font-bold">
+              по {summary.totalVehicles} автомобил{summary.totalVehicles === 1 ? 'ю' : 'ям'}
+            </span>
+          </div>
+          <div className="w-11 h-11 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center font-black shrink-0">
+            <span className="material-symbols-outlined text-[24px]">car_repair</span>
+          </div>
+        </div>
+
+        {/* 2. Запчасти */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              Потрачено на запчасти
+            </span>
+            <div className="text-2xl font-black text-rose-600 mt-1">
+              <Money amount={summary.partsCost.toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-rose-500 font-bold">
+              {summary.partsPct}% бюджета ТО
+            </span>
+          </div>
+          <div className="w-11 h-11 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center font-black shrink-0">
+            <span className="material-symbols-outlined text-[24px]">construction</span>
+          </div>
+        </div>
+
+        {/* 3. Зарплата водителя / слесаря */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              ЗП водителя / слесаря
+            </span>
+            <div className="text-2xl font-black text-amber-600 mt-1">
+              <Money amount={summary.salaryCost.toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-amber-600 font-bold">
+              {summary.salaryPct}% бюджета ТО
+            </span>
+          </div>
+          <div className="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center font-black shrink-0">
+            <span className="material-symbols-outlined text-[24px]">badge</span>
+          </div>
+        </div>
+
+        {/* 4. Итоговый бюджет ТО */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 shadow-md flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+              Итоговые расходы
+            </span>
+            <div className="text-2xl font-black text-emerald-400 mt-1">
+              <Money amount={summary.totalExpenses.toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-emerald-300 font-bold">Запчасти + ЗП/Работы</span>
+          </div>
+          <div className="w-11 h-11 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center font-black shrink-0">
+            <span className="material-symbols-outlined text-[24px]">payments</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filter & Search Control Bar ── */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[240px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+            search
+          </span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по госномеру, авто, детали, неисправности, слесарю..."
+            className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm font-bold"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Type Toggle: All / Own / Client */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0">
+          {(
+            [
+              ['all', 'Все'],
+              ['own', 'Свои'],
+              ['client', 'Клиент'],
+            ] as const
+          ).map(([v, l]) => (
+            <button
+              key={v}
+              onClick={() => setFilterType(v)}
+              className={cn(
+                'px-3 py-1.5 rounded-lg transition-colors',
+                filterType === v
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800',
+              )}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Mechanic Selector */}
+        <select
+          value={filterMechanic}
+          onChange={(e) => setFilterMechanic(e.target.value)}
+          className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0 text-slate-700"
+        >
+          <option value="">Все механики</option>
+          {mechanics.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Sorting Dropdown */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs font-semibold text-slate-400">Сортировка:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            <option value="cost_desc">По сумме расходов (убыв)</option>
+            <option value="cost_asc">По сумме расходов (возр)</option>
+            <option value="repairs_desc">По кол-ву ремонтов</option>
+            <option value="name">По названию машины</option>
+          </select>
+        </div>
+
+        {/* Expand / Collapse All */}
+        {vehicleGroups.length > 0 && (
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={expandAll}
+              className="text-[11px] font-bold text-slate-500 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+            >
+              Развернуть все
+            </button>
+            <span className="text-slate-300">·</span>
+            <button
+              onClick={collapseAll}
+              className="text-[11px] font-bold text-slate-500 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+            >
+              Свернуть
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Vehicle Cards List (Option 1: Review Flow) ── */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      ) : vehicleGroups.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-xs">
+          <p className="text-5xl mb-3">📋</p>
+          <p className="font-bold text-slate-700 text-base">
+            Нет завершённых заказ-нарядов за выбранный период
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            Попробуйте изменить период на «Месяц» или «За всё время»
+          </p>
+          {(search || filterType !== 'all' || filterMechanic) && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setFilterType('all');
+                setFilterMechanic('');
+              }}
+              className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+            >
+              Сбросить фильтры поиска
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {vehicleGroups.map((vg) => {
+            const isExpanded = expandedVehicles.has(vg.key);
+            const accentBorder =
+              vg.totalExpenses > 50000
+                ? 'border-l-sky-500'
+                : vg.totalExpenses > 20000
+                  ? 'border-l-emerald-500'
+                  : 'border-l-amber-500';
+
+            return (
+              <div
+                key={vg.key}
+                className={cn(
+                  'bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all duration-200 border-l-4 hover:shadow-md',
+                  accentBorder,
+                )}
+              >
+                {/* ── Collapsed / Summary Row in Review Style ── */}
+                <div
+                  onClick={() => toggleExpand(vg.key)}
+                  className="p-4 cursor-pointer hover:bg-slate-50/60 transition-colors select-none flex flex-wrap items-center justify-between gap-4"
+                >
+                  {/* Left: Vehicle Identity */}
+                  <div className="flex items-center gap-3 min-w-[260px] flex-1">
+                    <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-black shrink-0">
+                      <span className="material-symbols-outlined text-[26px]">
+                        {vg.name.toLowerCase().includes('самосвал')
+                          ? 'dump_truck'
+                          : 'local_shipping'}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-base font-black text-slate-900 truncate">
+                          {vg.name}
+                        </span>
+                        {vg.regNumber && vg.regNumber !== '—' && (
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-xs rounded border border-slate-200">
+                            {vg.regNumber}
+                          </span>
+                        )}
+                        {vg.odometerCurrent ? (
+                          <span className="px-2 py-0.5 bg-sky-50 text-sky-700 font-bold text-[10px] rounded-full border border-sky-200">
+                            {vg.odometerCurrent.toLocaleString('ru-RU')} км
+                          </span>
+                        ) : null}
+                        {!vg.isOwn && (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded border border-amber-200">
+                            Клиент: {vg.clientName || '—'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-2.5 flex-wrap">
+                        <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded font-black text-[11px]">
+                          {vg.repairsCount} ремонт
+                          {vg.repairsCount === 1
+                            ? ''
+                            : vg.repairsCount >= 2 && vg.repairsCount <= 4
+                              ? 'а'
+                              : 'ов'}
+                        </span>
+                        <span>·</span>
+                        <span className="text-slate-400">
+                          Посл. заезд:{' '}
+                          {new Date(vg.lastRepairDate).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        {vg.mechanicNames.length > 0 && (
+                          <>
+                            <span>·</span>
+                            <span className="text-slate-500">
+                              Слесари: {vg.mechanicNames.join(', ')}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Review-Style Cost Formula [Запчасти + ЗП = Итого] */}
+                  <div className="flex items-center gap-2 sm:gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/80">
+                    {/* Запчасти */}
+                    <div className="text-center min-w-[90px]">
+                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                        Запчасти
+                      </span>
+                      <span className="text-sm font-black text-rose-600">
+                        <Money amount={vg.totalPartsCost.toFixed(2)} />
+                      </span>
+                    </div>
+
+                    <span className="text-slate-300 font-bold text-sm">+</span>
+
+                    {/* ЗП водителя / слесаря */}
+                    <div className="text-center min-w-[100px]">
+                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                        ЗП / Работы
+                      </span>
+                      <span className="text-sm font-black text-amber-600">
+                        <Money amount={vg.totalLaborSalaryCost.toFixed(2)} />
+                      </span>
+                    </div>
+
+                    <span className="text-slate-300 font-bold text-sm">=</span>
+
+                    {/* Итого */}
+                    <div className="text-center min-w-[100px] pl-1">
+                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                        Всего затрат
+                      </span>
+                      <span className="text-base font-black text-slate-900">
+                        <Money amount={vg.totalExpenses.toFixed(2)} />
+                      </span>
+                    </div>
+
+                    {/* Expand Arrow */}
+                    <div className="pl-1">
+                      <span
+                        className={cn(
+                          'material-symbols-outlined text-slate-400 text-[22px] transition-transform duration-300',
+                          isExpanded ? 'rotate-180 text-sky-600' : '',
+                        )}
+                      >
+                        expand_circle_down
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Expanded Content: Service Orders Breakdown for this vehicle ── */}
+                {isExpanded && (
+                  <div className="border-t border-slate-200 bg-slate-50/40 p-4 space-y-3 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                        Заказ-наряды по машине «{vg.name}» ({vg.orders.length})
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Нажмите на наряд для просмотра полного акта
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {vg.orders.map((o) => {
+                        const { partsCost, laborSalaryCost, totalCost } = calcOrderCosts(o);
+                        const works = o.works ?? [];
+                        const parts = o.parts ?? [];
+
+                        return (
+                          <div
+                            key={o.id}
+                            onClick={() => onSelectOrder(o.id)}
+                            className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs hover:border-sky-300 hover:shadow-sm transition-all cursor-pointer space-y-3"
+                          >
+                            {/* Order Header */}
+                            <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-2.5 py-0.5 bg-slate-900 text-white font-mono font-bold text-xs rounded">
+                                  #НЗ-{o.order_number}
+                                </span>
+                                <span className="text-xs font-semibold text-slate-500">
+                                  {new Date(o.created_at).toLocaleDateString('ru-RU', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  })}
+                                </span>
+                                {o.odometer_start ? (
+                                  <span className="text-xs text-slate-400 font-mono">
+                                    · {o.odometer_start.toLocaleString('ru-RU')} км
+                                  </span>
+                                ) : null}
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                                  Завершён
+                                </span>
+                              </div>
+
+                              {/* Costs Formula on Order */}
+                              <div className="flex items-center gap-3 text-xs">
+                                <div>
+                                  <span className="text-slate-400 mr-1">Запчасти:</span>
+                                  <strong className="text-rose-600 font-black">
+                                    <Money amount={partsCost.toFixed(2)} />
+                                  </strong>
+                                </div>
+                                <span className="text-slate-300">+</span>
+                                <div>
+                                  <span className="text-slate-400 mr-1">ЗП:</span>
+                                  <strong className="text-amber-600 font-black">
+                                    <Money amount={laborSalaryCost.toFixed(2)} />
+                                  </strong>
+                                </div>
+                                <span className="text-slate-300">=</span>
+                                <div className="bg-slate-100 px-2 py-0.5 rounded font-black text-slate-900">
+                                  <Money amount={totalCost.toFixed(2)} />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Problem description if present */}
+                            {o.problem_description && (
+                              <div className="text-xs text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                                <span className="font-bold text-slate-400 uppercase text-[10px] mr-1.5">
+                                  Причина / Неисправность:
+                                </span>
+                                <span className="font-semibold">{o.problem_description}</span>
+                              </div>
+                            )}
+
+                            {/* 2-Column Details: Works & Parts */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                              {/* Works List */}
+                              <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-100 space-y-1.5">
+                                <span className="font-extrabold text-slate-500 uppercase text-[10px] block">
+                                  Выполненные работы ({works.length}):
+                                </span>
+                                {works.length === 0 ? (
+                                  <p className="text-slate-400 italic">Работы не указаны</p>
+                                ) : (
+                                  <ul className="space-y-1 text-slate-700">
+                                    {works.map((w, idx) => (
+                                      <li
+                                        key={idx}
+                                        className="flex justify-between items-center gap-2"
+                                      >
+                                        <span className="truncate">
+                                          • {w.work_catalog?.name ?? w.custom_work_name ?? 'Работа'}
+                                          {w.norm_minutes
+                                            ? ` (${(w.norm_minutes / 60).toFixed(1)} нч)`
+                                            : ''}
+                                        </span>
+                                        <span className="font-semibold text-slate-600 shrink-0">
+                                          {moneyVal(w.price_client) > 0 ? (
+                                            <Money amount={String(w.price_client)} />
+                                          ) : (
+                                            '—'
+                                          )}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+
+                              {/* Parts List */}
+                              <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-100 space-y-1.5">
+                                <span className="font-extrabold text-slate-500 uppercase text-[10px] block">
+                                  Установленные запчасти ({parts.length}):
+                                </span>
+                                {parts.length === 0 ? (
+                                  <p className="text-slate-400 italic">
+                                    Запчасти не использовались
+                                  </p>
+                                ) : (
+                                  <ul className="space-y-1 text-slate-700">
+                                    {parts.map((p, idx) => {
+                                      const pName = p.custom_part_name ?? p.part?.name ?? 'Деталь';
+                                      const pUnit = p.unit ?? p.part?.unit ?? 'шт';
+                                      const pCost =
+                                        (p.quantity || 1) * (parseFloat(p.unit_price ?? '0') || 0);
+                                      return (
+                                        <li
+                                          key={idx}
+                                          className="flex justify-between items-center gap-2"
+                                        >
+                                          <span className="truncate">
+                                            • {pName} ({p.quantity} {pUnit})
+                                          </span>
+                                          <span className="font-semibold text-slate-600 shrink-0">
+                                            {pCost > 0 ? <Money amount={pCost.toFixed(2)} /> : '—'}
+                                          </span>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Footer info line */}
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                              <div>
+                                {o.mechanic?.name && (
+                                  <span>
+                                    Слесарь:{' '}
+                                    <strong className="text-slate-600">{o.mechanic.name}</strong>
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-sky-600 font-bold hover:underline flex items-center gap-1">
+                                Открыть наряд #{o.order_number} ↗
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════ WORK ORDERS ═════════════════════════════════════
 
 function WorkOrdersSection() {
@@ -4518,6 +5511,10 @@ function WorkOrdersSection() {
   const [dateMode, setDateMode] = useState<'all' | 'month' | 'day'>('all');
   const [filterDate, setFilterDate] = useState(todayStr());
   const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
+  // Archive dedicated period filter ('day' | 'week' | 'month' | 'all')
+  const [archivePeriod, setArchivePeriod] = useState<'day' | 'week' | 'month' | 'all'>('month');
+  const [archiveDate, setArchiveDate] = useState(todayStr());
+  const [archiveMonth, setArchiveMonth] = useState(todayStr().slice(0, 7));
   // Text / type / status / mechanic filters (all client-side — instant)
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
@@ -4539,23 +5536,29 @@ function WorkOrdersSection() {
     refetchInterval: 60000,
   });
   const archiveUrl =
-    dateMode === 'day'
-      ? `/api/garage/orders?filter=history&date=${filterDate}`
-      : dateMode === 'month'
-        ? `/api/garage/orders?filter=history&month=${filterMonth}`
+    archivePeriod === 'day'
+      ? `/api/garage/orders?filter=history&date=${archiveDate}`
+      : archivePeriod === 'month'
+        ? `/api/garage/orders?filter=history&month=${archiveMonth}`
         : `/api/garage/orders?filter=history`;
   const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
     queryKey: [
       'garage-orders',
       'history',
-      dateMode,
-      dateMode === 'day' ? filterDate : dateMode === 'month' ? filterMonth : 'all',
+      archivePeriod,
+      archivePeriod === 'day'
+        ? archiveDate
+        : archivePeriod === 'month'
+          ? archiveMonth
+          : archivePeriod === 'week'
+            ? archiveDate
+            : 'all',
     ],
     queryFn: () =>
       fetch(archiveUrl)
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 120000,
+    staleTime: 60000,
     enabled: activeTab === 'archive',
   });
 
@@ -5206,114 +6209,114 @@ function WorkOrdersSection() {
         </button>
       </div>
 
-      {/* ── Global filter bar ── */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {/* Поиск */}
-        <div className="relative flex-1 min-w-52">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      {/* ── Global filter bar (только для вкладок В работе и Ждёт оплаты) ── */}
+      {activeTab !== 'archive' && activeTab !== 'requests' && (
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Поиск */}
+          <div className="relative flex-1 min-w-52">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="НЗ-42, авто, клиент, механик, работа..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
             />
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="НЗ-42, авто, клиент, механик, работа..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-        {/* Тип */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
-          {(
-            [
-              ['all', 'Все'],
-              ['own', 'Свои'],
-              ['client', 'Клиент'],
-            ] as const
-          ).map(([v, l]) => (
-            <button
-              key={v}
-              onClick={() => setFilterType(v)}
-              className={cn(
-                'px-3 py-1 rounded-lg font-medium transition-colors',
-                filterType === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-              )}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
+          {/* Тип */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
+            {(
+              [
+                ['all', 'Все'],
+                ['own', 'Свои'],
+                ['client', 'Клиент'],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={v}
+                onClick={() => setFilterType(v)}
+                className={cn(
+                  'px-3 py-1 rounded-lg font-medium transition-colors',
+                  filterType === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
 
-        {/* Статус */}
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-          className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
-        >
-          <option value="all">Все статусы</option>
-          <option value="created">В очереди</option>
-          <option value="in_progress">В работе</option>
-          <option value="review">На проверке</option>
-          <option value="completed">Завершён</option>
-        </select>
+          {/* Статус */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
+          >
+            <option value="all">Все статусы</option>
+            <option value="created">В очереди</option>
+            <option value="in_progress">В работе</option>
+            <option value="review">На проверке</option>
+            <option value="completed">Завершён</option>
+          </select>
 
-        {/* Механик */}
-        <select
-          value={filterMechanic}
-          onChange={(e) => setFilterMechanic(e.target.value)}
-          className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
-        >
-          <option value="">Все механики</option>
-          {mechanics.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+          {/* Механик */}
+          <select
+            value={filterMechanic}
+            onChange={(e) => setFilterMechanic(e.target.value)}
+            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
+          >
+            <option value="">Все механики</option>
+            {mechanics.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
 
-        {/* Диапазон дат */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
-          {(
-            [
-              ['all', 'Все даты'],
-              ['month', 'Месяц'],
-              ['day', 'День'],
-            ] as const
-          ).map(([v, l]) => (
-            <button
-              key={v}
-              onClick={() => setDateMode(v)}
-              className={cn(
-                'px-3 py-1 rounded-lg font-medium transition-colors',
-                dateMode === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-              )}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-        {dateMode === 'day' && <DateNav date={filterDate} onChange={setFilterDate} />}
-        {dateMode === 'month' && <MonthNav month={filterMonth} onChange={setFilterMonth} />}
+          {/* Диапазон дат */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
+            {(
+              [
+                ['all', 'Все даты'],
+                ['month', 'Месяц'],
+                ['day', 'День'],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={v}
+                onClick={() => setDateMode(v)}
+                className={cn(
+                  'px-3 py-1 rounded-lg font-medium transition-colors',
+                  dateMode === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          {dateMode === 'day' && <DateNav date={filterDate} onChange={setFilterDate} />}
+          {dateMode === 'month' && <MonthNav month={filterMonth} onChange={setFilterMonth} />}
 
-        {/* Группировка по машинам */}
-        {activeTab !== 'archive' && (
+          {/* Группировка по машинам */}
           <button
             onClick={() => setGroupByVehicle((v) => !v)}
             className={cn(
@@ -5325,18 +6328,34 @@ function WorkOrdersSection() {
           >
             По машинам
           </button>
-        )}
 
-        {/* Сброс */}
-        {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
-          >
-            × Сбросить
-          </button>
-        )}
-      </div>
+          {/* Сброс */}
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
+            >
+              × Сбросить
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Вкладка Архив (Вариант 1 в стиле Ревью с детализацией по автопарку) ── */}
+      {activeTab === 'archive' && (
+        <GarageArchiveSection
+          orders={historyOrders}
+          isLoading={histLoading}
+          mechanics={mechanics}
+          onSelectOrder={(id) => setSelectedOrderId(id)}
+          period={archivePeriod}
+          setPeriod={setArchivePeriod}
+          date={archiveDate}
+          setDate={setArchiveDate}
+          month={archiveMonth}
+          setMonth={setArchiveMonth}
+        />
+      )}
 
       {/* ── Заявки водителей ── */}
       {activeTab === 'requests' && (
@@ -5358,44 +6377,67 @@ function WorkOrdersSection() {
               >
                 {/* Заголовок */}
                 <div className="px-4 py-3 flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-slate-900 text-sm">
-                        {req.asset?.short_name ?? '—'}
-                      </span>
-                      <span className="text-xs text-slate-400">{req.asset?.reg_number}</span>
-                      <span className="text-xs text-slate-500">· {req.driver?.name ?? '—'}</span>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(req.created_at).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      🚚
+                    </span>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">
+                        {req.asset
+                          ? `${req.asset.short_name} (${req.asset.reg_number})`
+                          : 'Автомобиль не указан'}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {req.driver?.name ?? 'Водитель не указан'} · {fmtDate(req.created_at)}
+                      </p>
                     </div>
-                    <p className="text-sm text-slate-700 mt-1">
-                      {req.fault?.name ?? req.custom_description ?? '—'}
-                    </p>
                   </div>
-                  {/* Статус JSON */}
-                  {sj ? (
-                    <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                      JSON ✓
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                      Без JSON
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {req.fault && (
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                        {FAULT_CATEGORIES[req.fault.category] ?? req.fault.category}
+                      </span>
+                    )}
+                    {req.status === 'approved' ? (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
+                        Одобрена
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">
+                        Новая
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Описание проблемы */}
+                {req.custom_description && (
+                  <div className="px-4 pb-3">
+                    <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {req.custom_description}
+                    </p>
+                  </div>
+                )}
+
                 {/* Превью JSON если прикреплён */}
-                {sj && !isApproving && (
-                  <div className="px-4 pb-3 space-y-1">
+                {sj && (
+                  <div className="mx-4 mb-3 p-3 bg-violet-50/60 border border-violet-100 rounded-xl space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">
+                        Данные от ИИ
+                      </span>
+                      {req.service_order && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          Наряд #{req.service_order.order_number}
+                        </span>
+                      )}
+                    </div>
                     {sj.problem_description && (
-                      <p className="text-xs text-slate-600 italic">
-                        &quot;{sj.problem_description}&quot;
+                      <p className="text-xs text-slate-800 font-medium">{sj.problem_description}</p>
+                    )}
+                    {sj.mechanic_note && (
+                      <p className="text-xs text-slate-500 italic">
+                        Примечание: {sj.mechanic_note}
                       </p>
                     )}
                     {sj.works && sj.works.length > 0 && (
