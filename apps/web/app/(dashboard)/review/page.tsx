@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
@@ -52,6 +52,41 @@ interface TripForReview {
   }>;
 }
 
+interface ReviewServiceOrder {
+  id: string;
+  order_number: number;
+  machine_type: string;
+  status: string;
+  lifecycle_status: string;
+  created_at: string;
+  problem_description: string | null;
+  mechanic_note: string | null;
+  mechanic_pay: string | null;
+  second_mechanic_pay: string | null;
+  asset?: { id?: string; short_name?: string; reg_number?: string } | null;
+  mechanic?: { id: string; name: string } | null;
+  works?: Array<{
+    id: string;
+    custom_work_name: string | null;
+    status: string;
+    salary_paid: boolean;
+    actual_minutes: number | null;
+    price_client: string | null;
+    norm_minutes: number | null;
+    mechanic_id: string | null;
+    second_mechanic_id: string | null;
+    work_catalog?: { name: string } | null;
+  }>;
+  parts?: Array<{
+    id: string;
+    custom_part_name: string | null;
+    quantity: number;
+    unit_price: string;
+    unit: string | null;
+    part?: { name: string; unit: string | null } | null;
+  }>;
+}
+
 const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Наличные',
   qr: 'QR-код',
@@ -76,6 +111,28 @@ const PAYMENT_EDIT_OPTIONS = [
 ];
 
 // ── Helpers ────────────────────────────────────────────────
+
+function calcServiceOrder(o: ReviewServiceOrder) {
+  const parts = o.parts ?? [];
+  const works = o.works ?? [];
+
+  const partsCost = parts.reduce(
+    (sum, p) => sum + (Number(p.unit_price) || 0) * (Number(p.quantity) || 1),
+    0,
+  );
+
+  const m1Pay = Number(o.mechanic_pay) || 0;
+  const m2Pay = Number(o.second_mechanic_pay) || 0;
+  let salaryCost = m1Pay + m2Pay;
+  if (salaryCost <= 0) {
+    salaryCost = works
+      .filter((w) => w.status !== 'cancelled')
+      .reduce((sum, w) => sum + (Number(w.price_client) || 0) * 0.5, 0);
+  }
+
+  const totalCost = partsCost + salaryCost;
+  return { partsCost, salaryCost, totalCost };
+}
 
 function calcTrip(trip: TripForReview) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
@@ -1161,6 +1218,47 @@ export default function ReviewPage() {
     },
   });
 
+  // ── Maintenance / Service Orders Query ─────────────────────
+  const { data: dayServiceOrders = [] } = useQuery<ReviewServiceOrder[]>({
+    queryKey: ['service-orders-day', selectedDate, mode],
+    staleTime: 60000,
+    queryFn: async () => {
+      const url =
+        mode === 'history'
+          ? `/api/garage/orders?filter=history&machine_type=own&date=${selectedDate}`
+          : `/api/garage/orders?filter=all&machine_type=own`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: monthServiceOrders = [] } = useQuery<ReviewServiceOrder[]>({
+    queryKey: ['service-orders-month', monthKey],
+    enabled: mode === 'history',
+    staleTime: 120000,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/garage/orders?filter=history&machine_type=own&month=${monthKey}`,
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: weekServiceOrders = [] } = useQuery<ReviewServiceOrder[]>({
+    queryKey: ['service-orders-week', weekStart, weekEnd],
+    enabled: mode === 'history',
+    staleTime: 120000,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/garage/orders?filter=history&machine_type=own&weekStart=${weekStart}&weekEnd=${weekEnd}`,
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -1172,6 +1270,7 @@ export default function ReviewPage() {
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['trips-review'] });
+    queryClient.invalidateQueries({ queryKey: ['service-orders-day'] });
   };
 
   async function handleApprove(tripId: string) {
@@ -1223,10 +1322,6 @@ export default function ReviewPage() {
     }
   }
 
-  // Aggregate stats
-  const totalRevenue = trips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-  const totalProfit = trips.reduce((s, t) => s + calcTrip(t).profit, 0);
-
   const listTrips =
     mode === 'history'
       ? statsPeriod === 'day'
@@ -1236,22 +1331,135 @@ export default function ReviewPage() {
           : monthTrips
       : trips;
 
-  const groupedTrips = listTrips.reduce(
-    (acc, trip) => {
-      const assetKey = trip.asset
-        ? `${trip.asset.short_name} (${trip.asset.reg_number})`
-        : 'Без машины';
-      if (!acc[assetKey]) acc[assetKey] = [];
-      acc[assetKey].push(trip);
-      return acc;
-    },
-    {} as Record<string, TripForReview[]>,
+  const listServiceOrders =
+    mode === 'history'
+      ? statsPeriod === 'day'
+        ? dayServiceOrders
+        : statsPeriod === 'week'
+          ? weekServiceOrders
+          : monthServiceOrders
+      : dayServiceOrders;
+
+  // ── Combined Vehicle Groups (Trips + Maintenance) ──────────
+  const combinedAssetGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        assetKey: string;
+        assetName: string;
+        regNumber: string;
+        trips: TripForReview[];
+        serviceOrders: ReviewServiceOrder[];
+        tripsRevenue: number;
+        tripsPayroll: number;
+        tripsFuel: number;
+        tripsExpenses: number;
+        tripsProfit: number;
+        maintenanceParts: number;
+        maintenanceSalary: number;
+        maintenanceTotal: number;
+        netProfit: number;
+      }
+    >();
+
+    // 1. Process Trips
+    for (const t of listTrips) {
+      const assetKey = t.asset ? `${t.asset.short_name} (${t.asset.reg_number})` : 'Без машины';
+      if (!map.has(assetKey)) {
+        map.set(assetKey, {
+          assetKey,
+          assetName: t.asset?.short_name ?? 'Без машины',
+          regNumber: t.asset?.reg_number ?? '',
+          trips: [],
+          serviceOrders: [],
+          tripsRevenue: 0,
+          tripsPayroll: 0,
+          tripsFuel: 0,
+          tripsExpenses: 0,
+          tripsProfit: 0,
+          maintenanceParts: 0,
+          maintenanceSalary: 0,
+          maintenanceTotal: 0,
+          netProfit: 0,
+        });
+      }
+      const g = map.get(assetKey)!;
+      g.trips.push(t);
+      const ct = calcTrip(t);
+      g.tripsRevenue += ct.revenue;
+      g.tripsPayroll += ct.totalPayroll;
+      g.tripsFuel += ct.fuelExpense;
+      g.tripsExpenses += ct.totalExpenses;
+      g.tripsProfit += ct.profit;
+    }
+
+    // 2. Process Service Orders
+    for (const so of listServiceOrders) {
+      if (so.machine_type !== 'own' || !so.asset) continue;
+      const assetKey = `${so.asset.short_name ?? 'Свой ТС'} (${so.asset.reg_number ?? ''})`;
+      if (!map.has(assetKey)) {
+        map.set(assetKey, {
+          assetKey,
+          assetName: so.asset.short_name ?? 'Свой ТС',
+          regNumber: so.asset.reg_number ?? '',
+          trips: [],
+          serviceOrders: [],
+          tripsRevenue: 0,
+          tripsPayroll: 0,
+          tripsFuel: 0,
+          tripsExpenses: 0,
+          tripsProfit: 0,
+          maintenanceParts: 0,
+          maintenanceSalary: 0,
+          maintenanceTotal: 0,
+          netProfit: 0,
+        });
+      }
+      const g = map.get(assetKey)!;
+      g.serviceOrders.push(so);
+      const cso = calcServiceOrder(so);
+      g.maintenanceParts += cso.partsCost;
+      g.maintenanceSalary += cso.salaryCost;
+      g.maintenanceTotal += cso.totalCost;
+    }
+
+    // 3. Compute netProfit for each vehicle
+    const groups = Array.from(map.values()).map((g) => {
+      g.netProfit = g.tripsProfit - g.maintenanceTotal;
+      return g;
+    });
+
+    return groups.sort((a, b) => a.assetKey.localeCompare(b.assetKey));
+  }, [listTrips, listServiceOrders]);
+
+  // Aggregate Fleet Totals
+  const totalFleetRevenue = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.tripsRevenue, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetTripCosts = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.tripsPayroll + g.tripsExpenses, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetMaintenance = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.maintenanceTotal, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetMaintenanceParts = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.maintenanceParts, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetMaintenanceSalary = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.maintenanceSalary, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetNetProfit = useMemo(
+    () => totalFleetRevenue - totalFleetTripCosts - totalFleetMaintenance,
+    [totalFleetRevenue, totalFleetTripCosts, totalFleetMaintenance],
   );
 
-  const assetGroups = Object.entries(groupedTrips).sort(([a], [b]) => a.localeCompare(b));
-
   return (
-    <div className="space-y-5 max-w-4xl mx-auto animate-in fade-in duration-300">
+    <div className="space-y-5 max-w-5xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -1260,13 +1468,16 @@ export default function ReviewPage() {
             <p className="text-sm text-slate-500 mt-0.5">
               {trips.length} рейс{trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'} ожидают ·{' '}
               <span className="font-semibold text-slate-700">
-                <Money amount={totalRevenue.toFixed(2)} />
+                <Money amount={totalFleetRevenue.toFixed(2)} />
               </span>{' '}
               выручка ·{' '}
               <span
-                className={cn('font-bold', totalProfit >= 0 ? 'text-emerald-600' : 'text-rose-600')}
+                className={cn(
+                  'font-bold',
+                  totalFleetNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                )}
               >
-                <Money amount={totalProfit.toFixed(2)} />
+                <Money amount={totalFleetNetProfit.toFixed(2)} />
               </span>{' '}
               прибыль
             </p>
@@ -1322,6 +1533,65 @@ export default function ReviewPage() {
         />
       )}
 
+      {/* ── 4 Top Fleet KPI Cards ── */}
+      {!isLoading && combinedAssetGroups.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Выручка с рейсов
+            </span>
+            <div className="text-xl font-black text-slate-900 mt-1">
+              <Money amount={totalFleetRevenue.toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {listTrips.length} рейс
+              {listTrips.length === 1 ? '' : listTrips.length < 5 ? 'а' : 'ов'} за период
+            </span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Рейсовые расходы
+            </span>
+            <div className="text-xl font-black text-amber-600 mt-1">
+              −<Money amount={totalFleetTripCosts.toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-amber-600/80 font-medium">ЗП + ГСМ рейсов</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-500">
+              Ремонты ТО (Гараж)
+            </span>
+            <div className="text-xl font-black text-rose-600 mt-1">
+              −<Money amount={totalFleetMaintenance.toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-rose-500/80 font-medium">
+              Детали: {Math.round(totalFleetMaintenanceParts).toLocaleString('ru-RU')} ₽ · ЗП:{' '}
+              {Math.round(totalFleetMaintenanceSalary).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-md">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+              Итоговая чистая прибыль
+            </span>
+            <div
+              className={cn(
+                'text-xl font-black mt-1',
+                totalFleetNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
+              )}
+            >
+              {totalFleetNetProfit < 0 ? '−' : ''}
+              <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
+            </div>
+            <span className="text-[11px] text-emerald-300 font-medium">
+              Рейсы − Расходы − Ремонты ТО
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Summary line */}
       {!isLoading && (
         <div className="flex items-center justify-between">
@@ -1339,16 +1609,23 @@ export default function ReviewPage() {
                 {listTrips.length > 0
                   ? ` · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 ? 'а' : 'ов'}`
                   : ' · нет рейсов'}
+                {listServiceOrders.length > 0 && (
+                  <span className="text-rose-600 font-semibold">
+                    {' '}
+                    · {listServiceOrders.length} заказ-наряд
+                    {listServiceOrders.length === 1 ? '' : 'а'} ТО
+                  </span>
+                )}
               </>
             ) : trips.length === 0 ? (
               'Нет рейсов на ревью — всё проверено!'
             ) : null}
           </p>
-          {listTrips.length > 0 && (
+          {combinedAssetGroups.length > 0 && (
             <button
               onClick={() => {
                 const allIds = listTrips.map((t) => t.id);
-                const allGroups = assetGroups.map(([k]) => k);
+                const allGroups = combinedAssetGroups.map((g) => g.assetKey);
                 const isAllExpanded =
                   expandedIds.size === allIds.length && expandedGroups.size === allGroups.length;
 
@@ -1363,11 +1640,13 @@ export default function ReviewPage() {
               className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-1"
             >
               <span className="material-symbols-outlined text-[14px]">
-                {expandedIds.size === listTrips.length && expandedGroups.size === assetGroups.length
+                {expandedIds.size === listTrips.length &&
+                expandedGroups.size === combinedAssetGroups.length
                   ? 'unfold_less'
                   : 'unfold_more'}
               </span>
-              {expandedIds.size === listTrips.length && expandedGroups.size === assetGroups.length
+              {expandedIds.size === listTrips.length &&
+              expandedGroups.size === combinedAssetGroups.length
                 ? 'Свернуть все'
                 : 'Развернуть все'}
             </button>
@@ -1384,10 +1663,10 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* Trip cards */}
+      {/* ── Vehicle Cards List ── */}
       {!isLoading && (
-        <div className="space-y-3">
-          {listTrips.length === 0 ? (
+        <div className="space-y-4">
+          {combinedAssetGroups.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
               <span className="material-symbols-outlined text-slate-200 text-[72px] mb-4 block">
                 {mode === 'review'
@@ -1401,7 +1680,7 @@ export default function ReviewPage() {
                   ? 'Всё проверено'
                   : mode === 'active'
                     ? 'Нет активных рейсов'
-                    : 'Нет рейсов за эту дату'}
+                    : 'Нет данных за этот период'}
               </p>
               {mode === 'review' && (
                 <p className="text-slate-400 text-sm mt-1">Новые рейсы появятся здесь</p>
@@ -1409,147 +1688,287 @@ export default function ReviewPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
-                {assetGroups.map(([assetKey, assetTrips]) => {
-                  const groupRevenue = assetTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-                  const groupPayroll = assetTrips.reduce((s, t) => s + calcTrip(t).totalPayroll, 0);
-                  const groupFuel = assetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
-                  const groupProfit = assetTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
-                  const isExpanded = expandedGroups.has(assetKey);
+              {combinedAssetGroups.map((group) => {
+                const isExpanded = expandedGroups.has(group.assetKey);
 
-                  return (
+                return (
+                  <div
+                    key={group.assetKey}
+                    className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
+                  >
+                    {/* Group Header */}
                     <div
-                      key={assetKey}
-                      className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
+                      onClick={() => toggleGroup(group.assetKey)}
+                      className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
                     >
-                      {/* Group Header */}
-                      <div
-                        onClick={() => toggleGroup(assetKey)}
-                        className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="bg-sky-100 p-2 rounded-xl text-sky-600">
-                            <span className="material-symbols-outlined block">local_shipping</span>
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-slate-800">{assetKey}</h3>
-                            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
-                              <span>
-                                {assetTrips.length} рейс
-                                {assetTrips.length === 1 ? '' : assetTrips.length < 5 ? 'а' : 'ов'}:
-                              </span>
-                              <div className="inline-flex flex-wrap gap-1 items-center">
-                                {assetTrips.map((t) => (
-                                  <span
-                                    key={t.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (!expandedGroups.has(assetKey)) {
-                                        toggleGroup(assetKey);
-                                      }
-                                      if (!expandedIds.has(t.id)) {
-                                        toggleExpand(t.id);
-                                      }
-                                    }}
-                                    className="inline-flex items-center bg-sky-50 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-1.5 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
-                                    title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
-                                  >
-                                    #{t.trip_number}
-                                  </span>
-                                ))}
-                              </div>
-                              <span className="sm:hidden text-slate-300">·</span>
-                              <span className="sm:hidden text-slate-700 font-bold">
-                                Выручка: <Money amount={groupRevenue.toFixed(2)} />
-                              </span>
-                              <span className="sm:hidden text-slate-300">·</span>
-                              <span
-                                className={cn(
-                                  'sm:hidden font-bold',
-                                  groupProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
-                                )}
-                              >
-                                Прибыль: {groupProfit < 0 ? '−' : ''}
-                                <Money amount={Math.abs(groupProfit).toFixed(2)} />
-                              </span>
-                            </div>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-sky-100 p-2 rounded-xl text-sky-600">
+                          <span className="material-symbols-outlined block">local_shipping</span>
                         </div>
-
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className="text-right hidden sm:block">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              Выручка
+                        <div>
+                          <h3 className="font-bold text-slate-800 text-base">{group.assetKey}</h3>
+                          <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span>
+                              {group.trips.length} рейс
+                              {group.trips.length === 1 ? '' : group.trips.length < 5 ? 'а' : 'ов'}
                             </span>
-                            <span className="text-sm font-black text-slate-800">
-                              <Money amount={groupRevenue.toFixed(2)} />
-                            </span>
-                          </div>
-                          <div className="text-right hidden sm:block">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              ЗП
-                            </span>
-                            <span className="text-sm font-black text-amber-500">
-                              <Money amount={groupPayroll.toFixed(2)} />
-                            </span>
-                          </div>
-                          <div className="text-right hidden sm:block">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              ГСМ
-                            </span>
-                            <span className="text-sm font-black text-rose-500">
-                              <Money amount={groupFuel.toFixed(2)} />
-                            </span>
-                          </div>
-                          <div className="text-right hidden sm:block">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              Прибыль
-                            </span>
-                            <span
-                              className={cn(
-                                'text-sm font-black',
-                                groupProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
-                              )}
-                            >
-                              {groupProfit < 0 ? '−' : ''}
-                              <Money amount={Math.abs(groupProfit).toFixed(2)} />
-                            </span>
-                          </div>
-                          <span
-                            className={cn(
-                              'material-symbols-outlined text-slate-400 transition-transform duration-300',
-                              isExpanded ? 'rotate-180' : '',
+                            <span className="text-slate-300">·</span>
+                            {group.serviceOrders.length > 0 ? (
+                              <span className="text-rose-600 font-bold">
+                                {group.serviceOrders.length} наряд
+                                {group.serviceOrders.length === 1 ? '' : 'а'} ТО (−
+                                {group.maintenanceTotal.toLocaleString('ru-RU')} ₽)
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">Ремонтов не было (0 ₽)</span>
                             )}
-                          >
-                            expand_more
-                          </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Group Content (Trips) */}
-                      {isExpanded && (
-                        <div className="p-3 bg-slate-50/50 border-t border-slate-100 space-y-3">
-                          {assetTrips.map((trip) => (
-                            <TripCard
-                              key={trip.id}
-                              trip={trip}
-                              mode={mode}
-                              expanded={expandedIds.has(trip.id)}
-                              onToggle={() => toggleExpand(trip.id)}
-                              onEdit={() => setEditTrip(trip)}
-                              onApprove={() => handleApprove(trip.id)}
-                              onReturn={() => handleReturn(trip.id)}
-                              onDelete={() => handleDelete(trip.id)}
-                              approving={approvingId === trip.id}
-                              deleting={deletingId === trip.id}
-                            />
-                          ))}
+                      <div className="flex items-center gap-3 sm:gap-5">
+                        <div className="text-right hidden sm:block">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Выручка
+                          </span>
+                          <span className="text-sm font-black text-slate-800">
+                            <Money amount={group.tripsRevenue.toFixed(2)} />
+                          </span>
                         </div>
-                      )}
+                        <div className="text-right hidden sm:block">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Рейс (ЗП+ГСМ)
+                          </span>
+                          <span className="text-sm font-black text-amber-600">
+                            −
+                            <Money amount={(group.tripsPayroll + group.tripsExpenses).toFixed(2)} />
+                          </span>
+                        </div>
+                        <div className="text-right hidden sm:block bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
+                          <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 block">
+                            Ремонт ТО
+                          </span>
+                          <span className="text-sm font-black text-rose-600">
+                            {group.maintenanceTotal > 0 ? (
+                              <>
+                                −<Money amount={group.maintenanceTotal.toFixed(2)} />
+                              </>
+                            ) : (
+                              '0 ₽'
+                            )}
+                          </span>
+                        </div>
+                        <div className="text-right bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+                          <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+                            Чистый итог
+                          </span>
+                          <span
+                            className={cn(
+                              'text-sm sm:text-base font-black',
+                              group.netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                            )}
+                          >
+                            {group.netProfit < 0 ? '−' : ''}
+                            <Money amount={Math.abs(group.netProfit).toFixed(2)} />
+                          </span>
+                        </div>
+                        <span
+                          className={cn(
+                            'material-symbols-outlined text-slate-400 transition-transform duration-300',
+                            isExpanded ? 'rotate-180' : '',
+                          )}
+                        >
+                          expand_more
+                        </span>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Group Content (Formula + 2 Columns: Trips vs Maintenance) */}
+                    {isExpanded && (
+                      <div>
+                        {/* Formula Bar */}
+                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-slate-400 font-medium">
+                              Расчёт чистой прибыли машины:
+                            </span>
+                            <span className="bg-white/10 px-2 py-0.5 rounded font-bold">
+                              Рейсы: {group.tripsProfit >= 0 ? '+' : ''}
+                              <Money amount={group.tripsProfit.toFixed(2)} />
+                            </span>
+                            <span className="text-slate-400">−</span>
+                            <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-bold">
+                              Запчасти ТО: <Money amount={group.maintenanceParts.toFixed(2)} />
+                            </span>
+                            <span className="text-slate-400">−</span>
+                            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                              ЗП ремонта ТО: <Money amount={group.maintenanceSalary.toFixed(2)} />
+                            </span>
+                            <span className="text-slate-400">=</span>
+                            <span
+                              className={cn(
+                                'px-2.5 py-0.5 rounded font-black text-sm shadow-xs',
+                                group.netProfit >= 0
+                                  ? 'bg-emerald-500 text-white'
+                                  : 'bg-rose-500 text-white',
+                              )}
+                            >
+                              {group.netProfit >= 0 ? '+' : ''}
+                              <Money amount={group.netProfit.toFixed(2)} />
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 2 Columns: Trips vs Service Orders */}
+                        <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-5 bg-slate-50/50">
+                          {/* Left: Trips */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sky-600 text-base">
+                                  route
+                                </span>
+                                Рейсы автомобиля ({group.trips.length})
+                              </h4>
+                              <span className="text-xs font-bold text-emerald-600">
+                                Прибыль рейсов: {group.tripsProfit >= 0 ? '+' : ''}
+                                <Money amount={group.tripsProfit.toFixed(2)} />
+                              </span>
+                            </div>
+
+                            {group.trips.length === 0 ? (
+                              <div className="bg-white p-6 rounded-xl border border-slate-200 text-center text-xs text-slate-400 font-medium">
+                                За выбранный период рейсов не зафиксировано
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {group.trips.map((trip) => (
+                                  <TripCard
+                                    key={trip.id}
+                                    trip={trip}
+                                    mode={mode}
+                                    expanded={expandedIds.has(trip.id)}
+                                    onToggle={() => toggleExpand(trip.id)}
+                                    onEdit={() => setEditTrip(trip)}
+                                    onApprove={() => handleApprove(trip.id)}
+                                    onReturn={() => handleReturn(trip.id)}
+                                    onDelete={() => handleDelete(trip.id)}
+                                    approving={approvingId === trip.id}
+                                    deleting={deletingId === trip.id}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Service Orders */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-rose-600 text-base">
+                                  car_repair
+                                </span>
+                                Заказ-наряды на ремонт и ТО ({group.serviceOrders.length})
+                              </h4>
+                              <span className="text-xs font-bold text-rose-600">
+                                Всего ТО: −<Money amount={group.maintenanceTotal.toFixed(2)} />
+                              </span>
+                            </div>
+
+                            {group.serviceOrders.length === 0 ? (
+                              <div className="bg-white p-6 rounded-xl border border-slate-200 text-center text-xs text-slate-400 font-medium">
+                                🔧 За выбранный период заказ-нарядов на ремонт не было (0 ₽)
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {group.serviceOrders.map((so) => {
+                                  const cso = calcServiceOrder(so);
+                                  return (
+                                    <div
+                                      key={so.id}
+                                      className="bg-white p-3.5 rounded-xl border border-rose-200/80 shadow-xs space-y-2.5"
+                                    >
+                                      <div className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-black font-mono bg-rose-600 text-white px-2 py-0.5 rounded">
+                                            НЗ-{so.order_number}
+                                          </span>
+                                          <span className="text-slate-700 font-bold">
+                                            {new Date(so.created_at).toLocaleDateString('ru-RU', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                            })}
+                                            {so.mechanic?.name ? ` · ${so.mechanic.name}` : ''}
+                                          </span>
+                                        </div>
+                                        <span className="font-black text-rose-600 text-sm">
+                                          −<Money amount={cso.totalCost.toFixed(2)} />
+                                        </span>
+                                      </div>
+
+                                      <div className="text-[11px] space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                        {/* Works */}
+                                        {so.works && so.works.length > 0 && (
+                                          <div className="space-y-1">
+                                            {so.works.slice(0, 3).map((w) => (
+                                              <div
+                                                key={w.id}
+                                                className="flex justify-between text-slate-700 font-medium"
+                                              >
+                                                <span className="truncate pr-2">
+                                                  🔧{' '}
+                                                  {w.work_catalog?.name ??
+                                                    w.custom_work_name ??
+                                                    'Работа'}
+                                                </span>
+                                                <span className="text-amber-700 font-bold shrink-0">
+                                                  {w.price_client
+                                                    ? `${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
+                                                    : '—'}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {/* Parts */}
+                                        {so.parts && so.parts.length > 0 && (
+                                          <div className="space-y-1 border-t border-slate-200/60 pt-1">
+                                            {so.parts.slice(0, 3).map((p) => {
+                                              const cost =
+                                                (Number(p.unit_price) || 0) *
+                                                (Number(p.quantity) || 1);
+                                              return (
+                                                <div
+                                                  key={p.id}
+                                                  className="flex justify-between text-slate-700 font-medium"
+                                                >
+                                                  <span className="truncate pr-2">
+                                                    📦{' '}
+                                                    {p.part?.name ?? p.custom_part_name ?? 'Деталь'}{' '}
+                                                    ({p.quantity} {p.unit ?? 'шт'})
+                                                  </span>
+                                                  <span className="text-rose-700 font-bold shrink-0">
+                                                    {cost.toLocaleString('ru-RU')} ₽
+                                                  </span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* Unified Stats Strip */}
               <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
@@ -1560,98 +1979,65 @@ export default function ReviewPage() {
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       {mode === 'history'
-                        ? `Итоговая статистика · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}`
-                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
+                        ? `Итоговая статистика автопарка · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`
+                        : `Итого автопарк · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`}
                     </span>
                   </div>
                 </div>
 
-                {(() => {
-                  const targetTrips = listTrips;
+                <div className="flex items-center px-4 py-3">
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="flex items-center gap-1 sm:gap-3 flex-wrap justify-center">
+                      <div className="w-[85px] sm:w-[100px] text-center">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                          Выручка
+                        </span>
+                        <span className="text-sm sm:text-base font-black text-white">
+                          <Money amount={totalFleetRevenue.toFixed(2)} />
+                        </span>
+                      </div>
 
-                  const targetRevenue = targetTrips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-                  const targetCosts = targetTrips.reduce((s, t) => {
-                    const c = calcTrip(t);
-                    return s + c.driverPay + c.loaderPay + c.totalExpenses;
-                  }, 0);
-                  const targetProfit = targetTrips.reduce((s, t) => s + calcTrip(t).profit, 0);
-                  const targetFuel = targetTrips.reduce((s, t) => s + calcTrip(t).fuelExpense, 0);
-                  const targetPayroll = targetTrips.reduce(
-                    (s, t) => s + calcTrip(t).totalPayroll,
-                    0,
-                  );
+                      <span className="text-slate-600 text-sm hidden sm:block">|</span>
 
-                  return (
-                    <div className="flex items-center px-4 py-3">
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="flex items-center gap-1 sm:gap-3 flex-wrap justify-center">
-                          <div className="w-[85px] sm:w-[100px] text-center">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                              Выручка
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-white">
-                              <Money amount={targetRevenue.toFixed(2)} />
-                            </span>
-                          </div>
+                      <div className="w-[85px] sm:w-[100px] text-center">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                          Рейс (ЗП+ГСМ)
+                        </span>
+                        <span className="text-sm sm:text-base font-black text-amber-400">
+                          −<Money amount={totalFleetTripCosts.toFixed(2)} />
+                        </span>
+                      </div>
 
-                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+                      <span className="text-slate-600 text-sm hidden sm:block">|</span>
 
-                          <div className="w-[85px] sm:w-[100px] text-center">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                              Зарплаты
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-amber-400">
-                              <Money amount={targetPayroll.toFixed(2)} />
-                            </span>
-                          </div>
+                      <div className="w-[85px] sm:w-[100px] text-center">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                          Ремонты ТО
+                        </span>
+                        <span className="text-sm sm:text-base font-black text-rose-400">
+                          −<Money amount={totalFleetMaintenance.toFixed(2)} />
+                        </span>
+                      </div>
 
-                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+                      <span className="text-slate-600 text-sm hidden sm:block">=</span>
 
-                          <div className="w-[85px] sm:w-[100px] text-center">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                              Топливо
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-blue-400">
-                              <Money amount={targetFuel.toFixed(2)} />
-                            </span>
-                          </div>
-
-                          <span className="text-slate-600 text-sm hidden sm:block">−</span>
-
-                          <div className="w-[85px] sm:w-[100px] text-center">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                              Все расходы
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-rose-400">
-                              <Money amount={targetCosts.toFixed(2)} />
-                            </span>
-                          </div>
-
-                          <span className="text-slate-600 text-sm hidden sm:block">=</span>
-
-                          <div className="w-[85px] sm:w-[100px] text-center">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                              Прибыль
-                            </span>
-                            <span
-                              className={cn(
-                                'text-base sm:text-lg font-black',
-                                targetProfit > 0
-                                  ? 'text-emerald-400'
-                                  : targetProfit < 0
-                                    ? 'text-rose-400'
-                                    : 'text-slate-400',
-                              )}
-                            >
-                              {targetProfit < 0 ? '−' : ''}
-                              <Money amount={Math.abs(targetProfit).toFixed(2)} />
-                            </span>
-                          </div>
-                        </div>
+                      <div className="w-[85px] sm:w-[100px] text-center">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                          Чистый доход
+                        </span>
+                        <span
+                          className={cn(
+                            'text-base sm:text-lg font-black',
+                            totalFleetNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
+                          )}
+                        >
+                          {totalFleetNetProfit < 0 ? '−' : ''}
+                          <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
+                        </span>
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                </div>
               </div>
             </>
           )}

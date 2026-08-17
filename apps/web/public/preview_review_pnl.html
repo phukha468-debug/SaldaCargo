@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Интерактивный макет Ревью</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .trip-details { transition: all 0.25s ease-in-out; }
+  </style>
+</head>
+<body class="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <span class="text-xs font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md">Интерактивный прототип (нажимайте на карточки!)</span>
+      <h1 class="text-2xl font-black text-slate-900 mt-1.5">Ревью смен + Расходы на ТО</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Период: <span class="font-bold text-slate-700">Июль 2026</span> · Нажмите на <b>Рейс #49</b>, чтобы раскрыть его детали с заявками и грузчиками</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+        <button class="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800">День</button>
+        <button class="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800">Неделя</button>
+        <button class="px-3 py-1.5 rounded-lg bg-sky-500 text-white shadow-xs">Месяц</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Top Overview -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+      <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Выручка с рейсов</span>
+      <div class="text-xl font-black text-slate-900 mt-1">420 000 ₽</div>
+      <span class="text-[11px] text-slate-400 font-medium">32 рейса за период</span>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+      <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Рейсовые расходы (ЗП + ГСМ)</span>
+      <div class="text-xl font-black text-amber-600 mt-1">−165 000 ₽</div>
+      <span class="text-[11px] text-amber-500 font-medium">ЗП 95к · Топливо 70к</span>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+      <span class="text-[10px] font-extrabold uppercase tracking-wider text-rose-500">Ремонты ТО (Гараж)</span>
+      <div class="text-xl font-black text-rose-600 mt-1">−52 000 ₽</div>
+      <span class="text-[11px] text-rose-500 font-medium">Запчасти 38к · ЗП ТО 14к</span>
+    </div>
+    <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-md">
+      <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">Итоговая чистая прибыль</span>
+      <div class="text-xl font-black text-emerald-400 mt-1">+203 000 ₽</div>
+      <span class="text-[11px] text-emerald-300 font-medium">Рейсы − Расходы − ТО</span>
+    </div>
+  </div>
+
+  <!-- Vehicle Card: Expanded State -->
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-black uppercase tracking-wider text-slate-400">Экономика по автомобилям:</h2>
+      <span class="text-xs text-sky-600 font-bold">Кликните на рейс, чтобы раскрыть заявки ⬇</span>
+    </div>
+
+    <!-- CARD 1: ВАЛДАЙ А096МВ196 -->
+    <div class="bg-white border-2 border-sky-400 rounded-2xl shadow-md overflow-hidden">
+      
+      <!-- Group Header (clickable to collapse/expand vehicle) -->
+      <div onclick="toggleVehicle('valdai')" class="p-4 bg-sky-50/40 border-b border-sky-100 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-sky-50">
+        <div class="flex items-center gap-3">
+          <div class="bg-sky-500 p-2.5 rounded-xl text-white shadow-xs">
+            <span class="material-symbols-outlined block text-[22px]">local_shipping</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-black text-slate-900 text-base">Валдай · А096МВ196</h3>
+              <span class="text-[10px] font-extrabold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Свой парк</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">
+              <span>8 рейсов (#41, #45, #49...)</span> · <span class="text-rose-600 font-bold">2 ремонта (НЗ-98, НЗ-108)</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Metrics Breakdown -->
+        <div class="flex items-center gap-3 sm:gap-6">
+          <div class="text-right">
+            <span class="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Выручка</span>
+            <span class="text-sm font-black text-slate-800">145 000 ₽</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Рейс (ЗП+ГСМ)</span>
+            <span class="text-sm font-bold text-amber-600">−55 000 ₽</span>
+          </div>
+          <div class="text-right bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-100">
+            <span class="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 block">Ремонт (ТО)</span>
+            <span class="text-sm font-black text-rose-600">−21 500 ₽</span>
+          </div>
+          <div class="text-right bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+            <span class="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 block">Чистый итог</span>
+            <span class="text-base font-black text-emerald-600">+68 500 ₽</span>
+          </div>
+          <span id="icon-valdai" class="material-symbols-outlined text-slate-400 transition-transform duration-200">expand_less</span>
+        </div>
+      </div>
+
+      <!-- Vehicle Body -->
+      <div id="body-valdai">
+        
+        <!-- Formula Bar -->
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-slate-400 font-medium">Расчёт чистой прибыли машины:</span>
+            <span class="bg-white/10 px-2 py-0.5 rounded font-bold">Рейсы: +90 000 ₽</span>
+            <span class="text-slate-400">−</span>
+            <span class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-bold">Запчасти ТО: 15 500 ₽</span>
+            <span class="text-slate-400">−</span>
+            <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-bold">ЗП ремонта ТО: 6 000 ₽</span>
+            <span class="text-slate-400">=</span>
+            <span class="bg-emerald-500 text-white px-2.5 py-0.5 rounded font-black text-sm shadow-xs">+68 500 ₽</span>
+          </div>
+          <span class="text-[11px] text-slate-300 font-semibold">Рентабельность: 47.2% · Себестоимость: 31.4 ₽/км</span>
+        </div>
+
+        <!-- Two Columns: TRIPS vs REPAIRS -->
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5 bg-slate-50/50">
+          
+          <!-- LEFT COLUMN: Рейсы машины за период -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sky-600 text-base">route</span>
+                Рейсы автомобиля (8)
+              </h4>
+              <span class="text-xs font-bold text-emerald-600">Прибыль с рейсов: +90 000 ₽</span>
+            </div>
+
+            <!-- ================= TRIP CARD 1 (EXPANDABLE) ================= -->
+            <div class="bg-white rounded-xl border border-sky-300 shadow-sm overflow-hidden transition-all duration-200">
+              
+              <!-- Trip Header (Click to toggle full details) -->
+              <div onclick="toggleTrip('trip-49')" class="p-3.5 bg-sky-50/60 hover:bg-sky-100/70 cursor-pointer flex items-center justify-between gap-2 select-none border-b border-sky-100">
+                <div class="flex items-center gap-2">
+                  <span class="font-black font-mono bg-sky-600 text-white px-2 py-0.5 rounded text-xs">#49</span>
+                  <div>
+                    <span class="font-bold text-slate-900 text-xs">17 июля 2026</span>
+                    <span class="text-slate-400 text-xs"> · Водитель: <b>Иванов А.</b></span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="text-right text-xs">
+                    <span class="font-bold text-slate-800">22 000 ₽</span>
+                    <span class="text-emerald-600 font-black ml-2">+14 500 ₽</span>
+                  </div>
+                  <span id="trip-icon-49" class="material-symbols-outlined text-sky-600 text-lg transition-transform duration-200">expand_less</span>
+                </div>
+              </div>
+
+              <!-- FULL TRIP DETAILS (Orders, Loaders, Driver Pay, Expenses) -->
+              <div id="trip-body-49" class="p-4 space-y-4 bg-white">
+                
+                <!-- Orders Table -->
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-black uppercase tracking-wider text-slate-500">Заявки клиентов (3 шт.)</span>
+                    <span class="text-[11px] text-slate-400">Выручка: 22 000 ₽</span>
+                  </div>
+
+                  <!-- Order 1 -->
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between font-bold">
+                      <span class="text-slate-800">ООО «СтройКомплект» (Доставка цемента)</span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">Безнал</span>
+                        <span class="text-slate-900 font-black">12 000 ₽</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-200/60 pt-1">
+                      <span>ЗП Водителя: <b class="text-emerald-700">2 500 ₽</b></span>
+                      <span class="bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-100">
+                        Грузчик: <b>Васильев П.</b> (+1 200 ₽)
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Order 2 -->
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between font-bold">
+                      <span class="text-slate-800">ИП Смирнов (Перевозка профиля)</span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">Наличные</span>
+                        <span class="text-slate-900 font-black">7 000 ₽</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-200/60 pt-1">
+                      <span>ЗП Водителя: <b class="text-emerald-700">1 500 ₽</b></span>
+                      <span class="text-slate-400">Без грузчика</span>
+                    </div>
+                  </div>
+
+                  <!-- Order 3 -->
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between font-bold">
+                      <span class="text-slate-800">Частное лицо (Квартирный переезд)</span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">QR-код</span>
+                        <span class="text-slate-900 font-black">3 000 ₽</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-200/60 pt-1">
+                      <span>ЗП Водителя: <b class="text-emerald-700">1 000 ₽</b></span>
+                      <span class="bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-100">
+                        Грузчик: <b>Васильев П.</b> (+800 ₽)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Expenses & Mileage -->
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="bg-rose-50/60 p-2 rounded-xl border border-rose-100">
+                    <span class="text-[10px] font-extrabold uppercase text-rose-500 block">ГСМ / Топливо</span>
+                    <span class="font-black text-rose-700">−2 500 ₽ (48 л)</span>
+                  </div>
+                  <div class="bg-slate-100 p-2 rounded-xl border border-slate-200">
+                    <span class="text-[10px] font-extrabold uppercase text-slate-400 block">Пробег рейса</span>
+                    <span class="font-black text-slate-800">240 км (Одометр: 184 200 → 184 440)</span>
+                  </div>
+                </div>
+
+                <!-- Driver note -->
+                <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
+                  <b>Заметка водителя:</b> Доставка в Верхнюю Салду прошла вовремя, накладные подписаны.
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <button class="text-xs font-bold text-slate-400 hover:text-rose-600">Удалить рейс</button>
+                  <div class="flex gap-2">
+                    <button class="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg">Вернуть</button>
+                    <button class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Утвердить ✓</button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- ================= TRIP CARD 2 ================= -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div onclick="toggleTrip('trip-45')" class="p-3.5 bg-slate-50 hover:bg-slate-100 cursor-pointer flex items-center justify-between gap-2 select-none">
+                <div class="flex items-center gap-2">
+                  <span class="font-black font-mono bg-slate-800 text-white px-2 py-0.5 rounded text-xs">#45</span>
+                  <div>
+                    <span class="font-bold text-slate-900 text-xs">12 июля 2026</span>
+                    <span class="text-slate-400 text-xs"> · Водитель: <b>Иванов А.</b></span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="text-right text-xs">
+                    <span class="font-bold text-slate-800">28 000 ₽</span>
+                    <span class="text-emerald-600 font-black ml-2">+18 200 ₽</span>
+                  </div>
+                  <span id="trip-icon-45" class="material-symbols-outlined text-slate-400 text-lg transition-transform duration-200">expand_more</span>
+                </div>
+              </div>
+              <div id="trip-body-45" class="hidden p-4 space-y-3 bg-white">
+                <p class="text-xs text-slate-500">Заявки рейса #45: 4 заказа на сумму 28 000 ₽ (ЗП водителя 6 800 ₽, ГСМ 3 000 ₽).</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: Заказ-наряды на ремонт ТО за период -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-rose-600 text-base">car_repair</span>
+                Заказ-наряды на ремонт и ТО (2)
+              </h4>
+              <span class="text-xs font-bold text-rose-600">Всего ТО: −21 500 ₽</span>
+            </div>
+
+            <!-- Repair Order Item 1 -->
+            <div class="bg-white p-3.5 rounded-xl border border-rose-200/80 shadow-xs space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-black font-mono bg-rose-600 text-white px-2 py-0.5 rounded">НЗ-108</span>
+                  <span class="text-slate-700 font-bold">17 июля · Слесари: Вадик, Шайдулин</span>
+                </div>
+                <span class="font-black text-rose-600 text-sm">−4 500 ₽</span>
+              </div>
+              
+              <div class="text-[11px] space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <div class="flex justify-between text-slate-700 font-medium">
+                  <span>🔧 Демонтаж левого привода, замена масла</span>
+                  <span class="text-amber-700 font-bold">ЗП слесарей: 1 500 ₽</span>
+                </div>
+                <div class="flex justify-between text-slate-700 font-medium border-t border-slate-200/50 pt-1">
+                  <span>📦 Масло трансмиссионное 4л + сальник</span>
+                  <span class="text-rose-700 font-bold">Запчасти: 3 000 ₽</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Repair Order Item 2 -->
+            <div class="bg-white p-3.5 rounded-xl border border-rose-200/80 shadow-xs space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-black font-mono bg-rose-600 text-white px-2 py-0.5 rounded">НЗ-98</span>
+                  <span class="text-slate-700 font-bold">04 июля · Слесарь: Вадик</span>
+                </div>
+                <span class="font-black text-rose-600 text-sm">−17 000 ₽</span>
+              </div>
+              
+              <div class="text-[11px] space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <div class="flex justify-between text-slate-700 font-medium">
+                  <span>🔧 Замена колодок, переборка суппорта, ТО</span>
+                  <span class="text-amber-700 font-bold">ЗП слесарей: 4 500 ₽</span>
+                </div>
+                <div class="flex justify-between text-slate-700 font-medium border-t border-slate-200/50 pt-1">
+                  <span>📦 Тормозные диски, колодки, ремкомплект</span>
+                  <span class="text-rose-700 font-bold">Запчасти: 12 500 ₽</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    function toggleVehicle(id) {
+      const body = document.getElementById('body-' + id);
+      const icon = document.getElementById('icon-' + id);
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        icon.innerText = 'expand_less';
+      } else {
+        body.classList.add('hidden');
+        icon.innerText = 'expand_more';
+      }
+    }
+
+    function toggleTrip(id) {
+      const body = document.getElementById(id.replace('trip-', 'trip-body-'));
+      const icon = document.getElementById(id.replace('trip-', 'trip-icon-'));
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        icon.innerText = 'expand_less';
+      } else {
+        body.classList.add('hidden');
+        icon.innerText = 'expand_more';
+      }
+    }
+  </script>
+
+</body>
+</html>

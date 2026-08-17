@@ -43,6 +43,10 @@ export async function GET(request: Request) {
 
     if (filter === 'history') {
       const month = searchParams.get('month');
+      const weekStart = searchParams.get('weekStart');
+      const weekEnd = searchParams.get('weekEnd');
+      const machineType = searchParams.get('machine_type');
+
       let q = (supabase.from('service_orders') as any)
         .select(fullSelect)
         .or(
@@ -51,8 +55,14 @@ export async function GET(request: Request) {
         .order('created_at', { ascending: false })
         .limit(300);
 
+      if (machineType) {
+        q = q.eq('machine_type', machineType);
+      }
+
       if (date) {
         q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
+      } else if (weekStart && weekEnd) {
+        q = q.gte('created_at', `${weekStart}T00:00:00Z`).lte('created_at', `${weekEnd}T23:59:59Z`);
       } else if (month) {
         const [yStr, mStr] = month.split('-');
         const y = Number(yStr);

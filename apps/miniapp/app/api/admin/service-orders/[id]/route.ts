@@ -23,6 +23,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     work_id?: string;
     mechanic_id?: string;
     second_mechanic_id?: string;
+    odometer_start?: number | string;
+    odometer_end?: number | string;
   };
   const supabase = createAdminClient();
 
@@ -120,8 +122,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq('id', id);
 
     // Обновляем одометр в карточке авто
-    const finalOdo = body.odometer_end ?? body.odometer_start;
-    if (finalOdo && finalOdo > 0) {
+    const finalOdo = Number(body.odometer_end ?? body.odometer_start);
+    if (!isNaN(finalOdo) && finalOdo > 0) {
       if (order.client_vehicle_id) {
         await (supabase.from('client_vehicles') as any)
           .update({ odometer_last: finalOdo, odometer_updated_at: new Date().toISOString() })
