@@ -1143,11 +1143,156 @@ function TripCard({
   );
 }
 
+// ── Maintenance Detail Modal ─────────────────────────────────
+
+function MaintenanceDetailModal({
+  group,
+  onClose,
+}: {
+  group: {
+    assetKey: string;
+    maintenanceParts: number;
+    maintenanceSalary: number;
+    maintenanceTotal: number;
+    serviceOrders: ReviewServiceOrder[];
+  };
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-rose-600 text-xl">car_repair</span>
+              Расходы на ремонт и ТО: {group.assetKey}
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Итого за месяц:{' '}
+              <span className="font-black text-rose-600">
+                −{group.maintenanceTotal.toLocaleString('ru-RU')} ₽
+              </span>{' '}
+              · Запчасти: {group.maintenanceParts.toLocaleString('ru-RU')} ₽ · ЗП слесарей:{' '}
+              {group.maintenanceSalary.toLocaleString('ru-RU')} ₽
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-4 divide-y divide-slate-100">
+          {group.serviceOrders.map((so) => {
+            const cso = calcServiceOrder(so);
+            return (
+              <div key={so.id} className="pt-4 first:pt-0 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold bg-rose-600 text-white px-2 py-0.5 rounded text-xs">
+                      НЗ-{so.order_number}
+                    </span>
+                    <span className="text-xs font-bold text-slate-700">
+                      {new Date(so.created_at).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                      })}
+                    </span>
+                    {so.mechanic?.name && (
+                      <span className="text-xs text-slate-500 font-medium">
+                        · Слесарь: {so.mechanic.name}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-black text-rose-600 text-sm">
+                    −{cso.totalCost.toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+
+                {/* Works list */}
+                {so.works && so.works.length > 0 && (
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      Выполненные работы (ЗП слесаря)
+                    </span>
+                    {so.works.map((w) => {
+                      const wage =
+                        w.status !== 'cancelled' ? (Number(w.price_client) || 0) * 0.5 : 0;
+                      return (
+                        <div key={w.id} className="flex justify-between text-slate-700">
+                          <span>🔧 {w.work_catalog?.name ?? w.custom_work_name ?? 'Работа'}</span>
+                          <span className="font-bold text-amber-700">
+                            {wage.toLocaleString('ru-RU')} ₽
+                            {w.price_client && (
+                              <span className="text-[10px] text-slate-400 font-normal ml-1">
+                                (из тарифа {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Parts list */}
+                {so.parts && so.parts.length > 0 && (
+                  <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-100 space-y-1.5 text-xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 block">
+                      Установленные запчасти
+                    </span>
+                    {so.parts.map((p) => {
+                      const cost = (Number(p.unit_price) || 0) * (Number(p.quantity) || 1);
+                      return (
+                        <div key={p.id} className="flex justify-between text-slate-700">
+                          <span>
+                            📦 {p.part?.name ?? p.custom_part_name ?? 'Деталь'} ({p.quantity}{' '}
+                            {p.unit ?? 'шт'})
+                          </span>
+                          <span className="font-bold text-rose-700">
+                            {cost.toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────
 
 export default function ReviewPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedMaintenanceGroup, setSelectedMaintenanceGroup] = useState<{
+    assetKey: string;
+    maintenanceParts: number;
+    maintenanceSalary: number;
+    maintenanceTotal: number;
+    serviceOrders: ReviewServiceOrder[];
+  } | null>(null);
+
   const searchParams = useSearchParams();
   const modeFromUrl = searchParams.get('mode') as 'review' | 'active' | 'history' | null;
   const VALID_MODES: Array<'review' | 'active' | 'history'> = ['review', 'active', 'history'];
@@ -1169,7 +1314,7 @@ export default function ReviewPage() {
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('month');
   const queryClient = useQueryClient();
 
   const { data: trips = [], isLoading } = useQuery<TripForReview[]>({
@@ -1195,7 +1340,7 @@ export default function ReviewPage() {
   const monthKey = selectedDate.slice(0, 7); // YYYY-MM
   const { data: monthTrips = [] } = useQuery<TripForReview[]>({
     queryKey: ['trips-month', monthKey],
-    enabled: mode === 'history',
+    enabled: mode === 'history' && statsPeriod === 'month',
     staleTime: 120000,
     queryFn: async () => {
       const res = await fetch(`/api/trips?lifecycle=approved&month=${monthKey}`);
@@ -1207,7 +1352,7 @@ export default function ReviewPage() {
   const { weekStart, weekEnd } = getWeekDates(selectedDate);
   const { data: weekTrips = [] } = useQuery<TripForReview[]>({
     queryKey: ['trips-week', weekStart, weekEnd],
-    enabled: mode === 'history',
+    enabled: mode === 'history' && statsPeriod === 'week',
     staleTime: 120000,
     queryFn: async () => {
       const res = await fetch(
@@ -1218,16 +1363,15 @@ export default function ReviewPage() {
     },
   });
 
-  // ── Maintenance / Service Orders Query ─────────────────────
+  // ── Maintenance / Service Orders Query (History only) ───────
   const { data: dayServiceOrders = [] } = useQuery<ReviewServiceOrder[]>({
-    queryKey: ['service-orders-day', selectedDate, mode],
+    queryKey: ['service-orders-day', selectedDate],
+    enabled: mode === 'history' && statsPeriod === 'day',
     staleTime: 60000,
     queryFn: async () => {
-      const url =
-        mode === 'history'
-          ? `/api/garage/orders?filter=history&machine_type=own&date=${selectedDate}`
-          : `/api/garage/orders?filter=all&machine_type=own`;
-      const res = await fetch(url);
+      const res = await fetch(
+        `/api/garage/orders?filter=history&machine_type=own&date=${selectedDate}`,
+      );
       if (!res.ok) return [];
       return res.json();
     },
@@ -1235,7 +1379,7 @@ export default function ReviewPage() {
 
   const { data: monthServiceOrders = [] } = useQuery<ReviewServiceOrder[]>({
     queryKey: ['service-orders-month', monthKey],
-    enabled: mode === 'history',
+    enabled: mode === 'history' && statsPeriod === 'month',
     staleTime: 120000,
     queryFn: async () => {
       const res = await fetch(
@@ -1248,7 +1392,7 @@ export default function ReviewPage() {
 
   const { data: weekServiceOrders = [] } = useQuery<ReviewServiceOrder[]>({
     queryKey: ['service-orders-week', weekStart, weekEnd],
-    enabled: mode === 'history',
+    enabled: mode === 'history' && statsPeriod === 'week',
     staleTime: 120000,
     queryFn: async () => {
       const res = await fetch(
@@ -1270,7 +1414,7 @@ export default function ReviewPage() {
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['trips-review'] });
-    queryClient.invalidateQueries({ queryKey: ['service-orders-day'] });
+    queryClient.invalidateQueries({ queryKey: ['service-orders-month'] });
   };
 
   async function handleApprove(tripId: string) {
@@ -1338,9 +1482,9 @@ export default function ReviewPage() {
         : statsPeriod === 'week'
           ? weekServiceOrders
           : monthServiceOrders
-      : dayServiceOrders;
+      : [];
 
-  // ── Combined Vehicle Groups (Trips + Maintenance) ──────────
+  // ── Combined Vehicle Groups ────────────────────────────────
   const combinedAssetGroups = useMemo(() => {
     const map = new Map<
       string,
@@ -1393,34 +1537,36 @@ export default function ReviewPage() {
       g.tripsProfit += ct.profit;
     }
 
-    // 2. Process Service Orders
-    for (const so of listServiceOrders) {
-      if (so.machine_type !== 'own' || !so.asset) continue;
-      const assetKey = `${so.asset.short_name ?? 'Свой ТС'} (${so.asset.reg_number ?? ''})`;
-      if (!map.has(assetKey)) {
-        map.set(assetKey, {
-          assetKey,
-          assetName: so.asset.short_name ?? 'Свой ТС',
-          regNumber: so.asset.reg_number ?? '',
-          trips: [],
-          serviceOrders: [],
-          tripsRevenue: 0,
-          tripsPayroll: 0,
-          tripsFuel: 0,
-          tripsExpenses: 0,
-          tripsProfit: 0,
-          maintenanceParts: 0,
-          maintenanceSalary: 0,
-          maintenanceTotal: 0,
-          netProfit: 0,
-        });
+    // 2. Process Service Orders (History only)
+    if (mode === 'history') {
+      for (const so of listServiceOrders) {
+        if (so.machine_type !== 'own' || !so.asset) continue;
+        const assetKey = `${so.asset.short_name ?? 'Свой ТС'} (${so.asset.reg_number ?? ''})`;
+        if (!map.has(assetKey)) {
+          map.set(assetKey, {
+            assetKey,
+            assetName: so.asset.short_name ?? 'Свой ТС',
+            regNumber: so.asset.reg_number ?? '',
+            trips: [],
+            serviceOrders: [],
+            tripsRevenue: 0,
+            tripsPayroll: 0,
+            tripsFuel: 0,
+            tripsExpenses: 0,
+            tripsProfit: 0,
+            maintenanceParts: 0,
+            maintenanceSalary: 0,
+            maintenanceTotal: 0,
+            netProfit: 0,
+          });
+        }
+        const g = map.get(assetKey)!;
+        g.serviceOrders.push(so);
+        const cso = calcServiceOrder(so);
+        g.maintenanceParts += cso.partsCost;
+        g.maintenanceSalary += cso.salaryCost;
+        g.maintenanceTotal += cso.totalCost;
       }
-      const g = map.get(assetKey)!;
-      g.serviceOrders.push(so);
-      const cso = calcServiceOrder(so);
-      g.maintenanceParts += cso.partsCost;
-      g.maintenanceSalary += cso.salaryCost;
-      g.maintenanceTotal += cso.totalCost;
     }
 
     // 3. Compute netProfit for each vehicle
@@ -1430,11 +1576,19 @@ export default function ReviewPage() {
     });
 
     return groups.sort((a, b) => a.assetKey.localeCompare(b.assetKey));
-  }, [listTrips, listServiceOrders]);
+  }, [listTrips, listServiceOrders, mode]);
 
   // Aggregate Fleet Totals
   const totalFleetRevenue = useMemo(
     () => combinedAssetGroups.reduce((s, g) => s + g.tripsRevenue, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetPayroll = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.tripsPayroll, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetFuel = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.tripsFuel, 0),
     [combinedAssetGroups],
   );
   const totalFleetTripCosts = useMemo(
@@ -1445,21 +1599,13 @@ export default function ReviewPage() {
     () => combinedAssetGroups.reduce((s, g) => s + g.maintenanceTotal, 0),
     [combinedAssetGroups],
   );
-  const totalFleetMaintenanceParts = useMemo(
-    () => combinedAssetGroups.reduce((s, g) => s + g.maintenanceParts, 0),
-    [combinedAssetGroups],
-  );
-  const totalFleetMaintenanceSalary = useMemo(
-    () => combinedAssetGroups.reduce((s, g) => s + g.maintenanceSalary, 0),
-    [combinedAssetGroups],
-  );
   const totalFleetNetProfit = useMemo(
     () => totalFleetRevenue - totalFleetTripCosts - totalFleetMaintenance,
     [totalFleetRevenue, totalFleetTripCosts, totalFleetMaintenance],
   );
 
   return (
-    <div className="space-y-5 max-w-5xl mx-auto animate-in fade-in duration-300">
+    <div className="space-y-5 max-w-4xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -1533,65 +1679,6 @@ export default function ReviewPage() {
         />
       )}
 
-      {/* ── 4 Top Fleet KPI Cards ── */}
-      {!isLoading && combinedAssetGroups.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              Выручка с рейсов
-            </span>
-            <div className="text-xl font-black text-slate-900 mt-1">
-              <Money amount={totalFleetRevenue.toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-slate-400 font-medium">
-              {listTrips.length} рейс
-              {listTrips.length === 1 ? '' : listTrips.length < 5 ? 'а' : 'ов'} за период
-            </span>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              Рейсовые расходы
-            </span>
-            <div className="text-xl font-black text-amber-600 mt-1">
-              −<Money amount={totalFleetTripCosts.toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-amber-600/80 font-medium">ЗП + ГСМ рейсов</span>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-500">
-              Ремонты ТО (Гараж)
-            </span>
-            <div className="text-xl font-black text-rose-600 mt-1">
-              −<Money amount={totalFleetMaintenance.toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-rose-500/80 font-medium">
-              Детали: {Math.round(totalFleetMaintenanceParts).toLocaleString('ru-RU')} ₽ · ЗП:{' '}
-              {Math.round(totalFleetMaintenanceSalary).toLocaleString('ru-RU')} ₽
-            </span>
-          </div>
-
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-md">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
-              Итоговая чистая прибыль
-            </span>
-            <div
-              className={cn(
-                'text-xl font-black mt-1',
-                totalFleetNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
-              )}
-            >
-              {totalFleetNetProfit < 0 ? '−' : ''}
-              <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-emerald-300 font-medium">
-              Рейсы − Расходы − Ремонты ТО
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Summary line */}
       {!isLoading && (
         <div className="flex items-center justify-between">
@@ -1612,8 +1699,7 @@ export default function ReviewPage() {
                 {listServiceOrders.length > 0 && (
                   <span className="text-rose-600 font-semibold">
                     {' '}
-                    · {listServiceOrders.length} заказ-наряд
-                    {listServiceOrders.length === 1 ? '' : 'а'} ТО
+                    · {listServiceOrders.length} наряд{listServiceOrders.length === 1 ? '' : 'а'} ТО
                   </span>
                 )}
               </>
@@ -1682,9 +1768,6 @@ export default function ReviewPage() {
                     ? 'Нет активных рейсов'
                     : 'Нет данных за этот период'}
               </p>
-              {mode === 'review' && (
-                <p className="text-slate-400 text-sm mt-1">Новые рейсы появятся здесь</p>
-              )}
             </div>
           ) : (
             <>
@@ -1710,23 +1793,44 @@ export default function ReviewPage() {
                           <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
                             <span>
                               {group.trips.length} рейс
-                              {group.trips.length === 1 ? '' : group.trips.length < 5 ? 'а' : 'ов'}
+                              {group.trips.length === 1 ? '' : group.trips.length < 5 ? 'а' : 'ов'}:
                             </span>
-                            <span className="text-slate-300">·</span>
-                            {group.serviceOrders.length > 0 ? (
-                              <span className="text-rose-600 font-bold">
-                                {group.serviceOrders.length} наряд
-                                {group.serviceOrders.length === 1 ? '' : 'а'} ТО (−
-                                {group.maintenanceTotal.toLocaleString('ru-RU')} ₽)
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">Ремонтов не было (0 ₽)</span>
+                            <div className="inline-flex flex-wrap gap-1 items-center">
+                              {group.trips.map((t) => (
+                                <span
+                                  key={t.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!expandedGroups.has(group.assetKey)) {
+                                      toggleGroup(group.assetKey);
+                                    }
+                                    if (!expandedIds.has(t.id)) {
+                                      toggleExpand(t.id);
+                                    }
+                                  }}
+                                  className="inline-flex items-center bg-sky-50 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-1.5 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                  title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
+                                >
+                                  #{t.trip_number}
+                                </span>
+                              ))}
+                            </div>
+                            {mode === 'history' && group.serviceOrders.length > 0 && (
+                              <>
+                                <span className="text-slate-300">·</span>
+                                <span className="text-rose-600 font-bold">
+                                  {group.serviceOrders.length} наряд
+                                  {group.serviceOrders.length === 1 ? '' : 'а'} ТО (−
+                                  {group.maintenanceTotal.toLocaleString('ru-RU')} ₽)
+                                </span>
+                              </>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 sm:gap-5">
+                      {/* Header Metrics */}
+                      <div className="flex items-center gap-3 sm:gap-4">
                         <div className="text-right hidden sm:block">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                             Выручка
@@ -1737,34 +1841,48 @@ export default function ReviewPage() {
                         </div>
                         <div className="text-right hidden sm:block">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Рейс (ЗП+ГСМ)
+                            ЗП
                           </span>
-                          <span className="text-sm font-black text-amber-600">
-                            −
-                            <Money amount={(group.tripsPayroll + group.tripsExpenses).toFixed(2)} />
-                          </span>
-                        </div>
-                        <div className="text-right hidden sm:block bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
-                          <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 block">
-                            Ремонт ТО
-                          </span>
-                          <span className="text-sm font-black text-rose-600">
-                            {group.maintenanceTotal > 0 ? (
-                              <>
-                                −<Money amount={group.maintenanceTotal.toFixed(2)} />
-                              </>
-                            ) : (
-                              '0 ₽'
-                            )}
+                          <span className="text-sm font-black text-amber-500">
+                            <Money amount={group.tripsPayroll.toFixed(2)} />
                           </span>
                         </div>
-                        <div className="text-right bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
-                          <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 block">
-                            Чистый итог
+                        <div className="text-right hidden sm:block">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            ГСМ
+                          </span>
+                          <span className="text-sm font-black text-rose-500">
+                            <Money amount={group.tripsFuel.toFixed(2)} />
+                          </span>
+                        </div>
+                        {mode === 'history' && (
+                          <div className="text-right hidden sm:block">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              Ремонт ТО
+                            </span>
+                            <span
+                              className={cn(
+                                'text-sm font-black',
+                                group.maintenanceTotal > 0 ? 'text-rose-600' : 'text-slate-400',
+                              )}
+                            >
+                              {group.maintenanceTotal > 0 ? (
+                                <>
+                                  −<Money amount={group.maintenanceTotal.toFixed(2)} />
+                                </>
+                              ) : (
+                                '0 ₽'
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Прибыль
                           </span>
                           <span
                             className={cn(
-                              'text-sm sm:text-base font-black',
+                              'text-sm font-black',
                               group.netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
                             )}
                           >
@@ -1783,187 +1901,58 @@ export default function ReviewPage() {
                       </div>
                     </div>
 
-                    {/* Group Content (Formula + 2 Columns: Trips vs Maintenance) */}
+                    {/* Group Content (Trips + Optional Maintenance Banner) */}
                     {isExpanded && (
-                      <div>
-                        {/* Formula Bar */}
-                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-slate-400 font-medium">
-                              Расчёт чистой прибыли машины:
-                            </span>
-                            <span className="bg-white/10 px-2 py-0.5 rounded font-bold">
-                              Рейсы: {group.tripsProfit >= 0 ? '+' : ''}
-                              <Money amount={group.tripsProfit.toFixed(2)} />
-                            </span>
-                            <span className="text-slate-400">−</span>
-                            <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-bold">
-                              Запчасти ТО: <Money amount={group.maintenanceParts.toFixed(2)} />
-                            </span>
-                            <span className="text-slate-400">−</span>
-                            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
-                              ЗП ремонта ТО: <Money amount={group.maintenanceSalary.toFixed(2)} />
-                            </span>
-                            <span className="text-slate-400">=</span>
-                            <span
-                              className={cn(
-                                'px-2.5 py-0.5 rounded font-black text-sm shadow-xs',
-                                group.netProfit >= 0
-                                  ? 'bg-emerald-500 text-white'
-                                  : 'bg-rose-500 text-white',
-                              )}
+                      <div className="p-3 bg-slate-50/50 border-t border-slate-100 space-y-3">
+                        {/* Maintenance Banner (if vehicle had repairs) */}
+                        {mode === 'history' && group.serviceOrders.length > 0 && (
+                          <div className="bg-rose-50 border border-rose-200/80 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-rose-600 text-[18px]">
+                                car_repair
+                              </span>
+                              <span className="text-slate-800 font-bold">
+                                Расходы на ремонт и ТО:{' '}
+                                <span className="text-rose-600 font-black">
+                                  −{group.maintenanceTotal.toLocaleString('ru-RU')} ₽
+                                </span>
+                              </span>
+                              <span className="text-slate-500 hidden sm:inline">
+                                (Запчасти: {group.maintenanceParts.toLocaleString('ru-RU')} ₽ · ЗП
+                                слесарей: {group.maintenanceSalary.toLocaleString('ru-RU')} ₽)
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedMaintenanceGroup(group);
+                              }}
+                              className="px-3 py-1 bg-white hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-2xs text-xs"
                             >
-                              {group.netProfit >= 0 ? '+' : ''}
-                              <Money amount={group.netProfit.toFixed(2)} />
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 2 Columns: Trips vs Service Orders */}
-                        <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-5 bg-slate-50/50">
-                          {/* Left: Trips */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-sky-600 text-base">
-                                  route
-                                </span>
-                                Рейсы автомобиля ({group.trips.length})
-                              </h4>
-                              <span className="text-xs font-bold text-emerald-600">
-                                Прибыль рейсов: {group.tripsProfit >= 0 ? '+' : ''}
-                                <Money amount={group.tripsProfit.toFixed(2)} />
+                              <span className="material-symbols-outlined text-[15px]">
+                                receipt_long
                               </span>
-                            </div>
-
-                            {group.trips.length === 0 ? (
-                              <div className="bg-white p-6 rounded-xl border border-slate-200 text-center text-xs text-slate-400 font-medium">
-                                За выбранный период рейсов не зафиксировано
-                              </div>
-                            ) : (
-                              <div className="space-y-3">
-                                {group.trips.map((trip) => (
-                                  <TripCard
-                                    key={trip.id}
-                                    trip={trip}
-                                    mode={mode}
-                                    expanded={expandedIds.has(trip.id)}
-                                    onToggle={() => toggleExpand(trip.id)}
-                                    onEdit={() => setEditTrip(trip)}
-                                    onApprove={() => handleApprove(trip.id)}
-                                    onReturn={() => handleReturn(trip.id)}
-                                    onDelete={() => handleDelete(trip.id)}
-                                    approving={approvingId === trip.id}
-                                    deleting={deletingId === trip.id}
-                                  />
-                                ))}
-                              </div>
-                            )}
+                              Расшифровка нарядов ({group.serviceOrders.length})
+                            </button>
                           </div>
+                        )}
 
-                          {/* Right: Service Orders */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-rose-600 text-base">
-                                  car_repair
-                                </span>
-                                Заказ-наряды на ремонт и ТО ({group.serviceOrders.length})
-                              </h4>
-                              <span className="text-xs font-bold text-rose-600">
-                                Всего ТО: −<Money amount={group.maintenanceTotal.toFixed(2)} />
-                              </span>
-                            </div>
-
-                            {group.serviceOrders.length === 0 ? (
-                              <div className="bg-white p-6 rounded-xl border border-slate-200 text-center text-xs text-slate-400 font-medium">
-                                🔧 За выбранный период заказ-нарядов на ремонт не было (0 ₽)
-                              </div>
-                            ) : (
-                              <div className="space-y-3">
-                                {group.serviceOrders.map((so) => {
-                                  const cso = calcServiceOrder(so);
-                                  return (
-                                    <div
-                                      key={so.id}
-                                      className="bg-white p-3.5 rounded-xl border border-rose-200/80 shadow-xs space-y-2.5"
-                                    >
-                                      <div className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-black font-mono bg-rose-600 text-white px-2 py-0.5 rounded">
-                                            НЗ-{so.order_number}
-                                          </span>
-                                          <span className="text-slate-700 font-bold">
-                                            {new Date(so.created_at).toLocaleDateString('ru-RU', {
-                                              day: 'numeric',
-                                              month: 'short',
-                                            })}
-                                            {so.mechanic?.name ? ` · ${so.mechanic.name}` : ''}
-                                          </span>
-                                        </div>
-                                        <span className="font-black text-rose-600 text-sm">
-                                          −<Money amount={cso.totalCost.toFixed(2)} />
-                                        </span>
-                                      </div>
-
-                                      <div className="text-[11px] space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                        {/* Works */}
-                                        {so.works && so.works.length > 0 && (
-                                          <div className="space-y-1">
-                                            {so.works.slice(0, 3).map((w) => (
-                                              <div
-                                                key={w.id}
-                                                className="flex justify-between text-slate-700 font-medium"
-                                              >
-                                                <span className="truncate pr-2">
-                                                  🔧{' '}
-                                                  {w.work_catalog?.name ??
-                                                    w.custom_work_name ??
-                                                    'Работа'}
-                                                </span>
-                                                <span className="text-amber-700 font-bold shrink-0">
-                                                  {w.price_client
-                                                    ? `${parseFloat(w.price_client).toLocaleString('ru-RU')} ₽`
-                                                    : '—'}
-                                                </span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-
-                                        {/* Parts */}
-                                        {so.parts && so.parts.length > 0 && (
-                                          <div className="space-y-1 border-t border-slate-200/60 pt-1">
-                                            {so.parts.slice(0, 3).map((p) => {
-                                              const cost =
-                                                (Number(p.unit_price) || 0) *
-                                                (Number(p.quantity) || 1);
-                                              return (
-                                                <div
-                                                  key={p.id}
-                                                  className="flex justify-between text-slate-700 font-medium"
-                                                >
-                                                  <span className="truncate pr-2">
-                                                    📦{' '}
-                                                    {p.part?.name ?? p.custom_part_name ?? 'Деталь'}{' '}
-                                                    ({p.quantity} {p.unit ?? 'шт'})
-                                                  </span>
-                                                  <span className="text-rose-700 font-bold shrink-0">
-                                                    {cost.toLocaleString('ru-RU')} ₽
-                                                  </span>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        {/* Full-width standard Trip Cards */}
+                        {group.trips.map((trip) => (
+                          <TripCard
+                            key={trip.id}
+                            trip={trip}
+                            mode={mode}
+                            expanded={expandedIds.has(trip.id)}
+                            onToggle={() => toggleExpand(trip.id)}
+                            onEdit={() => setEditTrip(trip)}
+                            onApprove={() => handleApprove(trip.id)}
+                            onReturn={() => handleReturn(trip.id)}
+                            onDelete={() => handleDelete(trip.id)}
+                            approving={approvingId === trip.id}
+                            deleting={deletingId === trip.id}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
@@ -1979,8 +1968,8 @@ export default function ReviewPage() {
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       {mode === 'history'
-                        ? `Итоговая статистика автопарка · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`
-                        : `Итого автопарк · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`}
+                        ? `Итоговая статистика · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`
+                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
                     </span>
                   </div>
                 </div>
@@ -2001,10 +1990,10 @@ export default function ReviewPage() {
 
                       <div className="w-[85px] sm:w-[100px] text-center">
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Рейс (ЗП+ГСМ)
+                          Зарплаты
                         </span>
                         <span className="text-sm sm:text-base font-black text-amber-400">
-                          −<Money amount={totalFleetTripCosts.toFixed(2)} />
+                          −<Money amount={totalFleetPayroll.toFixed(2)} />
                         </span>
                       </div>
 
@@ -2012,18 +2001,33 @@ export default function ReviewPage() {
 
                       <div className="w-[85px] sm:w-[100px] text-center">
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Ремонты ТО
+                          Топливо
                         </span>
-                        <span className="text-sm sm:text-base font-black text-rose-400">
-                          −<Money amount={totalFleetMaintenance.toFixed(2)} />
+                        <span className="text-sm sm:text-base font-black text-blue-400">
+                          −<Money amount={totalFleetFuel.toFixed(2)} />
                         </span>
                       </div>
+
+                      {mode === 'history' && (
+                        <>
+                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                          <div className="w-[85px] sm:w-[100px] text-center">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                              Ремонты ТО
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-rose-400">
+                              −<Money amount={totalFleetMaintenance.toFixed(2)} />
+                            </span>
+                          </div>
+                        </>
+                      )}
 
                       <span className="text-slate-600 text-sm hidden sm:block">=</span>
 
                       <div className="w-[85px] sm:w-[100px] text-center">
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Чистый доход
+                          Чистый итог
                         </span>
                         <span
                           className={cn(
@@ -2043,6 +2047,15 @@ export default function ReviewPage() {
           )}
         </div>
       )}
+
+      {/* Maintenance Breakdown Modal */}
+      {selectedMaintenanceGroup && (
+        <MaintenanceDetailModal
+          group={selectedMaintenanceGroup}
+          onClose={() => setSelectedMaintenanceGroup(null)}
+        />
+      )}
+
       {/* Edit modal */}
       {editTrip && (
         <EditModal
