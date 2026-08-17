@@ -136,10 +136,6 @@ export async function PATCH(
 }
 
 function getWorkPct(w: any, defaultUserPct: string | number | null | undefined): number {
-  if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
-    const pct = Number(w.custom_salary_pct);
-    if (pct >= 0 && pct <= 100) return pct;
-  }
   if (w.notes) {
     const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
     if (match && match[1]) {

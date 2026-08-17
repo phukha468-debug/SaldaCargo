@@ -120,7 +120,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           `id, lifecycle_status, order_number, machine_type,
            mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
            second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, mechanic_id, second_mechanic_id, price_client, custom_work_name, custom_salary_pct, notes, work_catalog:work_catalog(name))`,
+           works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, mechanic_id, second_mechanic_id, price_client, custom_work_name, notes, work_catalog:work_catalog(name))`,
         )
         .eq('id', id)
         .single();
@@ -316,10 +316,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             w: any,
             defaultUserPct: string | number | null | undefined,
           ): number => {
-            if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
-              const pct = Number(w.custom_salary_pct);
-              if (pct >= 0 && pct <= 100) return pct;
-            }
             if (w.notes) {
               const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
               if (match && match[1]) {

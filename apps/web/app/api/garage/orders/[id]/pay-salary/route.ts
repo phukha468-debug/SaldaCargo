@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       mechanic_pay, second_mechanic_pay,
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
       second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, custom_salary_pct, notes)
+      works:service_order_works(id, status, salary_paid, norm_minutes, actual_minutes, price_client, notes)
     `,
     )
     .eq('id', orderId)
@@ -55,10 +55,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   );
 
   const getWorkPct = (w: any, defaultUserPct: string | number | null | undefined): number => {
-    if (w.custom_salary_pct != null && !isNaN(Number(w.custom_salary_pct))) {
-      const pct = Number(w.custom_salary_pct);
-      if (pct >= 0 && pct <= 100) return pct;
-    }
     if (w.notes) {
       const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
       if (match && match[1]) {
