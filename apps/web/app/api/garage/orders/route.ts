@@ -105,6 +105,11 @@ export async function GET(request: Request) {
       q = q.neq('lifecycle_status', 'cancelled');
     }
 
+    const machineType = searchParams.get('machine_type');
+    if (machineType) {
+      q = q.eq('machine_type', machineType);
+    }
+
     const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? []);
