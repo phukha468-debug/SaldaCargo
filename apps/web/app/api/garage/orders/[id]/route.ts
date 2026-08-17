@@ -249,7 +249,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       // Начисляем ЗП механикам
       const unpaidWorks = (order.works ?? []).filter(
-        (w: any) => w.status === 'completed' && !w.salary_paid,
+        (w: any) => w.status !== 'cancelled' && !w.salary_paid,
       );
       const manualPays = body.mechanic_pays as Record<string, number> | undefined;
       const hasManualPay = manualPays && Object.keys(manualPays).length > 0;
@@ -261,7 +261,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           .select('id')
           .filter('roles', 'cs', '{"admin"}')
           .limit(1)
-          .single();
+          .maybeSingle();
         const createdBy = adminUser?.id ?? null;
         const txns: any[] = [];
         const payMap: Record<string, string> = {}; // Keep empty unless needed for legacy

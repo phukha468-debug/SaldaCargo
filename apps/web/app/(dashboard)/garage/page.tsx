@@ -766,18 +766,24 @@ function OrderDetailModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!r.ok) throw new Error('Ошибка');
-      return r.json();
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка при сохранении наряда');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
       queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
+      setShowCloseDialog(false);
       setEditNote(null);
       setEditStatus(null);
       setEditPriority(null);
       setEditOdometerStart(null);
       setEditOdometerEnd(null);
+      onClose();
+    },
+    onError: (err: Error) => {
+      alert(`Ошибка: ${err.message}`);
     },
   });
 
@@ -811,10 +817,8 @@ function OrderDetailModal({
       const basePrice = mechs.length === 2 ? workPrice / 2 : workPrice;
       for (const mechId of mechs) {
         const mech = mechanics.find((m) => m.id === mechId);
-        if (mech) {
-          const pct = parseFloat((mech as MechanicWithPct).mechanic_salary_pct ?? '50');
-          defaults[mechId] = (defaults[mechId] || 0) + (basePrice * pct) / 100;
-        }
+        const pct = mech ? parseFloat((mech as MechanicWithPct).mechanic_salary_pct ?? '50') : 50;
+        defaults[mechId] = (defaults[mechId] || 0) + (basePrice * pct) / 100;
       }
     });
     const formatted: Record<string, string> = {};
@@ -2636,8 +2640,6 @@ function OrderDetailModal({
                       if (closeOdometerStart) updates.odometer_start = Number(closeOdometerStart);
                       if (closeOdometerEnd) updates.odometer_end = Number(closeOdometerEnd);
                       patchMutation.mutate(updates);
-                      setShowCloseDialog(false);
-                      onClose();
                     }}
                     disabled={patchMutation.isPending}
                     className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
