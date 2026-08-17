@@ -132,6 +132,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       // Утверждаем наряд; own-машины не требуют оплаты от клиента
       const orderUpdatePayload: Record<string, unknown> = {
+        status: 'completed',
         lifecycle_status: 'approved',
         payment_received: order.machine_type === 'own',
         updated_at: new Date().toISOString(),
@@ -146,7 +147,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         orderUpdatePayload.odometer_end = Number(body.odometer_end);
       }
 
-      await (supabase as any).from('service_orders').update(orderUpdatePayload).eq('id', id);
+      await Promise.all([
+        (supabase as any).from('service_orders').update(orderUpdatePayload).eq('id', id),
+        (supabase as any)
+          .from('service_order_works')
+          .update({ status: 'completed' })
+          .eq('service_order_id', id)
+          .neq('status', 'cancelled'),
+      ]);
 
       // Обновляем одометр в карточке автомобиля
       const finalOdo = body.odometer_end

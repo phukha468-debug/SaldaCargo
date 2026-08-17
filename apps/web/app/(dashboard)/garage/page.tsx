@@ -769,13 +769,10 @@ function OrderDetailModal({
       if (!r.ok) throw new Error('Ошибка');
       return r.json();
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
-      // Обновляем список и дашборд только при смене lifecycle (закрытие/открытие наряда)
-      if ('lifecycle_status' in variables) {
-        queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
-        queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
       setEditNote(null);
       setEditStatus(null);
       setEditPriority(null);
@@ -2629,6 +2626,7 @@ function OrderDetailModal({
                   <button
                     onClick={() => {
                       const updates: Record<string, unknown> = {
+                        status: 'completed',
                         lifecycle_status: 'approved',
                         mechanic_pays: closePays,
                         mechanic_note: closeRecommendation.trim() || null,
