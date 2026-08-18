@@ -6276,84 +6276,61 @@ function WorkOrdersSection() {
         </div>
       </div>
 
-      {/* ── Reminders Banner ── */}
+      {/* ── Compact Single-Line Reminders Banner ── */}
       {reminders.length > 0 && (
-        <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🔔</span>
-              <div>
-                <h3 className="text-sm font-bold text-amber-950">
-                  Напоминания о прозвоне клиентов по ТО ({reminders.length})
-                </h3>
-                <p className="text-xs text-amber-700">
-                  Срок рекомендаций по обслуживанию наступил или приближается — позвоните клиентам
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {reminders.map((rem: ReminderItem) => {
-              const clientName = rem.vehicle?.counterparty?.name || 'Клиент';
-              const clientPhone = rem.vehicle?.counterparty?.phone || '';
-              const vehicleStr = [rem.vehicle?.brand, rem.vehicle?.model, rem.vehicle?.reg_number]
-                .filter(Boolean)
-                .join(' ');
-              const orderNum = rem.order?.order_number;
+        <div className="bg-gradient-to-r from-amber-50 via-amber-50/70 to-orange-50/80 border border-amber-300/80 rounded-xl px-4 py-2.5 shadow-xs flex items-center justify-between gap-3 flex-wrap text-xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white font-bold shrink-0 shadow-xs text-sm">
+              🔔
+            </span>
+            <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-amber-950 shrink-0">
+                Напоминание по ТО ({reminders.length}):
+              </span>
+              {reminders.slice(0, 1).map((rem: ReminderItem) => {
+                const clientName = rem.vehicle?.counterparty?.name || 'Клиент';
+                const clientPhone = rem.vehicle?.counterparty?.phone || '';
+                const vehicleStr = [rem.vehicle?.brand, rem.vehicle?.model, rem.vehicle?.reg_number]
+                  .filter(Boolean)
+                  .join(' ');
 
-              return (
-                <div
-                  key={rem.id}
-                  className="bg-white border border-amber-200/80 rounded-xl p-3 shadow-xs space-y-2 flex flex-col justify-between"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-bold text-xs text-slate-900 line-clamp-1">
-                        {clientName}
-                      </span>
-                      {rem.due_date && (
-                        <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded shrink-0">
-                          до {new Date(rem.due_date).toLocaleDateString('ru-RU')}
-                        </span>
-                      )}
-                    </div>
-                    {vehicleStr && (
-                      <p className="text-xs text-slate-600 font-medium line-clamp-1">
-                        {vehicleStr}
-                      </p>
-                    )}
-                    <p className="text-xs text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-100 italic">
-                      «{rem.text}»
-                    </p>
-                    {rem.due_km && (
-                      <p className="text-[10px] text-slate-400">
-                        Целевой пробег: {rem.due_km.toLocaleString('ru-RU')} км
-                        {orderNum ? ` (наряд НЗ-${orderNum})` : ''}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 mt-2">
-                    {clientPhone ? (
+                return (
+                  <div key={rem.id} className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="font-bold text-slate-900 shrink-0">
+                      {clientName} {vehicleStr ? `(${vehicleStr})` : ''}
+                    </span>
+                    <span
+                      className="text-slate-500 truncate max-w-md hidden sm:inline"
+                      title={rem.text}
+                    >
+                      — «{rem.text}»
+                    </span>
+                    {clientPhone && (
                       <a
                         href={`tel:${clientPhone}`}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        className="font-bold text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-0.5 rounded-md text-[11px] shrink-0 hover:bg-blue-50 transition-colors"
                       >
                         📞 {clientPhone}
                       </a>
-                    ) : (
-                      <span className="text-xs text-slate-400">Нет телефона</span>
                     )}
-                    <button
-                      onClick={() => markReminderDoneMutation.mutate(rem.id)}
-                      disabled={markReminderDoneMutation.isPending}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-lg disabled:opacity-50"
-                    >
-                      ✓ Позвонил
-                    </button>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {reminders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => markReminderDoneMutation.mutate(reminders[0].id)}
+                disabled={markReminderDoneMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <span>✓</span>
+                <span>Позвонил</span>
+              </button>
+            )}
           </div>
         </div>
       )}
