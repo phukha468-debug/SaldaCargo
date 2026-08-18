@@ -1005,11 +1005,25 @@ function PayrollHistoryModal({
             </div>
           ) : (
             displayList.map((tx) => {
+              if (!tx || !tx.id) return null;
               const meta = classifyStaffTx(tx);
               const isIncome = meta.isIncome;
               const isAdvance = tx.category_id === ADVANCE_CAT;
               const isPayroll = PAYROLL_CATS.includes(tx.category_id);
               const canEdit = isAdvance || isPayroll;
+
+              const txDate = tx.transaction_date || tx.created_at;
+              const parsedDate = txDate ? new Date(txDate) : null;
+              const dateStr =
+                parsedDate && !isNaN(parsedDate.getTime())
+                  ? parsedDate.toLocaleDateString('ru-RU', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : '—';
+
+              const numAmount = parseFloat(tx.amount || '0') || 0;
 
               return (
                 <div
@@ -1022,13 +1036,7 @@ function PayrollHistoryModal({
                   {/* Left info */}
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-slate-400">
-                        {new Date(tx.created_at).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </span>
+                      <span className="text-xs font-bold text-slate-400">{dateStr}</span>
 
                       <span
                         className={cn(
@@ -1111,7 +1119,7 @@ function PayrollHistoryModal({
                           )}
                         >
                           {isIncome ? '+' : '−'}&nbsp;
-                          {parseFloat(tx.amount).toLocaleString('ru-RU')} ₽
+                          {numAmount.toLocaleString('ru-RU')} ₽
                         </span>
 
                         {canEdit && (
@@ -1120,7 +1128,7 @@ function PayrollHistoryModal({
                               type="button"
                               onClick={() => {
                                 setEditingId(tx.id);
-                                setEditAmount(tx.amount);
+                                setEditAmount(tx.amount || '0');
                                 setError('');
                               }}
                               className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
