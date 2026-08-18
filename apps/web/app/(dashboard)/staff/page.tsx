@@ -625,14 +625,88 @@ const PAYROLL_CATS = [
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
 ];
 
-function txLabel(tx: PayrollUser['history'][number]): string {
-  if (tx.category_id === ADVANCE_CAT) {
-    return tx.direction === 'expense' ? 'Аванс выдан' : 'Аванс зачтён';
+type StaffTx = PayrollUser['history'][number] & {
+  from_wallet?: { id: string; name: string; type: string } | null;
+  transaction_date?: string | null;
+};
+
+function classifyStaffTx(tx: StaffTx) {
+  const isAdvanceGiven = tx.category_id === ADVANCE_CAT && tx.direction === 'expense';
+  const isAdvanceOffset = tx.category_id === ADVANCE_CAT && tx.direction === 'income';
+  const isPayout =
+    Boolean(tx.from_wallet_id) ||
+    Boolean(tx.description && tx.description.startsWith('Выплата зарплаты'));
+  const isPayrollAccrual = PAYROLL_CATS.includes(tx.category_id) && !isPayout;
+
+  if (isPayrollAccrual) {
+    let source = 'Зарплата';
+    const lower = (tx.description || '').toLowerCase();
+    if (lower.includes('рейс')) {
+      source = 'Рейс';
+    } else if (lower.includes('наряд') || lower.includes('нз-')) {
+      source = 'Наряд ТО';
+    }
+    return {
+      type: 'accrual' as const,
+      isIncome: true,
+      badgeText: 'Заработано',
+      badgeCls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      source,
+      title: tx.description || 'Начисление зарплаты',
+    };
   }
-  if (tx.from_wallet_id || (tx.description && tx.description.startsWith('Выплата зарплаты'))) {
-    return 'Выплата ЗП';
+
+  if (isPayout) {
+    const walletName =
+      tx.from_wallet?.name ||
+      (tx.description?.includes('Касса')
+        ? '💵 Касса наличные'
+        : tx.description?.includes('Р/С') || tx.description?.includes('Банк')
+          ? '🏦 Р/С (Банк)'
+          : '💵 Выплата деньгами');
+    return {
+      type: 'payout' as const,
+      isIncome: false,
+      badgeText: 'Выплата ЗП',
+      badgeCls: 'bg-blue-50 text-blue-700 border-blue-200',
+      source: walletName,
+      title: tx.description || 'Выплата зарплаты',
+    };
   }
-  return tx.settlement_status === 'pending' ? 'ЗП начислена' : 'ЗП закрыта';
+
+  if (isAdvanceGiven) {
+    const walletName =
+      tx.from_wallet?.name ||
+      (tx.description?.includes('Касса') ? '💵 Касса наличные' : '💰 Аванс');
+    return {
+      type: 'advance' as const,
+      isIncome: false,
+      badgeText: 'Выдан аванс',
+      badgeCls: 'bg-purple-50 text-purple-700 border-purple-200',
+      source: walletName,
+      title: tx.description || 'Выдан аванс',
+    };
+  }
+
+  if (isAdvanceOffset) {
+    return {
+      type: 'offset' as const,
+      isIncome: true,
+      badgeText: 'Зачёт аванса',
+      badgeCls: 'bg-slate-100 text-slate-600 border-slate-200',
+      source: 'Взаимозачёт',
+      title: tx.description || 'Зачёт ранее выданного аванса',
+    };
+  }
+
+  return {
+    type: 'other' as const,
+    isIncome: tx.direction === 'income',
+    badgeText: tx.direction === 'income' ? 'Поступление' : 'Списание',
+    badgeCls: 'bg-slate-100 text-slate-700 border-slate-200',
+    source: 'Операция',
+    title: tx.description || 'Операция',
+  };
 }
 
 function PayrollHistoryModal({
@@ -644,10 +718,44 @@ function PayrollHistoryModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'all' | 'incomes' | 'expenses'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const history = (user.history ?? []) as StaffTx[];
+
+  // Categorized lists
+  const accruals = useMemo(
+    () => history.filter((t) => classifyStaffTx(t).type === 'accrual'),
+    [history],
+  );
+  const payouts = useMemo(
+    () =>
+      history.filter(
+        (t) => classifyStaffTx(t).type === 'payout' || classifyStaffTx(t).type === 'advance',
+      ),
+    [history],
+  );
+
+  // Financial totals
+  const totalAccrued = useMemo(
+    () => accruals.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
+    [accruals],
+  );
+  const totalPaidOut = useMemo(
+    () => payouts.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
+    [payouts],
+  );
+  const balanceToPay = parseFloat(user.payout || user.debt || String(totalAccrued - totalPaidOut));
+
+  // Current display list according to tab
+  const displayList = useMemo(() => {
+    if (activeTab === 'incomes') return accruals;
+    if (activeTab === 'expenses') return payouts;
+    return history;
+  }, [activeTab, accruals, payouts, history]);
 
   async function handleSave(txId: string) {
     const val = parseFloat(editAmount);
@@ -675,7 +783,7 @@ function PayrollHistoryModal({
   }
 
   async function handleConfirmAdmin(txId: string) {
-    if (!confirm('Подтвердить это начисление за водителя?')) return;
+    if (!confirm('Подтвердить это начисление за сотрудника?')) return;
     setSaving(true);
     try {
       const r = await fetch(`/api/staff/transactions/${txId}`, {
@@ -708,186 +816,333 @@ function PayrollHistoryModal({
     }
   }
 
-  const history = user.history;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
           <div>
-            <h2 className="font-bold text-slate-900">История транзакций</h2>
-            <p className="text-sm text-slate-500">{user.name}</p>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-slate-800 text-2xl">
+                account_balance
+              </span>
+              <h2 className="font-black text-slate-900 text-lg">История операций: {user.name}</h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+              <span>{user.roles.map((r) => ROLE_LABEL[r] ?? r).join(', ')}</span>
+              {user.phone && (
+                <span className="font-mono text-slate-600">📞 {formatPhone(user.phone)}</span>
+              )}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 text-xl leading-none transition-colors"
           >
-            ×
+            ✕
           </button>
         </div>
 
-        {/* Предупреждение */}
-        <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-[10px] text-amber-800 leading-relaxed">
-          <span className="font-bold">Правила редактирования:</span> ЗП начислена (ожидает выплаты)
-          — можно смело исправлять или удалять.{' '}
-          <span className="font-bold text-rose-700">
-            ЗП выплачена и Авансы — редактировать только для исправления ошибки ввода:
-          </span>{' '}
-          изменение суммы повлияет на P&L и остаток долга, удаление необратимо.
+        {/* ── KPI Summary Cards ── */}
+        <div className="p-6 pb-4 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
+          {/* Card 1: Incomes */}
+          <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                  arrow_circle_down
+                </span>
+                Поступления
+              </span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
+                {accruals.length} начислений
+              </span>
+            </div>
+            <div className="mt-2">
+              <span className="text-xl font-black text-emerald-600">
+                +&nbsp;{totalAccrued.toLocaleString('ru-RU')} ₽
+              </span>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                Заработано за рейсы и ТО
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2: Expenses */}
+          <div className="bg-white rounded-2xl p-4 border border-rose-100 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px] text-rose-600">
+                  arrow_circle_up
+                </span>
+                Списания
+              </span>
+              <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-full">
+                {payouts.length} выплат
+              </span>
+            </div>
+            <div className="mt-2">
+              <span className="text-xl font-black text-rose-600">
+                −&nbsp;{totalPaidOut.toLocaleString('ru-RU')} ₽
+              </span>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                Выдано деньгами + авансы
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Balance */}
+          <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px] text-amber-400">
+                  account_balance_wallet
+                </span>
+                К выплате
+              </span>
+              <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-1.5 py-0.5 rounded-full">
+                Остаток
+              </span>
+            </div>
+            <div className="mt-2">
+              <span
+                className={cn(
+                  'text-xl font-black',
+                  balanceToPay > 0
+                    ? 'text-amber-400'
+                    : balanceToPay < 0
+                      ? 'text-purple-300'
+                      : 'text-slate-300',
+                )}
+              >
+                {balanceToPay.toLocaleString('ru-RU')} ₽
+              </span>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                {balanceToPay > 0
+                  ? 'Долг компании перед сотрудником'
+                  : balanceToPay < 0
+                    ? 'Долг сотрудника по авансу'
+                    : 'Все расчёты закрыты'}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="overflow-y-auto flex-1">
-          {history.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-10">История пуста</p>
-          ) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                    Дата
-                  </th>
-                  <th className="px-2 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                    Описание
-                  </th>
-                  <th className="px-2 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest text-right">
-                    Сумма
-                  </th>
-                  <th className="px-2 py-2 w-16" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {history.map((tx) => {
-                  const label = txLabel(tx);
-                  const isAdvance = tx.category_id === ADVANCE_CAT;
-                  const isPayroll = PAYROLL_CATS.includes(tx.category_id);
-                  const canEdit = isAdvance || isPayroll;
-                  const colorCls =
-                    isAdvance && tx.direction === 'expense'
-                      ? 'text-violet-600'
-                      : isAdvance
-                        ? 'text-violet-400'
-                        : tx.settlement_status === 'pending'
-                          ? 'text-amber-600'
-                          : 'text-emerald-600';
+        {/* ── Tabs Navigation ── */}
+        <div className="px-6 pt-3 border-b border-slate-200 flex items-center gap-2 bg-white shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab('all')}
+            className={cn(
+              'pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 px-2 cursor-pointer',
+              activeTab === 'all'
+                ? 'border-slate-900 text-slate-900'
+                : 'border-transparent text-slate-400 hover:text-slate-700',
+            )}
+          >
+            <span>📋 Все операции</span>
+            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
+              {history.length}
+            </span>
+          </button>
 
-                  return (
-                    <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors group">
-                      <td className="px-4 py-2.5 text-[10px] text-slate-400 whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => setActiveTab('incomes')}
+            className={cn(
+              'pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 px-2 cursor-pointer',
+              activeTab === 'incomes'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-400 hover:text-slate-700',
+            )}
+          >
+            <span>🟢 Поступления (Заработано)</span>
+            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full">
+              {accruals.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('expenses')}
+            className={cn(
+              'pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 px-2 cursor-pointer',
+              activeTab === 'expenses'
+                ? 'border-rose-600 text-rose-700'
+                : 'border-transparent text-slate-400 hover:text-slate-700',
+            )}
+          >
+            <span>🔴 Списания (Выплаты и авансы)</span>
+            <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-full">
+              {payouts.length}
+            </span>
+          </button>
+        </div>
+
+        {/* ── Transactions List ── */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-2.5">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-xs font-medium">
+              {error}
+            </div>
+          )}
+
+          {displayList.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <span className="material-symbols-outlined text-4xl block mb-2 text-slate-300">
+                receipt_long
+              </span>
+              <p className="text-sm font-medium">В этой категории нет записей</p>
+            </div>
+          ) : (
+            displayList.map((tx) => {
+              const meta = classifyStaffTx(tx);
+              const isIncome = meta.isIncome;
+              const isAdvance = tx.category_id === ADVANCE_CAT;
+              const isPayroll = PAYROLL_CATS.includes(tx.category_id);
+              const canEdit = isAdvance || isPayroll;
+
+              return (
+                <div
+                  key={tx.id}
+                  className={cn(
+                    'bg-white border rounded-2xl p-4 shadow-xs flex items-center justify-between gap-4 transition-all group hover:border-slate-300',
+                    isIncome ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500',
+                  )}
+                >
+                  {/* Left info */}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-400">
                         {new Date(tx.created_at).toLocaleDateString('ru-RU', {
                           day: 'numeric',
                           month: 'short',
-                          year: '2-digit',
+                          year: 'numeric',
                         })}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        <span className={cn('text-[10px] font-bold', colorCls)}>{label}</span>
-                        {tx.description && (
-                          <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">
-                            {tx.description}
-                          </p>
+                      </span>
+
+                      <span
+                        className={cn(
+                          'text-[10px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider',
+                          meta.badgeCls,
                         )}
-                        {isPayroll && tx.employee_confirmed === false && (
-                          <div className="mt-1 flex items-center gap-2">
-                            <p className="text-[9px] text-amber-600 font-bold flex items-center gap-0.5">
-                              <span className="material-symbols-outlined text-[10px]">timer</span>
-                              ожидает подтверждения
-                            </p>
+                      >
+                        {meta.badgeText}
+                      </span>
+
+                      <span className="text-xs font-semibold text-slate-500">{meta.source}</span>
+                    </div>
+
+                    <p className="text-sm font-bold text-slate-800 truncate">{meta.title}</p>
+
+                    {/* Driver confirmation status */}
+                    {isPayroll && tx.employee_confirmed === false && (
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                          <span className="material-symbols-outlined text-[12px]">timer</span>
+                          Ожидает подтверждения сотрудником
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmAdmin(tx.id)}
+                          disabled={saving}
+                          className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded px-2 py-0.5 font-bold transition-colors cursor-pointer"
+                        >
+                          ✓ Подтвердить
+                        </button>
+                      </div>
+                    )}
+
+                    {isPayroll && tx.employee_confirmed === true && (
+                      <span className="text-[10px] text-emerald-600 font-bold inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">done_all</span>
+                        Подтверждено сотрудником
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Right Amount & Actions */}
+                  <div className="text-right shrink-0 flex items-center gap-3">
+                    {editingId === tx.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editAmount}
+                          onChange={(e) => setEditAmount(e.target.value)}
+                          autoFocus
+                          className="w-28 border-2 border-blue-500 rounded-xl px-2.5 py-1 text-sm font-bold text-right focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSave(tx.id)}
+                          disabled={saving}
+                          className="w-8 h-8 font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center cursor-pointer text-sm shadow-xs"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingId(null);
+                            setError('');
+                          }}
+                          className="w-8 h-8 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer text-sm"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <span
+                          className={cn(
+                            'text-base font-black tracking-tight block',
+                            isIncome ? 'text-emerald-600' : 'text-rose-600',
+                          )}
+                        >
+                          {isIncome ? '+' : '−'}&nbsp;
+                          {parseFloat(tx.amount).toLocaleString('ru-RU')} ₽
+                        </span>
+
+                        {canEdit && (
+                          <div className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => handleConfirmAdmin(tx.id)}
-                              disabled={saving}
-                              className="text-[9px] text-emerald-600 border border-emerald-200 rounded px-1.5 py-0.5 hover:bg-emerald-50 transition-colors"
-                              title="Подтвердить за водителя"
+                              type="button"
+                              onClick={() => {
+                                setEditingId(tx.id);
+                                setEditAmount(tx.amount);
+                                setError('');
+                              }}
+                              className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                              title="Изменить сумму"
                             >
-                              Подтвердить
+                              <span className="material-symbols-outlined text-[16px]">edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(tx.id, meta.title)}
+                              disabled={saving}
+                              className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer disabled:opacity-50"
+                              title="Удалить"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">delete</span>
                             </button>
                           </div>
                         )}
-                        {isPayroll && tx.employee_confirmed === true && (
-                          <p className="text-[9px] text-emerald-600 font-bold mt-0.5 flex items-center gap-0.5">
-                            <span className="material-symbols-outlined text-[10px]">done_all</span>
-                            подтверждено водителем
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5 text-right">
-                        {editingId === tx.id ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={editAmount}
-                            onChange={(e) => setEditAmount(e.target.value)}
-                            autoFocus
-                            className="w-24 border border-blue-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
-                          />
-                        ) : (
-                          <span className={cn('text-xs font-bold', colorCls)}>
-                            {tx.direction === 'income' ? '+' : '−'}&nbsp;
-                            <Money amount={tx.amount} />
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        {canEdit &&
-                          (editingId === tx.id ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleSave(tx.id)}
-                                disabled={saving}
-                                className="text-[9px] font-bold px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                              >
-                                {saving ? '...' : '✓'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingId(null);
-                                  setError('');
-                                }}
-                                className="text-[9px] font-bold px-2 py-1 border border-slate-200 text-slate-500 rounded hover:bg-slate-100 transition-colors"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => {
-                                  setEditingId(tx.id);
-                                  setEditAmount(tx.amount);
-                                  setError('');
-                                }}
-                                className="text-[9px] text-slate-400 hover:text-blue-600 transition-colors p-1"
-                                title="Изменить сумму"
-                              >
-                                <span className="material-symbols-outlined text-sm">edit</span>
-                              </button>
-                              <button
-                                onClick={() => handleDelete(tx.id, label)}
-                                disabled={saving}
-                                className="text-[9px] text-slate-400 hover:text-rose-600 transition-colors p-1 disabled:opacity-50"
-                                title="Удалить"
-                              >
-                                <span className="material-symbols-outlined text-sm">delete</span>
-                              </button>
-                            </div>
-                          ))}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
-          {error && <p className="px-4 py-2 text-xs text-rose-600 font-medium">{error}</p>}
-        </div>
-
-        <div className="px-6 py-4 border-t border-slate-100 shrink-0">
-          <button
-            onClick={onClose}
-            className="w-full text-sm text-slate-500 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
-          >
-            Закрыть
-          </button>
         </div>
       </div>
     </div>

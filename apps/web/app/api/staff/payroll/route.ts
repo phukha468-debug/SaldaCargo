@@ -117,17 +117,17 @@ export async function GET(request: Request) {
         .eq('category_id', ADVANCE_CATEGORY_ID)
         .not('related_user_id', 'is', null),
 
-      // История: все PAYROLL + ADVANCE транзакции, последние 50 на сотрудника
+      // История: все PAYROLL + ADVANCE транзакции, последние записи на сотрудника
       (supabase as any)
         .from('transactions')
         .select(
-          'id, related_user_id, amount, direction, description, created_at, settlement_status, category_id, employee_confirmed, from_wallet_id',
+          'id, related_user_id, amount, direction, description, created_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id, from_wallet:wallets!transactions_from_wallet_id_fkey(id, name, type)',
         )
         .eq('lifecycle_status', 'approved')
         .or(`category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
         .not('related_user_id', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(500),
+        .limit(2000),
     ]);
 
     // Машины
