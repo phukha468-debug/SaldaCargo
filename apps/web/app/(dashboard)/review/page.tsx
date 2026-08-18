@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -1289,7 +1290,7 @@ function MaintenanceDetailModal({
                               {wage.toLocaleString('ru-RU')} ₽
                               {w.price_client && (
                                 <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                  (тариф {parseFloat(w.price_client).toLocaleString('ru-RU')} ₽)
+                                  (тариф {Number(w.price_client || 0).toLocaleString('ru-RU')} ₽)
                                 </span>
                               )}
                             </div>
@@ -1326,7 +1327,7 @@ function MaintenanceDetailModal({
                               📦 {p.part?.name ?? p.custom_part_name ?? 'Деталь'}{' '}
                               <span className="text-slate-400">
                                 ({p.quantity} {p.unit ?? 'шт'} ×{' '}
-                                {parseFloat(p.unit_price).toLocaleString('ru-RU')} ₽)
+                                {Number(p.unit_price || 0).toLocaleString('ru-RU')} ₽)
                               </span>
                             </span>
                             <span className="font-bold text-rose-700">
