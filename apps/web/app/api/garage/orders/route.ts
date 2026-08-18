@@ -128,6 +128,17 @@ export async function POST(request: Request) {
       assigned_mechanic_id?: string;
       priority?: string;
       admin_note?: string;
+
+      // External & Retro repair fields:
+      is_external?: boolean;
+      contractor_name?: string;
+      external_doc_number?: string;
+      order_date?: string; // YYYY-MM-DD
+      works_cost?: number | string;
+      parts_cost?: number | string;
+      work_description?: string;
+      parts_description?: string;
+      is_completed?: boolean;
     };
 
     if (!body.problem_description?.trim()) {
@@ -171,6 +182,29 @@ export async function POST(request: Request) {
       }
     }
 
+    const isExternal = Boolean(body.is_external);
+    const orderCreatedAt = body.order_date
+      ? `${body.order_date}T12:00:00.000Z`
+      : new Date().toISOString();
+
+    let adminNote = body.admin_note?.trim() || null;
+    let problemDesc = body.problem_description.trim();
+
+    if (isExternal) {
+      const contractorPart = body.contractor_name?.trim()
+        ? ` Исполнитель: ${body.contractor_name.trim()}.`
+        : '';
+      const docPart = body.external_doc_number?.trim()
+        ? ` Документ/Акт №: ${body.external_doc_number.trim()}.`
+        : '';
+      adminNote = `[Сторонний сервис]${contractorPart}${docPart} ${adminNote || ''}`.trim();
+      if (!problemDesc.includes('[Сторонний сервис]')) {
+        problemDesc = `[Сторонний сервис${body.contractor_name ? `: ${body.contractor_name.trim()}` : ''}] ${problemDesc}`;
+      }
+    }
+
+    const isCompleted = isExternal ? body.is_completed !== false : false;
+
     const { data, error } = await (supabase as any)
       .from('service_orders')
       .insert({
@@ -178,18 +212,53 @@ export async function POST(request: Request) {
         asset_id: body.asset_id || null,
         client_vehicle_id: body.client_vehicle_id || null,
         ...clientVehicleFields,
-        problem_description: body.problem_description.trim(),
-        assigned_mechanic_id: body.assigned_mechanic_id || null,
+        problem_description: problemDesc,
+        assigned_mechanic_id: isExternal ? null : body.assigned_mechanic_id || null,
         priority: body.priority ?? 'normal',
-        admin_note: body.admin_note?.trim() || null,
-        status: 'in_progress',
-        lifecycle_status: 'draft',
+        admin_note: adminNote,
+        status: isCompleted ? 'completed' : 'in_progress',
+        lifecycle_status: isCompleted ? 'approved' : 'draft',
+        payment_received: isCompleted ? true : body.machine_type === 'own',
+        mechanic_pay: isExternal ? 0 : null,
+        second_mechanic_pay: isExternal ? 0 : null,
         created_by: adminUsers?.id ?? null,
+        created_at: orderCreatedAt,
+        updated_at: orderCreatedAt,
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    // If external service, insert work & parts items
+    if (isExternal && data?.id) {
+      const worksCost = Number(body.works_cost) || 0;
+      const partsCost = Number(body.parts_cost) || 0;
+
+      if (worksCost > 0 || body.work_description) {
+        await (supabase as any).from('service_order_works').insert({
+          service_order_id: data.id,
+          custom_work_name: body.work_description?.trim() || 'Работы стороннего сервиса',
+          price_client: worksCost,
+          status: 'completed',
+          salary_paid: true,
+          created_at: orderCreatedAt,
+        });
+      }
+
+      if (partsCost > 0 || body.parts_description) {
+        await (supabase as any).from('service_order_parts').insert({
+          service_order_id: data.id,
+          custom_part_name: body.parts_description?.trim() || 'Запчасти стороннего сервиса',
+          quantity: 1,
+          unit_price: partsCost,
+          client_price: partsCost,
+          unit: 'компл',
+          created_at: orderCreatedAt,
+        });
+      }
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

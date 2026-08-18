@@ -116,23 +116,37 @@ const PAYMENT_EDIT_OPTIONS = [
 function calcServiceOrder(o: ReviewServiceOrder) {
   const parts = o.parts ?? [];
   const works = o.works ?? [];
+  const isExternal =
+    (o.admin_note && o.admin_note.includes('[Сторонний сервис]')) ||
+    (o.problem_description && o.problem_description.includes('[Сторонний сервис]'));
 
   const partsCost = parts.reduce(
     (sum, p) => sum + (Number(p.unit_price) || 0) * (Number(p.quantity) || 1),
     0,
   );
 
-  const m1Pay = Number(o.mechanic_pay) || 0;
-  const m2Pay = Number(o.second_mechanic_pay) || 0;
-  let salaryCost = m1Pay + m2Pay;
-  if (salaryCost <= 0) {
-    salaryCost = works
+  let salaryCost = 0;
+  let worksCost = 0;
+
+  if (isExternal) {
+    // 100% of work cost is an external expense paid to the contractor
+    worksCost = works
       .filter((w) => w.status !== 'cancelled')
-      .reduce((sum, w) => sum + (Number(w.price_client) || 0) * 0.5, 0);
+      .reduce((sum, w) => sum + (Number(w.price_client) || 0), 0);
+    salaryCost = 0;
+  } else {
+    const m1Pay = Number(o.mechanic_pay) || 0;
+    const m2Pay = Number(o.second_mechanic_pay) || 0;
+    salaryCost = m1Pay + m2Pay;
+    if (salaryCost <= 0) {
+      salaryCost = works
+        .filter((w) => w.status !== 'cancelled')
+        .reduce((sum, w) => sum + (Number(w.price_client) || 0) * 0.5, 0);
+    }
   }
 
-  const totalCost = partsCost + salaryCost;
-  return { partsCost, salaryCost, totalCost };
+  const totalCost = isExternal ? partsCost + worksCost : partsCost + salaryCost;
+  return { partsCost, salaryCost, worksCost, totalCost, isExternal };
 }
 
 function calcTrip(trip: TripForReview) {
@@ -1226,27 +1240,45 @@ function MaintenanceDetailModal({
                 {/* Order Header */}
                 <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-black bg-rose-600 text-white px-2.5 py-1 rounded-lg text-sm tracking-wide shadow-xs">
+                    <span
+                      className={cn(
+                        'font-mono font-black text-white px-2.5 py-1 rounded-lg text-sm tracking-wide shadow-xs',
+                        cso.isExternal ? 'bg-purple-600' : 'bg-rose-600',
+                      )}
+                    >
                       НЗ-{so.order_number}
                     </span>
                     <div>
-                      <span className="text-sm font-bold text-slate-800">
-                        {new Date(so.created_at).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                      </span>
-                      {so.mechanic?.name && (
-                        <p className="text-xs text-slate-500 font-medium">
-                          Слесарь:{' '}
-                          <span className="text-slate-700 font-semibold">{so.mechanic.name}</span>
-                          {so.second_mechanic?.name && (
-                            <span className="ml-1 text-slate-500">
-                              + 2-й слесарь: {so.second_mechanic.name}
-                            </span>
-                          )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-800">
+                          {new Date(so.created_at).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        {cso.isExternal && (
+                          <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded">
+                            Сторонний сервис
+                          </span>
+                        )}
+                      </div>
+                      {cso.isExternal ? (
+                        <p className="text-xs text-slate-600 font-medium mt-0.5">
+                          {so.admin_note || so.problem_description}
                         </p>
+                      ) : (
+                        so.mechanic?.name && (
+                          <p className="text-xs text-slate-500 font-medium">
+                            Слесарь:{' '}
+                            <span className="text-slate-700 font-semibold">{so.mechanic.name}</span>
+                            {so.second_mechanic?.name && (
+                              <span className="ml-1 text-slate-500">
+                                + 2-й слесарь: {so.second_mechanic.name}
+                              </span>
+                            )}
+                          </p>
+                        )
                       )}
                     </div>
                   </div>
@@ -1268,16 +1300,25 @@ function MaintenanceDetailModal({
                         <span className="material-symbols-outlined text-[16px] text-amber-500">
                           build
                         </span>
-                        Выполненные работы (ЗП слесаря)
+                        {cso.isExternal
+                          ? 'Работы стороннего сервиса'
+                          : 'Выполненные работы (ЗП слесаря)'}
                       </span>
                       <span className="text-xs font-bold text-amber-700">
-                        Итого ЗП: {cso.salaryCost.toLocaleString('ru-RU')} ₽
+                        Итого работы:{' '}
+                        {cso.isExternal
+                          ? cso.worksCost.toLocaleString('ru-RU')
+                          : cso.salaryCost.toLocaleString('ru-RU')}{' '}
+                        ₽
                       </span>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 divide-y divide-slate-100 text-xs">
                       {so.works.map((w) => {
-                        const wage =
-                          w.status !== 'cancelled' ? (Number(w.price_client) || 0) * 0.5 : 0;
+                        const wage = cso.isExternal
+                          ? Number(w.price_client) || 0
+                          : w.status !== 'cancelled'
+                            ? (Number(w.price_client) || 0) * 0.5
+                            : 0;
                         return (
                           <div
                             key={w.id}
@@ -1288,7 +1329,7 @@ function MaintenanceDetailModal({
                             </span>
                             <div className="text-right font-bold text-amber-700">
                               {wage.toLocaleString('ru-RU')} ₽
-                              {w.price_client && (
+                              {!cso.isExternal && w.price_client && (
                                 <span className="text-[10px] text-slate-400 font-normal ml-1">
                                   (тариф {Number(w.price_client || 0).toLocaleString('ru-RU')} ₽)
                                 </span>

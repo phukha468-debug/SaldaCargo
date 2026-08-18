@@ -321,6 +321,7 @@ const FAULT_CATEGORIES: Record<string, string> = {
 
 const emptyForm = {
   machine_type: 'own' as 'own' | 'client',
+  service_type: 'internal' as 'internal' | 'external',
   asset_id: '',
   client_vehicle_brand: '',
   client_vehicle_model: '',
@@ -332,6 +333,14 @@ const emptyForm = {
   odometer_start: '',
   priority: 'normal',
   admin_note: '',
+
+  // External repair fields
+  contractor_name: '',
+  external_doc_number: '',
+  order_date: new Date().toISOString().slice(0, 10),
+  works_cost: '',
+  parts_cost: '',
+  is_completed: true,
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -3000,6 +3009,9 @@ function CreateOrderModal({
   const [form, setForm] = useState(emptyForm);
   const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
   const [error, setError] = useState('');
+
+  const isExternal = form.machine_type === 'own' && form.service_type === 'external';
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (form.machine_type === 'own' && !form.asset_id) {
@@ -3009,7 +3021,10 @@ function CreateOrderModal({
         throw new Error('Выберите или создайте клиентский автомобиль');
       }
       if (!form.problem_description.trim()) {
-        throw new Error('Укажите описание проблемы');
+        throw new Error('Укажите описание проблемы или выполненных работ');
+      }
+      if (isExternal && !form.contractor_name.trim()) {
+        throw new Error('Укажите исполнителя / сторонний сервис');
       }
 
       const r = await fetch('/api/garage/orders', {
@@ -3017,9 +3032,11 @@ function CreateOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          is_external: isExternal,
           client_vehicle_id: form.machine_type === 'client' ? selectedClientVehicle?.id : undefined,
-          assigned_mechanic_id: form.assigned_mechanic_id || undefined,
+          assigned_mechanic_id: isExternal ? undefined : form.assigned_mechanic_id || undefined,
           odometer_start: form.odometer_start ? parseInt(form.odometer_start) : undefined,
+          work_description: isExternal ? form.problem_description : undefined,
         }),
       });
       const json = await r.json();
@@ -3029,32 +3046,54 @@ function CreateOrderModal({
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
       queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['service-orders-month'] });
       onClose();
       if (data?.id) onCreated?.(data.id);
     },
     onError: (e: Error) => setError(e.message),
   });
-  const set = (field: keyof typeof emptyForm, value: string) =>
+
+  const set = <K extends keyof typeof emptyForm>(field: K, value: (typeof emptyForm)[K]) =>
     setForm((f) => ({ ...f, [field]: value }));
+
+  const totalExternalCost =
+    (parseFloat(String(form.works_cost)) || 0) + (parseFloat(String(form.parts_cost)) || 0);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Новый наряд</h2>
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'material-symbols-outlined text-xl',
+                isExternal ? 'text-purple-600' : 'text-slate-700',
+              )}
+            >
+              {isExternal ? 'store' : 'car_repair'}
+            </span>
+            <h2 className="text-base font-bold text-slate-900">
+              {isExternal ? 'Ремонт в стороннем сервисе' : 'Новый заказ-наряд'}
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 text-2xl leading-none"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 text-xl leading-none transition-colors"
           >
             ×
           </button>
         </div>
-        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+
+        {/* Modal Body */}
+        <div className="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+          {/* Machine Type */}
           <div>
             <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
               Тип машины *
@@ -3063,11 +3102,12 @@ function CreateOrderModal({
               {(['own', 'client'] as const).map((t) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => set('machine_type', t)}
                   className={cn(
                     'flex-1 py-2 rounded-lg text-sm font-semibold transition-colors',
                     form.machine_type === t
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-slate-900 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                   )}
                 >
@@ -3076,10 +3116,49 @@ function CreateOrderModal({
               ))}
             </div>
           </div>
+
+          {/* Service Type Toggle (for own vehicles) */}
+          {form.machine_type === 'own' && (
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                Исполнитель ремонта *
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => set('service_type', 'internal')}
+                  className={cn(
+                    'flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5',
+                    form.service_type === 'internal'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[16px]">build</span>
+                  Наш бокс (свои слесари)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set('service_type', 'external')}
+                  className={cn(
+                    'flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5',
+                    form.service_type === 'external'
+                      ? 'bg-purple-700 text-white shadow-xs'
+                      : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100',
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[16px]">store</span>
+                  Сторонний сервис
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Vehicle Selection */}
           {form.machine_type === 'own' ? (
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Машина *
+                Машина парка *
               </label>
               <select
                 value={form.asset_id}
@@ -3124,96 +3203,225 @@ function CreateOrderModal({
               {!selectedClientVehicle && <p className="text-xs text-red-500 mt-0.5">Обязательно</p>}
             </div>
           )}
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-              Описание проблемы *
-            </label>
-            <textarea
-              value={form.problem_description}
-              onChange={(e) => set('problem_description', e.target.value)}
-              rows={3}
-              placeholder="Что случилось..."
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Исполнитель (опционально)
-              </label>
-              <select
-                value={form.assigned_mechanic_id}
-                onChange={(e) => set('assigned_mechanic_id', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="">— Не выбран —</option>
-                {mechanics.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+
+          {/* External Repair Specific Fields */}
+          {isExternal ? (
+            <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    Дата ремонта *
+                  </label>
+                  <input
+                    type="date"
+                    value={form.order_date}
+                    onChange={(e) => set('order_date', e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white font-medium"
+                  />
+                  <span className="text-[10px] text-slate-400">Можно указать прошлую дату</span>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    Акт / наряд №
+                  </label>
+                  <input
+                    value={form.external_doc_number}
+                    onChange={(e) => set('external_doc_number', e.target.value)}
+                    placeholder="№ 452"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Исполнитель / Сервис *
+                </label>
+                <input
+                  value={form.contractor_name}
+                  onChange={(e) => set('contractor_name', e.target.value)}
+                  placeholder="Например, ООО Дизель-Сервис, Мастер по КПП..."
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Что ремонтировали *
+                </label>
+                <textarea
+                  value={form.problem_description}
+                  onChange={(e) => set('problem_description', e.target.value)}
+                  rows={2}
+                  placeholder="Например, Капитальный ремонт двигателя Д-245, замена поршневой..."
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    Стоимость работ (₽)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.works_cost}
+                    onChange={(e) => set('works_cost', e.target.value)}
+                    placeholder="0"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    Стоимость запчастей (₽)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.parts_cost}
+                    onChange={(e) => set('parts_cost', e.target.value)}
+                    placeholder="0"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white font-bold"
+                  />
+                </div>
+              </div>
+
+              {totalExternalCost > 0 && (
+                <div className="bg-purple-100/70 p-3 rounded-lg flex items-center justify-between text-xs">
+                  <span className="font-bold text-purple-900">Итого расход автопарка:</span>
+                  <span className="font-black text-purple-700 text-sm">
+                    {totalExternalCost.toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="ext_completed"
+                  checked={form.is_completed}
+                  onChange={(e) => set('is_completed', e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded"
+                />
+                <label
+                  htmlFor="ext_completed"
+                  className="text-xs text-slate-700 font-semibold cursor-pointer"
+                >
+                  Ремонт завершён и оплачен (сразу в архив и P&L)
+                </label>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Пробег (км)
-              </label>
-              <input
-                type="number"
-                value={form.odometer_start}
-                onChange={(e) => set('odometer_start', e.target.value)}
-                placeholder="Одометр..."
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-                Приоритет
-              </label>
-              <select
-                value={form.priority}
-                onChange={(e) => set('priority', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                {Object.entries(PRIORITY_LABEL).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
-              Заметка
-            </label>
-            <input
-              value={form.admin_note}
-              onChange={(e) => set('admin_note', e.target.value)}
-              placeholder="Дополнительно..."
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          ) : (
+            /* Standard In-House Repair Fields */
+            <>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                  Описание проблемы *
+                </label>
+                <textarea
+                  value={form.problem_description}
+                  onChange={(e) => set('problem_description', e.target.value)}
+                  rows={3}
+                  placeholder="Что случилось..."
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                    Исполнитель (опционально)
+                  </label>
+                  <select
+                    value={form.assigned_mechanic_id}
+                    onChange={(e) => set('assigned_mechanic_id', e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">— Не выбран —</option>
+                    {mechanics.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                    Пробег (км)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.odometer_start}
+                    onChange={(e) => set('odometer_start', e.target.value)}
+                    placeholder="Одометр..."
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                    Приоритет
+                  </label>
+                  <select
+                    value={form.priority}
+                    onChange={(e) => set('priority', e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    {Object.entries(PRIORITY_LABEL).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">
+                  Заметка
+                </label>
+                <input
+                  value={form.admin_note}
+                  onChange={(e) => set('admin_note', e.target.value)}
+                  placeholder="Дополнительно..."
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
+
           <div className="flex gap-3 pt-2">
             <button
+              type="button"
               onClick={onClose}
               className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-50"
             >
               Отмена
             </button>
             <button
+              type="button"
               onClick={() => createMutation.mutate()}
               disabled={
                 createMutation.isPending ||
                 (form.machine_type === 'own' ? !form.asset_id : !selectedClientVehicle) ||
-                !form.problem_description.trim()
+                !form.problem_description.trim() ||
+                (isExternal && !form.contractor_name.trim())
               }
-              className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50 hover:bg-slate-800 transition-colors"
+              className={cn(
+                'flex-[2] text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50 transition-colors shadow-sm',
+                isExternal
+                  ? 'bg-purple-700 hover:bg-purple-800'
+                  : 'bg-slate-900 hover:bg-slate-800',
+              )}
             >
-              {createMutation.isPending ? 'Создаём...' : 'Создать наряд'}
+              {createMutation.isPending
+                ? 'Сохраняем...'
+                : isExternal
+                  ? 'Сохранить сторонний ремонт'
+                  : 'Создать наряд'}
             </button>
           </div>
         </div>
@@ -4527,6 +4735,9 @@ function getArchiveWeekDates(dateStr: string) {
 function calcOrderCosts(o: TabOrder) {
   const works = o.works ?? [];
   const parts = o.parts ?? [];
+  const isExternal =
+    Boolean(o.admin_note && o.admin_note.includes('[Сторонний сервис]')) ||
+    Boolean(o.problem_description && o.problem_description.includes('[Сторонний сервис]'));
 
   const partsCost = parts.reduce((s, p) => {
     const q = p.quantity || 1;
@@ -4534,19 +4745,26 @@ function calcOrderCosts(o: TabOrder) {
     return s + q * price;
   }, 0);
 
-  const directSalary =
-    (parseFloat(String(o.mechanic_pay ?? '0')) || 0) +
-    (parseFloat(String(o.second_mechanic_pay ?? '0')) || 0);
   const worksPriceSum = works.reduce((s, w) => s + (parseFloat(w.price_client ?? '0') || 0), 0);
-  const laborSalaryCost = directSalary > 0 ? directSalary : worksPriceSum;
 
-  const totalCost = partsCost + laborSalaryCost;
+  let laborSalaryCost = 0;
+  if (isExternal) {
+    laborSalaryCost = 0;
+  } else {
+    const directSalary =
+      (parseFloat(String(o.mechanic_pay ?? '0')) || 0) +
+      (parseFloat(String(o.second_mechanic_pay ?? '0')) || 0);
+    laborSalaryCost = directSalary > 0 ? directSalary : worksPriceSum * 0.5;
+  }
+
+  const totalCost = isExternal ? partsCost + worksPriceSum : partsCost + laborSalaryCost;
 
   return {
     partsCost,
     laborSalaryCost,
     worksPriceSum,
     totalCost,
+    isExternal,
   };
 }
 
