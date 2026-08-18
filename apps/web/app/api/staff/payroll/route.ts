@@ -38,6 +38,8 @@ export async function GET(request: Request) {
       { data: advanceOffset },
       // История выплат + авансов для каждого сотрудника
       { data: payHistory },
+      // Кошельки для привязки к выплатам
+      { data: walletsData },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
@@ -121,14 +123,22 @@ export async function GET(request: Request) {
       (supabase as any)
         .from('transactions')
         .select(
-          'id, related_user_id, amount, direction, description, created_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id, from_wallet:wallets!transactions_from_wallet_id_fkey(id, name, type)',
+          'id, related_user_id, amount, direction, description, created_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id',
         )
         .eq('lifecycle_status', 'approved')
         .or(`category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
         .not('related_user_id', 'is', null)
         .order('created_at', { ascending: false })
         .limit(2000),
+
+      // Кошельки для привязки к выплатам
+      (supabase as any).from('wallets').select('id, name, type'),
     ]);
+
+    const walletMap = new Map<string, { id: string; name: string; type: string }>();
+    for (const w of (walletsData as any[]) ?? []) {
+      walletMap.set(w.id, w);
+    }
 
     // Машины
     const assetIds = [
@@ -179,7 +189,12 @@ export async function GET(request: Request) {
       const uid = r.related_user_id;
       if (!uid) continue;
       const list = historyMap.get(uid) ?? [];
-      if (list.length < 50) list.push(r);
+      if (list.length < 100) {
+        if (r.from_wallet_id) {
+          r.from_wallet = walletMap.get(r.from_wallet_id) || null;
+        }
+        list.push(r);
+      }
       historyMap.set(uid, list);
     }
 

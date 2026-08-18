@@ -741,14 +741,15 @@ function PayrollHistoryModal({
 
   // Financial totals
   const totalAccrued = useMemo(
-    () => accruals.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
+    () => accruals.reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0),
     [accruals],
   );
   const totalPaidOut = useMemo(
-    () => payouts.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
+    () => payouts.reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0),
     [payouts],
   );
-  const balanceToPay = parseFloat(user.payout || user.debt || String(totalAccrued - totalPaidOut));
+  const rawBalance = totalAccrued - totalPaidOut;
+  const balanceToPay = parseFloat(user.payout || user.debt || String(rawBalance)) || 0;
 
   // Current display list according to tab
   const displayList = useMemo(() => {
@@ -835,7 +836,9 @@ function PayrollHistoryModal({
               <h2 className="font-black text-slate-900 text-lg">История операций: {user.name}</h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-              <span>{user.roles.map((r) => ROLE_LABEL[r] ?? r).join(', ')}</span>
+              <span>
+                {(user.roles ?? []).map((r) => ROLE_LABEL[r as UserRole] ?? r).join(', ')}
+              </span>
               {user.phone && (
                 <span className="font-mono text-slate-600">📞 {formatPhone(user.phone)}</span>
               )}
@@ -843,7 +846,7 @@ function PayrollHistoryModal({
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 text-xl leading-none transition-colors"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 text-xl leading-none transition-colors cursor-pointer"
           >
             ✕
           </button>
