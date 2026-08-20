@@ -258,47 +258,54 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ── Horizontal Navigation Bar (Tabs) ───────────────────────── */}
-        <div className="flex items-center gap-1.5 px-4 sm:px-6 py-2 bg-slate-50 border-t border-slate-200/80 overflow-x-auto">
-          {navItems.map((item) => {
-            const active = isNavActive(item.href);
-            const { count, isCritical } = getBadge(item.href);
+        {/* ── Horizontal Navigation Bar (Variant 2: Elevated 3D Cards) ── */}
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-200/80">
+          <nav className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            {navItems.map((item) => {
+              const active = isNavActive(item.href);
+              const { count, isCritical } = getBadge(item.href);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all',
-                  active
-                    ? 'bg-white text-sky-700 font-bold border border-slate-200/80 shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 border border-transparent',
-                )}
-              >
-                <span
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
                   className={cn(
-                    'material-symbols-outlined text-[17px] transition-colors',
-                    active ? 'text-sky-600' : 'text-slate-400',
+                    'flex items-center justify-center gap-2 py-3 px-2 rounded-2xl text-xs sm:text-[13px] transition-all duration-200 group cursor-pointer relative select-none',
+                    active
+                      ? 'bg-gradient-to-b from-blue-50 to-indigo-50 border-2 border-blue-500 text-blue-800 shadow-md shadow-blue-500/15 font-black ring-4 ring-blue-500/10'
+                      : 'bg-white border border-slate-200 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 font-bold text-slate-700 hover:text-blue-600 shadow-2xs',
                   )}
                 >
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-                {count > 0 && (
                   <span
                     className={cn(
-                      'text-[10px] px-1.5 py-0.2 rounded-full font-bold border',
-                      isCritical
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200',
+                      'material-symbols-outlined text-[20px] transition-all duration-200',
+                      active
+                        ? 'text-blue-600'
+                        : 'text-slate-400 group-hover:text-blue-500 group-hover:scale-110',
                     )}
+                    style={{
+                      fontVariationSettings: active
+                        ? "'FILL' 1, 'wght' 600"
+                        : "'FILL' 0, 'wght' 500",
+                    }}
                   >
-                    {count}
+                    {item.icon}
                   </span>
-                )}
-              </Link>
-            );
-          })}
+                  <span className="truncate">{item.label}</span>
+                  {count > 0 && (
+                    <span
+                      className={cn(
+                        'text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-2xs',
+                        isCritical ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white',
+                      )}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
       </header>
 
