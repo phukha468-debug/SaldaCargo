@@ -6,10 +6,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   try {
     const supabase = createAdminClient();
-    const { data, error } = await (supabase as any)
-      .from('service_orders')
-      .select(
-        `
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const cleanNum = id.replace(/[^0-9]/g, '');
+
+    let query = (supabase as any).from('service_orders').select(
+      `
         id, order_number, status, lifecycle_status, priority, machine_type,
         problem_description, admin_note, mechanic_note,
         mechanic_pay, second_mechanic_pay,
@@ -35,11 +36,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           related_user:users!transactions_related_user_id_fkey(name)
         )
       `,
-      )
-      .eq('id', id)
-      .single();
+    );
+
+    if (isUuid) {
+      query = query.eq('id', id);
+    } else if (cleanNum) {
+      query = query.or(`order_number.eq.${cleanNum},id.eq.${id}`);
+    } else {
+      query = query.eq('id', id);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) throw error;
+    if (!data) return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
     return NextResponse.json(data);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка' }, { status: 500 });

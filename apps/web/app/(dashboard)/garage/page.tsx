@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { cn, Money } from '@saldacargo/ui';
@@ -8364,10 +8365,20 @@ function SettingsSection() {
 // ═══════════════════════════ MAIN PAGE ═══════════════════════════════════════
 
 export default function GaragePage() {
+  const searchParams = useSearchParams();
+  const orderFromQuery =
+    searchParams.get('order') || searchParams.get('order_id') || searchParams.get('id');
+
   const [section, setSection] = useState<GarageSection>('dashboard');
   const [showCreate, setShowCreate] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(orderFromQuery || null);
+
+  useEffect(() => {
+    if (orderFromQuery) {
+      setSelectedOrderId(orderFromQuery);
+    }
+  }, [orderFromQuery]);
 
   const { data: dashData } = useQuery<DashboardData>({
     queryKey: ['garage-dashboard'],

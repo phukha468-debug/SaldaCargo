@@ -631,6 +631,28 @@ type StaffTx = PayrollUser['history'][number] & {
   transaction_date?: string | null;
   service_order_id?: string | null;
   trip_id?: string | null;
+  service_order?: {
+    id: string;
+    order_number: number | string;
+    machine_type: 'own' | 'client';
+    client_name?: string | null;
+    client_vehicle_brand?: string | null;
+    client_vehicle_model?: string | null;
+    client_vehicle_reg?: string | null;
+    vehicle_label?: string;
+    asset?: {
+      id: string;
+      short_name: string;
+      reg_number: string;
+      make?: string;
+      model?: string;
+    } | null;
+  } | null;
+  trip?: {
+    id: string;
+    trip_number?: string | number;
+    vehicle_label?: string;
+  } | null;
 };
 
 function classifyStaffTx(tx: StaffTx) {
@@ -714,6 +736,8 @@ function classifyStaffTx(tx: StaffTx) {
 
 function parseAccrualMeta(tx: StaffTx) {
   const desc = tx.description || '';
+  const so = tx.service_order;
+  const trip = tx.trip;
 
   const orderMatch =
     desc.match(/(?:наряд|наряда|заказ-наряд|заказ-наряда)\s*[#№]?\s*([A-Za-zА-Яа-я0-9_-]+)/i) ||
@@ -729,29 +753,45 @@ function parseAccrualMeta(tx: StaffTx) {
     workName = parenIndex !== -1 ? afterColon.slice(0, parenIndex).trim() : afterColon;
   }
 
-  if (tx.service_order_id || orderMatch) {
-    const orderNum = orderMatch
-      ? orderMatch[1]
-      : tx.service_order_id
-        ? tx.service_order_id.slice(0, 8)
-        : '';
+  if (tx.service_order_id || so || orderMatch) {
+    const orderNum = so?.order_number
+      ? String(so.order_number)
+      : orderMatch
+        ? orderMatch[1]
+        : tx.service_order_id
+          ? tx.service_order_id.slice(0, 8)
+          : '';
+
+    const orderIdToOpen = so?.id || tx.service_order_id || orderNum;
+    const vehicleDesc = so?.vehicle_label || '';
+
     return {
       isOrder: true,
       isTrip: false,
       orderNumber: orderNum,
-      service_order_id: tx.service_order_id || null,
+      service_order_id: orderIdToOpen,
+      vehicleDesc,
       workName: workName || 'Выполненные работы',
-      groupKey: `order_${tx.service_order_id || orderNum}`,
+      groupKey: `order_${orderIdToOpen || orderNum}`,
     };
   }
 
-  if (tx.trip_id || tripMatch) {
-    const tripNum = tripMatch ? tripMatch[1] : tx.trip_id ? tx.trip_id.slice(0, 8) : '';
+  if (tx.trip_id || trip || tripMatch) {
+    const tripNum = trip?.trip_number
+      ? String(trip.trip_number)
+      : tripMatch
+        ? tripMatch[1]
+        : tx.trip_id
+          ? tx.trip_id.slice(0, 8)
+          : '';
+    const vehicleDesc = trip?.vehicle_label || '';
+
     return {
       isOrder: false,
       isTrip: true,
       tripNumber: tripNum,
-      trip_id: tx.trip_id || null,
+      trip_id: trip?.id || tx.trip_id || null,
+      vehicleDesc,
       workName: desc,
       groupKey: `trip_${tx.trip_id || tripNum}`,
     };
@@ -760,6 +800,7 @@ function parseAccrualMeta(tx: StaffTx) {
   return {
     isOrder: false,
     isTrip: false,
+    vehicleDesc: '',
     workName: desc || 'Начисление',
     groupKey: `tx_${tx.id}`,
   };
@@ -775,6 +816,7 @@ type GroupedAccrualItem = {
   tripNumber?: string;
   service_order_id?: string | null;
   trip_id?: string | null;
+  vehicle_desc?: string;
   category_id: string;
   source: string;
   latestDate: string;
@@ -851,6 +893,7 @@ function PayrollHistoryModal({
           tripNumber: parsed.tripNumber,
           service_order_id: parsed.service_order_id,
           trip_id: parsed.trip_id,
+          vehicle_desc: parsed.vehicleDesc,
           category_id: tx.category_id,
           source,
           latestDate: txDate,
@@ -862,6 +905,8 @@ function PayrollHistoryModal({
           works: [],
         };
         map.set(parsed.groupKey, group);
+      } else if (parsed.vehicleDesc && !group.vehicle_desc) {
+        group.vehicle_desc = parsed.vehicleDesc;
       }
 
       if (txDate && (!group.latestDate || new Date(txDate) > new Date(group.latestDate))) {
@@ -1212,22 +1257,33 @@ function PayrollHistoryModal({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-base font-extrabold text-slate-900 leading-snug">
                           {g.title}
                         </p>
                         {g.service_order_id && (
                           <Link
                             href={`/garage?order=${g.service_order_id}`}
-                            className="text-sky-600 hover:text-sky-800 text-xs font-bold inline-flex items-center gap-0.5 transition-colors"
-                            title="Открыть заказ-наряд"
+                            className="text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors shadow-2xs"
+                            title="Открыть заказ-наряд в гараже"
                           >
-                            <span className="material-symbols-outlined text-[14px]">
+                            <span>Открыть наряд</span>
+                            <span className="material-symbols-outlined text-[13px]">
                               open_in_new
                             </span>
                           </Link>
                         )}
                       </div>
+
+                      {/* ── Vehicle and Client Description ── */}
+                      {g.vehicle_desc && (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 border border-slate-200 px-2.5 py-1 rounded-lg w-fit shadow-2xs">
+                          <span className="material-symbols-outlined text-[15px] text-slate-500">
+                            {g.isOrder ? 'directions_car' : 'local_shipping'}
+                          </span>
+                          <span>{g.vehicle_desc}</span>
+                        </div>
+                      )}
 
                       {/* Confirmation alert if pending employee confirm */}
                       {g.employee_confirmed === false && (

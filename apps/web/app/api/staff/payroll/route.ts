@@ -183,6 +183,86 @@ export async function GET(request: Request) {
     const advanceGivenMap = sumByUser(advanceGiven);
     const advanceOffsetMap = sumByUser(advanceOffset);
 
+    // Собираем ID и номера заказ-нарядов и рейсов для детализации истории
+    const orderIds = new Set<string>();
+    const orderNums = new Set<number>();
+    const tripIds = new Set<string>();
+
+    for (const r of (payHistory as any[]) ?? []) {
+      if (r.service_order_id) orderIds.add(r.service_order_id);
+      if (r.trip_id) tripIds.add(r.trip_id);
+      if (r.description) {
+        const match =
+          r.description.match(/(?:наряд|наряда|заказ-наряд)\s*[#№]?\s*([0-9]+)/i) ||
+          r.description.match(/Н[3З]-([0-9]+)/i);
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num)) orderNums.add(num);
+        }
+      }
+    }
+
+    const serviceOrderMap = new Map<string, any>();
+    if (orderIds.size > 0 || orderNums.size > 0) {
+      let soQuery = (supabase as any).from('service_orders').select(`
+        id, order_number, machine_type, client_name, client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
+        asset:assets(id, short_name, reg_number, make, model)
+      `);
+      if (orderIds.size > 0 && orderNums.size > 0) {
+        soQuery = soQuery.or(
+          `id.in.(${Array.from(orderIds).join(',')}),order_number.in.(${Array.from(orderNums).join(',')})`,
+        );
+      } else if (orderIds.size > 0) {
+        soQuery = soQuery.in('id', Array.from(orderIds));
+      } else {
+        soQuery = soQuery.in('order_number', Array.from(orderNums));
+      }
+
+      const { data: serviceOrders } = await soQuery;
+      for (const so of serviceOrders ?? []) {
+        let vehicleLabel = '';
+        if (so.machine_type === 'client') {
+          const clientPart = so.client_name ? `Клиент: ${so.client_name}` : 'Клиент';
+          const carModel =
+            [so.client_vehicle_brand, so.client_vehicle_model].filter(Boolean).join(' ') ||
+            'Автомобиль клиента';
+          const regPart = so.client_vehicle_reg ? `(${so.client_vehicle_reg})` : '';
+          vehicleLabel = `${clientPart} • ${carModel} ${regPart}`.trim();
+        } else {
+          const carName =
+            so.asset?.short_name ||
+            [so.asset?.make, so.asset?.model].filter(Boolean).join(' ') ||
+            'Собственный автопарк';
+          const regPart = so.asset?.reg_number ? `${so.asset.reg_number}` : '';
+          vehicleLabel = `${carName} ${regPart}`.trim();
+        }
+
+        const enriched = {
+          ...so,
+          vehicle_label: vehicleLabel,
+        };
+
+        serviceOrderMap.set(so.id, enriched);
+        serviceOrderMap.set(String(so.order_number), enriched);
+      }
+    }
+
+    const tripMap = new Map<string, any>();
+    if (tripIds.size > 0) {
+      const { data: tripsData } = await (supabase as any)
+        .from('trips')
+        .select(`id, trip_number, asset:assets(id, short_name, reg_number)`)
+        .in('id', Array.from(tripIds));
+      for (const tr of tripsData ?? []) {
+        const carName = tr.asset?.short_name || 'Авто';
+        const reg = tr.asset?.reg_number || '';
+        tripMap.set(tr.id, {
+          ...tr,
+          vehicle_label: `${carName} ${reg}`.trim(),
+        });
+      }
+    }
+
     // История по сотруднику (map: userId → последние записи)
     const historyMap = new Map<string, any[]>();
     for (const r of (payHistory as any[]) ?? []) {
@@ -193,6 +273,24 @@ export async function GET(request: Request) {
         if (r.from_wallet_id) {
           r.from_wallet = walletMap.get(r.from_wallet_id) || null;
         }
+
+        // Привязываем данные заказ-наряда
+        if (r.service_order_id && serviceOrderMap.has(r.service_order_id)) {
+          r.service_order = serviceOrderMap.get(r.service_order_id);
+        } else if (r.description) {
+          const match =
+            r.description.match(/(?:наряд|наряда|заказ-наряд)\s*[#№]?\s*([0-9]+)/i) ||
+            r.description.match(/Н[3З]-([0-9]+)/i);
+          if (match && match[1] && serviceOrderMap.has(match[1])) {
+            r.service_order = serviceOrderMap.get(match[1]);
+          }
+        }
+
+        // Привязываем данные рейса
+        if (r.trip_id && tripMap.has(r.trip_id)) {
+          r.trip = tripMap.get(r.trip_id);
+        }
+
         list.push(r);
       }
       historyMap.set(uid, list);
