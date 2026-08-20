@@ -187,17 +187,24 @@ export async function GET(request: Request) {
     const orderIds = new Set<string>();
     const orderNums = new Set<number>();
     const tripIds = new Set<string>();
+    const tripNums = new Set<number>();
 
     for (const r of (payHistory as any[]) ?? []) {
       if (r.service_order_id) orderIds.add(r.service_order_id);
       if (r.trip_id) tripIds.add(r.trip_id);
       if (r.description) {
-        const match =
+        const matchOrder =
           r.description.match(/(?:наряд|наряда|заказ-наряд)\s*[#№]?\s*([0-9]+)/i) ||
           r.description.match(/Н[3З]-([0-9]+)/i);
-        if (match && match[1]) {
-          const num = parseInt(match[1], 10);
+        if (matchOrder && matchOrder[1]) {
+          const num = parseInt(matchOrder[1], 10);
           if (!isNaN(num)) orderNums.add(num);
+        }
+
+        const matchTrip = r.description.match(/(?:рейс|рейса)\s*[#№]?\s*([0-9]+)/i);
+        if (matchTrip && matchTrip[1]) {
+          const tNum = parseInt(matchTrip[1], 10);
+          if (!isNaN(tNum)) tripNums.add(tNum);
         }
       }
     }
@@ -248,18 +255,33 @@ export async function GET(request: Request) {
     }
 
     const tripMap = new Map<string, any>();
-    if (tripIds.size > 0) {
-      const { data: tripsData } = await (supabase as any)
+    if (tripIds.size > 0 || tripNums.size > 0) {
+      let trQuery = (supabase as any)
         .from('trips')
-        .select(`id, trip_number, asset:assets(id, short_name, reg_number)`)
-        .in('id', Array.from(tripIds));
+        .select(`id, trip_number, asset:assets(id, short_name, reg_number, make, model)`);
+      if (tripIds.size > 0 && tripNums.size > 0) {
+        trQuery = trQuery.or(
+          `id.in.(${Array.from(tripIds).join(',')}),trip_number.in.(${Array.from(tripNums).join(',')})`,
+        );
+      } else if (tripIds.size > 0) {
+        trQuery = trQuery.in('id', Array.from(tripIds));
+      } else {
+        trQuery = trQuery.in('trip_number', Array.from(tripNums));
+      }
+
+      const { data: tripsData } = await trQuery;
       for (const tr of tripsData ?? []) {
-        const carName = tr.asset?.short_name || 'Авто';
+        const carName =
+          tr.asset?.short_name ||
+          [tr.asset?.make, tr.asset?.model].filter(Boolean).join(' ') ||
+          'Авто';
         const reg = tr.asset?.reg_number || '';
-        tripMap.set(tr.id, {
+        const enrichedTrip = {
           ...tr,
           vehicle_label: `${carName} ${reg}`.trim(),
-        });
+        };
+        tripMap.set(tr.id, enrichedTrip);
+        tripMap.set(String(tr.trip_number), enrichedTrip);
       }
     }
 
@@ -289,6 +311,11 @@ export async function GET(request: Request) {
         // Привязываем данные рейса
         if (r.trip_id && tripMap.has(r.trip_id)) {
           r.trip = tripMap.get(r.trip_id);
+        } else if (r.description) {
+          const matchTrip = r.description.match(/(?:рейс|рейса)\s*[#№]?\s*([0-9]+)/i);
+          if (matchTrip && matchTrip[1] && tripMap.has(matchTrip[1])) {
+            r.trip = tripMap.get(matchTrip[1]);
+          }
         }
 
         list.push(r);

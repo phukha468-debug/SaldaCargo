@@ -1420,9 +1420,19 @@ export default function ReviewPage() {
 
   const searchParams = useSearchParams();
   const modeFromUrl = searchParams.get('mode') as 'review' | 'active' | 'history' | null;
+  const tripFromUrl =
+    searchParams.get('trip') ||
+    searchParams.get('trip_id') ||
+    searchParams.get('trip_number') ||
+    searchParams.get('id');
+
   const VALID_MODES: Array<'review' | 'active' | 'history'> = ['review', 'active', 'history'];
   const [mode, setMode] = useState<'review' | 'active' | 'history'>(
-    modeFromUrl && VALID_MODES.includes(modeFromUrl) ? modeFromUrl : 'review',
+    modeFromUrl && VALID_MODES.includes(modeFromUrl)
+      ? modeFromUrl
+      : tripFromUrl
+        ? 'history'
+        : 'review',
   );
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -1441,6 +1451,31 @@ export default function ReviewPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('month');
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!tripFromUrl) return;
+    let isMounted = true;
+    fetch(`/api/trips/${tripFromUrl}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: TripForReview | null) => {
+        if (!isMounted || !data) return;
+        setEditTrip(data);
+        if (data.started_at) {
+          setSelectedDate(data.started_at.slice(0, 10));
+        }
+        if (data.lifecycle_status === 'draft') {
+          setMode('review');
+        } else {
+          setMode('history');
+        }
+        setExpandedIds((prev) => new Set([...prev, data.id]));
+      })
+      .catch((e) => console.error('Error fetching trip from URL:', e));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tripFromUrl]);
 
   const { data: trips = [], isLoading } = useQuery<TripForReview[]>({
     queryKey: ['trips-review', selectedDate, mode],

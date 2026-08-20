@@ -1273,6 +1273,18 @@ function PayrollHistoryModal({
                             </span>
                           </Link>
                         )}
+                        {g.isTrip && (g.trip_id || g.tripNumber) && (
+                          <Link
+                            href={`/review?mode=history&trip=${g.trip_id || g.tripNumber}`}
+                            className="text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors shadow-2xs"
+                            title="Открыть рейс в разделе Ревью"
+                          >
+                            <span>Открыть рейс</span>
+                            <span className="material-symbols-outlined text-[13px]">
+                              open_in_new
+                            </span>
+                          </Link>
+                        )}
                       </div>
 
                       {/* ── Vehicle and Client Description ── */}

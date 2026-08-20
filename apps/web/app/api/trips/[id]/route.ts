@@ -2,6 +2,54 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+/** GET /api/trips/:id — получить детали одного рейса (по UUID или номеру рейса) */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const supabase = createAdminClient();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const cleanNum = id.replace(/[^0-9]/g, '');
+
+    let query = supabase.from('trips').select(
+      `
+      id, trip_number, status, lifecycle_status, started_at, ended_at,
+      trip_type, odometer_start, odometer_end, driver_note,
+      asset:assets(short_name, reg_number),
+      driver:users!trips_driver_id_fkey(id, name),
+      loader:users!trips_loader_id_fkey(id, name),
+      trip_orders(
+        id, amount, driver_pay, loader_pay, loader2_pay,
+        loader_id, loader2_id,
+        loader:users!trip_orders_loader_id_fkey(id, name),
+        loader2:users!trip_orders_loader2_id_fkey(id, name),
+        payment_method, settlement_status, lifecycle_status,
+        counterparty_id,
+        counterparty:counterparties(name)
+      ),
+      trip_expenses(
+        id, amount, payment_method, description,
+        category:transaction_categories(name)
+      )
+    `,
+    );
+
+    if (isUuid) {
+      query = query.eq('id', id);
+    } else if (cleanNum) {
+      query = query.or(`trip_number.eq.${cleanNum},id.eq.${id}`);
+    } else {
+      query = query.eq('id', id);
+    }
+
+    const { data, error } = await (query as any).maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
+  }
+}
+
 /** PATCH /api/trips/:id — редактировать заказы рейса */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
