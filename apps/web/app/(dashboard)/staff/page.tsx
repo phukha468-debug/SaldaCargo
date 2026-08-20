@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useMemo } from 'react';
 import { Money } from '@saldacargo/ui';
@@ -628,6 +629,8 @@ const PAYROLL_CATS = [
 type StaffTx = PayrollUser['history'][number] & {
   from_wallet?: { id: string; name: string; type: string } | null;
   transaction_date?: string | null;
+  service_order_id?: string | null;
+  trip_id?: string | null;
 };
 
 function classifyStaffTx(tx: StaffTx) {
@@ -643,8 +646,8 @@ function classifyStaffTx(tx: StaffTx) {
     const lower = (tx.description || '').toLowerCase();
     if (lower.includes('рейс')) {
       source = 'Рейс';
-    } else if (lower.includes('наряд') || lower.includes('нз-')) {
-      source = 'Наряд ТО';
+    } else if (lower.includes('наряд') || lower.includes('нз-') || lower.includes('н3-')) {
+      source = 'Гараж / СТО';
     }
     return {
       type: 'accrual' as const,
@@ -709,54 +712,216 @@ function classifyStaffTx(tx: StaffTx) {
   };
 }
 
+function parseAccrualMeta(tx: StaffTx) {
+  const desc = tx.description || '';
+
+  const orderMatch =
+    desc.match(/(?:наряд|наряда|заказ-наряд|заказ-наряда)\s*[#№]?\s*([A-Za-zА-Яа-я0-9_-]+)/i) ||
+    desc.match(/\b(Н[3З]-[0-9]+)\b/i);
+
+  const tripMatch = desc.match(/(?:рейс|рейса)\s*[#№]?\s*([A-Za-zА-Яа-я0-9_-]+)/i);
+
+  let workName = '';
+  const colonIndex = desc.indexOf(':');
+  if (colonIndex !== -1) {
+    const afterColon = desc.slice(colonIndex + 1).trim();
+    const parenIndex = afterColon.indexOf('(');
+    workName = parenIndex !== -1 ? afterColon.slice(0, parenIndex).trim() : afterColon;
+  }
+
+  if (tx.service_order_id || orderMatch) {
+    const orderNum = orderMatch
+      ? orderMatch[1]
+      : tx.service_order_id
+        ? tx.service_order_id.slice(0, 8)
+        : '';
+    return {
+      isOrder: true,
+      isTrip: false,
+      orderNumber: orderNum,
+      service_order_id: tx.service_order_id || null,
+      workName: workName || 'Выполненные работы',
+      groupKey: `order_${tx.service_order_id || orderNum}`,
+    };
+  }
+
+  if (tx.trip_id || tripMatch) {
+    const tripNum = tripMatch ? tripMatch[1] : tx.trip_id ? tx.trip_id.slice(0, 8) : '';
+    return {
+      isOrder: false,
+      isTrip: true,
+      tripNumber: tripNum,
+      trip_id: tx.trip_id || null,
+      workName: desc,
+      groupKey: `trip_${tx.trip_id || tripNum}`,
+    };
+  }
+
+  return {
+    isOrder: false,
+    isTrip: false,
+    workName: desc || 'Начисление',
+    groupKey: `tx_${tx.id}`,
+  };
+}
+
+type GroupedAccrualItem = {
+  id: string;
+  groupKey: string;
+  isOrder: boolean;
+  isTrip: boolean;
+  title: string;
+  orderNumber?: string;
+  tripNumber?: string;
+  service_order_id?: string | null;
+  trip_id?: string | null;
+  category_id: string;
+  source: string;
+  latestDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  paidPct: number;
+  settlement_status: 'completed' | 'pending' | 'partial';
+  employee_confirmed?: boolean | null;
+  works: Array<{
+    id: string;
+    title: string;
+    amount: number;
+    settlement_status: string;
+    employee_confirmed: boolean | null;
+    rawTx: StaffTx;
+  }>;
+};
+
 function PayrollHistoryModal({
   user,
   onClose,
+  onSettle,
   onChanged,
 }: {
   user: PayrollUser;
   onClose: () => void;
+  onSettle?: () => void;
   onChanged: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'all' | 'incomes' | 'expenses'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const history = (user.history ?? []) as StaffTx[];
 
-  // Categorized lists
+  // Accruals (Поступления)
   const accruals = useMemo(
     () => history.filter((t) => classifyStaffTx(t).type === 'accrual'),
     [history],
   );
-  const payouts = useMemo(
-    () =>
-      history.filter(
-        (t) => classifyStaffTx(t).type === 'payout' || classifyStaffTx(t).type === 'advance',
-      ),
-    [history],
-  );
+
+  // Group service order and trip works
+  const groupedAccruals = useMemo(() => {
+    const map = new Map<string, GroupedAccrualItem>();
+
+    for (const tx of accruals) {
+      const parsed = parseAccrualMeta(tx);
+      const amt = parseFloat(tx.amount || '0') || 0;
+      const isCompleted = tx.settlement_status === 'completed';
+      const txDate = tx.transaction_date || tx.created_at || '';
+
+      let group = map.get(parsed.groupKey);
+      if (!group) {
+        let title = tx.description || 'Начисление';
+        let source = 'Зарплата';
+        if (parsed.isOrder) {
+          title = `Заказ-наряд #${parsed.orderNumber}`;
+          source = 'Гараж / СТО';
+        } else if (parsed.isTrip) {
+          title = `Рейс #${parsed.tripNumber}`;
+          source = 'Рейс';
+        }
+
+        group = {
+          id: tx.id,
+          groupKey: parsed.groupKey,
+          isOrder: parsed.isOrder,
+          isTrip: parsed.isTrip,
+          title,
+          orderNumber: parsed.orderNumber,
+          tripNumber: parsed.tripNumber,
+          service_order_id: parsed.service_order_id,
+          trip_id: parsed.trip_id,
+          category_id: tx.category_id,
+          source,
+          latestDate: txDate,
+          totalAmount: 0,
+          paidAmount: 0,
+          unpaidAmount: 0,
+          paidPct: 0,
+          settlement_status: 'pending',
+          works: [],
+        };
+        map.set(parsed.groupKey, group);
+      }
+
+      if (txDate && (!group.latestDate || new Date(txDate) > new Date(group.latestDate))) {
+        group.latestDate = txDate;
+      }
+
+      group.totalAmount += amt;
+      if (isCompleted) {
+        group.paidAmount += amt;
+      } else {
+        group.unpaidAmount += amt;
+      }
+
+      group.works.push({
+        id: tx.id,
+        title: parsed.workName || tx.description || 'Работа',
+        amount: amt,
+        settlement_status: tx.settlement_status,
+        employee_confirmed: tx.employee_confirmed,
+        rawTx: tx,
+      });
+    }
+
+    return Array.from(map.values()).map((g) => {
+      const paidPct = g.totalAmount > 0 ? (g.paidAmount / g.totalAmount) * 100 : 0;
+      let settlement_status: 'completed' | 'pending' | 'partial' = 'pending';
+      if (g.paidAmount >= g.totalAmount - 0.01) {
+        settlement_status = 'completed';
+      } else if (g.paidAmount > 0.01) {
+        settlement_status = 'partial';
+      }
+
+      const hasUnconfirmed = g.works.some((w) => w.employee_confirmed === false);
+
+      return {
+        ...g,
+        paidPct,
+        settlement_status,
+        employee_confirmed: hasUnconfirmed ? false : true,
+      };
+    });
+  }, [accruals]);
 
   // Financial totals
   const totalAccrued = useMemo(
     () => accruals.reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0),
     [accruals],
   );
-  const totalPaidOut = useMemo(
-    () => payouts.reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0),
-    [payouts],
-  );
-  const rawBalance = totalAccrued - totalPaidOut;
-  const balanceToPay = parseFloat(user.payout || user.debt || String(rawBalance)) || 0;
 
-  // Current display list according to tab
-  const displayList = useMemo(() => {
-    if (activeTab === 'incomes') return accruals;
-    if (activeTab === 'expenses') return payouts;
-    return history;
-  }, [activeTab, accruals, payouts, history]);
+  const totalPaidOut = useMemo(
+    () => groupedAccruals.reduce((sum, g) => sum + g.paidAmount, 0),
+    [groupedAccruals],
+  );
+
+  const balanceToPay = parseFloat(user.payout || user.debt || '0') || 0;
+  const advanceDebt = parseFloat(user.advance_balance || '0') || 0;
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   async function handleSave(txId: string) {
     const val = parseFloat(editAmount);
@@ -830,10 +995,10 @@ function PayrollHistoryModal({
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-slate-800 text-2xl">
-                account_balance
-              </span>
-              <h2 className="font-black text-slate-900 text-lg">История операций: {user.name}</h2>
+              <span className="material-symbols-outlined text-slate-800 text-2xl">payments</span>
+              <h2 className="font-black text-slate-900 text-lg">
+                Поступления и выплаты: {user.name}
+              </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
               <span>
@@ -854,7 +1019,7 @@ function PayrollHistoryModal({
 
         {/* ── KPI Summary Cards ── */}
         <div className="p-6 pb-4 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
-          {/* Card 1: Incomes */}
+          {/* Card 1: Total Accrued (Поступления) */}
           <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
@@ -863,8 +1028,8 @@ function PayrollHistoryModal({
                 </span>
                 Поступления
               </span>
-              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
-                {accruals.length} начислений
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                {groupedAccruals.length} заказов / рейсов
               </span>
             </div>
             <div className="mt-2">
@@ -872,35 +1037,35 @@ function PayrollHistoryModal({
                 +&nbsp;{totalAccrued.toLocaleString('ru-RU')} ₽
               </span>
               <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                Заработано за рейсы и ТО
+                Всего начислено за работы и рейсы
               </p>
             </div>
           </div>
 
-          {/* Card 2: Expenses */}
-          <div className="bg-white rounded-2xl p-4 border border-rose-100 shadow-xs flex flex-col justify-between">
+          {/* Card 2: Settled / Paid */}
+          <div className="bg-white rounded-2xl p-4 border border-blue-100 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px] text-rose-600">
-                  arrow_circle_up
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px] text-blue-600">
+                  verified
                 </span>
-                Списания
+                Оплачено
               </span>
-              <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-full">
-                {payouts.length} выплат
+              <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                {groupedAccruals.filter((g) => g.settlement_status === 'completed').length} закрыто
               </span>
             </div>
             <div className="mt-2">
-              <span className="text-xl font-black text-rose-600">
-                −&nbsp;{totalPaidOut.toLocaleString('ru-RU')} ₽
+              <span className="text-xl font-black text-blue-600">
+                {totalPaidOut.toLocaleString('ru-RU')} ₽
               </span>
               <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                Выдано деньгами + авансы
+                Выплачено сотруднику деньгами
               </p>
             </div>
           </div>
 
-          {/* Card 3: Balance */}
+          {/* Card 3: Debt / Balance to Pay */}
           <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
@@ -909,11 +1074,18 @@ function PayrollHistoryModal({
                 </span>
                 К выплате
               </span>
-              <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-1.5 py-0.5 rounded-full">
-                Остаток
-              </span>
+              {onSettle && balanceToPay > 0 && (
+                <button
+                  type="button"
+                  onClick={onSettle}
+                  className="text-[10px] bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold px-2.5 py-1 rounded-lg transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[12px]">payments</span>
+                  Выплатить
+                </button>
+              )}
             </div>
-            <div className="mt-2">
+            <div className="mt-1">
               <span
                 className={cn(
                   'text-xl font-black',
@@ -927,93 +1099,60 @@ function PayrollHistoryModal({
                 {balanceToPay.toLocaleString('ru-RU')} ₽
               </span>
               <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                {balanceToPay > 0
-                  ? 'Долг компании перед сотрудником'
-                  : balanceToPay < 0
-                    ? 'Долг сотрудника по авансу'
-                    : 'Все расчёты закрыты'}
+                {advanceDebt > 0
+                  ? `Долг компании (с учётом аванса ${advanceDebt.toLocaleString('ru-RU')} ₽)`
+                  : balanceToPay > 0
+                    ? 'Остаток долга перед сотрудником'
+                    : 'Все расчёты полностью закрыты'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* ── Tabs Navigation ── */}
-        <div className="px-6 pt-3 border-b border-slate-200 flex items-center gap-2 bg-white shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab('all')}
-            className={cn(
-              'pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 px-2 cursor-pointer',
-              activeTab === 'all'
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-slate-400 hover:text-slate-700',
-            )}
-          >
-            <span>📋 Все операции</span>
-            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
-              {history.length}
+        {/* ── Subtitle / Info Bar ── */}
+        <div className="px-6 py-3 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+              Поступления и статус оплаты
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('incomes')}
-            className={cn(
-              'pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 px-2 cursor-pointer',
-              activeTab === 'incomes'
-                ? 'border-emerald-600 text-emerald-700'
-                : 'border-transparent text-slate-400 hover:text-slate-700',
-            )}
-          >
-            <span>🟢 Поступления (Заработано)</span>
-            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full">
-              {accruals.length}
+            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {groupedAccruals.length} позиций
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('expenses')}
-            className={cn(
-              'pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 px-2 cursor-pointer',
-              activeTab === 'expenses'
-                ? 'border-rose-600 text-rose-700'
-                : 'border-transparent text-slate-400 hover:text-slate-700',
-            )}
-          >
-            <span>🔴 Списания (Выплаты и авансы)</span>
-            <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-full">
-              {payouts.length}
+          </div>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+              Оплачено
             </span>
-          </button>
+            <span className="inline-flex items-center gap-1 text-rose-700 font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+              Не оплачено
+            </span>
+          </div>
         </div>
 
-        {/* ── Transactions List ── */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-2.5">
+        {/* ── Transactions List (Grouped) ── */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-3.5">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-xs font-medium">
               {error}
             </div>
           )}
 
-          {displayList.length === 0 ? (
+          {groupedAccruals.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <span className="material-symbols-outlined text-4xl block mb-2 text-slate-300">
                 receipt_long
               </span>
-              <p className="text-sm font-medium">В этой категории нет записей</p>
+              <p className="text-sm font-medium">Нет поступлений и начислений</p>
             </div>
           ) : (
-            displayList.map((tx) => {
-              if (!tx || !tx.id) return null;
-              const meta = classifyStaffTx(tx);
-              const isIncome = meta.isIncome;
-              const isAdvance = tx.category_id === ADVANCE_CAT;
-              const isPayroll = PAYROLL_CATS.includes(tx.category_id);
-              const canEdit = isAdvance || isPayroll;
+            groupedAccruals.map((g) => {
+              const isCompleted = g.settlement_status === 'completed';
+              const isPartial = g.settlement_status === 'partial';
+              const isPending = g.settlement_status === 'pending';
 
-              const txDate = tx.transaction_date || tx.created_at;
-              const parsedDate = txDate ? new Date(txDate) : null;
+              const parsedDate = g.latestDate ? new Date(g.latestDate) : null;
               const dateStr =
                 parsedDate && !isNaN(parsedDate.getTime())
                   ? parsedDate.toLocaleDateString('ru-RU', {
@@ -1023,133 +1162,324 @@ function PayrollHistoryModal({
                     })
                   : '—';
 
-              const numAmount = parseFloat(tx.amount || '0') || 0;
+              const isExpanded = Boolean(expandedGroups[g.groupKey]);
+              const hasMultipleWorks = g.works.length > 1;
 
               return (
                 <div
-                  key={tx.id}
+                  key={g.groupKey}
                   className={cn(
-                    'bg-white border rounded-2xl p-4 shadow-xs flex items-center justify-between gap-4 transition-all group hover:border-slate-300',
-                    isIncome ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500',
+                    'rounded-2xl p-4.5 shadow-xs relative overflow-hidden transition-all border-2 group',
+                    isCompleted
+                      ? 'bg-emerald-50/70 border-emerald-300 hover:border-emerald-400'
+                      : isPartial
+                        ? 'bg-rose-50/70 border-amber-300 hover:border-amber-400'
+                        : 'bg-rose-50/70 border-rose-300 hover:border-rose-400',
                   )}
                 >
-                  {/* Left info */}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-slate-400">{dateStr}</span>
+                  {/* ── Partial Payment translucent background progress bar ── */}
+                  {isPartial && (
+                    <div
+                      className="absolute inset-y-0 left-0 bg-emerald-300/35 pointer-events-none transition-all duration-500"
+                      style={{ width: `${g.paidPct}%` }}
+                    />
+                  )}
 
-                      <span
-                        className={cn(
-                          'text-[10px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider',
-                          meta.badgeCls,
-                        )}
-                      >
-                        {meta.badgeText}
-                      </span>
+                  {/* Main Card Content */}
+                  <div className="relative z-10 flex items-start justify-between gap-4">
+                    {/* Left Details */}
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-400">{dateStr}</span>
 
-                      <span className="text-xs font-semibold text-slate-500">{meta.source}</span>
-                    </div>
-
-                    <p className="text-sm font-bold text-slate-800 truncate">{meta.title}</p>
-
-                    {/* Driver confirmation status */}
-                    {isPayroll && tx.employee_confirmed === false && (
-                      <div className="flex items-center gap-2 pt-0.5">
-                        <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                          <span className="material-symbols-outlined text-[12px]">timer</span>
-                          Ожидает подтверждения сотрудником
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleConfirmAdmin(tx.id)}
-                          disabled={saving}
-                          className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded px-2 py-0.5 font-bold transition-colors cursor-pointer"
-                        >
-                          ✓ Подтвердить
-                        </button>
-                      </div>
-                    )}
-
-                    {isPayroll && tx.employee_confirmed === true && (
-                      <span className="text-[10px] text-emerald-600 font-bold inline-flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">done_all</span>
-                        Подтверждено сотрудником
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Right Amount & Actions */}
-                  <div className="text-right shrink-0 flex items-center gap-3">
-                    {editingId === tx.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editAmount}
-                          onChange={(e) => setEditAmount(e.target.value)}
-                          autoFocus
-                          className="w-28 border-2 border-blue-500 rounded-xl px-2.5 py-1 text-sm font-bold text-right focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSave(tx.id)}
-                          disabled={saving}
-                          className="w-8 h-8 font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center cursor-pointer text-sm shadow-xs"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingId(null);
-                            setError('');
-                          }}
-                          className="w-8 h-8 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer text-sm"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
                         <span
                           className={cn(
-                            'text-base font-black tracking-tight block',
-                            isIncome ? 'text-emerald-600' : 'text-rose-600',
+                            'text-[10px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider',
+                            g.isOrder
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : g.isTrip
+                                ? 'bg-sky-100 text-sky-900 border-sky-300'
+                                : 'bg-slate-100 text-slate-700 border-slate-200',
                           )}
                         >
-                          {isIncome ? '+' : '−'}&nbsp;
-                          {numAmount.toLocaleString('ru-RU')} ₽
+                          {g.source}
                         </span>
 
-                        {canEdit && (
-                          <div className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(tx.id);
-                                setEditAmount(tx.amount || '0');
-                                setError('');
-                              }}
-                              className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
-                              title="Изменить сумму"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(tx.id, meta.title)}
-                              disabled={saving}
-                              className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer disabled:opacity-50"
-                              title="Удалить"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">delete</span>
-                            </button>
-                          </div>
+                        {hasMultipleWorks && (
+                          <span className="text-[10px] font-bold bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-md">
+                            {g.works.length} работ(ы)
+                          </span>
                         )}
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-2">
+                        <p className="text-base font-extrabold text-slate-900 leading-snug">
+                          {g.title}
+                        </p>
+                        {g.service_order_id && (
+                          <Link
+                            href={`/garage?order=${g.service_order_id}`}
+                            className="text-sky-600 hover:text-sky-800 text-xs font-bold inline-flex items-center gap-0.5 transition-colors"
+                            title="Открыть заказ-наряд"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">
+                              open_in_new
+                            </span>
+                          </Link>
+                        )}
+                      </div>
+
+                      {/* Confirmation alert if pending employee confirm */}
+                      {g.employee_confirmed === false && (
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded">
+                            <span className="material-symbols-outlined text-[12px]">timer</span>
+                            Ожидает подтверждения
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              g.works.forEach((w) => {
+                                if (w.employee_confirmed === false) handleConfirmAdmin(w.id);
+                              });
+                            }}
+                            disabled={saving}
+                            className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 hover:bg-emerald-200 rounded px-2 py-0.5 font-bold transition-colors cursor-pointer"
+                          >
+                            ✓ Подтвердить всё
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Amount & Payment Stamp */}
+                    <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'text-lg sm:text-xl font-black tracking-tight',
+                            isCompleted ? 'text-emerald-700' : 'text-slate-900',
+                          )}
+                        >
+                          +&nbsp;{g.totalAmount.toLocaleString('ru-RU')} ₽
+                        </span>
+                      </div>
+
+                      {/* ── Visual Stamps ── */}
+                      {isCompleted && (
+                        <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/90 border-2 border-emerald-600 text-emerald-700 font-black text-[11px] rounded-lg uppercase tracking-wider shadow-xs rotate-[-2deg] select-none">
+                          <span className="material-symbols-outlined text-[15px]">verified</span>
+                          ОПЛАЧЕНО
+                        </div>
+                      )}
+
+                      {isPending && (
+                        <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/90 border-2 border-rose-500 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider rotate-[-2deg] select-none">
+                          <span className="material-symbols-outlined text-[13px]">
+                            hourglass_top
+                          </span>
+                          НЕ ОПЛАЧЕНО
+                        </div>
+                      )}
+
+                      {isPartial && (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100/90 border border-emerald-300 text-emerald-900 font-extrabold text-[10px] rounded-md uppercase tracking-wide">
+                            <span className="material-symbols-outlined text-[12px] text-emerald-700">
+                              done
+                            </span>
+                            <span>
+                              Оплачено {g.paidAmount.toLocaleString('ru-RU')} ₽ (
+                              {Math.round(g.paidPct)}%)
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-bold text-rose-700">
+                            Остаток: {g.unpaidAmount.toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* ── Expandable Breakdown for multiple works ── */}
+                  {hasMultipleWorks && (
+                    <div className="relative z-10 mt-3 pt-2.5 border-t border-slate-200/70">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(g.groupKey)}
+                        className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1 cursor-pointer transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-slate-500">
+                          {isExpanded ? 'expand_less' : 'expand_more'}
+                        </span>
+                        <span>
+                          {isExpanded
+                            ? 'Скрыть детализацию'
+                            : `Показать все работы (${g.works.length})`}
+                        </span>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-2 space-y-1.5 bg-white/80 rounded-xl p-3 border border-slate-200 shadow-xs">
+                          <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
+                            Разбивка по заказ-наряду:
+                          </div>
+                          {g.works.map((w, idx) => {
+                            const isWorkPaid = w.settlement_status === 'completed';
+                            return (
+                              <div
+                                key={w.id}
+                                className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-slate-50 transition-colors group/item"
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="text-slate-400 font-bold text-[11px]">
+                                    {idx + 1}.
+                                  </span>
+                                  <span className="font-semibold text-slate-800 truncate">
+                                    {w.title}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2.5 shrink-0">
+                                  {editingId === w.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={editAmount}
+                                        onChange={(e) => setEditAmount(e.target.value)}
+                                        autoFocus
+                                        className="w-20 border-2 border-blue-500 rounded-lg px-2 py-0.5 text-xs font-bold text-right"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSave(w.id)}
+                                        disabled={saving}
+                                        className="w-6 h-6 bg-emerald-600 text-white rounded-lg font-bold flex items-center justify-center text-xs"
+                                      >
+                                        ✓
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingId(null)}
+                                        className="w-6 h-6 border border-slate-200 text-slate-500 rounded-lg flex items-center justify-center text-xs"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span
+                                        className={cn(
+                                          'font-bold',
+                                          isWorkPaid ? 'text-emerald-700' : 'text-rose-600',
+                                        )}
+                                      >
+                                        {w.amount.toLocaleString('ru-RU')} ₽
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          'text-[9px] font-black px-1.5 py-0.5 rounded border uppercase',
+                                          isWorkPaid
+                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                            : 'bg-rose-100 text-rose-800 border-rose-200',
+                                        )}
+                                      >
+                                        {isWorkPaid ? 'Оплачено' : 'К выплате'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingId(w.id);
+                                          setEditAmount(String(w.amount));
+                                        }}
+                                        className="text-slate-400 hover:text-blue-600 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
+                                        title="Изменить сумму работы"
+                                      >
+                                        <span className="material-symbols-outlined text-[14px]">
+                                          edit
+                                        </span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDelete(w.id, w.title)}
+                                        disabled={saving}
+                                        className="text-slate-400 hover:text-rose-600 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
+                                        title="Удалить работу"
+                                      >
+                                        <span className="material-symbols-outlined text-[14px]">
+                                          delete
+                                        </span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Single work edit/delete actions */}
+                  {!hasMultipleWorks && g.works[0] && (
+                    <div className="relative z-10 flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {editingId === g.works[0].id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                            autoFocus
+                            className="w-24 border-2 border-blue-500 rounded-lg px-2 py-0.5 text-xs font-bold text-right"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSave(g.works[0].id)}
+                            disabled={saving}
+                            className="w-6 h-6 bg-emerald-600 text-white rounded-lg font-bold flex items-center justify-center text-xs"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="w-6 h-6 border border-slate-200 text-slate-500 rounded-lg flex items-center justify-center text-xs"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(g.works[0].id);
+                              setEditAmount(String(g.works[0].amount));
+                              setError('');
+                            }}
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                            title="Изменить сумму"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(g.works[0].id, g.title)}
+                            disabled={saving}
+                            className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer disabled:opacity-50"
+                            title="Удалить"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">delete</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -2395,6 +2725,11 @@ export default function StaffPage() {
         <PayrollHistoryModal
           user={historyUser}
           onClose={() => setHistoryUser(null)}
+          onSettle={() => {
+            const u = historyUser;
+            setHistoryUser(null);
+            setSettleUser(u);
+          }}
           onChanged={() => {
             setHistoryUser(null);
             qc.invalidateQueries({ queryKey: ['staff-payroll'] });

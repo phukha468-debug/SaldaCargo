@@ -123,7 +123,7 @@ export async function GET(request: Request) {
       (supabase as any)
         .from('transactions')
         .select(
-          'id, related_user_id, amount, direction, description, created_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id',
+          'id, related_user_id, amount, direction, description, created_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id, service_order_id, trip_id',
         )
         .eq('lifecycle_status', 'approved')
         .or(`category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
