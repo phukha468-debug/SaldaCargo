@@ -222,7 +222,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           .neq('status', 'cancelled');
         const { data: partsForRevenue } = await (supabase as any)
           .from('service_order_parts')
-          .select('client_price, quantity')
+          .select('client_price, unit_price, quantity')
           .eq('service_order_id', id);
 
         const worksTotal = ((worksForRevenue ?? []) as any[]).reduce(
@@ -231,7 +231,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         );
         const partsTotal = ((partsForRevenue ?? []) as any[]).reduce(
           (s: number, p: any) =>
-            s + parseFloat(p.client_price ?? '0') * parseFloat(p.quantity ?? '1'),
+            s +
+            (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) *
+              (parseFloat(p.quantity ?? '1') || 1),
           0,
         );
         const revenueTotal = worksTotal + partsTotal;

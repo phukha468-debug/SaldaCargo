@@ -3458,6 +3458,7 @@ type TabOrder = Omit<OrderRow, 'works'> & {
     custom_part_name?: string | null;
     quantity: number;
     unit_price?: string | null;
+    client_price?: string | null;
     unit?: string | null;
     part?: { name: string; unit: string } | null;
   }>;
@@ -6024,10 +6025,15 @@ function WorkOrdersSection() {
 
   const totalCost = useMemo(
     () =>
-      filteredOrders.reduce(
-        (s, o) => s + (o.works ?? []).reduce((ws, w) => ws + moneyVal(w.price_client), 0),
-        0,
-      ),
+      filteredOrders.reduce((s, o) => {
+        const worksCost = (o.works ?? []).reduce((ws, w) => ws + moneyVal(w.price_client), 0);
+        const partsCost = (o.parts ?? []).reduce(
+          (ps, p) =>
+            ps + (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1),
+          0,
+        );
+        return s + worksCost + partsCost;
+      }, 0),
     [filteredOrders],
   );
 
@@ -6050,7 +6056,13 @@ function WorkOrdersSection() {
   // ── Order card ──────────────────────────────────────────────────────────────
   function OrderCard({ o }: { o: TabOrder }) {
     const works = o.works ?? [];
-    const cost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
+    const parts = o.parts ?? [];
+    const worksCost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
+    const partsCost = parts.reduce(
+      (s, p) => s + (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1),
+      0,
+    );
+    const cost = worksCost + partsCost;
     const normH = works.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
     const factH = works.reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
     const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
@@ -6112,7 +6124,7 @@ function WorkOrdersSection() {
           </span>
         </div>
 
-        {/* Center: vehicle + works */}
+        {/* Center: vehicle + works + parts */}
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm text-slate-900 truncate">
@@ -6120,8 +6132,8 @@ function WorkOrdersSection() {
             </span>
             {clientLabel && <span className="text-xs text-slate-500 truncate">{clientLabel}</span>}
           </div>
-          {works.length === 0 ? (
-            <span className="text-xs text-amber-600 italic">⚠ Работы не указаны</span>
+          {works.length === 0 && parts.length === 0 ? (
+            <span className="text-xs text-amber-600 italic">⚠ Работы и запчасти не указаны</span>
           ) : (
             <div className="flex flex-wrap gap-1">
               {works.slice(0, 4).map((w) => (
@@ -6144,6 +6156,25 @@ function WorkOrdersSection() {
                   +{works.length - 4}
                 </span>
               )}
+              {parts.slice(0, 3).map((p) => {
+                const partName = p.part?.name ?? p.custom_part_name ?? 'Запчасть';
+                const partPrice =
+                  (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1);
+                return (
+                  <span
+                    key={p.id}
+                    className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-800 border border-amber-200"
+                  >
+                    📦 {partName}
+                    {partPrice > 0 ? ` (${partPrice.toLocaleString('ru-RU')} ₽)` : ''}
+                  </span>
+                );
+              })}
+              {parts.length > 3 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  +{parts.length - 3} з/ч
+                </span>
+              )}
             </div>
           )}
           {o.problem_description && (
@@ -6159,9 +6190,21 @@ function WorkOrdersSection() {
             {statusBadge.label}
           </span>
           {cost > 0 && (
-            <span className="text-sm font-bold text-slate-800">
-              {cost.toLocaleString('ru-RU')} ₽
-            </span>
+            <div className="flex flex-col items-end leading-tight">
+              <span className="text-sm font-bold text-slate-900">
+                {cost.toLocaleString('ru-RU')} ₽
+              </span>
+              {partsCost > 0 && worksCost > 0 && (
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {worksCost.toLocaleString('ru-RU')} ₽ + {partsCost.toLocaleString('ru-RU')} ₽ з/ч
+                </span>
+              )}
+              {partsCost > 0 && worksCost === 0 && (
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {partsCost.toLocaleString('ru-RU')} ₽ з/ч
+                </span>
+              )}
+            </div>
           )}
           {o.mechanic?.name && (
             <span className="text-[11px] text-slate-500">{o.mechanic.name}</span>

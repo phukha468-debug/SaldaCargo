@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
-        id, custom_part_name, quantity, unit_price, unit,
+        id, custom_part_name, quantity, unit_price, client_price, unit,
         part:parts(name, unit)
       )
     `;
@@ -38,6 +38,10 @@ export async function GET(request: Request) {
       works:service_order_works(
         id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
+      ),
+      parts:service_order_parts(
+        id, custom_part_name, quantity, unit_price, client_price, unit,
+        part:parts(name, unit)
       )
     `;
 
