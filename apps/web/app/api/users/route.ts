@@ -16,7 +16,11 @@ export async function GET(request: Request) {
 
   if (!includeInactive) query = query.eq('is_active', true);
   if (role === 'mechanic') {
-    query = query.filter('roles', 'ov', '{mechanic,mechanic_lead,welder,electrician}');
+    query = query.filter(
+      'roles',
+      'ov',
+      '{mechanic,mechanic_lead,welder,painter,electrician,handyman}',
+    );
   } else if (role) {
     query = query.contains('roles', [role]);
   }

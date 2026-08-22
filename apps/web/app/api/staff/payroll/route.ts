@@ -373,7 +373,14 @@ export async function GET(request: Request) {
     const assignedIds = new Set<string>();
 
     const mechanics = (() => {
-      const raw = [...byRole('mechanic_lead'), ...byRole('mechanic')]
+      const raw = [
+        ...byRole('mechanic_lead'),
+        ...byRole('mechanic'),
+        ...byRole('welder'),
+        ...byRole('painter'),
+        ...byRole('electrician'),
+        ...byRole('handyman'),
+      ]
         .filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i)
         .filter((u) => !assignedIds.has(u.id));
       raw.forEach((u) => assignedIds.add(u.id));

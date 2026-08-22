@@ -8,6 +8,10 @@ const PAYROLL_CATEGORIES: Record<string, string> = {
   loader: '18792fa8-fda8-472d-8e04-e19d2c6c053c',
   mechanic: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
   mechanic_lead: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+  welder: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+  painter: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+  electrician: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+  handyman: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
 };
 const OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 

@@ -9,7 +9,16 @@ const SALARY_CATEGORY_IDS = [
 ];
 
 const MANAGEMENT_ROLES = ['owner', 'admin'];
-const OPERATIONAL_ROLES = ['driver', 'loader', 'mechanic', 'mechanic_lead'];
+const OPERATIONAL_ROLES = [
+  'driver',
+  'loader',
+  'mechanic',
+  'mechanic_lead',
+  'welder',
+  'painter',
+  'electrician',
+  'handyman',
+];
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 

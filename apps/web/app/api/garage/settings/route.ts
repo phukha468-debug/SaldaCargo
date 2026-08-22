@@ -9,7 +9,7 @@ export async function GET() {
     (supabase.from('users') as any)
       .select('id, name, mechanic_salary_pct, roles')
       .or(
-        'roles.cs.{mechanic},roles.cs.{mechanic_lead},roles.cs.{welder},roles.cs.{electrician},roles.cs.{painter}',
+        'roles.cs.{mechanic},roles.cs.{mechanic_lead},roles.cs.{welder},roles.cs.{electrician},roles.cs.{painter},roles.cs.{handyman}',
       )
       .eq('is_active', true)
       .order('name'),

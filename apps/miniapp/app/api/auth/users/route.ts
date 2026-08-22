@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     // Маппинг UI-ролей на DB-роли
     const roleMapping: Record<string, string[]> = {
       driver: ['driver'],
-      mechanic: ['mechanic', 'mechanic_lead'],
+      mechanic: ['mechanic', 'mechanic_lead', 'welder', 'painter', 'electrician', 'handyman'],
       admin: ['admin', 'owner'],
     };
 

@@ -271,15 +271,23 @@ export async function POST(request: Request) {
     );
     const advanceBalance = Math.max(0, advanceTotal - offsetTotal);
 
+    const workshopRoles = [
+      'mechanic',
+      'mechanic_lead',
+      'welder',
+      'painter',
+      'electrician',
+      'handyman',
+    ];
     const operationalRole = (userRow?.roles as string[] | undefined)?.find(
-      (r: string) => r === 'driver' || r === 'loader' || r === 'mechanic',
+      (r: string) => r === 'driver' || r === 'loader' || workshopRoles.includes(r),
     );
     const categoryId =
       operationalRole === 'driver'
         ? 'd79213ee-3bc6-4433-b58a-ca7ea1040d00'
         : operationalRole === 'loader'
           ? '18792fa8-fda8-472d-8e04-e19d2c6c053c'
-          : operationalRole === 'mechanic'
+          : workshopRoles.includes(operationalRole ?? '')
             ? '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'
             : 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 

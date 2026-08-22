@@ -31,9 +31,34 @@ export async function GET(request: Request) {
     // Фильтруем по роли на стороне сервера, так как roles - это JSONB/Array
     let filteredUsers = usersData;
     if (role) {
-      filteredUsers = filteredUsers.filter(
-        (u) => u.roles && Array.isArray(u.roles) && u.roles.includes(role),
-      );
+      if (role === 'mechanic') {
+        const workshopRoles = [
+          'mechanic',
+          'mechanic_lead',
+          'welder',
+          'painter',
+          'electrician',
+          'handyman',
+        ];
+        filteredUsers = filteredUsers.filter(
+          (u) =>
+            u.roles &&
+            Array.isArray(u.roles) &&
+            u.roles.some((r: string) => workshopRoles.includes(r)),
+        );
+      } else if (role === 'admin') {
+        const adminRoles = ['admin', 'owner'];
+        filteredUsers = filteredUsers.filter(
+          (u) =>
+            u.roles &&
+            Array.isArray(u.roles) &&
+            u.roles.some((r: string) => adminRoles.includes(r)),
+        );
+      } else {
+        filteredUsers = filteredUsers.filter(
+          (u) => u.roles && Array.isArray(u.roles) && u.roles.includes(role),
+        );
+      }
     }
 
     // Expose has_pin flag (not the pin itself)

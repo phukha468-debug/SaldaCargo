@@ -7,7 +7,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data, error } = await (supabase.from('users') as any)
     .select('id, name, mechanic_salary_pct')
-    .filter('roles', 'ov', '{mechanic,mechanic_lead,welder,electrician}')
+    .filter('roles', 'ov', '{mechanic,mechanic_lead,welder,painter,electrician,handyman}')
     .eq('is_active', true)
     .not('name', 'ilike', '%STRESS%')
     .not('name', 'ilike', '%TEST%')
