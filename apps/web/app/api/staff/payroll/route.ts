@@ -123,7 +123,7 @@ export async function GET(request: Request) {
       (supabase as any)
         .from('transactions')
         .select(
-          'id, related_user_id, amount, direction, description, created_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id, service_order_id, trip_id',
+          'id, related_user_id, amount, direction, description, created_at, updated_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id, service_order_id, trip_id',
         )
         .eq('lifecycle_status', 'approved')
         .or(`category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
     const serviceOrderMap = new Map<string, any>();
     if (orderIds.size > 0 || orderNums.size > 0) {
       let soQuery = (supabase as any).from('service_orders').select(`
-        id, order_number, machine_type, client_name, client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
+        id, order_number, machine_type, client_name, client_vehicle_brand, client_vehicle_model, client_vehicle_reg, created_at,
         asset:assets(id, short_name, reg_number, make, model)
       `);
       if (orderIds.size > 0 && orderNums.size > 0) {
@@ -240,13 +240,14 @@ export async function GET(request: Request) {
             so.asset?.short_name ||
             [so.asset?.make, so.asset?.model].filter(Boolean).join(' ') ||
             'Собственный автопарк';
-          const regPart = so.asset?.reg_number ? `${so.asset.reg_number}` : '';
+          const regPart = so.asset?.reg_number ? `(${so.asset.reg_number})` : '';
           vehicleLabel = `${carName} ${regPart}`.trim();
         }
 
         const enriched = {
           ...so,
           vehicle_label: vehicleLabel,
+          order_date: so.created_at || null,
         };
 
         serviceOrderMap.set(so.id, enriched);
@@ -258,7 +259,9 @@ export async function GET(request: Request) {
     if (tripIds.size > 0 || tripNums.size > 0) {
       let trQuery = (supabase as any)
         .from('trips')
-        .select(`id, trip_number, asset:assets(id, short_name, reg_number, make, model)`);
+        .select(
+          `id, trip_number, started_at, created_at, asset_id, asset:assets(id, short_name, reg_number, make, model)`,
+        );
       if (tripIds.size > 0 && tripNums.size > 0) {
         trQuery = trQuery.or(
           `id.in.(${Array.from(tripIds).join(',')}),trip_number.in.(${Array.from(tripNums).join(',')})`,
@@ -271,14 +274,17 @@ export async function GET(request: Request) {
 
       const { data: tripsData } = await trQuery;
       for (const tr of tripsData ?? []) {
+        const carAsset = tr.asset || (tr.asset_id ? assetMap[tr.asset_id] : null);
         const carName =
-          tr.asset?.short_name ||
-          [tr.asset?.make, tr.asset?.model].filter(Boolean).join(' ') ||
-          'Авто';
-        const reg = tr.asset?.reg_number || '';
+          carAsset?.short_name || [carAsset?.make, carAsset?.model].filter(Boolean).join(' ') || '';
+        const reg = carAsset?.reg_number ? `(${carAsset.reg_number})` : '';
+        const vehicleLabel = carName || reg ? `${carName} ${reg}`.trim() : '';
         const enrichedTrip = {
           ...tr,
-          vehicle_label: `${carName} ${reg}`.trim(),
+          vehicle_label: vehicleLabel,
+          started_at: tr.started_at,
+          created_at: tr.created_at,
+          trip_date: tr.started_at || tr.created_at || null,
         };
         tripMap.set(tr.id, enrichedTrip);
         tripMap.set(String(tr.trip_number), enrichedTrip);

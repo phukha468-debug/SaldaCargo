@@ -46,6 +46,7 @@ type PayrollUser = {
     direction: string;
     description: string;
     created_at: string;
+    updated_at?: string;
     settlement_status: string;
     category_id: string;
     employee_confirmed: boolean | null;
@@ -640,6 +641,8 @@ type StaffTx = PayrollUser['history'][number] & {
     client_vehicle_model?: string | null;
     client_vehicle_reg?: string | null;
     vehicle_label?: string;
+    order_date?: string | null;
+    created_at?: string | null;
     asset?: {
       id: string;
       short_name: string;
@@ -652,6 +655,9 @@ type StaffTx = PayrollUser['history'][number] & {
     id: string;
     trip_number?: string | number;
     vehicle_label?: string;
+    started_at?: string | null;
+    trip_date?: string | null;
+    created_at?: string | null;
   } | null;
 };
 
@@ -743,7 +749,7 @@ function parseAccrualMeta(tx: StaffTx) {
     desc.match(/(?:наряд|наряда|заказ-наряд|заказ-наряда)\s*[#№]?\s*([A-Za-zА-Яа-я0-9_-]+)/i) ||
     desc.match(/\b(Н[3З]-[0-9]+)\b/i);
 
-  const tripMatch = desc.match(/(?:рейс|рейса)\s*[#№]?\s*([A-Za-zА-Яа-я0-9_-]+)/i);
+  const tripMatch = desc.match(/(?:рейс|рейса)\s*[#№]?\s*([0-9]+)/i);
 
   let workName = '';
   const colonIndex = desc.indexOf(':');
@@ -764,6 +770,8 @@ function parseAccrualMeta(tx: StaffTx) {
 
     const orderIdToOpen = so?.id || tx.service_order_id || orderNum;
     const vehicleDesc = so?.vehicle_label || '';
+    const eventDate =
+      so?.order_date || so?.created_at || tx.transaction_date || tx.created_at || null;
 
     return {
       isOrder: true,
@@ -771,6 +779,7 @@ function parseAccrualMeta(tx: StaffTx) {
       orderNumber: orderNum,
       service_order_id: orderIdToOpen,
       vehicleDesc,
+      eventDate,
       workName: workName || 'Выполненные работы',
       groupKey: `order_${orderIdToOpen || orderNum}`,
     };
@@ -785,6 +794,13 @@ function parseAccrualMeta(tx: StaffTx) {
           ? tx.trip_id.slice(0, 8)
           : '';
     const vehicleDesc = trip?.vehicle_label || '';
+    const eventDate =
+      trip?.trip_date ||
+      trip?.started_at ||
+      trip?.created_at ||
+      tx.transaction_date ||
+      tx.created_at ||
+      null;
 
     return {
       isOrder: false,
@@ -792,6 +808,7 @@ function parseAccrualMeta(tx: StaffTx) {
       tripNumber: tripNum,
       trip_id: trip?.id || tx.trip_id || null,
       vehicleDesc,
+      eventDate,
       workName: desc,
       groupKey: `trip_${tx.trip_id || tripNum}`,
     };
@@ -801,6 +818,7 @@ function parseAccrualMeta(tx: StaffTx) {
     isOrder: false,
     isTrip: false,
     vehicleDesc: '',
+    eventDate: tx.transaction_date || tx.created_at || null,
     workName: desc || 'Начисление',
     groupKey: `tx_${tx.id}`,
   };
@@ -817,6 +835,8 @@ type GroupedAccrualItem = {
   service_order_id?: string | null;
   trip_id?: string | null;
   vehicle_desc?: string;
+  eventDate?: string | null;
+  paidDate?: string | null;
   category_id: string;
   source: string;
   latestDate: string;
@@ -832,6 +852,7 @@ type GroupedAccrualItem = {
     amount: number;
     settlement_status: string;
     employee_confirmed: boolean | null;
+    updated_at?: string | null;
     rawTx: StaffTx;
   }>;
 };
@@ -870,6 +891,7 @@ function PayrollHistoryModal({
       const amt = parseFloat(tx.amount || '0') || 0;
       const isCompleted = tx.settlement_status === 'completed';
       const txDate = tx.transaction_date || tx.created_at || '';
+      const txPaidDate = isCompleted ? tx.updated_at || tx.transaction_date || tx.created_at : null;
 
       let group = map.get(parsed.groupKey);
       if (!group) {
@@ -894,6 +916,8 @@ function PayrollHistoryModal({
           service_order_id: parsed.service_order_id,
           trip_id: parsed.trip_id,
           vehicle_desc: parsed.vehicleDesc,
+          eventDate: parsed.eventDate,
+          paidDate: txPaidDate,
           category_id: tx.category_id,
           source,
           latestDate: txDate,
@@ -905,8 +929,16 @@ function PayrollHistoryModal({
           works: [],
         };
         map.set(parsed.groupKey, group);
-      } else if (parsed.vehicleDesc && !group.vehicle_desc) {
-        group.vehicle_desc = parsed.vehicleDesc;
+      } else {
+        if (parsed.vehicleDesc && !group.vehicle_desc) {
+          group.vehicle_desc = parsed.vehicleDesc;
+        }
+        if (parsed.eventDate && !group.eventDate) {
+          group.eventDate = parsed.eventDate;
+        }
+        if (txPaidDate && (!group.paidDate || new Date(txPaidDate) > new Date(group.paidDate))) {
+          group.paidDate = txPaidDate;
+        }
       }
 
       if (txDate && (!group.latestDate || new Date(txDate) > new Date(group.latestDate))) {
@@ -926,6 +958,7 @@ function PayrollHistoryModal({
         amount: amt,
         settlement_status: tx.settlement_status,
         employee_confirmed: tx.employee_confirmed,
+        updated_at: tx.updated_at,
         rawTx: tx,
       });
     }
@@ -1148,45 +1181,32 @@ function PayrollHistoryModal({
                   ? `Долг компании (с учётом аванса ${advanceDebt.toLocaleString('ru-RU')} ₽)`
                   : balanceToPay > 0
                     ? 'Остаток долга перед сотрудником'
-                    : 'Все расчёты полностью закрыты'}
+                    : 'Все начисления закрыты'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* ── Subtitle / Info Bar ── */}
-        <div className="px-6 py-3 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-700">
-              Поступления и статус оплаты
-            </span>
-            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-              {groupedAccruals.length} позиций
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-[11px]">
-            <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-              Оплачено
-            </span>
-            <span className="inline-flex items-center gap-1 text-rose-700 font-bold">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
-              Не оплачено
-            </span>
-          </div>
-        </div>
-
-        {/* ── Transactions List (Grouped) ── */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-3.5">
+        {/* List of Accruals */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-100/50">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-xs font-medium">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-xs font-bold">
               {error}
             </div>
           )}
 
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Список начислений по рейсам и нарядам
+            </span>
+            <span className="text-xs text-slate-400 font-medium">
+              Всего {groupedAccruals.length} операций
+            </span>
+          </div>
+
           {groupedAccruals.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <span className="material-symbols-outlined text-4xl block mb-2 text-slate-300">
+            <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+              <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
                 receipt_long
               </span>
               <p className="text-sm font-medium">Нет поступлений и начислений</p>
@@ -1197,15 +1217,44 @@ function PayrollHistoryModal({
               const isPartial = g.settlement_status === 'partial';
               const isPending = g.settlement_status === 'pending';
 
-              const parsedDate = g.latestDate ? new Date(g.latestDate) : null;
-              const dateStr =
-                parsedDate && !isNaN(parsedDate.getTime())
-                  ? parsedDate.toLocaleDateString('ru-RU', {
+              const parsedEventDate = g.eventDate
+                ? new Date(g.eventDate)
+                : g.latestDate
+                  ? new Date(g.latestDate)
+                  : null;
+              const eventDateStr =
+                parsedEventDate && !isNaN(parsedEventDate.getTime())
+                  ? parsedEventDate.toLocaleDateString('ru-RU', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
                     })
                   : '—';
+
+              const parsedPaidDate = g.paidDate
+                ? new Date(g.paidDate)
+                : g.latestDate
+                  ? new Date(g.latestDate)
+                  : null;
+              const paidDateStr =
+                parsedPaidDate && !isNaN(parsedPaidDate.getTime())
+                  ? parsedPaidDate.toLocaleDateString('ru-RU', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : eventDateStr;
+
+              const displayVehicle =
+                g.vehicle_desc ||
+                (g.isTrip && user.asset
+                  ? [
+                      user.asset.short_name,
+                      user.asset.reg_number ? `(${user.asset.reg_number})` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')
+                  : null);
 
               const isExpanded = Boolean(expandedGroups[g.groupKey]);
               const hasMultipleWorks = g.works.length > 1;
@@ -1235,11 +1284,9 @@ function PayrollHistoryModal({
                     {/* Left Details */}
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-slate-400">{dateStr}</span>
-
                         <span
                           className={cn(
-                            'text-[10px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider',
+                            'text-[10px] font-black px-2 py-0.5 rounded-md border uppercase tracking-wider',
                             g.isOrder
                               ? 'bg-amber-100 text-amber-900 border-amber-300'
                               : g.isTrip
@@ -1250,6 +1297,19 @@ function PayrollHistoryModal({
                           {g.source}
                         </span>
 
+                        <span className="text-xs font-bold text-slate-600 flex items-center gap-1 bg-white/80 border border-slate-200 px-2.5 py-0.5 rounded-md shadow-2xs">
+                          <span className="material-symbols-outlined text-[14px] text-slate-400">
+                            calendar_today
+                          </span>
+                          <span>
+                            {g.isTrip
+                              ? `Дата рейса: ${eventDateStr}`
+                              : g.isOrder
+                                ? `Дата наряда: ${eventDateStr}`
+                                : eventDateStr}
+                          </span>
+                        </span>
+
                         {hasMultipleWorks && (
                           <span className="text-[10px] font-bold bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-md">
                             {g.works.length} работ(ы)
@@ -1258,7 +1318,7 @@ function PayrollHistoryModal({
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-base font-extrabold text-slate-900 leading-snug">
+                        <p className="text-base font-black text-slate-900 leading-snug">
                           {g.title}
                         </p>
                         {g.service_order_id && (
@@ -1288,13 +1348,22 @@ function PayrollHistoryModal({
                       </div>
 
                       {/* ── Vehicle and Client Description ── */}
-                      {g.vehicle_desc && (
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 border border-slate-200 px-2.5 py-1 rounded-lg w-fit shadow-2xs">
-                          <span className="material-symbols-outlined text-[15px] text-slate-500">
+                      {displayVehicle ? (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-white/95 border border-slate-200 px-2.5 py-1 rounded-lg w-fit shadow-2xs">
+                          <span className="material-symbols-outlined text-[16px] text-sky-600">
                             {g.isOrder ? 'directions_car' : 'local_shipping'}
                           </span>
-                          <span>{g.vehicle_desc}</span>
+                          <span>Авто: {displayVehicle}</span>
                         </div>
+                      ) : (
+                        g.isTrip && (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 italic">
+                            <span className="material-symbols-outlined text-[14px]">
+                              local_shipping
+                            </span>
+                            <span>Автомобиль не указан</span>
+                          </div>
+                        )
                       )}
 
                       {/* Confirmation alert if pending employee confirm */}
@@ -1321,7 +1390,7 @@ function PayrollHistoryModal({
                     </div>
 
                     {/* Right Amount & Payment Stamp */}
-                    <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                       <div className="flex items-center gap-2">
                         <span
                           className={cn(
@@ -1333,11 +1402,16 @@ function PayrollHistoryModal({
                         </span>
                       </div>
 
-                      {/* ── Visual Stamps ── */}
+                      {/* ── Visual Stamps & Dates ── */}
                       {isCompleted && (
-                        <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/90 border-2 border-emerald-600 text-emerald-700 font-black text-[11px] rounded-lg uppercase tracking-wider shadow-xs rotate-[-2deg] select-none">
-                          <span className="material-symbols-outlined text-[15px]">verified</span>
-                          ОПЛАЧЕНО
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/90 border-2 border-emerald-600 text-emerald-700 font-black text-[11px] rounded-lg uppercase tracking-wider shadow-xs rotate-[-2deg] select-none">
+                            <span className="material-symbols-outlined text-[15px]">verified</span>
+                            ОПЛАЧЕНО
+                          </div>
+                          <span className="text-[10px] text-emerald-800 font-extrabold bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs">
+                            выплачено {paidDateStr}
+                          </span>
                         </div>
                       )}
 
@@ -1361,6 +1435,9 @@ function PayrollHistoryModal({
                               {Math.round(g.paidPct)}%)
                             </span>
                           </div>
+                          <span className="text-[10px] text-emerald-700 font-bold">
+                            выплачено {paidDateStr}
+                          </span>
                           <span className="text-[11px] font-bold text-rose-700">
                             Остаток: {g.unpaidAmount.toLocaleString('ru-RU')} ₽
                           </span>
