@@ -376,11 +376,13 @@ function SettleModal({
   const maxOffset = Math.min(salaryTotal, advanceBalance);
 
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
-  const [offsetInput, setOffsetInput] = useState(maxOffset.toFixed(2));
+  // По умолчанию НЕ списываем аванс (0 ₽), чтобы исключить случайные удержания
+  const [offsetInput, setOffsetInput] = useState('0');
   const [partialInput, setPartialInput] = useState(salaryTotal.toFixed(2));
   const [error, setError] = useState('');
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showOffsetConfirm, setShowOffsetConfirm] = useState(false);
 
   const isPartial = parseFloat(partialInput) < salaryTotal - 0.001;
   const partialVal = Math.min(Math.max(0, parseFloat(partialInput) || 0), salaryTotal);
@@ -417,7 +419,7 @@ function SettleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-slate-900">Выплата ЗП</h2>
@@ -430,189 +432,268 @@ function SettleModal({
             ×
           </button>
         </div>
-        <div className="p-6 space-y-3">
-          {/* Сумма к выплате */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1.5">
-              Сумма к выплате сейчас
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                max={salaryTotal}
-                step="100"
-                value={partialInput}
-                onChange={(e) => setPartialInput(e.target.value)}
-                className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              />
-              <span className="text-sm text-slate-500 shrink-0">₽</span>
+
+        {showOffsetConfirm ? (
+          /* Шаг подтверждения списания аванса */
+          <div className="p-6 space-y-4">
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-amber-900 font-black text-sm">
+                <span className="material-symbols-outlined text-amber-600">warning</span>
+                <span>Внимание: Списание аванса!</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Вы указали удержание в зачёт аванса на сумму{' '}
+                <strong className="text-amber-950 font-black">
+                  <Money amount={effectiveOffset.toFixed(2)} />
+                </strong>
+                .
+              </p>
+              <div className="bg-white/80 rounded-xl p-3 text-xs space-y-1.5 border border-amber-200">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Текущий долг водителя:</span>
+                  <span className="font-bold text-rose-600">
+                    <Money amount={advanceBalance.toFixed(2)} />
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Остаток долга после зачёта:</span>
+                  <span className="font-bold text-violet-700">
+                    <Money amount={remainingDebt.toFixed(2)} />
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-slate-100">
+                  <span className="text-slate-700 font-bold">Будет выплачено на руки:</span>
+                  <span className="font-black text-emerald-700">
+                    <Money amount={payout.toFixed(2)} />
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs font-bold text-amber-950 pt-1 text-center">
+                Вы точно хотите списать этот аванс?
+              </p>
+            </div>
+
+            {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+
+            <div className="flex flex-col gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setPartialInput(salaryTotal.toFixed(2))}
-                className={cn(
-                  'text-xs px-2.5 py-1.5 rounded-lg border font-semibold shrink-0 transition-colors',
-                  !isPartial
-                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 text-slate-500 hover:bg-slate-50',
-                )}
+                onClick={() => {
+                  if (isSubmitting || mutation.isPending) return;
+                  setIsSubmitting(true);
+                  mutation.mutate();
+                }}
+                disabled={mutation.isPending || isSubmitting}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-3.5 rounded-xl transition-colors shadow-lg shadow-amber-600/20 active:scale-[0.98]"
               >
-                Всё
+                {mutation.isPending || isSubmitting
+                  ? 'Проводим...'
+                  : '✓ Да, списать аванс и выплатить'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOffsetConfirm(false)}
+                className="w-full text-xs font-medium text-slate-600 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                ← Вернуться и изменить
               </button>
             </div>
-            {isPartial && (
-              <p className="text-xs text-amber-600 mt-1.5 font-medium">
-                Остаток долга {remainingSalary.toLocaleString('ru-RU')} ₽ останется к выплате
-              </p>
-            )}
           </div>
-
-          {/* Разбивка */}
-          <div className="bg-slate-50 rounded-xl divide-y divide-slate-200 overflow-hidden">
-            <div className="flex justify-between items-center px-4 py-3">
-              <span className="text-sm text-slate-600">Начислено ЗП</span>
-              <span className="text-sm font-bold text-slate-900">
-                <Money amount={user.debt} />
-              </span>
-            </div>
-            {advanceBalance > 0 && (
-              <div className="flex justify-between items-center px-4 py-3">
-                <span className="text-sm text-slate-600">Долг сотрудника (аванс)</span>
-                <span className="text-sm font-bold text-rose-600">
-                  <Money amount={user.advance_balance} />
-                </span>
-              </div>
-            )}
-            {advanceBalance > 0 && (
-              <div className="px-4 py-3 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-violet-700">Зачесть в счёт долга</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setOffsetInput('0')}
-                      className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      0%
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOffsetInput((maxOffset * 0.3).toFixed(2))}
-                      className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      30%
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOffsetInput((maxOffset * 0.5).toFixed(2))}
-                      className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      50%
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOffsetInput(maxOffset.toFixed(2))}
-                      className="text-[10px] px-2 py-0.5 rounded border border-violet-200 text-violet-600 hover:bg-violet-50 transition-colors font-bold"
-                    >
-                      Весь
-                    </button>
-                  </div>
-                </div>
+        ) : (
+          /* Обычная форма выплаты */
+          <>
+            <div className="p-6 space-y-3">
+              {/* Сумма к выплате */}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1.5">
+                  Сумма к выплате сейчас
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
                     min="0"
-                    max={maxOffset}
+                    max={salaryTotal}
                     step="100"
-                    value={offsetInput}
-                    onChange={(e) => setOffsetInput(e.target.value)}
-                    className="w-full border border-violet-200 rounded-lg px-3 py-2 text-sm font-bold text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-violet-50"
+                    value={partialInput}
+                    onChange={(e) => setPartialInput(e.target.value)}
+                    className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                   <span className="text-sm text-slate-500 shrink-0">₽</span>
-                </div>
-              </div>
-            )}
-            <div className="flex justify-between items-center px-4 py-3 bg-emerald-50">
-              <span className="text-sm font-bold text-emerald-800">
-                {isPartial ? 'К выплате сейчас' : 'К выплате деньгами'}
-              </span>
-              <span className="text-lg font-black text-emerald-700">
-                {payout > 0 ? <Money amount={payout.toFixed(2)} /> : '0 ₽'}
-              </span>
-            </div>
-          </div>
-
-          {advanceBalance > 0 && (
-            <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5 flex justify-between">
-              <span className="text-xs text-violet-600">Остаток долга после зачёта</span>
-              <span className="text-xs font-bold text-violet-700">
-                <Money amount={remainingDebt.toFixed(2)} />
-              </span>
-            </div>
-          )}
-
-          {needsWallet && (
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
-              <div className="flex gap-2">
-                {WALLETS.map((w) => (
                   <button
-                    key={w.id}
                     type="button"
-                    onClick={() => setWalletId(w.id)}
+                    onClick={() => setPartialInput(salaryTotal.toFixed(2))}
                     className={cn(
-                      'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
-                      walletId === w.id
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 text-slate-500',
+                      'text-xs px-2.5 py-1.5 rounded-lg border font-semibold shrink-0 transition-colors',
+                      !isPartial
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50',
                     )}
                   >
-                    {w.label}
+                    Всё
                   </button>
-                ))}
+                </div>
+                {isPartial && (
+                  <p className="text-xs text-amber-600 mt-1.5 font-medium">
+                    Остаток долга {remainingSalary.toLocaleString('ru-RU')} ₽ останется к выплате
+                  </p>
+                )}
               </div>
-            </div>
-          )}
 
-          {parseFloat(user.unconfirmed_debt) > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-              <span className="text-amber-500 material-symbols-outlined shrink-0">warning</span>
-              <div>
-                <p className="text-[11px] font-bold text-amber-900 leading-tight">
-                  Есть неподтверждённые начисления: <Money amount={user.unconfirmed_debt} />
-                </p>
-                <p className="text-[10px] text-amber-700 mt-0.5 leading-tight">
-                  Сотрудник ещё не подтвердил их в своём приложении. Рекомендуется выплачивать
-                  только подтверждённую ЗП.
-                </p>
+              {/* Разбивка */}
+              <div className="bg-slate-50 rounded-xl divide-y divide-slate-200 overflow-hidden">
+                <div className="flex justify-between items-center px-4 py-3">
+                  <span className="text-sm text-slate-600">Начислено ЗП</span>
+                  <span className="text-sm font-bold text-slate-900">
+                    <Money amount={user.debt} />
+                  </span>
+                </div>
+                {advanceBalance > 0 && (
+                  <div className="flex justify-between items-center px-4 py-3">
+                    <span className="text-sm text-slate-600">Долг сотрудника (аванс)</span>
+                    <span className="text-sm font-bold text-rose-600">
+                      <Money amount={user.advance_balance} />
+                    </span>
+                  </div>
+                )}
+                {advanceBalance > 0 && (
+                  <div className="px-4 py-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-violet-700">Зачесть в счёт долга</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setOffsetInput('0')}
+                          className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors font-bold"
+                        >
+                          0%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOffsetInput((maxOffset * 0.3).toFixed(2))}
+                          className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                        >
+                          30%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOffsetInput((maxOffset * 0.5).toFixed(2))}
+                          className="text-[10px] px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                        >
+                          50%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOffsetInput(maxOffset.toFixed(2))}
+                          className="text-[10px] px-2 py-0.5 rounded border border-violet-200 text-violet-600 hover:bg-violet-50 transition-colors font-bold"
+                        >
+                          Весь
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxOffset}
+                        step="100"
+                        value={offsetInput}
+                        onChange={(e) => setOffsetInput(e.target.value)}
+                        className="w-full border border-violet-200 rounded-lg px-3 py-2 text-sm font-bold text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-violet-50"
+                      />
+                      <span className="text-sm text-slate-500 shrink-0">₽</span>
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-between items-center px-4 py-3 bg-emerald-50">
+                  <span className="text-sm font-bold text-emerald-800">
+                    {isPartial ? 'К выплате сейчас' : 'К выплате деньгами'}
+                  </span>
+                  <span className="text-lg font-black text-emerald-700">
+                    {payout > 0 ? <Money amount={payout.toFixed(2)} /> : '0 ₽'}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
 
-          {salaryTotal <= 0 && (
-            <p className="text-sm text-slate-400 text-center py-2">Нет начисленной ЗП к выплате</p>
-          )}
-          {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
-        </div>
-        <div className="px-6 pb-6 flex gap-3">
-          <button
-            onClick={() => {
-              if (isSubmitting || mutation.isPending) return;
-              setIsSubmitting(true);
-              mutation.mutate();
-            }}
-            disabled={mutation.isPending || isSubmitting || salaryTotal <= 0}
-            className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-          >
-            {mutation.isPending || isSubmitting ? 'Проводим...' : '✓ Подтвердить'}
-          </button>
-          <button
-            onClick={onClose}
-            className="text-sm text-slate-500 px-4 py-3 rounded-xl border border-slate-200"
-          >
-            Отмена
-          </button>
-        </div>
+              {advanceBalance > 0 && parseFloat(offsetInput) > 0 && (
+                <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5 flex justify-between">
+                  <span className="text-xs text-violet-600">Остаток долга после зачёта</span>
+                  <span className="text-xs font-bold text-violet-700">
+                    <Money amount={remainingDebt.toFixed(2)} />
+                  </span>
+                </div>
+              )}
+
+              {needsWallet && (
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
+                  <div className="flex gap-2">
+                    {WALLETS.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => setWalletId(w.id)}
+                        className={cn(
+                          'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
+                          walletId === w.id
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 text-slate-500',
+                        )}
+                      >
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {parseFloat(user.unconfirmed_debt) > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                  <span className="text-amber-500 material-symbols-outlined shrink-0">warning</span>
+                  <div>
+                    <p className="text-[11px] font-bold text-amber-900 leading-tight">
+                      Есть неподтверждённые начисления: <Money amount={user.unconfirmed_debt} />
+                    </p>
+                    <p className="text-[10px] text-amber-700 mt-0.5 leading-tight">
+                      Сотрудник ещё не подтвердил их в своём приложении. Рекомендуется выплачивать
+                      только подтверждённую ЗП.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {salaryTotal <= 0 && (
+                <p className="text-sm text-slate-400 text-center py-2">
+                  Нет начисленной ЗП к выплате
+                </p>
+              )}
+              {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+            </div>
+
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => {
+                  if (isSubmitting || mutation.isPending || salaryTotal <= 0) return;
+                  if (effectiveOffset > 0) {
+                    setShowOffsetConfirm(true);
+                    return;
+                  }
+                  setIsSubmitting(true);
+                  mutation.mutate();
+                }}
+                disabled={mutation.isPending || isSubmitting || salaryTotal <= 0}
+                className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                {mutation.isPending || isSubmitting ? 'Проводим...' : '✓ Подтвердить'}
+              </button>
+              <button
+                onClick={onClose}
+                className="text-sm text-slate-500 px-4 py-3 rounded-xl border border-slate-200"
+              >
+                Отмена
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

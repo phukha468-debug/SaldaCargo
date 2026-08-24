@@ -135,6 +135,7 @@ function StaffContent() {
   const [unconfirmedCount, setUnconfirmedCount] = useState(0);
   const [settleIdempotencyKey, setSettleIdempotencyKey] = useState('');
   const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
+  const [confirmOffsetOpen, setConfirmOffsetOpen] = useState(false);
 
   // Adjust debt modal state
   const [adjustTarget, setAdjustTarget] = useState<PayrollEntry | null>(null);
@@ -200,6 +201,7 @@ function StaffContent() {
       setSettleAmount('');
       setSettleWallet('');
       setSettleOffset('');
+      setConfirmOffsetOpen(false);
     },
   });
 
@@ -268,14 +270,11 @@ function StaffContent() {
       const salaryTotal = parseFloat(data.salary_total || '0');
 
       setSettleTarget(entry);
-      // Logic from WebApp:
-      // Initial payout amount (what goes from wallet) = salary - automatic offset
-      const initialOffset = Math.min(salaryTotal, advanceBalance);
-      const initialPayout = Math.max(0, salaryTotal - initialOffset);
-
-      setSettleAmount(initialPayout.toFixed(0));
-      setSettleOffset(initialOffset.toFixed(0));
+      // По умолчанию НЕ списываем аванс (offset = 0), чтобы избежать случайных удержаний
+      setSettleAmount(salaryTotal.toFixed(0));
+      setSettleOffset('0');
       setMaxAdvance(advanceBalance);
+      setConfirmOffsetOpen(false);
       setSettleWallet(wallets?.cash.id ?? '');
       setPendingTransactions(data.pending_transactions ?? []);
       setUnconfirmedCount(data.unconfirmed_count ?? 0);
@@ -291,6 +290,11 @@ function StaffContent() {
     const offsetAmt = parseFloat(settleOffset) || 0;
 
     if (payoutAmt === 0 && offsetAmt === 0) return;
+
+    if (offsetAmt > 0 && !confirmOffsetOpen) {
+      setConfirmOffsetOpen(true);
+      return;
+    }
 
     setIsSubmittingSettle(true);
     settleMutation.mutate(
@@ -700,28 +704,66 @@ function StaffContent() {
               </div>
             </div>
 
-            <div className="pt-4 pb-10">
-              <button
-                onClick={handleSettle}
-                disabled={
-                  settleMutation.isPending ||
-                  isSubmittingSettle ||
-                  !settleWallet ||
-                  (parseFloat(settleAmount || '0') <= 0 && parseFloat(settleOffset || '0') <= 0)
-                }
-                className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
-              >
-                {settleMutation.isPending || isSubmittingSettle
-                  ? 'Проводим выплату...'
-                  : 'Подтвердить и выплатить'}
-              </button>
-
-              {settleMutation.isError && (
-                <p className="text-sm text-rose-600 text-center font-bold mt-4 bg-rose-50 p-3 rounded-xl">
-                  {(settleMutation.error as Error).message}
+            {confirmOffsetOpen ? (
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 space-y-4 animate-in fade-in">
+                <div className="flex items-center gap-2 text-amber-900 font-black text-sm">
+                  <span className="text-xl">⚠️</span>
+                  <span>Подтверждение списания аванса</span>
+                </div>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Вы указали зачёт аванса на сумму{' '}
+                  <strong className="text-amber-950 font-black">
+                    <Money amount={settleOffset} />
+                  </strong>
+                  . Долг сотрудника уменьшится на эту сумму. На руки будет выплачено:{' '}
+                  <strong className="text-emerald-700 font-black">
+                    <Money amount={settleAmount} />
+                  </strong>
+                  .
                 </p>
-              )}
-            </div>
+                <div className="flex flex-col gap-2 pt-2">
+                  <button
+                    onClick={handleSettle}
+                    disabled={settleMutation.isPending || isSubmittingSettle}
+                    className="w-full bg-amber-600 text-white font-black text-sm py-4 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-amber-600/30"
+                  >
+                    {settleMutation.isPending || isSubmittingSettle
+                      ? 'Проводим...'
+                      : '✓ Точно списать аванс'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmOffsetOpen(false)}
+                    className="w-full text-xs font-bold text-zinc-600 py-3 rounded-2xl bg-white border border-zinc-200"
+                  >
+                    ← Назад
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-4 pb-10">
+                <button
+                  onClick={handleSettle}
+                  disabled={
+                    settleMutation.isPending ||
+                    isSubmittingSettle ||
+                    !settleWallet ||
+                    (parseFloat(settleAmount || '0') <= 0 && parseFloat(settleOffset || '0') <= 0)
+                  }
+                  className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
+                >
+                  {settleMutation.isPending || isSubmittingSettle
+                    ? 'Проводим выплату...'
+                    : 'Подтвердить и выплатить'}
+                </button>
+
+                {settleMutation.isError && (
+                  <p className="text-sm text-rose-600 text-center font-bold mt-4 bg-rose-50 p-3 rounded-xl">
+                    {(settleMutation.error as Error).message}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
