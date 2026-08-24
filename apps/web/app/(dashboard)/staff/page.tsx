@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useMemo } from 'react';
 import { Money } from '@saldacargo/ui';
@@ -941,7 +940,6 @@ type GroupedAccrualItem = {
 function PayrollHistoryModal({
   user,
   onClose,
-  onSettle,
   onChanged,
 }: {
   user: PayrollUser;
@@ -949,6 +947,7 @@ function PayrollHistoryModal({
   onSettle?: () => void;
   onChanged: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'accruals' | 'payouts' | 'advances'>('accruals');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [saving, setSaving] = useState(false);
@@ -962,6 +961,33 @@ function PayrollHistoryModal({
     () => history.filter((t) => classifyStaffTx(t).type === 'accrual'),
     [history],
   );
+
+  // Payouts (Выплаты)
+  const payouts = useMemo(
+    () => history.filter((t) => classifyStaffTx(t).type === 'payout'),
+    [history],
+  );
+
+  // Advances (Авансы и займы)
+  const advancesHistory = useMemo(() => {
+    return history.filter((t) => {
+      const isAdvCat = t.category_id === ADVANCE_CAT;
+      const desc = (t.description || '').toLowerCase();
+      return isAdvCat || desc.includes('аванс') || desc.includes('долг') || desc.includes('займ');
+    });
+  }, [history]);
+
+  const totalAdvancesGiven = useMemo(() => {
+    return advancesHistory
+      .filter((t) => t.direction === 'expense')
+      .reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0);
+  }, [advancesHistory]);
+
+  const totalAdvancesOffset = useMemo(() => {
+    return advancesHistory
+      .filter((t) => t.direction === 'income')
+      .reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0);
+  }, [advancesHistory]);
 
   // Group service order and trip works
   const groupedAccruals = useMemo(() => {
@@ -1064,18 +1090,6 @@ function PayrollHistoryModal({
     });
   }, [accruals]);
 
-  // Financial totals
-  const totalAccrued = useMemo(
-    () => accruals.reduce((sum, t) => sum + (parseFloat(t.amount || '0') || 0), 0),
-    [accruals],
-  );
-
-  const totalPaidOut = useMemo(
-    () => groupedAccruals.reduce((sum, g) => sum + g.paidAmount, 0),
-    [groupedAccruals],
-  );
-
-  const balanceToPay = parseFloat(user.payout || user.debt || '0') || 0;
   const advanceDebt = parseFloat(user.advance_balance || '0') || 0;
 
   const toggleGroup = (key: string) => {
@@ -1150,7 +1164,6 @@ function PayrollHistoryModal({
         className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -1159,14 +1172,6 @@ function PayrollHistoryModal({
                 Поступления и выплаты: {user.name}
               </h2>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-              <span>
-                {(user.roles ?? []).map((r) => ROLE_LABEL[r as UserRole] ?? r).join(', ')}
-              </span>
-              {user.phone && (
-                <span className="font-mono text-slate-600">📞 {formatPhone(user.phone)}</span>
-              )}
-            </p>
           </div>
           <button
             onClick={onClose}
@@ -1176,99 +1181,86 @@ function PayrollHistoryModal({
           </button>
         </div>
 
-        {/* ── KPI Summary Cards ── */}
-        <div className="p-6 pb-4 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
-          {/* Card 1: Total Accrued (Поступления) */}
-          <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px] text-emerald-600">
-                  arrow_circle_down
-                </span>
-                Поступления
-              </span>
-              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                {groupedAccruals.length} заказов / рейсов
-              </span>
-            </div>
-            <div className="mt-2">
-              <span className="text-xl font-black text-emerald-600">
-                +&nbsp;{totalAccrued.toLocaleString('ru-RU')} ₽
-              </span>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                Всего начислено за работы и рейсы
-              </p>
-            </div>
-          </div>
-
-          {/* Card 2: Settled / Paid */}
-          <div className="bg-white rounded-2xl p-4 border border-blue-100 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px] text-blue-600">
-                  verified
-                </span>
-                Оплачено
-              </span>
-              <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
-                {groupedAccruals.filter((g) => g.settlement_status === 'completed').length} закрыто
-              </span>
-            </div>
-            <div className="mt-2">
-              <span className="text-xl font-black text-blue-600">
-                {totalPaidOut.toLocaleString('ru-RU')} ₽
-              </span>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                Выплачено сотруднику деньгами
-              </p>
-            </div>
-          </div>
-
-          {/* Card 3: Debt / Balance to Pay */}
-          <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px] text-amber-400">
-                  account_balance_wallet
-                </span>
-                К выплате
-              </span>
-              {onSettle && balanceToPay > 0 && (
-                <button
-                  type="button"
-                  onClick={onSettle}
-                  className="text-[10px] bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold px-2.5 py-1 rounded-lg transition-colors shadow-xs cursor-pointer flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[12px]">payments</span>
-                  Выплатить
-                </button>
+        {/* ── Tabs Navigation ── */}
+        <div className="flex border-b border-slate-200 bg-white px-6 shrink-0 gap-1 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('accruals')}
+            className={cn(
+              'py-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+              activeTab === 'accruals'
+                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-xl'
+                : 'border-transparent text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Начисления</span>
+            <span
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full font-extrabold',
+                activeTab === 'accruals'
+                  ? 'bg-emerald-200 text-emerald-900'
+                  : 'bg-slate-100 text-slate-600',
               )}
-            </div>
-            <div className="mt-1">
-              <span
-                className={cn(
-                  'text-xl font-black',
-                  balanceToPay > 0
-                    ? 'text-amber-400'
-                    : balanceToPay < 0
-                      ? 'text-purple-300'
-                      : 'text-slate-300',
-                )}
-              >
-                {balanceToPay.toLocaleString('ru-RU')} ₽
-              </span>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                {advanceDebt > 0
-                  ? `Долг компании (с учётом аванса ${advanceDebt.toLocaleString('ru-RU')} ₽)`
-                  : balanceToPay > 0
-                    ? 'Остаток долга перед сотрудником'
-                    : 'Все начисления закрыты'}
-              </p>
-            </div>
-          </div>
+            >
+              {groupedAccruals.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('payouts')}
+            className={cn(
+              'py-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+              activeTab === 'payouts'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50 rounded-t-xl'
+                : 'border-transparent text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">payments</span>
+            <span>Выплаты ЗП</span>
+            <span
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full font-extrabold',
+                activeTab === 'payouts'
+                  ? 'bg-blue-200 text-blue-900'
+                  : 'bg-slate-100 text-slate-600',
+              )}
+            >
+              {payouts.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('advances')}
+            className={cn(
+              'py-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+              activeTab === 'advances'
+                ? 'border-purple-600 text-purple-700 bg-purple-50/50 rounded-t-xl'
+                : 'border-transparent text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">savings</span>
+            <span>Авансы и займы</span>
+            <span
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full font-extrabold',
+                advanceDebt > 0
+                  ? 'bg-rose-100 text-rose-700 font-black'
+                  : activeTab === 'advances'
+                    ? 'bg-purple-200 text-purple-900'
+                    : 'bg-slate-100 text-slate-600',
+              )}
+            >
+              {advanceDebt > 0
+                ? `${advanceDebt.toLocaleString('ru-RU')} ₽`
+                : advancesHistory.length}
+            </span>
+          </button>
         </div>
 
-        {/* List of Accruals */}
+        {/* ── Tab Content ── */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-100/50">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-xs font-bold">
@@ -1276,439 +1268,593 @@ function PayrollHistoryModal({
             </div>
           )}
 
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Список начислений по рейсам и нарядам
-            </span>
-            <span className="text-xs text-slate-400 font-medium">
-              Всего {groupedAccruals.length} операций
-            </span>
-          </div>
+          {/* TAB 1: ACCRUALS */}
+          {activeTab === 'accruals' && (
+            <>
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Список начислений по рейсам и нарядам
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  Всего {groupedAccruals.length} операций
+                </span>
+              </div>
 
-          {groupedAccruals.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
-              <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
-                receipt_long
-              </span>
-              <p className="text-sm font-medium">Нет поступлений и начислений</p>
-            </div>
-          ) : (
-            groupedAccruals.map((g) => {
-              const isCompleted = g.settlement_status === 'completed';
-              const isPartial = g.settlement_status === 'partial';
-              const isPending = g.settlement_status === 'pending';
+              {groupedAccruals.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                  <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
+                    receipt_long
+                  </span>
+                  <p className="text-sm font-medium">Нет поступлений и начислений</p>
+                </div>
+              ) : (
+                groupedAccruals.map((g) => {
+                  const isCompleted = g.settlement_status === 'completed';
+                  const isPartial = g.settlement_status === 'partial';
+                  const isPending = g.settlement_status === 'pending';
 
-              const parsedEventDate = g.eventDate
-                ? new Date(g.eventDate)
-                : g.latestDate
-                  ? new Date(g.latestDate)
-                  : null;
-              const eventDateStr =
-                parsedEventDate && !isNaN(parsedEventDate.getTime())
-                  ? parsedEventDate.toLocaleDateString('ru-RU', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })
-                  : '—';
+                  const parsedEventDate = g.eventDate
+                    ? new Date(g.eventDate)
+                    : g.latestDate
+                      ? new Date(g.latestDate)
+                      : null;
+                  const eventDateStr =
+                    parsedEventDate && !isNaN(parsedEventDate.getTime())
+                      ? parsedEventDate.toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : '—';
 
-              const parsedPaidDate = g.paidDate
-                ? new Date(g.paidDate)
-                : g.latestDate
-                  ? new Date(g.latestDate)
-                  : null;
-              const paidDateStr =
-                parsedPaidDate && !isNaN(parsedPaidDate.getTime())
-                  ? parsedPaidDate.toLocaleDateString('ru-RU', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })
-                  : eventDateStr;
+                  const parsedPaidDate = g.paidDate
+                    ? new Date(g.paidDate)
+                    : g.latestDate
+                      ? new Date(g.latestDate)
+                      : null;
+                  const paidDateStr =
+                    parsedPaidDate && !isNaN(parsedPaidDate.getTime())
+                      ? parsedPaidDate.toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : eventDateStr;
 
-              const displayVehicle =
-                g.vehicle_desc ||
-                (g.isTrip && user.asset
-                  ? [
-                      user.asset.short_name,
-                      user.asset.reg_number ? `(${user.asset.reg_number})` : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
-                  : null);
+                  const displayVehicle =
+                    g.vehicle_desc ||
+                    (g.isTrip && user.asset
+                      ? [
+                          user.asset.short_name,
+                          user.asset.reg_number ? `(${user.asset.reg_number})` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')
+                      : null);
 
-              const isExpanded = Boolean(expandedGroups[g.groupKey]);
-              const hasMultipleWorks = g.works.length > 1;
+                  const isExpanded = Boolean(expandedGroups[g.groupKey]);
+                  const hasMultipleWorks = g.works.length > 1;
 
-              return (
-                <div
-                  key={g.groupKey}
-                  className={cn(
-                    'rounded-2xl p-4.5 shadow-xs relative overflow-hidden transition-all border-2 group',
-                    isCompleted
-                      ? 'bg-emerald-50/70 border-emerald-300 hover:border-emerald-400'
-                      : isPartial
-                        ? 'bg-rose-50/70 border-amber-300 hover:border-amber-400'
-                        : 'bg-rose-50/70 border-rose-300 hover:border-rose-400',
-                  )}
-                >
-                  {/* ── Partial Payment translucent background progress bar ── */}
-                  {isPartial && (
+                  return (
                     <div
-                      className="absolute inset-y-0 left-0 bg-emerald-300/35 pointer-events-none transition-all duration-500"
-                      style={{ width: `${g.paidPct}%` }}
-                    />
-                  )}
-
-                  {/* Main Card Content */}
-                  <div className="relative z-10 flex items-start justify-between gap-4">
-                    {/* Left Details */}
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={cn(
-                            'text-[10px] font-black px-2 py-0.5 rounded-md border uppercase tracking-wider',
-                            g.isOrder
-                              ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : g.isTrip
-                                ? 'bg-sky-100 text-sky-900 border-sky-300'
-                                : 'bg-slate-100 text-slate-700 border-slate-200',
-                          )}
-                        >
-                          {g.source}
-                        </span>
-
-                        <span className="text-xs font-bold text-slate-600 flex items-center gap-1 bg-white/80 border border-slate-200 px-2.5 py-0.5 rounded-md shadow-2xs">
-                          <span className="material-symbols-outlined text-[14px] text-slate-400">
-                            calendar_today
-                          </span>
-                          <span>
-                            {g.isTrip
-                              ? `Дата рейса: ${eventDateStr}`
-                              : g.isOrder
-                                ? `Дата наряда: ${eventDateStr}`
-                                : eventDateStr}
-                          </span>
-                        </span>
-
-                        {hasMultipleWorks && (
-                          <span className="text-[10px] font-bold bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-md">
-                            {g.works.length} работ(ы)
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-base font-black text-slate-900 leading-snug">
-                          {g.title}
-                        </p>
-                        {g.service_order_id && (
-                          <Link
-                            href={`/garage?order=${g.service_order_id}`}
-                            className="text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors shadow-2xs"
-                            title="Открыть заказ-наряд в гараже"
-                          >
-                            <span>Открыть наряд</span>
-                            <span className="material-symbols-outlined text-[13px]">
-                              open_in_new
-                            </span>
-                          </Link>
-                        )}
-                        {g.isTrip && (g.trip_id || g.tripNumber) && (
-                          <Link
-                            href={`/review?mode=history&trip=${g.trip_id || g.tripNumber}`}
-                            className="text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors shadow-2xs"
-                            title="Открыть рейс в разделе Ревью"
-                          >
-                            <span>Открыть рейс</span>
-                            <span className="material-symbols-outlined text-[13px]">
-                              open_in_new
-                            </span>
-                          </Link>
-                        )}
-                      </div>
-
-                      {/* ── Vehicle and Client Description ── */}
-                      {displayVehicle ? (
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-white/95 border border-slate-200 px-2.5 py-1 rounded-lg w-fit shadow-2xs">
-                          <span className="material-symbols-outlined text-[16px] text-sky-600">
-                            {g.isOrder ? 'directions_car' : 'local_shipping'}
-                          </span>
-                          <span>Авто: {displayVehicle}</span>
-                        </div>
-                      ) : (
-                        g.isTrip && (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 italic">
-                            <span className="material-symbols-outlined text-[14px]">
-                              local_shipping
-                            </span>
-                            <span>Автомобиль не указан</span>
-                          </div>
-                        )
+                      key={g.groupKey}
+                      className={cn(
+                        'rounded-2xl p-4.5 shadow-xs relative overflow-hidden transition-all border-2 group',
+                        isCompleted
+                          ? 'bg-emerald-50/70 border-emerald-300 hover:border-emerald-400'
+                          : isPartial
+                            ? 'bg-emerald-50/40 border-amber-300 hover:border-amber-400'
+                            : 'bg-white border-slate-200 hover:border-slate-300',
                       )}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={cn(
+                                'text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border',
+                                g.isOrder
+                                  ? 'bg-amber-100 text-amber-900 border-amber-200'
+                                  : 'bg-indigo-100 text-indigo-900 border-indigo-200',
+                              )}
+                            >
+                              {g.source}
+                            </span>
+                            <span className="text-xs text-slate-500 font-medium">
+                              📅 {eventDateStr}
+                            </span>
+                            {displayVehicle && (
+                              <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                🚛 {displayVehicle}
+                              </span>
+                            )}
+                          </div>
 
-                      {/* Confirmation alert if pending employee confirm */}
-                      {g.employee_confirmed === false && (
-                        <div className="flex items-center gap-2 pt-0.5">
-                          <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded">
-                            <span className="material-symbols-outlined text-[12px]">timer</span>
-                            Ожидает подтверждения
-                          </span>
+                          <h4 className="text-base font-extrabold text-slate-900 leading-tight">
+                            {g.title}
+                          </h4>
+
+                          {g.employee_confirmed === false && (
+                            <div className="flex items-center gap-2 pt-0.5">
+                              <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded">
+                                <span className="material-symbols-outlined text-[12px]">timer</span>
+                                Ожидает подтверждения
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  g.works.forEach((w) => {
+                                    if (w.employee_confirmed === false) handleConfirmAdmin(w.id);
+                                  });
+                                }}
+                                disabled={saving}
+                                className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 hover:bg-emerald-200 rounded px-2 py-0.5 font-bold transition-colors cursor-pointer"
+                              >
+                                ✓ Подтвердить всё
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                'text-lg sm:text-xl font-black tracking-tight',
+                                isCompleted ? 'text-emerald-700' : 'text-slate-900',
+                              )}
+                            >
+                              +&nbsp;{g.totalAmount.toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+
+                          {isCompleted && (
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/90 border-2 border-emerald-600 text-emerald-700 font-black text-[11px] rounded-lg uppercase tracking-wider shadow-xs rotate-[-2deg] select-none">
+                                <span className="material-symbols-outlined text-[15px]">
+                                  verified
+                                </span>
+                                ОПЛАЧЕНО
+                              </div>
+                              <span className="text-[10px] text-emerald-800 font-extrabold bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs">
+                                выплачено {paidDateStr}
+                              </span>
+                            </div>
+                          )}
+
+                          {isPending && (
+                            <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/90 border-2 border-rose-500 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider rotate-[-2deg] select-none">
+                              <span className="material-symbols-outlined text-[13px]">
+                                hourglass_top
+                              </span>
+                              НЕ ОПЛАЧЕНО
+                            </div>
+                          )}
+
+                          {isPartial && (
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100/90 border border-emerald-300 text-emerald-900 font-extrabold text-[10px] rounded-md uppercase tracking-wide">
+                                <span className="material-symbols-outlined text-[12px] text-emerald-700">
+                                  done
+                                </span>
+                                <span>
+                                  Оплачено {g.paidAmount.toLocaleString('ru-RU')} ₽ (
+                                  {Math.round(g.paidPct)}%)
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-emerald-700 font-bold">
+                                выплачено {paidDateStr}
+                              </span>
+                              <span className="text-[11px] font-bold text-rose-700">
+                                Остаток: {g.unpaidAmount.toLocaleString('ru-RU')} ₽
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {hasMultipleWorks && (
+                        <div className="relative z-10 mt-3 pt-2.5 border-t border-slate-200/70">
                           <button
                             type="button"
-                            onClick={() => {
-                              g.works.forEach((w) => {
-                                if (w.employee_confirmed === false) handleConfirmAdmin(w.id);
-                              });
-                            }}
-                            disabled={saving}
-                            className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 hover:bg-emerald-200 rounded px-2 py-0.5 font-bold transition-colors cursor-pointer"
+                            onClick={() => toggleGroup(g.groupKey)}
+                            className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1 cursor-pointer transition-colors"
                           >
-                            ✓ Подтвердить всё
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right Amount & Payment Stamp */}
-                    <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            'text-lg sm:text-xl font-black tracking-tight',
-                            isCompleted ? 'text-emerald-700' : 'text-slate-900',
-                          )}
-                        >
-                          +&nbsp;{g.totalAmount.toLocaleString('ru-RU')} ₽
-                        </span>
-                      </div>
-
-                      {/* ── Visual Stamps & Dates ── */}
-                      {isCompleted && (
-                        <div className="flex flex-col items-end gap-1">
-                          <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/90 border-2 border-emerald-600 text-emerald-700 font-black text-[11px] rounded-lg uppercase tracking-wider shadow-xs rotate-[-2deg] select-none">
-                            <span className="material-symbols-outlined text-[15px]">verified</span>
-                            ОПЛАЧЕНО
-                          </div>
-                          <span className="text-[10px] text-emerald-800 font-extrabold bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs">
-                            выплачено {paidDateStr}
-                          </span>
-                        </div>
-                      )}
-
-                      {isPending && (
-                        <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/90 border-2 border-rose-500 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider rotate-[-2deg] select-none">
-                          <span className="material-symbols-outlined text-[13px]">
-                            hourglass_top
-                          </span>
-                          НЕ ОПЛАЧЕНО
-                        </div>
-                      )}
-
-                      {isPartial && (
-                        <div className="flex flex-col items-end gap-1">
-                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100/90 border border-emerald-300 text-emerald-900 font-extrabold text-[10px] rounded-md uppercase tracking-wide">
-                            <span className="material-symbols-outlined text-[12px] text-emerald-700">
-                              done
+                            <span className="material-symbols-outlined text-[16px] text-slate-500">
+                              {isExpanded ? 'expand_less' : 'expand_more'}
                             </span>
                             <span>
-                              Оплачено {g.paidAmount.toLocaleString('ru-RU')} ₽ (
-                              {Math.round(g.paidPct)}%)
+                              {isExpanded
+                                ? 'Скрыть детализацию'
+                                : `Показать все работы (${g.works.length})`}
                             </span>
-                          </div>
-                          <span className="text-[10px] text-emerald-700 font-bold">
-                            выплачено {paidDateStr}
-                          </span>
-                          <span className="text-[11px] font-bold text-rose-700">
-                            Остаток: {g.unpaidAmount.toLocaleString('ru-RU')} ₽
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                          </button>
 
-                  {/* ── Expandable Breakdown for multiple works ── */}
-                  {hasMultipleWorks && (
-                    <div className="relative z-10 mt-3 pt-2.5 border-t border-slate-200/70">
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(g.groupKey)}
-                        className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1 cursor-pointer transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[16px] text-slate-500">
-                          {isExpanded ? 'expand_less' : 'expand_more'}
-                        </span>
-                        <span>
-                          {isExpanded
-                            ? 'Скрыть детализацию'
-                            : `Показать все работы (${g.works.length})`}
-                        </span>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="mt-2 space-y-1.5 bg-white/80 rounded-xl p-3 border border-slate-200 shadow-xs">
-                          <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
-                            Разбивка по заказ-наряду:
-                          </div>
-                          {g.works.map((w, idx) => {
-                            const isWorkPaid = w.settlement_status === 'completed';
-                            return (
-                              <div
-                                key={w.id}
-                                className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-slate-50 transition-colors group/item"
-                              >
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <span className="text-slate-400 font-bold text-[11px]">
-                                    {idx + 1}.
-                                  </span>
-                                  <span className="font-semibold text-slate-800 truncate">
-                                    {w.title}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2.5 shrink-0">
-                                  {editingId === w.id ? (
-                                    <div className="flex items-center gap-1">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={editAmount}
-                                        onChange={(e) => setEditAmount(e.target.value)}
-                                        autoFocus
-                                        className="w-20 border-2 border-blue-500 rounded-lg px-2 py-0.5 text-xs font-bold text-right"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSave(w.id)}
-                                        disabled={saving}
-                                        className="w-6 h-6 bg-emerald-600 text-white rounded-lg font-bold flex items-center justify-center text-xs"
-                                      >
-                                        ✓
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditingId(null)}
-                                        className="w-6 h-6 border border-slate-200 text-slate-500 rounded-lg flex items-center justify-center text-xs"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <span
-                                        className={cn(
-                                          'font-bold',
-                                          isWorkPaid ? 'text-emerald-700' : 'text-rose-600',
-                                        )}
-                                      >
-                                        {w.amount.toLocaleString('ru-RU')} ₽
-                                      </span>
-                                      <span
-                                        className={cn(
-                                          'text-[9px] font-black px-1.5 py-0.5 rounded border uppercase',
-                                          isWorkPaid
-                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                            : 'bg-rose-100 text-rose-800 border-rose-200',
-                                        )}
-                                      >
-                                        {isWorkPaid ? 'Оплачено' : 'К выплате'}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingId(w.id);
-                                          setEditAmount(String(w.amount));
-                                        }}
-                                        className="text-slate-400 hover:text-blue-600 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
-                                        title="Изменить сумму работы"
-                                      >
-                                        <span className="material-symbols-outlined text-[14px]">
-                                          edit
-                                        </span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDelete(w.id, w.title)}
-                                        disabled={saving}
-                                        className="text-slate-400 hover:text-rose-600 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
-                                        title="Удалить работу"
-                                      >
-                                        <span className="material-symbols-outlined text-[14px]">
-                                          delete
-                                        </span>
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
+                          {isExpanded && (
+                            <div className="mt-2 space-y-1.5 bg-white/80 rounded-xl p-3 border border-slate-200 shadow-xs">
+                              <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
+                                Состав работ:
                               </div>
-                            );
-                          })}
+                              {g.works.map((w) => {
+                                const isWorkPaid = w.settlement_status === 'completed';
+                                return (
+                                  <div
+                                    key={w.id}
+                                    className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0 group/item hover:bg-slate-50 rounded px-1.5 transition-colors"
+                                  >
+                                    <div className="flex-1 pr-2">
+                                      <span className="font-medium text-slate-800">{w.title}</span>
+                                      {w.employee_confirmed === false && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleConfirmAdmin(w.id)}
+                                          disabled={saving}
+                                          className="ml-2 text-[9px] text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 font-bold transition-colors cursor-pointer"
+                                        >
+                                          ✓ Подтвердить
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {editingId === w.id ? (
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={editAmount}
+                                            onChange={(e) => setEditAmount(e.target.value)}
+                                            className="w-20 border border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold"
+                                            autoFocus
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSave(w.id)}
+                                            disabled={saving}
+                                            className="text-xs bg-emerald-600 text-white rounded px-2 py-0.5 font-bold hover:bg-emerald-700 disabled:opacity-50"
+                                          >
+                                            ✓
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingId(null)}
+                                            className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <span
+                                            className={cn(
+                                              'font-bold',
+                                              isWorkPaid ? 'text-emerald-700' : 'text-rose-600',
+                                            )}
+                                          >
+                                            {w.amount.toLocaleString('ru-RU')} ₽
+                                          </span>
+                                          <span
+                                            className={cn(
+                                              'text-[9px] font-black px-1.5 py-0.5 rounded border uppercase',
+                                              isWorkPaid
+                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                                : 'bg-rose-100 text-rose-800 border-rose-200',
+                                            )}
+                                          >
+                                            {isWorkPaid ? 'Оплачено' : 'К выплате'}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEditingId(w.id);
+                                              setEditAmount(String(w.amount));
+                                            }}
+                                            className="text-slate-400 hover:text-blue-600 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
+                                            title="Изменить сумму работы"
+                                          >
+                                            <span className="material-symbols-outlined text-[14px]">
+                                              edit
+                                            </span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDelete(w.id, w.title)}
+                                            disabled={saving}
+                                            className="text-slate-400 hover:text-rose-600 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
+                                            title="Удалить работу"
+                                          >
+                                            <span className="material-symbols-outlined text-[14px]">
+                                              delete
+                                            </span>
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* Single work edit/delete actions */}
-                  {!hasMultipleWorks && g.works[0] && (
-                    <div className="relative z-10 flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {editingId === g.works[0].id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={editAmount}
-                            onChange={(e) => setEditAmount(e.target.value)}
-                            autoFocus
-                            className="w-24 border-2 border-blue-500 rounded-lg px-2 py-0.5 text-xs font-bold text-right"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSave(g.works[0].id)}
-                            disabled={saving}
-                            className="w-6 h-6 bg-emerald-600 text-white rounded-lg font-bold flex items-center justify-center text-xs"
-                          >
-                            ✓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="w-6 h-6 border border-slate-200 text-slate-500 rounded-lg flex items-center justify-center text-xs"
-                          >
-                            ✕
-                          </button>
+                      {!hasMultipleWorks && g.works[0] && (
+                        <div className="relative z-10 flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {editingId === g.works[0].id ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={editAmount}
+                                onChange={(e) => setEditAmount(e.target.value)}
+                                className="w-24 border border-emerald-400 rounded-lg px-2 py-1 text-xs font-bold"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSave(g.works[0]!.id)}
+                                disabled={saving}
+                                className="text-xs bg-emerald-600 text-white rounded-lg px-2.5 py-1 font-bold hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                              >
+                                ✓ Сохранить
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(null)}
+                                className="text-xs text-slate-400 hover:text-slate-600 px-1.5 py-1"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(g.works[0]!.id);
+                                  setEditAmount(String(g.works[0]!.amount));
+                                }}
+                                className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                                title="Редактировать сумму"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(g.works[0]!.id, g.title)}
+                                disabled={saving}
+                                className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer disabled:opacity-50"
+                                title="Удалить"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">
+                                  delete
+                                </span>
+                              </button>
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(g.works[0].id);
-                              setEditAmount(String(g.works[0].amount));
-                              setError('');
-                            }}
-                            className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
-                            title="Изменить сумму"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(g.works[0].id, g.title)}
-                            disabled={saving}
-                            className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer disabled:opacity-50"
-                            title="Удалить"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">delete</span>
-                          </button>
-                        </>
                       )}
                     </div>
-                  )}
+                  );
+                })
+              )}
+            </>
+          )}
+
+          {/* TAB 2: PAYOUTS */}
+          {activeTab === 'payouts' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  История выплат ЗП сотруднику
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  Всего {payouts.length} выплат
+                </span>
+              </div>
+
+              {payouts.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                  <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
+                    payments
+                  </span>
+                  <p className="text-sm font-medium">Нет зарегистрированных выплат ЗП</p>
                 </div>
-              );
-            })
+              ) : (
+                payouts.map((tx) => {
+                  const d = tx.transaction_date || tx.created_at;
+                  const dateStr = d
+                    ? new Date(d).toLocaleString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—';
+                  const walletName =
+                    tx.from_wallet?.name ||
+                    (tx.description?.includes('Касса')
+                      ? '💵 Сейф (Наличные)'
+                      : tx.description?.includes('Р/С') || tx.description?.includes('Банк')
+                        ? '🏦 Р/С (Банк)'
+                        : '💵 Кошелек');
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className="bg-white rounded-2xl p-4.5 border border-slate-200 shadow-xs flex items-start justify-between gap-4 hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
+                          <span className="material-symbols-outlined text-[20px]">payments</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full border border-blue-200">
+                              {walletName}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">{dateStr}</span>
+                          </div>
+                          <p className="text-sm font-bold text-slate-900 leading-snug">
+                            {tx.description || 'Выплата заработной платы'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-lg font-black text-blue-600">
+                          -&nbsp;{parseFloat(tx.amount || '0').toLocaleString('ru-RU')} ₽
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: ADVANCES & LOANS */}
+          {activeTab === 'advances' && (
+            <div className="space-y-4">
+              {/* Advance Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-purple-50 rounded-2xl p-4 border border-purple-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 block">
+                    Текущий долг по авансу
+                  </span>
+                  <span className="text-2xl font-black text-purple-900 mt-1 block">
+                    {advanceDebt.toLocaleString('ru-RU')} ₽
+                  </span>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {advanceDebt > 0 ? 'Сотрудник должен компании' : 'Долгов по авансам нет'}
+                  </span>
+                </div>
+
+                <div className="bg-rose-50 rounded-2xl p-4 border border-rose-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-700 block">
+                    Всего выдано займов
+                  </span>
+                  <span className="text-2xl font-black text-rose-700 mt-1 block">
+                    + {totalAdvancesGiven.toLocaleString('ru-RU')} ₽
+                  </span>
+                  <span className="text-[10px] text-rose-600 font-medium">
+                    Все выданные авансы за всё время
+                  </span>
+                </div>
+
+                <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+                    Всего удержано / погашено
+                  </span>
+                  <span className="text-2xl font-black text-emerald-700 mt-1 block">
+                    - {totalAdvancesOffset.toLocaleString('ru-RU')} ₽
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-medium">
+                    Зачтено из зарплаты или возвращено
+                  </span>
+                </div>
+              </div>
+
+              {/* Operations list */}
+              <div className="flex items-center justify-between px-1 pt-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Хронология движения авансов и займов
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  Всего {advancesHistory.length} операций
+                </span>
+              </div>
+
+              {advancesHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                  <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
+                    savings
+                  </span>
+                  <p className="text-sm font-medium">История авансов и займов пуста</p>
+                </div>
+              ) : (
+                advancesHistory.map((tx) => {
+                  const isGiven = tx.direction === 'expense';
+                  const amt = parseFloat(tx.amount || '0') || 0;
+                  const d = tx.transaction_date || tx.created_at;
+                  const dateStr = d
+                    ? new Date(d).toLocaleString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—';
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className={cn(
+                        'rounded-2xl p-4.5 shadow-xs border flex items-start justify-between gap-4 transition-all group',
+                        isGiven
+                          ? 'bg-purple-50/50 border-purple-200 hover:border-purple-300'
+                          : 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300',
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={cn(
+                            'w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 mt-0.5',
+                            isGiven
+                              ? 'bg-purple-100 border-purple-300 text-purple-700'
+                              : 'bg-emerald-100 border-emerald-300 text-emerald-700',
+                          )}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">
+                            {isGiven ? 'add_circle' : 'check_circle'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={cn(
+                                'text-xs font-black px-2.5 py-0.5 rounded-full border',
+                                isGiven
+                                  ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                              )}
+                            >
+                              {isGiven ? '➕ Выдан аванс / займ' : '➖ Зачёт аванса в ЗП'}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">{dateStr}</span>
+                          </div>
+                          <p className="text-sm font-bold text-slate-900 leading-snug">
+                            {tx.description || (isGiven ? 'Выдача аванса' : 'Зачёт аванса')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                        <span
+                          className={cn(
+                            'text-lg font-black tracking-tight',
+                            isGiven ? 'text-purple-700' : 'text-emerald-700',
+                          )}
+                        >
+                          {isGiven ? '+' : '−'} {amt.toLocaleString('ru-RU')} ₽
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(tx.id, tx.description || 'Аванс')}
+                          disabled={saving}
+                          className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-white"
+                          title="Удалить запись"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           )}
         </div>
       </div>

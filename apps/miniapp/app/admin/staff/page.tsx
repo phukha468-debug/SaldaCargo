@@ -923,6 +923,8 @@ function StaffDetailsModal({
   onClose: () => void;
   onSettle: () => void;
 }) {
+  const [detailTab, setDetailTab] = useState<'accruals' | 'payouts' | 'advances'>('accruals');
+
   const { data, isLoading } = useQuery<StaffSettleDetails>({
     queryKey: ['staff-settle-details', user.id, year, month],
     queryFn: () =>
@@ -939,12 +941,16 @@ function StaffDetailsModal({
       !t.from_wallet_id &&
       (!t.description || !t.description.startsWith('Выплата зарплаты')),
   );
-  const payments = history.filter(
+  const payouts = history.filter(
+    (t: any) => t.is_payout || (t.description && t.description.startsWith('Выплата зарплаты')),
+  );
+  const advances = history.filter(
     (t: any) =>
-      t.is_payout ||
-      (t.direction === 'expense' && t.is_advance) ||
-      (t.direction === 'income' && t.is_advance) ||
-      (t.description && t.description.startsWith('Выплата зарплаты')),
+      t.is_advance ||
+      t.category_id === 'a0000000-0000-0000-0000-000000000001' ||
+      (t.description &&
+        (t.description.toLowerCase().includes('аванс') ||
+          t.description.toLowerCase().includes('долг'))),
   );
 
   return (
@@ -953,7 +959,7 @@ function StaffDetailsModal({
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] p-6 space-y-6 shadow-2xl animate-in slide-in-from-bottom duration-300"
+        className="bg-white w-full max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] p-6 space-y-5 shadow-2xl animate-in slide-in-from-bottom duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -993,129 +999,245 @@ function StaffDetailsModal({
 
         <DriverDocuments driverId={user.id} />
 
-        {/* Accruals List */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">
-            Начисления за месяц
-          </h3>
-          {isLoading ? (
-            <div className="space-y-2">
-              <div className="h-16 bg-zinc-50 rounded-xl animate-pulse" />
-              <div className="h-16 bg-zinc-50 rounded-xl animate-pulse" />
-            </div>
-          ) : accruals.length === 0 ? (
-            <p className="text-sm text-zinc-400 font-bold text-center py-4">Нет начислений</p>
-          ) : (
-            <div className="space-y-2">
-              {accruals.map((t: any) => {
-                const displayDate = t.trip?.started_at || t.transaction_date || t.created_at;
-                return (
-                  <div
-                    key={t.id}
-                    className="bg-zinc-50 rounded-xl p-3 flex justify-between items-start"
-                  >
-                    <div className="flex-1 min-w-0 pr-2">
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">
-                        {new Date(displayDate).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                        })}
-                        {t.trip && ` · Рейс №${t.trip.trip_number}`}
-                        {t.service_order && ` · Наряд №${t.service_order.order_number}`}
-                      </p>
-                      <p className="text-sm font-bold text-zinc-800 leading-tight">
-                        {t.description.replace('ЗП: ', '')}
-                      </p>
-                      {t.trip?.driver?.name && t.trip.driver.name !== user.name && (
-                        <p className="text-[10px] font-bold text-sky-600 mt-1 uppercase">
-                          Водитель: {t.trip.driver.name}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <Money amount={t.amount} className="font-black text-zinc-900" />
-                      <p
-                        className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}
-                      >
-                        {t.settlement_status === 'completed' ? 'Выплачено' : 'Долг'}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        {/* Navigation Tabs */}
+        <div className="grid grid-cols-3 gap-1.5 bg-zinc-100 p-1 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => setDetailTab('accruals')}
+            className={`py-2.5 px-1 rounded-xl text-xs font-black transition-all ${
+              detailTab === 'accruals'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Начисления ({accruals.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setDetailTab('payouts')}
+            className={`py-2.5 px-1 rounded-xl text-xs font-black transition-all ${
+              detailTab === 'payouts'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Выплаты ({payouts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setDetailTab('advances')}
+            className={`py-2.5 px-1 rounded-xl text-xs font-black transition-all ${
+              detailTab === 'advances'
+                ? 'bg-white text-purple-700 shadow-sm'
+                : parseFloat(user.advance_balance || '0') > 0
+                  ? 'text-rose-600 font-black'
+                  : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Авансы ({advances.length})
+          </button>
         </div>
 
-        {/* Payments List */}
-        {payments.length > 0 && (
+        {/* Tab 1: Accruals List */}
+        {detailTab === 'accruals' && (
           <div className="space-y-3">
-            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">
-              Выплаты и авансы
-            </h3>
-            <div className="space-y-2">
-              {payments.map((t: any) => {
-                const isExpense = t.direction === 'expense';
-                const { cleanTitle, trips } = parseTripsFromDescription(t.description);
-                return (
-                  <div key={t.id} className="bg-zinc-50 rounded-xl p-3.5 space-y-2">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">
-                          {new Date(t.created_at || t.transaction_date).toLocaleDateString(
-                            'ru-RU',
-                            {
-                              day: 'numeric',
-                              month: 'short',
-                            },
-                          )}
+            {isLoading ? (
+              <div className="space-y-2">
+                <div className="h-16 bg-zinc-50 rounded-xl animate-pulse" />
+                <div className="h-16 bg-zinc-50 rounded-xl animate-pulse" />
+              </div>
+            ) : accruals.length === 0 ? (
+              <p className="text-sm text-zinc-400 font-bold text-center py-6">Нет начислений</p>
+            ) : (
+              <div className="space-y-2">
+                {accruals.map((t: any) => {
+                  const displayDate = t.trip?.started_at || t.transaction_date || t.created_at;
+                  return (
+                    <div
+                      key={t.id}
+                      className="bg-zinc-50 rounded-xl p-3 flex justify-between items-start"
+                    >
+                      <div className="flex-1 min-w-0 pr-2">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">
+                          {new Date(displayDate).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}
+                          {t.trip && ` · Рейс №${t.trip.trip_number}`}
+                          {t.service_order && ` · Наряд №${t.service_order.order_number}`}
                         </p>
-                        <p className="text-sm font-bold text-zinc-800 leading-snug">{cleanTitle}</p>
+                        <p className="text-sm font-bold text-zinc-800 leading-tight">
+                          {t.description.replace('ЗП: ', '')}
+                        </p>
+                        {t.trip?.driver?.name && t.trip.driver.name !== user.name && (
+                          <p className="text-[10px] font-bold text-sky-600 mt-1 uppercase">
+                            Водитель: {t.trip.driver.name}
+                          </p>
+                        )}
                       </div>
-                      <div className="text-right shrink-0">
-                        <Money
-                          amount={isExpense ? -parseFloat(t.amount) : parseFloat(t.amount)}
-                          className={`font-black text-sm ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}
-                          showSign={true}
-                        />
+                      <div className="text-right">
+                        <Money amount={t.amount} className="font-black text-zinc-900" />
+                        <p
+                          className={`text-[9px] font-black uppercase mt-1 ${t.settlement_status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}
+                        >
+                          {t.settlement_status === 'completed' ? 'Выплачено' : 'Долг'}
+                        </p>
                       </div>
                     </div>
-                    {trips.length > 0 && (
-                      <div className="pt-2 border-t border-zinc-200/60 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">
-                            Входящие в эту сумму рейсы
-                          </p>
-                          <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
-                            {trips.length} рейсов
-                          </span>
-                        </div>
-                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                          {trips.map((item, idx: number) => (
-                            <div
-                              key={idx}
-                              className="bg-white rounded-lg p-2.5 text-xs font-bold text-zinc-800 border border-zinc-200/60 flex items-center justify-between gap-2"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span>🚛</span>
-                                <span>{item.label}</span>
-                              </div>
-                              {item.amount && (
-                                <span className="text-emerald-600 font-black">{item.amount}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        <div className="pt-4 pb-10">
+        {/* Tab 2: Payouts List */}
+        {detailTab === 'payouts' && (
+          <div className="space-y-3">
+            {payouts.length === 0 ? (
+              <p className="text-sm text-zinc-400 font-bold text-center py-6">
+                Нет зарегистрированных выплат ЗП
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {payouts.map((t: any) => {
+                  const { cleanTitle, trips } = parseTripsFromDescription(t.description);
+                  return (
+                    <div key={t.id} className="bg-zinc-50 rounded-xl p-3.5 space-y-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold text-zinc-400 uppercase">
+                            {new Date(t.created_at || t.transaction_date).toLocaleDateString(
+                              'ru-RU',
+                              {
+                                day: 'numeric',
+                                month: 'short',
+                              },
+                            )}
+                          </p>
+                          <p className="text-sm font-bold text-zinc-800 leading-snug">
+                            {cleanTitle}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <Money
+                            amount={parseFloat(t.amount)}
+                            className="font-black text-sm text-blue-600"
+                          />
+                        </div>
+                      </div>
+                      {trips.length > 0 && (
+                        <div className="pt-2 border-t border-zinc-200/60 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">
+                              Входящие в эту сумму рейсы
+                            </p>
+                            <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                              {trips.length} рейсов
+                            </span>
+                          </div>
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {trips.map((item, idx: number) => (
+                              <div
+                                key={idx}
+                                className="bg-white rounded-lg p-2.5 text-xs font-bold text-zinc-800 border border-zinc-200/60 flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span>🚛</span>
+                                  <span>{item.label}</span>
+                                </div>
+                                {item.amount && (
+                                  <span className="text-emerald-600 font-black">{item.amount}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Advances List */}
+        {detailTab === 'advances' && (
+          <div className="space-y-3">
+            {/* Advance summary pill */}
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black text-purple-700 uppercase tracking-wider">
+                  Текущий остаток займа
+                </p>
+                <p className="text-xl font-black text-purple-950 mt-0.5">
+                  <Money amount={user.advance_balance || '0'} />
+                </p>
+              </div>
+              <span className="text-2xl">💸</span>
+            </div>
+
+            {advances.length === 0 ? (
+              <p className="text-sm text-zinc-400 font-bold text-center py-6">
+                История авансов и займов пуста
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {advances.map((t: any) => {
+                  const isGiven = t.direction === 'expense';
+                  return (
+                    <div
+                      key={t.id}
+                      className={`rounded-xl p-3.5 flex justify-between items-start gap-3 border ${
+                        isGiven
+                          ? 'bg-purple-50/50 border-purple-200'
+                          : 'bg-emerald-50/50 border-emerald-200'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span
+                            className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              isGiven
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {isGiven ? '➕ Выдан аванс' : '➖ Зачёт аванса'}
+                          </span>
+                          <span className="text-[10px] font-bold text-zinc-400">
+                            {new Date(t.created_at || t.transaction_date).toLocaleDateString(
+                              'ru-RU',
+                              {
+                                day: 'numeric',
+                                month: 'short',
+                              },
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-zinc-800 leading-snug">
+                          {t.description || (isGiven ? 'Выдача аванса' : 'Зачёт аванса')}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span
+                          className={`font-black text-sm ${
+                            isGiven ? 'text-purple-700' : 'text-emerald-700'
+                          }`}
+                        >
+                          {isGiven ? '+' : '−'} {parseFloat(t.amount).toLocaleString('ru-RU')} ₽
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="pt-2 pb-8">
           {parseFloat(user.debt) > 0 ? (
             <button
               onClick={onSettle}
