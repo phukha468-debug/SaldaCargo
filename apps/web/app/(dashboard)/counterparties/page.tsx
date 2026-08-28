@@ -789,7 +789,7 @@ function OneoffAggregateTab({ irregular, regular }: { irregular: Client[]; regul
     totalNetAll !== 0 ? Math.round((totalNetIrreg / Math.abs(totalNetAll)) * 100) : 0;
 
   const monthlyData =
-    irregular.length > 0
+    irregular.length > 0 && irregular[0]
       ? irregular[0].monthly.map((_, i) =>
           irregular.reduce((s, c) => s + parseFloat(c.monthly[i] ?? '0'), 0),
         )

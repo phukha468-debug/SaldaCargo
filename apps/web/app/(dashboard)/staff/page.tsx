@@ -973,7 +973,18 @@ function PayrollHistoryModal({
     return history.filter((t) => {
       const isAdvCat = t.category_id === ADVANCE_CAT;
       const desc = (t.description || '').toLowerCase();
-      return isAdvCat || desc.includes('аванс') || desc.includes('долг') || desc.includes('займ');
+      const isWorkAccrual =
+        PAYROLL_CATS.includes(t.category_id) ||
+        desc.includes('наряд') ||
+        desc.includes('долг механику') ||
+        desc.includes('рейс');
+      if (isWorkAccrual) return false;
+      return (
+        isAdvCat ||
+        desc.includes('аванс') ||
+        desc.includes('займ') ||
+        (desc.includes('долг') && !desc.includes('долг механику'))
+      );
     });
   }, [history]);
 
@@ -2888,7 +2899,7 @@ export default function StaffPage() {
   const [historyUser, setHistoryUser] = useState<PayrollUser | null>(null);
   const [debtModalUser, setDebtModalUser] = useState<{
     user?: PayrollUser;
-    action?: 'add' | 'repay';
+    action?: 'add' | 'repay' | 'adjust';
   } | null>(null);
 
   const shiftMonth = (delta: number) => {

@@ -16,6 +16,24 @@ function last6MonthKeys(): string[] {
   return keys;
 }
 
+async function fetchAllRows<T = any>(
+  queryBuilder: (from: number, to: number) => Promise<{ data: T[] | null; error: any }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = [];
+  let page = 0;
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await queryBuilder(from, to);
+    if (error || !data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    page++;
+  }
+  return all;
+}
+
 /** GET /api/counterparties — список клиентов с аналитикой */
 export async function GET(request: Request) {
   try {
@@ -47,79 +65,97 @@ export async function GET(request: Request) {
 
     const overheadCatIds = (overheadCategories ?? []).map((c: any) => c.id);
 
-    const [overheadTxRes, overheadTripExpRes, totalRevRes] = await Promise.all([
+    const [overheadTxList, overheadTripExpList, allCompanyOrders, orders] = await Promise.all([
       overheadCatIds.length > 0
-        ? (supabase as any)
-            .from('transactions')
-            .select('amount')
-            .in('category_id', overheadCatIds)
-            .eq('direction', 'expense')
-            .eq('lifecycle_status', 'approved')
-            .eq('settlement_status', 'completed')
-        : Promise.resolve({ data: [] }),
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('transactions')
+              .select('amount')
+              .in('category_id', overheadCatIds)
+              .eq('direction', 'expense')
+              .eq('lifecycle_status', 'approved')
+              .eq('settlement_status', 'completed')
+              .range(from, to),
+          )
+        : Promise.resolve([]),
       overheadCatIds.length > 0
-        ? (supabase as any).from('trip_expenses').select('amount').in('category_id', overheadCatIds)
-        : Promise.resolve({ data: [] }),
-      (supabase as any)
-        .from('trip_orders')
-        .select('amount, trips!inner(lifecycle_status)')
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
-        .eq('trips.lifecycle_status', 'approved'),
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('trip_expenses')
+              .select('amount')
+              .in('category_id', overheadCatIds)
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+      fetchAllRows((from, to) =>
+        (supabase as any)
+          .from('trip_orders')
+          .select('amount, trips!inner(lifecycle_status)')
+          .eq('lifecycle_status', 'approved')
+          .eq('trips.lifecycle_status', 'approved')
+          .range(from, to),
+      ),
+      // Заказы всех клиентов с пагинацией (без обрезки на 1000)
+      fetchAllRows((from, to) =>
+        (supabase as any)
+          .from('trip_orders')
+          .select(
+            'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
+          )
+          .in('counterparty_id', cpIds)
+          .eq('lifecycle_status', 'approved')
+          .eq('trips.lifecycle_status', 'approved')
+          .range(from, to),
+      ),
     ]);
 
-    const totalOverhead = [
-      ...(overheadTxRes.data ?? []),
-      ...(overheadTripExpRes.data ?? []),
-    ].reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
-    const totalCompanyRevenue = (totalRevRes.data ?? []).reduce(
+    const totalOverhead = [...overheadTxList, ...overheadTripExpList].reduce(
+      (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
+      0,
+    );
+
+    const totalCompanyRevenue = allCompanyOrders.reduce(
       (s: number, o: any) => s + parseFloat(o.amount ?? '0'),
       0,
     );
     const overhead_pct = totalCompanyRevenue > 0 ? totalOverhead / totalCompanyRevenue : 0;
-
-    // Заказы клиентов — те же фильтры, что в /api/finance
-    const { data: orders } = await (supabase as any)
-      .from('trip_orders')
-      .select(
-        'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
-      )
-      .in('counterparty_id', cpIds)
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'completed')
-      .eq('trips.lifecycle_status', 'approved');
 
     // Все уникальные trip_id клиентских заказов
     const allTripIds = [
       ...new Set((orders ?? []).map((o: any) => o.trip_id).filter(Boolean)),
     ] as string[];
 
-    // Расходы на ГСМ по этим рейсам
-    const { data: fuelExpenses } =
+    // Расходы на ГСМ по этим рейсам (с пагинацией)
+    const fuelExpenses =
       allTripIds.length > 0
-        ? await (supabase as any)
-            .from('trip_expenses')
-            .select('trip_id, amount')
-            .in('trip_id', allTripIds)
-            .eq('category_id', FUEL_CATEGORY_ID)
-        : { data: [] };
+        ? await fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('trip_expenses')
+              .select('trip_id, amount')
+              .in('trip_id', allTripIds)
+              .eq('category_id', FUEL_CATEGORY_ID)
+              .range(from, to),
+          )
+        : [];
 
     const tripFuelMap = new Map<string, number>();
     for (const e of fuelExpenses ?? []) {
       tripFuelMap.set(e.trip_id, (tripFuelMap.get(e.trip_id) ?? 0) + parseFloat(e.amount ?? '0'));
     }
 
-    // Суммарная выручка каждого рейса (для пропорции ГСМ)
-    const { data: allTripOrders } =
+    // Суммарная выручка каждого рейса (для пропорции ГСМ, с пагинацией)
+    const allTripOrders =
       allTripIds.length > 0
-        ? await (supabase as any)
-            .from('trip_orders')
-            .select('trip_id, amount, lifecycle_status, settlement_status')
-            .in('trip_id', allTripIds)
-            .eq('lifecycle_status', 'approved')
-            .eq('settlement_status', 'completed')
-            .neq('lifecycle_status', 'cancelled')
-        : { data: [] };
+        ? await fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('trip_orders')
+              .select('trip_id, amount, lifecycle_status, settlement_status')
+              .in('trip_id', allTripIds)
+              .eq('lifecycle_status', 'approved')
+              .neq('lifecycle_status', 'cancelled')
+              .range(from, to),
+          )
+        : [];
 
     const tripTotalRevenueMap = new Map<string, number>();
     for (const o of allTripOrders ?? []) {
@@ -234,7 +270,9 @@ export async function GET(request: Request) {
         payment_breakdown: paymentBreakdown,
         monthly: monthKeys.map((k) => (s.monthly[k] ?? 0).toFixed(2)),
         month_labels: monthKeys.map((k) => {
-          const [y, m] = k.split('-').map(Number);
+          const parts = k.split('-').map(Number);
+          const y = parts[0] ?? 2026;
+          const m = parts[1] ?? 1;
           return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'short' });
         }),
       };

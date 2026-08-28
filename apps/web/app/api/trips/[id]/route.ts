@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { syncTripFinancials } from '@/lib/tripFinancials';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips/:id — получить детали одного рейса (по UUID или номеру рейса) */
@@ -117,6 +119,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         }
       }
+
+      const cookieStore = await cookies();
+      const adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+      await syncTripFinancials(supabase, id, adminId);
     }
 
     return NextResponse.json({ ok: true });

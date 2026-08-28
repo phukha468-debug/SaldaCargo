@@ -4,54 +4,79 @@ import { NextResponse } from 'next/server';
 
 const FUEL_CATEGORY_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 
+async function fetchAllRows<T = any>(
+  queryBuilder: (from: number, to: number) => Promise<{ data: T[] | null; error: any }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = [];
+  let page = 0;
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await queryBuilder(from, to);
+    if (error || !data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    page++;
+  }
+  return all;
+}
+
 /** GET /api/counterparties/[id]/trips — история рейсов клиента */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const supabase = createAdminClient();
 
-    const { data: orders, error } = await (supabase as any)
-      .from('trip_orders')
-      .select(
-        'id, trip_id, amount, driver_pay, loader_pay, payment_method,' +
-          ' trip:trips(started_at, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number))',
-      )
-      .eq('counterparty_id', id)
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'completed')
-      .order('created_at', { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const orders = await fetchAllRows((from, to) =>
+      (supabase as any)
+        .from('trip_orders')
+        .select(
+          'id, trip_id, amount, driver_pay, loader_pay, payment_method, settlement_status,' +
+            ' trip:trips!inner(trip_number, started_at, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number), lifecycle_status)',
+        )
+        .eq('counterparty_id', id)
+        .eq('lifecycle_status', 'approved')
+        .eq('trips.lifecycle_status', 'approved')
+        .order('created_at', { ascending: false })
+        .range(from, to),
+    );
 
     const tripIds = [
       ...new Set((orders ?? []).map((o: any) => o.trip_id).filter(Boolean)),
     ] as string[];
 
-    const [fuelRes, allOrdersRes] = await Promise.all([
+    const [fuelExpenses, allTripOrders] = await Promise.all([
       tripIds.length > 0
-        ? (supabase as any)
-            .from('trip_expenses')
-            .select('trip_id, amount')
-            .in('trip_id', tripIds)
-            .eq('category_id', FUEL_CATEGORY_ID)
-        : Promise.resolve({ data: [] }),
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('trip_expenses')
+              .select('trip_id, amount')
+              .in('trip_id', tripIds)
+              .eq('category_id', FUEL_CATEGORY_ID)
+              .range(from, to),
+          )
+        : Promise.resolve([]),
       tripIds.length > 0
-        ? (supabase as any)
-            .from('trip_orders')
-            .select('trip_id, amount')
-            .in('trip_id', tripIds)
-            .eq('lifecycle_status', 'approved')
-            .eq('settlement_status', 'completed')
-        : Promise.resolve({ data: [] }),
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('trip_orders')
+              .select('trip_id, amount')
+              .in('trip_id', tripIds)
+              .eq('lifecycle_status', 'approved')
+              .neq('lifecycle_status', 'cancelled')
+              .range(from, to),
+          )
+        : Promise.resolve([]),
     ]);
 
     const tripFuelMap = new Map<string, number>();
-    for (const e of fuelRes.data ?? []) {
+    for (const e of fuelExpenses ?? []) {
       tripFuelMap.set(e.trip_id, (tripFuelMap.get(e.trip_id) ?? 0) + parseFloat(e.amount ?? '0'));
     }
 
     const tripTotalMap = new Map<string, number>();
-    for (const o of allOrdersRes.data ?? []) {
+    for (const o of allTripOrders ?? []) {
       tripTotalMap.set(o.trip_id, (tripTotalMap.get(o.trip_id) ?? 0) + parseFloat(o.amount ?? '0'));
     }
 
@@ -66,6 +91,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return {
         id: o.id,
         trip_id: o.trip_id,
+        trip_number: o.trip?.trip_number ?? null,
         started_at: o.trip?.started_at ?? null,
         driver_name: o.trip?.driver?.name ?? null,
         asset_name: o.trip?.asset?.short_name ?? o.trip?.asset?.reg_number ?? null,
@@ -75,6 +101,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         fuel_allocated: fuelAllocated.toFixed(2),
         gross_profit: (amount - driverPay - loaderPay - fuelAllocated).toFixed(2),
         payment_method: o.payment_method,
+        settlement_status: o.settlement_status,
       };
     });
 

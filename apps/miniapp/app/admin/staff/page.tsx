@@ -946,11 +946,15 @@ function StaffDetailsModal({
   );
   const advances = history.filter(
     (t: any) =>
-      t.is_advance ||
-      t.category_id === 'a0000000-0000-0000-0000-000000000001' ||
-      (t.description &&
-        (t.description.toLowerCase().includes('аванс') ||
-          t.description.toLowerCase().includes('долг'))),
+      !t.is_payroll &&
+      (t.is_advance ||
+        t.category_id === 'a0000000-0000-0000-0000-000000000001' ||
+        (t.description &&
+          (t.description.toLowerCase().includes('аванс') ||
+            t.description.toLowerCase().includes('займ') ||
+            (t.description.toLowerCase().includes('долг') &&
+              !t.description.toLowerCase().includes('долг механику') &&
+              !t.description.toLowerCase().includes('наряд'))))),
   );
 
   return (
