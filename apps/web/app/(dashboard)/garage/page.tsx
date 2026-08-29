@@ -4751,7 +4751,7 @@ function calcOrderCosts(o: TabOrder) {
 
   let laborSalaryCost = 0;
   if (isExternal) {
-    laborSalaryCost = 0;
+    laborSalaryCost = worksPriceSum;
   } else {
     const directSalary =
       (parseFloat(String(o.mechanic_pay ?? '0')) || 0) +
@@ -4759,7 +4759,7 @@ function calcOrderCosts(o: TabOrder) {
     laborSalaryCost = directSalary > 0 ? directSalary : worksPriceSum * 0.5;
   }
 
-  const totalCost = isExternal ? partsCost + worksPriceSum : partsCost + laborSalaryCost;
+  const totalCost = partsCost + laborSalaryCost;
 
   return {
     partsCost,

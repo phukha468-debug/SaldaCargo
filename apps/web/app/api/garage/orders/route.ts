@@ -240,18 +240,25 @@ export async function POST(request: Request) {
       const partsCost = Number(body.parts_cost) || 0;
 
       if (worksCost > 0 || body.work_description) {
-        await (supabase as any).from('service_order_works').insert({
+        const { error: workErr } = await (supabase as any).from('service_order_works').insert({
           service_order_id: data.id,
-          custom_work_name: body.work_description?.trim() || 'Работы стороннего сервиса',
+          custom_work_name:
+            body.work_description?.trim() ||
+            body.problem_description?.trim() ||
+            'Работы стороннего сервиса',
           price_client: worksCost,
+          norm_minutes: 60,
           status: 'completed',
           salary_paid: true,
           created_at: orderCreatedAt,
         });
+        if (workErr) {
+          console.error('Error creating external service work:', workErr);
+        }
       }
 
       if (partsCost > 0 || body.parts_description) {
-        await (supabase as any).from('service_order_parts').insert({
+        const { error: partErr } = await (supabase as any).from('service_order_parts').insert({
           service_order_id: data.id,
           custom_part_name: body.parts_description?.trim() || 'Запчасти стороннего сервиса',
           quantity: 1,
@@ -260,6 +267,9 @@ export async function POST(request: Request) {
           unit: 'компл',
           created_at: orderCreatedAt,
         });
+        if (partErr) {
+          console.error('Error creating external service part:', partErr);
+        }
       }
     }
 
