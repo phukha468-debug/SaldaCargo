@@ -61,11 +61,13 @@ interface ReviewServiceOrder {
   lifecycle_status: string;
   created_at: string;
   problem_description: string | null;
+  admin_note?: string | null;
   mechanic_note: string | null;
   mechanic_pay: string | null;
   second_mechanic_pay: string | null;
   asset?: { id?: string; short_name?: string; reg_number?: string } | null;
   mechanic?: { id: string; name: string } | null;
+  second_mechanic?: { id: string; name: string } | null;
   works?: Array<{
     id: string;
     custom_work_name: string | null;
@@ -433,9 +435,25 @@ function DateNav({
 
 // ── Edit Modal ──────────────────────────────────────────────
 
-type EditableOrder = TripOrder & {
+type EditableOrder = {
+  id: string;
+  isNew?: boolean;
+  amount: string;
+  driver_pay: string;
+  loader_pay: string;
+  loader2_pay: string;
+  loader_id?: string | null;
+  loader2_id?: string | null;
+  loader?: { id: string; name: string } | null;
+  loader2?: { id: string; name: string } | null;
+  payment_method: string;
+  settlement_status?: string;
+  lifecycle_status?: string;
+  counterparty_id?: string | null;
+  counterparty?: { name: string } | null;
   _selectedId: string | null;
   _inputValue: string;
+  _deleted?: boolean;
 };
 
 function CounterpartySelect({
@@ -461,6 +479,10 @@ function CounterpartySelect({
     ? counterparties.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
     : counterparties;
 
+  const exactMatch = counterparties.find(
+    (c) => c.name.toLowerCase().trim() === query.toLowerCase().trim(),
+  );
+
   const handleSelect = (cp: Counterparty) => {
     setQuery(cp.name);
     setOpen(false);
@@ -474,7 +496,7 @@ function CounterpartySelect({
   };
 
   const handleBlur = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 150);
+    closeTimer.current = setTimeout(() => setOpen(false), 200);
   };
 
   const handleFocus = () => {
@@ -482,53 +504,82 @@ function CounterpartySelect({
     setOpen(true);
   };
 
-  const inputCls =
-    'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition-all';
-
   return (
     <div className="relative">
-      <div className="relative">
+      <div className="relative flex items-center">
         <input
           type="text"
-          className={inputCls}
+          className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-8 py-2.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
           value={query}
-          placeholder="Поиск клиента..."
+          placeholder="Поиск клиента или ввод нового..."
           onFocus={handleFocus}
           onBlur={handleBlur}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
-            if (!e.target.value.trim()) onChange(null, '');
+            if (!e.target.value.trim()) {
+              onChange(null, '');
+            } else {
+              const matched = counterparties.find(
+                (c) => c.name.toLowerCase() === e.target.value.toLowerCase().trim(),
+              );
+              onChange(matched ? matched.id : null, e.target.value);
+            }
           }}
         />
-        {value && (
+        <svg
+          className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+          />
+        </svg>
+        {query && (
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={handleClear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-500 text-xs font-bold transition-colors"
+            className="absolute right-2.5 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 text-xs font-bold transition-colors cursor-pointer"
           >
             ×
           </button>
         )}
       </div>
-      {open && filtered.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          {filtered.slice(0, 20).map((cp) => (
+
+      {open && (filtered.length > 0 || (query.trim() && !exactMatch)) && (
+        <ul className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto py-1 divide-y divide-slate-50 animate-in fade-in zoom-in-95 duration-100">
+          {filtered.slice(0, 25).map((cp) => (
             <li key={cp.id}>
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelect(cp)}
                 className={cn(
-                  'w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors',
-                  cp.id === value ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-700',
+                  'w-full text-left px-3.5 py-2 text-sm flex items-center justify-between hover:bg-indigo-50/60 transition-colors cursor-pointer',
+                  cp.id === value ? 'bg-indigo-50 font-bold text-indigo-900' : 'text-slate-700',
                 )}
               >
-                {cp.name}
+                <span>{cp.name}</span>
+                {cp.id === value && (
+                  <span className="text-xs text-indigo-600 font-semibold">✓ Выбран</span>
+                )}
               </button>
             </li>
           ))}
+          {query.trim() && !exactMatch && (
+            <li>
+              <div className="px-3.5 py-2 text-xs text-indigo-600 bg-indigo-50/40 flex items-center gap-1.5 font-medium">
+                <span>➕ Будет создан новый клиент:</span>
+                <span className="font-bold text-indigo-900">«{query.trim()}»</span>
+              </div>
+            </li>
+          )}
         </ul>
       )}
     </div>
@@ -545,11 +596,12 @@ function EditModal({
   onSaved: () => void;
 }) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
-  const [orders, setOrders] = useState<EditableOrder[]>(
+  const [orders, setOrders] = useState<EditableOrder[]>(() =>
     activeOrders.map((o) => ({
       ...o,
       _selectedId: o.counterparty_id,
       _inputValue: o.counterparty?.name ?? '',
+      _deleted: false,
     })),
   );
   const [saving, setSaving] = useState(false);
@@ -576,168 +628,486 @@ function EditModal({
     );
   };
 
+  const addOrder = () => {
+    const defaultLoaderId =
+      trip.loader?.id ?? activeOrders.find((o) => o.loader_id)?.loader_id ?? null;
+    const defaultLoader = trip.loader ?? activeOrders.find((o) => o.loader)?.loader ?? null;
+    const defaultLoader2Id = activeOrders.find((o) => o.loader2_id)?.loader2_id ?? null;
+    const defaultLoader2 = activeOrders.find((o) => o.loader2)?.loader2 ?? null;
+
+    const newOrder: EditableOrder = {
+      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      isNew: true,
+      amount: '',
+      driver_pay: '',
+      loader_pay: defaultLoaderId ? '0' : '0',
+      loader2_pay: defaultLoader2Id ? '0' : '0',
+      loader_id: defaultLoaderId,
+      loader2_id: defaultLoader2Id,
+      loader: defaultLoader,
+      loader2: defaultLoader2,
+      payment_method: 'debt_cash',
+      settlement_status: 'pending',
+      lifecycle_status: trip.lifecycle_status === 'approved' ? 'approved' : 'draft',
+      counterparty_id: null,
+      counterparty: null,
+      _selectedId: null,
+      _inputValue: '',
+      _deleted: false,
+    };
+    setOrders((prev) => [...prev, newOrder]);
+  };
+
+  const removeOrder = (orderId: string) => {
+    setOrders((prev) => {
+      const target = prev.find((o) => o.id === orderId);
+      if (!target) return prev;
+      if (target.isNew) {
+        return prev.filter((o) => o.id !== orderId);
+      }
+      return prev.map((o) => (o.id === orderId ? { ...o, _deleted: true } : o));
+    });
+  };
+
+  const restoreOrder = (orderId: string) => {
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, _deleted: false } : o)));
+  };
+
   const save = async () => {
+    const nonDeleted = orders.filter((o) => !o._deleted);
+    if (nonDeleted.length === 0) {
+      setError('В рейсе должен оставаться хотя бы один заказ');
+      return;
+    }
+
+    for (let i = 0; i < nonDeleted.length; i++) {
+      const o = nonDeleted[i];
+      if (!o) continue;
+      const amt = parseFloat(o.amount);
+      if (isNaN(amt) || amt <= 0) {
+        setError(`Укажите корректную сумму для заявки ${i + 1}`);
+        return;
+      }
+    }
+
     setSaving(true);
     setError('');
-    const payload = orders.map((o) => ({
+
+    const payload = nonDeleted.map((o) => ({
       id: o.id,
+      isNew: o.isNew,
       amount: o.amount,
-      driver_pay: o.driver_pay,
-      loader_pay: o.loader_pay,
+      driver_pay: o.driver_pay || '0',
+      loader_pay: o.loader_pay || '0',
       loader2_pay: o.loader2_pay ?? '0',
+      loader_id: o.loader_id ?? null,
+      loader2_id: o.loader2_id ?? null,
       payment_method: o.payment_method,
       counterparty_id: o._selectedId,
       ...(o._selectedId === null && o._inputValue.trim()
         ? { counterparty_name: o._inputValue.trim() }
         : {}),
     }));
-    const res = await fetch(`/api/trips/${trip.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orders: payload }),
-    });
-    const json = await res.json();
-    setSaving(false);
-    if (!res.ok) {
-      setError(json.error ?? 'Ошибка');
-      return;
+
+    const deletedIds = orders.filter((o) => o._deleted && !o.isNew).map((o) => o.id);
+
+    try {
+      const res = await fetch(`/api/trips/${trip.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: payload,
+          deleted_order_ids: deletedIds.length > 0 ? deletedIds : undefined,
+        }),
+      });
+      const json = await res.json();
+      setSaving(false);
+      if (!res.ok) {
+        setError(json.error ?? 'Ошибка сохранения');
+        return;
+      }
+      onSaved();
+    } catch {
+      setSaving(false);
+      setError('Не удалось сохранить изменения. Проверьте соединение.');
     }
-    onSaved();
   };
 
+  const visibleOrders = orders.filter((o) => !o._deleted);
+  const totalRevenue = visibleOrders.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
+  const totalDriverPay = visibleOrders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
+  const totalLoaderPay = visibleOrders.reduce(
+    (s, o) => s + (parseFloat(o.loader_pay) || 0) + (parseFloat(o.loader2_pay ?? '0') || 0),
+    0,
+  );
+  const expenses = trip.trip_expenses ?? [];
+  const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const estimatedProfit = totalRevenue - totalDriverPay - totalLoaderPay - totalExpenses;
+
   const inputCls =
-    'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition-all';
+    'w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs';
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl my-auto sm:my-8 overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+        {/* Modal Header */}
+        <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between">
           <div>
-            <h2 className="font-black text-slate-900 text-lg">
-              Редактирование · Смена #{trip.trip_number}
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/10 text-white border border-white/15">
+                Смена #{trip.trip_number}
+              </span>
+              {trip.lifecycle_status === 'approved' ? (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Утверждён
+                </span>
+              ) : (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  На проверке
+                </span>
+              )}
+            </div>
+            <h2 className="text-lg sm:text-xl font-black mt-1 text-white flex items-center gap-2">
+              Редактирование рейса
             </h2>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {trip.asset.short_name} ({trip.asset.reg_number}) · {trip.driver.name}
+            <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-1.5 font-medium">
+              <span>
+                🚚 {trip.asset.short_name} ({trip.asset.reg_number})
+              </span>
+              <span>·</span>
+              <span>👤 {trip.driver.name}</span>
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 text-xl transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white text-xl font-bold transition-colors cursor-pointer"
           >
             ×
           </button>
         </div>
 
-        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {orders.map((order, idx) => (
-            <div
-              key={order.id}
-              className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+        {/* Live KPI Summary Ribbon */}
+        <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Заявок в рейсе
+            </span>
+            <span className="text-base font-black text-slate-900">
+              {visibleOrders.length} {visibleOrders.length === 1 ? 'заказ' : 'заказа'}
+            </span>
+          </div>
+          <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Выручка
+            </span>
+            <span className="text-base font-black text-emerald-600">
+              <Money amount={totalRevenue.toFixed(2)} />
+            </span>
+          </div>
+          <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              ЗП водителя
+            </span>
+            <span className="text-base font-black text-indigo-600">
+              <Money amount={totalDriverPay.toFixed(2)} />
+            </span>
+          </div>
+          <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Прибыль рейса
+            </span>
+            <span
+              className={cn(
+                'text-base font-black',
+                estimatedProfit >= 0 ? 'text-emerald-700' : 'text-rose-600',
+              )}
             >
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Заявка {idx + 1}
-              </p>
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                  Клиент
-                </label>
-                <CounterpartySelect
-                  value={order._selectedId}
-                  inputValue={order._inputValue}
-                  counterparties={counterparties}
-                  onChange={(id, name) => updateCounterparty(order.id, id, name)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                    Сумма, ₽
-                  </label>
-                  <input
-                    type="number"
-                    className={inputCls}
-                    value={order.amount}
-                    onChange={(e) => update(order.id, 'amount', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                    ЗП водителя, ₽
-                  </label>
-                  <input
-                    type="number"
-                    className={inputCls}
-                    value={order.driver_pay}
-                    onChange={(e) => update(order.id, 'driver_pay', e.target.value)}
-                  />
-                </div>
-                {(order.loader_id || parseFloat(order.loader_pay) > 0) && (
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                      ЗП {order.loader ? order.loader.name.split(' ')[0] : 'грузчика'}, ₽
-                    </label>
-                    <input
-                      type="number"
-                      className={inputCls}
-                      value={order.loader_pay}
-                      onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
-                    />
-                  </div>
-                )}
-                {(order.loader2_id || parseFloat(order.loader2_pay ?? '0') > 0) && (
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                      ЗП {order.loader2 ? order.loader2.name.split(' ')[0] : 'грузчика 2'}, ₽
-                    </label>
-                    <input
-                      type="number"
-                      className={inputCls}
-                      value={order.loader2_pay ?? '0'}
-                      onChange={(e) => update(order.id, 'loader2_pay', e.target.value)}
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
-                    Способ оплаты
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={order.payment_method}
-                    onChange={(e) => update(order.id, 'payment_method', e.target.value)}
-                  >
-                    {PAYMENT_EDIT_OPTIONS.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          ))}
+              <Money amount={estimatedProfit.toFixed(2)} />
+            </span>
+          </div>
         </div>
 
+        {/* Orders Scroll Container */}
+        <div className="p-6 space-y-5 max-h-[58vh] overflow-y-auto">
+          {orders.map((order, idx) => {
+            if (order._deleted) {
+              return (
+                <div
+                  key={order.id}
+                  className="border border-dashed border-rose-300 bg-rose-50/50 rounded-2xl p-4 flex items-center justify-between text-sm"
+                >
+                  <div className="flex items-center gap-2.5 text-rose-800 font-medium">
+                    <span className="w-6 h-6 rounded-full bg-rose-200 text-rose-700 flex items-center justify-center text-xs font-bold">
+                      {idx + 1}
+                    </span>
+                    <span>
+                      Заявка #{idx + 1} (
+                      {order._inputValue || order.counterparty?.name || 'Без клиента'} —{' '}
+                      {order.amount || '0'} ₽) помечена на удаление
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => restoreOrder(order.id)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                  >
+                    Вернуть заявку
+                  </button>
+                </div>
+              );
+            }
+
+            const amtNum = parseFloat(order.amount) || 0;
+            const suggestedPay = Math.round(amtNum * 0.3);
+
+            return (
+              <div
+                key={order.id}
+                className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 bg-slate-50/50 shadow-2xs hover:border-slate-300 transition-all relative group"
+              >
+                {/* Order Header */}
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs font-black">
+                      {idx + 1}
+                    </span>
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      Заявка {idx + 1}
+                    </span>
+                    {order.isNew && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Новая
+                      </span>
+                    )}
+                  </div>
+                  {visibleOrders.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeOrder(order.id)}
+                      className="text-xs font-semibold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Удалить эту заявку"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                      <span>Удалить заявку</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Counterparty Input */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                    Клиент / Контрагент
+                  </label>
+                  <CounterpartySelect
+                    value={order._selectedId}
+                    inputValue={order._inputValue}
+                    counterparties={counterparties}
+                    onChange={(id, name) => updateCounterparty(order.id, id, name)}
+                  />
+                </div>
+
+                {/* Financial Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Amount */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                      Сумма заказа, ₽
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="0"
+                      className={inputCls}
+                      value={order.amount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        update(order.id, 'amount', val);
+                        if (!order.driver_pay || order.driver_pay === '0') {
+                          const num = parseFloat(val);
+                          if (!isNaN(num) && num > 0) {
+                            update(order.id, 'driver_pay', Math.round(num * 0.3).toString());
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Driver Pay */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        ЗП водителя, ₽
+                      </label>
+                      {amtNum > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => update(order.id, 'driver_pay', suggestedPay.toString())}
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                          title="Установить стандартные 30%"
+                        >
+                          30%: {suggestedPay.toLocaleString('ru-RU')} ₽
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="0"
+                      className={inputCls}
+                      value={order.driver_pay}
+                      onChange={(e) => update(order.id, 'driver_pay', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Loader 1 */}
+                  {(order.loader_id || parseFloat(order.loader_pay) > 0 || trip.loader) && (
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                        ЗП{' '}
+                        {order.loader
+                          ? order.loader.name.split(' ')[0]
+                          : trip.loader
+                            ? trip.loader.name.split(' ')[0]
+                            : 'грузчика'}
+                        , ₽
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        className={inputCls}
+                        value={order.loader_pay}
+                        onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Loader 2 */}
+                  {(order.loader2_id || parseFloat(order.loader2_pay ?? '0') > 0) && (
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                        ЗП {order.loader2 ? order.loader2.name.split(' ')[0] : 'грузчика 2'}, ₽
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        className={inputCls}
+                        value={order.loader2_pay ?? '0'}
+                        onChange={(e) => update(order.id, 'loader2_pay', e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Payment Method */}
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                      Способ оплаты
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {PAYMENT_EDIT_OPTIONS.map(({ value, label }) => {
+                        const isSelected = order.payment_method === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => update(order.id, 'payment_method', value)}
+                            className={cn(
+                              'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
+                              isSelected
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'w-2 h-2 rounded-full',
+                                value === 'cash' && 'bg-amber-400',
+                                value === 'qr' && 'bg-purple-400',
+                                value === 'card_driver' && 'bg-blue-400',
+                                value === 'debt_cash' && 'bg-rose-400',
+                                value === 'bank_invoice' && 'bg-slate-400',
+                              )}
+                            />
+                            <span>{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Add Order Button */}
+          <button
+            type="button"
+            onClick={addOrder}
+            className="w-full border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/40 hover:bg-indigo-50/90 text-indigo-700 font-bold py-4 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs group"
+          >
+            <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold group-hover:scale-110 transition-transform">
+              +
+            </div>
+            <span className="text-sm">Добавить ещё одну заявку в этот рейс</span>
+          </button>
+        </div>
+
+        {/* Error Alert */}
         {error && (
-          <div className="mx-6 mb-4 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl">
-            <p className="text-sm text-rose-700 font-medium">{error}</p>
+          <div className="mx-6 mb-4 px-4 py-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5">
+            <span className="text-rose-600 text-lg">⚠️</span>
+            <p className="text-sm text-rose-800 font-medium">{error}</p>
           </div>
         )}
 
-        <div className="px-6 pb-6 flex gap-3">
+        {/* Footer Actions */}
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200/80 flex items-center gap-3">
           <button
+            type="button"
             onClick={save}
             disabled={saving}
-            className="flex-1 bg-slate-900 text-white text-sm font-bold py-3 rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-all active:scale-[0.98]"
+            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-3.5 px-6 rounded-xl shadow-md disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
           >
-            {saving ? 'Сохранение...' : 'Сохранить изменения'}
+            {saving ? (
+              <>
+                <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <span>Сохранение изменений...</span>
+              </>
+            ) : (
+              <span>Сохранить изменения</span>
+            )}
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 text-sm text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-medium"
+            disabled={saving}
+            className="px-6 py-3.5 text-sm text-slate-600 font-semibold border border-slate-200 bg-white rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
           >
             Отмена
           </button>

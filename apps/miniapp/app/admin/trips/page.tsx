@@ -232,6 +232,7 @@ function EditModal({
     activeOrders.map((o: any) => ({
       ...o,
       counterparty_name: o.counterparty?.name ?? '',
+      _deleted: false,
     })),
   );
   const [saving, setSaving] = useState(false);
@@ -254,25 +255,117 @@ function EditModal({
     setOrders((prev: any[]) => prev.map((o: any) => (o.id === id ? { ...o, [field]: value } : o)));
   };
 
-  const save = async () => {
-    setSaving(true);
-    setError('');
-    const res = await fetch(`/api/admin/trips/${trip.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'edit_orders', orders }),
-    });
-    const json = await res.json();
-    setSaving(false);
-    if (!res.ok) {
-      setError(json.error ?? 'Ошибка сохранения');
-      return;
-    }
-    onSaved();
+  const addOrder = () => {
+    const defaultLoaderId =
+      trip.loader?.id ?? activeOrders.find((o: any) => o.loader_id)?.loader_id ?? null;
+    const defaultLoader = trip.loader ?? activeOrders.find((o: any) => o.loader)?.loader ?? null;
+    const defaultLoader2Id = activeOrders.find((o: any) => o.loader2_id)?.loader2_id ?? null;
+    const defaultLoader2 = activeOrders.find((o: any) => o.loader2)?.loader2 ?? null;
+
+    const newOrder = {
+      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      isNew: true,
+      counterparty_name: '',
+      amount: '',
+      driver_pay: '',
+      loader_pay: defaultLoaderId ? '0' : '0',
+      loader2_pay: defaultLoader2Id ? '0' : '0',
+      loader_id: defaultLoaderId,
+      loader2_id: defaultLoader2Id,
+      loader: defaultLoader,
+      loader2: defaultLoader2,
+      payment_method: 'debt_cash',
+      _deleted: false,
+    };
+    setOrders((prev: any[]) => [...prev, newOrder]);
   };
 
+  const removeOrder = (orderId: string) => {
+    setOrders((prev: any[]) => {
+      const target = prev.find((o: any) => o.id === orderId);
+      if (!target) return prev;
+      if (target.isNew) {
+        return prev.filter((o: any) => o.id !== orderId);
+      }
+      return prev.map((o: any) => (o.id === orderId ? { ...o, _deleted: true } : o));
+    });
+  };
+
+  const restoreOrder = (orderId: string) => {
+    setOrders((prev: any[]) =>
+      prev.map((o: any) => (o.id === orderId ? { ...o, _deleted: false } : o)),
+    );
+  };
+
+  const save = async () => {
+    const nonDeleted = orders.filter((o: any) => !o._deleted);
+    if (nonDeleted.length === 0) {
+      setError('В рейсе должен быть хотя бы один заказ');
+      return;
+    }
+
+    for (let i = 0; i < nonDeleted.length; i++) {
+      const o = nonDeleted[i];
+      const amt = parseFloat(o.amount);
+      if (isNaN(amt) || amt <= 0) {
+        setError(`Укажите сумму для заявки ${i + 1}`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    setError('');
+
+    const payload = nonDeleted.map((o: any) => ({
+      id: o.id,
+      isNew: o.isNew,
+      counterparty_name: o.counterparty_name,
+      amount: o.amount,
+      driver_pay: o.driver_pay || '0',
+      loader_pay: o.loader_pay || '0',
+      loader2_pay: o.loader2_pay ?? '0',
+      loader_id: o.loader_id ?? null,
+      loader2_id: o.loader2_id ?? null,
+      payment_method: o.payment_method,
+    }));
+
+    const deletedIds = orders.filter((o: any) => o._deleted && !o.isNew).map((o: any) => o.id);
+
+    try {
+      const res = await fetch(`/api/admin/trips/${trip.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'edit_orders',
+          orders: payload,
+          deleted_order_ids: deletedIds.length > 0 ? deletedIds : undefined,
+        }),
+      });
+      const json = await res.json();
+      setSaving(false);
+      if (!res.ok) {
+        setError(json.error ?? 'Ошибка сохранения');
+        return;
+      }
+      onSaved();
+    } catch {
+      setSaving(false);
+      setError('Ошибка сети');
+    }
+  };
+
+  const visibleOrders = orders.filter((o: any) => !o._deleted);
+  const totalRevenue = visibleOrders.reduce(
+    (s: number, o: any) => s + (parseFloat(o.amount) || 0),
+    0,
+  );
+  const totalDriverPay = visibleOrders.reduce(
+    (s: number, o: any) => s + (parseFloat(o.driver_pay) || 0),
+    0,
+  );
+
   const inputCls =
-    'w-full border border-zinc-200 rounded-xl px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-zinc-400 transition-all';
+    'w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-zinc-400 transition-all bg-white';
 
   return (
     <div
@@ -314,80 +407,176 @@ function EditModal({
           </button>
         </div>
 
+        {/* Сводка */}
+        <div className="bg-zinc-50 px-5 py-2.5 border-b border-zinc-100 flex items-center justify-between text-xs">
+          <div>
+            <span className="text-zinc-400 font-bold uppercase text-[10px] block">Выручка</span>
+            <span className="font-black text-zinc-900 text-sm">
+              {totalRevenue.toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+          <div>
+            <span className="text-zinc-400 font-bold uppercase text-[10px] block">ЗП водителя</span>
+            <span className="font-black text-zinc-900 text-sm">
+              {totalDriverPay.toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+          <div>
+            <span className="text-zinc-400 font-bold uppercase text-[10px] block">Заявок</span>
+            <span className="font-black text-zinc-900 text-sm">{visibleOrders.length}</span>
+          </div>
+        </div>
+
         {/* Список заказов + кнопки */}
         <div className="p-5 space-y-5">
-          {orders.map((order: any, idx: number) => (
-            <div key={order.id} className="space-y-3">
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                Заявка {idx + 1}
-              </p>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-                  Клиент
-                </label>
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={order.counterparty_name}
-                  placeholder="Название клиента"
-                  onChange={(e) => update(order.id, 'counterparty_name', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-                  Сумма, ₽
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className={inputCls}
-                  value={order.amount}
-                  onChange={(e) => update(order.id, 'amount', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-                  ЗП водителя, ₽
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className={inputCls}
-                  value={order.driver_pay}
-                  onChange={(e) => update(order.id, 'driver_pay', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-                  ЗП грузчика, ₽
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className={inputCls}
-                  value={order.loader_pay}
-                  onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-                  Способ оплаты
-                </label>
-                <select
-                  className={inputCls}
-                  value={order.payment_method}
-                  onChange={(e) => update(order.id, 'payment_method', e.target.value)}
+          {orders.map((order: any, idx: number) => {
+            if (order._deleted) {
+              return (
+                <div
+                  key={order.id}
+                  className="border border-dashed border-rose-300 bg-rose-50 rounded-2xl p-3 flex items-center justify-between text-xs"
                 >
-                  {Object.entries(PAYMENT_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
+                  <span className="text-rose-800 font-medium">
+                    Заявка #{idx + 1} ({order.counterparty_name || 'Без клиента'}) удалена
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => restoreOrder(order.id)}
+                    className="font-bold text-indigo-600 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg"
+                  >
+                    Вернуть
+                  </button>
+                </div>
+              );
+            }
+
+            const amtNum = parseFloat(order.amount) || 0;
+            const suggestedPay = Math.round(amtNum * 0.3);
+
+            return (
+              <div
+                key={order.id}
+                className="border border-zinc-200 rounded-2xl p-4 space-y-3 bg-zinc-50/50"
+              >
+                <div className="flex items-center justify-between pb-1 border-b border-zinc-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-zinc-800 uppercase tracking-widest">
+                      Заявка {idx + 1}
+                    </span>
+                    {order.isNew && (
+                      <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+                        Новая
+                      </span>
+                    )}
+                  </div>
+                  {visibleOrders.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeOrder(order.id)}
+                      className="text-xs font-bold text-rose-600 hover:text-rose-700 active:opacity-60"
+                    >
+                      Удалить
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                    Клиент
+                  </label>
+                  <input
+                    type="text"
+                    className={inputCls}
+                    value={order.counterparty_name}
+                    placeholder="Название клиента"
+                    onChange={(e) => update(order.id, 'counterparty_name', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                    Сумма, ₽
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputCls}
+                    value={order.amount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      update(order.id, 'amount', val);
+                      if (!order.driver_pay || order.driver_pay === '0') {
+                        const num = parseFloat(val);
+                        if (!isNaN(num) && num > 0) {
+                          update(order.id, 'driver_pay', Math.round(num * 0.3).toString());
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase">
+                      ЗП водителя, ₽
+                    </label>
+                    {amtNum > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => update(order.id, 'driver_pay', suggestedPay.toString())}
+                        className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded"
+                      >
+                        30%: {suggestedPay} ₽
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputCls}
+                    value={order.driver_pay}
+                    onChange={(e) => update(order.id, 'driver_pay', e.target.value)}
+                  />
+                </div>
+                {(order.loader_id || parseFloat(order.loader_pay) > 0 || trip.loader) && (
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                      ЗП грузчика, ₽
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      className={inputCls}
+                      value={order.loader_pay}
+                      onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                    Способ оплаты
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={order.payment_method}
+                    onChange={(e) => update(order.id, 'payment_method', e.target.value)}
+                  >
+                    {Object.entries(PAYMENT_LABELS).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              {idx < orders.length - 1 && <div className="border-t border-zinc-100" />}
-            </div>
-          ))}
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={addOrder}
+            className="w-full border-2 border-dashed border-zinc-300 active:border-zinc-500 text-zinc-700 font-bold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm"
+          >
+            <span>+ Добавить ещё одну заявку</span>
+          </button>
 
           {/* Кнопки */}
           <div className="pt-3 border-t border-zinc-100 space-y-2 pb-4">

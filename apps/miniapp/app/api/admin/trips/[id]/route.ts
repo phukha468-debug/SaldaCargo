@@ -61,56 +61,132 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     driver_pay?: string;
     loader_pays?: Array<{ user_id: string; name: string; amount: string }>;
     orders?: Array<{
-      id: string;
+      id?: string;
+      isNew?: boolean;
       amount?: string;
       driver_pay?: string;
       loader_pay?: string;
+      loader2_pay?: string;
+      loader_id?: string | null;
+      loader2_id?: string | null;
+      description?: string;
       payment_method?: string;
+      counterparty_id?: string | null;
       counterparty_name?: string;
     }>;
+    deleted_order_ids?: string[];
   };
   const supabase = createAdminClient();
 
   if (body.action === 'edit_orders') {
-    if (!body.orders?.length) return NextResponse.json({ ok: true });
-    for (const order of body.orders) {
-      const { id: orderId, ...fields } = order;
-      const update: Record<string, any> = {};
-      if (fields.amount !== undefined) update.amount = parseFloat(fields.amount).toFixed(2);
-      if (fields.driver_pay !== undefined)
-        update.driver_pay = parseFloat(fields.driver_pay).toFixed(2);
-      if (fields.loader_pay !== undefined)
-        update.loader_pay = parseFloat(fields.loader_pay).toFixed(2);
-      if (fields.payment_method !== undefined) update.payment_method = fields.payment_method;
-      if (fields.counterparty_name !== undefined) {
-        const name = fields.counterparty_name.trim();
-        if (name) {
-          const { data: found } = await (supabase.from('counterparties') as any)
-            .select('id')
-            .ilike('name', name)
-            .maybeSingle();
-          if (found) {
-            update.counterparty_id = found.id;
-          } else {
-            const { data: created, error: createErr } = await (
-              supabase.from('counterparties') as any
-            )
-              .insert({ name, type: 'client' })
-              .select('id')
-              .single();
-            if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
-            update.counterparty_id = created.id;
+    // 1. Получаем рейс для статуса и грузчиков
+    const { data: trip, error: tripError } = await (supabase.from('trips') as any)
+      .select('id, lifecycle_status, driver_id, loader_id, loader2_id')
+      .eq('id', id)
+      .single();
+
+    if (tripError || !trip) {
+      return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
+    }
+
+    async function resolveCounterpartyId(cpId?: string | null, cpName?: string) {
+      if (cpId) return cpId;
+      const name = cpName?.trim();
+      if (!name) return null;
+      const { data: found } = await (supabase.from('counterparties') as any)
+        .select('id')
+        .ilike('name', name)
+        .maybeSingle();
+      if (found) return found.id;
+      const { data: created, error: createErr } = await (supabase.from('counterparties') as any)
+        .insert({ name, type: 'client' })
+        .select('id')
+        .single();
+      if (createErr) throw createErr;
+      return created.id;
+    }
+
+    // 2. Обработка удалённых заказов
+    if (body.deleted_order_ids?.length) {
+      const { error: delErr } = await (supabase.from('trip_orders') as any)
+        .update({
+          lifecycle_status: 'cancelled',
+          cancelled_reason: 'Удалено администратором при редактировании',
+        })
+        .in('id', body.deleted_order_ids)
+        .eq('trip_id', id);
+      if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    }
+
+    // 3. Обработка заказов
+    if (body.orders?.length) {
+      for (const order of body.orders) {
+        const isNew =
+          order.isNew || !order.id || order.id.startsWith('temp-') || order.id.startsWith('new-');
+
+        const resolvedCounterpartyId = await resolveCounterpartyId(
+          order.counterparty_id,
+          order.counterparty_name,
+        );
+
+        const paymentMethod = order.payment_method || 'debt_cash';
+        const isDebt =
+          paymentMethod === 'debt_cash' ||
+          paymentMethod === 'debt' ||
+          paymentMethod === 'debt_bank';
+        const settlementStatus = isDebt ? 'pending' : 'completed';
+
+        if (isNew) {
+          const newOrderPayload = {
+            trip_id: id,
+            counterparty_id: resolvedCounterpartyId,
+            description: order.description?.trim() || null,
+            amount: parseFloat(order.amount ?? '0').toFixed(2),
+            driver_pay: parseFloat(order.driver_pay ?? '0').toFixed(2),
+            loader_id: order.loader_id ?? trip.loader_id ?? null,
+            loader_pay: parseFloat(order.loader_pay ?? '0').toFixed(2),
+            loader2_id: order.loader2_id ?? trip.loader2_id ?? null,
+            loader2_pay: parseFloat(order.loader2_pay ?? '0').toFixed(2),
+            payment_method: paymentMethod,
+            settlement_status: settlementStatus,
+            lifecycle_status: trip.lifecycle_status === 'approved' ? 'approved' : 'draft',
+            idempotency_key: crypto.randomUUID(),
+          };
+
+          const { error: insErr } = await (supabase.from('trip_orders') as any).insert(
+            newOrderPayload,
+          );
+          if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+        } else {
+          const update: Record<string, any> = {};
+          if (order.amount !== undefined) update.amount = parseFloat(order.amount).toFixed(2);
+          if (order.driver_pay !== undefined)
+            update.driver_pay = parseFloat(order.driver_pay).toFixed(2);
+          if (order.loader_pay !== undefined)
+            update.loader_pay = parseFloat(order.loader_pay).toFixed(2);
+          if (order.loader2_pay !== undefined)
+            update.loader2_pay = parseFloat(order.loader2_pay).toFixed(2);
+          if (order.description !== undefined)
+            update.description = order.description?.trim() || null;
+          if (order.payment_method !== undefined) {
+            update.payment_method = order.payment_method;
+            update.settlement_status = settlementStatus;
+          }
+          if (order.counterparty_id !== undefined || order.counterparty_name !== undefined) {
+            update.counterparty_id = resolvedCounterpartyId;
+          }
+
+          if (Object.keys(update).length > 0) {
+            const { error: updErr } = await (supabase.from('trip_orders') as any)
+              .update(update)
+              .eq('id', order.id)
+              .eq('trip_id', id);
+            if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
           }
         }
       }
-      if (Object.keys(update).length > 0) {
-        const { error } = await (supabase.from('trip_orders') as any)
-          .update(update)
-          .eq('id', orderId)
-          .eq('trip_id', id);
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      }
     }
+
     await syncTripFinancials(supabase, id, adminId);
     return NextResponse.json({ ok: true });
   }
