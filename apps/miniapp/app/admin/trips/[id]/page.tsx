@@ -105,24 +105,33 @@ export default function AdminTripDetailPage() {
   // Уникальные грузчики из trip_orders для формы переназначения
   const loaderMap = new Map<string, { id: string; name: string; pay: number }>();
   for (const o of activeOrders) {
-    if (o.loader_id) {
-      const prev = loaderMap.get(o.loader_id) ?? {
-        id: o.loader_id,
-        name: o.loader?.name ?? 'Грузчик',
-        pay: 0,
-      };
-      loaderMap.set(o.loader_id, { ...prev, pay: prev.pay + parseFloat(o.loader_pay ?? '0') });
-    }
-    if (o.loader2_id) {
-      const prev = loaderMap.get(o.loader2_id) ?? {
-        id: o.loader2_id,
-        name: o.loader2?.name ?? 'Грузчик',
-        pay: 0,
-      };
-      loaderMap.set(o.loader2_id, {
-        ...prev,
-        pay: prev.pay + parseFloat(o.loader2_pay ?? '0'),
-      });
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      for (const l of o.loaders_data) {
+        if (l.id) {
+          const prev = loaderMap.get(l.id) ?? { id: l.id, name: l.name ?? 'Грузчик', pay: 0 };
+          loaderMap.set(l.id, { ...prev, pay: prev.pay + parseFloat(l.pay ?? '0') });
+        }
+      }
+    } else {
+      if (o.loader_id) {
+        const prev = loaderMap.get(o.loader_id) ?? {
+          id: o.loader_id,
+          name: o.loader?.name ?? 'Грузчик',
+          pay: 0,
+        };
+        loaderMap.set(o.loader_id, { ...prev, pay: prev.pay + parseFloat(o.loader_pay ?? '0') });
+      }
+      if (o.loader2_id) {
+        const prev = loaderMap.get(o.loader2_id) ?? {
+          id: o.loader2_id,
+          name: o.loader2?.name ?? 'Грузчик',
+          pay: 0,
+        };
+        loaderMap.set(o.loader2_id, {
+          ...prev,
+          pay: prev.pay + parseFloat(o.loader2_pay ?? '0'),
+        });
+      }
     }
   }
   const loaders = [...loaderMap.values()];
@@ -292,29 +301,60 @@ export default function AdminTripDetailPage() {
           {activeOrders.length === 0 && (
             <p className="text-center text-zinc-400 font-bold text-xs py-4">Заказов нет</p>
           )}
-          {activeOrders.map((order: any) => (
-            <div
-              key={order.id}
-              className="bg-white rounded-xl border border-zinc-100 p-3 flex justify-between items-center shadow-sm"
-            >
-              <div>
-                <p className="font-bold text-zinc-900 text-sm">
-                  {order.counterparty?.name ?? order.description ?? 'Без названия'}
-                </p>
-                <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
-                  {PAYMENT_LABELS[order.payment_method] ?? order.payment_method} · Вод:{' '}
-                  <Money amount={order.driver_pay} />
-                  {parseFloat(order.loader_pay ?? '0') > 0 && (
-                    <>
-                      {' '}
-                      · Груз: <Money amount={order.loader_pay} />
-                    </>
-                  )}
-                </p>
+          {activeOrders.map((order: any) => {
+            const hasDriverLoaderPay =
+              order.is_driver_loader && parseFloat(order.driver_loader_pay || '0') > 0;
+            const orderLoaders = Array.isArray(order.loaders_data) ? order.loaders_data : [];
+
+            return (
+              <div
+                key={order.id}
+                className="bg-white rounded-xl border border-zinc-100 p-3 flex justify-between items-center shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-bold text-zinc-900 text-sm">
+                      {order.counterparty?.name ?? order.description ?? 'Без названия'}
+                    </p>
+                    {order.direction && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
+                        {order.direction}
+                      </span>
+                    )}
+                    {order.is_driver_loader && (
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                        🚚 Грузчик
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase mt-0.5">
+                    {PAYMENT_LABELS[order.payment_method] ?? order.payment_method} · Вод:{' '}
+                    <Money amount={order.driver_pay} />
+                    {hasDriverLoaderPay && (
+                      <span className="text-zinc-400 lowercase font-medium">
+                        {' '}
+                        ({order.driver_car_pay} ₽ авто + {order.driver_loader_pay} ₽ погрузка)
+                      </span>
+                    )}
+                    {orderLoaders.length > 0 ? (
+                      <>
+                        {' · Грузчики: '}
+                        {orderLoaders
+                          .map((l: any) => `${l.name || 'Грузчик'}: ${l.pay} ₽`)
+                          .join(', ')}
+                      </>
+                    ) : parseFloat(order.loader_pay ?? '0') > 0 ? (
+                      <>
+                        {' '}
+                        · Груз: <Money amount={order.loader_pay} />
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+                <Money amount={order.amount} className="font-black text-zinc-900" />
               </div>
-              <Money amount={order.amount} className="font-black text-zinc-900" />
-            </div>
-          ))}
+            );
+          })}
         </section>
 
         {/* Расходы */}

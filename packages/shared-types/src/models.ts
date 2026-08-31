@@ -78,10 +78,18 @@ export interface TripOrder {
   id: UUID;
   trip_id: UUID;
   counterparty_id: UUID | null;
+  direction?: string;
+  is_driver_loader?: boolean;
+  driver_car_pay?: MoneyString;
+  driver_loader_pay?: MoneyString;
+  loaders_data?: Array<{ id: string; name: string; pay: MoneyString }>;
   description: string | null;
   amount: MoneyString;
   driver_pay: MoneyString;
+  loader_id?: UUID | null;
   loader_pay: MoneyString;
+  loader2_id?: UUID | null;
+  loader2_pay?: MoneyString;
   payment_method: PaymentMethod;
   settlement_status: SettlementStatus;
   lifecycle_status: LifecycleStatus;

@@ -10,10 +10,17 @@ import { useState, useEffect, useRef } from 'react';
 interface TripOrder {
   id: string;
   counterparty_id: string | null;
+  direction?: string;
+  is_driver_loader?: boolean;
+  driver_car_pay?: string;
+  driver_loader_pay?: string;
+  loaders_data?: Array<{ id: string; name: string; pay: string }>;
   amount: string;
   driver_pay: string;
-  loader_pay: string;
-  loader2_pay: string;
+  loader_id?: string | null;
+  loader_pay?: string;
+  loader2_id?: string | null;
+  loader2_pay?: string;
   payment_method: string;
   settlement_status: string;
   lifecycle_status: string;
@@ -155,15 +162,32 @@ export default function TripDetailPage() {
   const canEdit = trip.lifecycle_status !== 'approved';
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
 
+  const totalExternalLoadersPay = activeOrders.reduce((sum, o) => {
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      return sum + o.loaders_data.reduce((sub, l) => sub + parseFloat(l.pay || '0'), 0);
+    }
+    return sum + parseFloat(o.loader_pay ?? '0') + parseFloat(o.loader2_pay ?? '0');
+  }, 0);
+
   const totals = {
     revenue: activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0),
     driverPay: activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0),
-    loaderPay: activeOrders.reduce((s, o) => s + parseFloat(o.loader_pay ?? '0'), 0),
-    loader2Pay: activeOrders.reduce((s, o) => s + parseFloat(o.loader2_pay ?? '0'), 0),
+    loadersPay: totalExternalLoadersPay,
     expenses: (trip.trip_expenses ?? []).reduce((s, e) => s + parseFloat(e.amount), 0),
   };
 
-  const hasLoaders = totals.loaderPay > 0 || totals.loader2Pay > 0;
+  const hasLoaders = totals.loadersPay > 0;
+
+  const DIRECTION_LABELS: Record<string, string> = {
+    local: '🏙️ По городу',
+    ekb: '🏢 Екатеринбург',
+    tagil_vagonka: '🏭 Тагил (Вагонка)',
+    tagil_tagilstroy: '🏭 Тагил (Тагилстрой)',
+    tagil_galinka: '🏭 Тагил (Центр/ГГМ)',
+    perm: '🌲 Пермь',
+    chelyabinsk: '🏭 Челябинск',
+    other: '🗺️ Другой город',
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 pb-40">
@@ -224,10 +248,7 @@ export default function TripDetailPage() {
           <StatCard label="ЗП Водителя" value={<Money amount={totals.driverPay.toString()} />} />
           <StatCard label="Расходы" value={<Money amount={totals.expenses.toString()} />} error />
           {hasLoaders && (
-            <StatCard
-              label="ЗП Грузчики"
-              value={<Money amount={(totals.loaderPay + totals.loader2Pay).toString()} />}
-            />
+            <StatCard label="ЗП Грузчики" value={<Money amount={totals.loadersPay.toString()} />} />
           )}
         </section>
 
@@ -243,95 +264,130 @@ export default function TripDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {activeOrders.map((order) => (
-                <div key={order.id}>
-                  {confirmDelete === order.id ? (
-                    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-center justify-between gap-3">
-                      <p className="text-red-700 font-black text-xs uppercase tracking-wide flex-1">
-                        Отменить заказ?
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setConfirmDelete(null)}
-                          disabled={isMutating}
-                          className="px-3 py-2 bg-white border-2 border-zinc-200 rounded-lg text-xs font-black uppercase text-zinc-600 active:scale-95 transition-all"
-                        >
-                          Нет
-                        </button>
-                        <button
-                          onClick={() => cancelOrder.mutate(order.id)}
-                          disabled={isMutating}
-                          className="px-3 py-2 bg-red-600 rounded-lg text-xs font-black uppercase text-white active:scale-95 transition-all disabled:opacity-50"
-                        >
-                          {cancelOrder.isPending ? '...' : 'Да'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-white border-2 border-zinc-200 rounded-lg p-4 relative overflow-hidden">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
-                      <div className="pl-2 flex justify-between items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-zinc-400 text-lg flex-shrink-0">
-                              {order.payment_method === 'cash'
-                                ? '💵'
-                                : order.payment_method === 'bank_invoice'
-                                  ? '🏦'
-                                  : order.payment_method === 'qr'
-                                    ? '📱'
-                                    : order.payment_method === 'debt_cash'
-                                      ? '⏳'
-                                      : '💳'}
-                            </span>
-                            <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight truncate">
-                              {order.counterparty?.name ?? order.description ?? 'Без названия'}
-                            </h3>
-                          </div>
-                          <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">
-                            ЗП: <Money amount={order.driver_pay} />
-                          </p>
-                          {parseFloat(order.loader_pay ?? '0') > 0 && (
-                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">
-                              Грузчики:{' '}
-                              <Money
-                                amount={(
-                                  parseFloat(order.loader_pay ?? '0') +
-                                  parseFloat(order.loader2_pay ?? '0')
-                                ).toString()}
-                              />
-                            </p>
-                          )}
+              {activeOrders.map((order) => {
+                const dirLabel = DIRECTION_LABELS[order.direction || 'local'] || '🏙️ По городу';
+                const hasDriverLoaderPay =
+                  order.is_driver_loader && parseFloat(order.driver_loader_pay || '0') > 0;
+                const orderLoaders = Array.isArray(order.loaders_data) ? order.loaders_data : [];
+
+                return (
+                  <div key={order.id}>
+                    {confirmDelete === order.id ? (
+                      <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-center justify-between gap-3">
+                        <p className="text-red-700 font-black text-xs uppercase tracking-wide flex-1">
+                          Отменить заказ?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            disabled={isMutating}
+                            className="px-3 py-2 bg-white border-2 border-zinc-200 rounded-lg text-xs font-black uppercase text-zinc-600 active:scale-95 transition-all"
+                          >
+                            Нет
+                          </button>
+                          <button
+                            onClick={() => cancelOrder.mutate(order.id)}
+                            disabled={isMutating}
+                            className="px-3 py-2 bg-red-600 rounded-lg text-xs font-black uppercase text-white active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            {cancelOrder.isPending ? '...' : 'Да'}
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Money
-                            amount={order.amount}
-                            className="font-black text-lg text-zinc-900"
-                          />
-                          {canEdit && (
-                            <div className="flex flex-col gap-1">
-                              <Link
-                                href={`/trip/${id}/order/${order.id}`}
-                                className="text-zinc-400 hover:text-orange-500 active:scale-90 transition-all p-1 text-base leading-none"
-                                aria-label="Редактировать заказ"
-                              >
-                                ✏️
-                              </Link>
-                              <button
-                                onClick={() => setConfirmDelete(order.id)}
-                                className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1 text-base leading-none"
-                                aria-label="Отменить заказ"
-                              >
-                                🗑️
-                              </button>
+                      </div>
+                    ) : (
+                      <div className="bg-white border-2 border-zinc-200 rounded-lg p-4 relative overflow-hidden space-y-2">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
+                        <div className="pl-2 flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                              <span className="text-zinc-400 text-lg flex-shrink-0">
+                                {order.payment_method === 'cash'
+                                  ? '💵'
+                                  : order.payment_method === 'bank_invoice'
+                                    ? '🏦'
+                                    : order.payment_method === 'qr'
+                                      ? '📱'
+                                      : order.payment_method === 'debt_cash'
+                                        ? '⏳'
+                                        : '💳'}
+                              </span>
+                              <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight truncate">
+                                {order.counterparty?.name ?? order.description ?? 'Без названия'}
+                              </h3>
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
+                                {dirLabel}
+                              </span>
+                              {order.is_driver_loader && (
+                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                                  🚚 Грузчик
+                                </span>
+                              )}
                             </div>
-                          )}
+
+                            <p className="text-[11px] font-bold text-green-700 uppercase tracking-wide">
+                              ЗП водителя: <Money amount={order.driver_pay} />
+                              {hasDriverLoaderPay && (
+                                <span className="ml-1 text-[10px] text-zinc-400 lowercase font-medium">
+                                  ({order.driver_car_pay} ₽ авто + {order.driver_loader_pay} ₽
+                                  погрузка)
+                                </span>
+                              )}
+                            </p>
+
+                            {orderLoaders.length > 0 ? (
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {orderLoaders.map((l, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-100"
+                                  >
+                                    👷 {l.name || 'Грузчик'}: {l.pay} ₽
+                                  </span>
+                                ))}
+                              </div>
+                            ) : parseFloat(order.loader_pay ?? '0') > 0 ? (
+                              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">
+                                Грузчики:{' '}
+                                <Money
+                                  amount={(
+                                    parseFloat(order.loader_pay ?? '0') +
+                                    parseFloat(order.loader2_pay ?? '0')
+                                  ).toString()}
+                                />
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Money
+                              amount={order.amount}
+                              className="font-black text-lg text-zinc-900"
+                            />
+                            {canEdit && (
+                              <div className="flex flex-col gap-1">
+                                <Link
+                                  href={`/trip/${id}/order/${order.id}`}
+                                  className="text-zinc-400 hover:text-orange-500 active:scale-90 transition-all p-1 text-base leading-none"
+                                  aria-label="Редактировать заказ"
+                                >
+                                  ✏️
+                                </Link>
+                                <button
+                                  onClick={() => setConfirmDelete(order.id)}
+                                  className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1 text-base leading-none"
+                                  aria-label="Отменить заказ"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

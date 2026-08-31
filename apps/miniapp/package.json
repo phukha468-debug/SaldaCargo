@@ -12,6 +12,7 @@
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@saldacargo/domain-identity": "workspace:*",
+    "@saldacargo/domain-payroll": "workspace:*",
     "@saldacargo/domain-service": "workspace:*",
     "@saldacargo/shared": "workspace:*",
     "@saldacargo/shared-types": "workspace:*",

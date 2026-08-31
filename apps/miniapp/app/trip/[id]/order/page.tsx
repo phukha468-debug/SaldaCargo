@@ -9,12 +9,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuid } from 'uuid';
 import { Button } from '@saldacargo/ui';
+import {
+  calculateOrderPayroll,
+  ORDER_DIRECTIONS,
+  type OrderDirectionItem,
+} from '@saldacargo/domain-payroll';
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
-  driver_pay: z.coerce.number().min(0),
+  driver_pay: z.coerce.number().min(0).optional(),
   payment_method: z.enum(['cash', 'debt_cash']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
@@ -29,6 +34,8 @@ interface Counterparty {
   name: string;
   is_legal_entity: boolean;
   is_top?: boolean;
+  is_delivery_zone_client?: boolean;
+  min_delivery_base?: number;
 }
 
 interface Loader {
@@ -88,13 +95,20 @@ export default function AddOrderPage() {
   const [error, setError] = useState('');
   const [idempotencyKey] = useState(() => uuid());
 
+  // Направление заказа
+  const [direction, setDirection] = useState<string>('local');
+  const [showDirectionPicker, setShowDirectionPicker] = useState(false);
+
+  // Водитель-грузчик
+  const [isDriverLoader, setIsDriverLoader] = useState(false);
+
   // Client selection state
   const [clientType, setClientType] = useState<'individual' | 'legal' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
 
-  // Loaders
+  // Loaders (динамический неограниченный список)
   const [loaders, setLoaders] = useState<SelectedLoader[]>([]);
   const [showLoaderPicker, setShowLoaderPicker] = useState(false);
 
@@ -127,6 +141,21 @@ export default function AddOrderPage() {
 
   const amountRaw = watch('amount');
   const amount = amountRaw ? Number(amountRaw) : 0;
+
+  // Автоматический расчёт ЗП
+  const minMachineBase =
+    selectedCounterparty?.min_delivery_base ??
+    (selectedCounterparty?.is_delivery_zone_client ? 800 : 1000);
+
+  const payroll = calculateOrderPayroll({
+    direction,
+    amount,
+    isDriverLoader,
+    loadersCount: loaders.length,
+    minMachineBase,
+  });
+
+  const isCity = direction === 'local';
   const suggestedPay = amount ? Math.round((amount * SUGGEST_PERCENT) / 100) : 0;
 
   // Filter counterparties by search term (ignore type)
@@ -140,6 +169,16 @@ export default function AddOrderPage() {
   const availableLoaders = allLoaders.filter((l) => !loaders.find((s) => s.id === l.id));
   const isDebt = selectedPaymentMethod === 'debt_cash';
   const paymentMethods = clientType === 'legal' ? METHODS_LEGAL : METHODS_INDIVIDUAL;
+
+  const DEFAULT_DIRECTION: OrderDirectionItem = {
+    id: 'local',
+    label: 'По городу',
+    desc: 'В. Салда, Н. Салда, окрестности',
+    icon: '🏙️',
+  };
+
+  const currentDirectionObj =
+    ORDER_DIRECTIONS.find((d: OrderDirectionItem) => d.id === direction) ?? DEFAULT_DIRECTION;
 
   function selectCounterparty(c: Counterparty) {
     setValue('counterparty_id', c.id);
@@ -222,16 +261,26 @@ export default function AddOrderPage() {
     setSubmitting(true);
     setError('');
 
-    const [loader1, loader2] = loaders;
+    // Подготовка данных грузчиков и водителя
+    const driverPayValue = isCity ? String(payroll.driverTotalPay) : String(data.driver_pay ?? 0);
+    const loadersData = loaders.map((l) => ({
+      id: l.id,
+      name: l.name,
+      pay: isCity ? String(payroll.loaderPayEach) : String(parseFloat(l.pay || '0')),
+    }));
 
     const payload = JSON.stringify({
       ...data,
-      amount: String(data.amount),
-      driver_pay: String(data.driver_pay),
-      loader_id: loader1?.id ?? null,
-      loader_pay: loader1 ? String(parseFloat(loader1.pay || '0')) : '0',
-      loader2_id: loader2?.id ?? null,
-      loader2_pay: loader2 ? String(parseFloat(loader2.pay || '0')) : '0',
+      direction,
+      is_driver_loader: isDriverLoader,
+      driver_car_pay: String(payroll.driverCarPay),
+      driver_loader_pay: String(payroll.driverLoaderPay),
+      driver_pay: driverPayValue,
+      loaders_data: loadersData,
+      loader_id: loadersData[0]?.id ?? null,
+      loader_pay: loadersData[0]?.pay ?? '0',
+      loader2_id: loadersData[1]?.id ?? null,
+      loader2_pay: loadersData[1]?.pay ?? '0',
       idempotency_key: idempotencyKey,
     });
 
@@ -261,6 +310,29 @@ export default function AddOrderPage() {
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6 pb-28">
+        {/* ── Направление заказа ── */}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+            Направление заказа
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowDirectionPicker(true)}
+            className="w-full text-left p-3.5 rounded-2xl border-2 border-orange-200 bg-orange-50/50 hover:bg-orange-50 flex items-center justify-between transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{currentDirectionObj.icon}</span>
+              <div>
+                <div className="font-black text-zinc-900 text-sm">{currentDirectionObj.label}</div>
+                <div className="text-xs font-bold text-zinc-500">{currentDirectionObj.desc}</div>
+              </div>
+            </div>
+            <span className="text-xs font-black uppercase text-orange-600 bg-orange-100 px-2.5 py-1 rounded-lg">
+              Изменить
+            </span>
+          </button>
+        </div>
+
         {/* ── Клиент ── */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
@@ -290,6 +362,11 @@ export default function AddOrderPage() {
                 >
                   {clientType === 'legal' ? 'ЮЛ' : 'ФЛ'}
                 </span>
+                {selectedCounterparty.is_delivery_zone_client && (
+                  <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                    Зоны доставки (от 800 ₽)
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -431,7 +508,7 @@ export default function AddOrderPage() {
           )}
         </div>
 
-        {/* ── Сумма ── */}
+        {/* ── Сумма заказа ── */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
             Сумма заказа, ₽
@@ -440,13 +517,166 @@ export default function AddOrderPage() {
             type="number"
             inputMode="numeric"
             {...register('amount')}
-            placeholder="2 700"
+            placeholder="2 000"
             className="w-full rounded-xl border-2 border-zinc-200 px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
           />
           {errors.amount && (
             <p className="text-red-500 text-xs font-bold mt-1 pl-1">{errors.amount.message}</p>
           )}
         </div>
+
+        {/* ── Роль водителя (Водитель-грузчик) ── */}
+        <div className="bg-orange-50/70 border-2 border-orange-200 rounded-2xl p-4 space-y-2">
+          <label className="flex items-center justify-between cursor-pointer select-none">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={isDriverLoader}
+                onChange={(e) => setIsDriverLoader(e.target.checked)}
+                className="w-6 h-6 rounded-lg text-orange-600 accent-orange-600 cursor-pointer"
+              />
+              <div>
+                <div className="font-black text-zinc-900 text-sm">🚚 Я работал грузчиком</div>
+                <div className="text-xs font-bold text-zinc-500">
+                  Водитель получает 30% за авто + 70% как грузчик
+                </div>
+              </div>
+            </div>
+            <span
+              className={`text-xs font-black px-2.5 py-1 rounded-full uppercase ${
+                isDriverLoader ? 'bg-orange-500 text-white' : 'bg-zinc-200 text-zinc-600'
+              }`}
+            >
+              {isDriverLoader ? 'Да' : 'Нет'}
+            </span>
+          </label>
+        </div>
+
+        {/* ── Грузчики ── */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between pl-1">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+              Сторонние грузчики ({loaders.length})
+            </label>
+            {isCity && loaders.length > 0 && (
+              <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                ЗП авто: ~{payroll.loaderPayEach} ₽/чел
+              </span>
+            )}
+          </div>
+
+          {loaders.map((loader, idx) => (
+            <div
+              key={loader.id}
+              className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-900 text-sm">
+                  {idx + 1}. {loader.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeLoader(loader.id)}
+                  className="text-blue-400 font-black text-lg leading-none hover:text-red-500"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {isCity ? (
+                <div className="bg-white/80 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-500">ЗП грузчика (70%):</span>
+                  <span className="text-base font-black text-zinc-900">
+                    {payroll.loaderPayEach} ₽
+                  </span>
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={loader.pay}
+                  onChange={(e) => setLoaderPay(loader.id, e.target.value)}
+                  placeholder="ЗП грузчика, ₽"
+                  className="w-full rounded-lg border-2 border-blue-200 px-4 h-12 text-xl font-black text-zinc-900 focus:border-blue-500 focus:outline-none"
+                />
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setShowLoaderPicker(true)}
+            className="w-full text-left px-4 h-12 border-2 border-dashed border-blue-300 rounded-xl text-blue-500 font-bold hover:bg-blue-50/50 transition-colors flex items-center gap-2"
+          >
+            <span className="text-lg">+</span>
+            <span>Добавить грузчика из списка</span>
+          </button>
+        </div>
+
+        {/* ── ЗП водителя ── */}
+        {isCity ? (
+          <div className="bg-zinc-900 text-white rounded-2xl p-4 space-y-3 shadow-md">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-orange-400">
+                ⚡ Авторасчёт ЗП («{currentDirectionObj.label}»)
+              </span>
+              <span className="text-xs font-bold text-zinc-400">Автоматически</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-zinc-800/80 p-2.5 rounded-xl">
+                <div className="text-zinc-400 font-bold">🚗 За машину (30%)</div>
+                <div className="text-base font-black text-white mt-0.5">
+                  {payroll.driverCarPay} ₽
+                </div>
+                <div className="text-[10px] text-zinc-500">
+                  из пула авто {payroll.machinePool} ₽
+                </div>
+              </div>
+
+              <div className="bg-zinc-800/80 p-2.5 rounded-xl">
+                <div className="text-zinc-400 font-bold">📦 За погрузку (70%)</div>
+                <div className="text-base font-black text-white mt-0.5">
+                  {payroll.driverLoaderPay} ₽
+                </div>
+                <div className="text-[10px] text-zinc-500">
+                  {isDriverLoader ? `из пула грузчиков ${payroll.loadersPool} ₽` : 'не отмечен'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <div className="text-[11px] font-bold text-zinc-400 uppercase">
+                  Итого водителю за заказ
+                </div>
+                <div className="text-2xl font-black text-orange-400">
+                  {payroll.driverTotalPay} ₽
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">Доход компании</div>
+                <div className="text-sm font-bold text-zinc-300">{payroll.companyShare} ₽</div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+              ЗП водителя, ₽ ({currentDirectionObj.label})
+              <span className="ml-2 text-zinc-400 normal-case font-medium">
+                ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)
+              </span>
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              {...register('driver_pay')}
+              placeholder={String(suggestedPay)}
+              className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+            />
+          </div>
+        )}
 
         {/* ── Способ оплаты ── */}
         <div className="space-y-2">
@@ -517,68 +747,6 @@ export default function AddOrderPage() {
           </div>
         )}
 
-        {/* ── ЗП водителя ── */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            ЗП водителя, ₽
-            <span className="ml-2 text-zinc-400 normal-case font-medium">
-              ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)
-            </span>
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            {...register('driver_pay')}
-            placeholder={String(suggestedPay)}
-            className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-          />
-        </div>
-
-        {/* ── Грузчики ── */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-            Грузчики
-          </label>
-
-          {loaders.map((loader, idx) => (
-            <div
-              key={loader.id}
-              className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-blue-900 text-sm">
-                  {idx + 1}. {loader.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeLoader(loader.id)}
-                  className="text-blue-400 font-black text-lg leading-none"
-                >
-                  ✕
-                </button>
-              </div>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={loader.pay}
-                onChange={(e) => setLoaderPay(loader.id, e.target.value)}
-                placeholder="ЗП грузчика, ₽"
-                className="w-full rounded-lg border-2 border-blue-200 px-4 h-12 text-xl font-black text-zinc-900 focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-          ))}
-
-          {loaders.length < 2 && (
-            <button
-              type="button"
-              onClick={() => setShowLoaderPicker(true)}
-              className="w-full text-left px-4 h-12 border-2 border-dashed border-blue-300 rounded-xl text-blue-500 font-bold"
-            >
-              + Добавить грузчика
-            </button>
-          )}
-        </div>
-
         {/* ── Описание (только для физлиц при оплате не в долг) ── */}
         {!isDebt && clientType !== 'legal' && !selectedCounterparty?.is_legal_entity && (
           <div className="space-y-2">
@@ -612,7 +780,70 @@ export default function AddOrderPage() {
         </div>
       </form>
 
-      {/* Loader picker */}
+      {/* Выбор направления (Модалка) */}
+      {showDirectionPicker && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{
+            background: 'rgba(0,0,0,0.5)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowDirectionPicker(false)}
+        >
+          <div className="bg-white rounded-t-3xl shadow-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-zinc-200 rounded-full" />
+            </div>
+            <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-black text-zinc-900 text-base">Направление заказа</h2>
+                <p className="text-xs text-zinc-400">Выберите тип или город рейса</p>
+              </div>
+              <button
+                onClick={() => setShowDirectionPicker(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-4 py-3 space-y-2">
+              {ORDER_DIRECTIONS.map((dir: OrderDirectionItem) => {
+                const isSelected = direction === dir.id;
+                return (
+                  <button
+                    key={dir.id}
+                    type="button"
+                    onClick={() => {
+                      setDirection(dir.id);
+                      setShowDirectionPicker(false);
+                    }}
+                    className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                      isSelected
+                        ? 'border-orange-500 bg-orange-50 shadow-sm'
+                        : 'border-zinc-100 hover:border-orange-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{dir.icon}</span>
+                      <div>
+                        <div className="font-black text-zinc-900 text-sm">{dir.label}</div>
+                        <div className="text-xs font-bold text-zinc-400">{dir.desc}</div>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="text-xs font-black text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
+                        Выбрано
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Выбор грузчика (Модалка) */}
       {showLoaderPicker && (
         <div
           className="fixed inset-0 z-50 flex flex-col justify-end"
@@ -646,9 +877,12 @@ export default function AddOrderPage() {
                     key={loader.id}
                     type="button"
                     onClick={() => addLoader(loader)}
-                    className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-blue-50 border-2 border-zinc-100 rounded-xl"
+                    className="w-full text-left px-4 py-3.5 font-bold text-zinc-900 hover:bg-blue-50 border-2 border-zinc-100 rounded-xl flex items-center justify-between"
                   >
-                    {loader.name}
+                    <span>{loader.name}</span>
+                    <span className="text-blue-500 text-xs font-black uppercase bg-blue-50 px-2 py-1 rounded-lg">
+                      + Добавить
+                    </span>
                   </button>
                 ))
               )}
