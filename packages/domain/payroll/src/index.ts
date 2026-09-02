@@ -9,35 +9,153 @@ export interface OrderDirectionItem {
   label: string;
   desc: string;
   icon: string;
+  category: 'local' | 'intercity';
+  baseMachinePrice?: number;
 }
 
 export const ORDER_DIRECTIONS: readonly OrderDirectionItem[] = [
-  { id: 'local', label: 'По городу', desc: 'В. Салда, Н. Салда, окрестности', icon: '🏙️' },
-  { id: 'ekb', label: 'Екатеринбург', desc: 'Прямой рейс', icon: '🏢' },
+  {
+    id: 'local',
+    label: 'По городу',
+    desc: 'Верхняя Салда (базовый тариф)',
+    icon: '🏙️',
+    category: 'local',
+    baseMachinePrice: 1000,
+  },
+  {
+    id: 'n_salda',
+    label: 'Нижняя Салда',
+    desc: 'Тариф машины 1 500 ₽',
+    icon: '🏙️',
+    category: 'local',
+    baseMachinePrice: 1500,
+  },
+  {
+    id: 'n_salda_dam',
+    label: 'Нижняя Салда (после плотины)',
+    desc: 'Тариф машины 2 000 ₽',
+    icon: '🌊',
+    category: 'local',
+    baseMachinePrice: 2000,
+  },
+  {
+    id: 'nikitino',
+    label: 'Никитино',
+    desc: 'Тариф машины 1 500 ₽',
+    icon: '🏡',
+    category: 'local',
+    baseMachinePrice: 1500,
+  },
+  {
+    id: 'neloba',
+    label: 'Нелоба',
+    desc: 'Тариф машины 2 500 ₽',
+    icon: '🌲',
+    category: 'local',
+    baseMachinePrice: 2500,
+  },
+  {
+    id: 'basyanovka',
+    label: 'Басьяновка',
+    desc: 'Тариф машины 4 000 ₽',
+    icon: '🏭',
+    category: 'local',
+    baseMachinePrice: 4000,
+  },
+  {
+    id: 'akinfievo',
+    label: 'Акинфьево',
+    desc: 'Тариф машины 4 000 ₽',
+    icon: '🗺️',
+    category: 'local',
+    baseMachinePrice: 4000,
+  },
+  {
+    id: 'ekb',
+    label: 'Екатеринбург',
+    desc: 'Прямой рейс',
+    icon: '🏢',
+    category: 'intercity',
+  },
   {
     id: 'tagil_vagonka',
     label: 'Тагил · Вагонка',
     desc: 'Дзержинский район',
     icon: '🏭',
+    category: 'intercity',
   },
   {
     id: 'tagil_tagilstroy',
     label: 'Тагил · Тагилстрой',
     desc: 'Тагилстроевский район',
     icon: '🏭',
+    category: 'intercity',
   },
   {
     id: 'tagil_galinka',
     label: 'Тагил · Центр / ГГМ',
     desc: 'Гальянка, Выя, Кр. Камень, Ленинский',
     icon: '🏭',
+    category: 'intercity',
   },
-  { id: 'perm', label: 'Пермь', desc: 'Межгород', icon: '🌲' },
-  { id: 'chelyabinsk', label: 'Челябинск', desc: 'Межгород', icon: '🏭' },
-  { id: 'other', label: 'Другой город', desc: 'Межгород по км + суточные', icon: '🗺️' },
+  {
+    id: 'perm',
+    label: 'Пермь',
+    desc: 'Межгород',
+    icon: '🌲',
+    category: 'intercity',
+  },
+  {
+    id: 'chelyabinsk',
+    label: 'Челябинск',
+    desc: 'Межгород',
+    icon: '🏭',
+    category: 'intercity',
+  },
+  {
+    id: 'other',
+    label: 'Другой город',
+    desc: 'Межгород по км + суточные',
+    icon: '🗺️',
+    category: 'intercity',
+  },
 ] as const;
 
 export type OrderDirectionId = (typeof ORDER_DIRECTIONS)[number]['id'];
+
+export const DIRECTION_LABELS: Record<string, string> = {
+  local: '🏙️ Верхняя Салда',
+  n_salda: '🏙️ Нижняя Салда',
+  n_salda_dam: '🌊 Н. Салда (после плотины)',
+  nikitino: '🏡 Никитино',
+  neloba: '🌲 Нелоба',
+  basyanovka: '🏭 Басьяновка',
+  akinfievo: '🗺️ Акинфьево',
+  ekb: '🏢 Екатеринбург',
+  tagil_vagonka: '🏭 Тагил (Вагонка)',
+  tagil_tagilstroy: '🏭 Тагил (Тагилстрой)',
+  tagil_galinka: '🏭 Тагил (Центр/ГГМ)',
+  perm: '🌲 Пермь',
+  chelyabinsk: '🏭 Челябинск',
+  other: '🗺️ Другой город',
+};
+
+export function getDirectionLabel(id: string): string {
+  return DIRECTION_LABELS[id] || '🏙️ По городу';
+}
+
+export function isLocalDirection(id: string): boolean {
+  const dir = ORDER_DIRECTIONS.find((d) => d.id === id);
+  return dir ? dir.category === 'local' : id === 'local';
+}
+
+export function getDirectionBasePrice(id: string, customLocalBase?: number): number {
+  if (id === 'local' && customLocalBase && customLocalBase > 0) {
+    return customLocalBase;
+  }
+  const dir = ORDER_DIRECTIONS.find((d) => d.id === id);
+  return dir?.baseMachinePrice ?? (customLocalBase && customLocalBase > 0 ? customLocalBase : 1000);
+}
 
 export interface OrderPayrollParams {
   direction?: string;
@@ -60,7 +178,7 @@ export interface OrderPayrollResult {
 }
 
 /**
- * Расчёт распределения средств по заказу внутри города (и базовый fallback для межгорода).
+ * Расчёт распределения средств по заказу внутри города / местных направлений (и базовый fallback для межгорода).
  */
 export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollResult {
   const {
@@ -71,9 +189,9 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
     minMachineBase = 1000,
   } = params;
 
-  // Если направление НЕ городское, по умолчанию даём базовую подсказку 30% водителю,
-  // но флаг isAutomatic = false (позволяет ручной ввод)
-  const isCity = direction === 'local';
+  // Автоматический расчет применяется ко всем местным направлениям
+  const isAutomatic = isLocalDirection(direction);
+  const baseRate = getDirectionBasePrice(direction, minMachineBase);
 
   if (!amount || amount <= 0) {
     return {
@@ -85,7 +203,7 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
       companyShare: 0,
       machinePool: 0,
       loadersPool: 0,
-      isAutomatic: isCity,
+      isAutomatic,
     };
   }
 
@@ -105,24 +223,24 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
       companyShare,
       machinePool: amount,
       loadersPool: 0,
-      isAutomatic: isCity,
+      isAutomatic,
     };
   }
 
   // Сценарий 2: Есть грузчики (водитель-грузчик и/или сторонние грузчики)
-  const baseRate = minMachineBase > 0 ? minMachineBase : 1000;
-  const fullPackageHourRate = (1 + totalLoadersCount) * baseRate;
+  const loaderUnitRate = 1000;
+  const nominalPackageRate = baseRate + totalLoadersCount * loaderUnitRate;
 
   let machinePool = 0;
   let loadersPool = 0;
 
-  if (amount >= fullPackageHourRate) {
-    // Полные часы или стандартный тариф: делим пропорционально количеству долей (1 машина + N грузчиков)
-    machinePool = Math.round(amount / (1 + totalLoadersCount));
+  if (amount >= nominalPackageRate) {
+    // Полные часы или стандартный тариф: делим пропорционально ставкам компонентов
+    machinePool = Math.round(amount * (baseRate / nominalPackageRate));
     loadersPool = amount - machinePool;
   } else {
-    // Быстрый/короткий заказ (меньше полного часа):
-    // Машина забирает базовую ставку, остаток идёт в пул грузчиков
+    // Быстрый/короткий заказ (меньше полного комплекта):
+    // Машина забирает базовую ставку направления, остаток идёт в пул грузчиков
     machinePool = Math.min(amount, baseRate);
     loadersPool = Math.max(0, amount - machinePool);
   }
@@ -148,7 +266,7 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
     companyShare,
     machinePool,
     loadersPool,
-    isAutomatic: isCity,
+    isAutomatic,
   };
 }
 

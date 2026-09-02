@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
+import { getDirectionLabel } from '@saldacargo/domain-payroll';
 
 export default function AdminTripDetailPage() {
   const { id } = useParams() as { id: string };
@@ -318,7 +319,7 @@ export default function AdminTripDetailPage() {
                     </p>
                     {order.direction && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
-                        {order.direction}
+                        {getDirectionLabel(order.direction)}
                       </span>
                     )}
                     {order.is_driver_loader && (

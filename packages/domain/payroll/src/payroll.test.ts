@@ -74,6 +74,7 @@ assert(t8.companyShare === 850, 'T8 companyShare should be 850');
 
 // 9. Спец. магазин с зоной 800 ₽
 const t9 = calculateOrderPayroll({
+  direction: 'local',
   amount: 800,
   isDriverLoader: false,
   loadersCount: 0,
@@ -82,5 +83,44 @@ const t9 = calculateOrderPayroll({
 console.log('T9 (800, store zone):', t9);
 assert(t9.driverCarPay === 240, 'T9 driverCarPay should be 240');
 assert(t9.companyShare === 560, 'T9 companyShare should be 560');
+
+// 10. Нижняя Салда (1500 ₽ машина): 1800 ₽, водитель-грузчик + 1 сторонний грузчик
+const t10 = calculateOrderPayroll({
+  direction: 'n_salda',
+  amount: 1800,
+  isDriverLoader: true,
+  loadersCount: 1,
+});
+console.log('T10 (1800, n_salda driver loader + 1 loader):', t10);
+assert(t10.machinePool === 1500, 'T10 machinePool should be 1500');
+assert(t10.loadersPool === 300, 'T10 loadersPool should be 300');
+assert(t10.driverCarPay === 450, 'T10 driverCarPay should be 450');
+assert(t10.driverLoaderPay === 105, 'T10 driverLoaderPay should be 105');
+assert(t10.driverTotalPay === 555, 'T10 driverTotalPay should be 555');
+assert(t10.loaderPayEach === 105, 'T10 loaderPayEach should be 105');
+assert(t10.companyShare === 1140, 'T10 companyShare should be 1140');
+assert(t10.isAutomatic === true, 'T10 should be isAutomatic');
+
+// 11. Басьяновка (4000 ₽ машина): 4000 ₽, только водитель
+const t11 = calculateOrderPayroll({
+  direction: 'basyanovka',
+  amount: 4000,
+  isDriverLoader: false,
+  loadersCount: 0,
+});
+console.log('T11 (4000, basyanovka driver only):', t11);
+assert(t11.driverCarPay === 1200, 'T11 driverCarPay should be 1200 (30% of 4000)');
+assert(t11.companyShare === 2800, 'T11 companyShare should be 2800 (70% of 4000)');
+assert(t11.isAutomatic === true, 'T11 should be isAutomatic');
+
+// 12. Межгород (Екатеринбург): isAutomatic должен быть false
+const t12 = calculateOrderPayroll({
+  direction: 'ekb',
+  amount: 15000,
+  isDriverLoader: false,
+  loadersCount: 0,
+});
+console.log('T12 (15000, ekb intercity):', t12);
+assert(t12.isAutomatic === false, 'T12 isAutomatic should be false for intercity');
 
 console.log('ALL PAYROLL TESTS PASSED SUCCESSFULLY! ✅');

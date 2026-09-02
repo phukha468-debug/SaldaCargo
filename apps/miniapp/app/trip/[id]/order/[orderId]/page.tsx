@@ -214,7 +214,7 @@ export default function EditOrderPage() {
     minMachineBase,
   });
 
-  const isCity = direction === 'local';
+  const isCity = payroll.isAutomatic;
   const suggestedPay = amount ? Math.round((amount * SUGGEST_PERCENT) / 100) : 0;
 
   const filteredCounterparties =
@@ -228,8 +228,10 @@ export default function EditOrderPage() {
   const DEFAULT_DIRECTION: OrderDirectionItem = {
     id: 'local',
     label: 'По городу',
-    desc: 'В. Салда, Н. Салда, окрестности',
+    desc: 'Верхняя Салда (базовый тариф)',
     icon: '🏙️',
+    category: 'local',
+    baseMachinePrice: 1000,
   };
 
   const currentDirectionObj =
@@ -783,38 +785,93 @@ export default function EditOrderPage() {
                 ×
               </button>
             </div>
-            <div className="px-4 py-3 space-y-2">
-              {ORDER_DIRECTIONS.map((dir: OrderDirectionItem) => {
-                const isSelected = direction === dir.id;
-                return (
-                  <button
-                    key={dir.id}
-                    type="button"
-                    onClick={() => {
-                      setDirection(dir.id);
-                      setShowDirectionPicker(false);
-                    }}
-                    className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between ${
-                      isSelected
-                        ? 'border-orange-500 bg-orange-50 shadow-sm'
-                        : 'border-zinc-100 hover:border-orange-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{dir.icon}</span>
-                      <div>
-                        <div className="font-black text-zinc-900 text-sm">{dir.label}</div>
-                        <div className="text-xs font-bold text-zinc-400">{dir.desc}</div>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <span className="text-xs font-black text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
-                        Выбрано
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="px-4 py-3 space-y-4">
+              {/* Местные направления */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-wider text-orange-600 px-1">
+                  📍 Местные направления (авторасчёт)
+                </div>
+                {ORDER_DIRECTIONS.filter((d) => d.category === 'local').map(
+                  (dir: OrderDirectionItem) => {
+                    const isSelected = direction === dir.id;
+                    return (
+                      <button
+                        key={dir.id}
+                        type="button"
+                        onClick={() => {
+                          setDirection(dir.id);
+                          setShowDirectionPicker(false);
+                        }}
+                        className={`w-full text-left p-3 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                          isSelected
+                            ? 'border-orange-500 bg-orange-50 shadow-sm'
+                            : 'border-zinc-100 hover:border-orange-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{dir.icon}</span>
+                          <div>
+                            <div className="font-black text-zinc-900 text-sm">{dir.label}</div>
+                            <div className="text-xs font-bold text-zinc-400">{dir.desc}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {dir.baseMachinePrice && (
+                            <span className="text-xs font-black text-zinc-700 bg-zinc-100 px-2.5 py-1 rounded-lg">
+                              {dir.baseMachinePrice} ₽
+                            </span>
+                          )}
+                          {isSelected && (
+                            <span className="text-xs font-black text-orange-600 bg-orange-100 px-2 py-1 rounded-lg uppercase">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+
+              {/* Межгород */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">
+                  🚚 Межгород
+                </div>
+                {ORDER_DIRECTIONS.filter((d) => d.category === 'intercity').map(
+                  (dir: OrderDirectionItem) => {
+                    const isSelected = direction === dir.id;
+                    return (
+                      <button
+                        key={dir.id}
+                        type="button"
+                        onClick={() => {
+                          setDirection(dir.id);
+                          setShowDirectionPicker(false);
+                        }}
+                        className={`w-full text-left p-3 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                          isSelected
+                            ? 'border-orange-500 bg-orange-50 shadow-sm'
+                            : 'border-zinc-100 hover:border-orange-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{dir.icon}</span>
+                          <div>
+                            <div className="font-black text-zinc-900 text-sm">{dir.label}</div>
+                            <div className="text-xs font-bold text-zinc-400">{dir.desc}</div>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <span className="text-xs font-black text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
+                            Выбрано
+                          </span>
+                        )}
+                      </button>
+                    );
+                  },
+                )}
+              </div>
             </div>
           </div>
         </div>

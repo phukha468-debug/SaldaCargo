@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDuration, formatDate } from '@saldacargo/shared';
+import { getDirectionLabel } from '@saldacargo/domain-payroll';
 import { useState, useEffect, useRef } from 'react';
 
 interface TripOrder {
@@ -178,17 +179,6 @@ export default function TripDetailPage() {
 
   const hasLoaders = totals.loadersPay > 0;
 
-  const DIRECTION_LABELS: Record<string, string> = {
-    local: '🏙️ По городу',
-    ekb: '🏢 Екатеринбург',
-    tagil_vagonka: '🏭 Тагил (Вагонка)',
-    tagil_tagilstroy: '🏭 Тагил (Тагилстрой)',
-    tagil_galinka: '🏭 Тагил (Центр/ГГМ)',
-    perm: '🌲 Пермь',
-    chelyabinsk: '🏭 Челябинск',
-    other: '🗺️ Другой город',
-  };
-
   return (
     <div className="min-h-screen bg-zinc-50 pb-40">
       {/* Шапка */}
@@ -265,7 +255,7 @@ export default function TripDetailPage() {
           ) : (
             <div className="space-y-3">
               {activeOrders.map((order) => {
-                const dirLabel = DIRECTION_LABELS[order.direction || 'local'] || '🏙️ По городу';
+                const dirLabel = getDirectionLabel(order.direction || 'local');
                 const hasDriverLoaderPay =
                   order.is_driver_loader && parseFloat(order.driver_loader_pay || '0') > 0;
                 const orderLoaders = Array.isArray(order.loaders_data) ? order.loaders_data : [];
