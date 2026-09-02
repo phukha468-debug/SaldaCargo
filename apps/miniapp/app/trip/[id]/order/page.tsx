@@ -540,7 +540,7 @@ export default function AddOrderPage() {
               <div>
                 <div className="font-black text-zinc-900 text-sm">🚚 Я работал грузчиком</div>
                 <div className="text-xs font-bold text-zinc-500">
-                  Водитель получает 30% за авто + 70% как грузчик
+                  Водитель получает оплату за авто + за работу грузчика
                 </div>
               </div>
             </div>
@@ -562,7 +562,7 @@ export default function AddOrderPage() {
             </label>
             {isCity && loaders.length > 0 && (
               <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                ЗП авто: ~{payroll.loaderPayEach} ₽/чел
+                ЗП грузчика: {payroll.loaderPayEach} ₽/чел
               </span>
             )}
           </div>
@@ -587,7 +587,7 @@ export default function AddOrderPage() {
 
               {isCity ? (
                 <div className="bg-white/80 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-500">ЗП грузчика (70%):</span>
+                  <span className="text-xs font-bold text-zinc-500">ЗП грузчика:</span>
                   <span className="text-base font-black text-zinc-900">
                     {payroll.loaderPayEach} ₽
                   </span>
@@ -620,29 +620,26 @@ export default function AddOrderPage() {
           <div className="bg-zinc-900 text-white rounded-2xl p-4 space-y-3 shadow-md">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
               <span className="text-xs font-black uppercase tracking-wider text-orange-400">
-                ⚡ Авторасчёт ЗП («{currentDirectionObj.label}»)
+                ⚡ Расчёт ЗП («{currentDirectionObj.label}»)
               </span>
               <span className="text-xs font-bold text-zinc-400">Автоматически</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">🚗 За машину (30%)</div>
+                <div className="text-zinc-400 font-bold">🚗 За машину</div>
                 <div className="text-base font-black text-white mt-0.5">
                   {payroll.driverCarPay} ₽
-                </div>
-                <div className="text-[10px] text-zinc-500">
-                  из пула авто {payroll.machinePool} ₽
                 </div>
               </div>
 
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">📦 За погрузку (70%)</div>
+                <div className="text-zinc-400 font-bold">📦 За погрузку</div>
                 <div className="text-base font-black text-white mt-0.5">
                   {payroll.driverLoaderPay} ₽
                 </div>
                 <div className="text-[10px] text-zinc-500">
-                  {isDriverLoader ? `из пула грузчиков ${payroll.loadersPool} ₽` : 'не отмечен'}
+                  {isDriverLoader ? 'водитель как грузчик' : 'не отмечен'}
                 </div>
               </div>
             </div>
@@ -656,19 +653,23 @@ export default function AddOrderPage() {
                   {payroll.driverTotalPay} ₽
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">Доход компании</div>
-                <div className="text-sm font-bold text-zinc-300">{payroll.companyShare} ₽</div>
-              </div>
+              {loaders.length > 0 && (
+                <div className="text-right">
+                  <div className="text-[10px] font-bold text-zinc-400 uppercase">
+                    ЗП грузчикам ({loaders.length})
+                  </div>
+                  <div className="text-base font-black text-blue-300">
+                    {payroll.totalLoadersPay} ₽
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
               ЗП водителя, ₽ ({currentDirectionObj.label})
-              <span className="ml-2 text-zinc-400 normal-case font-medium">
-                ~{suggestedPay} ₽ ({SUGGEST_PERCENT}%)
-              </span>
+              <span className="ml-2 text-zinc-400 normal-case font-medium">~{suggestedPay} ₽</span>
             </label>
             <input
               type="number"
