@@ -12,7 +12,6 @@ const tabs = [
   { href: '/driver/profile', label: 'Профиль', icon: '👤' },
 ] as const;
 
-
 export default function DriverLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -24,7 +23,9 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
           <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center overflow-hidden">
             <span className="text-xl">👤</span>
           </div>
-          <span className="text-xl font-black text-zinc-900">SaldaCargo</span>
+          <span className="text-xl font-black text-zinc-900">
+            ancargo<span className="text-orange-600">66</span>
+          </span>
         </div>
         <NetworkIndicator />
       </header>

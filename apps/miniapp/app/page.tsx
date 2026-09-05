@@ -185,7 +185,7 @@ export default function RootDispatcher() {
           <div className="w-full max-w-sm space-y-6">
             <div className="text-center mb-8">
               <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
-                Salda<span className="text-orange-600">Cargo</span>
+                ancargo<span className="text-orange-600">66</span>
               </h1>
               <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-2">
                 Выберите роль
@@ -326,7 +326,7 @@ export default function RootDispatcher() {
           <div className="w-full max-w-xs space-y-8">
             <div className="text-center">
               <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
-                Salda<span className="text-orange-600">Cargo</span>
+                ancargo<span className="text-orange-600">66</span>
               </h1>
               <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-2">
                 {pendingUser?.name}

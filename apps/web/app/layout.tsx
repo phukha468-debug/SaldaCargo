@@ -7,7 +7,7 @@ import { ScrollOnFocus } from '@/components/scroll-on-focus';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'SaldaCargo Web',
+  title: 'ancargo66 Web',
   description: 'Управление транспортным бизнесом',
 };
 

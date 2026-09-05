@@ -536,7 +536,7 @@ function Sidebar({
   return (
     <aside className="w-56 min-h-full bg-slate-900 flex flex-col flex-shrink-0">
       <div className="px-5 py-5 border-b border-slate-700">
-        <div className="text-white font-bold text-base">SaldaCargo</div>
+        <div className="text-white font-bold text-base">ancargo66</div>
         <div className="text-slate-400 text-xs mt-0.5">Раздел: Гараж</div>
       </div>
       <nav className="flex-1 py-3 px-2 overflow-y-auto">

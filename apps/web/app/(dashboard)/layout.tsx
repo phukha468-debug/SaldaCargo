@@ -129,9 +129,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">
-                  S
+                  A
                 </div>
-                <span className="font-extrabold text-slate-900 text-base">SaldaCargo</span>
+                <span className="font-extrabold text-slate-900 text-base">ancargo66</span>
               </div>
               <button
                 onClick={() => setMobileNavOpen(false)}
@@ -206,7 +206,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
               <div className="hidden sm:block">
                 <div className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
-                  SaldaCargo
+                  ancargo66
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium leading-none">
                   Управление автопарком
@@ -223,7 +223,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   {currentNav?.label || 'Главная'}
                 </h1>
                 <span className="bg-sky-50 text-sky-700 border border-sky-200/70 text-[11px] font-bold px-2 py-0.5 rounded-full hidden md:inline-block">
-                  SaldaCargo ERP
+                  ancargo66 ERP
                 </span>
               </div>
             </div>
@@ -314,7 +314,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer className="py-4 px-6 border-t border-slate-200 text-center text-xs text-slate-400 bg-white">
-        © 2026 SaldaCargo ERP · Все финансовые и операционные данные синхронизированы
+        © 2026 ancargo66 ERP · Все финансовые и операционные данные синхронизированы
       </footer>
     </div>
   );

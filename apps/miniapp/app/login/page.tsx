@@ -22,7 +22,7 @@ function LoginForm() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!userId || pin.length < 4) return;
-    
+
     setLoading(true);
     setError('');
 
@@ -42,7 +42,7 @@ function LoginForm() {
         setError(data.error || 'Ошибка входа');
         setLoading(false);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login error:', err);
       setError('Ошибка сервера');
       setLoading(false);
@@ -59,7 +59,7 @@ function LoginForm() {
 
   return (
     <main className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-4 antialiased">
-      <button 
+      <button
         onClick={reset}
         className="fixed top-4 right-4 bg-zinc-200 text-zinc-500 text-[10px] font-bold uppercase px-3 py-1 rounded-full hover:bg-zinc-300 transition-colors"
       >
@@ -70,7 +70,7 @@ function LoginForm() {
         <div className="p-8">
           <div className="text-center mb-10">
             <h1 className="text-3xl font-black text-zinc-900 tracking-tight uppercase italic">
-              Salda<span className="text-orange-600">Cargo</span>
+              ancargo<span className="text-orange-600">66</span>
             </h1>
             <p className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest mt-1">
               Вход по ПИН-коду
@@ -126,18 +126,27 @@ function LoginForm() {
           </form>
         </div>
       </div>
-      
+
       <p className="mt-8 text-zinc-400 font-bold text-[10px] uppercase tracking-widest">
-        v1.1.1 • SaldaCargo
+        v1.1.1 • ancargo66
       </p>
 
       <style jsx global>{`
         @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-4px); }
-          75% { transform: translateX(4px); }
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          25% {
+            transform: translateX(-4px);
+          }
+          75% {
+            transform: translateX(4px);
+          }
         }
-        .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
+        .animate-shake {
+          animation: shake 0.2s ease-in-out 0s 2;
+        }
       `}</style>
     </main>
   );
@@ -145,11 +154,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

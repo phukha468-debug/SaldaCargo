@@ -8,8 +8,18 @@ import { MinimizeOnBack } from '@/components/minimize-on-back';
 const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'SaldaCargo',
+  title: 'ancargo66',
   description: 'Грузоперевозки Верхняя Салда',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'ancargo66',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

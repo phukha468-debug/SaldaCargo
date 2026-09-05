@@ -163,7 +163,7 @@ export default function ProfilePage() {
       </section>
 
       <footer className="text-center text-[10px] text-zinc-300 font-bold uppercase tracking-[0.3em] pt-4">
-        SaldaCargo v1.0
+        ancargo66 v1.0
       </footer>
     </div>
   );

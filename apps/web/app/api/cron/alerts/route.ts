@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
 
     // Формируем текст сообщения
     const sections = [
-      `⚠️ SaldaCargo — предупреждения на ${new Date().toLocaleDateString('ru-RU')}`,
+      `⚠️ ancargo66 — предупреждения на ${new Date().toLocaleDateString('ru-RU')}`,
       formatDocAlerts(fleet),
       formatReceivableAlerts(receivables),
       formatLoanAlerts(loans),

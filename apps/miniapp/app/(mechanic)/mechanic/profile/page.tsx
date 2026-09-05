@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 
 export default function MechanicProfilePage() {
   const { data: user, isLoading } = useQuery({
@@ -16,7 +15,7 @@ export default function MechanicProfilePage() {
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/'; 
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout failed', error);
       document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -37,7 +36,9 @@ export default function MechanicProfilePage() {
       </div>
 
       <div className="space-y-2">
-        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">Система</h2>
+        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
+          Система
+        </h2>
         <button
           onClick={logout}
           className="w-full bg-white border border-red-100 text-red-600 rounded-xl py-4 font-black uppercase tracking-widest text-xs active:bg-red-50 transition-colors shadow-sm"
@@ -47,7 +48,9 @@ export default function MechanicProfilePage() {
       </div>
 
       <div className="text-center">
-        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">SaldaCargo v1.0.0</p>
+        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">
+          ancargo66 v1.0.0
+        </p>
       </div>
     </div>
   );
