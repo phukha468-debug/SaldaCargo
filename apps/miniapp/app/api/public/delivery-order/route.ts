@@ -15,8 +15,6 @@ export async function OPTIONS() {
   });
 }
 
-const MAX_BOT_API = 'https://botapi.max.ru';
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -135,7 +133,9 @@ export async function POST(request: Request) {
     }
 
     // 2. Отправляем в MAX Бот администраторам
-    const maxToken = process.env.MAX_BOT_TOKEN;
+    const maxToken =
+      process.env.MAX_BOT_TOKEN ||
+      'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
     if (maxToken) {
       try {
         const { data: adminUsers } = await (supabaseAdmin
@@ -152,10 +152,13 @@ export async function POST(request: Request) {
 
         await Promise.all(
           uniqueRecipients.map((userId) =>
-            fetch(`${MAX_BOT_API}/sendMessage?access_token=${maxToken}`, {
+            fetch(`https://botapi.max.ru/messages?user_id=${userId}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, text: messageText }),
+              headers: {
+                Authorization: maxToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ text: messageText }),
             }).catch((e) => console.error(`Failed to send MAX notification to ${userId}:`, e)),
           ),
         );
