@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       carPrice = 0,
       hasLoaders = false,
       loadersCount = 1,
+      loadersCrewText = '',
       cargoCategory = 'standard',
       cargoName = '',
       cargoValue = 0,
@@ -60,6 +61,14 @@ export async function POST(request: Request) {
     if (elevatorType === 'cargo') elevatorLabel = 'Грузовой лифт';
     if (elevatorType === 'passenger') elevatorLabel = 'Пассажирский лифт';
 
+    const crewLine = loadersCrewText
+      ? loadersCrewText
+      : loadersCount === 1
+        ? '1 чел. (водитель один)'
+        : loadersCount === 2
+          ? '2 чел. (водитель + напарник)'
+          : `${loadersCount} чел. (усиленная бригада)`;
+
     const messageText = [
       `🚚 НОВЫЙ ЗАКАЗ ДОСТАВКИ: ${storeName}`,
       `━━━━━━━━━━━━━━━━━━`,
@@ -73,7 +82,7 @@ export async function POST(request: Request) {
       `• Категория: ${categoryLabel}`,
       cargoValue > 0 ? `• Стоимость товара: ${cargoValue.toLocaleString('ru-RU')} ₽` : null,
       cargoValue > 30000 ? `  *(Ответственность: +100 ₽/эт за ценный груз)*` : null,
-      `• Грузчики: ${hasLoaders ? `${loadersCount} чел.` : 'Без грузчиков'}`,
+      `• Состав бригады: ${hasLoaders ? crewLine : 'Без грузчиков (только доставка)'}`,
       `• Этаж: ${floor} эт. (${elevatorLabel})`,
       hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж)` : null,
       ``,
