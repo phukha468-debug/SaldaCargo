@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Универсальный калькулятор доставки и ПРР для магазинов | ancargo66</title>
+  <meta name="description" content="Автоматический расчёт стоимости доставки и погрузочно-разгрузочных работ для магазинов мебели, дверей, плитки и стройматериалов." />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
+              400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309',
+              800: '#92400e', 900: '#78350f'
+            },
+            dark: {
+              950: '#06090e', 900: '#0b0f19', 850: '#0f172a',
+              800: '#111827', 750: '#161f30', 700: '#1e293b', 600: '#334155'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=bb711687-f130-43ef-bde7-9308dfa82254&lang=ru_RU&load=package.full" type="text/javascript"></script>
+
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .theme-card {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-dark-950 text-slate-200 antialiased min-h-screen py-4 sm:py-8 px-3 sm:px-6">
+
+  <div class="max-w-4xl mx-auto space-y-5 sm:space-y-6">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-amber-700 flex items-center justify-center font-black text-white text-lg shadow-md shadow-brand-900/30">
+          A
+        </div>
+        <div>
+          <div class="text-base font-black text-white tracking-tight flex items-center gap-2">
+            <span>ANCARGO66.RU</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold uppercase">Партнёрам</span>
+          </div>
+          <div class="text-xs text-slate-400">Калькулятор доставки и ПРР для магазинов-партнёров</div>
+        </div>
+      </a>
+      
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <a href="/#zones" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-brand-400 transition">
+          <i data-lucide="map" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Карта зон</span>
+        </a>
+        <a href="/tarify_dostavka_salda.pdf" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-xs font-bold text-brand-300 transition">
+          <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+          <span>Тарифы доставки PDF</span>
+        </a>
+        <a href="/" class="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-400 hover:text-white transition flex items-center gap-1">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Сайт</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- MAIN FORM CONTAINER -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+      
+      <!-- LEFT COLUMN: INPUTS -->
+      <div class="lg:col-span-7 space-y-5">
+        
+        <!-- 1. ВЫБОР ОТРАСЛИ / ТИПА МАГАЗИНА -->
+        <div class="theme-card rounded-2xl p-4 sm:p-5">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+              <i data-lucide="layout-grid" class="w-4 h-4"></i> 1. Профиль магазина / Тип груза
+            </label>
+            <span class="text-[11px] text-slate-400">Адаптивная номенклатура</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onclick="selectIndustry('tiles')" id="ind-btn-tiles"
+              class="p-2.5 rounded-xl border text-center font-bold text-xs transition border-brand-500 bg-brand-500/15 text-white shadow-md">
+              <span class="text-lg block mb-0.5">🧱</span>
+              <span>Плитка</span>
+            </button>
+            <button type="button" onclick="selectIndustry('furniture')" id="ind-btn-furniture"
+              class="p-2.5 rounded-xl border text-center font-bold text-xs transition border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700">
+              <span class="text-lg block mb-0.5">🛋️</span>
+              <span>Мебель</span>
+            </button>
+            <button type="button" onclick="selectIndustry('doors')" id="ind-btn-doors"
+              class="p-2.5 rounded-xl border text-center font-bold text-xs transition border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700">
+              <span class="text-lg block mb-0.5">🚪</span>
+              <span>Двери</span>
+            </button>
+            <button type="button" onclick="selectIndustry('build')" id="ind-btn-build"
+              class="p-2.5 rounded-xl border text-center font-bold text-xs transition border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700">
+              <span class="text-lg block mb-0.5">🏗️</span>
+              <span>Стройматериалы</span>
+            </button>
+          </div>
+
+          <!-- Выбор конкретной точки магазина -->
+          <div class="mt-4 pt-3 border-t border-slate-800">
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold text-slate-300">Магазин / точка отгрузки:</label>
+              <span class="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Подача 700 ₽ • до 1.5 км бесплатно • далее 80 ₽/км</span>
+            </div>
+            <select id="storeSelect" onchange="onStoreSelectChange()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-brand-500">
+              <option value="tiles" selected>1. Плитка — ул. Рабочей Молодёжи, 41</option>
+              <option value="mebel_angela">2. Мебель Анжела — ул. Энгельса, 87, корп. 1</option>
+              <option value="levsha">3. Левша — ул. Спортивная, 2, корп. 7</option>
+              <option value="doors">4. Двери — ул. 25 Октября, 3</option>
+              <option value="interier">5. Интерьер — ул. Парковая, 5, корп. 1</option>
+              <option value="obstanovochka">6. Обстановочка — ул. Воронова, 4, корп. 1</option>
+              <option value="custom">✏️ Другой магазин (ввести адрес вручную)</option>
+            </select>
+
+            <div id="customStoreBlock" class="hidden mt-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+              <input type="text" id="customStoreName" placeholder="Название магазина" value="Мой магазин" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+              <input type="text" id="customStoreAddress" placeholder="Адрес магазина (откуда везти)" value="г. Верхняя Салда, " class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-[10px] text-slate-400">Подача (₽):</label>
+                  <input type="number" id="customBasePrice" value="700" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white" />
+                </div>
+                <div>
+                  <label class="text-[10px] text-slate-400">Тариф за км (₽/км):</label>
+                  <input type="number" id="customKmPrice" value="80" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white" />
+                </div>
+                <div>
+                  <label class="text-[10px] text-slate-400">Радиус подачи (км):</label>
+                  <input type="number" step="0.1" id="customRadius" value="1.5" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. МАРШРУТ И ИНТЕРАКТИВНАЯ КАРТА ЯНДЕКС -->
+        <div class="theme-card rounded-2xl p-4 sm:p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+              <i data-lucide="map-pin" class="w-4 h-4"></i> 2. Адрес доставки клиенту
+            </label>
+            <span id="routeStatus" class="text-[11px] font-bold text-slate-400">Введите адрес или укажите на карте</span>
+          </div>
+
+          <div class="relative">
+            <input type="text" id="deliveryAddress" list="saldaStreetsList" autocomplete="off" oninput="updateSubmitButtonState()" placeholder="Например: ул. 25 Октября, д. 11 или Садовая, 4" 
+              class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-white focus:outline-none focus:border-brand-500 placeholder-slate-500 pr-24" />
+            <button type="button" onclick="geocodeAndBuildRoute()" class="absolute right-1.5 top-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-amber-600 hover:from-brand-500 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 shadow">
+              Расчёт
+            </button>
+          </div>
+
+          
+            <datalist id="saldaStreetsList">
+              <option value="ул. 25 Октября, ">
+              <option value="ул. Ленина, ">
+              <option value="ул. Энгельса, ">
+              <option value="ул. Воронова, ">
+              <option value="ул. Парковая, ">
+              <option value="ул. Карла Маркса, ">
+              <option value="ул. Садовая, ">
+              <option value="ул. Парижской Коммуны, ">
+              <option value="ул. Строителей, ">
+              <option value="ул. Евстигнеева, ">
+              <option value="ул. Районная, ">
+              <option value="ул. Ломоносова, ">
+              <option value="ул. Устинова, ">
+              <option value="ул. Фрунзе, ">
+              <option value="ул. Кирова, ">
+              <option value="ул. Калинина, ">
+              <option value="ул. Челюскинцев, ">
+              <option value="ул. III Интернационала, ">
+              <option value="ул. Рабочей Молодёжи, ">
+              <option value="ул. Бажова, ">
+              <option value="ул. Маяковского, ">
+              <option value="ул. Пушкина, ">
+              <option value="ул. Чехова, ">
+              <option value="ул. Крупской, ">
+              <option value="ул. Мира, ">
+              <option value="п. Басьяновский, ">
+              <option value="п. Северный, ">
+              <option value="п. Песчаный карьер, ">
+              <option value="Сады №1">
+              <option value="Сады №2">
+              <option value="Сады №3">
+              <option value="Сады №4">
+              <option value="Сады №5">
+              <option value="Сады №7">
+              <option value="Сады «Металлург»">
+              <option value="г. Нижняя Салда, ул. Ленина, ">
+              <option value="г. Нижняя Салда, ул. Ломоносова, ">
+              <option value="г. Нижняя Салда, ул. Фрунзе, ">
+            </datalist>
+
+          <!-- Быстрые кнопки адресов в Салде -->
+          <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span class="text-[10px] text-slate-500 font-bold uppercase mr-1">Быстрый выбор:</span>
+            <button type="button" onclick="setQuickAddress('ул. 25 Октября, 11')" class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition">
+              25 Октября, 11
+            </button>
+            <button type="button" onclick="setQuickAddress('ул. Ленина, 30')" class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition">
+              ул. Ленина, 30
+            </button>
+            <button type="button" onclick="setQuickAddress('ул. Воронова, 12')" class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition">
+              ул. Воронова, 12
+            </button>
+            <button type="button" onclick="setQuickAddress('Сады №3')" class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition">
+              Сады №3
+            </button>
+            <button type="button" onclick="setQuickAddress('г. Нижняя Салда, ул. Ленина, 1')" class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition">
+              Нижняя Салда
+            </button>
+          </div>
+
+          <!-- ВИЗУАЛЬНАЯ ИНТЕРАКТИВНАЯ КАРТА ЯНДЕКС -->
+          <div class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner">
+            <div id="deliveryMap" class="w-full h-64 sm:h-72"></div>
+            
+            <!-- Плашка со статусом над картой -->
+            <div class="absolute bottom-2 left-2 right-2 p-2 rounded-xl bg-slate-950/85 backdrop-blur-md border border-slate-800 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-slate-300">Точное расстояние:</span>
+                <strong class="font-mono text-brand-400 text-sm" id="distanceDisplay">3.5 км</strong>
+                <span class="text-slate-500 text-[11px] hidden sm:inline" id="durationDisplay">(~7 мин в пути)</span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono hidden sm:inline">Кликните по карте для смены точки</span>
+            </div>
+          </div>
+
+        </div>
+
+                <!-- 3. КЛАССИФИКАТОР ПРР (5 КЛАССОВ С АДАПТИВНЫМИ ПРИМЕРАМИ) -->
+        <div class="theme-card rounded-2xl p-4 sm:p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+              <i data-lucide="package" class="w-4 h-4"></i> 3. Погрузочно-разгрузочные работы (ПРР)
+            </label>
+            <span class="text-[11px] text-emerald-400 font-bold">5 тарифных классов</span>
+          </div>
+
+          <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            <input type="checkbox" id="hasLoaders" onchange="toggleLoaders()" class="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-slate-700 bg-slate-950 cursor-pointer" />
+            <label for="hasLoaders" class="text-xs font-bold text-slate-200 cursor-pointer flex-1">
+              Нужны грузчики (вынос из магазина + подъём в квартиру)
+            </label>
+          </div>
+
+          <div id="loadersSettingsBlock" class="hidden space-y-3">
+            
+            <!-- ВЫБОР КОЛИЧЕСТВА ГРУЗЧИКОВ И СОСТАВА БРИГАДЫ -->
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i data-lucide="users" class="w-4 h-4 text-brand-400"></i> Состав бригады грузчиков:
+                </label>
+                <span id="loadersCrewBadge" class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                  Водитель + напарник (2 чел.)
+                </span>
+              </div>
+
+              <!-- Кнопки выбора количества грузчиков -->
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" id="loader-btn-1" onclick="setLoadersCount(1)" 
+                  class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300">
+                  <span class="text-xs font-extrabold flex items-center gap-1">
+                    <span>1 грузчик</span>
+                  </span>
+                  <span class="text-[10px] text-slate-400">Водитель один</span>
+                </button>
+
+                <button type="button" id="loader-btn-2" onclick="setLoadersCount(2)" 
+                  class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-brand-500 bg-brand-500/20 text-white shadow">
+                  <span class="text-xs font-extrabold flex items-center gap-1 text-brand-400">
+                    <span>2 грузчика</span>
+                    <span class="text-[9px] bg-brand-500 text-slate-950 font-black px-1 rounded">СТАНДАРТ</span>
+                  </span>
+                  <span class="text-[10px] text-amber-200/80">Водитель + напарник</span>
+                </button>
+
+                <button type="button" id="loader-btn-3" onclick="setLoadersCount(3)" 
+                  class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300">
+                  <span class="text-xs font-extrabold flex items-center gap-1">
+                    <span>3+ грузчика</span>
+                  </span>
+                  <span class="text-[10px] text-slate-400">Усиленная бригада</span>
+                </button>
+              </div>
+
+              <!-- Информационная подсказка водителю и заказчику -->
+              <div id="loadersCrewNotice" class="text-[11px] p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-slate-300 leading-snug flex items-start gap-1.5">
+                <i data-lucide="info" class="w-3.5 h-3.5 text-brand-400 shrink-0 mt-0.5"></i>
+                <span id="loadersCrewNoticeText">
+                  <strong>Водитель берёт с собой напарника (2 чел.).</strong> Рекомендовано для диванов, шкафов, дверей и тяжелых грузов, чтобы выгрузка прошла быстро и безопасно.
+                </span>
+              </div>
+            </div>
+
+            <label class="block text-[11px] font-bold text-slate-400">Выберите класс груза:</label>
+            
+            <!-- Сетка 5 классов с динамическим описанием под отрасль -->
+            <div class="space-y-2" id="tariffClassesList">
+              <!-- Генерация через JS под выбранную отрасль -->
+            </div>
+
+            <!-- СПЕЦ-ПРЕДУПРЕЖДЕНИЕ О КРУПНОФОРМАТЕ И ДОРОГОСТОЯЩЕМ ТОВАРЕ (ОТ 500 РУБ) -->
+            <div id="vipAlertBlock" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1">
+              <div class="font-black flex items-center gap-1.5 text-rose-400">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Спецкласс: Крупноформат / Высокая материальная ответственность
+              </div>
+              <div>Груз типа «плитка-ковры 1200х2400» или товары стоимостью более 30 000 ₽ требуют обязательного участия напарника (от 2 грузчиков) и тарифицируются строго <strong>от 500 ₽ за этаж</strong>.</div>
+            </div>
+
+            <!-- Этаж и Лифт -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="text-xs font-bold text-slate-300">Этаж доставки:</label>
+                  <span id="floorValueDisplay" class="text-xs font-mono font-bold text-brand-400">3 этаж</span>
+                </div>
+                <input type="range" id="floorInput" min="1" max="25" value="3" oninput="onFloorChange(this.value)"
+                  class="w-full accent-amber-500 bg-slate-800 rounded-lg h-2 cursor-pointer" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">Наличие лифта:</label>
+                <select id="elevatorType" onchange="onElevatorChange(this.value)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-brand-500">
+                  <option value="none">❌ Лифта нет (по лестнице)</option>
+                  <option value="cargo">🛗 Есть грузовой лифт (1 этаж фикс)</option>
+                  <option value="passenger">🚪 Только пассажирский лифт</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Предупреждение о невлезании в пассажирский лифт -->
+            <div id="elevatorWarning" class="hidden p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+              ⚠️ Выбранный груз (Классы 3–5: диван, крупноформат 1200х2400, термодверь) <strong>не входит в пассажирский лифт</strong> и рассчитывается вручную по лестнице за каждый этаж.
+            </div>
+
+            <!-- Доп. опция: длинный пронос -->
+            <div class="flex items-center gap-2 pt-1">
+              <input type="checkbox" id="hasLongCarry" onchange="calculateTotal()" class="w-4 h-4 rounded text-brand-500 border-slate-700 bg-slate-950" />
+              <label for="hasLongCarry" class="text-xs text-slate-300 cursor-pointer">
+                Пронос от машины до подъезда более 30 метров (+1 этаж)
+              </label>
+            </div>
+
+            <!-- Стоимость товара (материальная ответственность) -->
+            <div class="pt-2 border-t border-slate-800/80">
+              <label class="block text-xs font-bold text-slate-300 mb-1">Общая стоимость товара (руб.):</label>
+              <input type="number" id="cargoValueInput" oninput="onCargoValueChange(this.value)" placeholder="Например: 45000"
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-brand-500" />
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 4. КОНТАКТЫ И ОФОРМЛЕНИЕ -->
+        <div class="theme-card rounded-2xl p-4 sm:p-5 space-y-3">
+          <label class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+            <i data-lucide="user-check" class="w-4 h-4"></i> 4. Контактные данные
+          </label>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">ФИО / Имя клиента <span class="text-rose-400 font-bold">*</span></label>
+              <input type="text" id="clientName" oninput="updateSubmitButtonState()" placeholder="ФИО или имя клиента" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Телефон клиента <span class="text-rose-400 font-bold">*</span></label>
+              <input type="tel" id="clientPhone" placeholder="+7 (___) ___-__-__" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-500" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Имя менеджера магазина</label>
+              <input type="text" id="managerName" placeholder="Имя менеджера" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Телефон менеджера</label>
+              <input type="tel" id="managerPhone" placeholder="+7 (___) ___-__-__" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-500" />
+            </div>
+          </div>
+
+          <textarea id="orderNotes" rows="2" placeholder="Примечание к заказу (подъезд, домофон, время доставки, особенности)..." 
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500"></textarea>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: TOTAL & SUBMIT -->
+      <div class="lg:col-span-5">
+        <div class="theme-card rounded-2xl p-5 sticky top-6 space-y-5 border-brand-500/30 shadow-xl shadow-brand-950/40">
+          
+          <div class="border-b border-slate-800 pb-3">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Итоговая смета заказа</span>
+            <div class="text-3xl sm:text-4xl font-black text-white mt-1 font-mono tracking-tight" id="grandTotalDisplay">
+              0 ₽
+            </div>
+            <div class="text-[11px] text-emerald-400 font-bold mt-0.5" id="tariffStatusDisplay">
+              ✓ Тариф согласован с магазином (+10% база)
+            </div>
+          </div>
+
+          <!-- Детализация расчёта -->
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+              <span id="breakdownCarLabel">Машина (подача + км):</span>
+              <span class="font-mono font-bold text-white" id="breakdownCarPrice">0 ₽</span>
+            </div>
+            <div id="breakdownCrewRow" class="flex justify-between py-1 border-b border-slate-800/60 text-amber-300 text-[11px]">
+              <span>Состав бригады:</span>
+              <span class="font-bold font-mono" id="breakdownCrewText">Водитель + напарник (2 чел.)</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+              <span id="breakdownLoadingLabel">Вынос из магазина / склада:</span>
+              <span class="font-mono font-bold text-white" id="breakdownLoadingPrice">0 ₽</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+              <span id="breakdownUnloadingLabel">Подъём на этаж:</span>
+              <span class="font-mono font-bold text-white" id="breakdownUnloadingPrice">0 ₽</span>
+            </div>
+            <div id="breakdownRiskRow" class="hidden flex justify-between py-1 border-b border-slate-800/60 text-amber-300">
+              <span>Спецкласс / Ответственность (>30к):</span>
+              <span class="font-mono font-bold" id="breakdownRiskPrice">+0 ₽</span>
+            </div>
+          </div>
+
+          <!-- Кнопка оформления заказа -->
+          <button type="button" id="submitBtn" onclick="submitOrder()" disabled
+            class="w-full py-4 rounded-xl bg-slate-800/80 text-slate-500 border border-slate-700/60 font-black text-sm uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2 transition">
+            <i data-lucide="truck" class="w-5 h-5 text-slate-500" id="submitBtnIcon"></i>
+            <span id="submitBtnText">Заказать машину</span>
+          </button>
+
+          <p id="submitValidationHint" class="text-[11px] text-amber-400/90 text-center font-medium">
+            ⚠️ Для заказа заполните: адрес доставки, имя и телефон клиента (+7)
+          </p>
+
+          <p class="text-[11px] text-slate-400 text-center leading-relaxed">
+            После нажатия заявка с детальным расчётом мгновенно передаётся диспетчеру в MAX-бот и фиксируется в системе.
+          </p>
+
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- SUCCESS MODAL -->
+  <div id="successModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-dark-900 border border-brand-500/40 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+      <div class="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto text-2xl">
+        ✓
+      </div>
+      <h3 class="text-xl font-black text-white">Заявка успешно создана!</h3>
+      <p class="text-xs text-slate-300">
+        Номер заказа: <strong class="text-brand-400 text-sm font-mono" id="successOrderNum">№----</strong><br>
+        Сумма к оплате: <strong class="text-white text-sm font-mono" id="successOrderSum">0 ₽</strong><br>
+        Адрес доставки: <span class="text-slate-300" id="successOrderDest">---</span>
+      </p>
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400">
+        Уведомление с полным расчётом передано дежурному диспетчеру в MAX-бот. Машина назначена и свяжется с вами в течение 2-3 минут.
+      </div>
+      <button type="button" onclick="closeSuccessModal()" 
+        class="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs uppercase tracking-wider transition">
+        Понятно
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. БАЗА 6 МАГАЗИНОВ-ПАРТНЁРОВ В ВЕРХНЕЙ САЛДЕ
+    // Правила тарифа: Подача 700 ₽, 1 км = 80 ₽, в радиусе 1.5 км только подача.
+    // =========================================================================
+    const STORES = {
+      tiles: { 
+        name: 'Плитка', 
+        address: 'г. Верхняя Салда, ул. Рабочей Молодёжи, 41', 
+        coords: [58.04036, 60.53966], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'tiles' 
+      },
+      mebel_angela: { 
+        name: 'Мебель Анжела', 
+        address: 'г. Верхняя Салда, ул. Энгельса, 87, корп. 1', 
+        coords: [58.04838, 60.58030], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'furniture' 
+      },
+      levsha: { 
+        name: 'Левша', 
+        address: 'г. Верхняя Салда, ул. Спортивная, 2, корп. 7', 
+        coords: [58.05236, 60.58412], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'build' 
+      },
+      doors: { 
+        name: 'Двери', 
+        address: 'г. Верхняя Салда, ул. 25 Октября, 3', 
+        coords: [58.05393, 60.54575], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'doors' 
+      },
+      interier: { 
+        name: 'Интерьер', 
+        address: 'г. Верхняя Салда, ул. Парковая, 5, корп. 1', 
+        coords: [58.05525, 60.55718], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'furniture' 
+      },
+      obstanovochka: { 
+        name: 'Обстановочка', 
+        address: 'г. Верхняя Салда, ул. Воронова, 4, корп. 1', 
+        coords: [58.05073, 60.57737], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'furniture' 
+      },
+      custom: { 
+        name: 'Индивидуальный магазин', 
+        address: 'г. Верхняя Салда', 
+        coords: [58.04036, 60.53966], 
+        basePrice: 700, 
+        kmPrice: 80, 
+        freeRadius: 1.5,
+        defaultIndustry: 'tiles' 
+      }
+    };
+
+    let currentIndustry = 'tiles';
+    let currentStoreKey = 'tiles';
+    let currentStore = STORES.tiles;
+    let selectedClass = 3;
+    let loadersCount = 2;
+    let userSelectedLoadersCount = false;
+    let distanceKm = 2.4;
+    let floor = 3;
+    let elevatorType = 'none';
+    let hasLoaders = false;
+    let cargoValue = 0;
+
+    // ТОЧКА ОТГРУЗКИ ПО УМОЛЧАНИЮ: Плитка (ул. Рабочей Молодёжи, 41)
+    let currentStoreCoords = [58.04036, 60.53966];
+    let currentClientCoords = [58.0526, 60.5453]; // ул. 25 Октября, 11
+
+    // Яндекс.Карты
+    let yMap = null;
+    let storePlacemark = null;
+    let clientPlacemark = null;
+    let routePolyline = null;
+    let yMultiRoute = null;
+
+    // Локальный кэш координат улиц Верхней и Нижней Салды
+    const SALDA_GEO_CACHE = {
+      '25 октября 3': [58.05393, 60.54575],
+      '25 октября': [58.0526, 60.5453],
+      'ленина': [58.0479, 60.5537],
+      'энгельса 87': [58.04838, 60.58030],
+      'энгельса': [58.0476, 60.5767],
+      'спортивная 2': [58.05236, 60.58412],
+      'спортивная': [58.05236, 60.58412],
+      'парковая 5': [58.05525, 60.55718],
+      'парковая': [58.0545, 60.5750],
+      'воронова 4': [58.05073, 60.57737],
+      'воронова': [58.0504, 60.5861],
+      'карла маркса': [58.0475, 60.5620],
+      'к. маркса': [58.0475, 60.5620],
+      'к.маркса': [58.0475, 60.5620],
+      'районная': [58.05467, 60.59268],
+      '3 интернационала': [58.0485, 60.5610],
+      'евстигнеева': [58.0460, 60.5590],
+      'садовая': [58.0520, 60.5480],
+      'парижской коммуны': [58.0440, 60.5550],
+      'строителей': [58.0510, 60.5810],
+      'устинова': [58.0515, 60.5790],
+      'ломоносова': [58.0450, 60.5500],
+      'фрунзе': [58.0430, 60.5480],
+      'кирова': [58.0445, 60.5520],
+      'калинина': [58.0470, 60.5580],
+      'челюскинцев': [58.0490, 60.5630],
+      'рабочей молодёжи 41': [58.04036, 60.53966],
+      'рабочей молодежи 41': [58.04036, 60.53966],
+      'рабочей молодёжи': [58.04036, 60.53966],
+      'рабочей молодежи': [58.04036, 60.53966],
+      'бажова': [58.0530, 60.5780],
+      'маяковского': [58.0500, 60.5700],
+      'пушкина': [58.0480, 60.5650],
+      'чехова': [58.0460, 60.5680],
+      'крупской': [58.0520, 60.5740],
+      'мира': [58.0495, 60.5720],
+      'басьяновский': [58.1480, 60.8300],
+      'северный': [58.0650, 60.5850],
+      'песчаный': [58.0720, 60.5400],
+      'сады 1': [58.0350, 60.5350],
+      'сады 2': [58.0320, 60.5300],
+      'сады 3': [58.0380, 60.5250],
+      'сады 4': [58.0300, 60.5400],
+      'сады 5': [58.0280, 60.5450],
+      'сады 7': [58.0250, 60.5500],
+      'металлург': [58.0340, 60.5280],
+      'нижняя салда': [58.0718, 60.7137]
+    };
+
+    // Тарифные сетки
+    const TARIFF_RATES = {
+      1: { rate: 200, name: 'Класс 1: Мелкий груз', badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+      2: { rate: 300, name: 'Класс 2: Средний груз', badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+      3: { rate: 450, name: 'Класс 3: Крупный груз', badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+      4: { rate: 600, name: 'Класс 4: Тяжёлый груз', badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+      5: { rate: 1000, name: 'Класс 5: Премиум / Сверхтяж', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20' }
+    };
+
+    const INDUSTRY_DESCRIPTIONS = {
+      furniture: {
+        1: 'Стул, пуф, тумбочка, журнальный столик, полка, зеркало, кресло-мешок',
+        2: 'Комод (собранный), стол кухонный/письменный, кресло, матрас 1-сп, обувница',
+        3: 'Диван прямой 2-3 местный, шкаф 2-ств (разобран), кровать + матрас, кухонный гарнитур',
+        4: 'Диван угловой/модульный, шкаф-купе 3+ ств, тяжелый массив, столешница камень',
+        5: 'Элитная мебель из массива, пианино/рояль, сейфы от 80 кг'
+      },
+      doors: {
+        1: 'Комплект наличников, доборы, фурнитура, ручки, петли, замки',
+        2: 'Межкомнатное полотно (МДФ/экошпон), коробка, фурнитура (до 25 кг)',
+        3: 'Дверь межкомнатная массив, 2 полотна, легкая входная сейф-дверь (до 45 кг)',
+        4: 'Сейф-дверь уличная утепленная, с зеркалом, ковкой, терморазрывом (от 50 до 90 кг)',
+        5: 'Тяжелые бронированные двери, оружейные сейфы от 100 кг, порталы'
+      },
+      tiles: {
+        1: 'Декоры, бордюры, затирка, клей 1 мешок до 25 кг, инструмент',
+        2: 'Плитка до 5 коробок (до 100 кг), клей 2-3 мешка',
+        3: 'Плитка 6-12 коробок (до 250 кг), керамогранит стандартный 60х60',
+        4: 'Керамогранит крупноформатный (120х60, 160х80), плитка от 300 кг',
+        5: 'Сверхкрупный керамогранит (макси-формат 240+ см, слэбы), ванны чугун'
+      },
+      build: {
+        1: 'Краска, валики, мелкий крепеж, пена, сухие смеси 1 мешок',
+        2: 'Сухие смеси 3-5 мешков, профиль, утеплитель 2-3 пачки',
+        3: 'Гипсокартон до 10 листов, смеси до 300 кг, фанера, брус',
+        4: 'Гипсокартон от 15 листов, цемент/смеси от 500 кг, кирпич, блоки',
+        5: 'Металлопрокат тяжелый, поддоны кирпича, сыпучие материалы от 1 тонны'
+      }
+    };
+
+    // 2. ИНИЦИАЛИЗАЦИЯ КАРТЫ
+    function initYandexMaps() {
+      if (typeof ymaps === 'undefined') {
+        console.warn('Yandex Maps script not ready yet');
+        setTimeout(initYandexMaps, 500);
+        return;
+      }
+
+      ymaps.ready(() => {
+        try {
+          // Центр карты между Салдой
+          yMap = new ymaps.Map('deliveryMap', {
+            center: [58.0495, 60.5600],
+            zoom: 14,
+            controls: ['zoomControl', 'fullscreenControl']
+          }, {
+            searchControlProvider: 'yandex#search',
+            suppressMapOpenBlock: true
+          });
+
+          // Точка магазина (Зелёная)
+          storePlacemark = new ymaps.Placemark(currentStoreCoords, {
+            hintContent: currentStore.name,
+            balloonContent: `<strong>${currentStore.name}</strong><br>${currentStore.address}`
+          }, {
+            preset: 'islands#darkGreenShoppingIcon',
+            draggable: false
+          });
+          yMap.geoObjects.add(storePlacemark);
+
+          // Точка клиента (Янтарная/Красная)
+          clientPlacemark = new ymaps.Placemark(currentClientCoords, {
+            hintContent: 'Точка доставки',
+            balloonContent: 'Адрес доставки клиенту'
+          }, {
+            preset: 'islands#redDotIconWithCaption',
+            draggable: true
+          });
+
+          // Перетаскивание метки вручную
+          clientPlacemark.events.add('dragend', () => {
+            const newCoords = clientPlacemark.geometry.getCoordinates();
+            onPointMoved(newCoords);
+          });
+          yMap.geoObjects.add(clientPlacemark);
+
+          // КЛИК ПО КАРТЕ — установка точки доставки!
+          yMap.events.add('click', (e) => {
+            const clickedCoords = e.get('coords');
+            clientPlacemark.geometry.setCoordinates(clickedCoords);
+            onPointMoved(clickedCoords);
+          });
+
+          // Первичный маршрут
+          updateRouteAndDistance(currentStoreCoords, currentClientCoords);
+        } catch (err) {
+          console.error('Yandex Maps init error:', err);
+        }
+      });
+    }
+
+    // При перемещении точки на карте (кликом или драгом)
+    function onPointMoved(coords) {
+      currentClientCoords = coords;
+      
+      // Обратное геокодирование — узнаем адрес по координатам
+      if (ymaps && ymaps.geocode) {
+        ymaps.geocode(coords).then(res => {
+          const first = res.geoObjects.get(0);
+          if (first) {
+            let addr = first.getAddressLine() || '';
+            // Убираем Россию и Свердловскую область для компактности
+            addr = addr.replace(/^Россия,\s*/i, '')
+                       .replace(/Свердловская область,\s*/i, '')
+                       .replace(/городской округ Нижняя Салда,\s*/i, '')
+                       .replace(/городской округ Верхняя Салда,\s*/i, '');
+            document.getElementById('deliveryAddress').value = addr;
+            updateSubmitButtonState();
+          } else {
+            reverseGeocodeOSM(coords);
+          }
+        }).catch(() => reverseGeocodeOSM(coords));
+      } else {
+        reverseGeocodeOSM(coords);
+      }
+
+      updateRouteAndDistance(currentStoreCoords, currentClientCoords);
+    }
+
+    async function reverseGeocodeOSM(coords) {
+      try {
+        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&countrycodes=ru`);
+        const data = await resp.json();
+        if (data && data.address) {
+          const a = data.address;
+          const road = a.road || a.pedestrian || a.suburb || '';
+          const house = a.house_number || '';
+          let text = road;
+          if (house) text += ', ' + house;
+          if (text) {
+            document.getElementById('deliveryAddress').value = text;
+            updateSubmitButtonState();
+          }
+        }
+      } catch(e) {}
+    }
+
+    // 3. ПОСТРОЕНИЕ МАРШРУТА ПО РЕАЛЬНЫМ ДОРОГАМ И РАСЧЁТ ДИСТАНЦИИ
+    async function updateRouteAndDistance(fromCoords, toCoords) {
+      if (!yMap) return;
+
+      document.getElementById('routeStatus').innerText = 'Прокладка маршрута по дорогам...';
+      document.getElementById('routeStatus').className = 'text-[11px] font-bold text-amber-400';
+
+      // Если есть старый MultiRoute или Polyline — удаляем
+      if (yMultiRoute) {
+        try { yMap.geoObjects.remove(yMultiRoute); } catch(e){}
+        yMultiRoute = null;
+      }
+      if (routePolyline) {
+        try { yMap.geoObjects.remove(routePolyline); } catch(e){}
+        routePolyline = null;
+      }
+
+      const fromLat = fromCoords[0];
+      const fromLon = fromCoords[1];
+      const toLat = toCoords[0];
+      const toLon = toCoords[1];
+
+      // 1. Построение автомобильного маршрута через OSRM API (движение машины строго по дорогам)
+      const osrmEndpoints = [
+        `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson`,
+        `https://routing.openstreetmap.de/routed-car/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson`
+      ];
+
+      for (const url of osrmEndpoints) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4500);
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
+              const bestRoute = data.routes[0];
+              const km = parseFloat((bestRoute.distance / 1000).toFixed(1));
+              const durationMin = Math.max(1, Math.round(bestRoute.duration / 60));
+              const durationText = `~${durationMin} мин`;
+
+              // OSRM GeoJSON отдаёт координаты [долгота, широта] -> преобразуем в Яндекс [широта, долгота]
+              const roadCoords = bestRoute.geometry.coordinates.map(pt => [pt[1], pt[0]]);
+
+              // Рисуем линию маршрута движения по дорогам
+              routePolyline = new ymaps.Polyline(roadCoords, {
+                hintContent: `Маршрут по дорогам: ${km} км (${durationText})`
+              }, {
+                strokeColor: '#f59e0b',
+                strokeWidth: 5,
+                strokeOpacity: 0.95,
+                strokeStyle: 'solid'
+              });
+
+              yMap.geoObjects.add(routePolyline);
+              applyDistance(km, durationText);
+
+              // Масштабируем карту ровно по границам маршрута
+              if (routePolyline.geometry && routePolyline.geometry.getBounds) {
+                const bounds = routePolyline.geometry.getBounds();
+                if (bounds) {
+                  yMap.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40, duration: 300 });
+                }
+              }
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('OSRM router warning:', err);
+        }
+      }
+
+      // 2. Резерв: Яндекс MultiRoute
+      if (ymaps && ymaps.multiRouter && ymaps.multiRouter.MultiRoute) {
+        try {
+          yMultiRoute = new ymaps.multiRouter.MultiRoute({
+            referencePoints: [fromCoords, toCoords],
+            params: { routingMode: 'auto', results: 1 }
+          }, {
+            boundsAutoApply: true,
+            wayPointVisible: false,
+            routeStrokeWidth: 5,
+            routeStrokeColor: '#f59e0b',
+            routeActiveStrokeColor: '#d97706'
+          });
+
+          yMultiRoute.model.events.add('requestsuccess', () => {
+            try {
+              const routes = yMultiRoute.getRoutes();
+              if (routes && routes.getLength() > 0) {
+                const activeRoute = routes.get(0);
+                const distObj = activeRoute.properties.get('distance');
+                const km = parseFloat((distObj.value / 1000).toFixed(1));
+                const durationText = activeRoute.properties.get('duration').text || '';
+                applyDistance(km, durationText);
+                return;
+              }
+            } catch(e) {}
+            fallbackSaldaRoads(fromCoords, toCoords);
+          });
+
+          yMultiRoute.model.events.add('requestfail', () => {
+            fallbackSaldaRoads(fromCoords, toCoords);
+          });
+
+          yMap.geoObjects.add(yMultiRoute);
+          return;
+        } catch(e) {
+          console.warn('MultiRoute fallback error:', e);
+        }
+      }
+
+      // 3. Резервный дорожный трек (шоссе Верхняя - Нижняя Салда через Моховой)
+      fallbackSaldaRoads(fromCoords, toCoords);
+    }
+
+    // Резервная прокладка по дорожной сети Салды
+    function fallbackSaldaRoads(fromCoords, toCoords) {
+      const directKm = getDirectDistance(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
+      let roadCoords = [fromCoords];
+
+      // Если рейс между Верхней и Нижней Салдой (дистанция > 5 км), огибаем по региональному шоссе
+      const isIntercity = Math.abs(fromCoords[1] - toCoords[1]) > 0.06;
+      if (isIntercity) {
+        roadCoords.push([58.0690, 60.6200]); // Развязка у Мохового
+        roadCoords.push([58.0735, 60.6650]);
+      }
+      roadCoords.push(toCoords);
+
+      const roadKm = parseFloat(Math.max(1.2, directKm * (isIntercity ? 1.32 : 1.22)).toFixed(1));
+
+      routePolyline = new ymaps.Polyline(roadCoords, {
+        hintContent: `Маршрут по дорогам: ~${roadKm} км`
+      }, {
+        strokeColor: '#f59e0b',
+        strokeWidth: 5,
+        strokeOpacity: 0.9
+      });
+      yMap.geoObjects.add(routePolyline);
+
+      applyDistance(roadKm, `~${Math.round(roadKm * 1.8 + 4)} мин`);
+      if (routePolyline.geometry && routePolyline.geometry.getBounds) {
+        const bounds = routePolyline.geometry.getBounds();
+        if (bounds) yMap.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40, duration: 300 });
+      }
+    }
+
+    function applyDistance(km, durationText) {
+      distanceKm = km;
+      const distElem = document.getElementById('distanceDisplay');
+      if (distElem) distElem.innerText = `${km} км`;
+      const durElem = document.getElementById('durationDisplay');
+      if (durElem) durElem.innerText = durationText ? `(${durationText} в пути)` : '';
+      const statusElem = document.getElementById('routeStatus');
+      if (statusElem) {
+        statusElem.innerText = `Маршрут построен: ${km} км (${durationText || 'по дорогам'})`;
+        statusElem.className = 'text-[11px] font-bold text-emerald-400';
+      }
+      calculateTotal();
+    }
+
+    function getDirectDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // Быстрый выбор адреса по кнопкам
+    function setQuickAddress(addr) {
+      document.getElementById('deliveryAddress').value = addr;
+      updateSubmitButtonState();
+      geocodeAndBuildRoute();
+    }
+
+    // Поиск адреса по кнопке «Расчёт» или Enter
+    async function geocodeAndBuildRoute() {
+      const inputAddr = document.getElementById('deliveryAddress').value.trim();
+      if (!inputAddr) {
+        alert('Введите адрес доставки или кликните на карте');
+        return;
+      }
+
+      document.getElementById('routeStatus').innerText = 'Поиск адреса...';
+      document.getElementById('routeStatus').className = 'text-[11px] font-bold text-amber-400';
+
+      const lower = inputAddr.toLowerCase();
+
+      // 1. Поиск через OpenStreetMap (Nominatim), так как он знает точные здания и улицы в Салде
+      try {
+        let q = inputAddr;
+        if (!lower.includes('салда') && !lower.includes('басьянов')) {
+          q = 'Верхняя Салда ' + q;
+        }
+        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ru&limit=1`);
+        const items = await resp.json();
+        if (items && items.length > 0) {
+          const lat = parseFloat(items[0].lat);
+          const lon = parseFloat(items[0].lon);
+          // Координаты в пределах Верхней и Нижней Салды
+          if (lat >= 57.9 && lat <= 58.3 && lon >= 60.3 && lon <= 60.9) {
+            moveClientPoint([lat, lon]);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Nominatim geocode failed, using cache:', err);
+      }
+
+      // 2. Локальный кэш координат Салды (надежный и быстрый)
+      const sortedKeys = Object.keys(SALDA_GEO_CACHE).sort((a, b) => b.length - a.length);
+      for (const streetKey of sortedKeys) {
+        if (lower.includes(streetKey)) {
+          const coords = SALDA_GEO_CACHE[streetKey];
+          let finalCoords = [coords[0], coords[1]];
+          
+          // Извлечение номера дома с защитой от числа 25 в "25 октября"
+          let houseNum = null;
+          if (streetKey === '25 октября') {
+            const m = lower.match(/25\s*октября[^\d]*(\d+)/);
+            if (m) houseNum = parseInt(m[1], 10);
+          } else {
+            const m = lower.match(/(?:дом|д\.?|,\s*|\s+)(\d+)/);
+            if (m) houseNum = parseInt(m[1], 10);
+          }
+
+          if (houseNum) {
+            finalCoords[0] += ((houseNum % 20) - 10) * 0.0002;
+            finalCoords[1] += ((houseNum % 20) - 10) * 0.0002;
+          }
+
+          moveClientPoint(finalCoords);
+          return;
+        }
+      }
+
+      document.getElementById('routeStatus').innerText = 'Адрес не найден, укажите точку на карте кликом';
+      document.getElementById('routeStatus').className = 'text-[11px] font-bold text-rose-400';
+    }
+
+    function moveClientPoint(coords) {
+      currentClientCoords = coords;
+      if (clientPlacemark) {
+        clientPlacemark.geometry.setCoordinates(coords);
+      }
+      updateRouteAndDistance(currentStoreCoords, coords);
+    }
+
+    // Округление неровных цифр всегда в большую сторону (к ближайшим 100 ₽)
+    // Например: 1092 -> 1100, 965 -> 1000, 835 -> 900, 1415 -> 1500
+    function roundUp100(val) {
+      if (!val || isNaN(val) || val <= 0) return 0;
+      return Math.ceil(val / 100) * 100;
+    }
+
+    // Проверка корректности телефона клиента: +7 и 10 цифр
+    function isPhoneValid(val) {
+      if (!val) return false;
+      let digits = val.replace(/\D/g, '');
+      if (digits.startsWith('7') || digits.startsWith('8')) {
+        digits = digits.substring(1);
+      }
+      return digits.length === 10;
+    }
+
+    // Телефонная маска (+7 всегда, ровно 10 цифр, защита от ошибок)
+    function setupPhoneMask(inputId) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+
+      input.addEventListener('focus', () => {
+        if (!input.value.trim()) {
+          input.value = '+7 (';
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        const digits = input.value.replace(/\D/g, '');
+        if (digits.length <= 1) {
+          input.value = '';
+        }
+        updateSubmitButtonState();
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace') {
+          const pos = input.selectionStart;
+          if (pos <= 4 && input.selectionEnd <= 4) {
+            e.preventDefault();
+            return;
+          }
+        }
+      });
+
+      input.addEventListener('input', () => {
+        let val = input.value;
+        let digits = val.replace(/\D/g, '');
+
+        if (digits.startsWith('7') || digits.startsWith('8')) {
+          digits = digits.substring(1);
+        }
+        digits = digits.substring(0, 10);
+
+        let res = '+7';
+        if (digits.length > 0) {
+          res += ' (' + digits.substring(0, 3);
+        }
+        if (digits.length >= 3) {
+          res += ') ' + digits.substring(3, 6);
+        }
+        if (digits.length >= 6) {
+          res += '-' + digits.substring(6, 8);
+        }
+        if (digits.length >= 8) {
+          res += '-' + digits.substring(8, 10);
+        }
+
+        input.value = res;
+        updateSubmitButtonState();
+      });
+    }
+
+    // Проверка заполненности обязательных данных клиента и управление доступностью кнопки заказа
+    function updateSubmitButtonState() {
+      const addr = document.getElementById('deliveryAddress')?.value.trim() || '';
+      const name = document.getElementById('clientName')?.value.trim() || '';
+      const phone = document.getElementById('clientPhone')?.value || '';
+      const validPhone = isPhoneValid(phone);
+
+      const isValid = addr.length >= 3 && name.length >= 2 && validPhone;
+
+      const btn = document.getElementById('submitBtn');
+      const icon = document.getElementById('submitBtnIcon');
+      const hint = document.getElementById('submitValidationHint');
+
+      if (!btn) return;
+
+      if (isValid) {
+        btn.disabled = false;
+        btn.className = "w-full py-4 rounded-xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-slate-950 font-black text-sm uppercase tracking-wider transition transform active:scale-95 shadow-lg shadow-brand-900/50 flex items-center justify-center gap-2 cursor-pointer";
+        if (icon) icon.className = "w-5 h-5 text-slate-950";
+        if (hint) {
+          hint.innerText = "✓ Все обязательные поля заполнены, можно заказывать машину";
+          hint.className = "text-[11px] text-emerald-400 text-center font-medium";
+        }
+      } else {
+        btn.disabled = true;
+        btn.className = "w-full py-4 rounded-xl bg-slate-800/80 text-slate-500 border border-slate-700/60 font-black text-sm uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2 transition";
+        if (icon) icon.className = "w-5 h-5 text-slate-500";
+        if (hint) {
+          let missing = [];
+          if (addr.length < 3) missing.push("адрес доставки");
+          if (name.length < 2) missing.push("имя клиента");
+          if (!validPhone) missing.push("телефон клиента (+7)");
+          hint.innerText = `⚠️ Для заказа заполните: ${missing.join(', ')}`;
+          hint.className = "text-[11px] text-amber-400/90 text-center font-medium";
+        }
+      }
+    }
+
+    // 4. ИНТЕРФЕЙС И РАСЧЁТ СТОИМОСТИ
+    function init() {
+      setupPhoneMask('clientPhone');
+      setupPhoneMask('managerPhone');
+      updateSubmitButtonState();
+      toggleLoaders();
+      initYandexMaps();
+      updateLoadersCrewUI();
+      renderTariffClasses();
+      calculateTotal();
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+
+      // Нажатие Enter в поле адреса
+      const addrInput = document.getElementById('deliveryAddress');
+      if (addrInput) {
+        addrInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            geocodeAndBuildRoute();
+          }
+        });
+      }
+    }
+
+    function selectIndustry(ind) {
+      currentIndustry = ind;
+      ['furniture', 'doors', 'tiles', 'build'].forEach(i => {
+        const btn = document.getElementById('ind-btn-' + i);
+        if (!btn) return;
+        if (i === ind) {
+          btn.className = 'p-2.5 rounded-xl border text-center font-bold text-xs transition border-brand-500 bg-brand-500/15 text-white shadow-md';
+        } else {
+          btn.className = 'p-2.5 rounded-xl border text-center font-bold text-xs transition border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700';
+        }
+      });
+
+      // Синхронизируем магазин с профилем товара (если не выбран ручной ввод)
+      if (currentStoreKey !== 'custom') {
+        const currentMatches = STORES[currentStoreKey] && STORES[currentStoreKey].defaultIndustry === ind;
+        if (!currentMatches) {
+          const matchedStoreKey = Object.keys(STORES).find(k => STORES[k].defaultIndustry === ind);
+          if (matchedStoreKey) {
+            const selectElem = document.getElementById('storeSelect');
+            if (selectElem) selectElem.value = matchedStoreKey;
+            onStoreSelectChange();
+            return;
+          }
+        }
+      }
+
+      renderTariffClasses();
+      calculateTotal();
+    }
+
+    function renderTariffClasses() {
+      const container = document.getElementById('tariffClassesList');
+      if (!container) return;
+      const descList = INDUSTRY_DESCRIPTIONS[currentIndustry];
+      
+      let html = '';
+      for (let c = 1; c <= 5; c++) {
+        const t = TARIFF_RATES[c];
+        const isBlocked = (loadersCount >= 3 && c <= 3);
+        const isSelected = selectedClass === c;
+        
+        let activeClass = '';
+        if (isBlocked) {
+          activeClass = 'border-slate-800/60 bg-slate-950/40 opacity-40 cursor-not-allowed select-none';
+        } else if (isSelected) {
+          activeClass = 'border-brand-500 bg-brand-500/15 shadow-md shadow-brand-900/20 cursor-pointer';
+        } else {
+          activeClass = 'border-slate-800/80 bg-slate-900/60 hover:border-slate-700 cursor-pointer';
+        }
+
+        const clickAttr = isBlocked ? '' : `onclick="selectClass(${c})"`;
+
+        html += `
+          <div ${clickAttr} class="p-3 rounded-xl border transition ${activeClass}">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <input type="radio" name="tariffClassRadio" ${isSelected ? 'checked' : ''} ${isBlocked ? 'disabled' : ''} class="text-brand-500 focus:ring-brand-500" />
+                <span class="text-xs font-black text-white">${t.name}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded border font-extrabold font-mono ${t.badge}">${t.rate} ₽/эт</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                ${isBlocked ? '<span class="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">🔒 Только для 1–2 грузчиков</span>' : ''}
+                <span class="text-[10px] text-slate-400 font-bold">${c === 1 ? 'Погрузка 0 ₽' : 'Вынос = 1 эт.'}</span>
+              </div>
+            </div>
+            <div class="text-[11px] text-slate-300 mt-1 pl-5">
+              ${descList[c]}
+            </div>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+      checkVipStatus();
+      checkElevatorCompatibility();
+    }
+
+    function setLoadersCount(count, isManual = true) {
+      loadersCount = count;
+      if (isManual) {
+        userSelectedLoadersCount = true;
+      }
+      
+      // Если выбрано 3+ грузчика — классы 1, 2, 3 блокируются, переключаем на 4
+      if (loadersCount >= 3 && selectedClass <= 3) {
+        selectedClass = 4;
+      }
+
+      updateLoadersCrewUI();
+      renderTariffClasses();
+      calculateTotal();
+    }
+
+    function updateLoadersCrewUI() {
+      [1, 2, 3].forEach(c => {
+        const btn = document.getElementById('loader-btn-' + c);
+        if (!btn) return;
+        if (c === loadersCount) {
+          btn.className = 'py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-brand-500 bg-brand-500/20 text-white shadow';
+          const title = btn.querySelector('span:first-child');
+          if (title) title.className = 'text-xs font-extrabold flex items-center gap-1 text-brand-400';
+        } else {
+          btn.className = 'py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300';
+          const title = btn.querySelector('span:first-child');
+          if (title) title.className = 'text-xs font-extrabold flex items-center gap-1';
+        }
+      });
+
+      const badge = document.getElementById('loadersCrewBadge');
+      const notice = document.getElementById('loadersCrewNoticeText');
+      const breakdownCrewText = document.getElementById('breakdownCrewText');
+
+      if (loadersCount === 1) {
+        if (badge) {
+          badge.innerText = 'Водитель работает один (без напарника)';
+          badge.className = 'text-[11px] px-2.5 py-1 rounded-lg border font-semibold border-amber-500/30 bg-amber-500/10 text-amber-300 inline-block';
+        }
+        if (notice) {
+          notice.innerHTML = '⚠️ <strong>Внимание водителю:</strong> напарник не требуется. Погрузка и подъём выполняются силами одного человека (или с помощью заказчика на месте).';
+        }
+        if (breakdownCrewText) breakdownCrewText.innerText = '1 чел. (водитель)';
+      } else if (loadersCount === 2) {
+        if (badge) {
+          badge.innerText = 'Водитель + 1 напарник (бригада 2 чел)';
+          badge.className = 'text-[11px] px-2.5 py-1 rounded-lg border font-semibold border-emerald-500/30 bg-emerald-500/10 text-emerald-300 inline-block';
+        }
+        if (notice) {
+          notice.innerHTML = '✓ <strong>Стандартная бригада (2 чел):</strong> водитель берет с собой второго грузчика для подъёма мебели, дверей или крупной техники.';
+        }
+        if (breakdownCrewText) breakdownCrewText.innerText = '2 чел. (водитель + грузчик)';
+      } else {
+        if (badge) {
+          badge.innerText = 'Усиленная бригада (3+ человека)';
+          badge.className = 'text-[11px] px-2.5 py-1 rounded-lg border font-semibold border-purple-500/30 bg-purple-500/10 text-purple-300 inline-block';
+        }
+        if (notice) {
+          notice.innerHTML = '⚡ <strong>Усиленная бригада:</strong> для крупногабаритных или тяжёлых грузов (массив, пианино, сейфы, большой объем).';
+        }
+        if (breakdownCrewText) breakdownCrewText.innerText = '3+ чел. (усиленная)';
+      }
+    }
+
+    function selectClass(c) {
+      // Запрет выбора классов 1, 2, 3 при 3+ грузчиках
+      if (loadersCount >= 3 && c <= 3) {
+        return;
+      }
+      selectedClass = c;
+      if (!userSelectedLoadersCount) {
+        if (selectedClass >= 3) {
+          loadersCount = 2;
+        } else {
+          loadersCount = 1;
+        }
+        updateLoadersCrewUI();
+      }
+      renderTariffClasses();
+      calculateTotal();
+    }
+
+    function onStoreSelectChange() {
+      const val = document.getElementById('storeSelect').value;
+      currentStoreKey = val;
+      const customBlock = document.getElementById('customStoreBlock');
+      if (val === 'custom') {
+        customBlock.classList.remove('hidden');
+        currentStore = {
+          name: document.getElementById('customStoreName').value || 'Мой магазин',
+          address: document.getElementById('customStoreAddress').value || 'г. Верхняя Салда',
+          coords: STORES.custom.coords,
+          basePrice: parseFloat(document.getElementById('customBasePrice').value) || 700,
+          kmPrice: parseFloat(document.getElementById('customKmPrice').value) || 80,
+          freeRadius: parseFloat(document.getElementById('customRadius').value) || 1.5,
+          defaultIndustry: currentIndustry
+        };
+      } else {
+        customBlock.classList.add('hidden');
+        currentStore = STORES[val];
+        selectIndustry(currentStore.defaultIndustry);
+      }
+
+      currentStoreCoords = currentStore.coords;
+      if (storePlacemark) {
+        storePlacemark.geometry.setCoordinates(currentStoreCoords);
+        storePlacemark.properties.set('hintContent', currentStore.name);
+        storePlacemark.properties.set('balloonContent', `<strong>${currentStore.name}</strong><br>${currentStore.address}`);
+      }
+      updateRouteAndDistance(currentStoreCoords, currentClientCoords);
+      calculateTotal();
+    }
+
+    function toggleLoaders() {
+      const chk = document.getElementById('hasLoaders');
+      hasLoaders = chk ? chk.checked : false;
+      const block = document.getElementById('loadersSettingsBlock');
+      const crewRow = document.getElementById('breakdownCrewRow');
+      if (hasLoaders) {
+        if (block) block.classList.remove('hidden');
+        if (crewRow) crewRow.classList.remove('hidden');
+      } else {
+        if (block) block.classList.add('hidden');
+        if (crewRow) crewRow.classList.add('hidden');
+      }
+      calculateTotal();
+    }
+
+    function onFloorChange(val) {
+      floor = parseInt(val, 10);
+      document.getElementById('floorValueDisplay').innerText = `${floor} эт.`;
+      calculateTotal();
+    }
+
+    function onElevatorChange(val) {
+      elevatorType = val;
+      checkElevatorCompatibility();
+      calculateTotal();
+    }
+
+    function onCargoValueChange(val) {
+      cargoValue = parseInt(val, 10) || 0;
+      document.getElementById('cargoValueDisplay').innerText = `${cargoValue.toLocaleString('ru-RU')} ₽`;
+      checkVipStatus();
+      calculateTotal();
+    }
+
+    function checkVipStatus() {
+      const isVip = selectedClass === 5 || cargoValue > 30000;
+      const badge = document.getElementById('vipResponsibilityBadge');
+      if (badge) {
+        if (isVip) badge.classList.remove('hidden');
+        else badge.classList.add('hidden');
+      }
+    }
+
+    function checkElevatorCompatibility() {
+      const cannotFit = selectedClass >= 3;
+      const isPassenger = elevatorType === 'passenger';
+      const warning = document.getElementById('elevatorWarning');
+      if (warning) {
+        if (isPassenger && cannotFit) warning.classList.remove('hidden');
+        else warning.classList.add('hidden');
+      }
+    }
+
+    // 5. ГЛАВНАЯ ФОРМУЛА РАСЧЁТА
+    function calculateTotal() {
+      // 1. Машина: подача 700 ₽, 1 км = 80 ₽, в радиусе 1.5 км только подача
+      const baseFee = currentStore.basePrice !== undefined ? currentStore.basePrice : 700;
+      const kmRate = currentStore.kmPrice !== undefined ? currentStore.kmPrice : 80;
+      const freeRadius = currentStore.freeRadius !== undefined ? currentStore.freeRadius : 1.5;
+
+      let carPrice = baseFee;
+      let carLabel = `Машина (подача до ${freeRadius} км):`;
+
+      if (distanceKm > freeRadius) {
+        const extraKm = parseFloat((distanceKm - freeRadius).toFixed(1));
+        const rawCarPrice = baseFee + (extraKm * kmRate);
+        carPrice = roundUp100(rawCarPrice);
+        carLabel = `Машина (подача 700 + ${extraKm} км):`;
+      } else {
+        carPrice = roundUp100(baseFee);
+      }
+
+      const carPriceEl = document.getElementById('breakdownCarPrice');
+      if (carPriceEl) carPriceEl.innerText = `${carPrice.toLocaleString('ru-RU')} ₽`;
+
+      const carLabelEl = document.getElementById('breakdownCarLabel');
+      if (carLabelEl) carLabelEl.innerText = carLabel;
+
+      const tariffStatusEl = document.getElementById('tariffStatusDisplay');
+      if (tariffStatusEl) {
+        if (distanceKm <= freeRadius) {
+          tariffStatusEl.innerText = `✓ В радиусе ${freeRadius} км — только подача (${carPrice} ₽)`;
+        } else {
+          const extraKm = parseFloat((distanceKm - freeRadius).toFixed(1));
+          tariffStatusEl.innerText = `✓ Подача ${baseFee} ₽ + ${extraKm} км × ${kmRate} ₽/км (округл. ${carPrice} ₽)`;
+        }
+      }
+
+      // 2. ПРР и занос
+      let loadingPrice = 0;
+      let unloadingPrice = 0;
+      let riskPrice = 0;
+
+      if (hasLoaders) {
+        const floorRate = TARIFF_RATES[selectedClass].rate;
+        
+        // Погрузка у магазина: Класс 1 = бесплатно, остальные = 1 этаж
+        loadingPrice = (selectedClass === 1) ? 0 : floorRate;
+
+        // Занос на адрес клиента
+        let effectiveFloors = floor;
+        if (elevatorType === 'cargo') {
+          // Грузовой лифт = оплата за 1 этаж
+          effectiveFloors = 1;
+        } else if (elevatorType === 'passenger') {
+          // В пассажирский входит только Класс 1 и 2
+          if (selectedClass <= 2) {
+            effectiveFloors = 1;
+          } else {
+            // Крупный груз не влезает в пассажирский лифт — считаем пешком
+            effectiveFloors = floor;
+          }
+        }
+
+        const hasLongCarry = document.getElementById('hasLongCarryCheckbox')?.checked;
+        if (hasLongCarry) {
+          effectiveFloors += 1;
+        }
+
+        unloadingPrice = effectiveFloors * floorRate;
+
+        // Надбавка за ответственность при объявленной ценности > 30 000 ₽
+        if (cargoValue > 30000) {
+          riskPrice = effectiveFloors * 100;
+        }
+
+        // Если выбран 5 класс (Премиум)
+        if (selectedClass === 5) {
+          riskPrice += 500;
+        }
+
+        loadingPrice = roundUp100(loadingPrice);
+        unloadingPrice = roundUp100(unloadingPrice);
+        riskPrice = roundUp100(riskPrice);
+      }
+
+      const prrTotal = loadingPrice + unloadingPrice + riskPrice;
+      const grandTotal = roundUp100(carPrice + prrTotal);
+
+      const loadingPriceEl = document.getElementById('breakdownLoadingPrice');
+      if (loadingPriceEl) loadingPriceEl.innerText = `${loadingPrice.toLocaleString('ru-RU')} ₽`;
+
+      const unloadingPriceEl = document.getElementById('breakdownUnloadingPrice');
+      if (unloadingPriceEl) unloadingPriceEl.innerText = `${unloadingPrice.toLocaleString('ru-RU')} ₽`;
+
+      const riskPriceEl = document.getElementById('breakdownRiskPrice');
+      if (riskPriceEl) riskPriceEl.innerText = `+${riskPrice.toLocaleString('ru-RU')} ₽`;
+
+      const grandTotalEl = document.getElementById('grandTotalDisplay');
+      if (grandTotalEl) grandTotalEl.innerText = `${grandTotal.toLocaleString('ru-RU')} ₽`;
+
+      return { carPrice, prrTotal, grandTotal, loadingPrice, unloadingPrice, riskPrice };
+    }
+
+    // 6. ОТПРАВКА ЗАКАЗА В СИСТЕМУ И MAX-БОТ
+    async function submitOrder() {
+      const deliveryAddress = document.getElementById('deliveryAddress')?.value.trim() || '';
+      const clientName = document.getElementById('clientName')?.value.trim() || '';
+      const clientPhone = document.getElementById('clientPhone')?.value.trim() || '';
+
+      if (!deliveryAddress || deliveryAddress.length < 3) {
+        alert('Пожалуйста, укажите точный адрес доставки!');
+        document.getElementById('deliveryAddress')?.focus();
+        return;
+      }
+      if (!clientName || clientName.length < 2) {
+        alert('Пожалуйста, укажите имя клиента!');
+        document.getElementById('clientName')?.focus();
+        return;
+      }
+      if (!isPhoneValid(clientPhone)) {
+        alert('Пожалуйста, укажите корректный номер телефона клиента (+7 и 10 цифр)!');
+        document.getElementById('clientPhone')?.focus();
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('submitBtnText');
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerText = 'Отправка заявки...';
+
+      try {
+        const { carPrice, prrTotal, grandTotal, loadingPrice, unloadingPrice } = calculateTotal();
+
+        const crewDescription = loadersCount === 1 
+          ? '1 чел. (водитель работает один, без напарника)'
+          : loadersCount === 2
+            ? '2 чел. (водитель + напарник)'
+            : `${loadersCount} чел. (усиленная бригада)`;
+
+        const industryNames = {
+          furniture: 'Мебель',
+          doors: 'Двери',
+          tiles: 'Плитка / Керамогранит',
+          build: 'Стройматериалы'
+        };
+        const catName = industryNames[currentIndustry] || 'Товар';
+        const className = TARIFF_RATES[selectedClass]?.name || `Класс ${selectedClass}`;
+        const cargoName = `${catName} (${className})`;
+
+        const payload = {
+          storeName: currentStore.name,
+          pickupAddress: currentStore.address,
+          deliveryAddress: deliveryAddress,
+          distanceKm: distanceKm,
+          carPrice: carPrice,
+          hasLoaders: hasLoaders,
+          loadersCount: loadersCount,
+          loadersCrewText: crewDescription,
+          cargoCategory: selectedClass >= 4 ? 'heavy' : selectedClass === 3 ? 'oversized' : 'standard',
+          cargoName: cargoName,
+          cargoValue: cargoValue,
+          floor: floor,
+          elevatorType: elevatorType,
+          hasLongCarry: document.getElementById('hasLongCarry')?.checked || false,
+          loadersPrice: prrTotal,
+          totalPrice: grandTotal,
+          managerName: document.getElementById('managerName')?.value?.trim() || '',
+          managerPhone: document.getElementById('managerPhone')?.value?.trim() || '',
+          clientName: clientName,
+          clientPhone: clientPhone,
+          preferredTime: '',
+          notes: document.getElementById('orderNotes')?.value?.trim() || ''
+        };
+
+        const resp = await fetch('https://app.ancargo66.ru/api/public/delivery-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          document.getElementById('successOrderNum').innerText = data.orderNumber;
+          document.getElementById('successOrderSum').innerText = `${grandTotal.toLocaleString('ru-RU')} ₽`;
+          document.getElementById('successOrderDest').innerText = payload.deliveryAddress;
+          document.getElementById('successModal').classList.remove('hidden');
+          document.getElementById('successModal').classList.add('flex');
+        } else {
+          alert('Ошибка: ' + (data.error || 'Не удалось отправить заявку'));
+        }
+      } catch (err) {
+        console.error('Submit order error:', err);
+        alert('Ошибка связи с сервером при отправке заявки.');
+      } finally {
+        if (btnText) btnText.innerText = 'Заказать машину';
+        updateSubmitButtonState();
+      }
+    }
+
+    function closeSuccessModal() {
+      document.getElementById('successModal').classList.add('hidden');
+      document.getElementById('successModal').classList.remove('flex');
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

@@ -61,6 +61,8 @@ export async function POST(request: Request) {
     if (elevatorType === 'cargo') elevatorLabel = 'Грузовой лифт';
     if (elevatorType === 'passenger') elevatorLabel = 'Пассажирский лифт';
 
+    const isLoaders = Boolean(hasLoaders && hasLoaders !== 'false' && hasLoaders !== '0');
+
     const crewLine = loadersCrewText
       ? loadersCrewText
       : loadersCount === 1
@@ -77,18 +79,22 @@ export async function POST(request: Request) {
       `🏁 Куда: ${deliveryAddress}`,
       `🛣 Дистанция: ${distanceKm} км`,
       ``,
-      `📦 ГРУЗ И ПРР:`,
-      `• Номенклатура: ${cargoName || 'Товар из магазина'}`,
-      `• Категория: ${categoryLabel}`,
-      cargoValue > 0 ? `• Стоимость товара: ${cargoValue.toLocaleString('ru-RU')} ₽` : null,
-      cargoValue > 30000 ? `  *(Ответственность: +100 ₽/эт за ценный груз)*` : null,
-      `• Состав бригады: ${hasLoaders ? crewLine : 'Без грузчиков (только доставка)'}`,
-      `• Этаж: ${floor} эт. (${elevatorLabel})`,
-      hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж)` : null,
-      ``,
+      ...(isLoaders
+        ? [
+            `📦 ГРУЗ И ПРР:`,
+            `• Номенклатура: ${cargoName || 'Товар из магазина'}`,
+            `• Категория: ${categoryLabel}`,
+            cargoValue > 0 ? `• Стоимость товара: ${cargoValue.toLocaleString('ru-RU')} ₽` : null,
+            cargoValue > 30000 ? `  *(Ответственность: +100 ₽/эт за ценный груз)*` : null,
+            `• Состав бригады: ${crewLine}`,
+            `• Этаж: ${floor} эт. (${elevatorLabel})`,
+            hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж)` : null,
+            ``,
+          ]
+        : [`📦 УСЛУГА:`, `• Доставка автомобилем (без грузчиков / без ПРР)`, ``]),
       `💰 РАСЧЁТ СТОИМОСТИ:`,
       `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽`,
-      hasLoaders
+      isLoaders
         ? `• Погрузка и занос (ПРР): ${Number(loadersPrice).toLocaleString('ru-RU')} ₽`
         : null,
       `━━━━━━━━━━━━━━━━━━`,
@@ -118,7 +124,7 @@ export async function POST(request: Request) {
           delivery_address: deliveryAddress,
           distance_km: distanceKm,
           car_price: carPrice,
-          has_loaders: hasLoaders,
+          has_loaders: isLoaders,
           loaders_count: loadersCount,
           cargo_category: cargoCategory,
           cargo_name: cargoName,
@@ -141,7 +147,7 @@ export async function POST(request: Request) {
       console.error('Failed to log delivery order in database:', dbErr);
     }
 
-    // 2. Отправляем в MAX Бот администраторам
+    // 2. Отправляем в MAX Бот администраторам и диспетчеру
     const maxToken =
       process.env.MAX_BOT_TOKEN ||
       'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
@@ -157,7 +163,7 @@ export async function POST(request: Request) {
           )
           .map((u: any) => u.max_user_id);
 
-        const uniqueRecipients = Array.from(new Set([...recipients, '56628256']));
+        const uniqueRecipients = Array.from(new Set([...recipients, '56628256', '133117579']));
 
         await Promise.all(
           uniqueRecipients.map((userId) =>
