@@ -21,13 +21,16 @@ export async function POST(request: Request) {
 
     const {
       storeName = 'Магазин-партнёр',
+      storeCategory = '',
       pickupAddress = '',
+      hasPickupCarry = true,
       deliveryAddress = '',
       distanceKm = 0,
       carPrice = 0,
       hasLoaders = false,
       loadersCount = 1,
       loadersCrewText = '',
+      items = [],
       cargoCategory = 'standard',
       cargoName = '',
       cargoValue = 0,
@@ -71,6 +74,16 @@ export async function POST(request: Request) {
           ? '2 чел. (водитель + напарник)'
           : `${loadersCount} чел. (усиленная бригада)`;
 
+    const itemsLines =
+      items && Array.isArray(items) && items.length > 0
+        ? items.map(
+            (it: any) =>
+              `  • ${it.name}: ${it.count} ${it.unit || 'шт'} (${(it.pricePerFloor || 0) * (it.count || 1)} ₽/эт)`,
+          )
+        : cargoName
+          ? [`  • Номенклатура: ${cargoName}`, `  • Категория: ${categoryLabel}`]
+          : [];
+
     const messageText = [
       `🚚 НОВЫЙ ЗАКАЗ ДОСТАВКИ: ${storeName}`,
       `━━━━━━━━━━━━━━━━━━`,
@@ -82,13 +95,13 @@ export async function POST(request: Request) {
       ...(isLoaders
         ? [
             `📦 ГРУЗ И ПРР:`,
-            `• Номенклатура: ${cargoName || 'Товар из магазина'}`,
-            `• Категория: ${categoryLabel}`,
+            ...itemsLines,
             cargoValue > 0 ? `• Стоимость товара: ${cargoValue.toLocaleString('ru-RU')} ₽` : null,
             cargoValue > 30000 ? `  *(Ответственность: +100 ₽/эт за ценный груз)*` : null,
             `• Состав бригады: ${crewLine}`,
-            `• Этаж: ${floor} эт. (${elevatorLabel})`,
-            hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж)` : null,
+            `• Этаж доставки: ${floor} эт. (${elevatorLabel})`,
+            hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж к заносу)` : null,
+            hasPickupCarry === false ? `• Погрузка в магазине: силами магазина (без выноса)` : null,
             ``,
           ]
         : [`📦 УСЛУГА:`, `• Доставка автомобилем (без грузчиков / без ПРР)`, ``]),
@@ -119,12 +132,15 @@ export async function POST(request: Request) {
         new_values: {
           order_number: orderNumber,
           store_name: storeName,
+          store_category: storeCategory,
           pickup_address: pickupAddress,
+          has_pickup_carry: hasPickupCarry,
           delivery_address: deliveryAddress,
           distance_km: distanceKm,
           car_price: carPrice,
           has_loaders: isLoaders,
           loaders_count: loadersCount,
+          items: items || [],
           cargo_category: cargoCategory,
           cargo_name: cargoName,
           cargo_value: cargoValue,
