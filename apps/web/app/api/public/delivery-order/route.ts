@@ -19,6 +19,89 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    if (body.action === 'verify_pin') {
+      const pin = String(body.pin || '').trim();
+      const STORE_PINS: Record<string, { storeKey: string; storeName: string; category: string }> =
+        {
+          '4141': {
+            storeKey: 'tiles',
+            storeName: 'Плитка (ул. Рабочей Молодёжи, 41)',
+            category: 'build',
+          },
+          '2727': {
+            storeKey: 'levsha',
+            storeName: 'Левша (ул. Спортивная, 2, корп. 7)',
+            category: 'build',
+          },
+          '2503': { storeKey: 'doors', storeName: 'Двери (ул. 25 Октября, 3)', category: 'build' },
+          '8701': {
+            storeKey: 'mebel_angela',
+            storeName: 'Мебель Анжела (ул. Энгельса, 87, корп. 1)',
+            category: 'furniture',
+          },
+          '0501': {
+            storeKey: 'interier',
+            storeName: 'Интерьер (ул. Парковая, 5, корп. 1)',
+            category: 'furniture',
+          },
+          '0401': {
+            storeKey: 'obstanovochka',
+            storeName: 'Обстановочка (ул. Воронова, 4, корп. 1)',
+            category: 'furniture',
+          },
+          '6600': { storeKey: 'admin', storeName: 'Диспетчер SaldaCargo', category: 'all' },
+          '1111': {
+            storeKey: 'tiles',
+            storeName: 'Плитка (ул. Рабочей Молодёжи, 41)',
+            category: 'build',
+          },
+          '2222': {
+            storeKey: 'levsha',
+            storeName: 'Левша (ул. Спортивная, 2, корп. 7)',
+            category: 'build',
+          },
+          '3333': { storeKey: 'doors', storeName: 'Двери (ул. 25 Октября, 3)', category: 'build' },
+          '4444': {
+            storeKey: 'mebel_angela',
+            storeName: 'Мебель Анжела (ул. Энгельса, 87, корп. 1)',
+            category: 'furniture',
+          },
+          '5555': {
+            storeKey: 'interier',
+            storeName: 'Интерьер (ул. Парковая, 5, корп. 1)',
+            category: 'furniture',
+          },
+          '6666': {
+            storeKey: 'obstanovochka',
+            storeName: 'Обстановочка (ул. Воронова, 4, корп. 1)',
+            category: 'furniture',
+          },
+          '7777': { storeKey: 'admin', storeName: 'Диспетчер SaldaCargo', category: 'all' },
+        };
+
+      const matched = STORE_PINS[pin];
+      if (!matched) {
+        return NextResponse.json(
+          { success: false, error: 'Неверный PIN-код магазина' },
+          { status: 401, headers: CORS_HEADERS },
+        );
+      }
+
+      const yandexApiKey =
+        process.env.YANDEX_MAPS_API_KEY || 'bb711687-f130-43ef-bde7-9308dfa82254';
+
+      return NextResponse.json(
+        {
+          success: true,
+          storeKey: matched.storeKey,
+          storeName: matched.storeName,
+          category: matched.category,
+          yandexApiKey,
+        },
+        { status: 200, headers: CORS_HEADERS },
+      );
+    }
+
     const {
       storeName = 'Магазин-партнёр',
       storeCategory = '',
