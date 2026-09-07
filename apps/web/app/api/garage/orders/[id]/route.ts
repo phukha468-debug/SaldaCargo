@@ -19,8 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         odometer_start, odometer_end,
         created_at, updated_at,
         asset:assets(id, short_name, reg_number),
-        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
-        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
+        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, roles, mechanic_salary_pct),
+        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, roles, mechanic_salary_pct),
         works:service_order_works(
           id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description,
           custom_work_name, mechanic_id, second_mechanic_id,
@@ -33,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ),
         transactions:transactions(
           id, amount, description, category_id, related_user_id,
-          related_user:users!transactions_related_user_id_fkey(name)
+          related_user:users!transactions_related_user_id_fkey(name, roles)
         )
       `,
     );
@@ -50,6 +50,73 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     if (error) throw error;
     if (!data) return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
+
+    // Enrichen performers (mechanics, welders, electricians, painters) on the order and on each work
+    const userIds = new Set<string>();
+    if (data.assigned_mechanic_id) userIds.add(data.assigned_mechanic_id);
+    if (data.second_mechanic_id) userIds.add(data.second_mechanic_id);
+    for (const w of data.works ?? []) {
+      if (w.mechanic_id) userIds.add(w.mechanic_id);
+      if (w.second_mechanic_id) userIds.add(w.second_mechanic_id);
+    }
+    for (const t of data.transactions ?? []) {
+      if (t.related_user_id) userIds.add(t.related_user_id);
+    }
+
+    if (userIds.size > 0) {
+      const { data: usersList } = await (supabase.from('users') as any)
+        .select('id, name, roles, mechanic_salary_pct')
+        .in('id', Array.from(userIds));
+
+      const userMap = new Map<string, any>();
+      for (const u of usersList ?? []) {
+        userMap.set(u.id, u);
+      }
+
+      if (!data.mechanic && data.assigned_mechanic_id && userMap.has(data.assigned_mechanic_id)) {
+        data.mechanic = userMap.get(data.assigned_mechanic_id);
+      }
+      if (
+        !data.second_mechanic &&
+        data.second_mechanic_id &&
+        userMap.has(data.second_mechanic_id)
+      ) {
+        data.second_mechanic = userMap.get(data.second_mechanic_id);
+      }
+
+      for (const w of data.works ?? []) {
+        if (w.mechanic_id && userMap.has(w.mechanic_id)) {
+          w.mechanic = userMap.get(w.mechanic_id);
+        }
+        if (w.second_mechanic_id && userMap.has(w.second_mechanic_id)) {
+          w.second_mechanic = userMap.get(w.second_mechanic_id);
+        }
+      }
+
+      for (const t of data.transactions ?? []) {
+        if (t.related_user_id && userMap.has(t.related_user_id)) {
+          t.related_user = userMap.get(t.related_user_id);
+        }
+      }
+
+      const executorIds = new Set<string>();
+      if (data.assigned_mechanic_id) executorIds.add(data.assigned_mechanic_id);
+      if (data.second_mechanic_id) executorIds.add(data.second_mechanic_id);
+      for (const w of data.works ?? []) {
+        if (w.mechanic_id) executorIds.add(w.mechanic_id);
+        if (w.second_mechanic_id) executorIds.add(w.second_mechanic_id);
+      }
+      for (const t of data.transactions ?? []) {
+        if (t.related_user_id) executorIds.add(t.related_user_id);
+      }
+
+      data.executors = Array.from(executorIds)
+        .map((uid) => userMap.get(uid))
+        .filter(Boolean);
+    } else {
+      data.executors = [];
+    }
+
     return NextResponse.json(data);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка' }, { status: 500 });

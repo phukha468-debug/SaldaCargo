@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { Money } from '@saldacargo/ui';
 import { formatPhone } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
@@ -725,8 +725,14 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
     created_at?: string | null;
     updated_at?: string | null;
     asset?: { id: string; short_name: string; reg_number: string } | null;
-    mechanic?: { id: string; name: string; mechanic_salary_pct?: number } | null;
-    second_mechanic?: { id: string; name: string; mechanic_salary_pct?: number } | null;
+    mechanic?: { id: string; name: string; roles?: string[]; mechanic_salary_pct?: number } | null;
+    second_mechanic?: {
+      id: string;
+      name: string;
+      roles?: string[];
+      mechanic_salary_pct?: number;
+    } | null;
+    executors?: Array<{ id: string; name: string; roles?: string[]; mechanic_salary_pct?: number }>;
     works?: Array<{
       id: string;
       status: string;
@@ -737,6 +743,20 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
       price_client?: string;
       work_description?: string;
       custom_work_name?: string;
+      mechanic_id?: string | null;
+      second_mechanic_id?: string | null;
+      mechanic?: {
+        id: string;
+        name: string;
+        roles?: string[];
+        mechanic_salary_pct?: number;
+      } | null;
+      second_mechanic?: {
+        id: string;
+        name: string;
+        roles?: string[];
+        mechanic_salary_pct?: number;
+      } | null;
       work_catalog?: { id: string; name: string; norm_minutes?: number } | null;
     }>;
     parts?: Array<{
@@ -752,7 +772,7 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
       id: string;
       amount: string;
       description?: string;
-      related_user?: { name: string } | null;
+      related_user?: { name: string; roles?: string[] } | null;
     }>;
   }>({
     queryKey: ['service-order-quick-view', orderId],
@@ -797,6 +817,103 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
     label: order?.status || '—',
     cls: 'bg-slate-100 text-slate-700 border-slate-300',
   };
+
+  const SPECIALTY_MAP: Record<string, { label: string; cls: string; icon: string }> = {
+    welder: {
+      label: 'Сварщик',
+      cls: 'bg-orange-50 text-orange-800 border-orange-200',
+      icon: 'local_fire_department',
+    },
+    electrician: {
+      label: 'Электрик',
+      cls: 'bg-amber-50 text-amber-800 border-amber-200',
+      icon: 'bolt',
+    },
+    painter: {
+      label: 'Маляр',
+      cls: 'bg-purple-50 text-purple-800 border-purple-200',
+      icon: 'format_paint',
+    },
+    mechanic_lead: {
+      label: 'Старший механик',
+      cls: 'bg-blue-50 text-blue-800 border-blue-200',
+      icon: 'engineering',
+    },
+    mechanic: {
+      label: 'Механик',
+      cls: 'bg-sky-50 text-sky-800 border-sky-200',
+      icon: 'build',
+    },
+    handyman: {
+      label: 'Разнорабочий',
+      cls: 'bg-slate-100 text-slate-700 border-slate-200',
+      icon: 'handyman',
+    },
+    driver: {
+      label: 'Водитель',
+      cls: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+      icon: 'drive_eta',
+    },
+    loader: {
+      label: 'Грузчик',
+      cls: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      icon: 'inventory',
+    },
+  };
+
+  function getSpecialty(roles?: string[] | null) {
+    if (!roles || roles.length === 0) {
+      return {
+        label: 'Мастер',
+        cls: 'bg-slate-100 text-slate-700 border-slate-200',
+        icon: 'person',
+      };
+    }
+    const priority = [
+      'welder',
+      'electrician',
+      'painter',
+      'mechanic_lead',
+      'mechanic',
+      'handyman',
+      'driver',
+      'loader',
+    ];
+    for (const p of priority) {
+      if (roles.includes(p) && SPECIALTY_MAP[p]) {
+        return SPECIALTY_MAP[p];
+      }
+    }
+    return {
+      label: roles[0],
+      cls: 'bg-slate-100 text-slate-700 border-slate-200',
+      icon: 'person',
+    };
+  }
+
+  // Сбор всех исполнителей наряда
+  const orderExecutors = (() => {
+    const map = new Map<string, { id?: string; name: string; roles?: string[] }>();
+    if (order?.executors) {
+      for (const ex of order.executors) {
+        if (ex?.id) map.set(ex.id, ex);
+        else if (ex?.name) map.set(ex.name, ex);
+      }
+    }
+    if (order?.mechanic) {
+      map.set(order.mechanic.id || order.mechanic.name, order.mechanic);
+    }
+    if (order?.second_mechanic) {
+      map.set(order.second_mechanic.id || order.second_mechanic.name, order.second_mechanic);
+    }
+    for (const w of works) {
+      if (w.mechanic) map.set(w.mechanic.id || w.mechanic.name, w.mechanic);
+      if (w.second_mechanic) {
+        map.set(w.second_mechanic.id || w.second_mechanic.name, w.second_mechanic);
+      }
+    }
+    return Array.from(map.values());
+  })();
 
   return (
     <div
@@ -920,11 +1037,34 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
                     <span className="material-symbols-outlined text-[13px] text-emerald-500">
                       badge
                     </span>
-                    Исполнитель (Механик)
+                    Исполнители (Мастера)
                   </div>
                   <div className="text-xs font-black text-slate-900">
-                    {order.mechanic?.name || 'Не назначен'}
-                    {order.second_mechanic?.name ? ` + ${order.second_mechanic.name}` : ''}
+                    {orderExecutors.length > 0 ? (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {orderExecutors.map((ex, i) => {
+                          const spec = getSpecialty(ex.roles);
+                          return (
+                            <span key={ex.id || i} className="inline-flex items-center gap-1">
+                              <span>{ex.name}</span>
+                              <span
+                                className={cn(
+                                  'text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border',
+                                  spec.cls,
+                                )}
+                              >
+                                {spec.label}
+                              </span>
+                              {i < orderExecutors.length - 1 && (
+                                <span className="text-slate-400 font-bold">+</span>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      'Не назначен'
+                    )}
                   </div>
                 </div>
               </div>
@@ -972,12 +1112,30 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
                       const normMin = w.norm_minutes || w.work_catalog?.norm_minutes;
                       const actMin = w.actual_minutes;
 
+                      const performers = [
+                        w.mechanic ||
+                          (w.mechanic_id
+                            ? order?.executors?.find((e) => e.id === w.mechanic_id)
+                            : null),
+                        w.second_mechanic ||
+                          (w.second_mechanic_id
+                            ? order?.executors?.find((e) => e.id === w.second_mechanic_id)
+                            : null),
+                      ].filter(Boolean) as Array<{ id: string; name: string; roles?: string[] }>;
+
+                      const effectivePerformers =
+                        performers.length > 0
+                          ? performers
+                          : orderExecutors.length === 1
+                            ? orderExecutors
+                            : [];
+
                       return (
                         <div
                           key={w.id}
                           className="p-3.5 hover:bg-slate-50/80 transition-colors flex items-start justify-between gap-3"
                         >
-                          <div className="space-y-1 flex-1 min-w-0">
+                          <div className="space-y-1.5 flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-xs font-black text-slate-900">
                                 {idx + 1}. {workName}
@@ -994,6 +1152,42 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
                               ) : (
                                 <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
                                   ⏳ Начислено
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Кто выполнял конкретную работу (Механик, Сварщик, Электрик, Маляр) */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Исполнитель:
+                              </span>
+                              {effectivePerformers.length > 0 ? (
+                                effectivePerformers.map((m, mIdx) => {
+                                  const spec = getSpecialty(m.roles);
+                                  return (
+                                    <span
+                                      key={m.id || mIdx}
+                                      className={cn(
+                                        'inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border shadow-2xs',
+                                        spec.cls,
+                                      )}
+                                      title={`Мастер: ${m.name} (${spec.label})`}
+                                    >
+                                      <span className="material-symbols-outlined text-[13px]">
+                                        {spec.icon}
+                                      </span>
+                                      <span className="font-extrabold text-slate-900">
+                                        {m.name}
+                                      </span>
+                                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-white/80 border border-slate-300/60">
+                                        {spec.label}
+                                      </span>
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">
+                                  Мастер не назначен персонально
                                 </span>
                               )}
                             </div>
@@ -1086,47 +1280,724 @@ function ServiceOrderViewModal({ orderId, onClose }: { orderId: string; onClose:
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-                    <div className="text-[10px] font-bold uppercase text-slate-400">
-                      Начислено механику ({order.mechanic?.name || 'Основной'})
-                    </div>
-                    <div className="text-lg font-black text-emerald-400 mt-0.5">
-                      {parseFloat(order.mechanic_pay || '0').toLocaleString('ru-RU')} ₽
-                    </div>
-                  </div>
-
-                  {order.second_mechanic?.name && (
+                  {order.mechanic_pay && parseFloat(order.mechanic_pay) > 0 ? (
                     <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-                      <div className="text-[10px] font-bold uppercase text-slate-400">
-                        Начислено 2-му механику ({order.second_mechanic.name})
+                      <div className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                        <span>Начислено: {order.mechanic?.name || 'Основной мастер'}</span>
+                        {order.mechanic?.roles && (
+                          <span className="text-[9px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded font-bold">
+                            {getSpecialty(order.mechanic.roles).label}
+                          </span>
+                        )}
                       </div>
                       <div className="text-lg font-black text-emerald-400 mt-0.5">
-                        {parseFloat(order.second_mechanic_pay || '0').toLocaleString('ru-RU')} ₽
+                        {parseFloat(order.mechanic_pay).toLocaleString('ru-RU')} ₽
                       </div>
                     </div>
-                  )}
+                  ) : null}
+
+                  {order.second_mechanic_pay && parseFloat(order.second_mechanic_pay) > 0 ? (
+                    <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
+                      <div className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                        <span>Начислено: {order.second_mechanic?.name || '2-й мастер'}</span>
+                        {order.second_mechanic?.roles && (
+                          <span className="text-[9px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded font-bold">
+                            {getSpecialty(order.second_mechanic.roles).label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-lg font-black text-emerald-400 mt-0.5">
+                        {parseFloat(order.second_mechanic_pay).toLocaleString('ru-RU')} ₽
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 {transactions.length > 0 && (
                   <div className="pt-2 border-t border-slate-800 space-y-1.5">
                     <div className="text-[10px] font-bold uppercase text-slate-400">
-                      Связанные финансовые транзакции:
+                      Начисления ЗП мастерам по операциям:
                     </div>
-                    {transactions.map((tx) => (
+                    {transactions.map((tx) => {
+                      const userRoles =
+                        tx.related_user?.roles ||
+                        orderExecutors.find((e) => e.name === tx.related_user?.name)?.roles;
+                      const spec = userRoles ? getSpecialty(userRoles) : null;
+                      return (
+                        <div
+                          key={tx.id}
+                          className="text-xs flex items-center justify-between bg-slate-800/50 px-2.5 py-1.5 rounded-lg gap-2"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-slate-300 font-medium truncate">
+                              {tx.description || 'Начисление ЗП'}
+                            </span>
+                            {spec && (
+                              <span
+                                className={cn(
+                                  'text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0',
+                                  spec.cls,
+                                )}
+                              >
+                                {spec.label}
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-mono font-bold text-amber-400 shrink-0">
+                            +{parseFloat(tx.amount || '0').toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TripViewModal ──────────────────────────────────────────────────────────
+
+function TripViewModal({
+  tripId,
+  currentUser,
+  onClose,
+}: {
+  tripId: string;
+  currentUser?: PayrollUser;
+  onClose: () => void;
+}) {
+  const backdropRef = useRef(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const {
+    data: trip,
+    isLoading,
+    error,
+  } = useQuery<{
+    id: string;
+    trip_number: number | string;
+    status: string;
+    lifecycle_status: string;
+    started_at: string;
+    ended_at: string | null;
+    created_at?: string | null;
+    trip_type?: string | null;
+    odometer_start?: number | null;
+    odometer_end?: number | null;
+    driver_note?: string | null;
+    asset?: {
+      id: string;
+      short_name: string;
+      reg_number: string;
+      make?: string;
+      model?: string;
+    } | null;
+    driver?: { id: string; name: string } | null;
+    loader?: { id: string; name: string } | null;
+    trip_orders?: Array<{
+      id: string;
+      amount: string;
+      driver_pay: string;
+      loader_pay: string;
+      loader2_pay: string;
+      loader_id?: string | null;
+      loader2_id?: string | null;
+      description?: string | null;
+      payment_method?: string;
+      settlement_status?: string;
+      lifecycle_status?: string;
+      counterparty_id?: string | null;
+      counterparty?: { id: string; name: string } | null;
+      loader?: { id: string; name: string } | null;
+      loader2?: { id: string; name: string } | null;
+    }>;
+    trip_expenses?: Array<{
+      id: string;
+      amount: string;
+      payment_method?: string;
+      description?: string | null;
+      category?: { id: string; name: string } | null;
+    }>;
+  }>({
+    queryKey: ['trip-quick-view', tripId],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Не удалось загрузить данные рейса');
+      }
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+
+  const LIFECYCLE_LABELS: Record<string, { label: string; cls: string }> = {
+    draft: { label: 'Черновик', cls: 'bg-slate-100 text-slate-700 border-slate-300' },
+    submitted: { label: 'На согласовании', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+    in_review: { label: 'На согласовании', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+    approved: { label: 'Одобрен', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+    completed: { label: 'Завершен', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+    cancelled: { label: 'Отменен', cls: 'bg-rose-100 text-rose-800 border-rose-300' },
+  };
+
+  const PAYMENT_LABELS: Record<string, string> = {
+    cash: '💵 Наличные водителю',
+    card_driver: '💳 Перевод водителю',
+    qr: '📱 QR / СБП',
+    bank: '🏛️ Б/Н расчетный счет',
+    debt_cash: '⏳ Долг (нал)',
+    debt_bank: '⏳ Долг (б/н)',
+    debt: '⏳ Долг',
+  };
+
+  const statusInfo = LIFECYCLE_LABELS[trip?.lifecycle_status || trip?.status || ''] || {
+    label: trip?.lifecycle_status || trip?.status || '—',
+    cls: 'bg-slate-100 text-slate-700 border-slate-300',
+  };
+
+  const vehicleTitle = trip?.asset
+    ? [trip.asset.short_name, trip.asset.reg_number ? `(${trip.asset.reg_number})` : '']
+        .filter(Boolean)
+        .join(' ')
+    : 'Автомобиль не указан';
+
+  const activeOrders = (trip?.trip_orders || []).filter((o) => o.lifecycle_status !== 'cancelled');
+  const expenses = trip?.trip_expenses || [];
+
+  const totalRevenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount || '0'), 0);
+  const totalDriverPay = activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay || '0'), 0);
+  const totalLoader1Pay = activeOrders.reduce((s, o) => s + parseFloat(o.loader_pay || '0'), 0);
+  const totalLoader2Pay = activeOrders.reduce((s, o) => s + parseFloat(o.loader2_pay || '0'), 0);
+  const totalPayroll = totalDriverPay + totalLoader1Pay + totalLoader2Pay;
+  const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount || '0'), 0);
+  const netMargin = totalRevenue - totalPayroll - totalExpenses;
+
+  // Определение заработка конкретно просматриваемого сотрудника
+  const isCurrentDriver = Boolean(
+    currentUser &&
+    (trip?.driver?.id === currentUser.id ||
+      (trip?.driver?.name &&
+        trip.driver.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase())),
+  );
+
+  let currentEmployeePay = 0;
+  if (currentUser) {
+    if (isCurrentDriver) {
+      currentEmployeePay = totalDriverPay;
+    } else {
+      const loaderSum = activeOrders.reduce((sum, o) => {
+        let s = 0;
+        const isL1 =
+          o.loader_id === currentUser.id ||
+          (o.loader?.name &&
+            o.loader.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+          (trip?.loader?.id === currentUser.id &&
+            (!o.loader_id || o.loader_id === trip?.loader?.id));
+        const isL2 =
+          o.loader2_id === currentUser.id ||
+          (o.loader2?.name &&
+            o.loader2.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
+
+        if (isL1) s += parseFloat(o.loader_pay || '0');
+        if (isL2) s += parseFloat(o.loader2_pay || '0');
+        return sum + s;
+      }, 0);
+
+      if (loaderSum > 0) {
+        currentEmployeePay = loaderSum;
+      } else if (currentUser.roles?.includes('driver') && totalDriverPay > 0) {
+        currentEmployeePay = totalDriverPay;
+      } else if (currentUser.roles?.includes('loader') && totalLoader1Pay > 0) {
+        currentEmployeePay = totalLoader1Pay;
+      }
+    }
+  }
+
+  // Данные по одометру
+  const hasOdometer =
+    trip?.odometer_start !== undefined &&
+    trip?.odometer_start !== null &&
+    trip?.odometer_end !== undefined &&
+    trip?.odometer_end !== null;
+  const distanceKm =
+    hasOdometer && (trip.odometer_end as number) >= (trip.odometer_start as number)
+      ? (trip.odometer_end as number) - (trip.odometer_start as number)
+      : null;
+
+  // Грузчики
+  const loader1Name =
+    trip?.loader?.name || activeOrders.find((o) => o.loader?.name)?.loader?.name || null;
+  const loader2Name = activeOrders.find((o) => o.loader2?.name)?.loader2?.name || null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      onMouseDown={(e) => {
+        backdropRef.current = e.target === e.currentTarget;
+      }}
+      onMouseUp={(e) => {
+        if (backdropRef.current && e.target === e.currentTarget) {
+          onClose();
+        }
+        backdropRef.current = false;
+      }}
+    >
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="px-6 py-4.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-black text-lg">
+              🚚
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black tracking-tight text-white">
+                  Рейс #{trip?.trip_number || tripId}
+                </h3>
+                {trip && (
+                  <span
+                    className={cn(
+                      'text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border',
+                      statusInfo.cls,
+                    )}
+                  >
+                    {statusInfo.label}
+                  </span>
+                )}
+                {trip?.trip_type && (
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {trip.trip_type === 'intercity' ? 'Межгород' : 'Город'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-indigo-200/80 font-medium">
+                {isLoading ? 'Загрузка данных...' : vehicleTitle}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {trip && (
+              <a
+                href={`/review?trip=${trip.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-indigo-200 hover:text-white bg-indigo-900/60 hover:bg-indigo-800/80 border border-indigo-700/60 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs"
+                title="Открыть полный рейс в разделе Ревью"
+              >
+                <span>В Ревью</span>
+                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50/50">
+          {isLoading ? (
+            <div className="py-16 text-center space-y-3">
+              <div className="inline-block animate-spin text-3xl">⚙️</div>
+              <p className="text-sm font-bold text-slate-500">
+                Загрузка информации о рейсе #{tripId}...
+              </p>
+            </div>
+          ) : error || !trip ? (
+            <div className="py-12 text-center space-y-3 bg-white rounded-2xl border border-rose-200 p-6">
+              <span className="material-symbols-outlined text-4xl text-rose-500">error</span>
+              <p className="text-sm font-bold text-rose-700">
+                {error instanceof Error ? error.message : 'Не удалось загрузить данные рейса'}
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Акцентная плашка сотрудника: за что начислена ЗП */}
+              {currentUser && currentEmployeePay > 0 && (
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-4 text-white shadow-sm flex items-center justify-between gap-4 flex-wrap">
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-emerald-100 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[15px]">payments</span>
+                      Начислено сотруднику ({currentUser.name})
+                    </div>
+                    <p className="text-xs text-emerald-50">
+                      {isCurrentDriver
+                        ? `Зарплата водителя за рейс #${trip.trip_number} (${activeOrders.length} ${activeOrders.length === 1 ? 'заказ' : 'заказа'})`
+                        : `Зарплата грузчика за погрузку / разгрузку в рейсе #${trip.trip_number}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-black tracking-tight">
+                      +&nbsp;{currentEmployeePay.toLocaleString('ru-RU')} ₽
+                    </div>
+                    <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded text-white inline-block mt-0.5">
+                      {trip.lifecycle_status === 'approved' ? '✓ Одобрено' : 'В обработке'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Информация о датах, машине и экипаже («Когда был рейс») */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* Дата и время */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-indigo-500">
+                      calendar_today
+                    </span>
+                    Когда был рейс
+                  </div>
+                  <div className="text-xs font-black text-slate-900">
+                    {trip.started_at
+                      ? new Date(trip.started_at).toLocaleString('ru-RU', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : trip.created_at
+                        ? new Date(trip.created_at).toLocaleString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })
+                        : '—'}
+                  </div>
+                  {trip.ended_at && (
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      Завершен:{' '}
+                      {new Date(trip.ended_at).toLocaleTimeString('ru-RU', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Автомобиль */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-blue-500">
+                      local_shipping
+                    </span>
+                    Автомобиль
+                  </div>
+                  <div className="text-xs font-black text-slate-900 truncate" title={vehicleTitle}>
+                    {vehicleTitle}
+                  </div>
+                  {hasOdometer && (
+                    <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px] text-slate-400">
+                        speed
+                      </span>
+                      {distanceKm !== null
+                        ? `Пробег: ${distanceKm} км`
+                        : `Одометр: ${trip.odometer_start} км`}
+                    </div>
+                  )}
+                </div>
+
+                {/* Экипаж */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1 sm:col-span-2 lg:col-span-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-emerald-500">
+                      group
+                    </span>
+                    Экипаж рейса
+                  </div>
+                  <div className="text-xs font-black text-slate-900">
+                    <span className="text-slate-500 font-medium">Водитель: </span>
+                    {trip.driver?.name || 'Не назначен'}
+                  </div>
+                  {(loader1Name || loader2Name) && (
+                    <div className="text-[11px] text-slate-600 font-medium">
+                      <span className="text-slate-400">Грузчики: </span>
+                      {[loader1Name, loader2Name].filter(Boolean).join(' + ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Примечание водителя */}
+              {trip.driver_note && (
+                <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                    Примечание водителя по рейсу
+                  </div>
+                  <p className="text-xs font-semibold text-indigo-950 leading-relaxed whitespace-pre-line">
+                    {trip.driver_note}
+                  </p>
+                </div>
+              )}
+
+              {/* Заказы / точки и расчет ЗП («За что зарплата») */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-indigo-600">
+                      receipt_long
+                    </span>
+                    Заказы и точки в рейсе ({activeOrders.length})
+                  </span>
+                  <span className="text-xs font-black text-slate-900">
+                    Выручка: {totalRevenue.toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+
+                {activeOrders.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 font-medium">
+                    Заказы не внесены
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {activeOrders.map((o, idx) => {
+                      const clientName = o.counterparty?.name || 'Клиент без названия';
+                      const orderAmt = parseFloat(o.amount || '0');
+                      const dPay = parseFloat(o.driver_pay || '0');
+                      const lPay1 = parseFloat(o.loader_pay || '0');
+                      const lPay2 = parseFloat(o.loader2_pay || '0');
+                      const payMethodLabel =
+                        PAYMENT_LABELS[o.payment_method || ''] || o.payment_method || '—';
+
+                      // Проверяем, является ли текущий сотрудник получателем ЗП по этому заказу
+                      const isUserDriver = isCurrentDriver;
+                      const isUserLoader1 = Boolean(
+                        currentUser &&
+                        (o.loader_id === currentUser.id ||
+                          (o.loader?.name &&
+                            o.loader.name.trim().toLowerCase() ===
+                              currentUser.name.trim().toLowerCase())),
+                      );
+                      const isUserLoader2 = Boolean(
+                        currentUser &&
+                        (o.loader2_id === currentUser.id ||
+                          (o.loader2?.name &&
+                            o.loader2.name.trim().toLowerCase() ===
+                              currentUser.name.trim().toLowerCase())),
+                      );
+
+                      return (
+                        <div
+                          key={o.id || idx}
+                          className="p-4 hover:bg-slate-50/80 transition-colors space-y-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1 flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black text-slate-900">
+                                  {idx + 1}. {clientName}
+                                </span>
+                                {o.settlement_status === 'completed' ? (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                    ✓ Оплачен
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                    ⏳ Ожидает оплаты
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                  {payMethodLabel}
+                                </span>
+                              </div>
+
+                              {o.description && (
+                                <p className="text-xs text-slate-600 font-medium">
+                                  {o.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-xs text-slate-400 font-semibold uppercase">
+                                Сумма заказа
+                              </div>
+                              <span className="text-sm sm:text-base font-black text-slate-900">
+                                {orderAmt.toLocaleString('ru-RU')} ₽
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Блок начислений зарплаты за эту точку/заказ */}
+                          <div className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between gap-3 flex-wrap text-xs">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px] text-emerald-600">
+                                payments
+                              </span>
+                              Начисления за заказ:
+                            </span>
+
+                            <div className="flex items-center gap-3 flex-wrap font-medium">
+                              {/* ЗП Водителя */}
+                              {dPay > 0 && (
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 rounded-md border text-[11px]',
+                                    isUserDriver
+                                      ? 'bg-emerald-100/90 border-emerald-300 text-emerald-950 font-black ring-1 ring-emerald-400'
+                                      : 'bg-white border-slate-200 text-slate-700',
+                                  )}
+                                  title={`Водитель: ${trip.driver?.name || 'Водитель'}`}
+                                >
+                                  Водителю: <b>+{dPay.toLocaleString('ru-RU')} ₽</b>
+                                  {isUserDriver && ' (Вы)'}
+                                </span>
+                              )}
+
+                              {/* ЗП Грузчика 1 */}
+                              {lPay1 > 0 && (
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 rounded-md border text-[11px]',
+                                    isUserLoader1
+                                      ? 'bg-emerald-100/90 border-emerald-300 text-emerald-950 font-black ring-1 ring-emerald-400'
+                                      : 'bg-white border-slate-200 text-slate-700',
+                                  )}
+                                  title={`Грузчик: ${o.loader?.name || loader1Name || 'Грузчик'}`}
+                                >
+                                  Грузчику ({o.loader?.name || loader1Name || '1'}):{' '}
+                                  <b>+{lPay1.toLocaleString('ru-RU')} ₽</b>
+                                  {isUserLoader1 && ' (Вы)'}
+                                </span>
+                              )}
+
+                              {/* ЗП Грузчика 2 */}
+                              {lPay2 > 0 && (
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 rounded-md border text-[11px]',
+                                    isUserLoader2
+                                      ? 'bg-emerald-100/90 border-emerald-300 text-emerald-950 font-black ring-1 ring-emerald-400'
+                                      : 'bg-white border-slate-200 text-slate-700',
+                                  )}
+                                  title={`Второй грузчик: ${o.loader2?.name || loader2Name || 'Грузчик 2'}`}
+                                >
+                                  Грузчику ({o.loader2?.name || loader2Name || '2'}):{' '}
+                                  <b>+{lPay2.toLocaleString('ru-RU')} ₽</b>
+                                  {isUserLoader2 && ' (Вы)'}
+                                </span>
+                              )}
+
+                              {dPay === 0 && lPay1 === 0 && lPay2 === 0 && (
+                                <span className="text-slate-400 text-[11px]">ЗП не задана</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Расходы по рейсу */}
+              {expenses.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-amber-600">
+                        local_gas_station
+                      </span>
+                      Расходы по рейсу ({expenses.length})
+                    </span>
+                    <span className="text-xs font-black text-rose-700">
+                      Всего расходов: {totalExpenses.toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {expenses.map((e, idx) => (
                       <div
-                        key={tx.id}
-                        className="text-xs flex items-center justify-between bg-slate-800/50 px-2.5 py-1.5 rounded-lg"
+                        key={e.id || idx}
+                        className="p-3.5 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-3 text-xs"
                       >
-                        <span className="text-slate-300 font-medium truncate max-w-[70%]">
-                          {tx.description || 'Начисление ЗП'}
-                        </span>
-                        <span className="font-mono font-bold text-amber-400">
-                          +{parseFloat(tx.amount || '0').toLocaleString('ru-RU')} ₽
-                        </span>
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>{e.category?.name || 'Расход'}</span>
+                            {e.description && (
+                              <span className="text-slate-500 font-normal">— {e.description}</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            Оплата:{' '}
+                            {e.payment_method
+                              ? PAYMENT_LABELS[e.payment_method] || e.payment_method
+                              : '—'}
+                          </span>
+                        </div>
+                        <div className="text-right font-black text-rose-600">
+                          -&nbsp;{parseFloat(e.amount || '0').toLocaleString('ru-RU')} ₽
+                        </div>
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Итоговая финансовая сводка рейса */}
+              <div className="bg-slate-900 text-white rounded-2xl p-4.5 space-y-3 shadow-md">
+                <div className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-indigo-400">
+                    analytics
+                  </span>
+                  Финансовые итоги рейса #{trip.trip_number}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Выручка</div>
+                    <div className="text-sm sm:text-base font-black text-white">
+                      {totalRevenue.toLocaleString('ru-RU')} ₽
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Всего ЗП</div>
+                    <div className="text-sm sm:text-base font-black text-emerald-400">
+                      {totalPayroll.toLocaleString('ru-RU')} ₽
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Расходы</div>
+                    <div className="text-sm sm:text-base font-black text-rose-400">
+                      {totalExpenses.toLocaleString('ru-RU')} ₽
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">
+                      Маржа рейса
+                    </div>
+                    <div
+                      className={cn(
+                        'text-sm sm:text-base font-black',
+                        netMargin >= 0 ? 'text-indigo-300' : 'text-rose-400',
+                      )}
+                    >
+                      {netMargin.toLocaleString('ru-RU')} ₽
+                    </div>
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -1392,6 +2263,7 @@ function PayrollHistoryModal({
   const [error, setError] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
+  const [viewingTripId, setViewingTripId] = useState<string | null>(null);
 
   const history = (user.history ?? []) as StaffTx[];
 
@@ -1846,6 +2718,30 @@ function PayrollHistoryModal({
                                   visibility
                                 </span>
                                 <span>Детали наряда</span>
+                              </button>
+                            </div>
+                          ) : g.isTrip ? (
+                            <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setViewingTripId(g.trip_id || g.tripNumber || null)}
+                                className="text-base font-extrabold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 cursor-pointer text-left leading-tight group/link"
+                                title="Нажмите, чтобы открыть детали рейса и начислений"
+                              >
+                                <span>{g.title}</span>
+                                <span className="material-symbols-outlined text-[16px] text-indigo-500 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform">
+                                  open_in_new
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setViewingTripId(g.trip_id || g.tripNumber || null)}
+                                className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shadow-2xs"
+                              >
+                                <span className="material-symbols-outlined text-[12px]">
+                                  visibility
+                                </span>
+                                <span>Детали рейса</span>
                               </button>
                             </div>
                           ) : (
@@ -2341,6 +3237,13 @@ function PayrollHistoryModal({
 
       {viewingOrderId && (
         <ServiceOrderViewModal orderId={viewingOrderId} onClose={() => setViewingOrderId(null)} />
+      )}
+      {viewingTripId && (
+        <TripViewModal
+          tripId={viewingTripId}
+          currentUser={user}
+          onClose={() => setViewingTripId(null)}
+        />
       )}
     </div>
   );

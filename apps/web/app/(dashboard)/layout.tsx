@@ -8,9 +8,10 @@ import { cn } from '@saldacargo/ui';
 
 const navItems = [
   { href: '/', label: 'Главная', icon: 'dashboard' },
+  { href: '/deliveries', label: 'Заявки с сайта', icon: 'local_shipping' },
   { href: '/review', label: 'Ревью рейсов', icon: 'rate_review' },
   { href: '/finance', label: 'Финансы / P&L', icon: 'account_balance_wallet' },
-  { href: '/fleet', label: 'Автопарк', icon: 'local_shipping' },
+  { href: '/fleet', label: 'Автопарк', icon: 'directions_car' },
   { href: '/garage', label: 'Гараж / СТО', icon: 'build' },
   { href: '/counterparties', label: 'Контрагенты', icon: 'corporate_fare' },
   { href: '/staff', label: 'Персонал', icon: 'badge' },

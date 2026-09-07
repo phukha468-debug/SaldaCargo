@@ -14,23 +14,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     let query = supabase.from('trips').select(
       `
-      id, trip_number, status, lifecycle_status, started_at, ended_at,
+      id, trip_number, status, lifecycle_status, started_at, ended_at, created_at,
       trip_type, odometer_start, odometer_end, driver_note,
-      asset:assets(short_name, reg_number),
+      asset:assets(id, short_name, reg_number, make, model),
       driver:users!trips_driver_id_fkey(id, name),
       loader:users!trips_loader_id_fkey(id, name),
       trip_orders(
         id, amount, driver_pay, loader_pay, loader2_pay,
-        loader_id, loader2_id,
+        loader_id, loader2_id, description,
         loader:users!trip_orders_loader_id_fkey(id, name),
         loader2:users!trip_orders_loader2_id_fkey(id, name),
         payment_method, settlement_status, lifecycle_status,
         counterparty_id,
-        counterparty:counterparties(name)
+        counterparty:counterparties(id, name)
       ),
       trip_expenses(
         id, amount, payment_method, description,
-        category:transaction_categories(name)
+        category:transaction_categories(id, name)
       )
     `,
     );
@@ -38,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (isUuid) {
       query = query.eq('id', id);
     } else if (cleanNum) {
-      query = query.or(`trip_number.eq.${cleanNum},id.eq.${id}`);
+      query = query.eq('trip_number', parseInt(cleanNum, 10));
     } else {
       query = query.eq('id', id);
     }

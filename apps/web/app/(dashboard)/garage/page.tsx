@@ -7,7 +7,36 @@ import { cn, Money } from '@saldacargo/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Mechanic = { id: string; name: string; mechanic_salary_pct?: string | null };
+type Mechanic = { id: string; name: string; roles?: string[]; mechanic_salary_pct?: string | null };
+
+const SPECIALTY_LABELS: Record<string, string> = {
+  welder: 'Сварщик',
+  electrician: 'Электрик',
+  painter: 'Маляр',
+  mechanic_lead: 'Старший механик',
+  mechanic: 'Механик',
+  handyman: 'Разнорабочий',
+  driver: 'Водитель',
+  loader: 'Грузчик',
+};
+
+function getSpecialtyLabel(roles?: string[] | null) {
+  if (!roles || roles.length === 0) return '';
+  const priority = [
+    'welder',
+    'electrician',
+    'painter',
+    'mechanic_lead',
+    'mechanic',
+    'handyman',
+    'driver',
+    'loader',
+  ];
+  for (const p of priority) {
+    if (roles.includes(p) && SPECIALTY_LABELS[p]) return SPECIALTY_LABELS[p];
+  }
+  return '';
+}
 type Asset = {
   id: string;
   short_name: string;
@@ -1521,12 +1550,19 @@ function OrderDetailModal({
                                   return mechs.map((m) => {
                                     const pct = parseFloat(m.mechanic_salary_pct ?? '50');
                                     const salary = (basePrice * pct) / 100;
+                                    const specLabel = getSpecialtyLabel(m.roles);
                                     return (
                                       <span
                                         key={m.id}
-                                        className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded leading-none"
+                                        className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded leading-none inline-flex items-center gap-1"
                                       >
-                                        {m.name.split(' ')[0]} {salary > 0 ? `+${salary}₽` : ''}
+                                        <span>{m.name.split(' ')[0]}</span>
+                                        {specLabel && (
+                                          <span className="opacity-80 text-[9px] font-bold">
+                                            ({specLabel})
+                                          </span>
+                                        )}
+                                        {salary > 0 ? <span>+{salary}₽</span> : ''}
                                       </span>
                                     );
                                   });
@@ -1697,11 +1733,14 @@ function OrderDetailModal({
                                         className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white"
                                       >
                                         <option value="">— Не назначен —</option>
-                                        {mechanics.map((m) => (
-                                          <option key={m.id} value={m.id}>
-                                            {m.name}
-                                          </option>
-                                        ))}
+                                        {mechanics.map((m) => {
+                                          const spec = getSpecialtyLabel(m.roles);
+                                          return (
+                                            <option key={m.id} value={m.id}>
+                                              {m.name} {spec ? `(${spec})` : ''}
+                                            </option>
+                                          );
+                                        })}
                                       </select>
                                     </div>
                                     <div>
@@ -1715,15 +1754,18 @@ function OrderDetailModal({
                                         disabled={!editWorkMechanic}
                                       >
                                         <option value="">— Нет —</option>
-                                        {mechanics.map((m) => (
-                                          <option
-                                            key={m.id}
-                                            value={m.id}
-                                            disabled={m.id === editWorkMechanic}
-                                          >
-                                            {m.name}
-                                          </option>
-                                        ))}
+                                        {mechanics.map((m) => {
+                                          const spec = getSpecialtyLabel(m.roles);
+                                          return (
+                                            <option
+                                              key={m.id}
+                                              value={m.id}
+                                              disabled={m.id === editWorkMechanic}
+                                            >
+                                              {m.name} {spec ? `(${spec})` : ''}
+                                            </option>
+                                          );
+                                        })}
                                       </select>
                                     </div>
                                     <div>
