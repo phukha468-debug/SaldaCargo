@@ -356,3 +356,80 @@ export async function POST(request: Request) {
     );
   }
 }
+
+/**
+ * GET /api/public/delivery-order
+ * Получение списка заявок из audit_log с фильтрацией по магазину и периоду
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const store = searchParams.get('store');
+    const fromDate = searchParams.get('fromDate');
+    const toDate = searchParams.get('toDate');
+
+    const supabaseAdmin = createAdminClient();
+
+    let query = (supabaseAdmin.from('audit_log') as any)
+      .select('id, new_values, created_at')
+      .eq('table_name', 'delivery_requests')
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (fromDate) {
+      query = query.gte('created_at', fromDate);
+    }
+    if (toDate) {
+      query = query.lte('created_at', toDate);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    let orders = (data || []).map((row: any) => ({
+      id: row.id,
+      createdAt: row.created_at,
+      ...row.new_values,
+    }));
+
+    if (store && store !== 'all') {
+      const sLower = store.toLowerCase();
+      orders = orders.filter(
+        (o: any) =>
+          (o.store_name && o.store_name.toLowerCase().includes(sLower)) ||
+          (o.storeName && o.storeName.toLowerCase().includes(sLower)),
+      );
+    }
+
+    // Подсчёт сводки по магазинам
+    const storeStats: Record<string, { count: number; totalSum: number }> = {};
+    for (const ord of orders) {
+      const sName = ord.store_name || ord.storeName || 'Прочие магазины';
+      if (!storeStats[sName]) {
+        storeStats[sName] = { count: 0, totalSum: 0 };
+      }
+      storeStats[sName].count += 1;
+      storeStats[sName].totalSum += Number(ord.total_price || ord.totalPrice || 0);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        orders,
+        storeStats,
+        totalCount: orders.length,
+        grandTotal: orders.reduce(
+          (sum: number, o: any) => sum + Number(o.total_price || o.totalPrice || 0),
+          0,
+        ),
+      },
+      { status: 200, headers: CORS_HEADERS },
+    );
+  } catch (error: any) {
+    console.error('Error fetching delivery orders:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Ошибка получения заявок' },
+      { status: 500, headers: CORS_HEADERS },
+    );
+  }
+}

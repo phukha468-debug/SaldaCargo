@@ -426,7 +426,7 @@
               onclick="geocodeAndBuildRoute()"
               class="absolute right-1.5 top-1 px-3 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-amber-600 hover:from-brand-500 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 shadow"
             >
-              Расчёт
+              Найти
             </button>
           </div>
 
@@ -516,10 +516,10 @@
             />
             <button
               type="button"
-              onclick="geocodeAndBuildRoute()"
+              onclick="geocodeAndBuildExtraRoute()"
               class="absolute right-1.5 top-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider transition active:scale-95 shadow"
             >
-              Расчёт
+              Найти
             </button>
           </div>
 
@@ -2696,6 +2696,10 @@
               }
             });
 
+            if (!document.getElementById('deliveryAddress')?.value) {
+              reverseGeocodeCoords(currentClientCoords, 'deliveryAddress');
+            }
+
             updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
           } catch (err) {
             console.error('Yandex Maps init error:', err);
@@ -2774,6 +2778,81 @@
         }
       }
 
+      async function reverseGeocodeCoords(coords, targetInputId) {
+        if (!coords || coords.length < 2) return;
+        const inputEl = document.getElementById(targetInputId);
+        if (!inputEl) return;
+
+        let formattedAddr = '';
+
+        // 1. Попытка через Яндекс.Карты JS API v2.1
+        if (typeof ymaps !== 'undefined' && ymaps.geocode) {
+          try {
+            const res = await ymaps.geocode(coords);
+            const first = res.geoObjects.get(0);
+            if (first) {
+              if (typeof first.getAddressLine === 'function') {
+                formattedAddr = first.getAddressLine() || '';
+              } else if (first.properties && first.properties.get('text')) {
+                formattedAddr = first.properties.get('text') || '';
+              } else if (first.properties && first.properties.get('name')) {
+                const n = first.properties.get('name') || '';
+                const d = first.properties.get('description') || '';
+                formattedAddr = d ? `${d}, ${n}` : n;
+              }
+            }
+          } catch (e) {
+            console.warn('Yandex geocode error, fallback to OSM:', e);
+          }
+        }
+
+        // 2. Резерв через OpenStreetMap Nominatim (если Яндекс 403 или не нашел)
+        if (!formattedAddr) {
+          try {
+            const lat = coords[0];
+            const lon = coords[1];
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+            const resp = await fetch(url, { headers: { 'Accept-Language': 'ru' } });
+            if (resp.ok) {
+              const data = await resp.json();
+              const a = data.address || {};
+              const road = a.road || a.street || a.neighbourhood || a.pedestrian || '';
+              const house = a.house_number || '';
+              if (road && house) {
+                formattedAddr = `${road}, ${house}`;
+              } else if (road) {
+                formattedAddr = road;
+              } else if (data.display_name) {
+                formattedAddr = data.display_name;
+              }
+            }
+          } catch (oe) {
+            console.warn('OSM reverse geocode error:', oe);
+          }
+        }
+
+        // 3. Если координаты в промзоне / за городом / оффлайн
+        if (!formattedAddr) {
+          formattedAddr = `Верхняя Салда, точка на карте (${coords[0].toFixed(4)}, ${coords[1].toFixed(4)})`;
+        }
+
+        // Очищаем адрес от повторяющихся длинных префиксов
+        formattedAddr = formattedAddr
+          .replace(/^Россия,\s*/i, '')
+          .replace(/Свердловская область,\s*/i, '')
+          .replace(/Верхнесалдинский городской округ,\s*/i, '')
+          .replace(/Верхнесалдинский муниципальный округ,\s*/i, '')
+          .replace(/городской округ Нижняя Салда,\s*/i, '')
+          .replace(/городской округ Верхняя Салда,\s*/i, '')
+          .replace(/Уральский федеральный округ,\s*/i, '')
+          .replace(/\b\d{6},\s*/g, '')
+          .trim();
+
+        inputEl.value = formattedAddr;
+        updateSubmitButtonState();
+        calculateTotal();
+      }
+
       function onExtraAddressInput() {
         const addr = document.getElementById('extraAddress')?.value.trim();
         if (!addr) return;
@@ -2802,6 +2881,58 @@
         }
       }
 
+      async function geocodeAndBuildExtraRoute() {
+        let addr = document.getElementById('extraAddress')?.value.trim();
+        if (!addr) {
+          if (currentExtraCoords) {
+            await reverseGeocodeCoords(currentExtraCoords, 'extraAddress');
+            return;
+          }
+          return;
+        }
+
+        const norm = addr
+          .toLowerCase()
+          .replace(/^(г\.?|город)?\s*(верхняя\s+салда|нижняя\s+салда)[,\s]*/i, '')
+          .trim();
+
+        for (const [key, coords] of Object.entries(SALDA_GEO_CACHE)) {
+          if (norm === key || norm.startsWith(key + ' ') || norm.startsWith(key + ',')) {
+            moveExtraPoint(coords);
+            return;
+          }
+        }
+
+        try {
+          const q = `Свердловская область, Верхняя Салда, ${addr}`;
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ru&limit=5`;
+          const resp = await fetch(url, { headers: { 'Accept-Language': 'ru' } });
+          const results = await resp.json();
+
+          if (results && results.length > 0) {
+            const inBounds = results.find((r) => {
+              const lat = parseFloat(r.lat);
+              const lon = parseFloat(r.lon);
+              return lat >= 58.0 && lat <= 58.12 && lon >= 60.5 && lon <= 60.75;
+            });
+            const target = inBounds || results[0];
+            moveExtraPoint([parseFloat(target.lat), parseFloat(target.lon)]);
+            return;
+          }
+        } catch (e) {}
+
+        if (ymaps && ymaps.geocode) {
+          try {
+            const res = await ymaps.geocode(`Свердловская область, Верхняя Салда, ${addr}`);
+            const first = res.geoObjects.get(0);
+            if (first) {
+              moveExtraPoint(first.geometry.getCoordinates());
+              return;
+            }
+          } catch (e) {}
+        }
+      }
+
       function moveExtraPoint(coords) {
         currentExtraCoords = coords;
         if (extraPlacemark) {
@@ -2812,46 +2943,13 @@
 
       function onExtraPointMoved(coords) {
         currentExtraCoords = coords;
-        if (ymaps && ymaps.geocode) {
-          ymaps
-            .geocode(coords)
-            .then((res) => {
-              const first = res.geoObjects.get(0);
-              if (first) {
-                let addr = first.getAddressLine() || '';
-                addr = addr
-                  .replace(/^Россия,\s*/i, '')
-                  .replace(/Свердловская область,\s*/i, '')
-                  .replace(/городской округ Нижняя Салда,\s*/i, '')
-                  .replace(/городской округ Верхняя Салда,\s*/i, '');
-                document.getElementById('extraAddress').value = addr;
-              }
-            })
-            .catch(() => {});
-        }
+        reverseGeocodeCoords(coords, 'extraAddress');
         updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
       }
 
       function onPointMoved(coords) {
         currentClientCoords = coords;
-        if (ymaps && ymaps.geocode) {
-          ymaps
-            .geocode(coords)
-            .then((res) => {
-              const first = res.geoObjects.get(0);
-              if (first) {
-                let addr = first.getAddressLine() || '';
-                addr = addr
-                  .replace(/^Россия,\s*/i, '')
-                  .replace(/Свердловская область,\s*/i, '')
-                  .replace(/городской округ Нижняя Салда,\s*/i, '')
-                  .replace(/городской округ Верхняя Салда,\s*/i, '');
-                document.getElementById('deliveryAddress').value = addr;
-                updateSubmitButtonState();
-              }
-            })
-            .catch(() => {});
-        }
+        reverseGeocodeCoords(coords, 'deliveryAddress');
         updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
       }
 
@@ -3003,9 +3101,13 @@
       }
 
       async function geocodeAndBuildRoute() {
-        const addr = document.getElementById('deliveryAddress')?.value.trim();
+        let addr = document.getElementById('deliveryAddress')?.value.trim();
         if (!addr) {
-          alert('Введите адрес доставки!');
+          if (currentClientCoords) {
+            await reverseGeocodeCoords(currentClientCoords, 'deliveryAddress');
+            return;
+          }
+          alert('Введите адрес доставки или кликните точку на карте!');
           return;
         }
 
