@@ -371,16 +371,16 @@ export async function GET(request: Request) {
     const supabaseAdmin = createAdminClient();
 
     let query = (supabaseAdmin.from('audit_log') as any)
-      .select('id, new_values, created_at')
+      .select('id, new_values, changed_at')
       .eq('table_name', 'delivery_requests')
-      .order('created_at', { ascending: false })
+      .order('changed_at', { ascending: false })
       .limit(200);
 
     if (fromDate) {
-      query = query.gte('created_at', fromDate);
+      query = query.gte('changed_at', fromDate);
     }
     if (toDate) {
-      query = query.lte('created_at', toDate);
+      query = query.lte('changed_at', toDate);
     }
 
     const { data, error } = await query;
@@ -388,7 +388,7 @@ export async function GET(request: Request) {
 
     let orders = (data || []).map((row: any) => ({
       id: row.id,
-      createdAt: row.created_at,
+      createdAt: row.changed_at,
       ...row.new_values,
     }));
 
