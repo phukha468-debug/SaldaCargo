@@ -293,7 +293,7 @@ export async function POST(request: Request) {
           )
           .map((u: any) => u.max_user_id);
 
-        const uniqueRecipients = Array.from(new Set([...recipients, '56628256', '133117579']));
+        const uniqueRecipients = Array.from(new Set([...recipients, '56628256', '76489387']));
 
         await Promise.all(
           uniqueRecipients.map(async (userId) => {
