@@ -108,7 +108,13 @@ export async function POST(request: Request) {
       pickupAddress = '',
       hasPickupCarry = true,
       deliveryAddress = '',
+      hasExtraPoint = false,
+      extraPointAddress = '',
+      extraPointPrice = 0,
+      extraDisposalCarry = false,
       distanceKm = 0,
+      distanceKmLeg1 = 0,
+      distanceKmLeg2 = 0,
       carPrice = 0,
       hasLoaders = false,
       loadersCount = 1,
@@ -167,13 +173,27 @@ export async function POST(request: Request) {
           ? [`  • Номенклатура: ${cargoName}`, `  • Категория: ${categoryLabel}`]
           : [];
 
+    const routeHeaderLines =
+      hasExtraPoint && extraPointAddress
+        ? [
+            `📍 МАРШРУТ (через 2 точки):`,
+            `  1. Погрузка: ${pickupAddress || storeName}`,
+            `  2. Точка А (доставка): ${deliveryAddress}`,
+            `  3. Точка Б (заезд/вывоз): ${extraPointAddress}`,
+            extraDisposalCarry ? `     └ Опция: вывоз/спуск старой мебели (+500 ₽)` : null,
+            `🛣 Дистанция: ${distanceKm} км${distanceKmLeg1 && distanceKmLeg2 ? ` (Плечо 1: ${distanceKmLeg1} км + Плечо 2: ${distanceKmLeg2} км)` : ''}`,
+          ]
+        : [
+            `📍 Откуда: ${pickupAddress || storeName}`,
+            `🏁 Куда: ${deliveryAddress}`,
+            `🛣 Дистанция: ${distanceKm} км`,
+          ];
+
     const messageText = [
       `🚚 НОВЫЙ ЗАКАЗ ДОСТАВКИ: ${storeName}`,
       `━━━━━━━━━━━━━━━━━━`,
       `📦 Заказ: ${orderNumber}`,
-      `📍 Откуда: ${pickupAddress || storeName}`,
-      `🏁 Куда: ${deliveryAddress}`,
-      `🛣 Дистанция: ${distanceKm} км`,
+      ...routeHeaderLines,
       ``,
       ...(isLoaders
         ? [
@@ -189,7 +209,8 @@ export async function POST(request: Request) {
           ]
         : [`📦 УСЛУГА:`, `• Доставка автомобилем (без грузчиков / без ПРР)`, ``]),
       `💰 РАСЧЁТ СТОИМОСТИ:`,
-      `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽`,
+      `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽${hasExtraPoint ? ` (вкл. заезд во 2-ю точку +${extraPointPrice || 500} ₽)` : ''}`,
+      extraDisposalCarry ? `• Спуск/вывоз старой мебели: 500 ₽` : null,
       isLoaders
         ? `• Погрузка и занос (ПРР): ${Number(loadersPrice).toLocaleString('ru-RU')} ₽`
         : null,
@@ -219,7 +240,13 @@ export async function POST(request: Request) {
           pickup_address: pickupAddress,
           has_pickup_carry: hasPickupCarry,
           delivery_address: deliveryAddress,
+          has_extra_point: Boolean(hasExtraPoint),
+          extra_point_address: extraPointAddress || '',
+          extra_point_price: extraPointPrice || 0,
+          extra_disposal_carry: Boolean(extraDisposalCarry),
           distance_km: distanceKm,
+          distance_km_leg1: distanceKmLeg1 || 0,
+          distance_km_leg2: distanceKmLeg2 || 0,
           car_price: carPrice,
           has_loaders: isLoaders,
           loaders_count: loadersCount,
@@ -257,23 +284,37 @@ export async function POST(request: Request) {
 
         const recipients = (adminUsers ?? [])
           .filter(
-            (u: any) => u.max_user_id && (u.roles?.includes('admin') || u.roles?.includes('owner')),
+            (u: any) =>
+              u.max_user_id &&
+              (u.roles?.includes('admin') ||
+                u.roles?.includes('owner') ||
+                u.roles?.includes('dispatcher')),
           )
           .map((u: any) => u.max_user_id);
 
         const uniqueRecipients = Array.from(new Set([...recipients, '56628256', '133117579']));
 
         await Promise.all(
-          uniqueRecipients.map((userId) =>
-            fetch(`https://botapi.max.ru/messages?user_id=${userId}`, {
-              method: 'POST',
-              headers: {
-                Authorization: maxToken,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ text: messageText }),
-            }).catch((e) => console.error(`Failed to send MAX notification to ${userId}:`, e)),
-          ),
+          uniqueRecipients.map(async (userId) => {
+            try {
+              const res = await fetch(`https://botapi.max.ru/messages?user_id=${userId}`, {
+                method: 'POST',
+                headers: {
+                  Authorization: maxToken,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: messageText }),
+              });
+              if (!res.ok) {
+                const errText = await res.text();
+                console.error(
+                  `Failed to send MAX notification to ${userId}: HTTP ${res.status} - ${errText}`,
+                );
+              }
+            } catch (e) {
+              console.error(`Failed to send MAX notification to ${userId}:`, e);
+            }
+          }),
         );
       } catch (maxErr) {
         console.error('MAX Bot error:', maxErr);

@@ -13,7 +13,13 @@ type DeliveryOrder = {
   storeName?: string;
   pickup_address?: string;
   delivery_address?: string;
+  has_extra_point?: boolean;
+  extra_point_address?: string;
+  extra_point_price?: number;
+  extra_disposal_carry?: boolean;
   distance_km?: number;
+  distance_km_leg1?: number;
+  distance_km_leg2?: number;
   has_loaders?: boolean;
   loaders_count?: number;
   cargo_name?: string;
@@ -268,6 +274,17 @@ export default function DeliveriesPage() {
                         <div className="font-medium text-slate-900 max-w-xs truncate" title={dest}>
                           {dest}
                         </div>
+                        {ord.has_extra_point && ord.extra_point_address ? (
+                          <div
+                            className="text-[11px] text-blue-700 font-semibold flex items-center gap-1 max-w-xs truncate"
+                            title={ord.extra_point_address}
+                          >
+                            <span>➔ {ord.extra_point_address}</span>
+                            <span className="text-[9px] bg-blue-100 text-blue-800 px-1 rounded">
+                              2 точки
+                            </span>
+                          </div>
+                        ) : null}
                         <div className="text-[11px] text-slate-500">{km} км</div>
                       </td>
                       <td className="py-3 px-4">
