@@ -101,6 +101,7 @@ export default function AddOrderPage() {
 
   // Водитель-грузчик
   const [isDriverLoader, setIsDriverLoader] = useState(false);
+  const [loadingAmount, setLoadingAmount] = useState<string>('');
 
   // Client selection state
   const [clientType, setClientType] = useState<'individual' | 'legal' | null>(null);
@@ -147,12 +148,18 @@ export default function AddOrderPage() {
     selectedCounterparty?.min_delivery_base ??
     (selectedCounterparty?.is_delivery_zone_client ? 800 : 1000);
 
+  const parsedLoadingAmount =
+    (isDriverLoader || loaders.length > 0) && loadingAmount !== ''
+      ? Number(loadingAmount)
+      : undefined;
+
   const payroll = calculateOrderPayroll({
     direction,
     amount,
     isDriverLoader,
     loadersCount: loaders.length,
     minMachineBase,
+    loadingAmount: parsedLoadingAmount,
   });
 
   const isCity = payroll.isAutomatic;
@@ -615,6 +622,63 @@ export default function AddOrderPage() {
           </button>
         </div>
 
+        {/* ── Сумма за погрузку (если водитель-грузчик или есть сторонние грузчики) ── */}
+        {(isDriverLoader || loaders.length > 0) && (
+          <div className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-black text-amber-900 uppercase tracking-wide">
+                📦 В т.ч. за погрузку / занос, ₽
+              </label>
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                70% грузчикам
+              </span>
+            </div>
+
+            <input
+              type="number"
+              inputMode="numeric"
+              value={loadingAmount}
+              onChange={(e) => setLoadingAmount(e.target.value)}
+              placeholder="Например: 3 000 (или пусто = пополам)"
+              className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-14 text-2xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
+            />
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-amber-700 font-bold uppercase mr-1">Быстро:</span>
+              {[1000, 2000, 3000, 3300].map((quickSum) => (
+                <button
+                  key={quickSum}
+                  type="button"
+                  onClick={() => setLoadingAmount(String(quickSum))}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                    loadingAmount === String(quickSum)
+                      ? 'bg-amber-500 text-slate-950 font-black'
+                      : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
+                  }`}
+                >
+                  {quickSum.toLocaleString('ru-RU')} ₽
+                </button>
+              ))}
+              {loadingAmount && (
+                <button
+                  type="button"
+                  onClick={() => setLoadingAmount('')}
+                  className="text-[11px] text-amber-700 underline ml-auto hover:text-amber-900 font-bold"
+                >
+                  Сбросить
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-amber-200/60 text-amber-900">
+              <span>🚗 На машину остаётся:</span>
+              <span className="font-mono text-sm font-black text-amber-950">
+                {payroll.machinePool.toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* ── ЗП водителя ── */}
         {isCity ? (
           <div className="bg-zinc-900 text-white rounded-2xl p-4 space-y-3 shadow-md">
@@ -627,19 +691,24 @@ export default function AddOrderPage() {
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">🚗 За машину</div>
+                <div className="text-zinc-400 font-bold">🚗 За машину (30%)</div>
                 <div className="text-base font-black text-white mt-0.5">
                   {payroll.driverCarPay} ₽
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  из {payroll.machinePool.toLocaleString('ru-RU')} ₽
                 </div>
               </div>
 
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">📦 За погрузку</div>
+                <div className="text-zinc-400 font-bold">📦 За погрузку (70%)</div>
                 <div className="text-base font-black text-white mt-0.5">
                   {payroll.driverLoaderPay} ₽
                 </div>
-                <div className="text-[10px] text-zinc-500">
-                  {isDriverLoader ? 'водитель как грузчик' : 'не отмечен'}
+                <div className="text-[10px] text-zinc-400">
+                  {isDriverLoader
+                    ? `из ${payroll.loadersPool.toLocaleString('ru-RU')} ₽`
+                    : 'не отмечен'}
                 </div>
               </div>
             </div>

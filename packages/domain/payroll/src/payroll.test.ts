@@ -123,4 +123,63 @@ const t12 = calculateOrderPayroll({
 console.log('T12 (15000, ekb intercity):', t12);
 assert(t12.isAutomatic === false, 'T12 isAutomatic should be false for intercity');
 
+// 13. Кейс пользователя: 4000 ₽ всего, в т.ч. 3000 ₽ погрузка (водитель-грузчик)
+// Машина = 4000 - 3000 = 1000 ₽ -> ЗП авто = 300 ₽, ЗП погрузка = 2100 ₽, всего = 2400 ₽
+const t13 = calculateOrderPayroll({
+  amount: 4000,
+  loadingAmount: 3000,
+  isDriverLoader: true,
+  loadersCount: 0,
+});
+console.log('T13 (4000 total, 3000 loading, driver loader):', t13);
+assert(t13.machinePool === 1000, 'T13 machinePool should be 1000');
+assert(t13.loadersPool === 3000, 'T13 loadersPool should be 3000');
+assert(t13.driverCarPay === 300, 'T13 driverCarPay should be 300 (30% of 1000)');
+assert(t13.driverLoaderPay === 2100, 'T13 driverLoaderPay should be 2100 (70% of 3000)');
+assert(t13.driverTotalPay === 2400, 'T13 driverTotalPay should be 2400');
+assert(t13.companyShare === 1600, 'T13 companyShare should be 1600 (4000 - 2400)');
+
+// 14. Спецтариф магазина: 4000 ₽ всего, в т.ч. 3300 ₽ погрузка (машина = 700 ₽)
+const t14 = calculateOrderPayroll({
+  amount: 4000,
+  loadingAmount: 3300,
+  isDriverLoader: true,
+  loadersCount: 0,
+});
+console.log('T14 (4000 total, 3300 loading, machine 700):', t14);
+assert(t14.machinePool === 700, 'T14 machinePool should be 700');
+assert(t14.loadersPool === 3300, 'T14 loadersPool should be 3300');
+assert(t14.driverCarPay === 210, 'T14 driverCarPay should be 210 (30% of 700)');
+assert(t14.driverLoaderPay === 2310, 'T14 driverLoaderPay should be 2310 (70% of 3300)');
+assert(t14.driverTotalPay === 2520, 'T14 driverTotalPay should be 2520');
+assert(t14.companyShare === 1480, 'T14 companyShare should be 1480 (4000 - 2520)');
+
+// 15. Доставка из магазина 700 ₽ без погрузки
+const t15 = calculateOrderPayroll({
+  amount: 700,
+  loadingAmount: 0,
+  isDriverLoader: false,
+  loadersCount: 0,
+});
+console.log('T15 (700 total, 0 loading, driver only):', t15);
+assert(t15.machinePool === 700, 'T15 machinePool should be 700');
+assert(t15.loadersPool === 0, 'T15 loadersPool should be 0');
+assert(t15.driverCarPay === 210, 'T15 driverCarPay should be 210 (30% of 700)');
+assert(t15.driverTotalPay === 210, 'T15 driverTotalPay should be 210');
+assert(t15.companyShare === 490, 'T15 companyShare should be 490');
+
+// 16. Доставка с 1 сторонним грузчиком: 4000 ₽ всего, 3000 ₽ погрузка (водитель НЕ грузчик)
+const t16 = calculateOrderPayroll({
+  amount: 4000,
+  loadingAmount: 3000,
+  isDriverLoader: false,
+  loadersCount: 1,
+});
+console.log('T16 (4000 total, 3000 loading, 1 outside loader):', t16);
+assert(t16.driverCarPay === 300, 'T16 driverCarPay should be 300');
+assert(t16.driverLoaderPay === 0, 'T16 driverLoaderPay should be 0');
+assert(t16.driverTotalPay === 300, 'T16 driverTotalPay should be 300');
+assert(t16.loaderPayEach === 2100, 'T16 loaderPayEach should be 2100 (70% of 3000)');
+assert(t16.companyShare === 1600, 'T16 companyShare should be 1600');
+
 console.log('ALL PAYROLL TESTS PASSED SUCCESSFULLY! ✅');

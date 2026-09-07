@@ -163,6 +163,7 @@ export interface OrderPayrollParams {
   isDriverLoader: boolean;
   loadersCount: number; // количество сторонних грузчиков
   minMachineBase?: number; // по умолчанию 1000 ₽ (или 800 ₽ для спец. магазинов)
+  loadingAmount?: number; // явно выделенная сумма за погрузку из общего чека
 }
 
 export interface OrderPayrollResult {
@@ -187,6 +188,7 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
     isDriverLoader = false,
     loadersCount = 0,
     minMachineBase = 1000,
+    loadingAmount,
   } = params;
 
   // Автоматический расчет применяется ко всем местным направлениям
@@ -228,21 +230,28 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
   }
 
   // Сценарий 2: Есть грузчики (водитель-грузчик и/или сторонние грузчики)
-  const loaderUnitRate = 1000;
-  const nominalPackageRate = baseRate + totalLoadersCount * loaderUnitRate;
-
   let machinePool = 0;
   let loadersPool = 0;
 
-  if (amount >= nominalPackageRate) {
-    // Полные часы или стандартный тариф: делим пропорционально ставкам компонентов
-    machinePool = Math.round(amount * (baseRate / nominalPackageRate));
-    loadersPool = amount - machinePool;
+  if (loadingAmount !== undefined && loadingAmount >= 0) {
+    // Водитель или диспетчер явно указал сумму за погрузку из общего чека
+    loadersPool = Math.min(amount, Math.max(0, loadingAmount));
+    machinePool = Math.max(0, amount - loadersPool);
   } else {
-    // Быстрый/короткий заказ (меньше полного комплекта):
-    // Машина забирает базовую ставку направления, остаток идёт в пул грузчиков
-    machinePool = Math.min(amount, baseRate);
-    loadersPool = Math.max(0, amount - machinePool);
+    // Автоматическое распределение по умолчанию (пропорционально)
+    const loaderUnitRate = 1000;
+    const nominalPackageRate = baseRate + totalLoadersCount * loaderUnitRate;
+
+    if (amount >= nominalPackageRate) {
+      // Полные часы или стандартный тариф: делим пропорционально ставкам компонентов
+      machinePool = Math.round(amount * (baseRate / nominalPackageRate));
+      loadersPool = amount - machinePool;
+    } else {
+      // Быстрый/короткий заказ (меньше полного комплекта):
+      // Машина забирает базовую ставку направления, остаток идёт в пул грузчиков
+      machinePool = Math.min(amount, baseRate);
+      loadersPool = Math.max(0, amount - machinePool);
+    }
   }
 
   // Доля водителя за автомобиль: 30%
