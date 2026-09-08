@@ -129,8 +129,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           >
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm text-xs">
-                  TK
+                <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm flex-shrink-0">
+                  <img
+                    src="/logo.png"
+                    alt="TK501"
+                    className="w-full h-full object-cover rounded-[10px]"
+                  />
                 </div>
                 <span className="font-extrabold text-slate-900 text-base">TK501</span>
               </div>
@@ -202,8 +206,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
             {/* Brand Logo */}
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 bg-sky-600 group-hover:bg-sky-700 transition-colors rounded-xl flex items-center justify-center font-black text-white text-xs shadow-sm shadow-sky-600/20">
-                TK
+              <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm shadow-amber-900/20 flex-shrink-0">
+                <img
+                  src="/logo.png"
+                  alt="TK501"
+                  className="w-full h-full object-cover rounded-[10px]"
+                />
               </div>
               <div className="hidden sm:block">
                 <div className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
