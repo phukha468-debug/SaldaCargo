@@ -133,6 +133,8 @@ export async function POST(request: Request) {
       clientName = '',
       clientPhone = '',
       preferredTime = '',
+      deliveryDate = '',
+      deliveryTime = '',
       notes = '',
     } = body;
 
@@ -189,10 +191,17 @@ export async function POST(request: Request) {
             `🛣 Дистанция: ${distanceKm} км`,
           ];
 
+    const timeDisplay =
+      deliveryDate || deliveryTime
+        ? `${deliveryDate || 'Сегодня'}${deliveryTime ? ` (${deliveryTime})` : ''}`
+        : preferredTime || 'Ближайшее время';
+
     const messageText = [
-      `🚚 НОВЫЙ ЗАКАЗ ДОСТАВКИ: ${storeName}`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `📦 Заказ: ${orderNumber}`,
+      `🚚 НОВЫЙ ЗАКАЗ ИЗ МАГАЗИНА: «${storeName.toUpperCase()}»`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `🏬 Отправитель (магазин): ${storeName}`,
+      `📦 Номер заявки: ${orderNumber}`,
+      `📅 Дата и время доставки: ${timeDisplay}`,
       ...routeHeaderLines,
       ``,
       ...(isLoaders
@@ -214,13 +223,12 @@ export async function POST(request: Request) {
       isLoaders
         ? `• Погрузка и занос (ПРР): ${Number(loadersPrice).toLocaleString('ru-RU')} ₽`
         : null,
-      `━━━━━━━━━━━━━━━━━━`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
       `ИТОГО К ОПЛАТЕ: ${Number(totalPrice).toLocaleString('ru-RU')} ₽`,
       ``,
       `👤 КОНТАКТЫ:`,
       `• Клиент: ${clientName || 'Получатель'} (${clientPhone})`,
       managerName || managerPhone ? `• Менеджер магазина: ${managerName} (${managerPhone})` : null,
-      preferredTime ? `• Желаемое время: ${preferredTime}` : null,
       notes ? `• Примечание: ${notes}` : null,
     ]
       .filter((line) => line !== null)
@@ -263,7 +271,9 @@ export async function POST(request: Request) {
           client_phone: clientPhone,
           manager_name: managerName,
           manager_phone: managerPhone,
-          preferred_time: preferredTime,
+          preferred_time: timeDisplay,
+          delivery_date: deliveryDate,
+          delivery_time: deliveryTime,
           notes,
           created_at: new Date().toISOString(),
         },
