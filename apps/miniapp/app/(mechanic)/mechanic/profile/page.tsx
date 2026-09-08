@@ -49,7 +49,7 @@ export default function MechanicProfilePage() {
 
       <div className="text-center">
         <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">
-          ancargo66 v1.0.0
+          TK501 v1.0.0
         </p>
       </div>
     </div>

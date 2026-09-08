@@ -8,13 +8,13 @@ import { MinimizeOnBack } from '@/components/minimize-on-back';
 const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'ancargo66',
-  description: 'Грузоперевозки Верхняя Салда',
+  title: 'TK501',
+  description: 'Транспортная компания TK501 — Верхняя Салда',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'ancargo66',
+    title: 'TK501',
   },
   icons: {
     icon: '/favicon.ico',

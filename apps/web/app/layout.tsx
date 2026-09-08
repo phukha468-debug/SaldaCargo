@@ -7,8 +7,8 @@ import { ScrollOnFocus } from '@/components/scroll-on-focus';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'ancargo66 Web',
-  description: 'Управление транспортным бизнесом',
+  title: 'TK501 Web',
+  description: 'Транспортная компания TK501 — Управление автопарком',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

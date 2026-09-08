@@ -85,7 +85,7 @@ export default function DeliveriesPage() {
             Заявки на доставку из магазинов
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Учёт заказов с сайта ancargo66.ru, суммы по магазинам и связь с рейсами
+            Учёт заказов с сайта tk501.ru, суммы по магазинам и связь с рейсами
           </p>
         </div>
 

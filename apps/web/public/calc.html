@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>Калькулятор доставки и ПРР для магазинов-партнёров | ancargo66</title>
+    <title>Калькулятор доставки и ПРР для магазинов-партнёров | TK501</title>
     <meta
       name="description"
       content="Автоматический расчёт доставки и погрузочно-разгрузочных работ поштучно по этажам для магазинов стройматериалов и мебели."
@@ -216,7 +216,7 @@
         </div>
 
         <div class="text-[11px] text-slate-500 pt-1">
-          ПИН-код выдаётся диспетчером службы доставки SaldaCargo
+          ПИН-код выдаётся диспетчером службы доставки TK501
         </div>
       </div>
     </div>
@@ -230,13 +230,13 @@
       <div class="flex items-center justify-between border-b border-slate-800 pb-3.5">
         <a href="/" class="flex items-center gap-3">
           <div
-            class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-amber-700 flex items-center justify-center font-black text-white text-lg shadow-md shadow-brand-900/30"
+            class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-amber-700 flex items-center justify-center font-black text-white text-sm shadow-md shadow-brand-900/30"
           >
-            A
+            TK
           </div>
           <div>
             <div class="text-base font-black text-white tracking-tight flex items-center gap-2">
-              <span>ANCARGO66.RU</span>
+              <span>TK501.RU</span>
               <span
                 id="activeStoreBadge"
                 class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold uppercase"
@@ -1319,17 +1319,39 @@
         }
       }
 
+      const API_ENDPOINTS = [
+        'https://app.tk501.ru/api/public/delivery-order',
+        'https://app.ancargo66.ru/api/public/delivery-order',
+      ];
+
+      async function fetchDeliveryApi(payload) {
+        for (const endpoint of API_ENDPOINTS) {
+          try {
+            const resp = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (resp.ok) return resp;
+          } catch (e) {
+            console.warn(`Fetch ${endpoint} failed, trying fallback:`, e);
+          }
+        }
+        // Fallback final try
+        return fetch(API_ENDPOINTS[0], {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+
       async function verifyEnteredPin(pin) {
         const errorEl = document.getElementById('pinErrorMsg');
         errorEl?.classList.add('hidden');
 
         try {
           // Проверка через защищённый серверный API
-          const resp = await fetch('https://app.ancargo66.ru/api/public/delivery-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'verify_pin', pin }),
-          });
+          const resp = await fetchDeliveryApi({ action: 'verify_pin', pin });
 
           const data = await resp.json();
           if (resp.ok && data.success) {
@@ -3265,11 +3287,7 @@
             notes: document.getElementById('orderNotes')?.value?.trim() || '',
           };
 
-          const resp = await fetch('https://app.ancargo66.ru/api/public/delivery-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
+          const resp = await fetchDeliveryApi(payload);
 
           const data = await resp.json();
           if (resp.ok && data.success) {

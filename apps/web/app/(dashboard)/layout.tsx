@@ -129,10 +129,10 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           >
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">
-                  A
+                <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm text-xs">
+                  TK
                 </div>
-                <span className="font-extrabold text-slate-900 text-base">ancargo66</span>
+                <span className="font-extrabold text-slate-900 text-base">TK501</span>
               </div>
               <button
                 onClick={() => setMobileNavOpen(false)}
@@ -202,12 +202,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
             {/* Brand Logo */}
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 bg-sky-600 group-hover:bg-sky-700 transition-colors rounded-xl flex items-center justify-center font-black text-white text-base shadow-sm shadow-sky-600/20">
-                S
+              <div className="w-8 h-8 bg-sky-600 group-hover:bg-sky-700 transition-colors rounded-xl flex items-center justify-center font-black text-white text-xs shadow-sm shadow-sky-600/20">
+                TK
               </div>
               <div className="hidden sm:block">
                 <div className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
-                  ancargo66
+                  TK501
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium leading-none">
                   Управление автопарком
@@ -224,7 +224,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   {currentNav?.label || 'Главная'}
                 </h1>
                 <span className="bg-sky-50 text-sky-700 border border-sky-200/70 text-[11px] font-bold px-2 py-0.5 rounded-full hidden md:inline-block">
-                  ancargo66 ERP
+                  TK501 ERP
                 </span>
               </div>
             </div>
@@ -315,7 +315,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer className="py-4 px-6 border-t border-slate-200 text-center text-xs text-slate-400 bg-white">
-        © 2026 ancargo66 ERP · Все финансовые и операционные данные синхронизированы
+        © 2026 TK501 ERP · Все финансовые и операционные данные синхронизированы
       </footer>
     </div>
   );

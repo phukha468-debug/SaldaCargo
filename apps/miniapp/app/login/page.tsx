@@ -70,7 +70,7 @@ function LoginForm() {
         <div className="p-8">
           <div className="text-center mb-10">
             <h1 className="text-3xl font-black text-zinc-900 tracking-tight uppercase italic">
-              ancargo<span className="text-orange-600">66</span>
+              TK<span className="text-orange-600">501</span>
             </h1>
             <p className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest mt-1">
               Вход по ПИН-коду
@@ -128,7 +128,7 @@ function LoginForm() {
       </div>
 
       <p className="mt-8 text-zinc-400 font-bold text-[10px] uppercase tracking-widest">
-        v1.1.1 • ancargo66
+        v1.1.1 • TK501
       </p>
 
       <style jsx global>{`
