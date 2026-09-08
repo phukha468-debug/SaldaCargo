@@ -809,40 +809,60 @@
                 <!-- ФОРМА ДОБАВЛЕНИЯ СВОЕЙ ПОЗИЦИИ (CUSTOM) -->
                 <div
                   id="customItemForm"
-                  class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5"
+                  class="hidden p-3.5 rounded-xl bg-slate-950 border border-brand-500/30 space-y-2.5 shadow-lg"
                 >
-                  <div class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                    Добавление своей позиции:
+                  <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-brand-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Добавление своей позиции
+                    </span>
+                    <span class="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                      Формула: 40 ₽ за каждые 30 кг / этаж
+                    </span>
                   </div>
+
                   <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
                     <div class="sm:col-span-6">
+                      <label class="block text-[10px] font-bold text-slate-400 mb-1">Наименование позиции:</label>
                       <input
                         type="text"
                         id="customName"
-                        placeholder="Название (например: Душевая кабина)"
-                        class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                        placeholder="Например: Зеркало напольное или Стеллаж"
+                        class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-brand-500 focus:outline-none"
                       />
                     </div>
-                    <div class="sm:col-span-2">
-                      <input
-                        type="number"
-                        id="customCount"
-                        min="1"
-                        value="1"
-                        placeholder="Кол-во"
-                        class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white"
-                      />
-                    </div>
-                    <div class="sm:col-span-4">
+                    <div class="sm:col-span-3">
+                      <label class="block text-[10px] font-bold text-amber-400 mb-1">Вес (КГ) *обязательно:</label>
                       <input
                         type="number"
                         id="customWeight"
                         min="1"
                         max="500"
-                        placeholder="Вес 1 шт (кг)"
-                        class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                        placeholder="КГ (обязательно)"
+                        oninput="updateCustomPricePreview()"
+                        class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none font-bold"
                       />
                     </div>
+                    <div class="sm:col-span-3">
+                      <label class="block text-[10px] font-bold text-slate-400 mb-1">Кол-во (шт):</label>
+                      <input
+                        type="number"
+                        id="customCount"
+                        min="1"
+                        max="500"
+                        value="1"
+                        placeholder="Кол-во"
+                        class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:border-brand-500 focus:outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Живой бейдж расчёта тарифа по формуле -->
+                  <div
+                    id="customPricePreview"
+                    class="text-xs text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 rounded-lg flex items-center justify-between"
+                  >
+                    <span>⚖️ Укажите вес: базовый расчёт 40 ₽ за каждые 30 кг (60 кг = 80 ₽, 90 кг = 120 ₽...)</span>
+                    <span id="customPricePreviewVal" class="font-mono font-bold text-amber-400">0 ₽ / этаж</span>
                   </div>
 
                   <div class="flex items-center justify-between pt-1">
@@ -850,18 +870,19 @@
                       <input
                         type="checkbox"
                         id="customRequiresTwo"
-                        class="w-4 h-4 rounded text-brand-500 border-slate-700 bg-slate-900"
+                        class="w-4 h-4 rounded text-brand-500 border-slate-700 bg-slate-900 cursor-pointer"
                       />
-                      <label for="customRequiresTwo" class="text-xs text-slate-300 cursor-pointer">
-                        Не унести одному (требуется 2 грузчика)
+                      <label for="customRequiresTwo" class="text-xs text-slate-300 cursor-pointer select-none">
+                        👥 Требуется 2 грузчика (не унести одному)
                       </label>
                     </div>
                     <button
                       type="button"
                       onclick="addCustomItem()"
-                      class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 shadow"
+                      class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 shadow flex items-center gap-1"
                     >
-                      Внести в смету
+                      <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                      <span>Внести в смету</span>
                     </button>
                   </div>
                 </div>
@@ -1840,6 +1861,57 @@
       };
 
       // 2.1 ИНДИВИДУАЛЬНЫЕ ПРАЙСЫ ПРР ДЛЯ МАГАЗИНОВ-ПАРТНЁРОВ
+            // ЕДИНЫЙ ПРАЙС-ЛИСТ МЕБЕЛИ (22 ПОЗИЦИИ)
+      const FURNITURE_CATALOG = [
+        {
+          group: 'Кухня и столовая',
+          items: [
+            { id: 'ang_kitch_up', name: 'Кухонный гарнитур — Верхний модуль', pricePerFloor: 100, requiresTwo: false, weightKg: 15, unit: 'секц', fitsElevator: true, carryOutPrice: 0 },
+            { id: 'ang_kitch_down', name: 'Кухонный гарнитур — Нижний модуль', pricePerFloor: 150, requiresTwo: false, weightKg: 25, unit: 'секц', fitsElevator: true, carryOutPrice: 150 },
+            { id: 'ang_table_top', name: 'Столешница', pricePerFloor: 200, requiresTwo: true, weightKg: 30, unit: 'шт', fitsElevator: false, carryOutPrice: 200 },
+            { id: 'ang_dining_zone', name: 'Обеденная зона', pricePerFloor: 300, requiresTwo: true, weightKg: 45, unit: 'компл', fitsElevator: true, carryOutPrice: 300 },
+          ],
+        },
+        {
+          group: 'Шкафы и комоды',
+          items: [
+            { id: 'ang_shkaf_2_sborka', name: 'Шкаф 2-х дверный в сборе', pricePerFloor: 250, requiresTwo: true, weightKg: 65, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
+            { id: 'ang_shkaf_razbor', name: 'Шкаф в разборе', pricePerFloor: 250, requiresTwo: false, weightKg: 50, unit: 'компл', fitsElevator: true, carryOutPrice: 250 },
+            { id: 'ang_komod_small', name: 'Комод малый в сборе', pricePerFloor: 250, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 250 },
+            { id: 'ang_komod_big', name: 'Комод большой в сборе', pricePerFloor: 300, requiresTwo: true, weightKg: 55, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+            { id: 'ang_prihozhaya_sborka', name: 'Прихожая в сборе', pricePerFloor: 250, requiresTwo: true, weightKg: 50, unit: 'модуль', fitsElevator: false, carryOutPrice: 250 },
+            { id: 'ang_stenka_razbor', name: 'Стенка большая в разборе', pricePerFloor: 400, requiresTwo: true, weightKg: 100, unit: 'компл', fitsElevator: false, carryOutPrice: 400 },
+          ],
+        },
+        {
+          group: 'Кровати и спальня',
+          items: [
+            { id: 'ang_bed_single', name: 'Кровать односпальная / серия КР-3', pricePerFloor: 200, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_bed_double', name: 'Кровать двуспальная / серии КР-16, КР-710, Кр-71', pricePerFloor: 250, requiresTwo: true, weightKg: 55, unit: 'шт', fitsElevator: true, carryOutPrice: 250 },
+            { id: 'ang_matras_small', name: 'Матрас малый (800–900 мм)', pricePerFloor: 200, requiresTwo: false, weightKg: 15, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_matras_big', name: 'Матрас большой (1400–1600 мм)', pricePerFloor: 300, requiresTwo: true, weightKg: 35, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+          ],
+        },
+        {
+          group: 'Мягкая мебель',
+          items: [
+            { id: 'ang_kreslo_krovat', name: 'Кресло-кровать', pricePerFloor: 250, requiresTwo: true, weightKg: 45, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
+            { id: 'ang_kanape', name: 'Канапе', pricePerFloor: 400, requiresTwo: true, weightKg: 65, unit: 'шт', fitsElevator: false, carryOutPrice: 400 },
+            { id: 'ang_divan_standart', name: 'Диван прямой (стандартный 2-местный)', pricePerFloor: 400, requiresTwo: true, weightKg: 75, unit: 'шт', fitsElevator: false, carryOutPrice: 400 },
+            { id: 'ang_divan_ugol', name: 'Диван угловой', pricePerFloor: 450, requiresTwo: true, weightKg: 100, unit: 'шт', fitsElevator: false, carryOutPrice: 450 },
+            { id: 'ang_divan_3mest', name: 'Диван прямой 3-местный (тройной)', pricePerFloor: 500, requiresTwo: true, weightKg: 110, unit: 'шт', fitsElevator: false, carryOutPrice: 500 },
+          ],
+        },
+        {
+          group: 'Столы и тумбы',
+          items: [
+            { id: 'ang_tumba_zhurn', name: 'Тумбы прикроватные / Столы журнальные', pricePerFloor: 200, requiresTwo: false, weightKg: 15, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_stol_komp_pryam', name: 'Стол компьютерный прямой', pricePerFloor: 250, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 250 },
+            { id: 'ang_stol_komp_ugol', name: 'Стол компьютерный угловой', pricePerFloor: 300, requiresTwo: true, weightKg: 45, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+          ],
+        },
+      ];
+
       const PRR_CATALOG_BY_STORE = {
         tiles: [
           {
@@ -1866,49 +1938,10 @@
             ],
           },
         ],
-        mebel_angela: [
-          {
-            group: '1. Класс «Мелкий / модуль» (100 ₽/эт, вынос 0 ₽)',
-            items: [
-              { id: 'ang_kitch', name: 'Кухонный шкаф/модуль верхний/нижний (до 20 кг)', pricePerFloor: 100, requiresTwo: false, weightKg: 15, unit: 'модуль', carryOutPrice: 0 },
-              { id: 'ang_tumba', name: 'Тумбочка прикроватная / обувница в коробке', pricePerFloor: 100, requiresTwo: false, weightKg: 15, unit: 'шт', carryOutPrice: 0 },
-              { id: 'ang_table_zhurn', name: 'Столик журнальный / столик туалетный', pricePerFloor: 100, requiresTwo: false, weightKg: 15, unit: 'шт', carryOutPrice: 0 },
-              { id: 'ang_table_knizhka', name: 'Стол-книжка в сложенном виде', pricePerFloor: 100, requiresTwo: false, weightKg: 20, unit: 'шт', carryOutPrice: 0 },
-              { id: 'ang_matr_1', name: 'Матрас 1-спальный (80–90 см)', pricePerFloor: 100, requiresTwo: false, weightKg: 15, unit: 'шт', carryOutPrice: 0 },
-            ],
-          },
-          {
-            group: '2. Класс «Стандарт мебель» (200 ₽/эт, вынос 200 ₽, 2 грузчика)',
-            items: [
-              { id: 'ang_shkaf_2', name: 'Шкаф 2-дверный (в сборе / комплект упаковок)', pricePerFloor: 200, requiresTwo: true, weightKg: 60, unit: 'шкаф', carryOutPrice: 200 },
-              { id: 'ang_komod', name: 'Комод стандартный в сборе', pricePerFloor: 200, requiresTwo: true, weightKg: 40, unit: 'шт', carryOutPrice: 200 },
-              { id: 'ang_bed_kr', name: 'Кровать с основанием (КР-3 / КР-16 / КР-710)', pricePerFloor: 200, requiresTwo: true, weightKg: 45, unit: 'кровать', carryOutPrice: 200 },
-              { id: 'ang_prihozhaya', name: 'Прихожая стандартная в сборе', pricePerFloor: 200, requiresTwo: true, weightKg: 45, unit: 'компл', carryOutPrice: 200 },
-              { id: 'ang_table_desk', name: 'Стол письменный / компьютерный прямой', pricePerFloor: 200, requiresTwo: true, weightKg: 35, unit: 'шт', carryOutPrice: 200 },
-              { id: 'ang_kreslo_bed', name: 'Кресло / кресло-кровать', pricePerFloor: 200, requiresTwo: true, weightKg: 35, unit: 'шт', carryOutPrice: 200 },
-            ],
-          },
-          {
-            group: '3. Класс «Крупный / диван» (300 ₽/эт, вынос 300 ₽, 2 грузчика)',
-            items: [
-              { id: 'ang_divan_pryamoy', name: 'Диван прямой 2-3 местный / канапе', pricePerFloor: 300, requiresTwo: true, weightKg: 65, unit: 'диван', carryOutPrice: 300 },
-              { id: 'ang_obeden_zona', name: 'Обеденная зона (стол + стулья в сборе)', pricePerFloor: 300, requiresTwo: true, weightKg: 45, unit: 'компл', carryOutPrice: 300 },
-              { id: 'ang_matr_2', name: 'Матрас 2-спальный (140–180 см)', pricePerFloor: 300, requiresTwo: true, weightKg: 35, unit: 'шт', carryOutPrice: 300 },
-              { id: 'ang_stenka', name: 'Стенка гостиная большая (разбор / пачки)', pricePerFloor: 300, requiresTwo: true, weightKg: 90, unit: 'компл', carryOutPrice: 300 },
-              { id: 'ang_komod_big', name: 'Комод большой широкий в сборе', pricePerFloor: 300, requiresTwo: true, weightKg: 55, unit: 'шт', carryOutPrice: 300 },
-              { id: 'ang_table_corner', name: 'Стол компьютерный угловой большой', pricePerFloor: 300, requiresTwo: true, weightKg: 45, unit: 'шт', carryOutPrice: 300 },
-            ],
-          },
-          {
-            group: '4. Класс «Макси / угловой» (400 ₽/эт, вынос 400 ₽, 2 грузчика)',
-            items: [
-              { id: 'ang_divan_ugol', name: 'Диван угловой большой (2–3 секции)', pricePerFloor: 400, requiresTwo: true, weightKg: 95, unit: 'диван', carryOutPrice: 400 },
-              { id: 'ang_divan_modul', name: 'Диван тройной / модульный (П-образный)', pricePerFloor: 400, requiresTwo: true, weightKg: 120, unit: 'диван', carryOutPrice: 400 },
-              { id: 'ang_shkaf_kupe', name: 'Шкаф-купе 3+ двери (комплект упаковок)', pricePerFloor: 400, requiresTwo: true, weightKg: 110, unit: 'шкаф', carryOutPrice: 400 },
-              { id: 'ang_monolit', name: 'Крупногабаритная монолитная мебель', pricePerFloor: 400, requiresTwo: true, weightKg: 90, unit: 'шт', carryOutPrice: 400 },
-            ],
-          },
-        ],
+        mebel_angela: FURNITURE_CATALOG,
+        interier: FURNITURE_CATALOG,
+        obstanovochka: FURNITURE_CATALOG,
+        custom_furniture: FURNITURE_CATALOG,
         doors: [
           {
             group: 'Межкомнатные двери (1 грузчик, 100–150 ₽/эт)',
@@ -2118,135 +2151,7 @@
             ],
           },
         ],
-        furniture: [
-          {
-            group: 'Малые и разобранные элементы (1 грузчик, 50–100 ₽/эт)',
-            items: [
-              {
-                id: 'furn_small',
-                name: 'Полка / зеркало / фурнитура в коробке',
-                pricePerFloor: 50,
-                requiresTwo: false,
-                weightKg: 10,
-                unit: 'шт',
-              },
-              {
-                id: 'chairs',
-                name: 'Стулья / табуреты (комплект 2 шт)',
-                pricePerFloor: 50,
-                requiresTwo: false,
-                weightKg: 12,
-                unit: 'компл',
-              },
-              {
-                id: 'nightstand',
-                name: 'Тумба прикроватная / обувница в коробке',
-                pricePerFloor: 100,
-                requiresTwo: false,
-                weightKg: 20,
-                unit: 'шт',
-              },
-              {
-                id: 'table_small',
-                name: 'Стол журнальный / письменный разобранный',
-                pricePerFloor: 100,
-                requiresTwo: false,
-                weightKg: 25,
-                unit: 'шт',
-              },
-            ],
-          },
-          {
-            group: 'Корпусная мебель (1–2 грузчика, 100–200 ₽/эт)',
-            items: [
-              {
-                id: 'dresser',
-                name: 'Комод (собранный или тяжёлые упаковки, 2 грузчика)',
-                pricePerFloor: 150,
-                requiresTwo: true,
-                weightKg: 45,
-                unit: 'шт',
-              },
-              {
-                id: 'wardrobe_pack',
-                name: 'Шкаф 2-3 створчатый / купе (комплект упаковок, 2 грузчика)',
-                pricePerFloor: 200,
-                requiresTwo: true,
-                weightKg: 75,
-                unit: 'шкаф',
-              },
-              {
-                id: 'bed_pack',
-                name: 'Кровать двуспальная с основанием (упаковки, 2 грузчика)',
-                pricePerFloor: 150,
-                requiresTwo: true,
-                weightKg: 50,
-                unit: 'кровать',
-              },
-              {
-                id: 'countertop',
-                name: 'Столешница 3+ метра (2 грузчика)',
-                pricePerFloor: 150,
-                requiresTwo: true,
-                weightKg: 40,
-                unit: 'шт',
-              },
-              {
-                id: 'kitchen_module',
-                name: 'Кухонный гарнитур (модуль навесной/напольный)',
-                pricePerFloor: 100,
-                requiresTwo: false,
-                weightKg: 25,
-                unit: 'модуль',
-              },
-            ],
-          },
-          {
-            group: 'Мягкая мебель и матрасы (1–2 грузчика, 100–350 ₽/эт)',
-            items: [
-              {
-                id: 'mattress_1',
-                name: 'Матрас односпальный (до 120 см)',
-                pricePerFloor: 100,
-                requiresTwo: false,
-                weightKg: 20,
-                unit: 'шт',
-              },
-              {
-                id: 'mattress_2',
-                name: 'Матрас двуспальный (160–180+ см, 2 грузчика)',
-                pricePerFloor: 150,
-                requiresTwo: true,
-                weightKg: 35,
-                unit: 'шт',
-              },
-              {
-                id: 'armchair',
-                name: 'Кресло / кресло-кровать (2 грузчика)',
-                pricePerFloor: 150,
-                requiresTwo: true,
-                weightKg: 35,
-                unit: 'шт',
-              },
-              {
-                id: 'sofa_direct',
-                name: 'Диван прямой 2-3 местный (2 грузчика)',
-                pricePerFloor: 200,
-                requiresTwo: true,
-                weightKg: 65,
-                unit: 'шт',
-              },
-              {
-                id: 'sofa_corner',
-                name: 'Диван угловой большой (из 2-3 секций, 2 грузчика)',
-                pricePerFloor: 350,
-                requiresTwo: true,
-                weightKg: 100,
-                unit: 'диван',
-              },
-            ],
-          },
-        ],
+        furniture: FURNITURE_CATALOG,
       };
 
       // СОСТОЯНИЕ КАЛЬКУЛЯТОРА
@@ -2575,9 +2480,8 @@
           html += `<optgroup label="📂 ${g.group}">`;
           g.items.forEach((it) => {
             const badgeCrew = it.requiresTwo ? '👥 2 грузчика' : '👤 1 грузчик';
-            const carryInfo = it.carryOutPrice !== undefined ? ` • вынос ${it.carryOutPrice} ₽` : '';
-            html += `<option value="${it.id}" data-price="${it.pricePerFloor}" data-two="${it.requiresTwo}" data-weight="${it.weightKg}" data-unit="${it.unit}" data-carry="${it.carryOutPrice !== undefined ? it.carryOutPrice : ''}">
-            ${it.name} — ${it.pricePerFloor} ₽/эт${carryInfo} (${badgeCrew})
+            html += `<option value="${it.id}" data-price="${it.pricePerFloor}" data-two="${it.requiresTwo}" data-weight="${it.weightKg}" data-unit="${it.unit}" data-carry="${it.carryOutPrice !== undefined ? it.carryOutPrice : ''}" data-fits-elevator="${it.fitsElevator !== false}">
+            ${it.name} — ${it.pricePerFloor} ₽/эт (${badgeCrew})
           </option>`;
           });
           html += `</optgroup>`;
@@ -2625,7 +2529,8 @@
         const weightKg = parseInt(selectedOpt.getAttribute('data-weight'), 10) || 20;
         const unit = selectedOpt.getAttribute('data-unit') || 'шт';
         const carryAttr = selectedOpt.getAttribute('data-carry');
-        const carryOutPrice = carryAttr !== '' && carryAttr !== null && !isNaN(parseInt(carryAttr, 10)) ? parseInt(carryAttr, 10) : undefined;
+        const carryOutPrice = carryAttr !== '' && carryAttr !== null && !isNaN(parseInt(carryAttr, 10)) ? parseInt(carryAttr, 10) : pricePerFloor;
+        const fitsElevator = selectedOpt.getAttribute('data-fits-elevator') === 'true';
 
         let cleanName = selectedOpt.text.split(' — ')[0].trim();
 
@@ -2642,6 +2547,7 @@
             weightKg,
             unit,
             carryOutPrice,
+            fitsElevator,
             isCustom: false,
           });
         }
@@ -2667,6 +2573,36 @@
         }
       }
 
+      function updateCustomPricePreview() {
+        const weightInput = document.getElementById('customWeight');
+        const previewBox = document.getElementById('customPricePreview');
+        const twoCheck = document.getElementById('customRequiresTwo');
+        if (!weightInput) return;
+
+        const weight = parseFloat(weightInput.value) || 0;
+        if (weight <= 0) {
+          if (previewBox) {
+            previewBox.className = 'text-xs text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 rounded-lg flex items-center justify-between';
+            previewBox.innerHTML = `<span>⚖️ Укажите вес: базовый расчёт 40 ₽ за каждые 30 кг (60 кг = 80 ₽, 90 кг = 120 ₽...)</span><span id="customPricePreviewVal" class="font-mono font-bold text-amber-400">0 ₽ / этаж</span>`;
+          }
+          return;
+        }
+
+        // Формула: 30 кг стоит 40 ₽. 60 кг = 80 ₽, 90 кг = 120 ₽, пропорционально.
+        const pricePerFloor = Math.max(10, Math.round((weight / 30) * 40));
+
+        if (weight >= 50 && twoCheck && !twoCheck.checked) {
+          twoCheck.checked = true;
+        }
+
+        const crewHint = (twoCheck && twoCheck.checked) || weight >= 50 ? '👥 2 грузчика' : '👤 1 грузчик';
+
+        if (previewBox) {
+          previewBox.className = 'text-xs text-emerald-300 font-semibold bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1.5 rounded-lg flex items-center justify-between';
+          previewBox.innerHTML = `<span>💡 Вес ${weight} кг → Тариф: <strong>${pricePerFloor} ₽ / этаж</strong> (${crewHint})</span><span class="font-mono font-black text-emerald-400">${pricePerFloor} ₽ / эт</span>`;
+        }
+      }
+
       function addCustomItem() {
         const nameInput = document.getElementById('customName');
         const countInput = document.getElementById('customCount');
@@ -2675,30 +2611,35 @@
 
         const name = nameInput?.value.trim();
         const count = parseInt(countInput?.value, 10) || 1;
-        const weight = parseInt(weightInput?.value, 10) || 20;
-        const requiresTwo = twoCheck ? twoCheck.checked : false;
+        const weightVal = weightInput?.value.trim();
+        const weight = parseFloat(weightVal) || 0;
 
         if (!name || name.length < 2) {
-          alert('Пожалуйста, укажите название позиции!');
+          alert('Пожалуйста, укажите наименование позиции!');
           nameInput?.focus();
           return;
         }
 
-        let pricePerFloor = 50;
-        if (requiresTwo || weight > 50) {
-          pricePerFloor = weight > 80 ? 300 : 150;
-        } else if (weight > 25) {
-          pricePerFloor = 100;
+        if (!weightVal || weight <= 0) {
+          alert('Пожалуйста, обязательно укажите вес позиции в КГ!\nТариф рассчитывается по формуле: 40 ₽ за каждые 30 кг (например, 60 кг = 80 ₽).');
+          weightInput?.focus();
+          return;
         }
+
+        // Расчёт тарифа из пропорции: 30 кг стоит 40 ₽
+        const pricePerFloor = Math.max(10, Math.round((weight / 30) * 40));
+        const requiresTwo = (twoCheck ? twoCheck.checked : false) || weight >= 50;
 
         orderItems.push({
           id: 'custom_' + Date.now(),
-          name,
+          name: `${name} (${weight} кг)`,
           count,
           pricePerFloor,
           requiresTwo,
           weightKg: weight,
           unit: 'шт',
+          carryOutPrice: pricePerFloor,
+          fitsElevator: weight < 60 && !requiresTwo,
           isCustom: true,
         });
 
@@ -2706,6 +2647,7 @@
         countInput.value = 1;
         if (weightInput) weightInput.value = '';
         if (twoCheck) twoCheck.checked = false;
+        updateCustomPricePreview();
         toggleCustomItemForm();
 
         renderOrderItems();
@@ -2715,6 +2657,19 @@
 
       function removeOrderItem(index) {
         orderItems.splice(index, 1);
+        renderOrderItems();
+        autoUpdateCrewAndElevator();
+        calculateTotal();
+      }
+
+            function changeItemDirect(index, val) {
+        if (!orderItems[index]) return;
+        const count = parseInt(val, 10);
+        if (isNaN(count) || count <= 0) {
+          orderItems.splice(index, 1);
+        } else {
+          orderItems[index].count = count;
+        }
         renderOrderItems();
         autoUpdateCrewAndElevator();
         calculateTotal();
@@ -2785,7 +2740,7 @@
             <div class="flex items-center gap-1.5 shrink-0">
               <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
                 <button type="button" onclick="changeItemCount(${idx}, -1)" class="px-2 py-1 hover:bg-slate-800 text-slate-300 transition font-black text-xs">-</button>
-                <span class="px-2 font-mono font-bold text-white text-xs">${it.count}</span>
+                <input type="number" min="1" max="999" value="${it.count}" onchange="changeItemDirect(${idx}, this.value)" class="w-11 text-center bg-transparent font-mono font-bold text-white text-xs focus:outline-none focus:bg-slate-800 p-0" />
                 <button type="button" onclick="changeItemCount(${idx}, 1)" class="px-2 py-1 hover:bg-slate-800 text-slate-300 transition font-black text-xs">+</button>
               </div>
 
@@ -3017,7 +2972,8 @@
               if (elevatorType === 'cargo') {
                 itemFloors = 1;
               } else if (elevatorType === 'passenger') {
-                if (it.pricePerFloor <= 200) {
+                const fits = it.fitsElevator !== undefined ? it.fitsElevator : (it.pricePerFloor <= 200 && !it.requiresTwo);
+                if (fits) {
                   itemFloors = 1;
                 } else {
                   itemFloors = floor;
