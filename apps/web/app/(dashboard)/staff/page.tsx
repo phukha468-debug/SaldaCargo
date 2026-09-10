@@ -1401,8 +1401,6 @@ function TripViewModal({
       id: string;
       short_name: string;
       reg_number: string;
-      make?: string;
-      model?: string;
     } | null;
     driver?: { id: string; name: string } | null;
     loader?: { id: string; name: string } | null;
@@ -2036,8 +2034,6 @@ type StaffTx = PayrollUser['history'][number] & {
       id: string;
       short_name: string;
       reg_number: string;
-      make?: string;
-      model?: string;
     } | null;
   } | null;
   trip?: {

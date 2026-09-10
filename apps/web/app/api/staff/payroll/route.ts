@@ -213,7 +213,7 @@ export async function GET(request: Request) {
     if (orderIds.size > 0 || orderNums.size > 0) {
       let soQuery = (supabase as any).from('service_orders').select(`
         id, order_number, machine_type, client_name, client_vehicle_brand, client_vehicle_model, client_vehicle_reg, created_at,
-        asset:assets(id, short_name, reg_number, make, model)
+        asset:assets(id, short_name, reg_number)
       `);
       if (orderIds.size > 0 && orderNums.size > 0) {
         soQuery = soQuery.or(
@@ -236,10 +236,7 @@ export async function GET(request: Request) {
           const regPart = so.client_vehicle_reg ? `(${so.client_vehicle_reg})` : '';
           vehicleLabel = `${clientPart} • ${carModel} ${regPart}`.trim();
         } else {
-          const carName =
-            so.asset?.short_name ||
-            [so.asset?.make, so.asset?.model].filter(Boolean).join(' ') ||
-            'Собственный автопарк';
+          const carName = so.asset?.short_name || 'Собственный автопарк';
           const regPart = so.asset?.reg_number ? `(${so.asset.reg_number})` : '';
           vehicleLabel = `${carName} ${regPart}`.trim();
         }
@@ -260,7 +257,7 @@ export async function GET(request: Request) {
       let trQuery = (supabase as any)
         .from('trips')
         .select(
-          `id, trip_number, started_at, created_at, asset_id, asset:assets(id, short_name, reg_number, make, model)`,
+          `id, trip_number, started_at, created_at, asset_id, asset:assets(id, short_name, reg_number)`,
         );
       if (tripIds.size > 0 && tripNums.size > 0) {
         trQuery = trQuery.or(
@@ -275,8 +272,7 @@ export async function GET(request: Request) {
       const { data: tripsData } = await trQuery;
       for (const tr of tripsData ?? []) {
         const carAsset = tr.asset || (tr.asset_id ? assetMap[tr.asset_id] : null);
-        const carName =
-          carAsset?.short_name || [carAsset?.make, carAsset?.model].filter(Boolean).join(' ') || '';
+        const carName = carAsset?.short_name || '';
         const reg = carAsset?.reg_number ? `(${carAsset.reg_number})` : '';
         const vehicleLabel = carName || reg ? `${carName} ${reg}`.trim() : '';
         const enrichedTrip = {

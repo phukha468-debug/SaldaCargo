@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       `
       id, trip_number, status, lifecycle_status, started_at, ended_at, created_at,
       trip_type, odometer_start, odometer_end, driver_note,
-      asset:assets(id, short_name, reg_number, make, model),
+      asset:assets(id, short_name, reg_number),
       driver:users!trips_driver_id_fkey(id, name),
       loader:users!trips_loader_id_fkey(id, name),
       trip_orders(
