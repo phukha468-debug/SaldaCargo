@@ -212,7 +212,7 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
   const totalLoadersCount = (isDriverLoader ? 1 : 0) + loadersCount;
 
   // Сценарий 1: Только водитель (без погрузки)
-  if (totalLoadersCount === 0) {
+  if (totalLoadersCount === 0 && (loadingAmount === undefined || loadingAmount <= 0)) {
     const driverCarPay = Math.round(amount * 0.3);
     const driverTotalPay = driverCarPay;
     const companyShare = amount - driverTotalPay;

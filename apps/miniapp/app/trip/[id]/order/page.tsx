@@ -148,10 +148,7 @@ export default function AddOrderPage() {
     selectedCounterparty?.min_delivery_base ??
     (selectedCounterparty?.is_delivery_zone_client ? 800 : 1000);
 
-  const parsedLoadingAmount =
-    (isDriverLoader || loaders.length > 0) && loadingAmount !== ''
-      ? Number(loadingAmount)
-      : undefined;
+  const parsedLoadingAmount = loadingAmount !== '' ? Number(loadingAmount) : undefined;
 
   const payroll = calculateOrderPayroll({
     direction,
@@ -622,22 +619,34 @@ export default function AddOrderPage() {
           </button>
         </div>
 
-        {/* ── Сумма за погрузку (если водитель-грузчик или есть сторонние грузчики) ── */}
-        {(isDriverLoader || loaders.length > 0) && (
-          <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-1.5">
-            <label className="block text-xs font-bold text-amber-900">
-              Введите сумму за погрузку
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={loadingAmount}
-              onChange={(e) => setLoadingAmount(e.target.value)}
-              placeholder="0 ₽"
-              className="w-full rounded-lg border border-amber-300 bg-white px-3 h-11 text-lg font-bold text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
-            />
+        {/* ── Сумма за погрузку ── */}
+        <div className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
+          <label className="block text-xs font-black text-amber-900 uppercase tracking-wide">
+            Введите сумму за погрузку
+          </label>
+
+          <input
+            type="number"
+            inputMode="numeric"
+            value={loadingAmount}
+            onChange={(e) => {
+              const val = e.target.value;
+              setLoadingAmount(val);
+              if (val !== '' && Number(val) > 0 && loaders.length === 0 && !isDriverLoader) {
+                setIsDriverLoader(true);
+              }
+            }}
+            placeholder="0 ₽"
+            className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-12 text-xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
+          />
+
+          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-amber-200/60 text-amber-900">
+            <span>🚗 На машину остаётся:</span>
+            <span className="font-mono text-sm font-black text-amber-950">
+              {payroll.machinePool.toLocaleString('ru-RU')} ₽
+            </span>
           </div>
-        )}
+        </div>
 
         {/* ── ЗП водителя ── */}
         {isCity ? (
