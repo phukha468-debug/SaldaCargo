@@ -641,58 +641,18 @@ export default function EditOrderPage() {
 
         {/* ── Сумма за погрузку (если водитель-грузчик или есть сторонние грузчики) ── */}
         {(isDriverLoader || loaders.length > 0) && (
-          <div className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-black text-amber-900 uppercase tracking-wide">
-                📦 В т.ч. за погрузку / занос, ₽
-              </label>
-              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                70% грузчикам
-              </span>
-            </div>
-
+          <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-1.5">
+            <label className="block text-xs font-bold text-amber-900">
+              Введите сумму за погрузку
+            </label>
             <input
               type="number"
               inputMode="numeric"
               value={loadingAmount}
               onChange={(e) => setLoadingAmount(e.target.value)}
-              placeholder="Например: 3 000 (или пусто = пополам)"
-              className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-14 text-2xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
+              placeholder="0 ₽"
+              className="w-full rounded-lg border border-amber-300 bg-white px-3 h-11 text-lg font-bold text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
             />
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] text-amber-700 font-bold uppercase mr-1">Быстро:</span>
-              {[1000, 2000, 3000, 3300].map((quickSum) => (
-                <button
-                  key={quickSum}
-                  type="button"
-                  onClick={() => setLoadingAmount(String(quickSum))}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                    loadingAmount === String(quickSum)
-                      ? 'bg-amber-500 text-slate-950 font-black'
-                      : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
-                  }`}
-                >
-                  {quickSum.toLocaleString('ru-RU')} ₽
-                </button>
-              ))}
-              {loadingAmount && (
-                <button
-                  type="button"
-                  onClick={() => setLoadingAmount('')}
-                  className="text-[11px] text-amber-700 underline ml-auto hover:text-amber-900 font-bold"
-                >
-                  Сбросить
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-amber-200/60 text-amber-900">
-              <span>🚗 На машину остаётся:</span>
-              <span className="font-mono text-sm font-black text-amber-950">
-                {payroll.machinePool.toLocaleString('ru-RU')} ₽
-              </span>
-            </div>
           </div>
         )}
 
