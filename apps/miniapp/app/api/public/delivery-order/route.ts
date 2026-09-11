@@ -36,7 +36,7 @@ export async function POST(request: Request) {
           '2503': { storeKey: 'doors', storeName: 'Двери (ул. 25 Октября, 3)', category: 'build' },
           '8701': {
             storeKey: 'mebel_angela',
-            storeName: 'Мебель Анжела (ул. Энгельса, 87, корп. 1)',
+            storeName: 'Магазин «Лайм» (ул. Энгельса, 87, корп. 1)',
             category: 'furniture',
           },
           '0501': {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
           '3333': { storeKey: 'doors', storeName: 'Двери (ул. 25 Октября, 3)', category: 'build' },
           '4444': {
             storeKey: 'mebel_angela',
-            storeName: 'Мебель Анжела (ул. Энгельса, 87, корп. 1)',
+            storeName: 'Магазин «Лайм» (ул. Энгельса, 87, корп. 1)',
             category: 'furniture',
           },
           '5555': {
@@ -173,16 +173,30 @@ export async function POST(request: Request) {
           ? [`  • Номенклатура: ${cargoName}`, `  • Категория: ${categoryLabel}`]
           : [];
 
+    const isDisposal =
+      (body.extraPointMode === 'disposal' ||
+        (extraPointAddress && extraPointAddress.toLowerCase().includes('выброс')) ||
+        (extraPointAddress && extraPointAddress.toLowerCase().includes('утилизац'))) &&
+      Boolean(hasExtraPoint);
+
     const routeHeaderLines =
       hasExtraPoint && extraPointAddress
-        ? [
-            `📍 МАРШРУТ (через 2 точки):`,
-            `  1. Погрузка: ${pickupAddress || storeName}`,
-            `  2. Точка А (доставка): ${deliveryAddress}`,
-            `  3. Точка Б (заезд/вывоз): ${extraPointAddress}`,
-            extraDisposalCarry ? `     └ Опция: вывоз/спуск старой мебели (+500 ₽)` : null,
-            `🛣 Дистанция: ${distanceKm} км${distanceKmLeg1 && distanceKmLeg2 ? ` (Плечо 1: ${distanceKmLeg1} км + Плечо 2: ${distanceKmLeg2} км)` : ''}`,
-          ]
+        ? isDisposal
+          ? [
+              `📍 МАРШРУТ:`,
+              `  1. Погрузка: ${pickupAddress || storeName}`,
+              `  2. Доставка: ${deliveryAddress}`,
+              `  🗑 ВЫБРОСИТЬ СТАРУЮ МЕБЕЛЬ (утилизация: +1 000 ₽ фикс)`,
+              `     └ Внимание: выносится только мебель в объёме оплаченного подъёма`,
+              `🛣 Дистанция доставки: ${distanceKm} км`,
+            ]
+          : [
+              `📍 МАРШРУТ (через 2 точки):`,
+              `  1. Погрузка: ${pickupAddress || storeName}`,
+              `  2. Точка А (доставка): ${deliveryAddress}`,
+              `  3. Точка Б (заезд): ${extraPointAddress}`,
+              `🛣 Дистанция: ${distanceKm} км${distanceKmLeg1 && distanceKmLeg2 ? ` (Плечо 1: ${distanceKmLeg1} км + Плечо 2: ${distanceKmLeg2} км)` : ''}`,
+            ]
         : [
             `📍 Откуда: ${pickupAddress || storeName}`,
             `🏁 Куда: ${deliveryAddress}`,
@@ -209,8 +223,13 @@ export async function POST(request: Request) {
           ]
         : [`📦 УСЛУГА:`, `• Доставка автомобилем (без грузчиков / без ПРР)`, ``]),
       `💰 РАСЧЁТ СТОИМОСТИ:`,
-      `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽${hasExtraPoint ? ` (вкл. заезд во 2-ю точку +${extraPointPrice || 500} ₽)` : ''}`,
-      extraDisposalCarry ? `• Спуск/вывоз старой мебели: 500 ₽` : null,
+      `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽${
+        hasExtraPoint
+          ? isDisposal
+            ? ` (вкл. утилизацию старой мебели +${extraPointPrice || 1000} ₽)`
+            : ` (вкл. заезд во 2-ю точку +${extraPointPrice || 500} ₽)`
+          : ''
+      }`,
       isLoaders
         ? `• Погрузка и занос (ПРР): ${Number(loadersPrice).toLocaleString('ru-RU')} ₽`
         : null,
