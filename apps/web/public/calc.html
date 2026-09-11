@@ -12,6 +12,14 @@
       content="Автоматический расчёт доставки и погрузочно-разгрузочных работ поштучно по этажам для магазинов стройматериалов и мебели."
     />
 
+    <!-- Resource Hints для мгновенной загрузки -->
+    <link rel="preconnect" href="https://api-maps.yandex.ru" />
+    <link rel="dns-prefetch" href="https://api-maps.yandex.ru" />
+    <link rel="preconnect" href="https://yastatic.net" crossorigin />
+    <link rel="dns-prefetch" href="https://yastatic.net" />
+    <link rel="preconnect" href="https://app.tk501.ru" />
+    <link rel="dns-prefetch" href="https://app.tk501.ru" />
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -509,65 +517,41 @@
           </div>
         </div>
 
-        <!-- КНОПКИ ДОБАВЛЕНИЯ ВТОРОЙ ТОЧКИ (ВЫБРОС СТАРОЙ МЕБЕЛИ / ЗАЕЗД) -->
-        <div id="addExtraPointContainer" class="pt-0.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <!-- КНОПКА ДОБАВЛЕНИЯ УСЛУГИ: ВЫБРОС СТАРОЙ МЕБЕЛИ (+1 000 ₽) -->
+        <div id="addExtraPointContainer" class="pt-0.5">
           <button
             type="button"
-            onclick="setExtraPointMode('disposal')"
-            class="py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-sm"
+            onclick="toggleExtraPoint(true)"
+            class="w-full py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-sm"
           >
             <span class="text-base">🗑️</span>
             <span>Выбросить старую мебель (+1 000 ₽)</span>
           </button>
-          <button
-            type="button"
-            onclick="setExtraPointMode('address')"
-            class="py-2.5 px-3 rounded-xl border border-dashed border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-sm"
-          >
-            <i data-lucide="plus-circle" class="w-4 h-4 text-blue-400"></i>
-            <span>Заезд на 2-й адрес (500 ₽ + км)</span>
-          </button>
         </div>
 
-        <!-- ТОЧКА Б: ВТОРАЯ ТОЧКА (УТИЛИЗАЦИЯ ИЛИ ВТОРОЙ АДРЕС) -->
+        <!-- ПЛАШКА УТИЛИЗАЦИИ СТАРОЙ МЕБЕЛИ (+1 000 ₽ фикс, без лишних маршрутов) -->
         <div
           id="extraPointBlock"
-          class="hidden space-y-3 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-inner"
+          class="hidden space-y-3 p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/40 shadow-inner"
         >
-          <div class="flex items-center justify-between gap-2 flex-wrap pb-1 border-b border-slate-800/80">
-            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
-              <button
-                type="button"
-                id="tabExtraDisposal"
-                onclick="setExtraPointMode('disposal')"
-                class="px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 bg-amber-500 text-slate-950 shadow-sm"
-              >
-                <span>🗑️</span>
-                <span>Выбросить старую мебель (+1 000 ₽)</span>
-              </button>
-              <button
-                type="button"
-                id="tabExtraAddress"
-                onclick="setExtraPointMode('address')"
-                class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition flex items-center gap-1.5"
-              >
-                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-blue-400"></i>
-                <span>Заезд на 2-й адрес (500 ₽ + км)</span>
-              </button>
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🗑️</span>
+              <span class="text-xs font-black text-amber-300 uppercase tracking-wide">
+                Выброс старой мебели (утилизация)
+              </span>
             </div>
-
             <button
               type="button"
               onclick="toggleExtraPoint(false)"
               class="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition px-2 py-1 rounded-lg hover:bg-rose-500/10"
             >
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              <span>Убрать 2-ю точку</span>
+              <span>Отменить утилизацию</span>
             </button>
           </div>
 
-          <!-- 1. РЕЖИМ: ВЫБРОСИТЬ СТАРУЮ МЕБЕЛЬ (+1000 ₽ фикс, без маршрутов) -->
-          <div id="extraDisposalSection" class="space-y-2.5">
+          <div class="space-y-2.5">
             <div class="p-3 rounded-xl bg-amber-950/20 border border-amber-500/40 flex items-center justify-between">
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-lg shrink-0">
@@ -597,87 +581,6 @@
               <div id="disposalAllowanceInfo" class="pt-1.5 text-[11px] font-bold text-amber-400 border-t border-amber-500/20">
                 <!-- Заполняется динамически -->
               </div>
-            </div>
-          </div>
-
-          <!-- 2. РЕЖИМ: ВТОРОЙ АДРЕС ДОСТАВКИ / ЗАЕЗД (500 ₽ + км) -->
-          <div id="extraAddressSection" class="hidden space-y-2.5">
-            <div class="flex items-center justify-between text-[11px] text-blue-400 font-bold">
-              <span>Точка Б (второй адрес доставки / разгрузки):</span>
-              <span class="text-slate-400 text-[10px]">Тариф: 500 ₽ + 80 ₽/км</span>
-            </div>
-
-            <div class="relative">
-              <input
-                type="text"
-                id="extraAddress"
-                list="saldaStreetsList"
-                autocomplete="off"
-                oninput="onExtraAddressInput()"
-                placeholder="Второй адрес разгрузки: например, Сады №2, уч. 14 или гараж"
-                class="w-full bg-slate-950 border border-blue-500/40 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none focus:border-blue-400 placeholder-slate-500 pr-24"
-              />
-              <button
-                type="button"
-                onclick="geocodeAndBuildExtraRoute()"
-                class="absolute right-1.5 top-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider transition active:scale-95 shadow"
-              >
-                Найти
-              </button>
-            </div>
-
-            <!-- Быстрые направления для 2-й точки (дачи, сады, полигон) -->
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-[10px] text-blue-300 font-bold uppercase mr-1">Быстрый выбор:</span>
-              <button
-                type="button"
-                onclick="setQuickExtraAddress('Сады №1')"
-                class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition"
-              >
-                Сады №1
-              </button>
-              <button
-                type="button"
-                onclick="setQuickExtraAddress('Сады №2')"
-                class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition"
-              >
-                Сады №2
-              </button>
-              <button
-                type="button"
-                onclick="setQuickExtraAddress('Сады №3')"
-                class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition"
-              >
-                Сады №3
-              </button>
-              <button
-                type="button"
-                onclick="setQuickExtraAddress('Сады «Металлург»')"
-                class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition"
-              >
-                Сады Металлург
-              </button>
-              <button
-                type="button"
-                onclick="setQuickExtraAddress('п. Песчаный карьер')"
-                class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition"
-              >
-                Песчаный
-              </button>
-              <button
-                type="button"
-                onclick="setQuickExtraAddress('г. Нижняя Салда')"
-                class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition"
-              >
-                Нижняя Салда
-              </button>
-            </div>
-
-            <div
-              class="text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-lg border border-slate-800"
-            >
-              💡 <strong>Тариф заезда:</strong> 500 ₽ фиксированно + километраж от Точки А до Точки Б
-              (80 ₽/км).
             </div>
           </div>
         </div>
@@ -740,12 +643,6 @@
               <span class="text-slate-500 text-[11px] hidden sm:inline" id="durationDisplay"
                 >(~7 мин)</span
               >
-              <span
-                id="legsBreakdownDisplay"
-                class="hidden text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
-              >
-                (Плечо 1: 0 км + Плечо 2: 0 км)
-              </span>
             </div>
             <span class="text-[10px] text-slate-400 font-mono hidden sm:inline"
               >Кликните по карте для смены точки</span
@@ -2210,15 +2107,10 @@
       let currentStoreCoords = [58.04036, 60.53966];
       let currentClientCoords = [58.0526, 60.5453];
       let hasExtraPoint = false;
-      let extraPointMode = 'disposal'; // 'disposal' | 'address'
-      let currentExtraCoords = [58.032, 60.53]; // Сады №2 по умолчанию
-      let distanceKmLeg1 = 2.4;
-      let distanceKmLeg2 = 0;
 
       let yMap = null;
       let storePlacemark = null;
       let clientPlacemark = null;
-      let extraPlacemark = null;
       let routePolyline = null;
       let yMultiRoute = null;
 
@@ -2390,9 +2282,27 @@
 
         const addrInput = document.getElementById('deliveryAddress');
         if (addrInput) {
+          let addrDebounceTimer = null;
+          addrInput.addEventListener('input', () => {
+            updateSubmitButtonState();
+            const val = addrInput.value.trim();
+            if (val.length >= 3) {
+              const norm = val.toLowerCase().replace(/^(г\.?|город)?\s*(верхняя\s+салда|нижняя\s+салда)[,\s]*/i, '').trim();
+              if (SALDA_GEO_CACHE[norm]) {
+                clearTimeout(addrDebounceTimer);
+                moveClientPoint(SALDA_GEO_CACHE[norm]);
+                return;
+              }
+              clearTimeout(addrDebounceTimer);
+              addrDebounceTimer = setTimeout(() => {
+                geocodeAndBuildRoute();
+              }, 400);
+            }
+          });
           addrInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
+              clearTimeout(addrDebounceTimer);
               geocodeAndBuildRoute();
             }
           });
@@ -2920,12 +2830,10 @@
         const kmPrice = currentStore.kmPrice || 80;
         const freeRadius = currentStore.freeRadius || 1.5;
 
-        // 1. Авто: Плечо 1 (Магазин -> Точка А)
-        const leg1Km =
-          hasExtraPoint && extraPointMode === 'address' ? distanceKmLeg1 || distanceKm : distanceKm;
+        // 1. Авто: Подача + километраж до клиента
         let carPrice = basePrice;
-        if (leg1Km > freeRadius) {
-          const extraKm = leg1Km - freeRadius;
+        if (distanceKm > freeRadius) {
+          const extraKm = distanceKm - freeRadius;
           carPrice = basePrice + extraKm * kmPrice;
         }
         carPrice = roundUp100(carPrice);
@@ -2934,46 +2842,24 @@
         const breakdownCarLabel = document.getElementById('breakdownCarLabel');
         if (breakdownCar) breakdownCar.innerText = `${carPrice.toLocaleString('ru-RU')} ₽`;
         if (breakdownCarLabel) {
-          breakdownCarLabel.innerText =
-            hasExtraPoint && extraPointMode === 'address'
-              ? `Машина (Плечо 1: ${leg1Km} км):`
-              : 'Машина (подача + км):';
+          breakdownCarLabel.innerText = 'Машина (подача + км):';
         }
 
-        // 2. Вторая точка: Выбросить старую мебель (+1 000 ₽ фикс) ИЛИ Заезд на 2-й адрес (500 ₽ + км)
+        // 2. Дополнительная услуга: Выбросить старую мебель (+1 000 ₽ фикс)
         let extraPointPrice = 0;
         const extraPointRow = document.getElementById('breakdownExtraPointRow');
         const extraPointPriceEl = document.getElementById('breakdownExtraPointPrice');
         const extraPointLabel = document.getElementById('breakdownExtraPointLabel');
 
         if (hasExtraPoint) {
-          if (extraPointMode === 'disposal') {
-            // Выбросить старую мебель: ровно +1000 ₽ без маршрутов и расчётов км
-            extraPointPrice = 1000;
-            if (extraPointRow) extraPointRow.classList.remove('hidden');
-            if (extraPointPriceEl) {
-              extraPointPriceEl.innerText = '+1 000 ₽';
-              extraPointPriceEl.className = 'font-mono font-black text-amber-400';
-            }
-            if (extraPointLabel) {
-              extraPointLabel.innerHTML = `<span>🗑️</span> <span>Выбросить старую мебель:</span>`;
-            }
-          } else {
-            // Заезд на 2-й адрес: 500 ₽ + километраж Точка А -> Точка Б (80 ₽/км)
-            const leg2Km =
-              distanceKmLeg2 ||
-              (distanceKm > leg1Km ? parseFloat((distanceKm - leg1Km).toFixed(1)) : 0);
-            const leg2Cost = roundUp100(leg2Km * kmPrice);
-            extraPointPrice = 500 + leg2Cost;
-
-            if (extraPointRow) extraPointRow.classList.remove('hidden');
-            if (extraPointPriceEl) {
-              extraPointPriceEl.innerText = `+${extraPointPrice.toLocaleString('ru-RU')} ₽`;
-              extraPointPriceEl.className = 'font-mono font-bold text-blue-400';
-            }
-            if (extraPointLabel) {
-              extraPointLabel.innerHTML = `<i data-lucide="map-pin" class="w-3.5 h-3.5 text-blue-400"></i> Заезд во 2-ю точку (500 ₽ + ${leg2Km} км):`;
-            }
+          extraPointPrice = 1000;
+          if (extraPointRow) extraPointRow.classList.remove('hidden');
+          if (extraPointPriceEl) {
+            extraPointPriceEl.innerText = '+1 000 ₽';
+            extraPointPriceEl.className = 'font-mono font-black text-amber-400';
+          }
+          if (extraPointLabel) {
+            extraPointLabel.innerHTML = `<span>🗑️</span> <span>Выбросить старую мебель:</span>`;
           }
         } else {
           if (extraPointRow) extraPointRow.classList.add('hidden');
@@ -3165,23 +3051,15 @@
 
             yMap.events.add('click', (e) => {
               const clickedCoords = e.get('coords');
-              if (
-                hasExtraPoint &&
-                document.activeElement === document.getElementById('extraAddress')
-              ) {
-                moveExtraPoint(clickedCoords);
-                onExtraPointMoved(clickedCoords);
-              } else {
-                clientPlacemark.geometry.setCoordinates(clickedCoords);
-                onPointMoved(clickedCoords);
-              }
+              clientPlacemark.geometry.setCoordinates(clickedCoords);
+              onPointMoved(clickedCoords);
             });
 
             if (!document.getElementById('deliveryAddress')?.value) {
               reverseGeocodeCoords(currentClientCoords, 'deliveryAddress');
             }
 
-            updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
+            updateRouteAndDistance(currentStoreCoords, currentClientCoords);
           } catch (err) {
             console.error('Yandex Maps init error:', err);
           }
@@ -3205,120 +3083,25 @@
         }
       }
 
-      function setExtraPointMode(mode) {
-        hasExtraPoint = true;
-        extraPointMode = mode;
-
+      function toggleExtraPoint(enable) {
+        hasExtraPoint = Boolean(enable);
         const block = document.getElementById('extraPointBlock');
         const addBtnContainer = document.getElementById('addExtraPointContainer');
-        const legsEl = document.getElementById('legsBreakdownDisplay');
-        const disposalSection = document.getElementById('extraDisposalSection');
-        const addressSection = document.getElementById('extraAddressSection');
-        const tabDisposal = document.getElementById('tabExtraDisposal');
-        const tabAddress = document.getElementById('tabExtraAddress');
+        const breakdownRow = document.getElementById('breakdownExtraPointRow');
 
-        if (block) block.classList.remove('hidden');
-        if (addBtnContainer) addBtnContainer.classList.add('hidden');
-
-        if (mode === 'disposal') {
-          if (disposalSection) disposalSection.classList.remove('hidden');
-          if (addressSection) addressSection.classList.add('hidden');
-          if (tabDisposal) {
-            tabDisposal.className =
-              'px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 bg-amber-500 text-slate-950 shadow-sm';
-          }
-          if (tabAddress) {
-            tabAddress.className =
-              'px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition flex items-center gap-1.5';
-          }
-          if (legsEl) legsEl.classList.add('hidden');
-
-          if (extraPlacemark) {
-            extraPlacemark.options.set('visible', false);
-          }
-          distanceKmLeg2 = 0;
+        if (enable) {
+          if (block) block.classList.remove('hidden');
+          if (addBtnContainer) addBtnContainer.classList.add('hidden');
+          if (breakdownRow) breakdownRow.classList.remove('hidden');
           updateDisposalAllowanceInfo();
-          updateRouteAndDistance(currentStoreCoords, currentClientCoords, null);
         } else {
-          if (disposalSection) disposalSection.classList.add('hidden');
-          if (addressSection) addressSection.classList.remove('hidden');
-          if (tabDisposal) {
-            tabDisposal.className =
-              'px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition flex items-center gap-1.5';
-          }
-          if (tabAddress) {
-            tabAddress.className =
-              'px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 bg-blue-600 text-white shadow-sm';
-          }
-          if (legsEl) legsEl.classList.remove('hidden');
-
-          if (!currentExtraCoords) {
-            currentExtraCoords = [58.032, 60.53];
-          }
-
-          if (yMap && !extraPlacemark) {
-            extraPlacemark = new ymaps.Placemark(
-              currentExtraCoords,
-              {
-                hintContent: 'Точка Б (заезд)',
-                balloonContent: 'Точка Б: второй адрес / заезд',
-              },
-              {
-                preset: 'islands#blueDotIconWithCaption',
-                draggable: true,
-              },
-            );
-            extraPlacemark.events.add('dragend', () => {
-              const newCoords = extraPlacemark.geometry.getCoordinates();
-              onExtraPointMoved(newCoords);
-            });
-            yMap.geoObjects.add(extraPlacemark);
-          } else if (extraPlacemark) {
-            extraPlacemark.options.set('visible', true);
-          }
-
-          const extraAddrInput = document.getElementById('extraAddress');
-          if (extraAddrInput && !extraAddrInput.value) {
-            extraAddrInput.value = 'Сады №2';
-          }
-          updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
+          if (block) block.classList.add('hidden');
+          if (addBtnContainer) addBtnContainer.classList.remove('hidden');
+          if (breakdownRow) breakdownRow.classList.add('hidden');
         }
 
         calculateTotal();
         if (window.lucide) lucide.createIcons();
-      }
-
-      function toggleExtraPoint(enable) {
-        if (enable) {
-          setExtraPointMode('disposal');
-        } else {
-          hasExtraPoint = false;
-          const block = document.getElementById('extraPointBlock');
-          const addBtnContainer = document.getElementById('addExtraPointContainer');
-          const legsEl = document.getElementById('legsBreakdownDisplay');
-          const breakdownRow = document.getElementById('breakdownExtraPointRow');
-
-          if (block) block.classList.add('hidden');
-          if (addBtnContainer) addBtnContainer.classList.remove('hidden');
-          if (legsEl) legsEl.classList.add('hidden');
-          if (breakdownRow) breakdownRow.classList.add('hidden');
-
-          if (extraPlacemark) {
-            extraPlacemark.options.set('visible', false);
-          }
-          distanceKmLeg2 = 0;
-          updateRouteAndDistance(currentStoreCoords, currentClientCoords, null);
-          calculateTotal();
-          if (window.lucide) lucide.createIcons();
-        }
-      }
-
-      function setQuickExtraAddress(addr) {
-        const input = document.getElementById('extraAddress');
-        if (input) {
-          input.value = addr;
-          onExtraAddressInput();
-        }
       }
 
       async function reverseGeocodeCoords(coords, targetInputId) {
@@ -3396,112 +3179,16 @@
         calculateTotal();
       }
 
-      function onExtraAddressInput() {
-        const addr = document.getElementById('extraAddress')?.value.trim();
-        if (!addr) return;
-
-        const norm = addr
-          .toLowerCase()
-          .replace(/^(г\.?|город)?\s*(верхняя\s+салда|нижняя\s+салда)[,\s]*/i, '')
-          .trim();
-        for (const [key, coords] of Object.entries(SALDA_GEO_CACHE)) {
-          if (norm === key || norm.startsWith(key + ' ') || norm.startsWith(key + ',')) {
-            moveExtraPoint(coords);
-            return;
-          }
-        }
-
-        if (ymaps && ymaps.geocode) {
-          ymaps
-            .geocode(`Свердловская область, Верхняя Салда, ${addr}`)
-            .then((res) => {
-              const first = res.geoObjects.get(0);
-              if (first) {
-                moveExtraPoint(first.geometry.getCoordinates());
-              }
-            })
-            .catch(() => {});
-        }
-      }
-
-      async function geocodeAndBuildExtraRoute() {
-        let addr = document.getElementById('extraAddress')?.value.trim();
-        if (!addr) {
-          if (currentExtraCoords) {
-            await reverseGeocodeCoords(currentExtraCoords, 'extraAddress');
-            return;
-          }
-          return;
-        }
-
-        const norm = addr
-          .toLowerCase()
-          .replace(/^(г\.?|город)?\s*(верхняя\s+салда|нижняя\s+салда)[,\s]*/i, '')
-          .trim();
-
-        for (const [key, coords] of Object.entries(SALDA_GEO_CACHE)) {
-          if (norm === key || norm.startsWith(key + ' ') || norm.startsWith(key + ',')) {
-            moveExtraPoint(coords);
-            return;
-          }
-        }
-
-        try {
-          const q = `Свердловская область, Верхняя Салда, ${addr}`;
-          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ru&limit=5`;
-          const resp = await fetch(url, { headers: { 'Accept-Language': 'ru' } });
-          const results = await resp.json();
-
-          if (results && results.length > 0) {
-            const inBounds = results.find((r) => {
-              const lat = parseFloat(r.lat);
-              const lon = parseFloat(r.lon);
-              return lat >= 58.0 && lat <= 58.12 && lon >= 60.5 && lon <= 60.75;
-            });
-            const target = inBounds || results[0];
-            moveExtraPoint([parseFloat(target.lat), parseFloat(target.lon)]);
-            return;
-          }
-        } catch (e) {}
-
-        if (ymaps && ymaps.geocode) {
-          try {
-            const res = await ymaps.geocode(`Свердловская область, Верхняя Салда, ${addr}`);
-            const first = res.geoObjects.get(0);
-            if (first) {
-              moveExtraPoint(first.geometry.getCoordinates());
-              return;
-            }
-          } catch (e) {}
-        }
-      }
-
-      function moveExtraPoint(coords) {
-        currentExtraCoords = coords;
-        if (extraPlacemark) {
-          extraPlacemark.geometry.setCoordinates(coords);
-        }
-        updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
-      }
-
-      function onExtraPointMoved(coords) {
-        currentExtraCoords = coords;
-        reverseGeocodeCoords(coords, 'extraAddress');
-        updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
-      }
-
       function onPointMoved(coords) {
         currentClientCoords = coords;
         reverseGeocodeCoords(coords, 'deliveryAddress');
-        updateRouteAndDistance(currentStoreCoords, currentClientCoords, currentExtraCoords);
+        updateRouteAndDistance(currentStoreCoords, currentClientCoords);
       }
 
-      async function updateRouteAndDistance(fromCoords, toCoords, extraCoords) {
+      async function updateRouteAndDistance(fromCoords, toCoords) {
         if (!yMap) return;
 
-        document.getElementById('routeStatus').innerText = hasExtraPoint
-          ? 'Прокладка маршрута через 2 точки по дорогам...'
-          : 'Прокладка маршрута по дорогам...';
+        document.getElementById('routeStatus').innerText = 'Прокладка маршрута по дорогам...';
         document.getElementById('routeStatus').className = 'text-[11px] font-bold text-amber-400';
 
         if (yMultiRoute) {
@@ -3517,11 +3204,7 @@
           routePolyline = null;
         }
 
-        const points =
-          hasExtraPoint && extraCoords
-            ? [fromCoords, toCoords, extraCoords]
-            : [fromCoords, toCoords];
-
+        const points = [fromCoords, toCoords];
         let routeBuilt = false;
 
         if (ymaps && ymaps.multiRouter) {
@@ -3534,7 +3217,7 @@
               {
                 boundsAutoApply: true,
                 wayPointStartIconColor: '#10b981',
-                wayPointFinishIconColor: hasExtraPoint ? '#3b82f6' : '#f59e0b',
+                wayPointFinishIconColor: '#f59e0b',
                 routeActiveStrokeColor: '#f59e0b',
                 routeActiveStrokeWidth: 6,
                 routeActiveStrokeOpacity: 0.95,
@@ -3553,30 +3236,8 @@
                   const durationObj = activeRoute.properties.get('duration');
                   if (distanceObj && distanceObj.value) {
                     distanceKm = parseFloat((distanceObj.value / 1000).toFixed(1));
-
-                    if (hasExtraPoint) {
-                      try {
-                        const paths = activeRoute.getPaths();
-                        if (paths && paths.getLength() >= 2) {
-                          const p1 = paths.get(0).properties.get('distance');
-                          const p2 = paths.get(1).properties.get('distance');
-                          if (p1 && p1.value)
-                            distanceKmLeg1 = parseFloat((p1.value / 1000).toFixed(1));
-                          if (p2 && p2.value)
-                            distanceKmLeg2 = parseFloat((p2.value / 1000).toFixed(1));
-                        } else {
-                          distanceKmLeg1 = parseFloat((distanceKm * 0.45).toFixed(1));
-                          distanceKmLeg2 = parseFloat((distanceKm - distanceKmLeg1).toFixed(1));
-                        }
-                      } catch (pe) {
-                        distanceKmLeg1 = parseFloat((distanceKm * 0.45).toFixed(1));
-                        distanceKmLeg2 = parseFloat((distanceKm - distanceKmLeg1).toFixed(1));
-                      }
-                    } else {
-                      distanceKmLeg1 = distanceKm;
-                      distanceKmLeg2 = 0;
-                    }
-
+                    distanceKmLeg1 = distanceKm;
+                    distanceKmLeg2 = 0;
                     applyDistanceResult(distanceKm, durationObj ? durationObj.text : null);
                     routeBuilt = true;
                   }
@@ -3596,15 +3257,9 @@
           const osrmOk = await drawRoadPolylineFallback(points);
           if (!osrmOk) {
             const d1 = calcCrow(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) * 1.35;
-            distanceKmLeg1 = parseFloat(d1.toFixed(1));
-            if (hasExtraPoint && extraCoords) {
-              const d2 = calcCrow(toCoords[0], toCoords[1], extraCoords[0], extraCoords[1]) * 1.35;
-              distanceKmLeg2 = parseFloat(d2.toFixed(1));
-              distanceKm = parseFloat((distanceKmLeg1 + distanceKmLeg2).toFixed(1));
-            } else {
-              distanceKmLeg2 = 0;
-              distanceKm = distanceKmLeg1;
-            }
+            distanceKm = parseFloat(d1.toFixed(1));
+            distanceKmLeg1 = distanceKm;
+            distanceKmLeg2 = 0;
             applyDistanceResult(distanceKm, null);
           }
         }
@@ -3692,19 +3347,7 @@
           document.getElementById('durationDisplay').innerText = '';
         }
 
-        const legsEl = document.getElementById('legsBreakdownDisplay');
-        if (legsEl) {
-          if (hasExtraPoint && distanceKmLeg2 > 0) {
-            legsEl.innerText = `Плечо 1: ${distanceKmLeg1} км + Плечо 2: ${distanceKmLeg2} км`;
-            legsEl.classList.remove('hidden');
-          } else {
-            legsEl.classList.add('hidden');
-          }
-        }
-
-        document.getElementById('routeStatus').innerText = hasExtraPoint
-          ? `✓ Маршрут через 2 точки построен: ${km} км`
-          : `✓ Маршрут построен: ${km} км`;
+        document.getElementById('routeStatus').innerText = `✓ Маршрут построен: ${km} км`;
         document.getElementById('routeStatus').className = 'text-[11px] font-bold text-emerald-400';
       }
 
@@ -3787,7 +3430,7 @@
         if (clientPlacemark) {
           clientPlacemark.geometry.setCoordinates(coords);
         }
-        updateRouteAndDistance(currentStoreCoords, coords, currentExtraCoords);
+        updateRouteAndDistance(currentStoreCoords, coords);
       }
 
       function setQuickAddress(addr) {
@@ -3821,17 +3464,8 @@
           return;
         }
 
-        const isDisposalMode = hasExtraPoint && extraPointMode === 'disposal';
-        const extraAddress = isDisposalMode
-          ? 'Выбросить старую мебель (утилизация: +1 000 ₽)'
-          : document.getElementById('extraAddress')?.value.trim() || '';
-        const hasDisposal = isDisposalMode || Boolean(document.getElementById('extraDisposalCarry')?.checked);
-
-        if (hasExtraPoint && !isDisposalMode && (!extraAddress || extraAddress.length < 3)) {
-          alert('Пожалуйста, укажите адрес 2-й точки маршрута (куда заехать)!');
-          document.getElementById('extraAddress')?.focus();
-          return;
-        }
+        const extraAddress = hasExtraPoint ? 'Выбросить старую мебель (утилизация: +1 000 ₽)' : '';
+        const hasDisposal = Boolean(hasExtraPoint);
 
         const deliveryDate = document.getElementById('deliveryDate')?.value || '';
         const deliveryTime = document.getElementById('deliveryTime')?.value?.trim() || '';
@@ -3861,13 +3495,13 @@
             hasPickupCarry: currentStore.hasPickupCarry !== false,
             deliveryAddress: deliveryAddress,
             hasExtraPoint: hasExtraPoint,
-            extraPointMode: extraPointMode,
+            extraPointMode: 'disposal',
             extraPointAddress: hasExtraPoint ? extraAddress : '',
             extraPointPrice: extraPointPrice,
             extraDisposalCarry: hasDisposal,
             distanceKm: distanceKm,
-            distanceKmLeg1: distanceKmLeg1,
-            distanceKmLeg2: distanceKmLeg2,
+            distanceKmLeg1: distanceKm,
+            distanceKmLeg2: 0,
             carPrice: carPrice + extraPointPrice,
             hasLoaders: hasEffectiveLoaders,
             loadersCount: loadersCount,
@@ -3970,9 +3604,6 @@
         if (timeInput) timeInput.value = '';
 
         toggleExtraPoint(false);
-        extraPointMode = 'disposal';
-        const extraAddr = document.getElementById('extraAddress');
-        if (extraAddr) extraAddr.value = '';
 
         orderItems = [];
         renderOrderItems();
