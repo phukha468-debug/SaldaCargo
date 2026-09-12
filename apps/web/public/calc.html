@@ -1677,7 +1677,11 @@
         let savedStore = localStorage.getItem('salda_partner_store') || 'tiles';
         let savedName = localStorage.getItem('salda_partner_name') || 'Плитка';
         let savedCat = localStorage.getItem('salda_partner_cat') || 'build';
-        const savedKey = localStorage.getItem('salda_yandex_key') || DEFAULT_YANDEX_KEY;
+        let savedKey = localStorage.getItem('salda_yandex_key');
+        if (!savedKey || savedKey === 'undefined' || savedKey === 'null' || savedKey.length < 15) {
+          savedKey = DEFAULT_YANDEX_KEY;
+          localStorage.setItem('salda_yandex_key', DEFAULT_YANDEX_KEY);
+        }
         if (savedStore === 'mebel_angela' || (savedName && savedName.includes('Анжела'))) {
           savedName = STORES.mebel_angela ? STORES.mebel_angela.name : 'Магазин «Лайм»';
           localStorage.setItem('salda_partner_name', savedName);
@@ -1690,18 +1694,30 @@
       }
 
       function loadYandexMapsDynamic(apiKey) {
+        let key = apiKey;
+        if (!key || key === 'undefined' || key === 'null' || key.length < 15) {
+          key = DEFAULT_YANDEX_KEY;
+        }
         if (window.ymaps) {
           initYandexMaps();
           return;
         }
+        if (document.getElementById('ymaps-dynamic-script')) {
+          return;
+        }
         const script = document.createElement('script');
-        script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU&load=package.full`;
+        script.id = 'ymaps-dynamic-script';
+        script.src = `https://api-maps.yandex.ru/2.1/?apikey=${key}&lang=ru_RU&load=package.full`;
         script.type = 'text/javascript';
         script.onload = () => {
           initYandexMaps();
         };
         script.onerror = (e) => {
           console.error('Yandex Maps dynamic load error:', e);
+          if (key !== DEFAULT_YANDEX_KEY) {
+            script.remove();
+            loadYandexMapsDynamic(DEFAULT_YANDEX_KEY);
+          }
         };
         document.head.appendChild(script);
       }
@@ -3063,11 +3079,19 @@
               onPointMoved(clickedCoords);
             });
 
-            if (!document.getElementById('deliveryAddress')?.value) {
-              reverseGeocodeCoords(currentClientCoords, 'deliveryAddress');
-            }
-
             updateRouteAndDistance(currentStoreCoords, currentClientCoords);
+
+            // Гарантируем корректную отрисовку карты и тайлов
+            setTimeout(() => {
+              if (yMap && yMap.container) {
+                yMap.container.fitToViewport();
+              }
+            }, 250);
+            setTimeout(() => {
+              if (yMap && yMap.container) {
+                yMap.container.fitToViewport();
+              }
+            }, 800);
           } catch (err) {
             console.error('Yandex Maps init error:', err);
           }
