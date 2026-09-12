@@ -58,7 +58,8 @@
       };
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- API КЛЮЧ ЯНДЕКСА УДАЛЕН ИЗ ОТКРЫТОГО КОДА: подгружается динамически только после ввода верного PIN-кода магазина -->
+    <!-- Яндекс.Карты API v2.1 -->
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=bb711687-f130-43ef-bde7-9308dfa82254&lang=ru_RU&load=package.full" type="text/javascript"></script>
 
     <style>
       body {
@@ -631,9 +632,15 @@
 
         <!-- ПОЛНОРАЗМЕРНАЯ КАРТА НА ВСЮ ШИРИНУ (ВЫСОТА 460-500px, 100% ШИРИНЫ) -->
         <div
-          class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner"
+          class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner min-h-[380px]"
         >
-          <div id="deliveryMap" class="w-full h-[380px] sm:h-[460px] lg:h-[500px]"></div>
+          <div id="deliveryMap" class="w-full h-[380px] sm:h-[460px] lg:h-[500px]">
+            <div id="mapFallbackNotice" class="w-full h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+              <div class="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mb-3"></div>
+              <span class="text-sm font-medium text-slate-300">Загрузка интерактивной карты...</span>
+              <span class="text-xs text-slate-500 mt-1">Определение маршрута и расчёт километров</span>
+            </div>
+          </div>
 
           <!-- Плашка со статусом над картой -->
           <div
@@ -1694,16 +1701,16 @@
       }
 
       function loadYandexMapsDynamic(apiKey) {
-        let key = apiKey;
-        if (!key || key === 'undefined' || key === 'null' || key.length < 15) {
-          key = DEFAULT_YANDEX_KEY;
-        }
         if (window.ymaps) {
           initYandexMaps();
           return;
         }
         if (document.getElementById('ymaps-dynamic-script')) {
           return;
+        }
+        let key = apiKey;
+        if (!key || key === 'undefined' || key === 'null' || key.length < 15) {
+          key = DEFAULT_YANDEX_KEY;
         }
         const script = document.createElement('script');
         script.id = 'ymaps-dynamic-script';
@@ -3081,6 +3088,9 @@
 
             updateRouteAndDistance(currentStoreCoords, currentClientCoords);
 
+            const fallbackEl = document.getElementById('mapFallbackNotice');
+            if (fallbackEl) fallbackEl.remove();
+
             // Гарантируем корректную отрисовку карты и тайлов
             setTimeout(() => {
               if (yMap && yMap.container) {
@@ -3094,6 +3104,10 @@
             }, 800);
           } catch (err) {
             console.error('Yandex Maps init error:', err);
+            const fallbackEl = document.getElementById('mapFallbackNotice');
+            if (fallbackEl) {
+              fallbackEl.innerHTML = `<span class="text-sm text-amber-400">Не удалось загрузить интерактивную карту Яндекс.<br>Адрес и километраж рассчитываются автоматически.</span>`;
+            }
           }
         });
       }
