@@ -11,6 +11,9 @@
       name="description"
       content="Автоматический расчёт доставки и погрузочно-разгрузочных работ поштучно по этажам для магазинов стройматериалов и мебели."
     />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 
     <!-- Resource Hints для мгновенной загрузки -->
     <link rel="preconnect" href="https://api-maps.yandex.ru" />
@@ -1568,10 +1571,11 @@
       }
 
       function applyAuthSuccess(storeKey, storeName, category, yandexKey, pin) {
-        authenticatedStore = { storeKey, storeName, category };
+        const canonicalName = STORES[storeKey]?.name || storeName;
+        authenticatedStore = { storeKey, storeName: canonicalName, category };
         localStorage.setItem('salda_partner_pin', pin);
         localStorage.setItem('salda_partner_store', storeKey);
-        localStorage.setItem('salda_partner_name', storeName);
+        localStorage.setItem('salda_partner_name', canonicalName);
         localStorage.setItem('salda_partner_cat', category);
         localStorage.setItem('salda_yandex_key', yandexKey || DEFAULT_YANDEX_KEY);
 
@@ -1588,7 +1592,7 @@
 
         // Обновляем бейдж магазина в шапке
         const badge = document.getElementById('activeStoreBadge');
-        if (badge) badge.innerText = storeName.split(' (')[0];
+        if (badge) badge.innerText = canonicalName.split(' (')[0];
 
         // Магазинный изолированный режим vs Админ
         const isAdmin = storeKey === 'admin';
@@ -1615,7 +1619,7 @@
             partnerStoreCard.classList.remove('hidden');
             const pTitle = document.getElementById('partnerStoreTitle');
             const pAddress = document.getElementById('partnerStoreAddress');
-            if (pTitle) pTitle.innerText = STORES[storeKey]?.name || storeName;
+            if (pTitle) pTitle.innerText = canonicalName;
             if (pAddress) pAddress.innerText = STORES[storeKey]?.address || '';
           }
 
@@ -1670,10 +1674,14 @@
 
       function checkSavedAuth() {
         const savedPin = localStorage.getItem('salda_partner_pin');
-        const savedStore = localStorage.getItem('salda_partner_store') || 'tiles';
-        const savedName = localStorage.getItem('salda_partner_name') || 'Плитка';
-        const savedCat = localStorage.getItem('salda_partner_cat') || 'build';
+        let savedStore = localStorage.getItem('salda_partner_store') || 'tiles';
+        let savedName = localStorage.getItem('salda_partner_name') || 'Плитка';
+        let savedCat = localStorage.getItem('salda_partner_cat') || 'build';
         const savedKey = localStorage.getItem('salda_yandex_key') || DEFAULT_YANDEX_KEY;
+        if (savedStore === 'mebel_angela' || (savedName && savedName.includes('Анжела'))) {
+          savedName = STORES.mebel_angela ? STORES.mebel_angela.name : 'Магазин «Лайм»';
+          localStorage.setItem('salda_partner_name', savedName);
+        }
         if (savedPin) {
           applyAuthSuccess(savedStore, savedName, savedCat, savedKey, savedPin);
           return true;
