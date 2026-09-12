@@ -13,11 +13,11 @@ export async function proxy(request: NextRequest) {
     pathname === '/api/vehicles/public' ||
     pathname.startsWith('/api/public/');
 
-  if (!userId && !isAuthPage && !isAuthApi && !isPublicApi && pathname !== '/') {
-    return NextResponse.redirect(new URL('/login', request.url));
+  if (!userId && !isAuthApi && !isPublicApi && pathname !== '/') {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
-  if (userId && isAuthPage) {
+  if (isAuthPage) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
