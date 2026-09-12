@@ -17,7 +17,8 @@
     "seed:apply": "tsx scripts/apply-seed.ts",
     "deploy:web": "cd apps/web && vercel --prod",
     "deploy:miniapp": "cd apps/miniapp && vercel --prod",
-    "deploy:all": "pnpm deploy:web && pnpm deploy:miniapp",
+    "deploy:regru": "python C:\\ancargo66\\deploy.py",
+    "deploy:all": "pnpm deploy:web && pnpm deploy:miniapp && pnpm deploy:regru",
     "prepare": "husky"
   },
   "devDependencies": {
