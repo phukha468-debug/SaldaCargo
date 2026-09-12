@@ -2878,12 +2878,14 @@
 
         // 2. Дополнительная услуга: Выбросить старую мебель (+1 000 ₽ фикс)
         let extraPointPrice = 0;
+        let disposalPrice = 0;
         const extraPointRow = document.getElementById('breakdownExtraPointRow');
         const extraPointPriceEl = document.getElementById('breakdownExtraPointPrice');
         const extraPointLabel = document.getElementById('breakdownExtraPointLabel');
 
         if (hasExtraPoint) {
           extraPointPrice = 1000;
+          disposalPrice = extraPointPrice;
           if (extraPointRow) extraPointRow.classList.remove('hidden');
           if (extraPointPriceEl) {
             extraPointPriceEl.innerText = '+1 000 ₽';
