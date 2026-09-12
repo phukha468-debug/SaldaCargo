@@ -16,8 +16,7 @@
     "seed:generate": "tsx scripts/generate-seed-from-md.ts",
     "seed:apply": "tsx scripts/apply-seed.ts",
     "deploy:web": "cd apps/web && vercel --prod",
-    "deploy:miniapp": "cd apps/miniapp && vercel --prod",
-    "deploy:regru": "python C:\\ancargo66\\deploy.py",
+    "deploy:regru": "python deploy_to_regru.py",
     "deploy:all": "pnpm deploy:web && pnpm deploy:miniapp && pnpm deploy:regru",
     "prepare": "husky"
   },
