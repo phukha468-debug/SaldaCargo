@@ -4780,8 +4780,8 @@ function calcOrderCosts(o: TabOrder) {
   const works = o.works ?? [];
   const parts = o.parts ?? [];
   const isExternal =
-    Boolean(o.admin_note && o.admin_note.includes('[Сторонний сервис]')) ||
-    Boolean(o.problem_description && o.problem_description.includes('[Сторонний сервис]'));
+    Boolean(o.admin_note && o.admin_note.includes('[Сторонний сервис')) ||
+    Boolean(o.problem_description && o.problem_description.includes('[Сторонний сервис'));
 
   const partsCost = parts.reduce((s, p) => {
     const q = p.quantity || 1;

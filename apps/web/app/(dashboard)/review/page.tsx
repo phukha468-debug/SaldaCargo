@@ -118,9 +118,43 @@ const PAYMENT_EDIT_OPTIONS = [
 function calcServiceOrder(o: ReviewServiceOrder) {
   const parts = o.parts ?? [];
   const works = o.works ?? [];
+
+  const desc = o.problem_description || '';
+  const note = o.admin_note || '';
+
+  // Reliable detection of external services and contractor name
+  const externalMatch =
+    desc.match(/\[Сторонний сервис(?::\s*([^\]]+))?\]/i) ||
+    note.match(/\[Сторонний сервис(?::\s*([^\]]+))?\]/i) ||
+    note.match(/Исполнитель:\s*([^.]+)/i);
+
   const isExternal =
-    (o.admin_note && o.admin_note.includes('[Сторонний сервис]')) ||
-    (o.problem_description && o.problem_description.includes('[Сторонний сервис]'));
+    Boolean(externalMatch) ||
+    desc.includes('[Сторонний сервис') ||
+    note.includes('[Сторонний сервис');
+
+  let contractorName: string | null = null;
+  if (externalMatch && externalMatch[1]) {
+    contractorName = externalMatch[1].trim();
+  } else if (note.includes('Исполнитель:')) {
+    const m = note.match(/Исполнитель:\s*([^.]+)/i);
+    if (m) contractorName = m[1].trim();
+  }
+
+  // Equipment / tuning detection
+  const fullText =
+    `${desc} ${note} ${works.map((w) => w.custom_work_name || '').join(' ')} ${parts.map((p) => p.custom_part_name || '').join(' ')}`.toLowerCase();
+  const isEquipment =
+    fullText.includes('доп. оборудован') ||
+    fullText.includes('допоборудован') ||
+    fullText.includes('установка доп') ||
+    fullText.includes('пневмо') ||
+    fullText.includes('вебасто') ||
+    fullText.includes('автономк') ||
+    fullText.includes('тахограф') ||
+    fullText.includes('рация') ||
+    fullText.includes('спойлер') ||
+    fullText.includes('фаркоп');
 
   const partsCost = parts.reduce(
     (sum, p) => sum + (Number(p.unit_price) || 0) * (Number(p.quantity) || 1),
@@ -148,7 +182,7 @@ function calcServiceOrder(o: ReviewServiceOrder) {
   }
 
   const totalCost = isExternal ? partsCost + worksCost : partsCost + salaryCost;
-  return { partsCost, salaryCost, worksCost, totalCost, isExternal };
+  return { partsCost, salaryCost, worksCost, totalCost, isExternal, contractorName, isEquipment };
 }
 
 function calcTrip(trip: TripForReview) {
@@ -1566,16 +1600,16 @@ function MaintenanceDetailModal({
               </span>
               <span className="text-slate-300">|</span>
               <span>
-                Запчасти:{' '}
+                Запчасти и материалы:{' '}
                 <strong className="text-slate-700">
                   {group.maintenanceParts.toLocaleString('ru-RU')} ₽
                 </strong>
               </span>
               <span className="text-slate-300">|</span>
               <span>
-                ЗП слесарей:{' '}
+                Работы (свои + сторонние):{' '}
                 <strong className="text-slate-700">
-                  {group.maintenanceSalary.toLocaleString('ru-RU')} ₽
+                  {(group.maintenanceTotal - group.maintenanceParts).toLocaleString('ru-RU')} ₽
                 </strong>
               </span>
             </p>
@@ -1602,10 +1636,18 @@ function MaintenanceDetailModal({
         <div className="p-6 overflow-y-auto space-y-5">
           {group.serviceOrders.map((so) => {
             const cso = calcServiceOrder(so);
+            const cleanDesc = (so.problem_description || so.admin_note || '')
+              .replace(/\[Сторонний сервис[^\]]*\]\s*/gi, '')
+              .trim();
             return (
               <div
                 key={so.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4 hover:border-rose-300 transition-colors"
+                className={cn(
+                  'bg-white rounded-2xl border p-5 shadow-xs space-y-4 transition-colors',
+                  cso.isExternal
+                    ? 'border-purple-200 hover:border-purple-400'
+                    : 'border-slate-200 hover:border-rose-300',
+                )}
               >
                 {/* Order Header */}
                 <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
@@ -1619,7 +1661,7 @@ function MaintenanceDetailModal({
                       НЗ-{so.order_number}
                     </span>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-slate-800">
                           {new Date(so.created_at).toLocaleDateString('ru-RU', {
                             day: 'numeric',
@@ -1628,27 +1670,35 @@ function MaintenanceDetailModal({
                           })}
                         </span>
                         {cso.isExternal && (
-                          <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded">
-                            Сторонний сервис
+                          <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                            <span>🏢</span>
+                            <span>
+                              {cso.contractorName
+                                ? `Сторонний сервис: ${cso.contractorName}`
+                                : 'Сторонний сервис'}
+                            </span>
+                          </span>
+                        )}
+                        {cso.isEquipment && (
+                          <span className="bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span>⚙️</span>
+                            <span>Доп. оборудование</span>
                           </span>
                         )}
                       </div>
-                      {cso.isExternal ? (
-                        <p className="text-xs text-slate-600 font-medium mt-0.5">
-                          {so.admin_note || so.problem_description}
+                      {cleanDesc && (
+                        <p className="text-xs text-slate-700 font-medium mt-1">{cleanDesc}</p>
+                      )}
+                      {!cso.isExternal && so.mechanic?.name && (
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          Слесарь:{' '}
+                          <span className="text-slate-700 font-semibold">{so.mechanic.name}</span>
+                          {so.second_mechanic?.name && (
+                            <span className="ml-1 text-slate-500">
+                              + 2-й слесарь: {so.second_mechanic.name}
+                            </span>
+                          )}
                         </p>
-                      ) : (
-                        so.mechanic?.name && (
-                          <p className="text-xs text-slate-500 font-medium">
-                            Слесарь:{' '}
-                            <span className="text-slate-700 font-semibold">{so.mechanic.name}</span>
-                            {so.second_mechanic?.name && (
-                              <span className="ml-1 text-slate-500">
-                                + 2-й слесарь: {so.second_mechanic.name}
-                              </span>
-                            )}
-                          </p>
-                        )
                       )}
                     </div>
                   </div>
@@ -2321,30 +2371,41 @@ export default function ReviewPage() {
                         <div>
                           <h3 className="font-bold text-slate-800 text-base">{group.assetKey}</h3>
                           <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
-                            <span>
-                              {group.trips.length} рейс
-                              {group.trips.length === 1 ? '' : group.trips.length < 5 ? 'а' : 'ов'}:
-                            </span>
-                            <div className="inline-flex flex-wrap gap-1 items-center">
-                              {group.trips.map((t) => (
-                                <span
-                                  key={t.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!expandedGroups.has(group.assetKey)) {
-                                      toggleGroup(group.assetKey);
-                                    }
-                                    if (!expandedIds.has(t.id)) {
-                                      toggleExpand(t.id);
-                                    }
-                                  }}
-                                  className="inline-flex items-center bg-sky-50 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-1.5 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
-                                  title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
-                                >
-                                  #{t.trip_number}
+                            {group.trips.length > 0 ? (
+                              <>
+                                <span>
+                                  {group.trips.length} рейс
+                                  {group.trips.length === 1
+                                    ? ''
+                                    : group.trips.length < 5
+                                      ? 'а'
+                                      : 'ов'}
+                                  :
                                 </span>
-                              ))}
-                            </div>
+                                <div className="inline-flex flex-wrap gap-1 items-center">
+                                  {group.trips.map((t) => (
+                                    <span
+                                      key={t.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!expandedGroups.has(group.assetKey)) {
+                                          toggleGroup(group.assetKey);
+                                        }
+                                        if (!expandedIds.has(t.id)) {
+                                          toggleExpand(t.id);
+                                        }
+                                      }}
+                                      className="inline-flex items-center bg-sky-50 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-1.5 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                      title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
+                                    >
+                                      #{t.trip_number}
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-slate-400 italic">0 рейсов</span>
+                            )}
                             {mode === 'history' && group.serviceOrders.length > 0 && (
                               <>
                                 <span className="text-slate-300">·</span>
@@ -2364,6 +2425,45 @@ export default function ReviewPage() {
                               </>
                             )}
                           </div>
+                          {/* Service order badges directly in header */}
+                          {mode === 'history' && group.serviceOrders.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                              {group.serviceOrders.map((so) => {
+                                const cso = calcServiceOrder(so);
+                                return (
+                                  <span
+                                    key={so.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedMaintenanceGroup(group);
+                                    }}
+                                    className={cn(
+                                      'inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-[11px] cursor-pointer transition-all shadow-2xs',
+                                      cso.isExternal
+                                        ? 'bg-purple-50 hover:bg-purple-600 hover:text-white border border-purple-200 text-purple-800'
+                                        : cso.isEquipment
+                                          ? 'bg-amber-50 hover:bg-amber-600 hover:text-white border border-amber-300 text-amber-800'
+                                          : 'bg-rose-50 hover:bg-rose-600 hover:text-white border border-rose-200 text-rose-700',
+                                    )}
+                                    title={`Заказ-наряд #${so.order_number}: ${so.problem_description || ''}. Нажмите для просмотра`}
+                                  >
+                                    <span>
+                                      {cso.isExternal ? '🏢' : cso.isEquipment ? '⚙️' : '🔧'}
+                                    </span>
+                                    <span>#{so.order_number}</span>
+                                    {cso.contractorName && (
+                                      <span className="opacity-85 max-w-[120px] truncate">
+                                        {cso.contractorName.replace(/^ООО\s*["']?|["']$/g, '')}
+                                      </span>
+                                    )}
+                                    <span className="font-mono text-[10px] opacity-90">
+                                      (−{cso.totalCost.toLocaleString('ru-RU')} ₽)
+                                    </span>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -2457,24 +2557,144 @@ export default function ReviewPage() {
                       </div>
                     </div>
 
-                    {/* Group Content (Only Full-Width Trips) */}
+                    {/* Group Content (Trips & Service Orders) */}
                     {isExpanded && (
-                      <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-3">
-                        {group.trips.map((trip) => (
-                          <TripCard
-                            key={trip.id}
-                            trip={trip}
-                            mode={mode}
-                            expanded={expandedIds.has(trip.id)}
-                            onToggle={() => toggleExpand(trip.id)}
-                            onEdit={() => setEditTrip(trip)}
-                            onApprove={() => handleApprove(trip.id)}
-                            onReturn={() => handleReturn(trip.id)}
-                            onDelete={() => handleDelete(trip.id)}
-                            approving={approvingId === trip.id}
-                            deleting={deletingId === trip.id}
-                          />
-                        ))}
+                      <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-4">
+                        {/* 1. Trips Section */}
+                        {group.trips.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider px-1">
+                              <span className="material-symbols-outlined text-sky-600 text-[18px]">
+                                local_shipping
+                              </span>
+                              Рейсы автомобиля ({group.trips.length})
+                            </div>
+                            <div className="space-y-3">
+                              {group.trips.map((trip) => (
+                                <TripCard
+                                  key={trip.id}
+                                  trip={trip}
+                                  mode={mode}
+                                  expanded={expandedIds.has(trip.id)}
+                                  onToggle={() => toggleExpand(trip.id)}
+                                  onEdit={() => setEditTrip(trip)}
+                                  onApprove={() => handleApprove(trip.id)}
+                                  onReturn={() => handleReturn(trip.id)}
+                                  onDelete={() => handleDelete(trip.id)}
+                                  approving={approvingId === trip.id}
+                                  deleting={deletingId === trip.id}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. Service Orders Section (History Mode) */}
+                        {mode === 'history' && group.serviceOrders.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t border-slate-200/60">
+                            <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+                              <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider">
+                                <span className="material-symbols-outlined text-rose-600 text-[18px]">
+                                  build_circle
+                                </span>
+                                Заказ-наряды ТО и ремонты ({group.serviceOrders.length})
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMaintenanceGroup(group)}
+                                className="text-xs font-black text-rose-600 hover:text-rose-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <span>
+                                  Итого ТО: −{group.maintenanceTotal.toLocaleString('ru-RU')} ₽
+                                </span>
+                                <span className="material-symbols-outlined text-[14px]">
+                                  open_in_new
+                                </span>
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {group.serviceOrders.map((so) => {
+                                const cso = calcServiceOrder(so);
+                                const cleanDesc = (so.problem_description || so.admin_note || '')
+                                  .replace(/\[Сторонний сервис[^\]]*\]\s*/gi, '')
+                                  .trim();
+                                return (
+                                  <div
+                                    key={so.id}
+                                    onClick={() => setSelectedMaintenanceGroup(group)}
+                                    className={cn(
+                                      'p-3.5 rounded-xl border bg-white shadow-2xs hover:shadow-sm cursor-pointer transition-all flex flex-col justify-between gap-2.5',
+                                      cso.isExternal
+                                        ? 'border-purple-200 hover:border-purple-400'
+                                        : 'border-slate-200 hover:border-rose-300',
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span
+                                          className={cn(
+                                            'text-[11px] font-mono font-black px-2 py-0.5 rounded-md text-white',
+                                            cso.isExternal ? 'bg-purple-600' : 'bg-rose-600',
+                                          )}
+                                        >
+                                          НЗ-{so.order_number}
+                                        </span>
+                                        <span className="text-xs font-bold text-slate-800">
+                                          {new Date(so.created_at).toLocaleDateString('ru-RU', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                          })}
+                                        </span>
+                                        {cso.isExternal && (
+                                          <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                            <span>🏢</span>
+                                            <span>{cso.contractorName || 'Сторонний сервис'}</span>
+                                          </span>
+                                        )}
+                                        {cso.isEquipment && (
+                                          <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                            <span>⚙️</span>
+                                            <span>Доп. оборуд.</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-xs font-black text-rose-600 whitespace-nowrap">
+                                        −{cso.totalCost.toLocaleString('ru-RU')} ₽
+                                      </span>
+                                    </div>
+                                    {cleanDesc && (
+                                      <p className="text-xs text-slate-700 font-medium line-clamp-2">
+                                        {cleanDesc}
+                                      </p>
+                                    )}
+                                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100">
+                                      <span>
+                                        {cso.isExternal
+                                          ? `Подрядчик: ${cso.worksCost > 0 ? `${cso.worksCost.toLocaleString('ru-RU')} ₽` : 'запчасти'}`
+                                          : so.mechanic?.name
+                                            ? `Слесарь: ${so.mechanic.name}`
+                                            : 'Свой гараж'}
+                                      </span>
+                                      <span className="text-slate-400 flex items-center gap-0.5 font-medium hover:text-slate-700">
+                                        Детали{' '}
+                                        <span className="material-symbols-outlined text-[14px]">
+                                          arrow_forward
+                                        </span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Empty state */}
+                        {group.trips.length === 0 && group.serviceOrders.length === 0 && (
+                          <div className="text-center py-6 text-slate-400 text-xs font-medium">
+                            Нет записей за выбранный период
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
