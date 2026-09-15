@@ -1,0 +1,2277 @@
+import os
+
+html_code = """<!DOCTYPE html>
+<html lang="ru" class="dark scroll-smooth overflow-x-hidden">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>ИП Нигамедьянов А.С. | Грузоперевозки Верхняя Салда, УрФО, Россия</title>
+  <meta name="description" content="Грузоперевозки собственным автопарком (11 единиц: Газель NEXT, Валдай, Mitsubishi Fuso). Рейтинг 5.0 на ATI.SU (Код 2811269). Личная ремонтная база, ЭДО, работаем без НДС (УСН)." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          screens: {
+            'xs': '380px'
+          },
+          colors: {
+            brand: {
+              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
+              400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309',
+              800: '#92400e', 900: '#78350f'
+            },
+            dark: {
+              950: '#06090e', 900: '#0b0f19', 850: '#0f172a',
+              800: '#111827', 750: '#161f30', 700: '#1e293b', 600: '#334155'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    html, body {
+      overflow-x: hidden !important;
+      width: 100% !important;
+      max-width: 100vw !important;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #06090e; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #d97706; }
+    .theme-card {
+      background: rgba(17, 24, 39, 0.90);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .theme-card-hover:hover {
+      border-color: rgba(217, 119, 6, 0.5);
+      background: rgba(30, 41, 59, 0.96);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
+    }
+    .pb-safe {
+      padding-bottom: max(env(safe-area-inset-bottom, 0.5rem), 0.5rem);
+    }
+    .pulse-glow {
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-dark-900 text-slate-200 antialiased selection:bg-brand-600 selection:text-white relative overflow-x-hidden pb-20 lg:pb-0 w-full">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-800/95 border border-brand-500/50 text-white shadow-2xl backdrop-blur-md max-w-[90vw]">
+    <i data-lucide="check-circle-2" class="w-5 h-5 text-brand-500 flex-shrink-0"></i>
+    <span id="toast-message" class="text-xs sm:text-sm font-medium">Реквизиты успешно скопированы!</span>
+  </div>
+
+  <!-- Lightbox Modal -->
+  <div id="lightbox-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden items-center justify-center p-4" onclick="closeLightbox()">
+    <div class="relative max-w-5xl max-h-[90vh] flex flex-col items-center">
+      <button class="absolute -top-12 right-0 text-white hover:text-brand-400 p-2 text-sm font-bold flex items-center gap-1" aria-label="Закрыть фото">
+        <i data-lucide="x" class="w-6 h-6"></i> Закрыть
+      </button>
+      <img id="lightbox-img" src="" alt="Увеличенное фото" class="max-w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl border border-slate-700" onclick="event.stopPropagation()">
+      <p id="lightbox-caption" class="text-slate-300 text-sm mt-3 text-center px-4 font-medium"></p>
+    </div>
+  </div>
+
+  <!-- ==================== 🍔 ВСЕ РАЗДЕЛЫ САЙТА (ПОЛНОЭКРАННОЕ МЕНЮ-НАВИГАТОР) ==================== -->
+  <div id="mobile-drawer" class="fixed inset-0 z-50 bg-dark-950/98 backdrop-blur-2xl hidden flex-col justify-between p-4 sm:p-7 overflow-y-auto transition-all duration-300" aria-label="Все разделы сайта">
+    
+    <!-- Шапка меню -->
+    <div>
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-brand-400 to-amber-700 flex-shrink-0 shadow-md">
+            <img src="logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-[10px]" />
+          </div>
+          <div>
+            <div class="font-black text-sm sm:text-base text-white tracking-wide">ИП Нигамедьянов А.С.</div>
+            <div class="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+              <span>ATI.SU 5.0 ⭐</span>
+              <span class="text-slate-400 font-mono">(Код: 2811269)</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Кнопка закрытия -->
+        <button id="close-drawer-btn" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition" aria-label="Закрыть меню">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Список всех разделов сайта -->
+      <div class="py-5 space-y-2.5">
+        <div class="text-[11px] font-black text-brand-400 uppercase tracking-widest px-2 mb-2 flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+          <span>Все разделы и сервисы сайта (мгновенный переход):</span>
+        </div>
+
+        <!-- 1. Главная страница -->
+        <a href="#hero" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-400 flex items-center justify-center">
+              <i data-lucide="home" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold">1. Главная страница</div>
+              <div class="text-[11px] text-slate-400 font-normal">Автопарк 11 машин, онлайн-расчет, связь</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+        </a>
+
+        <!-- 2. Онлайн-калькулятор -->
+        <a href="#calculator" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-white font-bold transition active:scale-[0.98]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-brand-500 text-black flex items-center justify-center font-bold">
+              <i data-lucide="calculator" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-brand-300">2. Онлайн-калькулятор стоимости</div>
+              <div class="text-[11px] text-slate-300 font-normal">Интерактивный расчет рейса и заказ онлайн</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-brand-400"></i>
+        </a>
+
+        <!-- 3. Карточка предприятия -->
+        <a href="#requisites" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold">3. Карточка предприятия</div>
+              <div class="text-[11px] text-slate-400 font-normal">Официальные реквизиты, ИНН, банк, ЭДО (Без НДС)</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+        </a>
+
+        <!-- 4. Блок для связи и заявка -->
+        <a href="#contact" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <i data-lucide="send" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold">4. Блок для связи и онлайн-заявка</div>
+              <div class="text-[11px] text-slate-400 font-normal">Форма заявки за 1 мин, телефон, мессенджер</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+        </a>
+
+        <!-- Дополнительные разделы (модальные) -->
+        <div class="pt-2">
+          <div class="text-[11px] font-black text-slate-400 uppercase tracking-widest px-2 mb-2">
+            Дополнительные сведения и сервисы:
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Тарифы подробно -->
+            <button type="button" onclick="openSectionModal('tariffs-modal')" class="drawer-link flex items-center justify-between p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-left transition">
+              <div class="flex items-center gap-2.5">
+                <i data-lucide="tag" class="w-4 h-4 text-brand-400 flex-shrink-0"></i>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">Тарифы и расценки</div>
+                  <div class="text-[10px] text-slate-400">Экспресс, почасовая, грузчики, мусор</div>
+                </div>
+              </div>
+              <span class="text-[11px] text-brand-400 font-bold">Открыть</span>
+            </button>
+
+            <!-- Автопарк -->
+            <button type="button" onclick="openSectionModal('fleet-modal')" class="drawer-link flex items-center justify-between p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-left transition">
+              <div class="flex items-center gap-2.5">
+                <i data-lucide="truck" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">Наш автопарк (11 авто)</div>
+                  <div class="text-[10px] text-slate-400">ГАЗели NEXT, Валдай 5т, Fuso</div>
+                </div>
+              </div>
+              <span class="text-[11px] text-brand-400 font-bold">Открыть</span>
+            </button>
+
+            <!-- Фотогалерея -->
+            <button type="button" onclick="openSectionModal('gallery-modal')" class="drawer-link flex items-center justify-between p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-left transition">
+              <div class="flex items-center gap-2.5">
+                <i data-lucide="camera" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">Фотогалерея техники</div>
+                  <div class="text-[10px] text-slate-400">Реальные фото на объектах</div>
+                </div>
+              </div>
+              <span class="text-[11px] text-brand-400 font-bold">Открыть</span>
+            </button>
+
+            <!-- Профиль ATI.SU -->
+            <button type="button" onclick="openSectionModal('ati-modal')" class="drawer-link flex items-center justify-between p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-left transition">
+              <div class="flex items-center gap-2.5">
+                <i data-lucide="star" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">Рейтинг ATI.SU 5.0</div>
+                  <div class="text-[10px] text-slate-400">Код 2811269, верификация, 0% срывов</div>
+                </div>
+              </div>
+              <span class="text-[11px] text-emerald-400 font-bold">Открыть</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Быстрые действия внизу меню -->
+    <div class="pt-4 border-t border-slate-800 space-y-2">
+      <a href="tel:+79630501501" class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 active:scale-95 transition">
+        <i data-lucide="phone-call" class="w-4 h-4"></i>
+        <span>Позвонить: 8 (963) 050-15-01</span>
+      </a>
+      <div class="grid grid-cols-2 gap-2">
+        <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+          <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+          <span>Мессенджер MAX</span>
+        </a>
+        <button type="button" onclick="copyFullRequisites()" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+          <i data-lucide="copy" class="w-3.5 h-3.5 text-brand-400"></i>
+          <span>Реквизиты ИП</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== 📌 ЗАФИКСИРОВАННЫЙ ХЕДЕР (ПРИ СКРОЛЛЕ ВСЕГДА СВЕРХУ) ==================== -->
+  <header class="fixed top-0 left-0 right-0 z-40 bg-dark-950/95 backdrop-blur-xl border-b border-slate-800 w-full transition-all shadow-xl">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14 sm:h-20 gap-2">
+        
+        <!-- Логотип и название компании -->
+        <a href="#hero" class="flex items-center gap-2.5 sm:gap-3.5 group select-none min-w-0">
+          <div class="relative w-9 h-9 sm:w-11 sm:h-11 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-brand-400 to-amber-700 shadow-md flex-shrink-0">
+            <img src="logo.jpg" alt="Логотип" class="w-full h-full object-cover rounded-[10px] fallback-img" />
+          </div>
+          <div class="min-w-0">
+            <div class="font-black text-xs xs:text-sm sm:text-base lg:text-lg text-white leading-tight flex items-center gap-1.5 sm:gap-2">
+              <span class="whitespace-nowrap">ИП Нигамедьянов</span>
+              <span class="inline-flex items-center px-1.5 py-0.5 text-[9px] sm:text-[10px] font-black bg-emerald-500/15 text-emerald-400 rounded-full border border-emerald-500/30 whitespace-nowrap">5.0 ⭐</span>
+            </div>
+            <div class="text-[9px] sm:text-xs text-slate-400 flex items-center gap-1 mt-0.5 whitespace-nowrap">
+              <i data-lucide="map-pin" class="w-2.5 h-2.5 sm:w-3 sm:h-3 text-brand-500 flex-shrink-0"></i>
+              <span>Верхняя Салда</span>
+            </div>
+          </div>
+        </a>
+
+        <!-- Навигационные ссылки для десктопа -->
+        <nav class="hidden xl:flex items-center gap-6 text-sm font-bold text-slate-300">
+          <a href="#hero" class="hover:text-brand-400 transition-colors whitespace-nowrap">Главная</a>
+          <a href="#calculator" class="text-brand-400 hover:text-brand-300 transition-colors whitespace-nowrap flex items-center gap-1">
+            <i data-lucide="calculator" class="w-4 h-4"></i>
+            <span>Калькулятор</span>
+          </a>
+          <a href="#requisites" class="hover:text-brand-400 transition-colors whitespace-nowrap">Карточка предприятия</a>
+          <a href="#contact" class="hover:text-brand-400 transition-colors whitespace-nowrap">Контакты</a>
+        </nav>
+
+        <!-- Правая часть: ЕДИНСТВЕННАЯ КНОПКА "РАЗДЕЛЫ" (ВИДНА НА ВСЕХ УСТРОЙСТВАХ) -->
+        <div class="flex items-center flex-shrink-0">
+          <button id="drawer-toggle-btn" class="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-white text-xs sm:text-sm font-black uppercase tracking-wider transition transform active:scale-95 shadow-lg shadow-brand-900/40 flex-shrink-0 cursor-pointer" aria-label="Открыть все разделы сайта" title="Все разделы сайта">
+            <i data-lucide="menu" class="w-4 h-4 text-white"></i>
+            <span>Разделы</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Отступ сверху равный высоте фиксированного хедера -->
+  <main class="w-full pt-14 sm:pt-20">
+
+    <!-- ========================================================================= -->
+    <!-- 1. ГЛАВНАЯ СТРАНИЦА (HERO) — МАКСИМАЛЬНО КОНВЕРСИОННАЯ С КЛИКАБЕЛЬНЫМИ CTA -->
+    <!-- ========================================================================= -->
+    <section id="hero" class="relative pt-4 pb-10 sm:pt-10 sm:pb-16 overflow-hidden w-full">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          
+          <!-- Левая колонка: Оффер, УТП, Кликабельные призывы к действию (CTA) -->
+          <div class="lg:col-span-7 space-y-5">
+
+            <!-- Главный конверсионный заголовок -->
+            <h1 class="text-2xl sm:text-4xl xl:text-5xl font-black text-white tracking-tight leading-tight">
+              Грузоперевозки по <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-amber-300 to-amber-500">Верхней Салде</span>, Свердловской области и РФ
+            </h1>
+
+            <!-- Подзаголовок с доказательствами -->
+            <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
+              Собственный автопарк <strong class="text-white">11 автомобилей</strong> (ГАЗель NEXT, Валдай 5т, Fuso). Личная ремонтная база, <strong class="text-emerald-400">0% срывов</strong>, рейтинг <strong class="text-brand-400">5.0 в бирже ATI.SU</strong>. Официальный договор, безналичный расчет <strong class="text-white">без НДС (УСН)</strong>, ЭДО.
+            </p>
+
+            <!-- 🎯 КЛИКАБЕЛЬНЫЕ ПРИЗЫВЫ К ДЕЙСТВИЮ (CTA-БЛОК) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              
+              <!-- Кнопка 1: Рассчитать онлайн (Главный конвертер) -->
+              <a href="#calculator" class="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-white font-black text-sm sm:text-base shadow-xl shadow-brand-900/50 active:scale-95 transition transform">
+                <i data-lucide="calculator" class="w-5 h-5"></i>
+                <span>Рассчитать стоимость онлайн</span>
+              </a>
+
+              <!-- Кнопка 2: Прямой звонок диспетчеру -->
+              <a href="tel:+79630501501" class="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-900/40 active:scale-95 transition transform">
+                <i data-lucide="phone-call" class="w-5 h-5"></i>
+                <span>Позвонить: 8 (963) 050-15-01</span>
+              </a>
+
+              <!-- Кнопка 3: Оставить заявку за 1 мин -->
+              <a href="#contact" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm active:scale-95 transition">
+                <i data-lucide="send" class="w-4 h-4 text-brand-400"></i>
+                <span>Оставить заявку на рейс</span>
+              </a>
+
+              <!-- Кнопка 4: Написать в MAX бот -->
+              <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600/90 hover:bg-blue-600 border border-blue-500/40 text-white font-bold text-xs sm:text-sm active:scale-95 transition">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>Написать в MAX бот</span>
+              </a>
+
+            </div>
+
+            <!-- Бейджи доверия и преимуществ -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <div class="text-xs font-bold text-brand-400">⚡ От 5 мин</div>
+                <div class="text-[10px] text-slate-400">Подача авто</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <div class="text-xs font-bold text-brand-400">🚛 11 машин</div>
+                <div class="text-[10px] text-slate-400">Парк до 5 тонн</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <div class="text-xs font-bold text-emerald-400">⭐ 5.0 ATI.SU</div>
+                <div class="text-[10px] text-slate-400">Код: 2811269</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <div class="text-xs font-bold text-white">📄 Без НДС / ЭДО</div>
+                <div class="text-[10px] text-slate-400">Безнал и договор</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Правая колонка: Фото автопарка + Статус готовности -->
+          <div class="lg:col-span-5 relative">
+            <div class="theme-card p-3 rounded-3xl border border-brand-500/40 shadow-2xl">
+              <div class="relative h-60 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-900 cursor-pointer flex items-center justify-center group" onclick="openLightbox('truck-next-winter.jpg', 'ГАЗель NEXT (А051МВ 196) — Подача по Верхней Салде')">
+                <img src="truck-next-winter.jpg" alt="ГАЗель NEXT" class="w-full h-full object-cover fallback-img group-hover:scale-105 transition-transform duration-500" />
+                <div class="absolute top-3 left-3 px-3 py-1 bg-brand-500 text-black text-xs font-black rounded-lg uppercase shadow-lg flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-black animate-ping"></span>
+                  <span>⚡ Свободна к подаче</span>
+                </div>
+                <div class="absolute bottom-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold rounded-lg border border-white/10 flex items-center gap-1">
+                  <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-brand-400"></i>
+                  <span>Увеличить фото</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+                <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span class="block text-lg font-black text-white font-mono">11</span>
+                  <span class="text-[10px] text-brand-400 font-bold uppercase">Автомобилей</span>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span class="block text-lg font-black text-emerald-400 font-mono">5.0 ⭐</span>
+                  <span class="text-[10px] text-slate-300 font-bold uppercase">Рейтинг ATI</span>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span class="block text-lg font-black text-white font-mono">0%</span>
+                  <span class="text-[10px] text-brand-400 font-bold uppercase">Срывов</span>
+                </div>
+              </div>
+
+              <!-- Кнопка быстрого перехода в калькулятор -->
+              <a href="#calculator" class="mt-3 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition">
+                <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-brand-400 animate-bounce"></i>
+                <span>Перейти к калькулятору стоимости ниже</span>
+              </a>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+        <!-- ========================================================================= -->
+    <!-- 2. ОНЛАЙН КАЛЬКУЛЯТОР СТОИМОСТИ (РАЗМЕЩЕН СРАЗУ ПОД ГЛАВНОЙ) -->
+    <!-- ========================================================================= -->
+    <section id="calculator" class="py-12 sm:py-16 bg-dark-800/70 border-t border-slate-800 relative w-full">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-2xl mx-auto mb-8">
+          <div class="inline-flex items-center gap-1.5 px-3 py-0.5 bg-brand-500/10 text-brand-400 text-xs font-bold rounded-md border border-brand-500/20 uppercase tracking-wider mb-2">
+            <i data-lucide="calculator" class="w-3.5 h-3.5"></i> Точный расчет стоимости
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            Калькулятор стоимости грузоперевозки
+          </h2>
+          <p class="mt-1.5 text-slate-300 text-xs sm:text-sm">
+            Честный онлайн-расчет без скрытых наценок. Выберите категорию и параметры рейса
+          </p>
+        </div>
+
+        <!-- Главные 4 кнопки категорий -->
+        <div class="max-w-4xl mx-auto mb-6">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            
+            <!-- Кнопка 1: Газель по городу -->
+            <button type="button" id="cat-btn-city" onclick="setMainCategory('city')" 
+              class="p-3 sm:p-3.5 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:text-white">
+              <span class="text-lg">🏙️</span>
+              <span class="text-xs sm:text-sm font-bold leading-tight">Газель по городу</span>
+              <span class="text-[10px] text-slate-400 font-mono">Верхняя Салда</span>
+            </button>
+
+            <!-- Кнопка 2: Газель межгород (АКТИВНАЯ ПО УМОЛЧАНИЮ) -->
+            <button type="button" id="cat-btn-intercity" onclick="setMainCategory('intercity')" 
+              class="p-3 sm:p-3.5 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 border-brand-500 bg-brand-500/15 text-white shadow-lg shadow-brand-500/10 font-bold">
+              <span class="text-lg">🗺️</span>
+              <span class="text-xs sm:text-sm font-bold leading-tight">Газель межгород</span>
+              <span class="text-[10px] text-brand-400 font-mono">Тагил, Екб, РФ</span>
+            </button>
+
+            <!-- Кнопка 3: Грузовики до 5 тонн -->
+            <button type="button" id="cat-btn-truck5t" onclick="setMainCategory('truck5t')" 
+              class="p-3 sm:p-3.5 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:text-white">
+              <span class="text-lg">🚚</span>
+              <span class="text-xs sm:text-sm font-bold leading-tight">Грузовики до 5т</span>
+              <span class="text-[10px] text-slate-400 font-mono">Валдай / Fuso</span>
+            </button>
+
+            <!-- Кнопка 4: Самосвал -->
+            <button type="button" id="cat-btn-tipper" onclick="setMainCategory('tipper')" 
+              class="p-3 sm:p-3.5 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:text-white">
+              <span class="text-lg">🚜</span>
+              <span class="text-xs sm:text-sm font-bold leading-tight">Самосвал</span>
+              <span class="text-[10px] text-slate-400 font-mono">Сыпучие / Снег</span>
+            </button>
+
+          </div>
+        </div>
+
+        <!-- Основная карточка калькулятора -->
+        <div class="theme-card rounded-3xl p-5 sm:p-7 max-w-4xl mx-auto shadow-2xl border border-brand-500/30">
+          <div class="grid md:grid-cols-12 gap-6 items-start">
+            
+            <!-- Левая колонка: Настройки параметров -->
+            <div class="md:col-span-7 space-y-5">
+              
+              <!-- ============================================================ -->
+              <!-- 1. РАЗДЕЛ: ГАЗЕЛЬ МЕЖГОРОД (АКТИВНЫЙ) -->
+              <!-- ============================================================ -->
+              <div id="section-intercity" class="space-y-4">
+                
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs font-black uppercase tracking-wider text-slate-200">
+                      1. Пункт назначения (из Верхней Салды):
+                    </label>
+                    <span class="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Цены без грузчиков (только авто)</span>
+                  </div>
+
+                  <!-- Сетка кнопок городов -->
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    
+                    <!-- Екатеринбург -->
+                    <button type="button" id="dest-btn-ekb" onclick="selectDestination('ekb')" 
+                      class="p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold">
+                      <div class="text-xs font-bold flex items-center justify-between">
+                        <span>Екатеринбург</span>
+                      </div>
+                      <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">16 000 ₽</div>
+                      <div class="text-[9px] text-slate-400">~180 км от Салды</div>
+                    </button>
+
+                    <!-- Нижний Тагил (с выпадающим меню районов) -->
+                    <button type="button" id="dest-btn-tagil" onclick="toggleTagilMenu()" 
+                      class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold flex items-center justify-between">
+                        <span id="tagil-btn-title">Нижний Тагил</span>
+                        <i id="tagil-arrow-icon" data-lucide="chevron-down" class="w-3.5 h-3.5 text-brand-400 transition-transform"></i>
+                      </div>
+                      <div id="tagil-btn-subtitle" class="text-xs sm:text-sm text-slate-300 font-mono font-bold mt-0.5">4 000 – 6 000 ₽</div>
+                      <div class="text-[9px] text-amber-400">выберите район ▼</div>
+                    </button>
+
+                    <!-- Челябинск -->
+                    <button type="button" id="dest-btn-chelyabinsk" onclick="selectDestination('chelyabinsk')" 
+                      class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold flex items-center justify-between">
+                        <span>Челябинск</span>
+                      </div>
+                      <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">30 000 ₽</div>
+                      <div class="text-[9px] text-slate-400">~390 км от Салды</div>
+                    </button>
+
+                    <!-- Пермь -->
+                    <button type="button" id="dest-btn-perm" onclick="selectDestination('perm')" 
+                      class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold flex items-center justify-between">
+                        <span>Пермь</span>
+                      </div>
+                      <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">30 000 ₽</div>
+                      <div class="text-[9px] text-slate-400">~480 км от Салды</div>
+                    </button>
+
+                    <!-- Другой город / расчет по км -->
+                    <button type="button" id="dest-btn-custom" onclick="selectDestination('custom')" 
+                      class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700 col-span-2 sm:col-span-2">
+                      <div class="text-xs font-bold flex items-center justify-between">
+                        <span>Другой город / расчет по км</span>
+                        <span class="text-[10px] text-emerald-400 font-mono">по тарифу</span>
+                      </div>
+                      <div class="text-[10px] text-slate-300 mt-0.5">
+                        до 400 км: <b class="text-brand-400">80 ₽/км</b> • дальше 400 км: <b class="text-brand-400">50 ₽/км</b>
+                      </div>
+                    </button>
+
+                  </div>
+
+                  <!-- ВЫПАДАЮЩЕЕ МЕНЮ РАЙОНОВ НИЖНЕГО ТАГИЛА -->
+                  <div id="tagil-sub-menu" class="hidden mt-2 p-3 rounded-2xl bg-slate-900/95 border border-brand-500/50 space-y-2">
+                    <div class="text-[11px] font-black text-amber-400 flex items-center justify-between">
+                      <span class="flex items-center gap-1">📍 Район доставки в Нижнем Тагиле:</span>
+                      <span class="text-[10px] text-slate-400 font-normal">без грузчиков</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      
+                      <!-- Вагонка: 4 000р -->
+                      <button type="button" id="tagil-opt-vagonka" onclick="selectTagilDistrict('vagonka')" 
+                        class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-dark-900 text-slate-300 hover:border-brand-500">
+                        <div class="text-xs font-bold text-white">Тагил — Вагонка</div>
+                        <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">4 000 ₽</div>
+                        <div class="text-[9px] text-slate-400">Дзержинский район</div>
+                      </button>
+
+                      <!-- Тагилстрой: 5 000р -->
+                      <button type="button" id="tagil-opt-tagilstroy" onclick="selectTagilDistrict('tagilstroy')" 
+                        class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-dark-900 text-slate-300 hover:border-brand-500">
+                        <div class="text-xs font-bold text-white">Тагилстрой</div>
+                        <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">5 000 ₽</div>
+                        <div class="text-[9px] text-slate-400">Тагилстроевский район</div>
+                      </button>
+
+                      <!-- Гальянка, Выя, Красный камень: 6 000р -->
+                      <button type="button" id="tagil-opt-center" onclick="selectTagilDistrict('center')" 
+                        class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-dark-900 text-slate-300 hover:border-brand-500">
+                        <div class="text-xs font-bold text-white leading-tight">Гальянка, Выя, Красный камень</div>
+                        <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">6 000 ₽</div>
+                        <div class="text-[9px] text-slate-400">Ленинский р-н / ГГМ</div>
+                      </button>
+
+                    </div>
+                  </div>
+
+                  <!-- ИНТЕРАКТИВНЫЙ ВВОД ДЛЯ ДРУГОГО ГОРОДА (ПО КМ) -->
+                  <div id="custom-distance-container" class="hidden mt-2 p-3.5 rounded-2xl bg-slate-900/95 border border-brand-500/50 space-y-2.5">
+                    <div class="flex justify-between items-center text-xs">
+                      <span class="font-bold text-slate-200">Расстояние маршрута (в одну сторону):</span>
+                      <div class="flex items-center gap-1.5">
+                        <input type="number" id="custom-km-input" min="10" max="3000" value="250" 
+                          class="w-20 px-2 py-1 text-right font-mono font-black text-brand-400 bg-dark-900 border border-slate-700 rounded-lg text-sm focus:border-brand-500 focus:outline-none"
+                          oninput="onCustomKmInput(this.value)">
+                        <span class="text-xs text-slate-400 font-bold">км</span>
+                      </div>
+                    </div>
+                    <input type="range" id="custom-km-slider" min="20" max="1500" step="10" value="250" 
+                      class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-500" 
+                      oninput="onCustomKmSlider(this.value)">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                      <span>20 км</span>
+                      <span class="text-amber-400">400 км (порог тарифа)</span>
+                      <span>1 500 км</span>
+                    </div>
+                    <div id="custom-km-rate-hint" class="text-[11px] text-slate-300 bg-dark-900/90 p-2.5 rounded-xl border border-slate-800">
+                      Тариф: <b class="text-brand-400">80 ₽/км</b> (до 400 км).
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- ==================== 2. БЛОК ГРУЗЧИКОВ ==================== -->
+                <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div>
+                      <label class="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                        <span>👥 Грузчики</span>
+                        <span class="px-1.5 py-0.2 rounded bg-brand-500/20 text-brand-400 text-[10px] font-mono font-bold">1 грузчик от 1 000 ₽/час</span>
+                      </label>
+                    </div>
+                    <span class="text-[10px] text-slate-400">изначально: без грузчиков</span>
+                  </div>
+
+                  <!-- Погрузка и Разгрузка в 2 колонки -->
+                  <div class="grid sm:grid-cols-2 gap-3">
+                    
+                    <!-- Погрузка (до 5 чел) -->
+                    <div class="space-y-1.5 bg-dark-900/80 p-2.5 rounded-xl border border-slate-800">
+                      <div class="flex justify-between items-center text-[11px]">
+                        <span class="font-bold text-white">📦 На погрузке (до 5 чел):</span>
+                        <span id="movers-load-label" class="text-brand-400 font-bold font-mono">0 чел</span>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <button type="button" onclick="setMoversCount('load', 0)" class="mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-500 text-black" data-count="0">0</button>
+                        <button type="button" onclick="setMoversCount('load', 1)" class="mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="1">1</button>
+                        <button type="button" onclick="setMoversCount('load', 2)" class="mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="2">2</button>
+                        <button type="button" onclick="setMoversCount('load', 3)" class="mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="3">3</button>
+                        <button type="button" onclick="setMoversCount('load', 4)" class="mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="4">4</button>
+                        <button type="button" onclick="setMoversCount('load', 5)" class="mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="5">5</button>
+                      </div>
+                      <div class="text-[10px] text-slate-400">Оплата времени по месту по факту</div>
+                    </div>
+
+                    <!-- Разгрузка (до 3 чел) -->
+                    <div class="space-y-1.5 bg-dark-900/80 p-2.5 rounded-xl border border-slate-800">
+                      <div class="flex justify-between items-center text-[11px]">
+                        <span class="font-bold text-white">🚚 На разгрузке (до 3 чел):</span>
+                        <span id="movers-unload-label" class="text-brand-400 font-bold font-mono">0 чел</span>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="setMoversCount('unload', 0)" class="mover-btn-unload px-3 py-1 rounded-lg text-xs font-bold bg-brand-500 text-black" data-count="0">0</button>
+                        <button type="button" onclick="setMoversCount('unload', 1)" class="mover-btn-unload px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="1">1</button>
+                        <button type="button" onclick="setMoversCount('unload', 2)" class="mover-btn-unload px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="2">2</button>
+                        <button type="button" onclick="setMoversCount('unload', 3)" class="mover-btn-unload px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="3">3</button>
+                      </div>
+                      <div class="text-[10px] text-amber-300/90 font-medium">Минимум 2 часа (от 2 000 ₽/чел)</div>
+                    </div>
+
+                  </div>
+
+                  <!-- Плашка условий дороги и суточных -->
+                  <div id="movers-distance-policy" class="p-2.5 rounded-xl bg-slate-800/70 border border-slate-700 text-[11px] space-y-1">
+                    <div id="movers-policy-text" class="text-emerald-400 font-bold flex items-center gap-1.5">
+                      <i data-lucide="check-circle-2" class="w-4 h-4 flex-shrink-0"></i>
+                      <span>В радиусе 200 км дорога грузчиков бесплатна</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 leading-tight">
+                      <span class="text-amber-400">*</span> — после оформления заявки менеджер свяжется с Вами, чтобы уточнить все детали и ответит на все вопросы.
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- ==================== 3. ДОП. ОПЦИИ ==================== -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  
+                  <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/70 border border-slate-800 cursor-pointer text-xs text-slate-300 hover:border-slate-700">
+                    <input type="checkbox" id="opt-urgent" class="w-4 h-4 rounded text-brand-600 bg-slate-800 border-slate-700" onchange="calculateIntercity()">
+                    <div>
+                      <span class="font-bold text-white">⚡ Срочно (+15%)</span>
+                      <div class="text-[10px] text-slate-400">Подача в день обращения</div>
+                    </div>
+                  </label>
+
+                  <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/70 border border-slate-800 cursor-pointer text-xs text-slate-300 hover:border-slate-700">
+                    <input type="checkbox" id="opt-uncover" class="w-4 h-4 rounded text-brand-600 bg-slate-800 border-slate-700" onchange="calculateIntercity()">
+                    <div>
+                      <span class="font-bold text-white">Растентовка (+1 000 ₽)</span>
+                      <div class="text-[10px] text-slate-400">Боковая или верхняя погрузка</div>
+                    </div>
+                  </label>
+
+                </div>
+
+              </div>
+              <!-- /РАЗДЕЛ: ГАЗЕЛЬ МЕЖГОРОД -->
+
+              <!-- ============================================================ -->
+              <!-- 2. РАЗДЕЛ: ГАЗЕЛЬ ПО ГОРОДУ (ВЕРХНЯЯ САЛДА) -->
+              <!-- ============================================================ -->
+              <div id="section-city" class="hidden space-y-4">
+                <div>
+                  <label class="block text-xs font-black uppercase tracking-wider text-slate-200 mb-2">
+                    Формат работы по Верхней Салде:
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button" id="city-mode-hourly" onclick="setCityMode('hourly')" class="p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold">
+                      <div class="text-xs font-bold">⏱️ Почасовая аренда</div>
+                      <div class="text-[11px] text-brand-400 font-mono font-bold mt-0.5">1 500 ₽ / час</div>
+                      <div class="text-[9px] text-slate-400">Подача от 5 минут</div>
+                    </button>
+                    <button type="button" id="city-mode-express" onclick="setCityMode('express')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold">⚡ Экспресс (20 мин)</div>
+                      <div class="text-[11px] text-blue-400 font-mono font-bold mt-0.5">1 000 — 1 500 ₽</div>
+                      <div class="text-[9px] text-slate-400">1-2 предмета</div>
+                    </button>
+                    <button type="button" id="city-mode-trash" onclick="setCityMode('trash')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700 col-span-2">
+                      <div class="text-xs font-bold">🗑️ Вывоз строительного мусора / старой мебели</div>
+                      <div class="text-[11px] text-amber-400 font-mono font-bold mt-0.5">от 5 000 ₽ / рейс</div>
+                      <div class="text-[9px] text-slate-400">Официальная утилизация на полигоне</div>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="city-slider-box" class="space-y-2 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="font-bold text-slate-200">Время аренды авто:</span>
+                    <span id="city-hours-display" class="font-mono font-black text-brand-400 text-sm">2 часа</span>
+                  </div>
+                  <input type="range" id="city-hours-slider" min="1" max="10" step="1" value="2" 
+                    class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-500" 
+                    oninput="onCityHoursChange(this.value)">
+                  <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>1 час (мин.)</span>
+                    <span>10 часов</span>
+                  </div>
+                </div>
+
+                <!-- Грузчики по городу -->
+                <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                  <div class="flex justify-between items-center text-xs font-bold text-slate-200">
+                    <span>Грузчики по Салде (1 000 ₽/час за чел):</span>
+                    <span id="city-movers-count-label" class="text-brand-400 font-mono">0 чел</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="setCityMovers(0)" class="city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-brand-500 text-black" data-count="0">Без грузчиков</button>
+                    <button type="button" onclick="setCityMovers(1)" class="city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="1">1 чел (+1000 ₽/ч)</button>
+                    <button type="button" onclick="setCityMovers(2)" class="city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="2">2 чел (+2000 ₽/ч)</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ============================================================ -->
+              <!-- 3. РАЗДЕЛ: ГРУЗОВИКИ ДО 5 ТОНН (МЕЖГОРОД) -->
+              <!-- ============================================================ -->
+              <div id="section-truck5t" class="hidden space-y-4">
+                <div>
+                  <label class="block text-xs font-black uppercase tracking-wider text-slate-200 mb-2">
+                    Тяжелые грузовики (Валдай / Mitsubishi Fuso до 5.0 т • до 36 м³ • 12 паллет):
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="selectTruck5tDest('ekb', 24000, 'Екатеринбург')" class="p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold">
+                      <div class="text-xs font-bold">Екатеринбург</div>
+                      <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">24 000 ₽</div>
+                      <div class="text-[9px] text-slate-400">до 5 тонн • 36 м³</div>
+                    </button>
+                    <button type="button" onclick="selectTruck5tDest('tagil', 9000, 'Нижний Тагил')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold">Нижний Тагил</div>
+                      <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">9 000 ₽</div>
+                      <div class="text-[9px] text-slate-400">до 5 тонн • 36 м³</div>
+                    </button>
+                    <button type="button" onclick="selectTruck5tDest('rf', 70, 'По России (от 70 ₽/км)')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700 col-span-2">
+                      <div class="text-xs font-bold">Дальние рейсы по УрФО и всей России</div>
+                      <div class="text-xs sm:text-sm text-brand-400 font-mono font-bold mt-0.5">от 70 ₽ / км</div>
+                      <div class="text-[9px] text-slate-400">Челябинск, Пермь, Тюмень, Уфа, Москва, СПб</div>
+                    </button>
+                  </div>
+                </div>
+                <div class="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-xs text-slate-300">
+                  <div class="font-bold text-blue-400 mb-0.5">ℹ️ Работаем по договору с юрлицами (Без НДС / УСН, ЭДО)</div>
+                  <p class="text-[11px] text-slate-300">Для расчета индивидуального маршрута 5-тонника оформите заявку или позвоните диспетчеру.</p>
+                </div>
+              </div>
+
+              <!-- ============================================================ -->
+              <!-- 4. РАЗДЕЛ: САМОСВАЛ -->
+              <!-- ============================================================ -->
+              <div id="section-tipper" class="hidden space-y-4">
+                <div>
+                  <label class="block text-xs font-black uppercase tracking-wider text-slate-200 mb-2">
+                    Самосвальные перевозки (Верхняя Салда и пригород):
+                  </label>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <div class="text-xs font-bold text-white">🚜 Доставка сыпучих грузов</div>
+                      <div class="text-xs text-brand-400 font-mono font-bold">от 3 000 ₽ / рейс</div>
+                      <div class="text-[10px] text-slate-400">Песок, щебень, отсев, торф, чернозем</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <div class="text-xs font-bold text-white">❄️ Вывоз снега и грунта</div>
+                      <div class="text-xs text-brand-400 font-mono font-bold">от 2 500 ₽ / час</div>
+                      <div class="text-[10px] text-slate-400">С погрузкой и утилизацией</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-slate-300">
+                  <p class="text-[11px] text-slate-300">Быстрая подача самосвала по Верхней и Нижней Салде. Работаем без выходных.</p>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Правая колонка: ИТОГОВЫЙ РАСЧЕТ И СМЕТА -->
+            <div class="md:col-span-5 bg-gradient-to-b from-dark-800 to-slate-900 p-5 rounded-2xl border border-brand-500/50 flex flex-col justify-between shadow-2xl">
+              <div>
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span>Итоговый расчет:</span>
+                  <span id="calc-badge-status" class="text-emerald-400 font-mono text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Фиксировано</span>
+                </div>
+                <div class="text-3xl sm:text-4xl font-black text-white mt-1.5 font-mono flex items-baseline gap-2">
+                  <span id="calc-total-price">16 000</span>
+                  <span class="text-lg text-brand-400 font-sans font-black">₽</span>
+                </div>
+                <div id="calc-price-note" class="text-[11px] text-amber-300 font-bold mt-0.5">Верхняя Салда → Екатеринбург (без грузчиков)</div>
+
+                <!-- Детализация сметы -->
+                <div class="mt-4 pt-3.5 border-t border-slate-800 space-y-2 text-xs">
+                  <div class="flex justify-between">
+                    <span class="text-slate-400">Категория:</span>
+                    <span id="sum-category" class="font-bold text-slate-200">Газель межгород</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-400">Маршрут / Рейс:</span>
+                    <span id="sum-route" class="font-bold text-brand-400 text-right">Екатеринбург (16 000 ₽)</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-400">Погрузка (Пункт А):</span>
+                    <span id="sum-movers-load" class="font-bold text-slate-300">0 чел (только авто)</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-400">Разгрузка (Пункт Б):</span>
+                    <span id="sum-movers-unload" class="font-bold text-slate-300">0 чел (только авто)</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-400">Дорога грузчиков:</span>
+                    <span id="sum-movers-road" class="font-bold text-emerald-400">Бесплатно (&le;200 км)</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-400">Доп. опции:</span>
+                    <span id="sum-opts" class="font-bold text-slate-300">Без доп. опций</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 space-y-2.5">
+                <button type="button" onclick="applyCalculationToForm()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-lg shadow-brand-600/40 transition transform active:scale-95 flex items-center justify-center gap-2">
+                  <i data-lucide="check-square" class="w-4 h-4"></i>
+                  <span>Заказать по этому расчету</span>
+                </button>
+                <div class="text-[10px] text-center text-slate-400 flex items-center justify-center gap-1">
+                  <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Работаем по договору • Без переплат</span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- 3. КАРТОЧКА ПРЕДПРИЯТИЯ (РАЗМЕЩЕНА СРАЗУ НИЖЕ КАЛЬКУЛЯТОРА) -->
+    <!-- ========================================================================= -->
+    <section id="requisites" class="py-14 bg-dark-900 border-t border-slate-800 transition-colors w-full">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-2xl mx-auto mb-8">
+          <div class="inline-flex items-center gap-1.5 px-3 py-0.5 bg-amber-500/10 text-amber-400 text-xs font-bold rounded-md border border-amber-500/20 uppercase tracking-wider mb-2">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Юридическая надежность
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            Карточка предприятия и реквизиты
+          </h2>
+          <p class="mt-1.5 text-slate-300 text-xs sm:text-sm">
+            Официальные регистрационные и банковские данные для заключения договоров и оплаты
+          </p>
+        </div>
+
+        <div class="max-w-4xl mx-auto theme-card rounded-3xl p-5 sm:p-8 shadow-2xl border border-slate-800">
+          
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-5 mb-5">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base sm:text-lg font-black text-white">ИП Нигамедьянов Александр Сергеевич</h3>
+                <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">Действующий ИП</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">ОГРНИП 321665800053976 • ИНН 660704814106 • ЭДО (Диадок / СБИС) • Без НДС (УСН)</p>
+            </div>
+            
+            <!-- Кнопка копирования -->
+            <button onclick="copyFullRequisites()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-500/40 text-xs font-bold transition active:scale-95 flex-shrink-0 shadow">
+              <i data-lucide="copy" class="w-4 h-4 text-brand-400"></i>
+              <span>Скопировать реквизиты</span>
+            </button>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-6 text-xs sm:text-sm">
+            
+            <!-- Колонка 1: Регистрация -->
+            <div class="space-y-3">
+              <div class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+                <span>Регистрационные данные:</span>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">ИНН:</span><span class="font-mono font-bold text-white">660704814106</span></div>
+              <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">ОГРНИП:</span><span class="font-mono font-bold text-white">321665800053976</span></div>
+              <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">Налогообложение:</span><span class="font-bold text-emerald-400">УСН (Без НДС)</span></div>
+              <div class="py-2 border-b border-slate-800/80">
+                <span class="text-slate-400 block mb-0.5">Юридический адрес:</span>
+                <span class="font-medium text-white">624760, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22</span>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">Email:</span><a href="mailto:uralavto707@mail.ru" class="text-brand-400 font-bold hover:underline">uralavto707@mail.ru</a></div>
+              <div class="flex justify-between py-2"><span class="text-slate-400">Телефон:</span><a href="tel:+79630501501" class="text-white font-mono font-bold hover:text-brand-400">+7 (963) 050-15-01</a></div>
+            </div>
+
+            <!-- Колонка 2: Банковские счета -->
+            <div class="space-y-3">
+              <div class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                <i data-lucide="credit-card" class="w-3.5 h-3.5"></i>
+                <span>Банковские реквизиты:</span>
+              </div>
+              <div class="py-2 border-b border-slate-800/80"><span class="text-slate-400 block mb-0.5">Банк:</span><span class="font-bold text-white">АО «ТБанк»</span></div>
+              <div class="py-2 border-b border-slate-800/80"><span class="text-slate-400 block mb-0.5">Расчетный счет:</span><span class="font-mono font-bold text-white">40802810500001961654</span></div>
+              <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">БИК:</span><span class="font-mono font-bold text-white">044525974</span></div>
+              <div class="py-2"><span class="text-slate-400 block mb-0.5">Корр. счет:</span><span class="font-mono font-bold text-white">30101810145250000974</span></div>
+            </div>
+
+          </div>
+
+          <!-- Плашки работы по безналу и ЭДО -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-800 text-center">
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-xs font-bold text-white">📑 ЭДО (Диадок / СБИС)</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Мгновенный обмен документами</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-xs font-bold text-emerald-400">💳 Безнал (Без НДС)</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Счета и закрывающие документы</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-xs font-bold text-brand-400">⭐ Биржа ATI.SU 5.0</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Паспорт и транспорт подтверждены</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- 4. БЛОК ДЛЯ СВЯЗИ И ОНЛАЙН-ЗАЯВКА (РАЗМЕЩЕН СРАЗУ НИЖЕ КАРТОЧКИ ПРЕДПРИЯТИЯ) -->
+    <!-- ========================================================================= -->
+    <section id="contact" class="py-14 bg-dark-800/80 relative border-t border-slate-800 w-full">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="grid lg:grid-cols-12 gap-8 items-start">
+          
+          <!-- Левая колонка: Прямые контакты -->
+          <div class="lg:col-span-5 space-y-4">
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-md border border-emerald-500/20 uppercase tracking-wider">
+              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i> Прямой контакт
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Связь с перевозчиком
+            </h2>
+            <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
+              Свяжитесь напрямую с руководителем по телефону, через мессенджер МАКС или заполните заявку — ответим в течение 10 минут.
+            </p>
+
+            <div class="space-y-3 pt-1">
+              <!-- Телефон -->
+              <a href="tel:+79630501501" class="flex items-center gap-3 p-4 rounded-2xl theme-card theme-card-hover border-slate-800">
+                <div class="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                  <i data-lucide="phone-call" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Телефон руководителя (круглосуточно):</div>
+                  <div class="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">+7 (963) 050-15-01</div>
+                </div>
+              </a>
+
+              <!-- Электронная почта -->
+              <a href="mailto:uralavto707@mail.ru" class="flex items-center gap-3 p-4 rounded-2xl theme-card theme-card-hover border-slate-800">
+                <div class="w-11 h-11 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <i data-lucide="mail" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Электронная почта для заявок:</div>
+                  <div class="text-sm sm:text-base font-bold text-white font-mono">uralavto707@mail.ru</div>
+                </div>
+              </a>
+
+              <!-- Мессенджер МАКС -->
+              <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2.5 p-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm transition shadow-lg shadow-blue-900/40 w-full active:scale-95">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>Написать в MAX бот (@id660704814106_bot)</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Правая колонка: Форма быстрой заявки -->
+          <div class="lg:col-span-7">
+            <form id="order-form" onsubmit="submitForm(event)" class="theme-card p-5 sm:p-7 rounded-3xl space-y-4 shadow-2xl border border-brand-500/30">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-black text-white">Онлайн-заявка на рейс</h3>
+                <span class="text-[11px] text-brand-400 font-bold">⚡ Ответ за 10 мин</span>
+              </div>
+              <p class="text-xs text-slate-400 -mt-2">Заполните имя и телефон — диспетчер оперативно свяжется с вами</p>
+
+              <!-- Выбор канала отправки (MAX или E-mail) -->
+              <div>
+                <label class="block text-[11px] font-bold text-slate-300 mb-1.5">Куда отправить заявку: <span class="text-amber-400">*</span></label>
+                <div class="grid grid-cols-2 gap-2">
+                  <label id="channel-card-max" class="flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-blue-500 bg-blue-500/15 text-white font-bold shadow-md">
+                    <input type="radio" name="send-channel" id="channel-max" value="max" checked class="hidden" onchange="setSendChannel('max')">
+                    <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white flex-shrink-0">
+                      <i data-lucide="message-square" class="w-4 h-4"></i>
+                    </div>
+                    <span class="text-xs sm:text-sm font-bold">В мессенджер MAX</span>
+                  </label>
+
+                  <label id="channel-card-email" class="flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700">
+                    <input type="radio" name="send-channel" id="channel-email" value="email" class="hidden" onchange="setSendChannel('email')">
+                    <div class="w-8 h-8 rounded-xl bg-amber-600/30 text-amber-400 flex items-center justify-center flex-shrink-0">
+                      <i data-lucide="mail" class="w-4 h-4"></i>
+                    </div>
+                    <span class="text-xs sm:text-sm font-bold">На E-mail</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Обязательные поля: Имя и Телефон (с прозрачными квадратиками) -->
+              <div class="space-y-3">
+                
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-300 mb-1">
+                    Ваше имя / Организация <span class="text-amber-400">*</span>
+                  </label>
+                  <input type="text" id="form-name" required placeholder="Иван / ООО 'Компания'" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-xs sm:text-sm focus:border-brand-500 focus:outline-none transition">
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>Телефон для связи <span class="text-amber-400">*</span></span>
+                    <span id="phone-valid-badge" class="text-[10px] text-slate-400 font-mono font-bold">0 / 10 цифр</span>
+                  </label>
+
+                  <!-- Интерактивный блок с прозрачными квадратиками -->
+                  <div id="phone-boxes-wrapper" onclick="focusPhoneInput()" class="relative flex items-center justify-between p-2 sm:p-2.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 focus-within:border-brand-500 transition cursor-text select-none overflow-x-auto shadow-inner">
+                    
+                    <!-- Невидимый нативный инпут, перехватывающий клики и клавиатуру -->
+                    <input type="tel" id="form-phone-raw" required autocomplete="tel" maxlength="18"
+                      class="absolute inset-0 w-full h-full opacity-0 z-10 cursor-text pointer-events-auto"
+                      oninput="updatePhoneBoxes(this.value)"
+                      onfocus="onPhoneBoxFocus()"
+                      onblur="onPhoneBoxBlur()">
+
+                    <!-- Фиксированный бейдж +7 -->
+                    <div class="px-2 sm:px-2.5 py-1 rounded-xl bg-brand-500/15 border border-brand-500/30 text-brand-400 font-mono font-black text-xs sm:text-sm flex-shrink-0">
+                      +7
+                    </div>
+
+                    <!-- Блок 1 (3 цифры: код) -->
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                      <div id="pbox-0" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                      <div id="pbox-1" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                      <div id="pbox-2" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                    </div>
+
+                    <span class="text-slate-600 font-bold text-xs">-</span>
+
+                    <!-- Блок 2 (2 цифры) -->
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                      <div id="pbox-3" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                      <div id="pbox-4" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                    </div>
+
+                    <span class="text-slate-600 font-bold text-xs">-</span>
+
+                    <!-- Блок 3 (2 цифры) -->
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                      <div id="pbox-5" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                      <div id="pbox-6" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                    </div>
+
+                    <span class="text-slate-600 font-bold text-xs">-</span>
+
+                    <!-- Блок 4 (3 цифры) -->
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                      <div id="pbox-7" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                      <div id="pbox-8" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                      <div id="pbox-9" class="phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/40 border border-slate-700/80 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all"></div>
+                    </div>
+
+                  </div>
+
+                  <div id="phone-error-msg" class="hidden text-[10px] text-red-400 mt-1 font-medium flex items-center gap-1">
+                    <i data-lucide="alert-circle" class="w-3 h-3"></i>
+                    <span>Пожалуйста, заполните все 10 квадратиков номера телефона</span>
+                  </div>
+                </div>
+
+              </div>
+
+              <div class="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-300 mb-1">Откуда (Пункт А)</label>
+                  <input type="text" id="form-from" placeholder="г. Верхняя Салда, ул. Ленина" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-xs sm:text-sm focus:border-brand-500 focus:outline-none transition">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-300 mb-1">Куда (Пункт Б)</label>
+                  <input type="text" id="form-to" placeholder="г. Екатеринбург / Н. Тагил / РФ" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-xs sm:text-sm focus:border-brand-500 focus:outline-none transition">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-300 mb-1">Параметры груза и расчет</label>
+                <textarea id="form-comment" rows="2" placeholder="Характер груза, вес, дата, комментарии..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-xs sm:text-sm focus:border-brand-500 focus:outline-none transition"></textarea>
+              </div>
+
+              <button type="submit" id="form-submit-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-900/40 transition transform active:scale-95 flex items-center justify-center gap-2">
+                <i id="btn-submit-icon" data-lucide="message-square" class="w-4 h-4"></i>
+                <span id="btn-submit-text">Отправить заявку в мессенджер MAX</span>
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- 🗂️ МОДАЛЬНЫЕ ОКНА ДЛЯ ДОПОЛНИТЕЛЬНЫХ РАЗДЕЛОВ (ДОСТУПНЫ ЧЕРЕЗ МЕНЮ) -->
+  <!-- ========================================================================= -->
+
+  <!-- Модальное окно: Успешная отправка заявки в MAX-бот -->
+  <div id="success-order-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="theme-card max-w-lg w-full rounded-3xl p-6 sm:p-8 space-y-5 border border-emerald-500/50 shadow-2xl relative my-auto text-center">
+      <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/50">
+        <i data-lucide="check-circle-2" class="w-9 h-9"></i>
+      </div>
+
+      <div>
+        <span id="modal-order-badge" class="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono font-black text-xs inline-block mb-2">ЗАЯВКА ПРИНЯТА</span>
+        <h3 id="modal-order-title" class="text-xl sm:text-2xl font-black text-white">Заявка успешно отправлена!</h3>
+        <p class="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+          Информация моментально передана диспетчеру через официальный <strong class="text-white">MAX-бот (@id660704814106_bot)</strong>. Диспетчер свяжется с вами по указанному телефону в течение 10 минут.
+        </p>
+      </div>
+
+      <!-- Сводка параметров заявки -->
+      <div id="modal-order-details" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-left space-y-2 text-xs text-slate-300">
+        <!-- динамически заполняется -->
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+        <a id="modal-open-bot-btn" href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="flex-1 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40 active:scale-95 transition">
+          <i data-lucide="message-square" class="w-4 h-4"></i>
+          <span>Открыть чат с MAX ботом</span>
+        </a>
+        <button type="button" onclick="closeSuccessModal()" class="py-3.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs sm:text-sm border border-slate-700 active:scale-95 transition">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. Модальное окно: Тарифы подробно -->
+  <div id="tariffs-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="theme-card max-w-4xl w-full rounded-3xl p-5 sm:p-8 max-h-[90vh] overflow-y-auto space-y-6 border border-brand-500/40 shadow-2xl relative my-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h3 class="text-xl font-black text-white">Тарифы и расценки по Верхней Салде</h3>
+          <p class="text-xs text-slate-400">Честные фиксированные цены без скрытых доплат (Без НДС / УСН)</p>
+        </div>
+        <button onclick="closeSectionModal('tariffs-modal')" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">⚡ Экспресс (до 20 мин)</span><span class="text-blue-400 font-mono font-bold text-sm">1 000 — 1 500 ₽</span></div>
+          <p class="text-xs text-slate-400">Быстрая доставка 1-2 предметов без грузчиков.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-brand-500/40 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">⏱️ Почасовая (1 час)</span><span class="text-brand-400 font-mono font-bold text-sm">1 500 ₽ / час</span></div>
+          <p class="text-xs text-slate-400">ГАЗель с водителем. Подача от 5 минут по Верхней Салде.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">👥 С 2 грузчиками</span><span class="text-emerald-400 font-mono font-bold text-sm">3 000 ₽ / час</span></div>
+          <p class="text-xs text-slate-400">Машина + 2 опытных грузчика. Полный комплекс погрузки/разгрузки.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">🗑️ Вывоз мусора</span><span class="text-amber-400 font-mono font-bold text-sm">от 5 000 ₽ / час</span></div>
+          <p class="text-xs text-slate-400">Вывоз строительного мусора и старой мебели на полигон.</p>
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end gap-3">
+        <button onclick="closeSectionModal('tariffs-modal'); document.getElementById('calculator').scrollIntoView({behavior: 'smooth'});" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-amber-600 text-white font-bold text-xs shadow-md">Перейти в калькулятор →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Модальное окно: Автопарк подробно -->
+  <div id="fleet-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="theme-card max-w-4xl w-full rounded-3xl p-5 sm:p-8 max-h-[90vh] overflow-y-auto space-y-6 border border-slate-800 shadow-2xl relative my-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h3 class="text-xl font-black text-white">Автопарк компании (11 автомобилей)</h3>
+          <p class="text-xs text-slate-400">Собственные машины, чистые кузова, личная рембаза</p>
+        </div>
+        <button onclick="closeSectionModal('fleet-modal')" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <span class="px-2 py-0.5 bg-brand-500/20 text-brand-400 text-[10px] font-bold rounded">6 единиц</span>
+          <h4 class="font-bold text-white text-sm">ГАЗель NEXT / Самосвалы</h4>
+          <p class="text-xs text-slate-300">До 2.0 т • 16-22 м³ • Подача по городу и РФ</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded">4 единицы</span>
+          <h4 class="font-bold text-white text-sm">ГАЗ «Валдай» (Удлиненный)</h4>
+          <p class="text-xs text-slate-300">До 5.0 т • 30-36 м³ • До 12 европаллет</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] font-bold rounded">1 единица</span>
+          <h4 class="font-bold text-white text-sm">Mitsubishi Fuso Canter</h4>
+          <p class="text-xs text-slate-300">До 5.0 т • 32 м³ • Дальние рейсы по всей России</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Модальное окно: Фотогалерея -->
+  <div id="gallery-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="theme-card max-w-4xl w-full rounded-3xl p-5 sm:p-8 max-h-[90vh] overflow-y-auto space-y-6 border border-slate-800 shadow-2xl relative my-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h3 class="text-xl font-black text-white">Фотогалерея автопарка на объектах</h3>
+          <p class="text-xs text-slate-400">Нажмите на фото для просмотра в высоком качестве</p>
+        </div>
+        <button onclick="closeSectionModal('gallery-modal')" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="rounded-xl overflow-hidden cursor-pointer bg-slate-800 h-32" onclick="openLightbox('truck-next-winter.jpg', 'ГАЗель NEXT на зимней трассе')">
+          <img src="truck-next-winter.jpg" alt="Газель NEXT" class="w-full h-full object-cover fallback-img" />
+        </div>
+        <div class="rounded-xl overflow-hidden cursor-pointer bg-slate-800 h-32" onclick="openLightbox('truck-valday-side.jpg', 'ГАЗ Валдай (до 5 тонн)')">
+          <img src="truck-valday-side.jpg" alt="Валдай" class="w-full h-full object-cover fallback-img" />
+        </div>
+        <div class="rounded-xl overflow-hidden cursor-pointer bg-slate-800 h-32" onclick="openLightbox('truck-next-warehouse.jpg', 'Погрузка на складе')">
+          <img src="truck-next-warehouse.jpg" alt="Склад" class="w-full h-full object-cover fallback-img" />
+        </div>
+        <div class="rounded-xl overflow-hidden cursor-pointer bg-slate-800 h-32" onclick="openLightbox('truck-tipper-snow.jpg', 'Самосвал / Спецрейсы')">
+          <img src="truck-tipper-snow.jpg" alt="Самосвал" class="w-full h-full object-cover fallback-img" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Модальное окно: ATI.SU -->
+  <div id="ati-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="theme-card max-w-xl w-full rounded-3xl p-5 sm:p-7 space-y-5 border border-emerald-500/40 shadow-2xl relative my-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold">ATI.SU 5.0 ⭐</span>
+          <span class="text-xs text-slate-400 font-mono">Код 2811269</span>
+        </div>
+        <button onclick="closeSectionModal('ati-modal')" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs sm:text-sm text-slate-300">
+        <p><strong class="text-white">ИП Нигамедьянов Александр Сергеевич</strong> зарегистрирован в бирже грузоперевозок ATI.SU с высшим рейтингом <strong>5.0 звезд</strong>.</p>
+        <ul class="space-y-1.5 list-disc list-inside text-xs text-slate-300">
+          <li>Паспортные данные руководителя подтверждены</li>
+          <li>Транспортные средства находятся в собственности</li>
+          <li>0% срывов рейсов и отсутствие претензий</li>
+        </ul>
+      </div>
+
+      <div class="pt-2">
+        <a href="https://ati.su" target="_blank" rel="noopener noreferrer" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md">
+          <span>Открыть карточку на бирже ATI.SU</span>
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 📱 МОБИЛЬНАЯ НИЖНЯЯ ПАНЕЛЬ (ВСЕГО 3 КНОПКИ: 1. ЗВОНОК | 2. РАСЧЕТ | 3. ЗАЯВКА) -->
+  <!-- ========================================================================= -->
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-dark-950/95 backdrop-blur-xl border-t border-slate-800 p-2 pb-safe flex items-center justify-around gap-2 shadow-2xl">
+    
+    <!-- 1. ЗВОНОК -->
+    <a href="tel:+79630501501" class="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 active:scale-95 transition">
+      <i data-lucide="phone-call" class="w-4 h-4 mb-0.5"></i>
+      <span class="text-[11px] font-black">Звонок</span>
+    </a>
+
+    <!-- 2. РАСЧЕТ -->
+    <a href="#calculator" class="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-gradient-to-r from-brand-600 to-amber-600 text-white active:scale-95 transition shadow-md">
+      <i data-lucide="calculator" class="w-4 h-4 mb-0.5"></i>
+      <span class="text-[11px] font-black">Расчет</span>
+    </a>
+
+    <!-- 3. ЗАЯВКА -->
+    <a href="#contact" class="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-blue-600 text-white active:scale-95 transition shadow-md">
+      <i data-lucide="send" class="w-4 h-4 mb-0.5"></i>
+      <span class="text-[11px] font-black">Заявка</span>
+    </a>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- FOOTER -->
+  <!-- ========================================================================= -->
+  <footer class="bg-dark-950 text-slate-400 py-8 text-xs border-t border-slate-800 w-full">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+      <div>
+        <div class="font-bold text-white">ИП Нигамедьянов Александр Сергеевич</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">ИНН 660704814106 • ОГРНИП 321665800053976 • Верхняя Салда • Без НДС (УСН)</div>
+      </div>
+      <div class="text-[11px] text-slate-400">
+        © 2026 ancargo66.ru. Все права защищены.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT ЛОГИКА -->
+  <!-- ========================================================================= -->
+  <script>
+    lucide.createIcons();
+
+    // 1. Полноэкранное меню навигации
+    const drawerToggleBtn = document.getElementById('drawer-toggle-btn');
+    const closeDrawerBtn = document.getElementById('close-drawer-btn');
+    const mobileDrawer = document.getElementById('mobile-drawer');
+    const drawerLinks = document.querySelectorAll('.drawer-link');
+
+    function openDrawer() {
+      mobileDrawer.classList.remove('hidden');
+      mobileDrawer.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      lucide.createIcons();
+    }
+
+    function closeDrawer() {
+      mobileDrawer.classList.add('hidden');
+      mobileDrawer.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+
+    if (drawerToggleBtn) drawerToggleBtn.addEventListener('click', openDrawer);
+    if (closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeDrawer);
+    drawerLinks.forEach(link => {
+      if (link.tagName === 'A') {
+        link.addEventListener('click', closeDrawer);
+      }
+    });
+
+    // 2. Модальные окна дополнительных разделов
+    function openSectionModal(modalId) {
+      closeDrawer();
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        lucide.createIcons();
+      }
+    }
+
+    function closeSectionModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+      }
+    }
+
+    // 3. Fallback картинок
+    document.querySelectorAll('.fallback-img').forEach(img => {
+      let candidateList = [];
+      if (img.dataset.altSrcs) {
+        candidateList = img.dataset.altSrcs.split(',').map(s => s.trim());
+      }
+      img.addEventListener('error', function tryNext() {
+        if (candidateList.length > 0) {
+          const nextSrc = candidateList.shift();
+          this.src = nextSrc;
+        } else {
+          this.onerror = null;
+        }
+      });
+    });
+
+    // 4. Lightbox Modal
+    function openLightbox(src, caption) {
+      const modal = document.getElementById('lightbox-modal');
+      const img = document.getElementById('lightbox-img');
+      const cap = document.getElementById('lightbox-caption');
+      img.src = src;
+      cap.innerText = caption || '';
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      lucide.createIcons();
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightbox-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+
+    // 5. Toast уведомления
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.innerText = message;
+      toast.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 3200);
+    }
+
+    // 6. Скопировать реквизиты
+    function copyFullRequisites() {
+      const reqText = `ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ НИГАМЕДЬЯНОВ АЛЕКСАНДР СЕРГЕЕВИЧ
+ИНН: 660704814106
+ОГРНИП: 321665800053976
+Система налогообложения: УСН (Без НДС)
+Юридический адрес: 624760, Россия, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22
+Email: uralavto707@mail.ru
+Телефон: +7 (963) 050-15-01
+---
+Банк: АО «ТБанк»
+Р/с: 40802810500001961654
+БИК: 044525974
+К/с: 30101810145250000974`;
+
+      navigator.clipboard.writeText(reqText).then(() => {
+        showToast('Реквизиты скопированы в буфер обмена!');
+      }).catch(() => {
+        showToast('Реквизиты скопированы!');
+      });
+    }
+
+        // =========================================================================
+    // 7. ИНТЕРАКТИВНЫЙ КАЛЬКУЛЯТОР СТОИМОСТИ (ГАЗЕЛЬ МЕЖГОРОД, ГОРОД, 5Т, САМОСВАЛ)
+    // =========================================================================
+
+    let currentMainCategory = 'intercity'; // 'city', 'intercity', 'truck5t', 'tipper'
+
+    // Состояние раздела "Газель межгород"
+    let intercityState = {
+      destination: 'ekb', // 'ekb', 'tagil', 'chelyabinsk', 'perm', 'custom'
+      tagilDistrict: 'vagonka', // 'vagonka', 'tagilstroy', 'center'
+      tagilMenuOpen: false,
+      distance: 180,
+      customKm: 250,
+      priceBase: 16000,
+      moversLoad: 0,   // 0..5
+      moversUnload: 0, // 0..3
+      urgent: false,
+      uncover: false,
+      destName: 'Екатеринбург',
+      fromCity: 'г. Верхняя Салда',
+      toCity: 'г. Екатеринбург'
+    };
+
+    // Состояние раздела "Газель по городу"
+    let cityState = {
+      mode: 'hourly', // 'hourly', 'express', 'trash'
+      hours: 2,
+      movers: 0
+    };
+
+    // Состояние "Грузовики 5 тонн"
+    let truck5tState = {
+      dest: 'ekb',
+      price: 24000,
+      label: 'Екатеринбург'
+    };
+
+    // 1. Переключение 4 главных категорий
+    function setMainCategory(cat) {
+      currentMainCategory = cat;
+
+      const categories = ['city', 'intercity', 'truck5t', 'tipper'];
+      categories.forEach(c => {
+        const btn = document.getElementById('cat-btn-' + c);
+        if (btn) {
+          if (c === cat) {
+            btn.className = 'p-3 sm:p-3.5 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 border-brand-500 bg-brand-500/15 text-white shadow-lg shadow-brand-500/10 font-bold';
+          } else {
+            btn.className = 'p-3 sm:p-3.5 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:text-white';
+          }
+        }
+      });
+
+      // Показ нужной секции
+      document.getElementById('section-intercity').classList.toggle('hidden', cat !== 'intercity');
+      document.getElementById('section-city').classList.toggle('hidden', cat !== 'city');
+      document.getElementById('section-truck5t').classList.toggle('hidden', cat !== 'truck5t');
+      document.getElementById('section-tipper').classList.toggle('hidden', cat !== 'tipper');
+
+      if (cat === 'intercity') {
+        calculateIntercity();
+      } else if (cat === 'city') {
+        calculateCity();
+      } else if (cat === 'truck5t') {
+        calculateTruck5t();
+      } else if (cat === 'tipper') {
+        calculateTipper();
+      }
+      
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // 2. Выбор направления межгорода
+    function selectDestination(destKey) {
+      intercityState.destination = destKey;
+
+      const destButtons = {
+        'ekb': 'dest-btn-ekb',
+        'tagil': 'dest-btn-tagil',
+        'chelyabinsk': 'dest-btn-chelyabinsk',
+        'perm': 'dest-btn-perm',
+        'custom': 'dest-btn-custom'
+      };
+
+      Object.keys(destButtons).forEach(key => {
+        const btn = document.getElementById(destButtons[key]);
+        if (btn) {
+          const isColSpan = (key === 'custom');
+          if (key === destKey) {
+            btn.className = 'p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold' + (isColSpan ? ' col-span-2 sm:col-span-2' : '');
+          } else {
+            btn.className = 'p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700' + (isColSpan ? ' col-span-2 sm:col-span-2' : '');
+          }
+        }
+      });
+
+      const tagilSubMenu = document.getElementById('tagil-sub-menu');
+      const customContainer = document.getElementById('custom-distance-container');
+
+      if (destKey === 'tagil') {
+        tagilSubMenu.classList.remove('hidden');
+        customContainer.classList.add('hidden');
+        selectTagilDistrict(intercityState.tagilDistrict);
+      } else if (destKey === 'custom') {
+        tagilSubMenu.classList.add('hidden');
+        customContainer.classList.remove('hidden');
+        onCustomKmSlider(intercityState.customKm);
+      } else {
+        tagilSubMenu.classList.add('hidden');
+        customContainer.classList.add('hidden');
+
+        if (destKey === 'ekb') {
+          intercityState.priceBase = 16000;
+          intercityState.distance = 180;
+          intercityState.destName = 'Екатеринбург';
+          intercityState.toCity = 'г. Екатеринбург';
+        } else if (destKey === 'chelyabinsk') {
+          intercityState.priceBase = 30000;
+          intercityState.distance = 390;
+          intercityState.destName = 'Челябинск';
+          intercityState.toCity = 'г. Челябинск';
+        } else if (destKey === 'perm') {
+          intercityState.priceBase = 30000;
+          intercityState.distance = 480;
+          intercityState.destName = 'Пермь';
+          intercityState.toCity = 'г. Пермь';
+        }
+        calculateIntercity();
+      }
+    }
+
+    // 3. Открытие/закрытие меню Тагила
+    function toggleTagilMenu() {
+      selectDestination('tagil');
+    }
+
+    // 4. Выбор района Нижнего Тагила
+    function selectTagilDistrict(district) {
+      intercityState.destination = 'tagil';
+      intercityState.tagilDistrict = district;
+
+      const districts = {
+        'vagonka': { price: 4000, name: 'Тагил (Вагонка)', dist: 45, to: 'г. Нижний Тагил (Вагонка)' },
+        'tagilstroy': { price: 5000, name: 'Тагил (Тагилстрой)', dist: 55, to: 'г. Нижний Тагил (Тагилстрой)' },
+        'center': { price: 6000, name: 'Тагил (Гальянка, Выя, Кр. камень)', dist: 60, to: 'г. Нижний Тагил (Гальянка / Выя / Красный камень)' }
+      };
+
+      const sel = districts[district] || districts['vagonka'];
+      intercityState.priceBase = sel.price;
+      intercityState.distance = sel.dist;
+      intercityState.destName = sel.name;
+      intercityState.toCity = sel.to;
+
+      // Обновляем подсветку кнопок районов
+      ['vagonka', 'tagilstroy', 'center'].forEach(d => {
+        const btn = document.getElementById('tagil-opt-' + d);
+        if (btn) {
+          if (d === district) {
+            btn.className = 'p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/15 text-white shadow font-semibold';
+          } else {
+            btn.className = 'p-2.5 rounded-xl border text-left transition border-slate-800 bg-dark-900 text-slate-300 hover:border-brand-500';
+          }
+        }
+      });
+
+      // Обновляем текст на главной кнопке Тагила
+      document.getElementById('tagil-btn-subtitle').innerText = `${sel.price.toLocaleString('ru-RU')} ₽`;
+      document.getElementById('dest-btn-tagil').className = 'p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold';
+
+      calculateIntercity();
+    }
+
+    // 5. Обработка расстояния для произвольного города
+    function onCustomKmSlider(val) {
+      val = parseInt(val, 10) || 20;
+      intercityState.customKm = val;
+      intercityState.distance = val;
+      document.getElementById('custom-km-input').value = val;
+      document.getElementById('custom-km-slider').value = val;
+
+      let ratePerKm = val <= 400 ? 80 : 50;
+      let calculatedPrice = val * ratePerKm;
+
+      intercityState.priceBase = calculatedPrice;
+      intercityState.destName = `Другой город (${val} км)`;
+      intercityState.toCity = `Пункт назначения (~${val} км от Салды)`;
+
+      const hint = document.getElementById('custom-km-rate-hint');
+      if (val <= 400) {
+        hint.innerHTML = `Тариф: <b class="text-brand-400">80 ₽/км</b> (до 400 км). Расчет: ${val} км &times; 80 ₽ = <b class="text-white">${calculatedPrice.toLocaleString('ru-RU')} ₽</b>`;
+      } else {
+        hint.innerHTML = `Тариф: <b class="text-brand-400">50 ₽/км</b> (свыше 400 км). Расчет: ${val} км &times; 50 ₽ = <b class="text-white">${calculatedPrice.toLocaleString('ru-RU')} ₽</b>`;
+      }
+
+      calculateIntercity();
+    }
+
+    function onCustomKmInput(val) {
+      let num = parseInt(val, 10);
+      if (!num || num < 10) num = 10;
+      if (num > 3000) num = 3000;
+      onCustomKmSlider(num);
+    }
+
+    // 6. Установка количества грузчиков
+    function setMoversCount(type, count) {
+      count = parseInt(count, 10);
+      if (type === 'load') {
+        intercityState.moversLoad = count;
+        document.querySelectorAll('.mover-btn-load').forEach(btn => {
+          const c = parseInt(btn.getAttribute('data-count'), 10);
+          if (c === count) {
+            btn.className = 'mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-500 text-black';
+          } else {
+            btn.className = 'mover-btn-load px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700';
+          }
+        });
+        document.getElementById('movers-load-label').innerText = count === 0 ? 'Без грузчиков' : `${count} чел (по факту)`;
+      } else if (type === 'unload') {
+        intercityState.moversUnload = count;
+        document.querySelectorAll('.mover-btn-unload').forEach(btn => {
+          const c = parseInt(btn.getAttribute('data-count'), 10);
+          if (c === count) {
+            btn.className = 'mover-btn-unload px-3 py-1 rounded-lg text-xs font-bold bg-brand-500 text-black';
+          } else {
+            btn.className = 'mover-btn-unload px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700';
+          }
+        });
+        document.getElementById('movers-unload-label').innerText = count === 0 ? 'Без грузчиков' : `${count} чел (мин. 2 ч)`;
+      }
+
+      calculateIntercity();
+    }
+
+    // 7. Расчет и отображение раздела "Газель межгород"
+    function calculateIntercity() {
+      const urgent = document.getElementById('opt-urgent').checked;
+      const uncover = document.getElementById('opt-uncover').checked;
+      intercityState.urgent = urgent;
+      intercityState.uncover = uncover;
+
+      const baseCarPrice = intercityState.priceBase;
+      const distance = intercityState.distance;
+
+      // Стоимость грузчиков:
+      // Погрузка: оплата по факту (в предварительный расчет закладываем 1000 ₽/чел)
+      const moversLoadPrice = intercityState.moversLoad * 1000;
+      // Разгрузка: минимум 2 часа (2000 ₽/чел)
+      const moversUnloadPrice = intercityState.moversUnload * 2000;
+      const moversTotal = moversLoadPrice + moversUnloadPrice;
+
+      // Растентовка
+      const uncoverPrice = uncover ? 1000 : 0;
+
+      // Промежуточная сумма
+      let total = baseCarPrice + moversTotal + uncoverPrice;
+
+      // Срочность (+15%)
+      if (urgent) {
+        total = Math.round(total * 1.15);
+      }
+
+      // Правило расстояния грузчиков (200 км)
+      const policyEl = document.getElementById('movers-policy-text');
+      const isRoadFree = distance <= 200;
+      if (isRoadFree) {
+        policyEl.className = 'text-emerald-400 font-bold flex items-center gap-1.5';
+        policyEl.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4 flex-shrink-0"></i><span>В радиусе 200 км дорога грузчиков бесплатна</span>';
+      } else {
+        if (intercityState.moversLoad > 0 || intercityState.moversUnload > 0) {
+          policyEl.className = 'text-amber-400 font-bold flex items-center gap-1.5';
+          policyEl.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i><span>Свыше 200 км оплачиваются суточные грузчикам*</span>';
+        } else {
+          policyEl.className = 'text-slate-300 font-medium flex items-center gap-1.5';
+          policyEl.innerHTML = '<i data-lucide="info" class="w-4 h-4 flex-shrink-0"></i><span>Свыше 200 км (суточные при заказе грузчиков)*</span>';
+        }
+      }
+
+      // Обновление итоговой карточки
+      document.getElementById('calc-total-price').innerText = total.toLocaleString('ru-RU');
+      document.getElementById('calc-price-note').innerText = `Верхняя Салда → ${intercityState.destName}`;
+
+      document.getElementById('sum-category').innerText = 'Газель межгород';
+      document.getElementById('sum-route').innerText = `${intercityState.destName} (${baseCarPrice.toLocaleString('ru-RU')} ₽)`;
+
+      document.getElementById('sum-movers-load').innerText = intercityState.moversLoad === 0 
+        ? '0 чел (без грузчиков)' 
+        : `${intercityState.moversLoad} чел (~${moversLoadPrice.toLocaleString('ru-RU')} ₽, по факту)`;
+
+      document.getElementById('sum-movers-unload').innerText = intercityState.moversUnload === 0 
+        ? '0 чел (без грузчиков)' 
+        : `${intercityState.moversUnload} чел (мин. 2ч = ${moversUnloadPrice.toLocaleString('ru-RU')} ₽)`;
+
+      document.getElementById('sum-movers-road').innerText = isRoadFree 
+        ? 'Бесплатно (≤200 км)' 
+        : (intercityState.moversLoad > 0 || intercityState.moversUnload > 0 ? 'Суточные (уточняются)*' : 'Не требуется');
+      document.getElementById('sum-movers-road').className = isRoadFree ? 'font-bold text-emerald-400' : 'font-bold text-amber-400';
+
+      let opts = [];
+      if (urgent) opts.push('Срочно +15%');
+      if (uncover) opts.push('Растентовка +1 000 ₽');
+      document.getElementById('sum-opts').innerText = opts.length ? opts.join(', ') : 'Без доп. опций';
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // 8. Раздел "Газель по городу"
+    function setCityMode(mode) {
+      cityState.mode = mode;
+      ['hourly', 'express', 'trash'].forEach(m => {
+        const btn = document.getElementById('city-mode-' + m);
+        if (btn) {
+          const isColSpan = (m === 'trash');
+          if (m === mode) {
+            btn.className = 'p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold' + (isColSpan ? ' col-span-2' : '');
+          } else {
+            btn.className = 'p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700' + (isColSpan ? ' col-span-2' : '');
+          }
+        }
+      });
+
+      const sliderBox = document.getElementById('city-slider-box');
+      if (mode === 'express') {
+        sliderBox.classList.add('hidden');
+      } else {
+        sliderBox.classList.remove('hidden');
+      }
+
+      calculateCity();
+    }
+
+    function onCityHoursChange(val) {
+      cityState.hours = parseInt(val, 10) || 2;
+      document.getElementById('city-hours-display').innerText = `${cityState.hours} ${cityState.hours === 1 ? 'час' : (cityState.hours < 5 ? 'часа' : 'часов')}`;
+      calculateCity();
+    }
+
+    function setCityMovers(count) {
+      cityState.movers = count;
+      document.querySelectorAll('.city-mover-btn').forEach(btn => {
+        const c = parseInt(btn.getAttribute('data-count'), 10);
+        if (c === count) {
+          btn.className = 'city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-brand-500 text-black';
+        } else {
+          btn.className = 'city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700';
+        }
+      });
+      document.getElementById('city-movers-count-label').innerText = `${count} чел (+${count * 1000} ₽/ч)`;
+      calculateCity();
+    }
+
+    function calculateCity() {
+      let total = 0;
+      let note = '';
+      let route = '';
+
+      if (cityState.mode === 'express') {
+        total = 1200;
+        document.getElementById('calc-total-price').innerText = '1 000 — 1 500';
+        note = 'Экспресс-доставка по Верхней Салде (до 20 мин)';
+        route = 'Экспресс (1-2 предмета)';
+      } else if (cityState.mode === 'hourly') {
+        const carRate = 1500;
+        const moverRate = cityState.movers * 1000;
+        total = (carRate + moverRate) * cityState.hours;
+        document.getElementById('calc-total-price').innerText = total.toLocaleString('ru-RU');
+        note = `Почасовая работа: ${cityState.hours} ч (Авто 1500 ₽/ч + ${cityState.movers} грузч.)`;
+        route = `По Салде (${cityState.hours} ч)`;
+      } else if (cityState.mode === 'trash') {
+        total = 5000 + (cityState.movers * 1000 * cityState.hours);
+        document.getElementById('calc-total-price').innerText = 'от ' + total.toLocaleString('ru-RU');
+        note = 'Вывоз строительного мусора / утилизация на полигон';
+        route = 'Вывоз мусора (с полигоном)';
+      }
+
+      document.getElementById('calc-price-note').innerText = note;
+      document.getElementById('sum-category').innerText = 'Газель по городу (В. Салда)';
+      document.getElementById('sum-route').innerText = route;
+      document.getElementById('sum-movers-load').innerText = `${cityState.movers} чел (+${cityState.movers * 1000} ₽/ч)`;
+      document.getElementById('sum-movers-unload').innerText = 'Включено в почасовую';
+      document.getElementById('sum-movers-road').innerText = 'Бесплатно (по городу)';
+      document.getElementById('sum-opts').innerText = 'Подача от 5 минут';
+    }
+
+    // 9. Раздел "Грузовики до 5 тонн"
+    function selectTruck5tDest(key, price, label) {
+      truck5tState.dest = key;
+      truck5tState.price = price;
+      truck5tState.label = label;
+      calculateTruck5t();
+    }
+
+    function calculateTruck5t() {
+      if (truck5tState.dest === 'rf') {
+        document.getElementById('calc-total-price').innerText = 'от 70 ₽/км';
+        document.getElementById('calc-price-note').innerText = 'Грузовики до 5т: Валдай / Fuso по РФ';
+      } else {
+        document.getElementById('calc-total-price').innerText = truck5tState.price.toLocaleString('ru-RU');
+        document.getElementById('calc-price-note').innerText = `Грузовик 5т: Салда → ${truck5tState.label}`;
+      }
+      document.getElementById('sum-category').innerText = 'Грузовики до 5 тонн (Валдай/Fuso)';
+      document.getElementById('sum-route').innerText = truck5tState.label;
+      document.getElementById('sum-movers-load').innerText = 'По согласованию';
+      document.getElementById('sum-movers-unload').innerText = 'По согласованию';
+      document.getElementById('sum-movers-road').innerText = 'Договор / Безнал';
+      document.getElementById('sum-opts').innerText = 'Кузов до 36 м³, 12 паллет';
+    }
+
+    // 10. Раздел "Самосвал"
+    function calculateTipper() {
+      document.getElementById('calc-total-price').innerText = 'от 3 000';
+      document.getElementById('calc-price-note').innerText = 'Самосвал: Доставка сыпучих / Вывоз снега и грунта';
+      document.getElementById('sum-category').innerText = 'Самосвальные перевозки';
+      document.getElementById('sum-route').innerText = 'Верхняя Салда и пригород';
+      document.getElementById('sum-movers-load').innerText = 'Механизированная / Ручная';
+      document.getElementById('sum-movers-unload').innerText = 'Самосвальная выгрузка';
+      document.getElementById('sum-movers-road').innerText = 'По району';
+      document.getElementById('sum-opts').innerText = 'Песок, щебень, грунт, снег';
+    }
+
+    // 11. Перенос расчета в форму заявки
+    function applyCalculationToForm() {
+      let comment = '';
+      let fromPlace = 'г. Верхняя Салда';
+      let toPlace = '';
+
+      if (currentMainCategory === 'intercity') {
+        const price = document.getElementById('calc-total-price').innerText;
+        toPlace = intercityState.toCity;
+        let moversText = [];
+        if (intercityState.moversLoad > 0) moversText.push(`погрузка: ${intercityState.moversLoad} чел.`);
+        if (intercityState.moversUnload > 0) moversText.push(`разгрузка: ${intercityState.moversUnload} чел. (мин. 2ч)`);
+        
+        let roadText = intercityState.distance <= 200 ? 'дорога грузчиков: бесплатно' : 'дистанция >200км (суточные)';
+        let optsText = [];
+        if (intercityState.urgent) optsText.push('срочно (+15%)');
+        if (intercityState.uncover) optsText.push('растентовка');
+
+        comment = `[Калькулятор: Газель межгород] Маршрут: Верхняя Салда -> ${intercityState.destName}. ` +
+          `Грузчики: ${moversText.length ? moversText.join(', ') + ' (' + roadText + ')' : 'без грузчиков'}. ` +
+          `${optsText.length ? 'Опции: ' + optsText.join(', ') + '. ' : ''}` +
+          `Расчетная сумма: ~${price} ₽.`;
+      } else if (currentMainCategory === 'city') {
+        toPlace = 'г. Верхняя Салда';
+        const price = document.getElementById('calc-total-price').innerText;
+        comment = `[Калькулятор: Газель по городу] Режим: ${cityState.mode}, Время: ${cityState.hours} ч, Грузчики: ${cityState.movers} чел. Сумма: ~${price} ₽.`;
+      } else if (currentMainCategory === 'truck5t') {
+        toPlace = truck5tState.label;
+        const price = document.getElementById('calc-total-price').innerText;
+        comment = `[Калькулятор: 5-тонник] Направление: ${truck5tState.label}. Сумма: ~${price} ₽.`;
+      } else {
+        toPlace = 'Верхняя Салда';
+        comment = `[Калькулятор: Самосвал] Доставка сыпучих / вывоз снега. Сумма: ~${document.getElementById('calc-total-price').innerText} ₽.`;
+      }
+
+      document.getElementById('form-from').value = fromPlace;
+      document.getElementById('form-to').value = toPlace;
+      document.getElementById('form-comment').value = comment;
+
+      document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('form-name').focus();
+      showToast('Параметры рейса подставлены в форму заявки!');
+    }
+
+    // 8. Управление выбором канала отправки (MAX / E-mail), маска телефона в квадратиках и отправка формы
+    let currentSendChannel = 'max';
+    let phoneDigits = '';
+
+    function setSendChannel(channel) {
+      currentSendChannel = channel;
+      const maxCard = document.getElementById('channel-card-max');
+      const emailCard = document.getElementById('channel-card-email');
+      const btn = document.getElementById('form-submit-btn');
+      const btnText = document.getElementById('btn-submit-text');
+      const btnIcon = document.getElementById('btn-submit-icon');
+
+      if (channel === 'max') {
+        maxCard.className = 'flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-blue-500 bg-blue-500/15 text-white font-bold shadow-md';
+        emailCard.className = 'flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700';
+        btn.className = 'w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-900/40 transition transform active:scale-95 flex items-center justify-center gap-2';
+        btnText.innerText = 'Отправить заявку в мессенджер MAX';
+        btnIcon.setAttribute('data-lucide', 'message-square');
+      } else {
+        emailCard.className = 'flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-amber-500 bg-amber-500/15 text-white font-bold shadow-md';
+        maxCard.className = 'flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700';
+        btn.className = 'w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-700 to-brand-600 hover:from-amber-500 hover:to-brand-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-amber-900/40 transition transform active:scale-95 flex items-center justify-center gap-2';
+        btnText.innerText = 'Отправить заявку на E-mail (uralavto707@mail.ru)';
+        btnIcon.setAttribute('data-lucide', 'mail');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Интерактивные прозрачные квадратики телефона
+    function focusPhoneInput() {
+      const rawInput = document.getElementById('form-phone-raw');
+      if (rawInput) rawInput.focus();
+    }
+
+    function onPhoneBoxFocus() {
+      const wrapper = document.getElementById('phone-boxes-wrapper');
+      if (wrapper) {
+        wrapper.classList.add('border-brand-500', 'ring-2', 'ring-brand-500/20');
+      }
+      updateBoxesVisuals();
+    }
+
+    function onPhoneBoxBlur() {
+      const wrapper = document.getElementById('phone-boxes-wrapper');
+      if (wrapper) {
+        wrapper.classList.remove('ring-2', 'ring-brand-500/20');
+      }
+      validatePhoneState();
+    }
+
+    function updatePhoneBoxes(val) {
+      let digits = val.replace(/\D/g, '');
+      if (digits.startsWith('7') || digits.startsWith('8')) {
+        digits = digits.substring(1);
+      }
+      digits = digits.substring(0, 10);
+      phoneDigits = digits;
+
+      const rawInput = document.getElementById('form-phone-raw');
+      if (rawInput) rawInput.value = digits;
+
+      updateBoxesVisuals();
+      validatePhoneState();
+    }
+
+    function updateBoxesVisuals() {
+      const isFocused = document.activeElement === document.getElementById('form-phone-raw');
+      const len = phoneDigits.length;
+
+      for (let i = 0; i < 10; i++) {
+        const box = document.getElementById('pbox-' + i);
+        if (!box) continue;
+
+        if (i < len) {
+          box.innerText = phoneDigits[i];
+          if (len === 10) {
+            box.className = 'phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/90 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-emerald-300 transition-all shadow-sm';
+          } else {
+            box.className = 'phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/80 border border-brand-500/70 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-white transition-all shadow-sm';
+          }
+        } else if (i === len && isFocused) {
+          box.innerText = '';
+          box.className = 'phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-brand-500/10 border-2 border-brand-400 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-brand-300 transition-all shadow-md animate-pulse';
+        } else {
+          box.innerText = '';
+          box.className = 'phone-digit-box w-6 h-8 sm:w-7 sm:h-9 md:w-8 md:h-10 rounded-lg bg-slate-800/30 border border-slate-700/60 flex items-center justify-center font-mono text-xs sm:text-sm md:text-base font-black text-slate-500 transition-all';
+        }
+      }
+    }
+
+    function validatePhoneState() {
+      const wrapper = document.getElementById('phone-boxes-wrapper');
+      const badge = document.getElementById('phone-valid-badge');
+      const errorEl = document.getElementById('phone-error-msg');
+
+      if (phoneDigits.length === 10) {
+        if (wrapper) {
+          wrapper.classList.remove('border-slate-700/80', 'border-red-500');
+          wrapper.classList.add('border-emerald-500');
+        }
+        if (badge) {
+          badge.className = 'text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-0.5';
+          badge.innerHTML = '✓ 10 цифр заполнено';
+        }
+        if (errorEl) errorEl.classList.add('hidden');
+        return true;
+      } else {
+        if (wrapper) {
+          wrapper.classList.remove('border-emerald-500');
+        }
+        if (badge) {
+          badge.className = 'text-[10px] text-slate-400 font-mono font-bold';
+          badge.innerText = `${phoneDigits.length} / 10 цифр`;
+        }
+        return false;
+      }
+    }
+
+    function getFormattedPhoneNumber() {
+      if (phoneDigits.length !== 10) return '';
+      return `+7 (${phoneDigits.substring(0,3)}) ${phoneDigits.substring(3,5)}-${phoneDigits.substring(5,7)}-${phoneDigits.substring(7,10)}`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function openSuccessModal(orderData) {
+      const modal = document.getElementById('success-order-modal');
+      const badge = document.getElementById('modal-order-badge');
+      const title = document.getElementById('modal-order-title');
+      const details = document.getElementById('modal-order-details');
+      
+      if (badge) badge.innerText = `ЗАЯВКА ${orderData.orderNumber || ''}`;
+      if (title) title.innerText = `Заявка ${orderData.orderNumber || ''} принята!`;
+      
+      if (details) {
+        details.innerHTML = `
+          <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+            <span class="text-slate-400 font-medium">Клиент:</span>
+            <span class="font-bold text-white">${escapeHtml(orderData.name)}</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+            <span class="text-slate-400 font-medium">Телефон:</span>
+            <span class="font-mono font-bold text-emerald-400">${escapeHtml(orderData.phone)}</span>
+          </div>
+          <div class="flex justify-between items-start border-b border-slate-800 pb-1.5">
+            <span class="text-slate-400 font-medium">Маршрут:</span>
+            <span class="font-medium text-white text-right ml-2">${escapeHtml(orderData.from)} ➔ ${escapeHtml(orderData.to)}</span>
+          </div>
+          ${orderData.comment ? `
+          <div class="pt-1">
+            <span class="text-slate-400 font-medium block mb-0.5">Параметры и расчет:</span>
+            <span class="text-slate-200 leading-relaxed">${escapeHtml(orderData.comment)}</span>
+          </div>` : ''}
+        `;
+      }
+      
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeSuccessModal() {
+      const modal = document.getElementById('success-order-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function submitForm(e) {
+      e.preventDefault();
+      const name = document.getElementById('form-name').value.trim();
+      const from = document.getElementById('form-from').value.trim() || 'г. Верхняя Салда';
+      const to = document.getElementById('form-to').value.trim() || 'г. Верхняя Салда';
+      const comment = document.getElementById('form-comment').value.trim() || 'По согласованию';
+
+      // Проверка имени
+      if (!name) {
+        showToast('Пожалуйста, укажите Ваше имя');
+        document.getElementById('form-name').focus();
+        return;
+      }
+
+      // Проверка телефона (все 10 квадратиков должны быть заполнены)
+      if (phoneDigits.length !== 10) {
+        showToast('Заполните все 10 квадратиков номера телефона');
+        const wrapper = document.getElementById('phone-boxes-wrapper');
+        if (wrapper) {
+          wrapper.classList.remove('border-slate-700/80', 'border-emerald-500');
+          wrapper.classList.add('border-red-500');
+        }
+        const errorEl = document.getElementById('phone-error-msg');
+        if (errorEl) errorEl.classList.remove('hidden');
+        focusPhoneInput();
+        return;
+      }
+
+      const formattedPhone = getFormattedPhoneNumber();
+      const submitBtn = document.getElementById('form-submit-btn');
+      const submitBtnText = document.getElementById('btn-submit-text');
+
+      if (currentSendChannel === 'max') {
+        const originalText = submitBtnText.innerText;
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+        submitBtnText.innerHTML = 'Отправка заявки боту MAX...';
+
+        const payload = {
+          orderSource: 'website',
+          storeName: 'Сайт ancargo66.ru',
+          name: name,
+          clientName: name,
+          phone: formattedPhone,
+          clientPhone: formattedPhone,
+          from: from,
+          pickupAddress: from,
+          to: to,
+          deliveryAddress: to,
+          notes: comment
+        };
+
+        const API_ENDPOINTS = [
+          'https://app.ancargo66.ru/api/public/delivery-order',
+          'https://app.tk501.ru/api/public/delivery-order'
+        ];
+
+        let sentSuccess = false;
+        let responseOrderNumber = `№${Date.now().toString().slice(-4)}`;
+
+        for (const endpoint of API_ENDPOINTS) {
+          try {
+            const resp = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+              const resData = await resp.json().catch(() => ({}));
+              if (resData && resData.orderNumber) {
+                responseOrderNumber = resData.orderNumber;
+              }
+              sentSuccess = true;
+              break;
+            }
+          } catch (err) {
+            console.warn(`Отправка на ${endpoint} не удалась:`, err);
+          }
+        }
+
+        // Возвращаем кнопку в активное состояние
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+        submitBtnText.innerText = originalText;
+
+        if (sentSuccess) {
+          openSuccessModal({
+            orderNumber: responseOrderNumber,
+            name: name,
+            phone: formattedPhone,
+            from: from,
+            to: to,
+            comment: comment
+          });
+
+          // Очистка полей формы
+          document.getElementById('form-name').value = '';
+          document.getElementById('form-comment').value = '';
+          phoneDigits = '';
+          const rawInput = document.getElementById('form-phone-raw');
+          if (rawInput) rawInput.value = '';
+          updateBoxesVisuals();
+          validatePhoneState();
+        } else {
+          // Резервный переход к официальному боту компании
+          const fallbackText = `Здравствуйте! Заявка на грузоперевозку:\n\n👤 Клиент: ${name}\n📞 Телефон: ${formattedPhone}\n📍 Откуда: ${from}\n🏁 Куда: ${to}\n📋 Детали/расчет: ${comment}\n\nСайт ancargo66.ru`;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(fallbackText).catch(() => {});
+          }
+          showToast('Заявка скопирована! Открываем чат с MAX ботом...');
+          setTimeout(() => {
+            window.open('https://max.ru/id660704814106_bot', '_blank');
+          }, 500);
+        }
+      } else {
+        // Отправка по E-mail
+        const emailSubject = `Заявка на перевозку — ${name} (${formattedPhone})`;
+        const messageText = `Здравствуйте! Заявка на грузоперевозку (ИП Нигамедьянов):\n\n` +
+          `👤 Клиент: ${name}\n` +
+          `📞 Телефон: ${formattedPhone}\n` +
+          `📍 Маршрут: ${from} ➔ ${to}\n` +
+          `📋 Детали и расчет: ${comment}\n\n` +
+          `Отправлено с сайта ancargo66.ru`;
+        const mailtoUrl = `mailto:uralavto707@mail.ru?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
+        
+        showToast('Заявка сформирована! Открываем почтовую программу...');
+        setTimeout(() => {
+          window.location.href = mailtoUrl;
+        }, 600);
+      }
+    }
+
+    // Инициализация
+    setMainCategory('intercity');
+  </script>
+</body>
+</html>"""
+
+target_path = r"C:\ancargo66\index.html"
+with open(target_path, "w", encoding="utf-8") as f:
+    f.write(html_code)
+
+print(f"SUCCESS: index.html written to {target_path}")

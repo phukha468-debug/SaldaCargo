@@ -136,12 +136,28 @@ export async function POST(request: Request) {
       notes = '',
     } = body;
 
-    if (!deliveryAddress || !clientPhone) {
+    const rawDelivery = deliveryAddress || body.to || '';
+    const rawPickup = pickupAddress || body.from || 'г. Верхняя Салда';
+    const rawPhone = clientPhone || body.phone || '';
+    const rawName = clientName || body.name || '';
+    const isWebsiteOrder = Boolean(
+      body.orderSource === 'website' ||
+      body.source === 'website' ||
+      storeName === 'Онлайн-заявка на рейс' ||
+      (typeof storeName === 'string' && storeName.toLowerCase().includes('сайт')),
+    );
+
+    if (!rawPhone || (!rawDelivery && !isWebsiteOrder)) {
       return NextResponse.json(
-        { error: 'Укажите адрес доставки и контактный телефон' },
+        { error: 'Укажите контактный телефон и адрес' },
         { status: 400, headers: CORS_HEADERS },
       );
     }
+
+    const finalDelivery = rawDelivery || 'г. Верхняя Салда';
+    const finalPickup = rawPickup || 'г. Верхняя Салда';
+    const finalPhone = rawPhone;
+    const finalName = rawName || 'Клиент с сайта';
 
     const orderNumber = `№${Date.now().toString().slice(-4)}`;
 
@@ -184,66 +200,94 @@ export async function POST(request: Request) {
         ? isDisposal
           ? [
               `📍 МАРШРУТ:`,
-              `  1. Погрузка: ${pickupAddress || storeName}`,
-              `  2. Доставка: ${deliveryAddress}`,
+              `  1. Погрузка: ${finalPickup || storeName}`,
+              `  2. Доставка: ${finalDelivery}`,
               `  🗑 ВЫБРОСИТЬ СТАРУЮ МЕБЕЛЬ (утилизация: +1 000 ₽ фикс)`,
               `     └ Внимание: выносится только мебель в объёме оплаченного подъёма`,
               `🛣 Дистанция доставки: ${distanceKm} км`,
             ]
           : [
               `📍 МАРШРУТ (через 2 точки):`,
-              `  1. Погрузка: ${pickupAddress || storeName}`,
-              `  2. Точка А (доставка): ${deliveryAddress}`,
+              `  1. Погрузка: ${finalPickup || storeName}`,
+              `  2. Точка А (доставка): ${finalDelivery}`,
               `  3. Точка Б (заезд): ${extraPointAddress}`,
               `🛣 Дистанция: ${distanceKm} км${distanceKmLeg1 && distanceKmLeg2 ? ` (Плечо 1: ${distanceKmLeg1} км + Плечо 2: ${distanceKmLeg2} км)` : ''}`,
             ]
         : [
-            `📍 Откуда: ${pickupAddress || storeName}`,
-            `🏁 Куда: ${deliveryAddress}`,
+            `📍 Откуда: ${finalPickup || storeName}`,
+            `🏁 Куда: ${finalDelivery}`,
             `🛣 Дистанция: ${distanceKm} км`,
           ];
 
-    const messageText = [
-      `🚚 НОВЫЙ ЗАКАЗ ДОСТАВКИ: ${storeName}`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `📦 Заказ: ${orderNumber}`,
-      ...routeHeaderLines,
-      ``,
-      ...(isLoaders
-        ? [
-            `📦 ГРУЗ И ПРР:`,
-            ...itemsLines,
-            cargoValue > 0 ? `• Стоимость товара: ${cargoValue.toLocaleString('ru-RU')} ₽` : null,
-            cargoValue > 30000 ? `  *(Ответственность: +100 ₽/эт за ценный груз)*` : null,
-            `• Состав бригады: ${crewLine}`,
-            `• Этаж доставки: ${floor} эт. (${elevatorLabel})`,
-            hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж к заносу)` : null,
-            hasPickupCarry === false ? `• Погрузка в магазине: силами магазина (без выноса)` : null,
-            ``,
-          ]
-        : [`📦 УСЛУГА:`, `• Доставка автомобилем (без грузчиков / без ПРР)`, ``]),
-      `💰 РАСЧЁТ СТОИМОСТИ:`,
-      `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽${
-        hasExtraPoint
-          ? isDisposal
-            ? ` (вкл. утилизацию старой мебели +${extraPointPrice || 1000} ₽)`
-            : ` (вкл. заезд во 2-ю точку +${extraPointPrice || 500} ₽)`
-          : ''
-      }`,
-      isLoaders
-        ? `• Погрузка и занос (ПРР): ${Number(loadersPrice).toLocaleString('ru-RU')} ₽`
-        : null,
-      `━━━━━━━━━━━━━━━━━━`,
-      `ИТОГО К ОПЛАТЕ: ${Number(totalPrice).toLocaleString('ru-RU')} ₽`,
-      ``,
-      `👤 КОНТАКТЫ:`,
-      `• Клиент: ${clientName || 'Получатель'} (${clientPhone})`,
-      managerName || managerPhone ? `• Менеджер магазина: ${managerName} (${managerPhone})` : null,
-      preferredTime ? `• Желаемое время: ${preferredTime}` : null,
-      notes ? `• Примечание: ${notes}` : null,
-    ]
-      .filter((line) => line !== null)
-      .join('\n');
+    const nowStr = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' });
+
+    let messageText = '';
+    if (isWebsiteOrder) {
+      messageText = [
+        `🚚 НОВАЯ ОНЛАЙН-ЗАЯВКА НА РЕЙС`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `📦 Номер заявки: ${orderNumber}`,
+        `👤 Клиент / Организация: ${finalName}`,
+        `📞 Телефон для связи: ${finalPhone}`,
+        `📍 Маршрут:`,
+        `   • Откуда (Пункт А): ${finalPickup}`,
+        `   • Куда (Пункт Б): ${finalDelivery}`,
+        notes ? `\n📋 Параметры груза и расчет:\n${notes}` : null,
+        totalPrice ? `💰 Расчетная сумма: ~${Number(totalPrice).toLocaleString('ru-RU')} ₽` : null,
+        ``,
+        `⏰ Время заявки: ${nowStr} (Екб)`,
+        `🌐 Источник: Сайт tk501.ru / ancargo66.ru`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ]
+        .filter((line) => line !== null)
+        .join('\n');
+    } else {
+      messageText = [
+        `🚚 НОВЫЙ ЗАКАЗ ДОСТАВКИ: ${storeName}`,
+        `━━━━━━━━━━━━━━━━━━`,
+        `📦 Заказ: ${orderNumber}`,
+        ...routeHeaderLines,
+        ``,
+        ...(isLoaders
+          ? [
+              `📦 ГРУЗ И ПРР:`,
+              ...itemsLines,
+              cargoValue > 0 ? `• Стоимость товара: ${cargoValue.toLocaleString('ru-RU')} ₽` : null,
+              cargoValue > 30000 ? `  *(Ответственность: +100 ₽/эт за ценный груз)*` : null,
+              `• Состав бригады: ${crewLine}`,
+              `• Этаж доставки: ${floor} эт. (${elevatorLabel})`,
+              hasLongCarry ? `• Пронос от машины: более 25 м (+1 этаж к заносу)` : null,
+              hasPickupCarry === false
+                ? `• Погрузка в магазине: силами магазина (без выноса)`
+                : null,
+              ``,
+            ]
+          : [`📦 УСЛУГА:`, `• Доставка автомобилем (без грузчиков / без ПРР)`, ``]),
+        `💰 РАСЧЁТ СТОИМОСТИ:`,
+        `• Автомобиль: ${Number(carPrice).toLocaleString('ru-RU')} ₽${
+          hasExtraPoint
+            ? isDisposal
+              ? ` (вкл. утилизацию старой мебели +${extraPointPrice || 1000} ₽)`
+              : ` (вкл. заезд во 2-ю точку +${extraPointPrice || 500} ₽)`
+            : ''
+        }`,
+        isLoaders
+          ? `• Погрузка и занос (ПРР): ${Number(loadersPrice).toLocaleString('ru-RU')} ₽`
+          : null,
+        `━━━━━━━━━━━━━━━━━━`,
+        `ИТОГО К ОПЛАТЕ: ${Number(totalPrice).toLocaleString('ru-RU')} ₽`,
+        ``,
+        `👤 КОНТАКТЫ:`,
+        `• Клиент: ${finalName || 'Получатель'} (${finalPhone})`,
+        managerName || managerPhone
+          ? `• Менеджер магазина: ${managerName} (${managerPhone})`
+          : null,
+        preferredTime ? `• Желаемое время: ${preferredTime}` : null,
+        notes ? `• Примечание: ${notes}` : null,
+      ]
+        .filter((line) => line !== null)
+        .join('\n');
+    }
 
     const supabaseAdmin = createAdminClient();
 
@@ -257,9 +301,9 @@ export async function POST(request: Request) {
           order_number: orderNumber,
           store_name: storeName,
           store_category: storeCategory,
-          pickup_address: pickupAddress,
+          pickup_address: finalPickup,
           has_pickup_carry: hasPickupCarry,
-          delivery_address: deliveryAddress,
+          delivery_address: finalDelivery,
           has_extra_point: Boolean(hasExtraPoint),
           extra_point_address: extraPointAddress || '',
           extra_point_price: extraPointPrice || 0,
@@ -279,12 +323,13 @@ export async function POST(request: Request) {
           has_long_carry: hasLongCarry,
           loaders_price: loadersPrice,
           total_price: totalPrice,
-          client_name: clientName,
-          client_phone: clientPhone,
+          client_name: finalName,
+          client_phone: finalPhone,
           manager_name: managerName,
           manager_phone: managerPhone,
           preferred_time: preferredTime,
           notes,
+          is_website_order: isWebsiteOrder,
           created_at: new Date().toISOString(),
         },
       });
