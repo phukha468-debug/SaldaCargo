@@ -48,13 +48,18 @@ export default function AdminDashboard() {
   return (
     <div className="p-4 space-y-6">
       <header className="pt-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
-            Пульт <span className="text-orange-600">Админа</span>
-          </h1>
-          <p className="text-zinc-400 font-bold text-xs uppercase tracking-widest mt-1">
-            {me?.name ?? '...'}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center flex-shrink-0">
+            <img src="/logo.png" alt="TK501" className="w-full h-full object-cover" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
+              Пульт <span className="text-orange-600">Админа</span>
+            </h1>
+            <p className="text-zinc-400 font-bold text-xs uppercase tracking-widest mt-1">
+              {me?.name ?? '...'}
+            </p>
+          </div>
         </div>
         <button
           onClick={handleLogout}

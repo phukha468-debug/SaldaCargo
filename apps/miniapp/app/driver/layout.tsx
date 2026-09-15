@@ -20,8 +20,8 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
       {/* Шапка */}
       <header className="sticky top-0 z-50 bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center overflow-hidden">
-            <span className="text-xl">👤</span>
+          <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-xs">
+            <img src="/logo.png" alt="TK501" className="w-full h-full object-cover" />
           </div>
           <span className="text-xl font-black text-zinc-900">
             TK<span className="text-orange-600">501</span>

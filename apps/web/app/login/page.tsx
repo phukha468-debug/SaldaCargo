@@ -13,8 +13,8 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
       <div className="text-center space-y-3">
-        <div className="w-12 h-12 bg-sky-500 rounded-2xl flex items-center justify-center font-black text-white text-lg mx-auto shadow-lg animate-pulse">
-          TK
+        <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg mx-auto p-0.5 bg-gradient-to-br from-amber-500 to-amber-700">
+          <img src="/logo.png" alt="TK501" className="w-full h-full object-cover rounded-[14px]" />
         </div>
         <h1 className="text-xl font-bold">Вход в TK501</h1>
         <p className="text-xs text-slate-400">Перенаправление на главную панель...</p>

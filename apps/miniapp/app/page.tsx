@@ -183,7 +183,10 @@ export default function RootDispatcher() {
       case 'role':
         return (
           <div className="w-full max-w-sm space-y-6">
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
+              <div className="w-24 h-24 mx-auto mb-3 rounded-2xl overflow-hidden shadow-md flex items-center justify-center">
+                <img src="/logo.png" alt="TK501" className="w-full h-full object-contain" />
+              </div>
               <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
                 TK<span className="text-orange-600">501</span>
               </h1>
@@ -325,6 +328,9 @@ export default function RootDispatcher() {
         return (
           <div className="w-full max-w-xs space-y-8">
             <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-3 rounded-2xl overflow-hidden shadow-md flex items-center justify-center">
+                <img src="/logo.png" alt="TK501" className="w-full h-full object-contain" />
+              </div>
               <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight italic">
                 TK<span className="text-orange-600">501</span>
               </h1>
