@@ -385,7 +385,7 @@ def generate_html(config):
       <span class="dispatcher-notice">⚠️ Внимание: Окончательный расчёт стоимости согласовывается с диспетчером.</span>
     </div>
     <div class="contacts-bar">
-      <div>Диспетчерская служба: <strong>+7 (963) 050-15-01</strong></div>
+      <div>Диспетчерская служба: <strong style="font-size: 10px;">+7-963-0-<span style="color: #ea580c; font-weight: 900;">501</span>-<span style="color: #ea580c; font-weight: 900;">501</span></strong></div>
       <div>Официальный сайт: <strong>tk501.ru</strong></div>
       <div>Верхняя Салда • Актуально на 2026 г.</div>
     </div>
