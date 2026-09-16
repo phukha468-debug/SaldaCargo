@@ -745,20 +745,46 @@
               <!-- 2. РАЗДЕЛ: ГАЗЕЛЬ ПО ГОРОДУ (ВЕРХНЯЯ САЛДА) -->
               <!-- ============================================================ -->
               <div id="section-city" class="hidden space-y-4">
+                
+                <!-- 1. Выбор автомобиля для города -->
+                <div>
+                  <label class="block text-xs font-black uppercase tracking-wider text-slate-200 mb-2">
+                    Автомобиль для города:
+                  </label>
+                  <div class="grid grid-cols-3 gap-2">
+                    <button type="button" id="city-veh-gazelle" onclick="setCityVehicle('gazelle')" class="p-2 sm:p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold">
+                      <div class="text-xs font-bold">🚚 ГАЗель (3–4м)</div>
+                      <div class="text-[10px] text-brand-400 font-mono font-bold mt-0.5">1 000 ₽ • 1 500 ₽/ч</div>
+                      <div class="text-[9px] text-slate-400">Стандарт (1.5т)</div>
+                    </button>
+                    <button type="button" id="city-veh-gazelle_6m" onclick="setCityVehicle('gazelle_6m')" class="p-2 sm:p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold">📏 ГАЗель 6м</div>
+                      <div class="text-[10px] text-blue-400 font-mono font-bold mt-0.5">1 500 ₽ • 2 250 ₽/ч</div>
+                      <div class="text-[9px] text-slate-400">Брус 2–3 шт (до 6м)</div>
+                    </button>
+                    <button type="button" id="city-veh-valday" onclick="setCityVehicle('valday')" class="p-2 sm:p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold">🚛 Валдай 5т</div>
+                      <div class="text-[10px] text-amber-400 font-mono font-bold mt-0.5">2 000 ₽ • 3 000 ₽/ч</div>
+                      <div class="text-[9px] text-slate-400">Кузов 36 м³ (5т)</div>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 2. Формат работы -->
                 <div>
                   <label class="block text-xs font-black uppercase tracking-wider text-slate-200 mb-2">
                     Формат работы по Верхней Салде:
                   </label>
                   <div class="grid grid-cols-2 gap-2">
-                    <button type="button" id="city-mode-hourly" onclick="setCityMode('hourly')" class="p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold">
-                      <div class="text-xs font-bold">⏱️ Почасовая аренда</div>
-                      <div class="text-[11px] text-brand-400 font-mono font-bold mt-0.5">1 500 ₽ / час</div>
-                      <div class="text-[9px] text-slate-400">Подача от 5 минут</div>
+                    <button type="button" id="city-mode-express" onclick="setCityMode('express')" class="p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold">
+                      <div class="text-xs font-bold">⚡ Быстрый заказ (до 30 мин)</div>
+                      <div id="city-mode-express-price" class="text-[11px] text-brand-400 font-mono font-bold mt-0.5">1 000 ₽</div>
+                      <div class="text-[9px] text-slate-400">Разовый рейс по городу</div>
                     </button>
-                    <button type="button" id="city-mode-express" onclick="setCityMode('express')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
-                      <div class="text-xs font-bold">⚡ Экспресс (20 мин)</div>
-                      <div class="text-[11px] text-blue-400 font-mono font-bold mt-0.5">1 000 — 1 500 ₽</div>
-                      <div class="text-[9px] text-slate-400">1-2 предмета</div>
+                    <button type="button" id="city-mode-hourly" onclick="setCityMode('hourly')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700">
+                      <div class="text-xs font-bold">⏱️ Почасовая аренда</div>
+                      <div id="city-mode-hourly-price" class="text-[11px] text-white font-mono font-bold mt-0.5">1 500 ₽ / час</div>
+                      <div class="text-[9px] text-slate-400">Если авто занято &gt;30 мин</div>
                     </button>
                     <button type="button" id="city-mode-trash" onclick="setCityMode('trash')" class="p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700 col-span-2">
                       <div class="text-xs font-bold">🗑️ Вывоз строительного мусора / старой мебели</div>
@@ -768,7 +794,8 @@
                   </div>
                 </div>
 
-                <div id="city-slider-box" class="space-y-2 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <!-- 3. Слайдер часов -->
+                <div id="city-slider-box" class="space-y-2 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hidden">
                   <div class="flex justify-between items-center text-xs">
                     <span class="font-bold text-slate-200">Время аренды авто:</span>
                     <span id="city-hours-display" class="font-mono font-black text-brand-400 text-sm">2 часа</span>
@@ -782,10 +809,10 @@
                   </div>
                 </div>
 
-                <!-- Грузчики по городу -->
-                <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <!-- 4. Грузчики по городу -->
+                <div id="city-movers-box" class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 hidden">
                   <div class="flex justify-between items-center text-xs font-bold text-slate-200">
-                    <span>Грузчики по Салде (1 000 ₽/час за чел):</span>
+                    <span>Грузчики (1 000 ₽/час за чел):</span>
                     <span id="city-movers-count-label" class="text-brand-400 font-mono">0 чел</span>
                   </div>
                   <div class="flex items-center gap-1.5">
@@ -793,7 +820,23 @@
                     <button type="button" onclick="setCityMovers(1)" class="city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="1">1 чел (+1000 ₽/ч)</button>
                     <button type="button" onclick="setCityMovers(2)" class="city-mover-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700" data-count="2">2 чел (+2000 ₽/ч)</button>
                   </div>
+                  <div id="city-moving-badge" class="hidden text-[11px] p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-semibold flex items-center gap-1.5">
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                    <span>Тариф «Переезд под ключ»: ГАЗель + 2 грузчика = 3 500 ₽/час</span>
+                  </div>
                 </div>
+
+                <!-- Заметка для ГАЗели 6м -->
+                <div id="city-6m-notice" class="hidden p-3 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-300 space-y-1">
+                  <div class="font-bold flex items-center gap-1.5">
+                    <i data-lucide="info" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
+                    <span>Спецперевозка негабарита (брус/доска до 6м)</span>
+                  </div>
+                  <p class="text-[11px] text-slate-300 leading-relaxed">
+                    Для перевозки 2–3 палок бруса или профиля до 6м на автомобиле с обозначением негабарита грузчики не предоставляются. Погрузка и выгрузка производятся силами заказчика.
+                  </p>
+                </div>
+
               </div>
 
               <!-- ============================================================ -->
@@ -868,6 +911,10 @@
                   <span class="text-lg text-brand-400 font-sans font-black">₽</span>
                 </div>
                 <div id="calc-price-note" class="text-[11px] text-amber-300 font-bold mt-0.5">Верхняя Салда → Екатеринбург (без грузчиков)</div>
+                <div class="text-[10px] text-amber-400/90 font-medium mt-1 flex items-center gap-1.5">
+                  <i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                  <span>Окончательный расчёт согласовывается с диспетчером</span>
+                </div>
 
                 <!-- Детализация сметы -->
                 <div class="mt-4 pt-3.5 border-t border-slate-800 space-y-2 text-xs">
@@ -979,25 +1026,36 @@
               <div class="w-10 h-10 rounded-2xl bg-brand-500/15 text-brand-400 flex items-center justify-center">
                 <i data-lucide="truck" class="w-5 h-5"></i>
               </div>
-              <h3 class="text-base sm:text-lg font-black text-white">Доставка по городу (ГАЗель)</h3>
-              <p class="text-xs text-slate-400">Быстрая подача чистого автомобиля под погрузку за 15-20 минут.</p>
+              <h3 class="text-base sm:text-lg font-black text-white">Доставка по Верхней Салде</h3>
+              <p class="text-xs text-slate-400">Быстрый заказ без деления на зоны. Подача авто от 5–15 минут.</p>
               <div class="space-y-2 pt-2 border-t border-slate-800/80 text-xs">
                 <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
-                  <span class="text-slate-300">Верхняя Салда (1 рейс)</span>
-                  <span class="font-mono font-bold text-brand-400">от 800 ₽</span>
+                  <span class="text-slate-300">⚡ Быстрый заказ (до 30 мин)</span>
+                  <span class="font-mono font-bold text-brand-400">1 000 ₽</span>
                 </div>
                 <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
-                  <span class="text-slate-300">Нижняя Салда (1 рейс)</span>
-                  <span class="font-mono font-bold text-brand-400">от 1 300 ₽</span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
-                  <span class="text-slate-300">Почасовая работа авто</span>
+                  <span class="text-slate-300">⏱️ Почасовая оплата (&gt;30 мин)</span>
                   <span class="font-mono font-bold text-white">1 500 ₽ / час</span>
                 </div>
-                <div class="flex justify-between items-center py-1">
-                  <span class="text-slate-300">Вывоз строительного мусора</span>
-                  <span class="font-mono font-bold text-amber-400">от 5 000 ₽ / рейс</span>
+                <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
+                  <span class="text-slate-300">👥 Переезд под ключ (авто + 2 грузч.)</span>
+                  <span class="font-mono font-bold text-emerald-400">3 500 ₽ / час</span>
                 </div>
+                <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
+                  <span class="text-slate-300">📏 ГАЗель 6м (брус до 6м, 2-3 палки)</span>
+                  <span class="font-mono font-bold text-blue-400">от 1 500 ₽</span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
+                  <span class="text-slate-300">🚛 Валдай 5 тонн (кузов 36 м³)</span>
+                  <span class="font-mono font-bold text-amber-400">от 2 000 ₽</span>
+                </div>
+                <div class="flex justify-between items-center py-1 text-[11px]">
+                  <span class="text-slate-400">🏪 Магазинам-партнёрам (по договору)</span>
+                  <span class="font-mono font-bold text-orange-400">от 700 ₽</span>
+                </div>
+              </div>
+              <div class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300">
+                ⚠️ Окончательный расчёт стоимости согласовывается с диспетчером
               </div>
             </div>
             <a href="#calculator" class="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-center text-xs font-bold text-slate-300 hover:text-white transition block">
@@ -1084,16 +1142,66 @@
             <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 self-start sm:self-auto">Актуально на 2026 г.</span>
           </div>
 
-          <div class="grid sm:grid-cols-3 gap-3.5">
+          <div class="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center gap-2">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+            <span>Внимание: Окончательный расчёт стоимости перевозки и рейсов согласовывается с диспетчером службы: <b>+7 (963) 050-15-01</b></span>
+          </div>
+
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             
-            <!-- Документ 1: Единые тарифы для магазинов -->
+            <!-- Документ 1: Стандартная ГАЗель -->
+            <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                <i data-lucide="truck" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-bold text-white group-hover:text-blue-300 transition-colors">Тарифы: ГАЗель (до 3–4м)</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Город 1000 ₽, пригород, Басьяновский 5000 ₽</div>
+                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-blue-400">
+                  <span>PDF • 135 КБ</span>
+                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
+                </div>
+              </div>
+            </a>
+
+            <!-- Документ 2: ГАЗель 6м -->
+            <a href="/tarify_dostavka_gazel_6m.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                <i data-lucide="maximize" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">Тарифы: ГАЗель 6 метров</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Длинномеры до 6м, город 1500 ₽, пригород +50%</div>
+                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-indigo-400">
+                  <span>PDF • 135 КБ</span>
+                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
+                </div>
+              </div>
+            </a>
+
+            <!-- Документ 3: Валдай 5т -->
+            <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                <i data-lucide="container" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">Тарифы: Валдай / 5 тонн</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Кузов до 36 м³, город 2000 ₽, пригород х2</div>
+                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-purple-400">
+                  <span>PDF • 136 КБ</span>
+                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
+                </div>
+              </div>
+            </a>
+
+            <!-- Документ 4: Единые тарифы для магазинов -->
             <a href="/universal_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
               <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <i data-lucide="store" class="w-5 h-5"></i>
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-xs font-bold text-white group-hover:text-brand-300 transition-colors">Единые тарифы магазинов-партнёров</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Доставка + ПРР для стройматериалов и мебели</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Спецтариф от 700 ₽ + поштучный ПРР стройматериалов</div>
                 <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-brand-400">
                   <span>PDF • 133 КБ</span>
                   <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
@@ -1101,25 +1209,10 @@
               </div>
             </a>
 
-            <!-- Документ 2: Автодоставка Салда -->
-            <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="file-text" class="w-5 h-5"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-white group-hover:text-blue-300 transition-colors">Тарифы автодоставки по Салде и РФ</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Город, межгород, почасовая аренда техники</div>
-                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-blue-400">
-                  <span>PDF • 80 КБ</span>
-                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
-                </div>
-              </div>
-            </a>
-
-            <!-- Документ 3: Мебельный регламент -->
+            <!-- Документ 5: Мебельный регламент -->
             <a href="/mebel_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
               <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <i data-lucide="sofa" class="w-5 h-5"></i>
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">Классификатор тарифов для мебели</div>
@@ -1453,34 +1546,60 @@
     <div class="theme-card max-w-4xl w-full rounded-3xl p-5 sm:p-8 max-h-[90vh] overflow-y-auto space-y-6 border border-brand-500/40 shadow-2xl relative my-auto">
       <div class="flex items-center justify-between border-b border-slate-800 pb-4">
         <div>
-          <h3 class="text-xl font-black text-white">Тарифы и расценки по Верхней Салде</h3>
-          <p class="text-xs text-slate-400">Честные фиксированные цены без скрытых доплат (Без НДС / УСН)</p>
+          <h3 class="text-xl font-black text-white">Тарифы и расценки на перевозки</h3>
+          <p class="text-xs text-slate-400">Честные прозрачные цены по Верхней Салде, пригородным садам и межгороду</p>
         </div>
         <button onclick="closeSectionModal('tariffs-modal')" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">⚡ Экспресс (до 20 мин)</span><span class="text-blue-400 font-mono font-bold text-sm">1 000 — 1 500 ₽</span></div>
-          <p class="text-xs text-slate-400">Быстрая доставка 1-2 предметов без грузчиков.</p>
-        </div>
+      <!-- Сетка основных тарифов -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         <div class="p-4 rounded-2xl bg-slate-900/80 border border-brand-500/40 space-y-2">
-          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">⏱️ Почасовая (1 час)</span><span class="text-brand-400 font-mono font-bold text-sm">1 500 ₽ / час</span></div>
-          <p class="text-xs text-slate-400">ГАЗель с водителем. Подача от 5 минут по Верхней Салде.</p>
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-xs sm:text-sm">⚡ Быстрый заказ</span><span class="text-brand-400 font-mono font-bold text-sm">1 000 ₽</span></div>
+          <p class="text-[11px] text-slate-300">Разовый рейс по Верхней Салде до 30 минут без задержек.</p>
+          <div class="text-[10px] text-slate-400 border-t border-slate-800 pt-1.5 font-mono">ГАЗель 6м: 1 500 ₽ • Валдай: 2 000 ₽</div>
         </div>
+
         <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">👥 С 2 грузчиками</span><span class="text-emerald-400 font-mono font-bold text-sm">3 000 ₽ / час</span></div>
-          <p class="text-xs text-slate-400">Машина + 2 опытных грузчика. Полный комплекс погрузки/разгрузки.</p>
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-xs sm:text-sm">⏱️ Почасовая аренда</span><span class="text-white font-mono font-bold text-sm">1 500 ₽ / час</span></div>
+          <p class="text-[11px] text-slate-300">Включается, если автомобиль занят более 30 минут.</p>
+          <div class="text-[10px] text-slate-400 border-t border-slate-800 pt-1.5 font-mono">ГАЗель 6м: 2 250 ₽/ч • Валдай: 3 000 ₽/ч</div>
         </div>
-        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-          <div class="flex justify-between items-center"><span class="font-bold text-white text-sm">🗑️ Вывоз мусора</span><span class="text-amber-400 font-mono font-bold text-sm">от 5 000 ₽ / час</span></div>
-          <p class="text-xs text-slate-400">Вывоз строительного мусора и старой мебели на полигон.</p>
+
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-emerald-500/40 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-xs sm:text-sm">👥 Переезд под ключ</span><span class="text-emerald-400 font-mono font-bold text-sm">3 500 ₽ / час</span></div>
+          <p class="text-[11px] text-slate-300">ГАЗель (1 500 ₽) + 2 штатных грузчика (по 1 000 ₽/час за чел).</p>
+          <div class="text-[10px] text-emerald-400/90 border-t border-slate-800 pt-1.5">Бережный занос мебели и коробок</div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-blue-500/40 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-xs sm:text-sm">📏 ГАЗель 6 метров</span><span class="text-blue-400 font-mono font-bold text-sm">от 1 500 ₽</span></div>
+          <p class="text-[11px] text-slate-300">Перевозка 2–3 палок бруса/доски до 6м с обозначением негабарита.</p>
+          <div class="text-[10px] text-slate-400 border-t border-slate-800 pt-1.5">Почасовая: 2 250 ₽/ч (погрузка силами клиента)</div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-purple-500/40 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-xs sm:text-sm">🚛 Валдай / 5 тонн</span><span class="text-purple-400 font-mono font-bold text-sm">от 2 000 ₽</span></div>
+          <p class="text-[11px] text-slate-300">Тяжелый грузовик до 5т (кузов 36 м³, 12 паллет).</p>
+          <div class="text-[10px] text-slate-400 border-t border-slate-800 pt-1.5 font-mono">Почасовая: 3 000 ₽/ч • Межгород: от 70 ₽/км</div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-amber-500/40 space-y-2">
+          <div class="flex justify-between items-center"><span class="font-bold text-white text-xs sm:text-sm">🗑️ Вывоз мусора</span><span class="text-amber-400 font-mono font-bold text-sm">от 5 000 ₽</span></div>
+          <p class="text-[11px] text-slate-300">Вывоз строительного мусора и старой мебели на официальный полигон.</p>
+          <div class="text-[10px] text-amber-300/80 border-t border-slate-800 pt-1.5">С талоном утилизации</div>
         </div>
       </div>
 
-      <!-- Блок для магазинов и скачивание PDF -->
+      <!-- Важное примечание диспетчера -->
+      <div class="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+        <span><b>Внимание:</b> Окончательный расчёт стоимости согласовывается с диспетчером: <b>+7 (963) 050-15-01</b></span>
+      </div>
+
+      <!-- Блок для магазинов -->
       <div class="p-4 rounded-2xl bg-gradient-to-r from-orange-500/15 via-brand-500/15 to-amber-500/10 border border-orange-500/40 space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-3">
@@ -1488,8 +1607,8 @@
               <i data-lucide="store" class="w-5 h-5"></i>
             </div>
             <div>
-              <h4 class="font-bold text-white text-sm">Специальный сервис для магазинов-партнёров</h4>
-              <p class="text-[11px] text-slate-300">Расчёт доставки и подъёма на этаж по позициям в 1 клик</p>
+              <h4 class="font-bold text-white text-sm">Специальный сервис для магазинов-партнёров (от 700 ₽)</h4>
+              <p class="text-[11px] text-slate-300">Спецтарифы для магазинов мебели и стройматериалов по договору и PIN-коду</p>
             </div>
           </div>
           <a href="/calc.html" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md whitespace-nowrap text-center">
@@ -1500,15 +1619,23 @@
 
       <!-- Ссылки на PDF -->
       <div class="space-y-2 pt-1">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Официальные прайсы в PDF:</div>
-        <div class="grid sm:grid-cols-3 gap-2 text-xs">
-          <a href="/universal_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-brand-500/50 flex items-center gap-2 text-slate-200 hover:text-brand-300 transition">
-            <i data-lucide="download" class="w-4 h-4 text-brand-400 flex-shrink-0"></i>
-            <span class="truncate">Единые тарифы магазинов (PDF)</span>
-          </a>
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Официальные прайсы в PDF (скачать):</div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
           <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 flex items-center gap-2 text-slate-200 hover:text-blue-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
-            <span class="truncate">Автодоставка Салда (PDF)</span>
+            <span class="truncate">ГАЗель до 3–4м (PDF)</span>
+          </a>
+          <a href="/tarify_dostavka_gazel_6m.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 flex items-center gap-2 text-slate-200 hover:text-indigo-300 transition">
+            <i data-lucide="download" class="w-4 h-4 text-indigo-400 flex-shrink-0"></i>
+            <span class="truncate">ГАЗель 6м длинномеры (PDF)</span>
+          </a>
+          <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/50 flex items-center gap-2 text-slate-200 hover:text-purple-300 transition">
+            <i data-lucide="download" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
+            <span class="truncate">Валдай до 5 тонн (PDF)</span>
+          </a>
+          <a href="/universal_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-brand-500/50 flex items-center gap-2 text-slate-200 hover:text-brand-300 transition">
+            <i data-lucide="download" class="w-4 h-4 text-brand-400 flex-shrink-0"></i>
+            <span class="truncate">Тарифы магазинов (PDF)</span>
           </a>
           <a href="/mebel_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 flex items-center gap-2 text-slate-200 hover:text-emerald-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
@@ -1806,9 +1933,10 @@ Email: uralavto707@mail.ru
       toCity: 'г. Екатеринбург'
     };
 
-    // Состояние раздела "Газель по городу"
+    // Состояние раздела "Доставка по городу"
     let cityState = {
-      mode: 'hourly', // 'hourly', 'express', 'trash'
+      vehicle: 'gazelle', // 'gazelle', 'gazelle_6m', 'valday'
+      mode: 'express',    // 'express', 'hourly', 'trash'
       hours: 2,
       movers: 0
     };
@@ -2089,7 +2217,50 @@ Email: uralavto707@mail.ru
       if (window.lucide) lucide.createIcons();
     }
 
-    // 8. Раздел "Газель по городу"
+    // 8. Раздел "Доставка по городу"
+    function setCityVehicle(veh) {
+      cityState.vehicle = veh;
+      ['gazelle', 'gazelle_6m', 'valday'].forEach(v => {
+        const btn = document.getElementById('city-veh-' + v);
+        if (btn) {
+          if (v === veh) {
+            btn.className = 'p-2 sm:p-2.5 rounded-xl border text-left transition border-brand-500 bg-brand-500/10 text-white font-semibold';
+          } else {
+            btn.className = 'p-2 sm:p-2.5 rounded-xl border text-left transition border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700';
+          }
+        }
+      });
+
+      // Обновляем цены на кнопках форматов
+      const expressPriceEl = document.getElementById('city-mode-express-price');
+      const hourlyPriceEl = document.getElementById('city-mode-hourly-price');
+      if (veh === 'gazelle') {
+        if (expressPriceEl) expressPriceEl.innerText = '1 000 ₽';
+        if (hourlyPriceEl) hourlyPriceEl.innerText = '1 500 ₽ / час';
+      } else if (veh === 'gazelle_6m') {
+        if (expressPriceEl) expressPriceEl.innerText = '1 500 ₽';
+        if (hourlyPriceEl) hourlyPriceEl.innerText = '2 250 ₽ / час';
+      } else if (veh === 'valday') {
+        if (expressPriceEl) expressPriceEl.innerText = '2 000 ₽';
+        if (hourlyPriceEl) hourlyPriceEl.innerText = '3 000 ₽ / час';
+      }
+
+      // Для Газели 6м грузчики не предусмотрены (только негабарит)
+      const notice6m = document.getElementById('city-6m-notice');
+      const moversBox = document.getElementById('city-movers-box');
+      if (veh === 'gazelle_6m') {
+        cityState.movers = 0;
+        setCityMovers(0);
+        if (notice6m) notice6m.classList.remove('hidden');
+        if (moversBox) moversBox.classList.add('hidden');
+      } else {
+        if (notice6m) notice6m.classList.add('hidden');
+        if (moversBox && cityState.mode !== 'express') moversBox.classList.remove('hidden');
+      }
+
+      calculateCity();
+    }
+
     function setCityMode(mode) {
       cityState.mode = mode;
       ['hourly', 'express', 'trash'].forEach(m => {
@@ -2105,10 +2276,21 @@ Email: uralavto707@mail.ru
       });
 
       const sliderBox = document.getElementById('city-slider-box');
+      const moversBox = document.getElementById('city-movers-box');
+      const notice6m = document.getElementById('city-6m-notice');
+
       if (mode === 'express') {
-        sliderBox.classList.add('hidden');
+        if (sliderBox) sliderBox.classList.add('hidden');
+        if (moversBox) moversBox.classList.add('hidden');
       } else {
-        sliderBox.classList.remove('hidden');
+        if (sliderBox) sliderBox.classList.remove('hidden');
+        if (cityState.vehicle === 'gazelle_6m') {
+          if (moversBox) moversBox.classList.add('hidden');
+          if (notice6m) notice6m.classList.remove('hidden');
+        } else {
+          if (moversBox) moversBox.classList.remove('hidden');
+          if (notice6m) notice6m.classList.add('hidden');
+        }
       }
 
       calculateCity();
@@ -2138,33 +2320,60 @@ Email: uralavto707@mail.ru
       let total = 0;
       let note = '';
       let route = '';
+      let category = '';
+
+      const carRates = {
+        gazelle: { express: 1000, hourly: 1500, title: 'ГАЗель (до 3–4м)' },
+        gazelle_6m: { express: 1500, hourly: 2250, title: 'ГАЗель 6м (длинномер)' },
+        valday: { express: 2000, hourly: 3000, title: 'Валдай 5т (36 м³)' }
+      };
+      const currentRates = carRates[cityState.vehicle] || carRates.gazelle;
+      category = `Город: ${currentRates.title}`;
+
+      const movingBadge = document.getElementById('city-moving-badge');
 
       if (cityState.mode === 'express') {
-        total = 1200;
-        document.getElementById('calc-total-price').innerText = '1 000 — 1 500';
-        note = 'Экспресс-доставка по Верхней Салде (до 20 мин)';
-        route = 'Экспресс (1-2 предмета)';
+        total = currentRates.express;
+        document.getElementById('calc-total-price').innerText = total.toLocaleString('ru-RU');
+        note = `Быстрый заказ по Верхней Салде (до 30 мин): ${currentRates.title}`;
+        route = 'Быстрый заказ (до 30 мин)';
+        if (movingBadge) movingBadge.classList.add('hidden');
       } else if (cityState.mode === 'hourly') {
-        const carRate = 1500;
+        const carRate = currentRates.hourly;
         const moverRate = cityState.movers * 1000;
         total = (carRate + moverRate) * cityState.hours;
         document.getElementById('calc-total-price').innerText = total.toLocaleString('ru-RU');
-        note = `Почасовая работа: ${cityState.hours} ч (Авто 1500 ₽/ч + ${cityState.movers} грузч.)`;
+
+        if (cityState.vehicle === 'gazelle' && cityState.movers === 2) {
+          note = `Тариф «Переезд под ключ»: ${cityState.hours} ч (Авто 1500 ₽/ч + 2 грузч. = 3 500 ₽/ч)`;
+          if (movingBadge) movingBadge.classList.remove('hidden');
+        } else {
+          note = `Почасовая работа: ${cityState.hours} ч (${currentRates.title} ${carRate.toLocaleString('ru-RU')} ₽/ч + ${cityState.movers} грузч.)`;
+          if (movingBadge) movingBadge.classList.add('hidden');
+        }
         route = `По Салде (${cityState.hours} ч)`;
       } else if (cityState.mode === 'trash') {
         total = 5000 + (cityState.movers * 1000 * cityState.hours);
         document.getElementById('calc-total-price').innerText = 'от ' + total.toLocaleString('ru-RU');
         note = 'Вывоз строительного мусора / утилизация на полигон';
-        route = 'Вывоз мусора (с полигоном)';
+        route = 'Вывоз мусора (полигон)';
+        if (movingBadge) movingBadge.classList.add('hidden');
       }
 
       document.getElementById('calc-price-note').innerText = note;
-      document.getElementById('sum-category').innerText = 'Газель по городу (В. Салда)';
+      document.getElementById('sum-category').innerText = category;
       document.getElementById('sum-route').innerText = route;
-      document.getElementById('sum-movers-load').innerText = `${cityState.movers} чел (+${cityState.movers * 1000} ₽/ч)`;
-      document.getElementById('sum-movers-unload').innerText = 'Включено в почасовую';
+      if (cityState.mode === 'express') {
+        document.getElementById('sum-movers-load').innerText = 'Не требуются (до 30 мин)';
+      } else if (cityState.vehicle === 'gazelle_6m') {
+        document.getElementById('sum-movers-load').innerText = 'Силами клиента (негабарит)';
+      } else {
+        document.getElementById('sum-movers-load').innerText = `${cityState.movers} чел (+${cityState.movers * 1000} ₽/ч)`;
+      }
+      document.getElementById('sum-movers-unload').innerText = cityState.mode === 'express' ? 'Самостоятельно' : 'Включено в почасовую';
       document.getElementById('sum-movers-road').innerText = 'Бесплатно (по городу)';
       document.getElementById('sum-opts').innerText = 'Подача от 5 минут';
+      if (window.lucide) lucide.createIcons();
     }
 
     // 9. Раздел "Грузовики до 5 тонн"
@@ -2224,11 +2433,14 @@ Email: uralavto707@mail.ru
         comment = `[Калькулятор: Газель межгород] Маршрут: Верхняя Салда -> ${intercityState.destName}. ` +
           `Грузчики: ${moversText.length ? moversText.join(', ') + ' (' + roadText + ')' : 'без грузчиков'}. ` +
           `${optsText.length ? 'Опции: ' + optsText.join(', ') + '. ' : ''}` +
-          `Расчетная сумма: ~${price} ₽.`;
+          `Расчетная сумма: ~${price} ₽. (Окончательный расчет согласовывается с диспетчером)`;
       } else if (currentMainCategory === 'city') {
         toPlace = 'г. Верхняя Салда';
         const price = document.getElementById('calc-total-price').innerText;
-        comment = `[Калькулятор: Газель по городу] Режим: ${cityState.mode}, Время: ${cityState.hours} ч, Грузчики: ${cityState.movers} чел. Сумма: ~${price} ₽.`;
+        const vehTitles = { gazelle: 'ГАЗель (3–4м)', gazelle_6m: 'ГАЗель 6м (длинномер)', valday: 'Валдай 5т' };
+        const vehName = vehTitles[cityState.vehicle] || 'ГАЗель';
+        const modeDesc = cityState.mode === 'express' ? 'Быстрый заказ (до 30 мин)' : (cityState.mode === 'hourly' ? `Почасовая (${cityState.hours} ч, грузчики: ${cityState.movers} чел)` : 'Вывоз строительного мусора');
+        comment = `[Калькулятор город: ${vehName}] Режим: ${modeDesc}. Расчет: ~${price} ₽. (Окончательный расчет согласовывается с диспетчером)`;
       } else if (currentMainCategory === 'truck5t') {
         toPlace = truck5tState.label;
         const price = document.getElementById('calc-total-price').innerText;
