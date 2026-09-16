@@ -1,4 +1,5 @@
 import os
+import fitz
 from playwright.sync_api import sync_playwright
 
 destinations_base = [
@@ -15,7 +16,7 @@ destinations_base = [
     (10, "Никитино", 2000),
     (11, "Нелоба", 2500),
     
-    # Right column (12..21) - item 14 crossed out was removed, item 16 "Басьяновский" is 5000
+    # Right column (12..21) - пункт 14 исключен, Басьяновский = 5000
     (12, "г. Нижняя Салда — Шмаринские дачи", 2500),
     (13, "Покровское", 2500),
     (14, "Акинфиево", 4000),
@@ -31,32 +32,62 @@ destinations_base = [
 variants = [
     {
         "filename": "apps/web/public/tarify_dostavka_salda.pdf",
+        "png_filename": "apps/web/public/tarify_dostavka_salda.png",
         "vehicle_badge": "АВТОМОБИЛЬ ГАЗЕЛЬ (ДО 3–4 МЕТРОВ)",
         "multiplier": 1.0,
-        "zone1_price": 700,
-        "zone2_price": 1000,
-        "zone3_price": 1200,
-        "hourly_note": "Почасовая аренда авто: <b>1 500 ₽/час</b> (включается при занятости свыше 30 мин). Переезд (машина + 2 грузчика): <b>3 500 ₽/час</b> (1 500 ₽ машина + по 1 000 ₽ за грузчика).",
-        "special_desc": "Стандартная городская и междугородняя доставка грузов до 1.5–2 тонн"
+        "box1_title": "БЫСТРЫЙ ЗАКАЗ ПО ГОРОДУ",
+        "box1_price": "1 000 ₽",
+        "box1_desc": "Единый разовый рейс по Верхней Салде (до 30 минут без задержек)",
+        
+        "box2_title": "ПОЧАСОВАЯ ОПЛАТА АВТО",
+        "box2_price": "1 500 ₽ / час",
+        "box2_desc": "Включается при занятости автомобиля свыше 30 минут",
+        
+        "box3_title": "ПЕРЕЕЗД ПОД КЛЮЧ",
+        "box3_price": "3 500 ₽ / час",
+        "box3_desc": "Автомобиль 1 500 ₽/ч + 2 опытных грузчика (по 1 000 ₽/ч за чел)",
+        
+        "hourly_note": "Почасовая аренда авто: <b>1 500 ₽/час</b> (свыше 30 мин). Квартирный / офисный переезд: <b>3 500 ₽/час</b> (авто + 2 грузчика).",
+        "special_desc": "Городская и междугородняя перевозка грузов до 1.5–2 тонн"
     },
     {
         "filename": "apps/web/public/tarify_dostavka_gazel_6m.pdf",
+        "png_filename": "apps/web/public/tarify_dostavka_gazel_6m.png",
         "vehicle_badge": "АВТОМОБИЛЬ ГАЗЕЛЬ 6 МЕТРОВ (ДЛИННОМЕРЫ)",
         "multiplier": 1.5,
-        "zone1_price": 1050,
-        "zone2_price": 1500,
-        "zone3_price": 1800,
-        "hourly_note": "Почасовая аренда авто: <b>2 250 ₽/час</b> (включается при занятости свыше 30 мин). Перевозка длинномеров до 6м (2–3 палки бруса/доски/профиля) с обозначением негабарита (красный знак/флаг).",
+        "box1_title": "БЫСТРЫЙ ЗАКАЗ (ДО 30 МИН)",
+        "box1_price": "1 500 ₽",
+        "box1_desc": "Минимальный заказ на 4м авто (+50% к минималке от 1 000 ₽)",
+        
+        "box2_title": "ПОЧАСОВАЯ АРЕНДА АВТО",
+        "box2_price": "2 250 ₽ / час",
+        "box2_desc": "+50% к базовой ставке (при занятости авто свыше 30 минут)",
+        
+        "box3_title": "ПЕРЕВОЗКА НЕГАБАРИТА",
+        "box3_price": "3–4 палки бруса",
+        "box3_desc": "Доска, брус, профиль до 6м со спецзнаком негабарита (погрузка силами заказчика)",
+        
+        "hourly_note": "Почасовая аренда: <b>2 250 ₽/час</b> (свыше 30 мин). Перевозка 3–4 шт. бруса/доски до 6м на 4м машине с обозначением негабарита (красный знак/флаг).",
         "special_desc": "Экономичная перевозка длинномерного груза без заказа дорогой тяжелой спецтехники"
     },
     {
         "filename": "apps/web/public/tarify_dostavka_valday.pdf",
+        "png_filename": "apps/web/public/tarify_dostavka_valday.png",
         "vehicle_badge": "ГРУЗОВОЙ АВТОМОБИЛЬ ВАЛДАЙ / 5 ТОНН",
         "multiplier": 2.0,
-        "zone1_price": 1400,
-        "zone2_price": 2000,
-        "zone3_price": 2400,
-        "hourly_note": "Почасовая аренда авто: <b>3 000 ₽/час</b> (включается при занятости свыше 30 мин). Вместимость до 36 м³ (12 паллет), грузоподъёмность до 5 000 кг.",
+        "box1_title": "КОРОТКИЙ РЕЙС (ДО 30 МИН)",
+        "box1_price": "2 000 ₽",
+        "box1_desc": "Минимальная стоимость короткого рейса по городу (до 30 минут)",
+        
+        "box2_title": "СТАНДАРТНЫЙ РЕЙС / ЧАС",
+        "box2_price": "3 000 ₽ / час",
+        "box2_desc": "Меньше 3 000 ₽ нет рейса, кроме короткого до 30 мин за 2 000 ₽",
+        
+        "box3_title": "ВМЕСТИМОСТЬ И ПАРАМЕТРЫ",
+        "box3_price": "до 5 тонн • 36 м³",
+        "box3_desc": "Вместимость до 12 паллет, грузоподъёмность 5 000 кг (межгород от 70 ₽/км)",
+        
+        "hourly_note": "Стандартная ставка: <b>3 000 ₽/час</b> (минимальный рейс от 3 000 ₽, кроме короткого до 30 мин за <b>2 000 ₽</b>). Кузов до 36 м³, 12 паллет, до 5 тонн.",
         "special_desc": "Тяжелые объёмные партии грузов, промышленные поставки и крупные переезды"
     }
 ]
@@ -67,10 +98,8 @@ def format_price(val):
 def generate_html(config):
     mult = config["multiplier"]
     
-    # Split destinations into left (1..11) and right (12..21)
     left_rows = destinations_base[:11]
     right_rows = destinations_base[11:]
-    
     max_rows = max(len(left_rows), len(right_rows))
     
     table_rows_html = ""
@@ -103,7 +132,7 @@ def generate_html(config):
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Тарифы ancargo66.ru - {config['vehicle_badge']}</title>
+<title>Тарифы tk501.ru - {config['vehicle_badge']}</title>
 <style>
   @page {{
     size: 210mm 297mm;
@@ -153,15 +182,16 @@ def generate_html(config):
     letter-spacing: 0.3px;
   }}
   .doc-sub {{
-    font-size: 10px;
+    font-size: 10.5px;
     color: #475569;
     margin-top: 2px;
+    font-weight: 500;
   }}
   
-  /* 3 Boxes */
+  /* 3 Boxes - No zones, actual transparent rates */
   .zones-grid {{
     display: grid;
-    grid-template-columns: 1fr 1.2fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     margin-bottom: 10px;
   }}
@@ -177,14 +207,14 @@ def generate_html(config):
     background: #e0eefe;
   }}
   .zone-title {{
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 800;
     color: #1e3a8a;
     text-transform: uppercase;
     letter-spacing: 0.3px;
   }}
   .zone-price {{
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 900;
     color: #1d4ed8;
     margin: 1px 0;
@@ -293,8 +323,8 @@ def generate_html(config):
     margin-top: 4px;
     padding-top: 4px;
     border-top: 1px solid #e2e8f0;
-    font-size: 9px;
-    color: #64748b;
+    font-size: 9.5px;
+    color: #475569;
   }}
   .contacts-bar strong {{
     color: #0f172a;
@@ -305,27 +335,27 @@ def generate_html(config):
 
   <div class="header">
     <div class="org-title">ИП Нигамедьянов А.С.</div>
-    <div class="doc-title">ТАРИФЫ НА ДОСТАВКУ</div>
+    <div class="doc-title">ТАРИФЫ НА ГРУЗОПЕРЕВОЗКИ</div>
     <div class="doc-vehicle">{config['vehicle_badge']}</div>
-    <div class="doc-sub">Официальный прейскурант | Приложение к визуальной схеме зон доставки | ancargo66.ru</div>
+    <div class="doc-sub">Официальный прейскурант | Официальный сайт: <strong>tk501.ru</strong></div>
     <div class="doc-sub">({config['special_desc']})</div>
   </div>
 
   <div class="zones-grid">
-    <div class="zone-card">
-      <div class="zone-title">ЗОНА 1 (МАГАЗИНЫ-ПАРТНЁРЫ)</div>
-      <div class="zone-price">{format_price(config['zone1_price'])}</div>
-      <div class="zone-desc">ул. Ленина, Энгельса, К. Маркса, Воронова и др. (по договору)</div>
-    </div>
     <div class="zone-card main-zone">
-      <div class="zone-title">ПО ГОРОДУ (БЫСТРЫЙ ЗАКАЗ)</div>
-      <div class="zone-price">{format_price(config['zone2_price'])}</div>
-      <div class="zone-desc">Единый тариф по Верхней Салде (разовый рейс до 30 минут)</div>
+      <div class="zone-title">{config['box1_title']}</div>
+      <div class="zone-price">{config['box1_price']}</div>
+      <div class="zone-desc">{config['box1_desc']}</div>
     </div>
     <div class="zone-card">
-      <div class="zone-title">ЗОНА 3 (ОТДАЛЁННЫЙ СЕКТОР)</div>
-      <div class="zone-price">{format_price(config['zone3_price'])}</div>
-      <div class="zone-desc">Отдельный сектор города согласно утверждённой визуальной карте</div>
+      <div class="zone-title">{config['box2_title']}</div>
+      <div class="zone-price">{config['box2_price']}</div>
+      <div class="zone-desc">{config['box2_desc']}</div>
+    </div>
+    <div class="zone-card">
+      <div class="zone-title">{config['box3_title']}</div>
+      <div class="zone-price">{config['box3_price']}</div>
+      <div class="zone-desc">{config['box3_desc']}</div>
     </div>
   </div>
 
@@ -356,8 +386,7 @@ def generate_html(config):
     </div>
     <div class="contacts-bar">
       <div>Диспетчерская служба: <strong>+7 (963) 050-15-01</strong></div>
-      <div>Официальный сайт: <strong>ancargo66.ru</strong></div>
-      <div>Мессенджер MAX: <strong>@id660704814106_bot</strong></div>
+      <div>Официальный сайт: <strong>tk501.ru</strong></div>
       <div>Верхняя Салда • Актуально на 2026 г.</div>
     </div>
   </div>
@@ -387,9 +416,15 @@ def main():
                 print_background=True,
                 margin={"top": "8mm", "bottom": "8mm", "left": "10mm", "right": "10mm"}
             )
-            print(f"Generated {var['filename']}, size: {os.path.getsize(var['filename'])} bytes")
+            print(f"Generated PDF: {var['filename']}, size: {os.path.getsize(var['filename'])} bytes")
             if os.path.exists(temp_html):
                 os.remove(temp_html)
+                
+            # Render high-resolution preview image (.png)
+            doc = fitz.open(var["filename"])
+            pix = doc[0].get_pixmap(dpi=150)
+            pix.save(var["png_filename"])
+            print(f"Generated Image Preview: {var['png_filename']}, size: {os.path.getsize(var['png_filename'])} bytes")
                 
         browser.close()
 

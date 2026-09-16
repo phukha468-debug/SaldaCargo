@@ -275,14 +275,10 @@
         <i data-lucide="phone-call" class="w-4 h-4"></i>
         <span>Позвонить: 8 (963) 050-15-01</span>
       </a>
-      <div class="grid grid-cols-2 gap-2">
-        <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
-          <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
-          <span>Мессенджер MAX</span>
-        </a>
-        <button type="button" onclick="copyFullRequisites()" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+      <div>
+        <button type="button" onclick="copyFullRequisites()" class="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
           <i data-lucide="copy" class="w-3.5 h-3.5 text-brand-400"></i>
-          <span>Реквизиты ИП</span>
+          <span>Скопировать реквизиты ИП</span>
         </button>
       </div>
     </div>
@@ -384,12 +380,6 @@
               <a href="#contact" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm active:scale-95 transition">
                 <i data-lucide="send" class="w-4 h-4 text-brand-400"></i>
                 <span>Оставить заявку на рейс</span>
-              </a>
-
-              <!-- Кнопка 4: Написать в MAX бот -->
-              <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600/90 hover:bg-blue-600 border border-blue-500/40 text-white font-bold text-xs sm:text-sm active:scale-95 transition">
-                <i data-lucide="message-square" class="w-4 h-4"></i>
-                <span>Написать в MAX бот</span>
               </a>
 
             </div>
@@ -1125,22 +1115,25 @@
                 </div>
               </div>
             </div>
-            <a href="/calc.html" class="w-full py-2.5 px-3 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 text-center text-xs font-black text-orange-400 hover:text-white transition block">
-              Поштучный расчёт ПРР →
-            </a>
+            <div class="space-y-1.5">
+              <a href="#calculator" class="w-full py-2.5 px-3 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 text-center text-xs font-black text-brand-400 hover:text-white transition block">
+                Рассчитать переезд с грузчиками →
+              </a>
+              <p class="text-[10px] text-slate-400 text-center">Поштучный расчёт ПРР для магазинов-партнёров по договору</p>
+            </div>
           </div>
 
         </div>
 
-        <!-- 📥 СКАЧАТЬ ОФИЦИАЛЬНЫЕ ПРАЙС-ЛИСТЫ (PDF) -->
+        <!-- 📥 СКАЧАТЬ ОФИЦИАЛЬНЫЕ ПРАЙС-ЛИСТЫ (ПРОСМОТР И PDF) -->
         <div class="pt-4 border-t border-slate-800 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 class="text-lg font-black text-white flex items-center gap-2">
-                <i data-lucide="download" class="w-5 h-5 text-brand-400"></i>
-                <span>Официальные прейскуранты и регламенты (скачать PDF)</span>
+                <i data-lucide="file-text" class="w-5 h-5 text-brand-400"></i>
+                <span>Официальные прейскуранты службы перевозок</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-0.5">Утверждённые документы с печатями ИП Нигамедьянов А.С. для договоров и бухгалтерии</p>
+              <p class="text-xs text-slate-400 mt-0.5">Утверждённые документы ИП Нигамедьянов А.С. Нажмите на превью для увеличения или скачайте PDF с печатью</p>
             </div>
             <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 self-start sm:self-auto">Актуально на 2026 г.</span>
           </div>
@@ -1150,82 +1143,79 @@
             <span>Внимание: Окончательный расчёт стоимости перевозки и рейсов согласовывается с диспетчером службы: <b>+7 (963) 050-15-01</b></span>
           </div>
 
-          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             
             <!-- Документ 1: Стандартная ГАЗель -->
-            <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="truck" class="w-5 h-5"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-white group-hover:text-blue-300 transition-colors">Тарифы: ГАЗель (до 3–4м)</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Город 1000 ₽, пригород, Басьяновский 5000 ₽</div>
-                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-blue-400">
-                  <span>PDF • 135 КБ</span>
-                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
+            <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
+              <div class="space-y-3">
+                <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[3/4] max-h-72 flex items-center justify-center" onclick="openLightbox('/tarify_dostavka_salda.png', 'Прейскурант: ГАЗель (до 3–4м)')">
+                  <img src="/tarify_dostavka_salda.png" alt="Прейскурант ГАЗель 3-4м" class="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300">
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
+                    <i data-lucide="zoom-in" class="w-5 h-5 text-brand-400"></i>
+                    <span>Увеличить фото</span>
+                  </div>
+                  <div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-brand-400 border border-brand-500/30">
+                    Нажмите для просмотра
+                  </div>
+                </div>
+                <div>
+                  <div class="text-sm font-black text-white group-hover:text-brand-300 transition-colors">Тарифы: ГАЗель (до 3–4м)</div>
+                  <div class="text-[11px] text-slate-400 mt-1 leading-relaxed">Быстрый заказ 1 000 ₽ (до 30 мин), почасовая 1 500 ₽/ч, переезд под ключ 3 500 ₽/ч</div>
                 </div>
               </div>
-            </a>
+              <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition">
+                <i data-lucide="download" class="w-4 h-4 text-blue-400"></i>
+                <span>Скачать PDF с печатью</span>
+              </a>
+            </div>
 
             <!-- Документ 2: ГАЗель 6м -->
-            <a href="/tarify_dostavka_gazel_6m.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="maximize" class="w-5 h-5"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">Тарифы: ГАЗель 6 метров</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Длинномеры до 6м, город 1500 ₽, пригород +50%</div>
-                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-indigo-400">
-                  <span>PDF • 135 КБ</span>
-                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
+            <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
+              <div class="space-y-3">
+                <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[3/4] max-h-72 flex items-center justify-center" onclick="openLightbox('/tarify_dostavka_gazel_6m.png', 'Прейскурант: ГАЗель 6 метров (длинномеры)')">
+                  <img src="/tarify_dostavka_gazel_6m.png" alt="Прейскурант ГАЗель 6м" class="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300">
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
+                    <i data-lucide="zoom-in" class="w-5 h-5 text-indigo-400"></i>
+                    <span>Увеличить фото</span>
+                  </div>
+                  <div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-indigo-400 border border-indigo-500/30">
+                    Нажмите для просмотра
+                  </div>
+                </div>
+                <div>
+                  <div class="text-sm font-black text-white group-hover:text-indigo-300 transition-colors">Тарифы: ГАЗель 6 метров</div>
+                  <div class="text-[11px] text-slate-400 mt-1 leading-relaxed">Длинномеры до 6м (2–3 палки бруса с красным флажком). Город 1 500 ₽, почасовая 2 250 ₽/ч</div>
                 </div>
               </div>
-            </a>
+              <a href="/tarify_dostavka_gazel_6m.pdf" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition">
+                <i data-lucide="download" class="w-4 h-4 text-indigo-400"></i>
+                <span>Скачать PDF с печатью</span>
+              </a>
+            </div>
 
             <!-- Документ 3: Валдай 5т -->
-            <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="container" class="w-5 h-5"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">Тарифы: Валдай / 5 тонн</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Кузов до 36 м³, город 2000 ₽, пригород х2</div>
-                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-purple-400">
-                  <span>PDF • 136 КБ</span>
-                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
+            <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md sm:col-span-2 lg:col-span-1">
+              <div class="space-y-3">
+                <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[3/4] max-h-72 flex items-center justify-center" onclick="openLightbox('/tarify_dostavka_valday.png', 'Прейскурант: Валдай / Fuso до 5 тонн')">
+                  <img src="/tarify_dostavka_valday.png" alt="Прейскурант Валдай 5т" class="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300">
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
+                    <i data-lucide="zoom-in" class="w-5 h-5 text-purple-400"></i>
+                    <span>Увеличить фото</span>
+                  </div>
+                  <div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-purple-400 border border-purple-500/30">
+                    Нажмите для просмотра
+                  </div>
+                </div>
+                <div>
+                  <div class="text-sm font-black text-white group-hover:text-purple-300 transition-colors">Тарифы: Валдай / 5 тонн</div>
+                  <div class="text-[11px] text-slate-400 mt-1 leading-relaxed">Большой кузов 36 м³ (12–15 паллет). Короткий рейс 2 000 ₽ (до 30 мин), почасовая 3 000 ₽/ч</div>
                 </div>
               </div>
-            </a>
-
-            <!-- Документ 4: Единые тарифы для магазинов -->
-            <a href="/universal_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="store" class="w-5 h-5"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-white group-hover:text-brand-300 transition-colors">Единые тарифы магазинов-партнёров</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Спецтариф от 700 ₽ + поштучный ПРР стройматериалов</div>
-                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-brand-400">
-                  <span>PDF • 133 КБ</span>
-                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
-                </div>
-              </div>
-            </a>
-
-            <!-- Документ 5: Мебельный регламент -->
-            <a href="/mebel_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 transition group flex items-start gap-3.5 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <i data-lucide="sofa" class="w-5 h-5"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">Классификатор тарифов для мебели</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Поштучные нормы подъёма диванов, шкафов, кухонь</div>
-                <div class="flex items-center gap-2 mt-2 text-[10px] font-mono text-emerald-400">
-                  <span>PDF • 130 КБ</span>
-                  <span class="group-hover:translate-x-1 transition-transform">Скачать ↓</span>
-                </div>
-              </div>
-            </a>
+              <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition">
+                <i data-lucide="download" class="w-4 h-4 text-purple-400"></i>
+                <span>Скачать PDF с печатью</span>
+              </a>
+            </div>
 
           </div>
         </div>
@@ -1340,7 +1330,7 @@
               Связь с перевозчиком
             </h2>
             <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Свяжитесь напрямую с руководителем по телефону, через мессенджер МАКС или заполните заявку — ответим в течение 10 минут.
+              Свяжитесь напрямую с диспетчером по телефону или заполните онлайн-заявку — перезвоним в течение 10 минут для согласования всех деталей.
             </p>
 
             <div class="space-y-3 pt-1">
@@ -1350,7 +1340,7 @@
                   <i data-lucide="phone-call" class="w-5 h-5"></i>
                 </div>
                 <div>
-                  <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Телефон руководителя (круглосуточно):</div>
+                  <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Телефон диспетчера (круглосуточно):</div>
                   <div class="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">+7 (963) 050-15-01</div>
                 </div>
               </a>
@@ -1365,12 +1355,6 @@
                   <div class="text-sm sm:text-base font-bold text-white font-mono">uralavto707@mail.ru</div>
                 </div>
               </a>
-
-              <!-- Мессенджер МАКС -->
-              <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2.5 p-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm transition shadow-lg shadow-blue-900/40 w-full active:scale-95">
-                <i data-lucide="message-square" class="w-4 h-4"></i>
-                <span>Написать в MAX бот (@id660704814106_bot)</span>
-              </a>
             </div>
           </div>
 
@@ -1382,28 +1366,6 @@
                 <span class="text-[11px] text-brand-400 font-bold">⚡ Ответ за 10 мин</span>
               </div>
               <p class="text-xs text-slate-400 -mt-2">Заполните имя и телефон — диспетчер оперативно свяжется с вами</p>
-
-              <!-- Выбор канала отправки (MAX или E-mail) -->
-              <div>
-                <label class="block text-[11px] font-bold text-slate-300 mb-1.5">Куда отправить заявку: <span class="text-amber-400">*</span></label>
-                <div class="grid grid-cols-2 gap-2">
-                  <label id="channel-card-max" class="flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-blue-500 bg-blue-500/15 text-white font-bold shadow-md">
-                    <input type="radio" name="send-channel" id="channel-max" value="max" checked class="hidden" onchange="setSendChannel('max')">
-                    <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white flex-shrink-0">
-                      <i data-lucide="message-square" class="w-4 h-4"></i>
-                    </div>
-                    <span class="text-xs sm:text-sm font-bold">В мессенджер MAX</span>
-                  </label>
-
-                  <label id="channel-card-email" class="flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700">
-                    <input type="radio" name="send-channel" id="channel-email" value="email" class="hidden" onchange="setSendChannel('email')">
-                    <div class="w-8 h-8 rounded-xl bg-amber-600/30 text-amber-400 flex items-center justify-center flex-shrink-0">
-                      <i data-lucide="mail" class="w-4 h-4"></i>
-                    </div>
-                    <span class="text-xs sm:text-sm font-bold">На E-mail</span>
-                  </label>
-                </div>
-              </div>
 
               <!-- Обязательные поля: Имя и Телефон (с прозрачными квадратиками) -->
               <div class="space-y-3">
@@ -1494,9 +1456,24 @@
                 <textarea id="form-comment" rows="2" placeholder="Характер груза, вес, дата, комментарии..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-xs sm:text-sm focus:border-brand-500 focus:outline-none transition"></textarea>
               </div>
 
-              <button type="submit" id="form-submit-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-900/40 transition transform active:scale-95 flex items-center justify-center gap-2">
-                <i id="btn-submit-icon" data-lucide="message-square" class="w-4 h-4"></i>
-                <span id="btn-submit-text">Отправить заявку в мессенджер MAX</span>
+              <!-- 💰 Блок предварительного расчёта и подтверждения диспетчера -->
+              <div id="form-price-box" class="p-4 rounded-2xl bg-gradient-to-r from-brand-500/15 via-amber-500/15 to-orange-500/10 border-2 border-brand-500/40 space-y-2.5 shadow-lg">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-4 h-4 text-brand-400"></i>
+                    <span class="text-xs font-bold text-slate-200">Предварительный расчёт стоимости:</span>
+                  </div>
+                  <span id="form-display-price" class="text-xl sm:text-2xl font-black text-brand-400 font-mono">от 1 000 ₽</span>
+                </div>
+                <div class="flex items-start gap-2 pt-2 border-t border-brand-500/20 text-xs text-amber-200/95 leading-snug">
+                  <i data-lucide="phone-forwarded" class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5"></i>
+                  <span><b>Диспетчер свяжется с вами по телефону в ближайшее время</b> и зафиксирует точную сумму, время подачи и назначенный автомобиль.</span>
+                </div>
+              </div>
+
+              <button type="submit" id="form-submit-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-xl shadow-brand-900/40 transition transform active:scale-95 flex items-center justify-center gap-2">
+                <i id="btn-submit-icon" data-lucide="send" class="w-4 h-4"></i>
+                <span id="btn-submit-text">Отправить онлайн-заявку на рейс</span>
               </button>
             </form>
           </div>
@@ -1512,7 +1489,7 @@
   <!-- 🗂️ МОДАЛЬНЫЕ ОКНА ДЛЯ ДОПОЛНИТЕЛЬНЫХ РАЗДЕЛОВ (ДОСТУПНЫ ЧЕРЕЗ МЕНЮ) -->
   <!-- ========================================================================= -->
 
-  <!-- Модальное окно: Успешная отправка заявки в MAX-бот -->
+  <!-- Модальное окно: Успешная отправка заявки -->
   <div id="success-order-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
     <div class="theme-card max-w-lg w-full rounded-3xl p-6 sm:p-8 space-y-5 border border-emerald-500/50 shadow-2xl relative my-auto text-center">
       <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/50">
@@ -1523,7 +1500,7 @@
         <span id="modal-order-badge" class="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono font-black text-xs inline-block mb-2">ЗАЯВКА ПРИНЯТА</span>
         <h3 id="modal-order-title" class="text-xl sm:text-2xl font-black text-white">Заявка успешно отправлена!</h3>
         <p class="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
-          Информация моментально передана диспетчеру через официальный <strong class="text-white">MAX-бот (@id660704814106_bot)</strong>. Диспетчер свяжется с вами по указанному телефону в течение 10 минут.
+          Информация моментально передана диспетчерской службе. <b>Диспетчер свяжется с вами по указанному телефону в ближайшее время</b> и зафиксирует точную сумму, время подачи и назначенный автомобиль.
         </p>
       </div>
 
@@ -1532,13 +1509,9 @@
         <!-- динамически заполняется -->
       </div>
 
-      <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
-        <a id="modal-open-bot-btn" href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="flex-1 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40 active:scale-95 transition">
-          <i data-lucide="message-square" class="w-4 h-4"></i>
-          <span>Открыть чат с MAX ботом</span>
-        </a>
-        <button type="button" onclick="closeSuccessModal()" class="py-3.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs sm:text-sm border border-slate-700 active:scale-95 transition">
-          Закрыть
+      <div class="pt-2">
+        <button type="button" onclick="closeSuccessModal()" class="w-full py-3.5 px-5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm shadow-lg shadow-brand-900/40 active:scale-95 transition">
+          Понятно, спасибо
         </button>
       </div>
     </div>
@@ -1623,7 +1596,7 @@
       <!-- Ссылки на PDF -->
       <div class="space-y-2 pt-1">
         <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Официальные прайсы в PDF (скачать):</div>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+        <div class="grid sm:grid-cols-3 gap-2 text-xs">
           <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 flex items-center gap-2 text-slate-200 hover:text-blue-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
             <span class="truncate">ГАЗель до 3–4м (PDF)</span>
@@ -1635,14 +1608,6 @@
           <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/50 flex items-center gap-2 text-slate-200 hover:text-purple-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
             <span class="truncate">Валдай до 5 тонн (PDF)</span>
-          </a>
-          <a href="/universal_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-brand-500/50 flex items-center gap-2 text-slate-200 hover:text-brand-300 transition">
-            <i data-lucide="download" class="w-4 h-4 text-brand-400 flex-shrink-0"></i>
-            <span class="truncate">Тарифы магазинов (PDF)</span>
-          </a>
-          <a href="/mebel_tarify_ancargo66.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 flex items-center gap-2 text-slate-200 hover:text-emerald-300 transition">
-            <i data-lucide="download" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-            <span class="truncate">Тарифы на мебель (PDF)</span>
           </a>
         </div>
       </div>
@@ -1765,7 +1730,7 @@
     </a>
 
     <!-- 3. ЗАЯВКА -->
-    <a href="#contact" class="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-blue-600 text-white active:scale-95 transition shadow-md">
+    <a href="#contact" class="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-brand-600 text-white active:scale-95 transition shadow-md">
       <i data-lucide="send" class="w-4 h-4 mb-0.5"></i>
       <span class="text-[11px] font-black">Заявка</span>
     </a>
@@ -1782,7 +1747,7 @@
         <div class="text-[11px] text-slate-500 mt-0.5">ИНН 660704814106 • ОГРНИП 321665800053976 • Верхняя Салда • Без НДС (УСН)</div>
       </div>
       <div class="text-[11px] text-slate-400">
-        © 2026 ancargo66.ru. Все права защищены.
+        © 2026 tk501.ru. Все права защищены.
       </div>
     </div>
   </footer>
@@ -2457,9 +2422,16 @@ Email: uralavto707@mail.ru
       document.getElementById('form-to').value = toPlace;
       document.getElementById('form-comment').value = comment;
 
+      const calcTotal = document.getElementById('calc-total-price');
+      const formDisplay = document.getElementById('form-display-price');
+      if (calcTotal && formDisplay) {
+        const pText = calcTotal.innerText.trim();
+        formDisplay.innerText = pText.includes('₽') ? pText : pText + ' ₽';
+      }
+
       document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
       document.getElementById('form-name').focus();
-      showToast('Параметры рейса подставлены в форму заявки!');
+      showToast('Параметры рейса и расчёт подставлены в форму заявки!');
     }
 
     // 8. Управление выбором канала отправки (MAX / E-mail), маска телефона в квадратиках и отправка формы
@@ -2675,119 +2647,75 @@ Email: uralavto707@mail.ru
       const submitBtn = document.getElementById('form-submit-btn');
       const submitBtnText = document.getElementById('btn-submit-text');
 
-      if (currentSendChannel === 'max') {
-        const originalText = submitBtnText.innerText;
-        submitBtn.disabled = true;
-        submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
-        submitBtnText.innerHTML = 'Отправка заявки боту MAX...';
+      const originalText = submitBtnText.innerText;
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+      submitBtnText.innerHTML = 'Отправка заявки диспетчеру...';
 
-        const payload = {
-          orderSource: 'website',
-          storeName: 'Сайт ancargo66.ru',
-          name: name,
-          clientName: name,
-          phone: formattedPhone,
-          clientPhone: formattedPhone,
-          from: from,
-          pickupAddress: from,
-          to: to,
-          deliveryAddress: to,
-          notes: comment
-        };
+      const payload = {
+        orderSource: 'website',
+        storeName: 'Сайт tk501.ru',
+        name: name,
+        clientName: name,
+        phone: formattedPhone,
+        clientPhone: formattedPhone,
+        from: from,
+        pickupAddress: from,
+        to: to,
+        deliveryAddress: to,
+        notes: comment
+      };
 
-        const API_ENDPOINTS = [
-          'https://app.ancargo66.ru/api/public/delivery-order',
-          'https://app.tk501.ru/api/public/delivery-order'
-        ];
+      const API_ENDPOINTS = [
+        'https://app.ancargo66.ru/api/public/delivery-order',
+        'https://app.tk501.ru/api/public/delivery-order'
+      ];
 
-        let sentSuccess = false;
-        let responseOrderNumber = `№${Date.now().toString().slice(-4)}`;
+      let sentSuccess = false;
+      let responseOrderNumber = `№${Date.now().toString().slice(-4)}`;
 
-        for (const endpoint of API_ENDPOINTS) {
-          try {
-            const resp = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-            if (resp.ok) {
-              const resData = await resp.json().catch(() => ({}));
-              if (resData && resData.orderNumber) {
-                responseOrderNumber = resData.orderNumber;
-              }
-              sentSuccess = true;
-              break;
-            }
-          } catch (err) {
-            console.warn(`Отправка на ${endpoint} не удалась:`, err);
-          }
-        }
-
-        // Возвращаем кнопку в активное состояние
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-        submitBtnText.innerText = originalText;
-
-        if (sentSuccess) {
-          openSuccessModal({
-            orderNumber: responseOrderNumber,
-            name: name,
-            phone: formattedPhone,
-            from: from,
-            to: to,
-            comment: comment
+      for (const endpoint of API_ENDPOINTS) {
+        try {
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
           });
-
-          // Очистка полей формы
-          document.getElementById('form-name').value = '';
-          document.getElementById('form-comment').value = '';
-          phoneDigits = '';
-          const rawInput = document.getElementById('form-phone-raw');
-          if (rawInput) rawInput.value = '';
-          updateBoxesVisuals();
-          validatePhoneState();
-        } else {
-          // Резервный переход к официальному боту компании
-          const fallbackText = `Здравствуйте! Заявка на грузоперевозку:
-
-👤 Клиент: ${name}
-📞 Телефон: ${formattedPhone}
-📍 Откуда: ${from}
-🏁 Куда: ${to}
-📋 Детали/расчет: ${comment}
-
-Сайт ancargo66.ru`;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(fallbackText).catch(() => {});
+          if (resp.ok) {
+            const resData = await resp.json().catch(() => ({}));
+            if (resData && resData.orderNumber) {
+              responseOrderNumber = resData.orderNumber;
+            }
+            sentSuccess = true;
+            break;
           }
-          showToast('Заявка скопирована! Открываем чат с MAX ботом...');
-          setTimeout(() => {
-            window.open('https://max.ru/id660704814106_bot', '_blank');
-          }, 500);
+        } catch (err) {
+          console.warn(`Отправка на ${endpoint} не удалась:`, err);
         }
-      } else {
-        // Отправка по E-mail
-        const emailSubject = `Заявка на перевозку — ${name} (${formattedPhone})`;
-        const messageText = `Здравствуйте! Заявка на грузоперевозку (ИП Нигамедьянов):
-
-` +
-          `👤 Клиент: ${name}
-` +
-          `📞 Телефон: ${formattedPhone}
-` +
-          `📍 Маршрут: ${from} ➔ ${to}
-` +
-          `📋 Детали и расчет: ${comment}
-
-` +
-          `Отправлено с сайта ancargo66.ru`;
-        const mailtoUrl = `mailto:uralavto707@mail.ru?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
-        
-        showToast('Заявка сформирована! Открываем почтовую программу...');
-        setTimeout(() => {
-          window.location.href = mailtoUrl;
-        }, 600);
       }
+
+      // Возвращаем кнопку в активное состояние
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+      submitBtnText.innerText = originalText;
+
+      openSuccessModal({
+        orderNumber: responseOrderNumber,
+        name: name,
+        phone: formattedPhone,
+        from: from,
+        to: to,
+        comment: comment
+      });
+
+      // Очистка полей формы
+      document.getElementById('form-name').value = '';
+      document.getElementById('form-comment').value = '';
+      phoneDigits = '';
+      const rawInput = document.getElementById('form-phone-raw');
+      if (rawInput) rawInput.value = '';
+      updateBoxesVisuals();
+      validatePhoneState();
     }
 
     // Инициализация
