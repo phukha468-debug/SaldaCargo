@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark scroll-smooth overflow-x-hidden">
+<html lang="ru" class="scroll-smooth overflow-x-hidden">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -69,6 +69,247 @@
     .pulse-glow {
       box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
     }
+  
+    /* ================= СВЕТЛАЯ ТЕМА 2: ТЕПЛЫЙ ИНДУСТРИАЛЬНЫЙ КАРГО (WARM CARGO & AMBER) ================= */
+    :root {
+      color-scheme: light;
+    }
+    body {
+      background-color: #fafaf9 !important;
+      color: #1c1917 !important;
+    }
+    ::-webkit-scrollbar-track { background: #f5f5f4; }
+    ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #ea580c; }
+
+    /* Базовые карточки-блоки с теплыми тенями */
+    .theme-card {
+      background: #ffffff !important;
+      border: 1px solid #e7e5e4 !important;
+      box-shadow: 0 8px 24px -4px rgba(234, 88, 12, 0.07), 0 2px 8px -1px rgba(28, 25, 23, 0.03) !important;
+      color: #1c1917 !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    .theme-card-hover:hover {
+      border-color: #ea580c !important;
+      transform: translateY(-3px) !important;
+      box-shadow: 0 20px 35px -8px rgba(234, 88, 12, 0.18), 0 8px 16px -4px rgba(28, 25, 23, 0.05) !important;
+      background: #ffffff !important;
+    }
+
+    /* Заголовки и тексты */
+    h1, h2, h3, h4, .text-white {
+      color: #1c1917 !important;
+    }
+    .text-slate-300, .text-slate-200 {
+      color: #44403c !important;
+    }
+    .text-slate-400 {
+      color: #78716c !important;
+    }
+
+    /* Секции */
+    section {
+      background-color: #fafaf9 !important;
+    }
+    section:nth-of-type(even) {
+      background-color: #ffffff !important;
+    }
+    .bg-dark-950, .bg-dark-900 {
+      background-color: transparent !important;
+    }
+    .bg-slate-900, .bg-dark-800 {
+      background-color: #ffffff !important;
+      color: #1c1917 !important;
+    }
+    .bg-slate-900\/80, .bg-slate-800\/80, .bg-slate-800\/60, .bg-slate-900\/70 {
+      background-color: #ffffff !important;
+      border-color: #e7e5e4 !important;
+      color: #1c1917 !important;
+    }
+
+    /* Рамки */
+    .border-slate-800, .border-slate-700 {
+      border-color: #e7e5e4 !important;
+    }
+
+    /* Хедер */
+    header {
+      background: rgba(250, 250, 249, 0.96) !important;
+      border-bottom: 1.5px solid #e7e5e4 !important;
+      box-shadow: 0 4px 20px -4px rgba(28, 25, 23, 0.05) !important;
+    }
+    header a.text-slate-300, header a.text-slate-200 {
+      color: #44403c !important;
+    }
+    header a.text-slate-300:hover, header a.text-slate-200:hover {
+      color: #ea580c !important;
+      background-color: #fff7ed !important;
+    }
+
+    /* Плашки доверия под главным оффером */
+    #hero .grid.grid-cols-2 > div, #hero .grid.grid-cols-4 > div, #hero .bg-slate-800 {
+      background: #ffffff !important;
+      border: 1px solid #e7e5e4 !important;
+      box-shadow: 0 2px 8px rgba(234, 88, 12, 0.05) !important;
+      color: #1c1917 !important;
+    }
+    #hero .bg-slate-800 * {
+      color: #1c1917 !important;
+    }
+    #hero .bg-slate-800 .text-slate-400 {
+      color: #78716c !important;
+    }
+
+    /* Калькулятор: кнопки выбора направлений и категорий */
+    #calculator button, #dest-grid button, #dest-grid-town button {
+      background-color: #ffffff !important;
+      border: 1.5px solid #d6d3d1 !important;
+      color: #1c1917 !important;
+      box-shadow: 0 1px 3px rgba(28, 25, 23, 0.03) !important;
+    }
+    #calculator button:hover, #dest-grid button:hover, #dest-grid-town button:hover {
+      border-color: #ea580c !important;
+      background-color: #fff7ed !important;
+    }
+    #calculator .border-brand-500, #dest-grid .border-brand-500, #dest-grid-town .border-brand-500 {
+      background-color: #fff7ed !important;
+      border-color: #ea580c !important;
+      color: #c2410c !important;
+      box-shadow: 0 4px 12px rgba(234, 88, 12, 0.15) !important;
+    }
+    #calculator .border-brand-500 span, #calculator .border-brand-500 div {
+      color: #c2410c !important;
+    }
+    #calculator .bg-slate-900, #calculator .bg-dark-900, #calculator .bg-slate-800 {
+      background-color: #ffffff !important;
+      border-color: #e7e5e4 !important;
+      color: #1c1917 !important;
+    }
+    #calculator .text-slate-400, #calculator .text-slate-300 {
+      color: #57534e !important;
+    }
+
+    /* Чекбоксы опций (Срочно, Растентовка) */
+    label.cursor-pointer, .grid label {
+      background-color: #ffffff !important;
+      border: 1.5px solid #d6d3d1 !important;
+      color: #1c1917 !important;
+      box-shadow: 0 1px 3px rgba(28, 25, 23, 0.03) !important;
+    }
+    label.cursor-pointer:hover, .grid label:hover {
+      border-color: #ea580c !important;
+      background-color: #fff7ed !important;
+    }
+    label.cursor-pointer span.text-white {
+      color: #1c1917 !important;
+    }
+
+    /* Плашка радиуса грузчиков */
+    .bg-emerald-500\/10 {
+      background-color: #f0fdf4 !important;
+      border-color: #bbf7d0 !important;
+      color: #166534 !important;
+    }
+    .bg-emerald-500\/10 * {
+      color: #166534 !important;
+    }
+
+    /* Кнопки переключения грузчиков 0,1,2,3... */
+    #calculator button[onclick*="setLoaders"], #calculator button[onclick*="setUnloaders"] {
+      background-color: #f5f5f4 !important;
+      border: 1px solid #d6d3d1 !important;
+      color: #1c1917 !important;
+    }
+
+    /* Итоговая карточка расчета (Теплый белый карго-блок с оранжевой рамкой) */
+    .md\:col-span-5.bg-gradient-to-b {
+      background: #ffffff !important;
+      border: 2.5px solid #ea580c !important;
+      box-shadow: 0 15px 35px -5px rgba(234, 88, 12, 0.16) !important;
+      color: #1c1917 !important;
+    }
+    .md\:col-span-5.bg-gradient-to-b h3, .md\:col-span-5.bg-gradient-to-b .text-white {
+      color: #1c1917 !important;
+    }
+    .md\:col-span-5.bg-gradient-to-b #calc-total-price {
+      color: #ea580c !important;
+    }
+    .md\:col-span-5.bg-gradient-to-b #calc-total-price + span {
+      color: #ea580c !important;
+    }
+    .md\:col-span-5.bg-gradient-to-b .text-slate-400, .md\:col-span-5.bg-gradient-to-b .text-slate-300 {
+      color: #57534e !important;
+    }
+    .md\:col-span-5.bg-gradient-to-b .text-brand-400, .md\:col-span-5.bg-gradient-to-b b.text-brand-400 {
+      color: #ea580c !important;
+    }
+    .md\:col-span-5.bg-gradient-to-b button {
+      background: linear-gradient(135deg, #ea580c, #f97316) !important;
+      color: #ffffff !important;
+      font-weight: 900 !important;
+      box-shadow: 0 10px 25px -4px rgba(234, 88, 12, 0.35) !important;
+    }
+
+    /* Основные кнопки действий */
+    .bg-gradient-to-r.from-brand-600 {
+      background: linear-gradient(135deg, #ea580c, #f97316) !important;
+      color: #ffffff !important;
+    }
+
+    /* Инпуты формы заявки */
+    input, select, textarea {
+      background-color: #ffffff !important;
+      border: 1.5px solid #d6d3d1 !important;
+      color: #1c1917 !important;
+    }
+    input:focus, select:focus, textarea:focus {
+      background-color: #ffffff !important;
+      border-color: #ea580c !important;
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15) !important;
+    }
+
+    /* Блок ввода номера телефона в форме */
+    .phone-box, .digit-box, [id*="digit"], #phone-container, .phone-grid {
+      background-color: #ffffff !important;
+      border: 1.5px solid #d6d3d1 !important;
+      color: #1c1917 !important;
+    }
+    #form-phone-raw {
+      background: #ffffff !important;
+      color: #1c1917 !important;
+      border: 1.5px solid #d6d3d1 !important;
+    }
+
+    /* Реквизиты: нижние плашки (ЭДО, Безнал, АТИ) */
+    #requisites .grid.grid-cols-3 > div, #requisites .bg-slate-900, #requisites .bg-dark-900 {
+      background: #ffffff !important;
+      border: 1.5px solid #e7e5e4 !important;
+      color: #1c1917 !important;
+      box-shadow: 0 2px 6px rgba(28, 25, 23, 0.03) !important;
+    }
+    #requisites .grid.grid-cols-3 > div * {
+      color: #1c1917 !important;
+    }
+    #requisites .grid.grid-cols-3 > div .text-slate-400 {
+      color: #78716c !important;
+    }
+
+    /* Мобильное меню (Drawer) */
+    #mobile-drawer {
+      background: rgba(250, 250, 249, 0.98) !important;
+      color: #1c1917 !important;
+    }
+    #mobile-drawer a, #mobile-drawer button {
+      background: #ffffff !important;
+      border: 1px solid #e7e5e4 !important;
+      color: #1c1917 !important;
+    }
+    #mobile-drawer .text-white {
+      color: #1c1917 !important;
+    }
+    
   </style>
 </head>
 <body class="bg-dark-900 text-slate-200 antialiased selection:bg-brand-600 selection:text-white relative overflow-x-hidden pb-20 lg:pb-0 w-full">
@@ -286,7 +527,22 @@
   </div>
 
   <!-- ==================== 📌 ЗАФИКСИРОВАННЫЙ ХЕДЕР (ПРИ СКРОЛЛЕ ВСЕГДА СВЕРХУ) ==================== -->
-  <header class="fixed top-0 left-0 right-0 z-40 bg-dark-950/95 backdrop-blur-xl border-b border-slate-800 w-full transition-all shadow-xl">
+  
+  <!-- 🎨 ПЕРЕКЛЮЧАТЕЛЬ ДИЗАЙНОВ ДЛЯ ОЦЕНКИ -->
+  <div class="sticky top-0 z-50 bg-stone-900 text-white px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between text-xs border-b border-stone-800 shadow-xl">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-orange-400 animate-pulse"></span>
+      <span class="font-black text-amber-400 uppercase tracking-wide">ДИЗАЙН 2 (СВЕТЛЫЙ):</span>
+      <span class="text-stone-200 font-semibold">Тёплый Индустриальный Карго (Warm Cargo & Amber)</span>
+    </div>
+    <div class="flex items-center gap-2 mt-2 sm:mt-0 font-bold">
+      <a href="/index.html" class="px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition">🌙 Текущий тёмный</a>
+      <a href="/light-design-1.html" class="px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition">💎 Вариант 1 (Nordic)</a>
+      <a href="/light-design-2.html" class="px-3 py-1 rounded-lg bg-orange-600 text-white border border-orange-400 shadow transition">🔥 Вариант 2 (Cargo)</a>
+    </div>
+  </div>
+    
+  <header class="sticky top-0 left-0 right-0 z-40 bg-dark-950/95 backdrop-blur-xl border-b border-slate-800 w-full transition-all shadow-xl">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-14 sm:h-20 gap-3">
         
@@ -355,7 +611,7 @@
   </header>
 
   <!-- Отступ сверху равный высоте фиксированного хедера -->
-  <main class="w-full pt-14 sm:pt-20">
+  <main class="w-full pt-2 sm:pt-4">
 
     <!-- ========================================================================= -->
     <!-- 1. ГЛАВНАЯ СТРАНИЦА (HERO) — МАКСИМАЛЬНО КОНВЕРСИОННАЯ С КЛИКАБЕЛЬНЫМИ CTA -->
@@ -1165,7 +1421,7 @@
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_salda.png', 'Прейскурант: ГАЗель (до 3–4м)')">
-                  <img src="/tarify_dostavka_salda.png" alt="Прейскурант ГАЗель 3-4м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
+                  <img src="tarify_dostavka_salda.png" alt="Прейскурант ГАЗель 3-4м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
                     <i data-lucide="zoom-in" class="w-5 h-5 text-brand-400"></i>
                     <span>Увеличить фото</span>
@@ -1189,7 +1445,7 @@
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_gazel_6m.png', 'Прейскурант: ГАЗель 6 метров (длинномеры)')">
-                  <img src="/tarify_dostavka_gazel_6m.png" alt="Прейскурант ГАЗель 6м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
+                  <img src="tarify_dostavka_gazel_6m.png" alt="Прейскурант ГАЗель 6м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
                     <i data-lucide="zoom-in" class="w-5 h-5 text-indigo-400"></i>
                     <span>Увеличить фото</span>
@@ -1213,7 +1469,7 @@
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md sm:col-span-2 lg:col-span-1">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_valday.png', 'Прейскурант: Валдай / Fuso до 5 тонн')">
-                  <img src="/tarify_dostavka_valday.png" alt="Прейскурант Валдай 5т" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
+                  <img src="tarify_dostavka_valday.png" alt="Прейскурант Валдай 5т" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
                     <i data-lucide="zoom-in" class="w-5 h-5 text-purple-400"></i>
                     <span>Увеличить фото</span>
