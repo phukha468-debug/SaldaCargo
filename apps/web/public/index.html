@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark scroll-smooth overflow-x-hidden">
+<html lang="ru" class="scroll-smooth overflow-x-hidden">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -19,18 +19,38 @@
             'xs': '380px'
           },
           colors: {
+            /* ============================================================
+               ТОКЕНЫ ФИРМЕННОГО СТИЛЯ — «Дорожный маршрут» (светлая тема)
+               Один аккуратный источник цвета: все компоненты и вся логика
+               калькулятора ссылаются на эти же имена классов Tailwind,
+               поэтому весь сайт (включая JS-состояния) перекрашивается
+               из одной точки, без хаков и !important.
+               ============================================================ */
             brand: {
-              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
-              400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309',
-              800: '#92400e', 900: '#78350f'
+              50:  '#fdf4ec', 100: '#fbe4ce', 200: '#f3c79a', 300: '#d9822e',
+              400: '#c2540a', 500: '#e2660b', 600: '#b84e09', 700: '#96400a',
+              800: '#7a3510', 900: '#5c2a0e'
             },
             dark: {
-              950: '#06090e', 900: '#0b0f19', 850: '#0f172a',
-              800: '#111827', 750: '#161f30', 700: '#1e293b', 600: '#334155'
-            }
+              950: '#ffffff', 900: '#f6f4ee', 850: '#fbf1e3',
+              800: '#fbf1e3', 750: '#f1eee4', 700: '#ece8dc', 600: '#e1dccb'
+            },
+            slate: {
+              950: '#171310', 900: '#ffffff', 800: '#e8e3d6', 700: '#d8d1bd',
+              600: '#5a5346', 500: '#7a7263', 400: '#5c5445', 300: '#332d22',
+              200: '#211c14', 100: '#f6f4ee', 50: '#faf9f4'
+            },
+            amber:   { 200: '#a9791e', 300: '#c2540a', 400: '#c2540a', 500: '#e2660b' },
+            orange:  { 400: '#c2540a', 500: '#e2660b', 600: '#b84e09' },
+            emerald: { 300: '#1c9461', 400: '#157f52', 500: '#1c9461', 600: '#127048' },
+            blue:    { 300: '#2f6bb0', 400: '#1d4e89', 500: '#2563a8', 600: '#1e4f87', 700: '#183f6d' },
+            indigo:  { 300: '#6c63d6', 400: '#4f46c0', 500: '#453cb0', 600: '#3c34a0' },
+            purple:  { 300: '#8b5cc9', 400: '#6d3fae', 500: '#6d3fae', 600: '#5c3396' },
+            red:     { 400: '#c0362c', 500: '#dc4a3d' },
+            white: '#171310'
           },
           fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+            sans: ['Archivo', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
           }
         }
       }
@@ -38,7 +58,20 @@
   </script>
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,600&display=swap" rel="stylesheet">
+
   <style>
+    /* =====================================================================
+       ДИЗАЙН-СИСТЕМА «ДОРОЖНЫЙ МАРШРУТ»
+       Светлая, чистая, дисциплинированная тема для грузоперевозок.
+       Палитра и типографика заданы через tailwind.config выше — здесь
+       только базовые сбросы, компонентные классы и мелкая механика.
+       ===================================================================== */
+
+    :root { color-scheme: light; }
+
     html, body {
       overflow-x: hidden !important;
       width: 100% !important;
@@ -46,28 +79,116 @@
       touch-action: pan-y;
       -webkit-overflow-scrolling: touch;
     }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #06090e; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #d97706; }
+
+    body {
+      font-family: 'Archivo', 'Inter', system-ui, sans-serif;
+      background-color: #f6f4ee;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: 'Archivo', sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    ::selection { background: #f3c79a; color: #171310; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f6f4ee; }
+    ::-webkit-scrollbar-thumb { background: #d8d1bd; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #c2540a; }
+
+    /* ---- Карточки: тонкая рамка, мягкая тень, лёгкий подъём при наведении ---- */
     .theme-card {
-      background: rgba(17, 24, 39, 0.90);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      background: #ffffff;
+      border: 1px solid #e8e3d6;
+      box-shadow: 0 1px 2px rgba(23, 19, 16, 0.04);
+      color: #171310;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     }
     .theme-card-hover:hover {
-      border-color: rgba(217, 119, 6, 0.5);
-      background: rgba(30, 41, 59, 0.96);
+      border-color: #e2660b;
+      box-shadow: 0 12px 28px -12px rgba(23, 19, 16, 0.18);
       transform: translateY(-2px);
-      box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
     }
+
     .pb-safe {
       padding-bottom: max(env(safe-area-inset-bottom, 0.5rem), 0.5rem);
     }
     .pulse-glow {
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+      box-shadow: 0 0 0 6px rgba(226, 102, 11, 0.10);
+    }
+
+    /* ---- Шапка сайта: плотное стекло поверх маршрутной линии ---- */
+    header {
+      background: rgba(246, 244, 238, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid #e8e3d6;
+    }
+    header a.text-slate-300, header a.text-slate-200 { color: #5a5346; }
+    header a.text-slate-300:hover, header a.text-slate-200:hover {
+      color: #171310;
+      background-color: #f1eee4;
+    }
+
+    /* ---- Поля ввода ---- */
+    input, select, textarea {
+      background-color: #ffffff;
+      color: #171310;
+    }
+    input::placeholder, textarea::placeholder { color: #a49c8a; }
+    input:focus, select:focus, textarea:focus {
+      border-color: #e2660b !important;
+      box-shadow: 0 0 0 3px rgba(226, 102, 11, 0.14);
+      outline: none;
+    }
+
+    /* ---- Мобильное меню (полноэкранный навигатор) ---- */
+    #mobile-drawer {
+      background: rgba(255, 255, 255, 0.98);
+      color: #171310;
+    }
+
+    /* ---- Дорожная разметка: единичный, осознанный декоративный акцент ----
+       Использован один раз — под шапкой в hero — как отсылка к маршруту.
+       Больше нигде не повторяется, чтобы не превратиться в тик. */
+    .route-line {
+      height: 3px;
+      background-image: repeating-linear-gradient(
+        90deg, #e2660b 0 28px, transparent 28px 46px
+      );
+      opacity: 0.55;
+    }
+
+    /* ---- Лайтбокс фотографий: намеренно тёмная сцена независимо от темы
+       сайта — это просмотр фото на чёрном фоне, а не карточка контента. ---- */
+    #lightbox-modal, #lightbox-modal * { color: #f1eee4; }
+    #lightbox-modal button:hover { color: #f3c79a; }
+    #lightbox-img { background: #000; }
+
+    /* ---- Кнопки на насыщенной заливке: белый текст ради контраста и
+       «пробивной» силы CTA, а не приглушённый графит, как на карточках. ---- */
+    .from-brand-600.text-white,
+    .from-blue-600.text-white,
+    .from-amber-600.text-white,
+    .bg-emerald-600.text-white,
+    .bg-brand-600.text-white,
+    .bg-blue-600.text-white,
+    .bg-orange-500.text-white {
+      color: #fff;
+    }
+    .selection\:text-white ::selection { color: #fff; }
+
+    /* ---- Затемнённые оверлеи на фотографиях остаются тёмной сценой
+       независимо от темы сайта — текст и иконки на них светлые. ---- */
+    [class*="bg-black/"] { color: #f1eee4; }
+    [class*="bg-black/"].text-brand-400,
+    [class*="bg-black/"] .text-brand-400 { color: #f0a25a; }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
   </style>
 </head>
@@ -352,9 +473,12 @@
 
       </div>
     </div>
+    
+    <!-- Дорожная разметка по нижней кромке шапки -->
+    <div class="route-line w-full"></div>
   </header>
 
-  <!-- Отступ сверху равный высоте фиксированного хедера -->
+  <!-- Основной контент страницы -->
   <main class="w-full pt-14 sm:pt-20">
 
     <!-- ========================================================================= -->
@@ -465,7 +589,7 @@
       </div>
     </section>
 
-        <!-- ========================================================================= -->
+    <!-- ========================================================================= -->
     <!-- 2. ОНЛАЙН КАЛЬКУЛЯТОР СТОИМОСТИ (РАЗМЕЩЕН СРАЗУ ПОД ГЛАВНОЙ) -->
     <!-- ========================================================================= -->
     <section id="calculator" class="py-12 sm:py-16 bg-dark-800/70 border-t border-slate-800 relative w-full">
@@ -1165,7 +1289,7 @@
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_salda.png', 'Прейскурант: ГАЗель (до 3–4м)')">
-                  <img src="/tarify_dostavka_salda.png" alt="Прейскурант ГАЗель 3-4м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
+                  <img src="tarify_dostavka_salda.png" alt="Прейскурант ГАЗель 3-4м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
                     <i data-lucide="zoom-in" class="w-5 h-5 text-brand-400"></i>
                     <span>Увеличить фото</span>
@@ -1189,7 +1313,7 @@
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_gazel_6m.png', 'Прейскурант: ГАЗель 6 метров (длинномеры)')">
-                  <img src="/tarify_dostavka_gazel_6m.png" alt="Прейскурант ГАЗель 6м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
+                  <img src="tarify_dostavka_gazel_6m.png" alt="Прейскурант ГАЗель 6м" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
                     <i data-lucide="zoom-in" class="w-5 h-5 text-indigo-400"></i>
                     <span>Увеличить фото</span>
@@ -1213,7 +1337,7 @@
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md sm:col-span-2 lg:col-span-1">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_valday.png', 'Прейскурант: Валдай / Fuso до 5 тонн')">
-                  <img src="/tarify_dostavka_valday.png" alt="Прейскурант Валдай 5т" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
+                  <img src="tarify_dostavka_valday.png" alt="Прейскурант Валдай 5т" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
                     <i data-lucide="zoom-in" class="w-5 h-5 text-purple-400"></i>
                     <span>Увеличить фото</span>
@@ -1894,7 +2018,7 @@ Email: uralavto707@mail.ru
       });
     }
 
-        // =========================================================================
+    // =========================================================================
     // 7. ИНТЕРАКТИВНЫЙ КАЛЬКУЛЯТОР СТОИМОСТИ (ГАЗЕЛЬ МЕЖГОРОД, ГОРОД, 5Т, САМОСВАЛ)
     // =========================================================================
 
