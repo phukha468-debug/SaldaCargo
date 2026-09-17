@@ -72,10 +72,17 @@
                 400: '#5c5549',
                 300: '#38332c',
                 200: '#26211c',
-                100: '#171310',
-                50: '#0f0c0a',
+                100: '#f1ede1',
+                50: '#faf8f2',
               },
               white: '#171310',
+              amber:   { 200: '#a9791e', 300: '#c2540a', 400: '#c2540a', 500: '#e2660b' },
+              orange:  { 400: '#c2540a', 500: '#e2660b', 600: '#b84e09' },
+              emerald: { 300: '#1c9461', 400: '#157f52', 500: '#1c9461', 600: '#127048' },
+              blue:    { 300: '#2f6bb0', 400: '#1d4e89', 500: '#2563a8', 600: '#1e4f87', 700: '#183f6d' },
+              purple:  { 300: '#8b5cc9', 400: '#6d3fae', 500: '#6d3fae', 600: '#5c3396' },
+              rose:    { 300: '#c23d5c', 400: '#a8213f', 500: '#c23d5c' },
+              red:     { 400: '#c0362c', 500: '#dc4a3d' },
             },
             fontFamily: {
               sans: ['Archivo', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
@@ -130,6 +137,12 @@
       );
       opacity: 0.55;
     }
+    /* Плавающая HUD-плашка поверх карты — намеренно тёмная сцена (лежит на
+       живой карте, а не на светлой карточке), поэтому текст в ней светлый
+       независимо от темы страницы. */
+    .map-hud, .map-hud * { color: #d8d1bd; }
+    .map-hud .text-brand-400 { color: #f0a25a; }
+
     .from-brand-600.text-white,
     .from-blue-600.text-white,
     .from-amber-600.text-white,
@@ -416,7 +429,7 @@
             id="cat-btn-furniture"
             class="p-3 rounded-xl border text-left font-bold text-xs transition border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 flex items-center gap-3"
           >
-            <span class="text-xl p-2 rounded-xl bg-slate-950 border border-slate-800">🛋️</span>
+            <span class="text-xl p-2 rounded-xl bg-slate-100 border border-slate-800">🛋️</span>
             <div>
               <div class="text-xs sm:text-sm font-black text-slate-200">Мебельные магазины</div>
               <div class="text-[11px] text-slate-400 font-normal">
@@ -455,14 +468,14 @@
               id="customStoreName"
               placeholder="Название магазина"
               value="Мой магазин"
-              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+              class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
             />
             <input
               type="text"
               id="customStoreAddress"
               placeholder="Адрес магазина (откуда везти)"
               value="г. Верхняя Салда, "
-              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+              class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
             />
             <div class="grid grid-cols-3 gap-2">
               <div>
@@ -471,7 +484,7 @@
                   type="number"
                   id="customBasePrice"
                   value="700"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
+                  class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
                 />
               </div>
               <div>
@@ -480,7 +493,7 @@
                   type="number"
                   id="customKmPrice"
                   value="80"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
+                  class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
                 />
               </div>
               <div>
@@ -490,13 +503,15 @@
                   step="0.1"
                   id="customRadius"
                   value="1.5"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
+                  class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
                 />
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <div class="route-line w-full rounded-full"></div>
 
       <!-- 2. АДРЕС ДОСТАВКИ И КАРТА ЯНДЕКС — НА ВСЮ ШИРИНУ ЭКРАНА (100% ШИРИНЫ!) -->
       <div class="theme-card rounded-2xl p-4 sm:p-5 space-y-3.5">
@@ -529,7 +544,7 @@
               autocomplete="off"
               oninput="updateSubmitButtonState()"
               placeholder="Например: ул. 25 Октября, д. 11 или Садовая, 4"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none focus:border-brand-500 placeholder-slate-500 pr-24"
+              class="w-full bg-slate-100 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none focus:border-brand-500 placeholder-slate-500 pr-24"
             />
             <button
               type="button"
@@ -692,7 +707,7 @@
 
         <!-- ПОЛНОРАЗМЕРНАЯ КАРТА НА ВСЮ ШИРИНУ (ВЫСОТА 460-500px, 100% ШИРИНЫ) -->
         <div
-          class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner min-h-[380px]"
+          class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-100 shadow-inner min-h-[380px]"
         >
           <div id="deliveryMap" class="w-full h-[380px] sm:h-[460px] lg:h-[500px]">
             <div id="mapFallbackNotice" class="w-full h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
@@ -704,7 +719,7 @@
 
           <!-- Плашка со статусом над картой -->
           <div
-            class="absolute bottom-2.5 left-2.5 right-2.5 p-2.5 rounded-xl bg-slate-950/90 backdrop-blur-md border border-slate-800 flex items-center justify-between text-xs"
+            class="map-hud absolute bottom-2.5 left-2.5 right-2.5 p-2.5 rounded-xl bg-slate-950/90 backdrop-blur-md border border-slate-800 flex items-center justify-between text-xs"
           >
             <div class="flex items-center gap-2 flex-wrap">
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -744,7 +759,7 @@
                 type="checkbox"
                 id="hasLoaders"
                 onchange="toggleLoaders()"
-                class="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-slate-700 bg-slate-950 cursor-pointer"
+                class="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-slate-700 bg-slate-100 cursor-pointer"
               />
               <label
                 for="hasLoaders"
@@ -773,7 +788,7 @@
                     <div class="flex-1">
                       <select
                         id="itemSelect"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold text-white focus:outline-none focus:border-brand-500"
+                        class="w-full bg-slate-100 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold text-white focus:outline-none focus:border-brand-500"
                       ></select>
                     </div>
                     <div class="flex items-center gap-2">
@@ -785,7 +800,7 @@
                           max="500"
                           value="1"
                           placeholder="Кол-во"
-                          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-center font-bold text-white focus:outline-none focus:border-brand-500"
+                          class="w-full bg-slate-100 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-center font-bold text-white focus:outline-none focus:border-brand-500"
                         />
                       </div>
                       <button
@@ -815,7 +830,7 @@
                 <!-- ФОРМА ДОБАВЛЕНИЯ СВОЕЙ ПОЗИЦИИ (CUSTOM) -->
                 <div
                   id="customItemForm"
-                  class="hidden p-3.5 rounded-xl bg-slate-950 border border-brand-500/30 space-y-2.5 shadow-lg"
+                  class="hidden p-3.5 rounded-xl bg-slate-100 border border-brand-500/30 space-y-2.5 shadow-lg"
                 >
                   <div class="flex items-center justify-between">
                     <span class="text-[11px] font-bold text-brand-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -939,7 +954,7 @@
                     type="button"
                     id="loader-btn-1"
                     onclick="setLoadersCount(1, true)"
-                    class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300"
+                    class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-100 hover:border-slate-700 text-slate-300"
                   >
                     <span class="text-xs font-extrabold flex items-center gap-1">1 грузчик</span>
                     <span class="text-[10px] text-slate-400">Водитель один</span>
@@ -964,7 +979,7 @@
                     type="button"
                     id="loader-btn-3"
                     onclick="setLoadersCount(3, true)"
-                    class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300"
+                    class="py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-100 hover:border-slate-700 text-slate-300"
                   >
                     <span class="text-xs font-extrabold flex items-center gap-1">3+ грузчика</span>
                     <span class="text-[10px] text-slate-400">Усиленная бригада</span>
@@ -973,7 +988,7 @@
 
                 <div
                   id="loadersCrewNoticeText"
-                  class="text-[11px] p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-slate-300 leading-snug"
+                  class="text-[11px] p-2 rounded-lg bg-slate-900/70 border border-slate-800 text-slate-300 leading-snug"
                 >
                   <strong>Стандартная бригада (2 чел):</strong> водитель берет с собой второго
                   грузчика для подъёма мебели, дверей или крупного товара.
@@ -992,7 +1007,7 @@
                       max="50"
                       value="1"
                       onkeydown="if (event.key === 'Enter') confirmFloorInput();"
-                      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-black text-center text-white focus:outline-none focus:border-brand-500 font-mono"
+                      class="w-full bg-slate-100 border border-slate-800 rounded-xl px-3 py-2 text-sm font-black text-center text-white focus:outline-none focus:border-brand-500 font-mono"
                     />
                     <button
                       type="button"
@@ -1007,35 +1022,35 @@
                     <button
                       type="button"
                       onclick="setQuickFloor(1)"
-                      class="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
+                      class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
                     >
                       1 эт
                     </button>
                     <button
                       type="button"
                       onclick="setQuickFloor(2)"
-                      class="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
+                      class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
                     >
                       2 эт
                     </button>
                     <button
                       type="button"
                       onclick="setQuickFloor(3)"
-                      class="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
+                      class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
                     >
                       3 эт
                     </button>
                     <button
                       type="button"
                       onclick="setQuickFloor(5)"
-                      class="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
+                      class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
                     >
                       5 эт
                     </button>
                     <button
                       type="button"
                       onclick="setQuickFloor(9)"
-                      class="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
+                      class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300"
                     >
                       9 эт
                     </button>
@@ -1047,7 +1062,7 @@
                   <select
                     id="elevatorType"
                     onchange="onElevatorChange(this.value)"
-                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-brand-500"
+                    class="w-full bg-slate-100 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-brand-500"
                   >
                     <option value="none">❌ Лифта нет (по лестнице)</option>
                     <option value="cargo">🛗 Есть грузовой лифт (1 этаж фикс)</option>
@@ -1079,7 +1094,7 @@
                     id="hasLongCarry"
                     onchange="calculateTotal()"
                     disabled
-                    class="w-4 h-4 rounded text-brand-500 border-slate-700 bg-slate-950 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="w-4 h-4 rounded text-brand-500 border-slate-700 bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   />
                   <div>
                     <label
@@ -1424,7 +1439,7 @@
     <!-- МОДАЛЬНОЕ ОКНО ИСТОРИИ ЗАКАЗОВ МАГАЗИНА -->
     <div
       id="storeHistoryModal"
-      class="fixed inset-0 bg-dark-950/90 backdrop-blur-xl hidden items-center justify-center p-3 sm:p-6 z-50 transition-opacity duration-300"
+      class="fixed inset-0 bg-slate-950/70 backdrop-blur-xl hidden items-center justify-center p-3 sm:p-6 z-50 transition-opacity duration-300"
     >
       <div
         class="theme-card rounded-3xl p-4 sm:p-6 max-w-2xl w-full border-brand-500/30 shadow-2xl space-y-4 max-h-[90vh] flex flex-col"
@@ -2766,7 +2781,7 @@
             : '<span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-medium">👤 1 грузчик</span>';
 
           html += `
-          <div class="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+          <div class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-2 text-xs">
             <div class="flex-1 min-w-0">
               <div class="font-bold text-white truncate">${it.name}</div>
               <div class="text-[11px] text-slate-400 flex items-center gap-1.5 pt-0.5">
@@ -2839,7 +2854,7 @@
               title.className = 'text-xs font-extrabold flex items-center gap-1 text-brand-400';
           } else {
             btn.className =
-              'py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300';
+              'py-2 px-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-0.5 border-slate-800 bg-slate-100 hover:border-slate-700 text-slate-300';
             const title = btn.querySelector('span:first-child');
             if (title) title.className = 'text-xs font-extrabold flex items-center gap-1';
           }
@@ -3322,12 +3337,12 @@
               },
               {
                 boundsAutoApply: true,
-                wayPointStartIconColor: '#10b981',
-                wayPointFinishIconColor: '#f59e0b',
-                routeActiveStrokeColor: '#f59e0b',
+                wayPointStartIconColor: '#1c9461',
+                wayPointFinishIconColor: '#e2660b',
+                routeActiveStrokeColor: '#e2660b',
                 routeActiveStrokeWidth: 6,
                 routeActiveStrokeOpacity: 0.95,
-                routeStrokeColor: '#d97706',
+                routeStrokeColor: '#b84e09',
                 routeStrokeWidth: 4,
               },
             );
@@ -3394,7 +3409,7 @@
                 roadCoords,
                 {},
                 {
-                  strokeColor: '#f59e0b',
+                  strokeColor: '#e2660b',
                   strokeWidth: 6,
                   strokeOpacity: 0.95,
                 },
@@ -3430,7 +3445,7 @@
           points,
           {},
           {
-            strokeColor: '#f59e0b',
+            strokeColor: '#e2660b',
             strokeWidth: 5,
             strokeOpacity: 0.9,
           },
