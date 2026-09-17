@@ -90,8 +90,18 @@ def main():
                     ensure_remote_dir(sftp, remote_parent)
                 
                 size_kb = os.path.getsize(local_file) / 1024
+                local_size = os.path.getsize(local_file)
                 
                 print(f" [{i}/{len(files_to_upload)}] {rel_path} ({size_kb:.1f} KB)... ", end="", flush=True)
+                try:
+                    remote_stat = sftp.stat(remote_file)
+                    if remote_stat.st_size == local_size:
+                        print("АКТУАЛЕН [SKIP]")
+                        success_count += 1
+                        continue
+                except Exception:
+                    pass
+
                 try:
                     sftp.put(local_file, remote_file)
                     print("ГОТОВО [OK]")

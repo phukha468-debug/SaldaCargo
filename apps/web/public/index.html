@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>ИП Нигамедьянов А.С. | Грузоперевозки Верхняя Салда, УрФО, Россия</title>
-  <meta name="description" content="Грузоперевозки собственным автопарком (11 единиц: Газель NEXT, Валдай, Mitsubishi Fuso). Рейтинг 5.0 на ATI.SU (Код 2811269). Личная ремонтная база, ЭДО, работаем без НДС (УСН)." />
+  <meta name="description" content="Грузоперевозки от 1 до 20 тонн по В.Салде и всей РФ. Собственный автопарк 11 единиц + партнёрская сеть. Рейтинг 5.0 на ATI.SU (Код 2811269). Личная ремонтная база, 100% ЭТРН и ЭДО, работаем без НДС (УСН)." />
   <link rel="icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
@@ -190,7 +190,46 @@
     @media (prefers-reduced-motion: reduce) {
       * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
-  </style>
+  
+    /* Bulletproof beige theme contrast rules */
+    .bg-white {
+      background-color: #ffffff !important;
+    }
+    .theme-card {
+      background-color: #ffffff !important;
+      border: 1px solid #e8e3d6 !important;
+      color: #171310 !important;
+      box-shadow: 0 1px 3px rgba(23, 19, 16, 0.05), 0 10px 24px -8px rgba(23, 19, 16, 0.06) !important;
+    }
+    .from-brand-600.text-white,
+    .from-blue-600.text-white,
+    .from-amber-600.text-white,
+    .bg-emerald-600.text-white,
+    .bg-brand-600.text-white,
+    .bg-blue-600.text-white,
+    .bg-orange-500.text-white,
+    .bg-brand-500.text-white,
+    .bg-emerald-500.text-white,
+    .from-brand-500.text-white {
+      color: #ffffff !important;
+    }
+    .from-brand-600.text-white *,
+    .from-blue-600.text-white *,
+    .from-amber-600.text-white *,
+    .bg-emerald-600.text-white *,
+    .bg-brand-600.text-white *,
+    .bg-blue-600.text-white *,
+    .bg-orange-500.text-white *,
+    .bg-brand-500.text-white *,
+    .bg-emerald-500.text-white *,
+    .from-brand-500.text-white * {
+      color: inherit;
+    }
+    .bg-emerald-600 b,
+    .bg-emerald-600 .text-amber-200 {
+      color: #fef08a !important;
+    }
+</style>
 </head>
 <body class="bg-dark-900 text-slate-200 antialiased selection:bg-brand-600 selection:text-white relative overflow-x-hidden pb-20 lg:pb-0 w-full">
 
@@ -515,44 +554,46 @@
             </h1>
 
             <!-- Подзаголовок с доказательствами -->
-            <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
-              Собственный автопарк <strong class="text-white">11 автомобилей</strong> и проверенный транспорт до 20 тонн. Официальный договор, безналичный расчет <strong class="text-white">без НДС (УСН)</strong>, <strong class="text-brand-400">100% работа с ЭТРН и ЭДО</strong>. Рейтинг <strong class="text-emerald-400">5.0 в бирже ATI.SU</strong>.
+            <p class="text-sm sm:text-base text-slate-600 max-w-xl leading-relaxed">
+              Собственный автопарк <strong class="text-slate-950 font-bold">11 автомобилей</strong> (ГАЗель NEXT, Валдай 5т, Fuso) + партнёрская сеть грузоподъёмностью <strong class="text-slate-950 font-bold">до 20 тонн</strong>. Личная ремонтная база, <strong class="text-emerald-600 font-bold">0% срывов</strong>, рейтинг <strong class="text-brand-600 font-bold">5.0 на бирже ATI.SU</strong>. Работаем по договору <strong class="text-slate-950 font-bold">без НДС (УСН)</strong>, 100% готовность к <strong class="text-slate-950 font-bold">ЭТРН и ЭДО</strong>.
             </p>
 
             <!-- 🎯 КЛИКАБЕЛЬНЫЕ ПРИЗЫВЫ К ДЕЙСТВИЮ (CTA-БЛОК: 2 ГЛАВНЫЕ КНОПКИ) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               
               <!-- Кнопка 1: Заказать машину -->
-              <a href="#contact" class="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-white font-black text-sm sm:text-base shadow-xl shadow-brand-900/50 hover:scale-[1.02] active:scale-95 transition transform">
-                <i data-lucide="truck" class="w-5 h-5"></i>
-                <span>Заказать машину</span>
+              <a href="#calculator" class="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-600 to-brand-500 hover:from-brand-500 hover:to-amber-400 text-white font-black text-sm sm:text-base shadow-xl shadow-brand-900/20 hover:scale-[1.02] active:scale-95 transition transform">
+                <i data-lucide="calculator" class="w-5 h-5 text-white"></i>
+                <span class="text-white">Заказать машину</span>
               </a>
 
               <!-- Кнопка 2: Прямой звонок диспетчеру -->
-              <a href="tel:+79630501501" class="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-900/40 hover:scale-[1.02] active:scale-95 transition transform">
-                <i data-lucide="phone-call" class="w-5 h-5"></i>
-                <span>Позвонить: +7-963-0-<b class="text-amber-200">501</b>-<b class="text-amber-200">501</b></span>
+              <a href="tel:+79630501501" class="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-900/20 hover:scale-[1.02] active:scale-95 transition transform">
+                <i data-lucide="phone-call" class="w-5 h-5 text-white"></i>
+                <span class="text-white">Позвонить: +7-963-0-<b class="text-amber-200 font-black">501</b>-<b class="text-amber-200 font-black">501</b></span>
               </a>
 
             </div>
 
-            <!-- Бейджи доверия и преимуществ (без дублей) -->
+            <!-- Бейджи доверия и преимуществ: гармоничные белые карточки theme-card -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-emerald-400">⭐ 5.0 ATI.SU</div>
-                <div class="text-[10px] text-slate-400 font-mono">Код: 2811269</div>
+              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
+                <div class="text-xs sm:text-sm font-black text-emerald-600 flex items-center justify-center gap-1">
+                  <span>★ 5.0 ATI.SU</span>
+                </div>
+                <div class="text-[10px] text-slate-500 font-mono mt-0.5">Код: 2811269</div>
               </div>
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-brand-400">📄 ЭТРН & ЭДО</div>
-                <div class="text-[10px] text-slate-400">ГИС ЭПД • Диадок</div>
+              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
+                <div class="text-xs sm:text-sm font-black text-brand-600">100% ЭТРН & ЭДО</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">ГИС ЭПД • Диадок</div>
               </div>
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-white">⚖️ От 1 до 20 т</div>
-                <div class="text-[10px] text-slate-400">Город и вся РФ</div>
+              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
+                <div class="text-xs sm:text-sm font-black text-slate-950">От 1 до 20 тонн</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">В.Салда и вся РФ</div>
               </div>
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-amber-400">🔒 0% срывов</div>
-                <div class="text-[10px] text-slate-400">Договор и гарантия</div>
+              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
+                <div class="text-xs sm:text-sm font-black text-emerald-600">0% срывов</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">Договор и гарантия</div>
               </div>
             </div>
 
@@ -574,22 +615,22 @@
               </div>
 
               <!-- Информационная плашка готовности (без дублирования цифр) -->
-              <div class="mt-3 p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+              <div class="mt-3 p-3 rounded-2xl bg-dark-850 border border-slate-800 flex items-center justify-between gap-3 text-xs">
                 <div class="flex items-center gap-2.5">
-                  <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                  <div class="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-600 shrink-0">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
                   </div>
                   <div>
-                    <div class="font-black text-white text-xs">Автопарк готов к рейсам</div>
-                    <div class="text-[11px] text-slate-400">ГАЗель NEXT, Валдай 5т, Fuso, фуры 20т</div>
+                    <div class="font-black text-slate-950 text-xs">Автопарк готов к рейсам</div>
+                    <div class="text-[11px] text-slate-500">ГАЗель NEXT, Валдай 5т, Fuso, фуры 20т</div>
                   </div>
                 </div>
-                <a href="#tariffs" class="text-[11px] font-bold text-brand-400 hover:text-brand-300 whitespace-nowrap">Тарифы →</a>
+                <a href="#tariffs" class="text-[11px] font-bold text-brand-600 hover:text-brand-700 whitespace-nowrap">Тарифы →</a>
               </div>
 
               <!-- Кнопка быстрого перехода в калькулятор -->
-              <a href="#calculator" class="mt-2.5 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition">
-                <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-brand-400 animate-bounce"></i>
+              <a href="#calculator" class="mt-2.5 w-full py-3 px-4 rounded-xl bg-dark-850 hover:bg-dark-800 border border-slate-800 text-slate-950 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition">
+                <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-brand-500 animate-bounce"></i>
                 <span>Рассчитать стоимость поездки</span>
               </a>
 
@@ -621,76 +662,76 @@
           </div>
         </div>
 
-        <!-- Сетка 4 ключевых партнёров (лаконично, солидно, без громоздких подписей) -->
+        <!-- Сетка 4 ключевых партнёров: лаконично, статусно, чистый белый фон, идеальный контраст -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           
-          <!-- Партнёр 1: ВСМПО-Ависма -->
-          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
-            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
-              <i data-lucide="factory" class="w-5 h-5 text-brand-400"></i>
+          <!-- Партнёр 1: ВСМПО-АВИСМА -->
+          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-brand-500/50 hover:shadow-md transition group">
+            <div class="w-11 h-11 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shrink-0 group-hover:scale-105 transition-transform">
+              <i data-lucide="factory" class="w-5 h-5 text-brand-500"></i>
             </div>
             <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">ВСМПО-АВИСМА</div>
-              <div class="text-[11px] text-slate-400 font-semibold truncate">Титановая корпорация</div>
+              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">ВСМПО-АВИСМА</div>
+              <div class="text-[11px] text-slate-500 font-medium">Корпорация</div>
             </div>
           </div>
 
           <!-- Партнёр 2: Урал-Боинг -->
-          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
-            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-900/60 to-slate-900 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
-              <i data-lucide="plane" class="w-5 h-5 text-blue-400"></i>
+          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-blue-500/50 hover:shadow-md transition group">
+            <div class="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0 group-hover:scale-105 transition-transform">
+              <i data-lucide="plane" class="w-5 h-5 text-blue-500"></i>
             </div>
             <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">Урал-Боинг</div>
-              <div class="text-[11px] text-slate-400 font-semibold truncate">Ural Boeing Mfg</div>
+              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">Урал-Боинг</div>
+              <div class="text-[11px] text-slate-500 font-medium">Ural Boeing Mfg</div>
             </div>
           </div>
 
           <!-- Партнёр 3: ООО НПК "НТЛ" -->
-          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
-            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
-              <i data-lucide="flame" class="w-5 h-5 text-emerald-400"></i>
+          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group">
+            <div class="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0 group-hover:scale-105 transition-transform">
+              <i data-lucide="flame" class="w-5 h-5 text-emerald-500"></i>
             </div>
             <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">НПК «НТЛ»</div>
-              <div class="text-[11px] text-slate-400 font-semibold truncate">Газовое и СПГ оборудование</div>
+              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">НПК «НТЛ»</div>
+              <div class="text-[11px] text-slate-500 font-medium">ООО НПК «НТЛ»</div>
             </div>
           </div>
 
           <!-- Партнёр 4: ООО "Геостройиндустрия" -->
-          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
-            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
-              <i data-lucide="pickaxe" class="w-5 h-5 text-amber-400"></i>
+          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-amber-500/50 hover:shadow-md transition group">
+            <div class="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0 group-hover:scale-105 transition-transform">
+              <i data-lucide="pickaxe" class="w-5 h-5 text-amber-500"></i>
             </div>
             <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">Геостройиндустрия</div>
-              <div class="text-[11px] text-slate-400 font-semibold truncate">Недропользование и ископаемые</div>
+              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">Геостройиндустрия</div>
+              <div class="text-[11px] text-slate-500 font-medium">ООО «ГСИ»</div>
             </div>
           </div>
 
         </div>
 
-        <!-- Блок ЭТРН и ЭДО: готовность + бесплатные консультации для клиентов -->
-        <div class="p-4 sm:p-5 rounded-2xl bg-white border border-brand-500/35 shadow-md">
+        <!-- Блок ЭТРН и ЭДО: гармоничная белая карточка с идеальным контрастом текста -->
+        <div class="theme-card p-5 sm:p-6 rounded-2xl border-brand-500/40 shadow-sm">
           <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-brand-500 to-amber-700 flex items-center justify-center text-white shrink-0 shadow-md shadow-brand-900/30">
-                <i data-lucide="file-check-2" class="w-5 h-5 text-white"></i>
+              <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-brand-500 to-orange-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-brand-900/20">
+                <i data-lucide="file-check-2" class="w-6 h-6 text-white"></i>
               </div>
-              <div class="space-y-1">
+              <div class="space-y-1.5">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <h3 class="text-sm sm:text-base font-black text-white">Работаем с ЭТРН и электронным документооборотом (ЭДО)</h3>
-                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold uppercase">100% ГИС ЭПД</span>
+                  <h3 class="text-base sm:text-lg font-black text-slate-950">Работаем с ЭТРН и электронным документооборотом (ЭДО)</h3>
+                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 font-bold uppercase tracking-wider">100% ГИС ЭПД</span>
                 </div>
-                <p class="text-xs text-slate-300 max-w-3xl leading-relaxed">
-                  Оформляем электронные транспортные накладные через государственную систему ГИС ЭПД (Диадок, СБИС). <strong>Консультируем наших клиентов и бухгалтерию</strong>: бесплатно помогаем подключить, настроить обмен ЭТРН и перейти на цифровой документооборот без штрафов и задержек.
+                <p class="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
+                  Оформляем электронные транспортные накладные через государственную систему ГИС ЭПД (Диадок, СБИС). <strong class="text-slate-950 font-bold">Бесплатно консультируем клиентов и бухгалтерию</strong>: помогаем быстро настроить обмен ЭТРН и перейти на цифровой документооборот без задержек и штрафов.
                 </p>
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0 w-full md:w-auto">
-              <a href="tel:+79630501501" class="w-full md:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-sm whitespace-nowrap">
-                <i data-lucide="phone" class="w-3.5 h-3.5"></i>
-                <span>Консультация по ЭТРН</span>
+              <a href="tel:+79630501501" class="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-amber-600 hover:from-brand-500 hover:to-amber-500 text-white text-xs sm:text-sm font-black uppercase tracking-wider transition active:scale-95 shadow-md shadow-brand-900/20 whitespace-nowrap">
+                <i data-lucide="phone" class="w-4 h-4 text-white"></i>
+                <span class="text-white">Консультация по ЭТРН</span>
               </a>
             </div>
           </div>
