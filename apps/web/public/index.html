@@ -606,7 +606,7 @@
                 <img src="truck-next-winter.jpg" alt="ГАЗель NEXT" class="w-full h-full object-cover fallback-img group-hover:scale-105 transition-transform duration-500" />
                 <div class="absolute top-3 left-3 px-3 py-1 bg-brand-500 text-black text-xs font-black rounded-lg uppercase shadow-lg flex items-center gap-1.5">
                   <span class="w-2 h-2 rounded-full bg-black animate-ping"></span>
-                  <span>⚡ Свободна к подаче</span>
+                  <span>⚡ Свободна к рейсу</span>
                 </div>
                 <div class="absolute bottom-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold rounded-lg border border-white/10 flex items-center gap-1">
                   <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-brand-400"></i>
@@ -638,79 +638,53 @@
           </div>
 
         </div>
+
+        <!-- ========================================================================= -->
+        <!-- ЛОГОТИПЫ ПАРТНЁРОВ ПРЯМО НА ПЕРВОМ ЭКРАНЕ (HERO) -->
+        <!-- ========================================================================= -->
+        <div id="partners" class="mt-8 pt-5 border-t border-slate-300/80">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+              <span class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">Нам доверяют свои грузы лидеры промышленности:</span>
+            </div>
+            <span class="text-[11px] text-slate-500 font-medium">Регулярные рейсы по В.Салде, УрФО и всей РФ</span>
+          </div>
+
+          <!-- Сетка 4 ключевых партнёров с реальными фирменными логотипами -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            
+            <!-- Партнёр 1: ВСМПО-АВИСМА -->
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-brand-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="Корпорация ВСМПО-АВИСМА">
+              <img src="logo-vsmpo.png" alt="Корпорация ВСМПО-АВИСМА" class="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+            </div>
+
+            <!-- Партнёр 2: Ural Boeing Manufacturing -->
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-blue-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="Ural Boeing Manufacturing">
+              <img src="logo-ural-boeing.png" alt="Ural Boeing Manufacturing" class="max-h-10 sm:max-h-12 w-auto object-contain rounded-md transition-transform group-hover:scale-105" />
+            </div>
+
+            <!-- Партнёр 3: Компания НТЛ -->
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="Компания НТЛ">
+              <img src="logo-ntl.png" alt="Компания НТЛ" class="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+            </div>
+
+            <!-- Партнёр 4: ООО Геостройиндустрия -->
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-amber-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="ООО Геостройиндустрия">
+              <img src="logo-gsi.png" alt="ООО Геостройиндустрия" class="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </section>
 
     <!-- ========================================================================= -->
-    <!-- 1.1 НАМ ДОВЕРЯЮТ СВОИ ГРУЗЫ + ЭТРН / ЭДО (КОРПОРАТИВНЫЙ БЛОК ДОВЕРИЯ) -->
+    <!-- 1.1 ЭТРН И ЭДО (КОРПОРАТИВНЫЙ СТАНДАРТ) -->
     <!-- ========================================================================= -->
-    <section id="partners" class="py-8 sm:py-10 bg-slate-100 border-y border-slate-800/80 w-full relative">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        
-        <!-- Заголовок блока доверия -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-          <div>
-            <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-400 text-xs font-bold rounded-full border border-brand-500/20 uppercase tracking-wider mb-1.5">
-              <i data-lucide="award" class="w-3.5 h-3.5"></i> Постоянные партнёры
-            </div>
-            <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Они доверяют нам свои грузы
-            </h2>
-          </div>
-          <div class="text-xs text-slate-400 font-medium">
-            Регулярные рейсы по В.Салде, УрФО и всей России
-          </div>
-        </div>
-
-        <!-- Сетка 4 ключевых партнёров: лаконично, статусно, чистый белый фон, идеальный контраст -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          
-          <!-- Партнёр 1: ВСМПО-АВИСМА -->
-          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-brand-500/50 hover:shadow-md transition group">
-            <div class="w-11 h-11 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shrink-0 group-hover:scale-105 transition-transform">
-              <i data-lucide="factory" class="w-5 h-5 text-brand-500"></i>
-            </div>
-            <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">ВСМПО-АВИСМА</div>
-              <div class="text-[11px] text-slate-500 font-medium">Корпорация</div>
-            </div>
-          </div>
-
-          <!-- Партнёр 2: Урал-Боинг -->
-          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-blue-500/50 hover:shadow-md transition group">
-            <div class="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0 group-hover:scale-105 transition-transform">
-              <i data-lucide="plane" class="w-5 h-5 text-blue-500"></i>
-            </div>
-            <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">Урал-Боинг</div>
-              <div class="text-[11px] text-slate-500 font-medium">Ural Boeing Mfg</div>
-            </div>
-          </div>
-
-          <!-- Партнёр 3: ООО НПК "НТЛ" -->
-          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group">
-            <div class="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0 group-hover:scale-105 transition-transform">
-              <i data-lucide="flame" class="w-5 h-5 text-emerald-500"></i>
-            </div>
-            <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">НПК «НТЛ»</div>
-              <div class="text-[11px] text-slate-500 font-medium">ООО НПК «НТЛ»</div>
-            </div>
-          </div>
-
-          <!-- Партнёр 4: ООО "Геостройиндустрия" -->
-          <div class="theme-card p-4 rounded-2xl flex items-center gap-3.5 shadow-sm hover:border-amber-500/50 hover:shadow-md transition group">
-            <div class="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0 group-hover:scale-105 transition-transform">
-              <i data-lucide="pickaxe" class="w-5 h-5 text-amber-500"></i>
-            </div>
-            <div class="min-w-0">
-              <div class="font-black text-sm sm:text-base text-slate-950 tracking-tight leading-tight truncate">Геостройиндустрия</div>
-              <div class="text-[11px] text-slate-500 font-medium">ООО «ГСИ»</div>
-            </div>
-          </div>
-
-        </div>
-
+    <section class="py-6 sm:py-8 bg-slate-100 border-y border-slate-300/80 w-full relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Блок ЭТРН и ЭДО: гармоничная белая карточка с идеальным контрастом текста -->
         <div class="theme-card p-5 sm:p-6 rounded-2xl border-brand-500/40 shadow-sm">
           <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
