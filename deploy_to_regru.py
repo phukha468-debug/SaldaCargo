@@ -24,7 +24,7 @@ TARGET_DIRS = ["www/tk501.ru", "www/ancargo66.ru"]
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 LOCAL_DIR = os.path.join(REPO_ROOT, "apps", "web", "public")
 if not os.path.isdir(LOCAL_DIR):
-    LOCAL_DIR = r"C:\ancargo66"
+    raise FileNotFoundError(f"Папка с файлами для выгрузки не найдена: {LOCAL_DIR}")
 
 EXCLUDE_EXT = ['.ps1', '.bat', '.py', '.md']
 EXCLUDE_PREFIX = ['.git', '.vscode']
