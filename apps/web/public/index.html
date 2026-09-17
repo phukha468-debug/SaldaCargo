@@ -274,6 +274,20 @@
           <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
         </a>
 
+        <!-- 1.1 Партнёры и ЭТРН -->
+        <a href="#partners" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/15 text-brand-400 flex items-center justify-center font-bold">
+              <i data-lucide="award" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold">Партнёры и ЭТРН</div>
+              <div class="text-[11px] text-slate-400 font-normal">ВСМПО, Урал-Боинг, НТЛ, Геострой • ЭДО</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+        </a>
+
         <!-- 2. Онлайн-калькулятор -->
         <a href="#calculator" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-white font-bold transition active:scale-[0.98]">
           <div class="flex items-center gap-3">
@@ -436,8 +450,12 @@
         </a>
 
         <!-- Навигационные ссылки для десктопа (компактные, без наездов) -->
-        <nav class="hidden xl:flex items-center gap-3 2xl:gap-5 text-xs 2xl:text-sm font-bold text-slate-300 flex-shrink-0">
+        <nav class="hidden xl:flex items-center gap-2.5 2xl:gap-4 text-xs 2xl:text-sm font-bold text-slate-300 flex-shrink-0">
           <a href="#hero" class="py-1 px-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors whitespace-nowrap">Главная</a>
+          <a href="#partners" class="py-1 px-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors whitespace-nowrap flex items-center gap-1">
+            <i data-lucide="award" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Партнёры</span>
+          </a>
           <a href="#calculator" class="py-1 px-2 rounded-lg text-brand-400 hover:text-brand-300 hover:bg-brand-500/10 transition-colors whitespace-nowrap flex items-center gap-1">
             <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
             <span>Калькулятор</span>
@@ -493,12 +511,12 @@
 
             <!-- Главный конверсионный заголовок -->
             <h1 class="text-2xl sm:text-4xl xl:text-5xl font-black text-white tracking-tight leading-tight">
-              Грузоперевозки по <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-amber-300 to-amber-500">Верхней Салде</span>, Свердловской области и РФ
+              Грузоперевозки от 1 до 20 тонн по <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-amber-300 to-amber-500">В.Салде</span> и всей РФ
             </h1>
 
             <!-- Подзаголовок с доказательствами -->
             <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
-              Собственный автопарк <strong class="text-white">11 автомобилей</strong> (ГАЗель NEXT, Валдай 5т, Fuso). Личная ремонтная база, <strong class="text-emerald-400">0% срывов</strong>, рейтинг <strong class="text-brand-400">5.0 в бирже ATI.SU</strong>. Официальный договор, безналичный расчет <strong class="text-white">без НДС (УСН)</strong>, ЭДО.
+              Собственный автопарк <strong class="text-white">11 автомобилей</strong> и проверенный транспорт до 20 тонн. Официальный договор, безналичный расчет <strong class="text-white">без НДС (УСН)</strong>, <strong class="text-brand-400">100% работа с ЭТРН и ЭДО</strong>. Рейтинг <strong class="text-emerald-400">5.0 в бирже ATI.SU</strong>.
             </p>
 
             <!-- 🎯 КЛИКАБЕЛЬНЫЕ ПРИЗЫВЫ К ДЕЙСТВИЮ (CTA-БЛОК: 2 ГЛАВНЫЕ КНОПКИ) -->
@@ -518,23 +536,23 @@
 
             </div>
 
-            <!-- Бейджи доверия и преимуществ -->
+            <!-- Бейджи доверия и преимуществ (без дублей) -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
               <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-brand-400">⚡ От 5 мин</div>
-                <div class="text-[10px] text-slate-400">Подача авто</div>
-              </div>
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-brand-400">🚛 11 машин</div>
-                <div class="text-[10px] text-slate-400">Парк до 5 тонн</div>
-              </div>
-              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
                 <div class="text-xs font-bold text-emerald-400">⭐ 5.0 ATI.SU</div>
-                <div class="text-[10px] text-slate-400">Код: 2811269</div>
+                <div class="text-[10px] text-slate-400 font-mono">Код: 2811269</div>
               </div>
               <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
-                <div class="text-xs font-bold text-white">📄 Без НДС / ЭДО</div>
-                <div class="text-[10px] text-slate-400">Безнал и договор</div>
+                <div class="text-xs font-bold text-brand-400">📄 ЭТРН & ЭДО</div>
+                <div class="text-[10px] text-slate-400">ГИС ЭПД • Диадок</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <div class="text-xs font-bold text-white">⚖️ От 1 до 20 т</div>
+                <div class="text-[10px] text-slate-400">Город и вся РФ</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <div class="text-xs font-bold text-amber-400">🔒 0% срывов</div>
+                <div class="text-[10px] text-slate-400">Договор и гарантия</div>
               </div>
             </div>
 
@@ -555,31 +573,129 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-3 gap-2 mt-3 text-center">
-                <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
-                  <span class="block text-lg font-black text-white font-mono">11</span>
-                  <span class="text-[10px] text-brand-400 font-bold uppercase">Автомобилей</span>
+              <!-- Информационная плашка готовности (без дублирования цифр) -->
+              <div class="mt-3 p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <div class="font-black text-white text-xs">Автопарк готов к рейсам</div>
+                    <div class="text-[11px] text-slate-400">ГАЗель NEXT, Валдай 5т, Fuso, фуры 20т</div>
+                  </div>
                 </div>
-                <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
-                  <span class="block text-lg font-black text-emerald-400 font-mono">5.0 ⭐</span>
-                  <span class="text-[10px] text-slate-300 font-bold uppercase">Рейтинг ATI</span>
-                </div>
-                <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
-                  <span class="block text-lg font-black text-white font-mono">0%</span>
-                  <span class="text-[10px] text-brand-400 font-bold uppercase">Срывов</span>
-                </div>
+                <a href="#tariffs" class="text-[11px] font-bold text-brand-400 hover:text-brand-300 whitespace-nowrap">Тарифы →</a>
               </div>
 
               <!-- Кнопка быстрого перехода в калькулятор -->
-              <a href="#calculator" class="mt-3 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition">
+              <a href="#calculator" class="mt-2.5 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition">
                 <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-brand-400 animate-bounce"></i>
-                <span>Перейти к калькулятору стоимости ниже</span>
+                <span>Рассчитать стоимость поездки</span>
               </a>
 
             </div>
           </div>
 
         </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- 1.1 НАМ ДОВЕРЯЮТ СВОИ ГРУЗЫ + ЭТРН / ЭДО (КОРПОРАТИВНЫЙ БЛОК ДОВЕРИЯ) -->
+    <!-- ========================================================================= -->
+    <section id="partners" class="py-8 sm:py-10 bg-slate-100 border-y border-slate-800/80 w-full relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        <!-- Заголовок блока доверия -->
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-400 text-xs font-bold rounded-full border border-brand-500/20 uppercase tracking-wider mb-1.5">
+              <i data-lucide="award" class="w-3.5 h-3.5"></i> Постоянные партнёры
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Они доверяют нам свои грузы
+            </h2>
+          </div>
+          <div class="text-xs text-slate-400 font-medium">
+            Регулярные рейсы по В.Салде, УрФО и всей России
+          </div>
+        </div>
+
+        <!-- Сетка 4 ключевых партнёров (лаконично, солидно, без громоздких подписей) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          
+          <!-- Партнёр 1: ВСМПО-Ависма -->
+          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
+              <i data-lucide="factory" class="w-5 h-5 text-brand-400"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">ВСМПО-АВИСМА</div>
+              <div class="text-[11px] text-slate-400 font-semibold truncate">Титановая корпорация</div>
+            </div>
+          </div>
+
+          <!-- Партнёр 2: Урал-Боинг -->
+          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-900/60 to-slate-900 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+              <i data-lucide="plane" class="w-5 h-5 text-blue-400"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">Урал-Боинг</div>
+              <div class="text-[11px] text-slate-400 font-semibold truncate">Ural Boeing Mfg</div>
+            </div>
+          </div>
+
+          <!-- Партнёр 3: ООО НПК "НТЛ" -->
+          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
+              <i data-lucide="flame" class="w-5 h-5 text-emerald-400"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">НПК «НТЛ»</div>
+              <div class="text-[11px] text-slate-400 font-semibold truncate">Газовое и СПГ оборудование</div>
+            </div>
+          </div>
+
+          <!-- Партнёр 4: ООО "Геостройиндустрия" -->
+          <div class="theme-card p-4 rounded-2xl border border-slate-800 bg-white flex items-center gap-3 shadow-sm hover:border-brand-500/50 hover:shadow-md transition">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
+              <i data-lucide="pickaxe" class="w-5 h-5 text-amber-400"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-black text-sm sm:text-base text-white tracking-tight leading-tight">Геостройиндустрия</div>
+              <div class="text-[11px] text-slate-400 font-semibold truncate">Недропользование и ископаемые</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Блок ЭТРН и ЭДО: готовность + бесплатные консультации для клиентов -->
+        <div class="p-4 sm:p-5 rounded-2xl bg-white border border-brand-500/35 shadow-md">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-brand-500 to-amber-700 flex items-center justify-center text-white shrink-0 shadow-md shadow-brand-900/30">
+                <i data-lucide="file-check-2" class="w-5 h-5 text-white"></i>
+              </div>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-sm sm:text-base font-black text-white">Работаем с ЭТРН и электронным документооборотом (ЭДО)</h3>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold uppercase">100% ГИС ЭПД</span>
+                </div>
+                <p class="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                  Оформляем электронные транспортные накладные через государственную систему ГИС ЭПД (Диадок, СБИС). <strong>Консультируем наших клиентов и бухгалтерию</strong>: бесплатно помогаем подключить, настроить обмен ЭТРН и перейти на цифровой документооборот без штрафов и задержек.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 w-full md:w-auto">
+              <a href="tel:+79630501501" class="w-full md:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-sm whitespace-nowrap">
+                <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+                <span>Консультация по ЭТРН</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -1151,7 +1267,7 @@
                 <i data-lucide="truck" class="w-5 h-5"></i>
               </div>
               <h3 class="text-base sm:text-lg font-black text-white">Доставка по Верхней Салде</h3>
-              <p class="text-xs text-slate-400">Быстрый заказ без деления на зоны. Подача авто от 5–15 минут.</p>
+              <p class="text-xs text-slate-400">Быстрый заказ без деления на зоны. Оперативная подача по городу.</p>
               <div class="space-y-2 pt-2 border-t border-slate-800/80 text-xs">
                 <div class="flex justify-between items-center py-1 border-b border-slate-800/40">
                   <span class="text-slate-300">⚡ Быстрый заказ (до 30 мин)</span>
@@ -2474,7 +2590,7 @@ Email: uralavto707@mail.ru
       }
       document.getElementById('sum-movers-unload').innerText = cityState.mode === 'express' ? 'Самостоятельно' : 'Включено в почасовую';
       document.getElementById('sum-movers-road').innerText = 'Бесплатно (по городу)';
-      document.getElementById('sum-opts').innerText = 'Подача от 5 минут';
+      document.getElementById('sum-opts').innerText = 'Оперативная подача';
       if (window.lucide) lucide.createIcons();
     }
 
