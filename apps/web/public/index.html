@@ -642,36 +642,64 @@
         <!-- ========================================================================= -->
         <!-- ЛОГОТИПЫ ПАРТНЁРОВ ПРЯМО НА ПЕРВОМ ЭКРАНЕ (HERO) -->
         <!-- ========================================================================= -->
-        <div id="partners" class="mt-8 pt-5 border-t border-slate-300/80">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
-              <span class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">Нам доверяют свои грузы лидеры промышленности:</span>
+        <div id="partners" class="mt-8 pt-6 border-t border-slate-300">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-sm flex-shrink-0"></span>
+              <h2 class="text-sm sm:text-base font-black tracking-tight uppercase" style="color: #171310 !important;">
+                Нам доверяют свои грузы лидеры промышленности:
+              </h2>
             </div>
-            <span class="text-[11px] text-slate-500 font-medium">Регулярные рейсы по В.Салде, УрФО и всей РФ</span>
+            <span class="text-xs font-semibold" style="color: #524b42 !important;">
+              Регулярные рейсы по В.Салде, УрФО и всей РФ
+            </span>
           </div>
 
-          <!-- Сетка 4 ключевых партнёров с реальными фирменными логотипами -->
+          <!-- Сетка 4 ключевых партнёров: крупные узнаваемые логотипы + подписи -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             
             <!-- Партнёр 1: ВСМПО-АВИСМА -->
-            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-brand-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="Корпорация ВСМПО-АВИСМА">
-              <img src="logo-vsmpo.png" alt="Корпорация ВСМПО-АВИСМА" class="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-brand-500/50 hover:shadow-md transition group text-center cursor-pointer">
+              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
+                <img src="logo-vsmpo.png" alt="Корпорация ВСМПО-АВИСМА" class="max-h-12 sm:max-h-14 w-auto object-contain transition-transform group-hover:scale-105" />
+              </div>
+              <div class="pt-2 border-t border-slate-200">
+                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">ВСМПО-АВИСМА</div>
+                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Титановая корпорация</div>
+              </div>
             </div>
 
             <!-- Партнёр 2: Ural Boeing Manufacturing -->
-            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-blue-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="Ural Boeing Manufacturing">
-              <img src="logo-ural-boeing.png" alt="Ural Boeing Manufacturing" class="max-h-10 sm:max-h-12 w-auto object-contain rounded-md transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-blue-500/50 hover:shadow-md transition group text-center cursor-pointer">
+              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
+                <img src="logo-ural-boeing.png" alt="Ural Boeing Manufacturing" class="max-h-12 sm:max-h-14 w-auto object-contain rounded transition-transform group-hover:scale-105" />
+              </div>
+              <div class="pt-2 border-t border-slate-200">
+                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">Урал-Боинг</div>
+                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Ural Boeing Mfg</div>
+              </div>
             </div>
 
             <!-- Партнёр 3: Компания НТЛ -->
-            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="Компания НТЛ">
-              <img src="logo-ntl.png" alt="Компания НТЛ" class="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group text-center cursor-pointer">
+              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
+                <img src="logo-ntl.png" alt="Компания НТЛ" class="max-h-12 sm:max-h-14 w-auto object-contain transition-transform group-hover:scale-105" />
+              </div>
+              <div class="pt-2 border-t border-slate-200">
+                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">Компания НТЛ</div>
+                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Газовое оборудование</div>
+              </div>
             </div>
 
             <!-- Партнёр 4: ООО Геостройиндустрия -->
-            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex items-center justify-center h-16 sm:h-20 shadow-sm hover:border-amber-500/50 hover:shadow-md transition group px-4 cursor-pointer" title="ООО Геостройиндустрия">
-              <img src="logo-gsi.png" alt="ООО Геостройиндустрия" class="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-amber-500/50 hover:shadow-md transition group text-center cursor-pointer">
+              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
+                <img src="logo-gsi.png" alt="ООО Геостройиндустрия" class="max-h-12 sm:max-h-14 w-auto object-contain transition-transform group-hover:scale-105" />
+              </div>
+              <div class="pt-2 border-t border-slate-200">
+                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">Геостройиндустрия</div>
+                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Недропользование и ГСИ</div>
+              </div>
             </div>
 
           </div>
