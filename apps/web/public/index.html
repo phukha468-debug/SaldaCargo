@@ -120,6 +120,27 @@
       box-shadow: 0 0 0 6px rgba(226, 102, 11, 0.10);
     }
 
+    /* ---- Пульсация логотипов партнёров (мягкое увеличение и уменьшение) ---- */
+    @keyframes logoPulseBreath {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.10);
+      }
+    }
+    .animate-logo-pulse {
+      animation: logoPulseBreath 3.2s ease-in-out infinite;
+      transform-origin: center center;
+      display: inline-block;
+      will-change: transform;
+    }
+    .theme-card:hover .animate-logo-pulse {
+      animation-play-state: paused;
+      transform: scale(1.15);
+      transition: transform 0.25s ease;
+    }
+
     /* ---- Анимированная 3D переворачивающаяся кнопка ЭТРН (Вариант 5: 3D Flip 2.0) ---- */
     .etrn-flip-btn {
       perspective: 800px;
@@ -731,50 +752,50 @@
             </span>
           </div>
 
-          <!-- Сетка 4 ключевых партнёров: крупные узнаваемые логотипы + подписи -->
+          <!-- Сетка 4 ключевых партнёров: компактные пульсирующие логотипы + крупные названия -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
             
             <!-- Партнёр 1: ВСМПО-АВИСМА -->
-            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-brand-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
-              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
-                <img src="logo-vsmpo.png" alt="Корпорация ВСМПО-АВИСМА" class="max-h-12 sm:max-h-14 w-auto object-contain transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex flex-col justify-between shadow-sm hover:border-brand-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
+              <div class="h-8 sm:h-9 w-full flex items-center justify-center p-0.5 mb-1.5 bg-white rounded-lg overflow-hidden">
+                <img src="logo-vsmpo.png" alt="Корпорация ВСМПО-АВИСМА" class="max-h-6 sm:max-h-7 w-auto object-contain animate-logo-pulse" />
               </div>
-              <div class="pt-2 border-t border-slate-200">
-                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">ВСМПО-АВИСМА</div>
-                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Титановая корпорация</div>
+              <div class="pt-1.5 border-t border-slate-200">
+                <div class="font-black text-sm sm:text-base lg:text-lg tracking-tight leading-snug" style="color: #171310 !important;">ВСМПО-АВИСМА</div>
+                <div class="text-[11px] sm:text-xs font-medium mt-0.5" style="color: #524b42 !important;">Титановая корпорация</div>
               </div>
             </div>
 
             <!-- Партнёр 2: Ural Boeing Manufacturing -->
-            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-blue-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
-              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
-                <img src="logo-ural-boeing.png" alt="Ural Boeing Manufacturing" class="max-h-12 sm:max-h-14 w-auto object-contain rounded transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3.5 sm:p-3.5 rounded-2xl flex flex-col justify-between shadow-sm hover:border-blue-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
+              <div class="h-8 sm:h-9 w-full flex items-center justify-center p-0.5 mb-1.5 bg-white rounded-lg overflow-hidden">
+                <img src="logo-ural-boeing.png" alt="Ural Boeing Manufacturing" class="max-h-6 sm:max-h-7 w-auto object-contain rounded animate-logo-pulse" style="animation-delay: 0.8s;" />
               </div>
-              <div class="pt-2 border-t border-slate-200">
-                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">Урал-Боинг</div>
-                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Ural Boeing Mfg</div>
+              <div class="pt-1.5 border-t border-slate-200">
+                <div class="font-black text-sm sm:text-base lg:text-lg tracking-tight leading-snug" style="color: #171310 !important;">Урал-Боинг</div>
+                <div class="text-[11px] sm:text-xs font-medium mt-0.5" style="color: #524b42 !important;">Ural Boeing Mfg</div>
               </div>
             </div>
 
             <!-- Партнёр 3: Компания НТЛ -->
-            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
-              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
-                <img src="logo-ntl.png" alt="Компания НТЛ" class="max-h-12 sm:max-h-14 w-auto object-contain transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex flex-col justify-between shadow-sm hover:border-emerald-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
+              <div class="h-8 sm:h-9 w-full flex items-center justify-center p-0.5 mb-1.5 bg-white rounded-lg overflow-hidden">
+                <img src="logo-ntl.png" alt="Компания НТЛ" class="max-h-6 sm:max-h-7 w-auto object-contain animate-logo-pulse" style="animation-delay: 1.6s;" />
               </div>
-              <div class="pt-2 border-t border-slate-200">
-                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">Компания НТЛ</div>
-                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Газовое оборудование</div>
+              <div class="pt-1.5 border-t border-slate-200">
+                <div class="font-black text-sm sm:text-base lg:text-lg tracking-tight leading-snug" style="color: #171310 !important;">Компания НТЛ</div>
+                <div class="text-[11px] sm:text-xs font-medium mt-0.5" style="color: #524b42 !important;">Газовое оборудование</div>
               </div>
             </div>
 
             <!-- Партнёр 4: ООО Геостройиндустрия -->
-            <div class="theme-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-amber-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
-              <div class="h-14 sm:h-16 w-full flex items-center justify-center p-1 mb-2 bg-white rounded-xl">
-                <img src="logo-gsi.png" alt="ООО Геостройиндустрия" class="max-h-12 sm:max-h-14 w-auto object-contain transition-transform group-hover:scale-105" />
+            <div class="theme-card p-3 sm:p-3.5 rounded-2xl flex flex-col justify-between shadow-sm hover:border-amber-500/50 hover:shadow-md transition group text-center cursor-pointer w-full">
+              <div class="h-8 sm:h-9 w-full flex items-center justify-center p-0.5 mb-1.5 bg-white rounded-lg overflow-hidden">
+                <img src="logo-gsi.png" alt="ООО Геостройиндустрия" class="max-h-6 sm:max-h-7 w-auto object-contain animate-logo-pulse" style="animation-delay: 2.4s;" />
               </div>
-              <div class="pt-2 border-t border-slate-200">
-                <div class="font-black text-xs sm:text-sm tracking-tight leading-tight" style="color: #171310 !important;">Геостройиндустрия</div>
-                <div class="text-[10px] sm:text-[11px] font-medium mt-0.5" style="color: #524b42 !important;">Недропользование и ГСИ</div>
+              <div class="pt-1.5 border-t border-slate-200">
+                <div class="font-black text-sm sm:text-base lg:text-lg tracking-tight leading-snug" style="color: #171310 !important;">Геостройиндустрия</div>
+                <div class="text-[11px] sm:text-xs font-medium mt-0.5" style="color: #524b42 !important;">Недропользование и ГСИ</div>
               </div>
             </div>
 
