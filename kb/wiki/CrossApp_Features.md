@@ -53,10 +53,12 @@
 
 ## 3. ДЕБИТОРКА (RECEIVABLES)
 
-| Фича             | MiniApp файл                        | WebApp файл                       | Статус | Примечание                                                                 |
-| ---------------- | ----------------------------------- | --------------------------------- | ------ | -------------------------------------------------------------------------- |
-| Список должников | `api/admin/receivables` GET         | `api/receivables` GET             | ✅     | Оба: `settlement=pending + lifecycle=approved`. Web добавляет overdueCount |
-| Погасить долг    | `api/admin/receivables/settle` POST | `api/receivables/[orderId]` PATCH | ✅     | Оба: mark completed + создать income транзакцию с to_wallet_id             |
+| Фича                    | MiniApp файл                           | WebApp файл                       | Статус | Примечание                                                                                               |
+| ----------------------- | -------------------------------------- | --------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- |
+| Список должников        | `api/admin/receivables` GET            | `api/receivables` GET             | ✅     | Оба: `settlement=pending + lifecycle=approved`. Web добавляет overdueCount                               |
+| Погасить долг           | `api/admin/receivables/settle` POST    | `api/receivables/[orderId]` PATCH | ✅     | Оба: mark completed + создать income транзакцию с to_wallet_id и метаданными в photo_url                 |
+| Погасить всё (пакетно)  | `api/admin/receivables/close-all` POST | `api/receivables/close-all` POST  | ✅     | Оба: массовый settlement_status=completed + income транзакция с массивом orders в photo_url              |
+| Аннулировать транзакцию | —                                      | `api/transactions/[id]` DELETE    | ⚠️     | Только Web. При аннулировании транзакции погашения автоматически возвращает заказы в pending / unsettled |
 
 **Группировка должников:**
 

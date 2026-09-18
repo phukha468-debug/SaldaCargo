@@ -49,12 +49,17 @@ export async function POST(request: Request) {
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
     const description = body.note || 'Погашение исторического долга';
+    const meta = JSON.stringify({
+      type: 'receivables_settlement',
+      orders: [{ id: body.id, type: 'manual', amount: manual.amount }],
+    });
     const { error: txErr } = await (supabase as any).from('transactions').insert({
       direction: 'income',
       category_id: TRIP_REVENUE_CATEGORY,
       amount: manual.amount,
       counterparty_id: manual.counterparty_id,
       to_wallet_id: body.to_wallet_id ?? CASH_ID,
+      photo_url: meta,
       description,
       lifecycle_status: 'approved',
       settlement_status: 'completed',
@@ -82,7 +87,7 @@ export async function POST(request: Request) {
 
   const { error: updateErr } = await (supabase
     .from('trip_orders')
-    .update({ settlement_status: 'completed' })
+    .update({ settlement_status: 'completed', updated_at: new Date().toISOString() })
     .eq('id', body.id) as any);
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
@@ -92,12 +97,19 @@ export async function POST(request: Request) {
   const toWalletId = walletForDebt(isLegal);
   const description = body.note ? body.note : `Погашение: ${cpName}`;
 
+  const meta = JSON.stringify({
+    type: 'receivables_settlement',
+    orders: [{ id: body.id, type: 'trip_order', amount: order.amount }],
+  });
+
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
     amount: order.amount,
     counterparty_id: order.counterparty_id ?? null,
+    trip_order_id: body.id,
     to_wallet_id: toWalletId,
+    photo_url: meta,
     description,
     lifecycle_status: 'approved',
     settlement_status: 'completed',

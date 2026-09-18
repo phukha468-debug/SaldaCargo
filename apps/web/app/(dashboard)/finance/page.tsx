@@ -650,6 +650,10 @@ function ExpensesPanel() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payables'] });
       setPendingCancelId(null);
       setCancelReason('');
     },
@@ -4223,6 +4227,10 @@ function IncomePanel() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['recv-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payables'] });
       setPendingCancelId(null);
       setCancelReason('');
     },

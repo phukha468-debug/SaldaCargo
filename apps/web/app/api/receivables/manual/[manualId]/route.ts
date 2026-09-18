@@ -73,12 +73,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ manual
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
+  const meta = JSON.stringify({
+    type: 'receivables_settlement',
+    orders: [{ id: manualId, type: 'manual', amount: payAmount.toFixed(2), is_partial: isPartial }],
+  });
+
   const { error: txErr } = await (supabase as any).from('transactions').insert({
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
     amount: payAmount.toFixed(2),
     counterparty_id: manual.counterparty_id,
     to_wallet_id: isPartial ? toWalletId : walletId,
+    photo_url: meta,
     description: isPartial ? 'Частичное погашение долга' : 'Погашение исторического долга',
     lifecycle_status: 'approved',
     settlement_status: 'completed',

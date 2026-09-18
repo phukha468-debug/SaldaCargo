@@ -82,7 +82,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
     // Помечаем заказ полностью оплаченным
     const { error: updateErr } = await (supabase
       .from('trip_orders')
-      .update({ settlement_status: 'completed' })
+      .update({ settlement_status: 'completed', updated_at: new Date().toISOString() })
       .eq('id', orderId)
       .eq('settlement_status', 'pending') as any);
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
@@ -93,12 +93,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
   const isLegal = order.counterparty?.is_legal_entity ?? false;
   const toWalletId = customWalletId ?? walletForDebt(isLegal);
 
+  const meta = JSON.stringify({
+    type: 'receivables_settlement',
+    orders: [
+      { id: orderId, type: 'trip_order', amount: payAmount.toFixed(2), is_partial: isPartial },
+    ],
+  });
+
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
     amount: payAmount.toFixed(2),
     counterparty_id: order.counterparty_id ?? null,
+    trip_order_id: orderId,
     to_wallet_id: toWalletId,
+    photo_url: meta,
     description: isPartial ? `Частичное погашение: ${cpName}` : `Погашение: ${cpName}`,
     lifecycle_status: 'approved',
     settlement_status: 'completed',
