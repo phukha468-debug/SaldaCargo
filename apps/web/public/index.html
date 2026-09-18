@@ -555,12 +555,12 @@
 
         <!-- Навигационные ссылки для десктопа (компактные, без наездов) -->
         <nav class="hidden xl:flex items-center gap-2.5 2xl:gap-4 text-xs 2xl:text-sm font-bold text-slate-300 flex-shrink-0">
-          <!-- Анимированная переворачивающаяся кнопка ЭТРН -->
-          <a href="#etrn" class="etrn-flip-btn" title="ЭТРН и ЭДО — Консультация бесплатно (нажмите для перехода)">
+          <!-- Анимированная переворачивающаяся кнопка ЭТРН (Вариант 5: 3D Flip 2.0) -->
+          <a href="#etrn" class="etrn-flip-btn" title="100% ЭТРН и ЭДО — Консультация бесплатно (нажмите для перехода)">
             <div class="etrn-flip-container">
-              <!-- Сторона 1: ЭТРН -->
+              <!-- Сторона 1: 100% ЭТРН -->
               <div class="etrn-flip-side etrn-flip-front">
-                <span class="w-2 h-2 rounded-full bg-emerald-300 animate-ping"></span>
+                <span class="px-1.5 py-0.5 rounded bg-emerald-400 text-slate-950 text-[9px] font-black leading-none shadow-xs">100%</span>
                 <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-emerald-200"></i>
                 <span class="font-black text-white tracking-wide">ЭТРН</span>
                 <span class="text-[9px] px-1 py-0.5 rounded bg-emerald-900/60 text-emerald-200 font-extrabold uppercase leading-none">ГИС ЭПД</span>
@@ -650,30 +650,30 @@
 
             <!-- Бейджи доверия и преимуществ: гармоничные белые карточки theme-card -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
-              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
-                <div class="text-xs sm:text-sm font-black text-emerald-600 flex items-center justify-center gap-1">
+              <div class="theme-card p-2.5 sm:p-3 rounded-2xl text-center shadow-sm flex flex-col justify-center">
+                <div class="text-xs sm:text-[13px] font-black text-emerald-600 flex items-center justify-center gap-1 whitespace-nowrap">
                   <span>★ 5.0 ATI.SU</span>
                 </div>
-                <div class="text-[10px] text-slate-500 font-mono mt-0.5">Код: 2811269</div>
+                <div class="text-[10px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">Код: 2811269</div>
               </div>
               <!-- Карточка 2: 100% ЭТРН & ЭДО (переход в раздел) -->
-              <a href="#etrn" class="theme-card p-3 rounded-2xl text-center shadow-sm hover:border-brand-500/60 hover:shadow-md transition group block cursor-pointer" title="Нажмите для перехода в раздел ЭТРН и получения бесплатной консультации">
-                <div class="text-xs sm:text-sm font-black text-brand-600 flex items-center justify-center gap-1">
-                  <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-brand-600 flex-shrink-0"></i>
+              <a href="#etrn" class="theme-card p-2.5 sm:p-3 rounded-2xl text-center shadow-sm border border-transparent hover:border-brand-500/50 hover:shadow-md hover:bg-amber-500/[0.04] transition-all group flex flex-col justify-center cursor-pointer" title="Нажмите для перехода в раздел ЭТРН и получения бесплатной консультации">
+                <div class="text-[11px] xs:text-xs sm:text-[13px] font-black text-brand-600 flex items-center justify-center gap-1 whitespace-nowrap tracking-tight">
+                  <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-brand-600 flex-shrink-0 group-hover:scale-110 transition-transform"></i>
                   <span>100% ЭТРН & ЭДО</span>
                 </div>
-                <div class="text-[10px] text-slate-500 mt-0.5 flex items-center justify-center gap-1">
+                <div class="text-[10px] text-slate-500 mt-0.5 flex items-center justify-center gap-1 whitespace-nowrap">
                   <span>ГИС ЭПД • Диадок</span>
                   <span class="text-brand-600 font-bold group-hover:translate-x-0.5 transition-transform">→</span>
                 </div>
               </a>
-              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
-                <div class="text-xs sm:text-sm font-black text-slate-950">От 1 до 20 тонн</div>
-                <div class="text-[10px] text-slate-500 mt-0.5">В.Салда и вся РФ</div>
+              <div class="theme-card p-2.5 sm:p-3 rounded-2xl text-center shadow-sm flex flex-col justify-center">
+                <div class="text-xs sm:text-[13px] font-black text-slate-950 whitespace-nowrap">От 1 до 20 тонн</div>
+                <div class="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">В.Салда и вся РФ</div>
               </div>
-              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
-                <div class="text-xs sm:text-sm font-black text-emerald-600">0% срывов</div>
-                <div class="text-[10px] text-slate-500 mt-0.5">Договор и гарантия</div>
+              <div class="theme-card p-2.5 sm:p-3 rounded-2xl text-center shadow-sm flex flex-col justify-center">
+                <div class="text-xs sm:text-[13px] font-black text-emerald-600 whitespace-nowrap">0% срывов</div>
+                <div class="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">Договор и гарантия</div>
               </div>
             </div>
 
