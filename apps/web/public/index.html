@@ -120,25 +120,33 @@
       box-shadow: 0 0 0 6px rgba(226, 102, 11, 0.10);
     }
 
-    /* ---- Анимированная переворачивающаяся кнопка ЭТРН ---- */
+    /* ---- Анимированная 3D переворачивающаяся кнопка ЭТРН (Вариант 5: 3D Flip 2.0) ---- */
     .etrn-flip-btn {
-      perspective: 700px;
+      perspective: 800px;
+      -webkit-perspective: 800px;
       height: 32px;
-      width: 170px;
+      width: 175px;
       border-radius: 12px;
       text-decoration: none;
       cursor: pointer;
       display: inline-block;
       vertical-align: middle;
-      animation: etrnPulseGlow 2.6s ease-in-out infinite;
       flex-shrink: 0;
+      animation: etrnPulseGlow 3s ease-in-out infinite;
     }
     .etrn-flip-container {
       position: relative;
       width: 100%;
       height: 100%;
       transform-style: preserve-3d;
-      animation: etrnFlipCycle 5.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      -webkit-transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    /* Мгновенный 3D-переворот по ховеру мыши или по классу */
+    .etrn-flip-btn:hover .etrn-flip-container,
+    .etrn-flip-btn.is-flipped .etrn-flip-container {
+      transform: rotateY(180deg);
+      -webkit-transform: rotateY(180deg);
     }
     .etrn-flip-side {
       position: absolute;
@@ -154,33 +162,21 @@
       font-size: 11px;
       font-weight: 800;
       white-space: nowrap;
-      transition: transform 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
     }
     .etrn-flip-front {
-      background: linear-gradient(135deg, #065f46 0%, #059669 100%);
+      background: linear-gradient(135deg, #064e3b 0%, #059669 100%);
       color: #ffffff;
       border: 1px solid #10b981;
-      transform: rotateX(0deg);
+      transform: rotateY(0deg);
+      -webkit-transform: rotateY(0deg);
     }
     .etrn-flip-back {
-      background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+      background: linear-gradient(135deg, #b45309 0%, #ea580c 100%);
       color: #ffffff;
       border: 1px solid #f59e0b;
-      transform: rotateX(180deg);
-    }
-    .etrn-flip-btn:hover .etrn-flip-container {
-      animation-play-state: paused;
-    }
-    @keyframes etrnFlipCycle {
-      0%, 42% {
-        transform: rotateX(0deg);
-      }
-      50%, 92% {
-        transform: rotateX(180deg);
-      }
-      100% {
-        transform: rotateX(360deg);
-      }
+      transform: rotateY(180deg);
+      -webkit-transform: rotateY(180deg);
     }
     @keyframes etrnPulseGlow {
       0%, 100% {
@@ -3301,6 +3297,21 @@ Email: uralavto707@mail.ru
       if (rawInput) rawInput.value = '';
       updateBoxesVisuals();
       validatePhoneState();
+    }
+
+    // Автоматический и интерактивный 3D-переворот кнопки ЭТРН
+    const etrnBtn = document.querySelector('.etrn-flip-btn');
+    if (etrnBtn) {
+      setInterval(() => {
+        try {
+          if (!etrnBtn.matches(':hover')) {
+            etrnBtn.classList.toggle('is-flipped');
+          }
+        } catch (e) {}
+      }, 4500);
+      etrnBtn.addEventListener('mouseenter', () => {
+        etrnBtn.classList.remove('is-flipped');
+      });
     }
 
     // Инициализация
