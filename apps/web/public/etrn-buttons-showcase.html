@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>10 вариантов кнопки «100% ЭТРН» — ТК501 / СалдаКарго</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #070a10;
+      color: #f1f5f9;
+    }
+
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.96); }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 3s infinite ease-in-out;
+    }
+
+    @keyframes radar-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .radar-border {
+      position: relative;
+      background: #0b1120;
+    }
+    .radar-border::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1.5px;
+      background: conic-gradient(from 0deg, #10b981, #06b6d4, #10b981 40%, transparent 70%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: radar-spin 4s linear infinite;
+    }
+
+    .flip-wrapper {
+      perspective: 800px;
+    }
+    .flip-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform-style: preserve-3d;
+    }
+    .flip-wrapper:hover .flip-card-inner {
+      transform: rotateY(180deg);
+    }
+    .flip-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .flip-face-back {
+      transform: rotateY(180deg);
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    .shimmer-mask {
+      position: relative;
+      overflow: hidden;
+    }
+    .shimmer-mask::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      transform: translateX(-100%);
+      animation: shimmer 2.5s infinite;
+    }
+  </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen">
+
+  <div class="max-w-6xl mx-auto space-y-10">
+
+    <!-- Заголовок витрины -->
+    <div class="text-center space-y-3 pt-4">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        Витрина концептов для хедера
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-black text-white tracking-tight">
+        10 вариантов кнопки <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-400">«100% ЭТРН»</span>
+      </h1>
+      <p class="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">
+        Все варианты разработаны с учётом компактности хедера, фирменных цветов (изумруд, тёмный графит, янтарный акцент) и официального статуса работы с ГИС ЭПД Минтранса РФ.
+      </p>
+    </div>
+
+    <!-- Интерактивная примерка в реальном хедере -->
+    <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-xl">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+        <div>
+          <div class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="eye" class="w-4 h-4"></i>
+            Интерактивный стенд примерки в хедере сайта
+          </div>
+          <div class="text-sm text-slate-300 font-medium">Посмотрите, как выбранная кнопка сидит прямо в хедере</div>
+        </div>
+        <div class="text-xs text-slate-400">
+          Выбранный вариант: <strong id="current-preview-title" class="text-emerald-400">Вариант 1 (Cyber Pill)</strong>
+        </div>
+      </div>
+
+      <!-- Имитация реального хедера сайта -->
+      <div class="bg-[#090d16] border border-slate-800 rounded-xl px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 shadow-inner">
+        <!-- Логотип слева -->
+        <div class="flex items-center gap-2.5 flex-shrink-0">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center font-black text-slate-950 text-xs shadow-md">
+            ТК
+          </div>
+          <div class="leading-tight">
+            <div class="flex items-center gap-1.5">
+              <span class="font-black text-white text-xs sm:text-sm">ИП Нигамедьянов</span>
+              <span class="px-1 py-0.5 text-[9px] bg-emerald-500/20 text-emerald-400 rounded font-black border border-emerald-500/30">5.0 ★</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-medium">В.Салда • ТК501</div>
+          </div>
+        </div>
+
+        <!-- Центральная область с примеряемой кнопкой и ссылками -->
+        <div class="flex items-center gap-2 sm:gap-4">
+          <!-- Сюда подставляется выбранная кнопка -->
+          <div id="live-header-slot" class="transition-all duration-300"></div>
+
+          <!-- Остальные ссылки меню -->
+          <div class="hidden lg:flex items-center gap-3 text-xs font-bold text-slate-300">
+            <span class="text-amber-400 flex items-center gap-1"><i data-lucide="calculator" class="w-3.5 h-3.5"></i> Калькулятор</span>
+            <span class="text-slate-400 flex items-center gap-1"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> Тарифы</span>
+            <span class="text-slate-400">Реквизиты</span>
+          </div>
+        </div>
+
+        <!-- Правая часть хедера -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="hidden sm:block text-xs font-bold text-slate-300 px-2 py-1 bg-slate-800/80 rounded-lg border border-slate-700">
+            +7-963-0-501-501
+          </div>
+          <div class="text-[11px] font-black uppercase px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950">
+            Для магазинов
+          </div>
+          <div class="text-[11px] font-bold uppercase px-2 py-1.5 rounded-lg bg-slate-800 text-white border border-slate-700">
+            Разделы
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Сетка из 10 вариантов -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 1 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">1</span>
+            Cyber Pill (Нео-Минтранс)
+          </span>
+          <button onclick="previewInHeader(1)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Изумрудная капсула с пульсирующим статус-индикатором, микро-чипом «100%» и государственным тегом ГИС ЭПД.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-1">
+            <a href="#etrn" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-950/80 via-emerald-900/60 to-slate-900 border border-emerald-500/40 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-900/30 text-white transition-all transform active:scale-95 group/btn">
+              <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span class="px-1.5 py-0.2 rounded bg-emerald-500 text-slate-950 text-[10px] font-black uppercase tracking-tight shadow-sm">100%</span>
+              <span class="font-extrabold text-xs tracking-wide text-emerald-100 group-hover/btn:text-white transition">ЭТРН</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-bold border border-emerald-500/30 uppercase">ГИС ЭПД</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 2 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">2</span>
+            Split Badge Pro (Двухзонный монолит)
+          </span>
+          <button onclick="previewInHeader(2)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Строгая блочная конструкция: контрастный блок «100%» слева и графитовый блок с электронным документом справа.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-2">
+            <a href="#etrn" class="inline-flex items-stretch rounded-xl overflow-hidden border border-emerald-500/40 hover:border-emerald-400 shadow-md hover:shadow-emerald-950/50 transition-all transform active:scale-95 group/btn">
+              <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 px-2.5 py-1.5 text-slate-950 font-black text-xs flex items-center gap-1 shadow-inner">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-slate-950"></i>
+                <span>100%</span>
+              </div>
+              <div class="bg-slate-900/95 group-hover/btn:bg-slate-850 px-2.5 py-1.5 text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <span class="text-white font-black tracking-wide">ЭТРН</span>
+                <span class="text-[9px] text-emerald-400 font-semibold">• Минтранс</span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 3 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">3</span>
+            Radar Glow (Бегущий неоновый луч)
+          </span>
+          <button onclick="previewInHeader(3)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Динамическая световая обводка по контуру кнопки. Подчёркивает технологичность и полную цифровизацию накладных.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-3">
+            <a href="#etrn" class="radar-border rounded-xl inline-flex items-center gap-2 px-3.5 py-1.5 shadow-lg transition transform active:scale-95 group/btn">
+              <i data-lucide="file-check-2" class="w-4 h-4 text-emerald-400"></i>
+              <div class="flex flex-col text-left leading-none">
+                <div class="flex items-center gap-1">
+                  <span class="text-[10px] font-black text-emerald-400 uppercase">100%</span>
+                  <span class="text-xs font-black text-white tracking-wide">ЭТРН</span>
+                </div>
+                <span class="text-[8px] text-slate-400 font-medium mt-0.5">Электронные накладные</span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 4 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">4</span>
+            Amber & Emerald Gold (Фирменный дуэт сайта)
+          </span>
+          <button onclick="previewInHeader(4)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Сочетает фирменный тёплый оранжевый цвет сайта ИП Нигамедьянов с изумрудом официальной валидации.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-4">
+            <a href="#etrn" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border border-amber-500/40 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-900/20 transition-all transform active:scale-95 group/btn">
+              <span class="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase shadow-sm">100%</span>
+              <span class="text-xs font-black text-white">ЭТРН</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-tight">ГИС ЭПД</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 5 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">5</span>
+            3D Flip 2.0 (Премиум-перевертыш)
+          </span>
+          <button onclick="previewInHeader(5)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Эволюция текущей кнопки: на лицевой стороне бейдж «100% ЭТРН», при наведении карточка переворачивается на «Консультация 0 ₽».
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-5">
+            <div class="flip-wrapper w-44 h-8 cursor-pointer">
+              <div class="flip-card-inner">
+                <div class="flip-face rounded-xl bg-gradient-to-r from-emerald-950 to-slate-900 border border-emerald-500/40 px-3 flex items-center justify-center gap-1.5 shadow-md">
+                  <span class="px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[9px] font-black">100%</span>
+                  <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-emerald-300"></i>
+                  <span class="font-black text-xs text-white">ЭТРН</span>
+                  <span class="text-[8px] font-extrabold px-1 py-0.5 rounded bg-emerald-900/60 text-emerald-200">ГИС</span>
+                </div>
+                <div class="flip-face flip-face-back rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-3 flex items-center justify-center gap-1.5 shadow-md text-slate-950">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-200"></i>
+                  <span class="font-black text-xs text-white">Консультация 0 ₽</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 6 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">6</span>
+            Digital Seal (Цифровой штамп ЭЦП)
+          </span>
+          <button onclick="previewInHeader(6)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Стилизован под юридический штамп усиленной электронной цифровой подписи (КЭП / Госуслуги / Диадок).
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-6">
+            <a href="#etrn" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border-2 border-dashed border-emerald-500/50 hover:border-emerald-400 text-slate-200 transition transform active:scale-95 group/btn">
+              <i data-lucide="award" class="w-4 h-4 text-emerald-400"></i>
+              <div class="flex items-center gap-1.5 leading-none">
+                <span class="text-xs font-black text-white">100% ЭТРН</span>
+                <span class="text-[9px] font-bold text-emerald-400 bg-emerald-950 px-1 py-0.5 rounded border border-emerald-800">ЭЦП ОК</span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 7 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">7</span>
+            Glassmorphism Apple (Стеклянная линза)
+          </span>
+          <button onclick="previewInHeader(7)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Ультрасовременное полупрозрачное стекло с внутренней световой гранью, тихим блеском и изумрудным градиентом.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-7">
+            <a href="#etrn" class="shimmer-mask inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 backdrop-blur-md border-t border-white/20 border-b border-white/5 border-x border-white/10 shadow-lg text-white transition transform active:scale-95 group/btn">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+              <span class="text-xs font-black tracking-tight text-white">100% ЭТРН</span>
+              <span class="text-[9px] font-bold text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded-md border border-slate-700">ГИС ЭПД</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 8 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">8</span>
+            B2B Clean Micro (Микро-компакт для плотных экранов)
+          </span>
+          <button onclick="previewInHeader(8)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Максимально лаконичный вариант, занимающий минимум места по ширине, но сразу привлекающий внимание цифрой 100%.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-8">
+            <a href="#etrn" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 text-xs font-black transition transform active:scale-95 group/btn">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span class="text-white">100%</span>
+              <span class="text-emerald-400">ЭТРН</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 9 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">9</span>
+            Gov Tech Mint (Государственный цифровой контур)
+          </span>
+          <button onclick="previewInHeader(9)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Солидный дизайн в стиле цифровых сервисов Минтранса: глубокий мятный градиент, иконка QR-кода накладной и плашка доверия.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-9">
+            <a href="#etrn" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black shadow-md hover:shadow-emerald-500/25 transition transform active:scale-95 group/btn">
+              <i data-lucide="qr-code" class="w-3.5 h-3.5 text-slate-950"></i>
+              <span class="text-xs uppercase tracking-tight">100% ЭТРН</span>
+              <span class="text-[9px] px-1 py-0.2 rounded bg-slate-950/20 text-slate-950 font-extrabold uppercase">ЭДО</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- ВАРИАНТ 10 -->
+      <!-- ============================================== -->
+      <div class="variant-card bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-5 space-y-4 transition group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[11px] font-bold">10</span>
+            Sonar Live (Живой сонар готовности)
+          </span>
+          <button onclick="previewInHeader(10)" class="text-xs font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+            Примерить в хедер ↗
+          </button>
+        </div>
+        <p class="text-xs text-slate-400">
+          Индикатор постоянной онлайн-готовности автопарка к приёмке и подписанию электронных транспортных накладных через Диадок и СБИС.
+        </p>
+        <div class="p-4 bg-[#090d16] rounded-xl border border-slate-800/80 flex items-center justify-center min-h-[70px]">
+          <div id="btn-demo-10">
+            <a href="#etrn" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 hover:border-emerald-400 shadow-sm transition transform active:scale-95 group/btn">
+              <div class="relative flex items-center justify-center w-3.5 h-3.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-400 relative z-10"></i>
+              </div>
+              <div class="flex items-baseline gap-1">
+                <span class="text-xs font-black text-white">100%</span>
+                <span class="text-xs font-bold text-emerald-400">ЭТРН</span>
+              </div>
+              <span class="text-[9px] text-slate-400 font-medium">ГИС ЭПД</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Подвал витрины -->
+    <div class="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-transparent border border-slate-800 rounded-2xl p-6 text-center space-y-2">
+      <div class="text-base font-black text-white">Какой вариант поставить в шапку сайта?</div>
+      <p class="text-sm text-slate-400 max-w-xl mx-auto">
+        Назовите номер любого понравившегося варианта (например, <strong>«Ставь 1»</strong> или <strong>«Понравился 3»</strong>), и я моментально встрою его в основной хедер и обновлю на боевом сайте!
+      </p>
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    const variants = {
+      1: { title: "Вариант 1 (Cyber Pill)" },
+      2: { title: "Вариант 2 (Split Badge Pro)" },
+      3: { title: "Вариант 3 (Radar Glow)" },
+      4: { title: "Вариант 4 (Amber & Emerald Gold)" },
+      5: { title: "Вариант 5 (3D Flip 2.0)" },
+      6: { title: "Вариант 6 (Digital Seal)" },
+      7: { title: "Вариант 7 (Glassmorphism Apple)" },
+      8: { title: "Вариант 8 (B2B Clean Micro)" },
+      9: { title: "Вариант 9 (Gov Tech Mint)" },
+      10: { title: "Вариант 10 (Sonar Live)" }
+    };
+
+    function previewInHeader(num) {
+      const srcEl = document.getElementById(`btn-demo-${num}`);
+      const slot = document.getElementById('live-header-slot');
+      const title = document.getElementById('current-preview-title');
+      
+      if (srcEl && slot) {
+        slot.innerHTML = srcEl.innerHTML;
+        title.innerText = variants[num]?.title || `Вариант ${num}`;
+        lucide.createIcons();
+      }
+    }
+
+    // Default preview: Option 1
+    previewInHeader(1);
+  </script>
+</body>
+</html>
