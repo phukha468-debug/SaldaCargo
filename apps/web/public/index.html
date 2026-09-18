@@ -120,6 +120,77 @@
       box-shadow: 0 0 0 6px rgba(226, 102, 11, 0.10);
     }
 
+    /* ---- Анимированная переворачивающаяся кнопка ЭТРН ---- */
+    .etrn-flip-btn {
+      perspective: 700px;
+      height: 32px;
+      width: 170px;
+      border-radius: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-block;
+      vertical-align: middle;
+      animation: etrnPulseGlow 2.6s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .etrn-flip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: etrnFlipCycle 5.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    .etrn-flip-side {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 0 8px;
+      border-radius: 12px;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+      transition: transform 0.2s ease;
+    }
+    .etrn-flip-front {
+      background: linear-gradient(135deg, #065f46 0%, #059669 100%);
+      color: #ffffff;
+      border: 1px solid #10b981;
+      transform: rotateX(0deg);
+    }
+    .etrn-flip-back {
+      background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+      color: #ffffff;
+      border: 1px solid #f59e0b;
+      transform: rotateX(180deg);
+    }
+    .etrn-flip-btn:hover .etrn-flip-container {
+      animation-play-state: paused;
+    }
+    @keyframes etrnFlipCycle {
+      0%, 42% {
+        transform: rotateX(0deg);
+      }
+      50%, 92% {
+        transform: rotateX(180deg);
+      }
+      100% {
+        transform: rotateX(360deg);
+      }
+    }
+    @keyframes etrnPulseGlow {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2), 0 0 14px rgba(16, 185, 129, 0.45);
+      }
+    }
+
     /* ---- Шапка сайта: плотное стекло поверх маршрутной линии ---- */
     header {
       background: rgba(246, 244, 238, 0.92);
@@ -313,18 +384,22 @@
           <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
         </a>
 
-        <!-- 1.1 Партнёры и ЭТРН -->
-        <a href="#partners" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
+        <!-- 1.1 ЭТРН и ЭДО (Консультация бесплатно) -->
+        <a href="#etrn" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 text-white font-bold transition active:scale-[0.98] shadow-sm">
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-amber-500/15 text-brand-400 flex items-center justify-center font-bold">
-              <i data-lucide="award" class="w-4 h-4"></i>
+            <div class="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold relative">
+              <i data-lucide="file-check-2" class="w-4 h-4 text-white"></i>
+              <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
             </div>
             <div>
-              <div class="text-sm font-bold">Партнёры и ЭТРН</div>
-              <div class="text-[11px] text-slate-400 font-normal">ВСМПО, Урал-Боинг, НТЛ, Геострой • ЭДО</div>
+              <div class="text-sm font-black flex items-center gap-1.5 text-white">
+                <span>ЭТРН и ЭДО</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-extrabold uppercase">0 ₽</span>
+              </div>
+              <div class="text-[11px] text-emerald-200/80 font-normal">ГИС ЭПД • Диадок • Консультация бесплатно</div>
             </div>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-emerald-400"></i>
         </a>
 
         <!-- 2. Онлайн-калькулятор -->
@@ -491,9 +566,22 @@
         <!-- Навигационные ссылки для десктопа (компактные, без наездов) -->
         <nav class="hidden xl:flex items-center gap-2.5 2xl:gap-4 text-xs 2xl:text-sm font-bold text-slate-300 flex-shrink-0">
           <a href="#hero" class="py-1 px-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors whitespace-nowrap">Главная</a>
-          <a href="#partners" class="py-1 px-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors whitespace-nowrap flex items-center gap-1">
-            <i data-lucide="award" class="w-3.5 h-3.5 text-amber-400"></i>
-            <span>Партнёры</span>
+          <!-- Анимированная переворачивающаяся кнопка ЭТРН -->
+          <a href="#etrn" class="etrn-flip-btn" title="ЭТРН и ЭДО — Консультация бесплатно (нажмите для перехода)">
+            <div class="etrn-flip-container">
+              <!-- Сторона 1: ЭТРН -->
+              <div class="etrn-flip-side etrn-flip-front">
+                <span class="w-2 h-2 rounded-full bg-emerald-300 animate-ping"></span>
+                <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-emerald-200"></i>
+                <span class="font-black text-white tracking-wide">ЭТРН</span>
+                <span class="text-[9px] px-1 py-0.5 rounded bg-emerald-900/60 text-emerald-200 font-extrabold uppercase leading-none">ГИС ЭПД</span>
+              </div>
+              <!-- Сторона 2: Консультация бесплатно -->
+              <div class="etrn-flip-side etrn-flip-back">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-200"></i>
+                <span class="font-black text-white text-[11px] tracking-tight whitespace-nowrap">Консультация 0 ₽</span>
+              </div>
+            </div>
           </a>
           <a href="#calculator" class="py-1 px-2 rounded-lg text-brand-400 hover:text-brand-300 hover:bg-brand-500/10 transition-colors whitespace-nowrap flex items-center gap-1">
             <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
@@ -583,10 +671,22 @@
                 </div>
                 <div class="text-[10px] text-slate-500 font-mono mt-0.5">Код: 2811269</div>
               </div>
-              <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
-                <div class="text-xs sm:text-sm font-black text-brand-600">100% ЭТРН & ЭДО</div>
-                <div class="text-[10px] text-slate-500 mt-0.5">ГИС ЭПД • Диадок</div>
-              </div>
+              <!-- Графическая плашка 100% ЭТРН & ЭДО с переходом в раздел -->
+              <a href="#etrn" class="theme-card p-2.5 sm:p-3 rounded-2xl text-center shadow-sm relative overflow-hidden group hover:border-emerald-500/70 hover:shadow-md transition transform active:scale-95 block cursor-pointer bg-gradient-to-b from-white via-white to-emerald-50/50" title="Нажмите, чтобы узнать всё про ЭТРН и получить бесплатную консультацию">
+                <div class="flex items-center justify-center gap-1.5">
+                  <div class="w-5 h-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-white"></i>
+                  </div>
+                  <span class="text-xs sm:text-sm font-black text-emerald-800 tracking-tight leading-none">100% ЭТРН & ЭДО</span>
+                </div>
+                <div class="flex items-center justify-center gap-1.5 mt-1.5">
+                  <span class="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300/80 leading-none">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>ГИС ЭПД</span>
+                  </span>
+                  <span class="text-[9px] text-slate-600 font-bold">• Диадок</span>
+                </div>
+              </a>
               <div class="theme-card p-3 rounded-2xl text-center shadow-sm">
                 <div class="text-xs sm:text-sm font-black text-slate-950">От 1 до 20 тонн</div>
                 <div class="text-[10px] text-slate-500 mt-0.5">В.Салда и вся РФ</div>
@@ -709,7 +809,237 @@
     </section>
 
     <!-- ========================================================================= -->
-    <!-- 2. ОНЛАЙН КАЛЬКУЛЯТОР СТОИМОСТИ (РАЗМЕЩЕН СРАЗУ ПОД ГЛАВНОЙ) -->
+    <!-- 2. ЭТРН И ЭЛЕКТРОННЫЙ ДОКУМЕНТООБОРОТ (ЭДО) — НАША ГЛАВНАЯ ЭКСПЕРТИЗА -->
+    <!-- ========================================================================= -->
+    <section id="etrn" class="py-14 sm:py-20 bg-[#f4efe6] border-t border-slate-300 relative w-full scroll-mt-20">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        
+        <!-- Заголовок раздела и вводный оффер -->
+        <div class="text-center max-w-3xl mx-auto space-y-3">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 text-emerald-850 border border-emerald-500/35 text-xs font-black uppercase tracking-wider shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
+            <i data-lucide="file-check-2" class="w-4 h-4 text-emerald-700"></i>
+            <span class="text-emerald-900 font-extrabold">Главная компетенция ТК501</span>
+          </div>
+          <h2 class="text-2xl sm:text-4xl xl:text-5xl font-black tracking-tight leading-tight" style="color: #171310 !important;">
+            Работаем с <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700">ЭТРН и ЭДО</span> на 100%
+          </h2>
+          <p class="text-sm sm:text-base leading-relaxed font-medium" style="color: #524b42 !important;">
+            Мы с самого первого дня реформы грузоперевозок в РФ работаем с электронной транспортной накладной (ЭТРН) со всеми нашими партнёрами. Являемся признанными экспертами в государственной системе <strong style="color: #171310 !important;">ГИС ЭПД</strong> и <strong class="text-emerald-700 font-bold">бесплатно консультируем</strong> наших партнёров и их бухгалтерию по всем вопросам быстрого и безопасного перехода на цифровой документооборот.
+          </p>
+        </div>
+
+        <!-- Сетка 4 экспертных преимуществ -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          
+          <!-- Карточка 1: Опыт с первого дня -->
+          <div class="theme-card p-5 sm:p-6 rounded-3xl border border-emerald-500/30 shadow-sm flex flex-col justify-between hover:shadow-md transition group">
+            <div class="space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                <i data-lucide="award" class="w-6 h-6 text-emerald-600"></i>
+              </div>
+              <h3 class="text-base sm:text-lg font-black tracking-tight" style="color: #171310 !important;">
+                Опыт с 1-го дня реформы
+              </h3>
+              <p class="text-xs sm:text-sm leading-relaxed" style="color: #524b42 !important;">
+                Все рейсы с нашими промышленными партнёрами — включая титановую корпорацию <strong>ВСМПО-АВИСМА</strong>, <strong>Ural Boeing</strong> и <strong>НТЛ</strong> — оформляются в цифровом виде через ГИС ЭПД без задержек и рисков.
+              </p>
+            </div>
+            <div class="pt-4 mt-4 border-t border-slate-200/80 flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+              <span>100% цифровые рейсы</span>
+            </div>
+          </div>
+
+          <!-- Карточка 2: Бесплатные консультации -->
+          <div class="theme-card p-5 sm:p-6 rounded-3xl border border-amber-500/40 shadow-sm flex flex-col justify-between hover:shadow-md transition group bg-gradient-to-b from-white via-white to-amber-50/30">
+            <div class="space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                <i data-lucide="help-circle" class="w-6 h-6 text-amber-600"></i>
+              </div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base sm:text-lg font-black tracking-tight" style="color: #171310 !important;">
+                  Консультации — 0 ₽
+                </h3>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 font-black uppercase">Бесплатно</span>
+              </div>
+              <p class="text-xs sm:text-sm leading-relaxed" style="color: #524b42 !important;">
+                Помогаем вашей бухгалтерии и отделу снабжения настроить обмен ЭТРН, оформить машиночитаемые доверенности (МЧД) и электронные подписи (КЭП) без лишних затрат.
+              </p>
+            </div>
+            <div class="pt-4 mt-4 border-t border-slate-200/80 flex items-center gap-1.5 text-xs font-bold text-amber-800">
+              <i data-lucide="sparkles" class="w-4 h-4 text-amber-600"></i>
+              <span>Поддержка вашей бухгалтерии</span>
+            </div>
+          </div>
+
+          <!-- Карточка 3: Скорость подписания -->
+          <div class="theme-card p-5 sm:p-6 rounded-3xl border border-blue-500/30 shadow-sm flex flex-col justify-between hover:shadow-md transition group">
+            <div class="space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                <i data-lucide="clock" class="w-6 h-6 text-blue-600"></i>
+              </div>
+              <h3 class="text-base sm:text-lg font-black tracking-tight" style="color: #171310 !important;">
+                Подписание за 2 минуты
+              </h3>
+              <p class="text-xs sm:text-sm leading-relaxed" style="color: #524b42 !important;">
+                Водитель и грузополучатель подписывают титулы накладной прямо в смартфоне на выгрузке. Закрывающие документы поступают в вашу бухгалтерию моментально, без ожидания почты.
+              </p>
+            </div>
+            <div class="pt-4 mt-4 border-t border-slate-200/80 flex items-center gap-1.5 text-xs font-bold text-blue-700">
+              <i data-lucide="shield-check" class="w-4 h-4 text-blue-600"></i>
+              <span>Мгновенный зачёт расходов</span>
+            </div>
+          </div>
+
+          <!-- Карточка 4: Все операторы и 1С -->
+          <div class="theme-card p-5 sm:p-6 rounded-3xl border border-purple-500/30 shadow-sm flex flex-col justify-between hover:shadow-md transition group">
+            <div class="space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                <i data-lucide="layers" class="w-6 h-6 text-purple-600"></i>
+              </div>
+              <h3 class="text-base sm:text-lg font-black tracking-tight" style="color: #171310 !important;">
+                Все операторы и 1С
+              </h3>
+              <p class="text-xs sm:text-sm leading-relaxed" style="color: #524b42 !important;">
+                Работаем через Контур.Диадок, СБИС (Тензор), 1С-ЭПД и Такском. Настроен бесшовный роуминг — вашей компании не нужно менять своего привычного оператора ЭДО.
+              </p>
+            </div>
+            <div class="pt-4 mt-4 border-t border-slate-200/80 flex items-center gap-1.5 text-xs font-bold text-purple-700">
+              <i data-lucide="check-check" class="w-4 h-4 text-purple-600"></i>
+              <span>Любой оператор ЭДО</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Информационная панель платформ + 3 простых шага рейса -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          
+          <!-- Левая колонка: Поддерживаемые системы (5 колонок) -->
+          <div class="lg:col-span-5 theme-card p-6 rounded-3xl border border-slate-300 shadow-sm flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <h4 class="font-black text-sm uppercase tracking-wider" style="color: #171310 !important;">Поддерживаемые платформы:</h4>
+              </div>
+              
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs">ГИС</span>
+                    <div>
+                      <div class="font-bold text-xs" style="color: #171310 !important;">ГИС ЭПД Минтранса РФ</div>
+                      <div class="text-[10px] text-slate-500">Государственный реестр путевых и накладных</div>
+                    </div>
+                  </div>
+                  <span class="text-[10px] font-bold text-emerald-800 px-2 py-0.5 rounded bg-emerald-100">100% ГОСТ</span>
+                </div>
+
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-lg bg-red-600 text-white flex items-center justify-center font-black text-xs">К</span>
+                    <div>
+                      <div class="font-bold text-xs" style="color: #171310 !important;">Контур.Диадок (Логистика)</div>
+                      <div class="text-[10px] text-slate-500">Прямой обмен и роуминг</div>
+                    </div>
+                  </div>
+                  <span class="text-[10px] font-bold text-slate-600 px-2 py-0.5 rounded bg-slate-200">Активно</span>
+                </div>
+
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs">С</span>
+                    <div>
+                      <div class="font-bold text-xs" style="color: #171310 !important;">СБИС / Тензор</div>
+                      <div class="text-[10px] text-slate-500">Мгновенный обмен ЭТРН и актами</div>
+                    </div>
+                  </div>
+                  <span class="text-[10px] font-bold text-slate-600 px-2 py-0.5 rounded bg-slate-200">Активно</span>
+                </div>
+
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center font-black text-xs">1С</span>
+                    <div>
+                      <div class="font-bold text-xs" style="color: #171310 !important;">1С:ЭПД и 1С:Предприятие</div>
+                      <div class="text-[10px] text-slate-500">Бесшовная выгрузка в базу 1С</div>
+                    </div>
+                  </div>
+                  <span class="text-[10px] font-bold text-slate-600 px-2 py-0.5 rounded bg-slate-200">Интеграция</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-200 text-[11px] text-slate-500 font-medium">
+              Работаете через другого оператора (Такском, Калуга-Астрал, СберКорус)? Настроим роуминг за 1 день.
+            </div>
+          </div>
+
+          <!-- Правая колонка: 3 шага рейса + Конверсионная плашка консультации (7 колонок) -->
+          <div class="lg:col-span-7 theme-card p-6 sm:p-7 rounded-3xl border border-slate-300 shadow-sm flex flex-col justify-between">
+            <div class="space-y-5">
+              <div class="flex items-center justify-between">
+                <h4 class="font-black text-sm sm:text-base uppercase tracking-wider" style="color: #171310 !important;">
+                  Как проходит рейс по ЭТРН — просто и прозрачно:
+                </h4>
+                <span class="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">Без бумаги</span>
+              </div>
+
+              <!-- 3 этапа -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm relative">
+                  <div class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center mb-2">1</div>
+                  <div class="font-bold text-xs mb-1" style="color: #171310 !important;">Оформление титула</div>
+                  <div class="text-[11px] text-slate-600 leading-snug">Грузоотправитель формирует накладную в Диадок или СБИС перед погрузкой.</div>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm relative">
+                  <div class="w-6 h-6 rounded-full bg-brand-500 text-black font-black text-xs flex items-center justify-center mb-2">2</div>
+                  <div class="font-bold text-xs mb-1" style="color: #171310 !important;">Приём водителем</div>
+                  <div class="text-[11px] text-slate-600 leading-snug">Водитель ТК501 подписывает титул перевозчика по МЧД прямо со смартфона.</div>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm relative">
+                  <div class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center mb-2">3</div>
+                  <div class="font-bold text-xs mb-1" style="color: #171310 !important;">Выгрузка и отчёт</div>
+                  <div class="text-[11px] text-slate-600 leading-snug">Грузополучатель подписывает приёмку за 1 минуту. Рейс закрыт юридически.</div>
+                </div>
+              </div>
+
+              <!-- Выделенная плашка бесплатной консультации -->
+              <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 text-white border border-emerald-500/40 shadow-xl">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5">
+                  <div class="space-y-1">
+                    <div class="font-black text-sm sm:text-base flex items-center gap-2 text-white">
+                      <i data-lucide="phone-call" class="w-4 h-4 text-emerald-400"></i>
+                      <span>Нужна помощь с переходом на ЭТРН?</span>
+                    </div>
+                    <div class="text-xs text-emerald-100/85 leading-relaxed">
+                      Бесплатно проконсультируем вашу бухгалтерию, покажем тестовый обмен и поможем составить первый рейс без штрафов и проволочек.
+                    </div>
+                  </div>
+                  <a href="tel:+79630501501" class="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-brand-500 hover:from-amber-400 hover:to-brand-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition transform active:scale-95 shadow-lg shadow-amber-950/40 whitespace-nowrap">
+                    <i data-lucide="phone" class="w-4 h-4 text-slate-950"></i>
+                    <span>Консультация 0 ₽</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span>Полное соответствие Федеральному закону № 336-ФЗ</span>
+              <span class="font-bold text-emerald-700">Личный специалист по ЭДО: +7-963-0-501-501</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- 3. ОНЛАЙН КАЛЬКУЛЯТОР СТОИМОСТИ (РАЗМЕЩЕН СРАЗУ ПОД ЭТРН) -->
     <!-- ========================================================================= -->
     <section id="calculator" class="py-12 sm:py-16 bg-dark-800/70 border-t border-slate-800 relative w-full">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1207,40 +1537,6 @@
 
             </div>
 
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ========================================================================= -->
-    <!-- 1.1 ЭТРН И ЭДО (КОРПОРАТИВНЫЙ СТАНДАРТ) -->
-    <!-- ========================================================================= -->
-    <section class="py-8 sm:py-10 bg-slate-100 border-y border-slate-300/80 w-full relative">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Блок ЭТРН и ЭДО: гармоничная белая карточка с идеальным контрастом текста -->
-        <div class="theme-card p-5 sm:p-6 rounded-2xl border-brand-500/40 shadow-sm">
-          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div class="flex items-start gap-3.5">
-              <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-brand-500 to-orange-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-brand-900/20">
-                <i data-lucide="file-check-2" class="w-6 h-6 text-white"></i>
-              </div>
-              <div class="space-y-1.5">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h3 class="text-base sm:text-lg font-black text-slate-950">Работаем с ЭТРН и электронным документооборотом (ЭДО)</h3>
-                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 font-bold uppercase tracking-wider">100% ГИС ЭПД</span>
-                </div>
-                <p class="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
-                  Оформляем электронные транспортные накладные через государственную систему ГИС ЭПД (Диадок, СБИС). <strong class="text-slate-950 font-bold">Бесплатно консультируем клиентов и бухгалтерию</strong>: помогаем быстро настроить обмен ЭТРН и перейти на цифровой документооборот без задержек и штрафов.
-                </p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0 w-full md:w-auto">
-              <a href="tel:+79630501501" class="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-amber-600 hover:from-brand-500 hover:to-amber-500 text-white text-xs sm:text-sm font-black uppercase tracking-wider transition active:scale-95 shadow-md shadow-brand-900/20 whitespace-nowrap">
-                <i data-lucide="phone" class="w-4 h-4 text-white"></i>
-                <span class="text-white">Консультация по ЭТРН</span>
-              </a>
-            </div>
           </div>
         </div>
 
