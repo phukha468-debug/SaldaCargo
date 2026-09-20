@@ -935,8 +935,6 @@ export default function ReceivablesPage() {
     queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
   }
 
-  const promisedCount = allDebtors.filter((d) => d.follow_up?.status === 'promised').length;
-
   return (
     <>
       {showAddForm && (
@@ -1155,68 +1153,6 @@ export default function ReceivablesPage() {
           </div>
         </div>
 
-        {/* Compact KPI Cards */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 animate-pulse">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-14 bg-slate-200 rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                Всего к получению
-              </p>
-              <p className="text-base sm:text-lg font-black text-rose-600 mt-0.5">
-                <Money amount={data?.totalAmount ?? '0'} />
-              </p>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                Всего должников
-              </p>
-              <p className="text-base sm:text-lg font-black text-slate-800 mt-0.5">
-                {allDebtors.length}
-              </p>
-            </div>
-            <div
-              className={`border rounded-xl p-2.5 shadow-xs ${
-                (data?.overdueCount ?? 0) > 0
-                  ? 'bg-rose-50 border-rose-200'
-                  : 'bg-white border-slate-200'
-              }`}
-            >
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                Просрочено (&gt;30 дн.)
-              </p>
-              <p
-                className={`text-base sm:text-lg font-black mt-0.5 ${
-                  (data?.overdueCount ?? 0) > 0 ? 'text-rose-600' : 'text-emerald-600'
-                }`}
-              >
-                {data?.overdueCount ?? 0}
-              </p>
-            </div>
-            <div
-              className={`border rounded-xl p-2.5 shadow-xs ${
-                promisedCount > 0 ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'
-              }`}
-            >
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                Обещали заплатить
-              </p>
-              <p
-                className={`text-base sm:text-lg font-black mt-0.5 ${
-                  promisedCount > 0 ? 'text-blue-600' : 'text-slate-400'
-                }`}
-              >
-                {promisedCount}
-              </p>
-            </div>
-          </div>
-        )}
-
         {isError && (
           <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 font-bold">
             Ошибка загрузки данных
@@ -1360,7 +1296,7 @@ export default function ReceivablesPage() {
               )}
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {filteredDebtors.map((debtor) => {
                 const days = daysAgo(debtor.oldest_at);
                 const isOverdue = days > 30;
@@ -1395,7 +1331,7 @@ export default function ReceivablesPage() {
                   <div
                     key={debtor.counterparty_id}
                     data-debtor-id={debtor.counterparty_id}
-                    className={`bg-white border rounded-xl shadow-xs overflow-hidden transition-all ${
+                    className={`bg-white border rounded-lg shadow-none overflow-hidden transition-all ${
                       isExpanded
                         ? 'border-blue-300 ring-2 ring-blue-50'
                         : unbilledOrders.length > 0 && isLegal
@@ -1405,7 +1341,7 @@ export default function ReceivablesPage() {
                   >
                     {/* Debtor Compact Single-Line Header Row */}
                     <div
-                      className={`px-3 py-2 sm:px-4 sm:py-2.5 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-slate-50 select-none transition-colors ${
+                      className={`px-2.5 py-1 sm:py-1.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 select-none transition-colors ${
                         isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : ''
                       }`}
                       onClick={() => {
@@ -1414,9 +1350,9 @@ export default function ReceivablesPage() {
                       }}
                     >
                       {/* Left: Avatar, Name, Badges, Info all in 1 single row */}
-                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
                         <div
-                          className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] shrink-0 ${
+                          className={`w-5 h-5 rounded flex items-center justify-center font-black text-[9px] shrink-0 ${
                             isLegal
                               ? 'bg-blue-100 text-blue-800'
                               : isOverdue
@@ -1427,28 +1363,28 @@ export default function ReceivablesPage() {
                           {debtor.counterparty_name.slice(0, 2).toUpperCase()}
                         </div>
 
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[200px] lg:max-w-xs">
+                        <span className="text-xs font-bold text-slate-900 truncate shrink-0 max-w-[140px] sm:max-w-[200px]">
                           {debtor.counterparty_name}
                         </span>
 
                         {debtor.counterparty_subname && (
-                          <span className="text-[9px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 hidden sm:inline">
+                          <span className="text-[8px] font-medium text-slate-400 bg-slate-100 px-1 py-0.5 rounded shrink-0 hidden sm:inline">
                             {debtor.counterparty_subname}
                           </span>
                         )}
 
                         {isLegal ? (
-                          <span className="text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                          <span className="text-[8px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
                             Юрлицо
                           </span>
                         ) : (
-                          <span className="text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                          <span className="text-[8px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
                             Физлицо
                           </span>
                         )}
 
                         {unbilledOrders.length > 0 && isLegal && (
-                          <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 shrink-0">
+                          <span className="text-[8px] font-bold bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                             <span>{unbilledOrders.length} ждут счёта</span>
                           </span>
@@ -1456,14 +1392,14 @@ export default function ReceivablesPage() {
 
                         {statusCfg && (
                           <span
-                            className={`hidden md:inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${statusCfg.bg}`}
+                            className={`hidden md:inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${statusCfg.bg}`}
                           >
                             <span className={`w-1 h-1 rounded-full ${statusCfg.dot}`} />
                             {statusCfg.label}
                           </span>
                         )}
 
-                        <span className="text-[11px] text-slate-400 shrink-0 hidden md:inline">
+                        <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
                           {debtor.orders.length} зап. ·{' '}
                           {isOverdue ? (
                             <span className="text-rose-600 font-bold">просрочка {days} дн.</span>
@@ -1476,7 +1412,7 @@ export default function ReceivablesPage() {
                           <a
                             href={`tel:${debtor.counterparty_phone}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="text-[11px] text-blue-600 font-medium hover:text-blue-800 hidden lg:flex items-center gap-0.5 shrink-0"
+                            className="text-[10px] text-blue-600 font-medium hover:text-blue-800 hidden lg:flex items-center gap-0.5 shrink-0"
                             title={debtor.counterparty_phone}
                           >
                             <span className="material-symbols-outlined text-xs">call</span>
@@ -1496,7 +1432,7 @@ export default function ReceivablesPage() {
                       </div>
 
                       {/* Right: Sum + Actions in 1 single row */}
-                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         <span
                           className={`text-xs sm:text-sm font-black tracking-tight ${
                             isOverdue ? 'text-rose-600' : 'text-slate-900'
@@ -1512,7 +1448,7 @@ export default function ReceivablesPage() {
                             setExpandedId(debtor.counterparty_id);
                             setLinkingOrderId(debtor.counterparty_id);
                           }}
-                          className="px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
+                          className="px-1.5 py-0.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[9px] font-bold rounded uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
                           title="Привязать к контрагенту"
                         >
                           <span className="material-symbols-outlined text-xs">link</span>
@@ -1527,10 +1463,10 @@ export default function ReceivablesPage() {
                             e.stopPropagation();
                             setExpandedId(isExpanded ? null : debtor.counterparty_id);
                           }}
-                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
+                          className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold rounded uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
                         >
                           <span
-                            className="material-symbols-outlined text-sm transition-transform duration-200"
+                            className="material-symbols-outlined text-xs transition-transform duration-200"
                             style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
                           >
                             expand_more
