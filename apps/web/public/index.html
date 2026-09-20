@@ -953,27 +953,27 @@
 
           </div>
 
-          <!-- Задать вопрос / консультация: через MAX бот или телефон -->
+          <!-- Задать вопрос / консультация: по форме или по телефону -->
           <div class="p-4 sm:p-5 rounded-2xl bg-[#faf8f4] border border-[#e8e3d6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
             <div class="flex items-center gap-3.5 text-left">
-              <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-                <i data-lucide="help-circle" class="w-5 h-5 text-blue-600"></i>
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+                <i data-lucide="help-circle" class="w-5 h-5 text-emerald-600"></i>
               </div>
               <div>
                 <div class="font-black text-sm sm:text-base" style="color: #171310 !important;">
                   Задать вопрос или запросить консультацию по ЭТРН
                 </div>
                 <div class="text-xs text-slate-500 mt-0.5">
-                  Поможем с роумингом, МЧД или самовывозом со склада. Ответим в чат-боте MAX или по телефону.
+                  Поможем с роумингом, МЧД или самовывозом со склада. Задайте вопрос специалисту или позвоните нам.
                 </div>
               </div>
             </div>
             
             <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
-              <!-- Кнопка вызова формы для вопроса через MAX бот -->
-              <button type="button" onclick="openEtrnModal()" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider transition transform active:scale-95 shadow-sm shadow-blue-900/20 whitespace-nowrap cursor-pointer">
-                <i data-lucide="bot" class="w-4 h-4"></i>
-                <span>Вопрос через MAX бот</span>
+              <!-- Кнопка вызова формы для вопроса -->
+              <button type="button" onclick="openEtrnModal()" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider transition transform active:scale-95 shadow-sm shadow-slate-950/20 whitespace-nowrap cursor-pointer">
+                <i data-lucide="message-square" class="w-4 h-4 text-emerald-400"></i>
+                <span>Задать вопрос по ЭТРН</span>
               </button>
 
               <!-- Кнопка прямого звонка по номеру +7 922 18 00 911 -->
@@ -2401,17 +2401,17 @@
     </div>
   </div>
 
-  <!-- 5. Модальное окно: Задать вопрос / Консультация по ЭТРН через MAX бот -->
+  <!-- 5. Модальное окно: Задать вопрос / Консультация по ЭТРН -->
   <div id="etrn-consult-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
-    <div class="theme-card max-w-lg w-full rounded-3xl p-5 sm:p-7 space-y-4 border border-blue-500/40 shadow-2xl relative my-auto">
+    <div class="theme-card max-w-lg w-full rounded-3xl p-5 sm:p-7 space-y-4 border border-emerald-500/40 shadow-2xl relative my-auto">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
-            <i data-lucide="bot" class="w-5 h-5"></i>
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+            <i data-lucide="file-question" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-base sm:text-lg font-black text-white">Консультация по ЭТРН через MAX</h3>
-            <p class="text-[11px] text-slate-400">Форма для вопроса и открытия диалога в боте</p>
+            <h3 class="text-base sm:text-lg font-black text-white">Консультация по ЭТРН</h3>
+            <p class="text-[11px] text-slate-400">Задайте вопрос — специалист бесплатно перезвонит и проконсультирует</p>
           </div>
         </div>
         <button type="button" onclick="closeEtrnModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
@@ -2419,26 +2419,41 @@
         </button>
       </div>
 
-      <form id="etrn-modal-form" onsubmit="submitEtrnConsultForm(event)" class="space-y-3.5">
+      <form id="etrn-modal-form" onsubmit="submitEtrnConsultForm(event)" class="space-y-3.5" novalidate>
         <div>
           <label class="block text-[11px] font-bold text-slate-300 mb-1">
-            Ваше имя или организация <span class="text-blue-400">*</span>
+            Ваше имя или организация <span class="text-emerald-400">*</span>
           </label>
-          <input type="text" id="etrn-form-name" required placeholder="Например: ООО 'Логистика' или Роман" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition">
+          <input type="text" id="etrn-form-name" required placeholder="Например: ООО 'Логистика' или Роман" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-emerald-500 focus:outline-none transition">
         </div>
 
         <div>
-          <label class="block text-[11px] font-bold text-slate-300 mb-1">
-            Телефон для обратной связи <span class="text-blue-400">*</span>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1 flex items-center justify-between">
+            <span>Телефон для связи <span class="text-amber-400">*</span></span>
+            <span id="etrn-phone-badge" class="text-[10px] text-slate-400 font-mono font-bold">0 / 10 цифр</span>
           </label>
-          <input type="tel" id="etrn-form-phone" required placeholder="+7 (922) 000-00-00" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition font-mono">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-400 font-mono text-xs sm:text-sm font-black select-none">
+              +7
+            </div>
+            <input type="tel" id="etrn-form-phone" required maxlength="18" autocomplete="tel"
+              placeholder=" (___) ___-__-__"
+              class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:border-emerald-500 focus:outline-none transition tracking-wider"
+              oninput="formatEtrnPhone(this)"
+              onfocus="onEtrnPhoneFocus()"
+              onblur="onEtrnPhoneBlur()">
+          </div>
+          <div id="etrn-phone-error" class="text-[11px] text-red-400 mt-1 hidden flex items-center gap-1">
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+            <span>Пожалуйста, введите все 10 цифр номера телефона</span>
+          </div>
         </div>
 
         <div>
           <label class="block text-[11px] font-bold text-slate-300 mb-1">
             Тема вопроса / Описание ситуации
           </label>
-          <select id="etrn-form-topic" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition mb-2">
+          <select id="etrn-form-topic" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-emerald-500 focus:outline-none transition mb-2">
             <option value="Консультация по 4 титулам ЭТРН">Консультация по 4 титулам ЭТРН</option>
             <option value="Оформление МЧД для склада / ЛОП / водителя">Оформление МЧД для склада / ЛОП / водителя</option>
             <option value="Самовывоз и участие стороннего склада (ЛОП)">Самовывоз и участие стороннего склада (ЛОП)</option>
@@ -2446,22 +2461,19 @@
             <option value="Подготовка первого рейса по ЭТРН">Подготовка первого рейса по ЭТРН</option>
             <option value="Другой вопрос">Другой вопрос</option>
           </select>
-          <textarea id="etrn-form-comment" rows="2" placeholder="Опишите вопрос подробнее (необязательно)..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-blue-500 focus:outline-none transition"></textarea>
+          <textarea id="etrn-form-comment" rows="2" placeholder="Опишите вопрос подробнее (необязательно)..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-emerald-500 focus:outline-none transition"></textarea>
         </div>
 
-        <div class="pt-2 space-y-2">
-          <button type="submit" id="etrn-submit-btn" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-900/40 transition transform active:scale-95 flex items-center justify-center gap-2">
+        <div class="pt-2 space-y-2.5">
+          <button type="submit" id="etrn-submit-btn" class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-emerald-950/40 transition transform active:scale-95 flex items-center justify-center gap-2">
             <i data-lucide="send" class="w-4 h-4"></i>
-            <span>Отправить заявку и открыть MAX бот</span>
+            <span>Отправить вопрос специалисту</span>
           </button>
           
-          <div class="flex items-center justify-between gap-2 pt-1">
-            <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="flex-1 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition">
-              <i data-lucide="message-square" class="w-3.5 h-3.5 text-blue-400"></i>
-              <span>Открыть @id660704814106_bot</span>
-            </a>
-            <a href="tel:+79221800911" class="flex-1 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition">
-              <i data-lucide="phone-call" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <div class="flex items-center justify-center gap-2 pt-2 border-t border-slate-800 text-xs text-slate-400">
+            <span>Или позвоните напрямую:</span>
+            <a href="tel:+79221800911" class="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 font-mono text-xs sm:text-sm">
+              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
               <span>+7 (922) 180-09-11</span>
             </a>
           </div>
@@ -3491,7 +3503,9 @@ Email: uralavto707@mail.ru
       });
     }
 
-    // Модальное окно: консультация по ЭТРН через MAX бот
+    // Модальное окно: консультация по ЭТРН
+    let etrnPhoneDigits = '';
+
     function openEtrnModal() {
       const modal = document.getElementById('etrn-consult-modal');
       if (modal) {
@@ -3499,6 +3513,10 @@ Email: uralavto707@mail.ru
         modal.classList.add('flex');
         document.body.style.overflow = 'hidden';
         if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+          const nameInput = document.getElementById('etrn-form-name');
+          if (nameInput) nameInput.focus();
+        }, 120);
       }
     }
 
@@ -3511,17 +3529,107 @@ Email: uralavto707@mail.ru
       }
     }
 
+    // Маска ввода телефона для формы ЭТРН (строго 10 цифр)
+    function formatEtrnPhone(input) {
+      let val = input.value;
+      let digits = val.replace(/\D/g, '');
+
+      // Если вставка началась с 7 или 8, убираем первую цифру (+7 уже зафиксировано перед полем)
+      if (digits.startsWith('7') || digits.startsWith('8')) {
+        digits = digits.substring(1);
+      }
+
+      // Ограничиваем ровно 10 цифрами (больше ввести физически нельзя)
+      digits = digits.substring(0, 10);
+      etrnPhoneDigits = digits;
+
+      // Форматируем маску: (XXX) XXX-XX-XX
+      let formatted = '';
+      if (digits.length > 0) {
+        formatted = ' (' + digits.substring(0, 3);
+      }
+      if (digits.length >= 4) {
+        formatted += ') ' + digits.substring(3, 6);
+      }
+      if (digits.length >= 7) {
+        formatted += '-' + digits.substring(6, 8);
+      }
+      if (digits.length >= 9) {
+        formatted += '-' + digits.substring(8, 10);
+      }
+
+      input.value = formatted;
+      validateEtrnPhoneState();
+    }
+
+    function onEtrnPhoneFocus() {
+      const input = document.getElementById('etrn-form-phone');
+      if (input && !input.value) {
+        input.placeholder = ' (___) ___-__-__';
+      }
+    }
+
+    function onEtrnPhoneBlur() {
+      validateEtrnPhoneState();
+    }
+
+    function validateEtrnPhoneState() {
+      const input = document.getElementById('etrn-form-phone');
+      const badge = document.getElementById('etrn-phone-badge');
+      const errEl = document.getElementById('etrn-phone-error');
+      const len = etrnPhoneDigits.length;
+
+      if (len === 10) {
+        if (input) {
+          input.classList.remove('border-slate-700', 'border-red-500', 'ring-2', 'ring-red-500/30');
+          input.classList.add('border-emerald-500');
+        }
+        if (badge) {
+          badge.className = 'text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-0.5';
+          badge.innerHTML = '✓ Номер заполнен (10 цифр)';
+        }
+        if (errEl) errEl.classList.add('hidden');
+        return true;
+      } else {
+        if (input) {
+          input.classList.remove('border-emerald-500');
+        }
+        if (badge) {
+          badge.className = 'text-[10px] text-slate-400 font-mono font-bold';
+          badge.innerText = `${len} / 10 цифр`;
+        }
+        return false;
+      }
+    }
+
     async function submitEtrnConsultForm(e) {
       e.preventDefault();
       const name = document.getElementById('etrn-form-name').value.trim();
-      const phone = document.getElementById('etrn-form-phone').value.trim();
       const topic = document.getElementById('etrn-form-topic').value;
       const comment = document.getElementById('etrn-form-comment').value.trim();
+      const phoneInput = document.getElementById('etrn-form-phone');
+      const errEl = document.getElementById('etrn-phone-error');
 
-      if (!name || !phone) {
-        showToast('Пожалуйста, укажите имя и телефон');
+      // 1. Проверка имени
+      if (!name) {
+        showToast('Пожалуйста, укажите Ваше имя или организацию');
+        document.getElementById('etrn-form-name').focus();
         return;
       }
+
+      // 2. Строгая валидация номера: БЕЗ 10 ЦИФР ОТПРАВИТЬ НЕЛЬЗЯ!
+      if (etrnPhoneDigits.length !== 10) {
+        if (phoneInput) {
+          phoneInput.classList.remove('border-slate-700', 'border-emerald-500');
+          phoneInput.classList.add('border-red-500', 'ring-2', 'ring-red-500/30');
+          phoneInput.focus();
+        }
+        if (errEl) errEl.classList.remove('hidden');
+        showToast('Пожалуйста, введите полный номер телефона (все 10 цифр)');
+        return;
+      }
+
+      const formattedPhone = `+7 (${etrnPhoneDigits.substring(0,3)}) ${etrnPhoneDigits.substring(3,6)}-${etrnPhoneDigits.substring(6,8)}-${etrnPhoneDigits.substring(8,10)}`;
 
       const submitBtn = document.getElementById('etrn-submit-btn');
       if (submitBtn) {
@@ -3529,17 +3637,17 @@ Email: uralavto707@mail.ru
         submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
       }
 
-      const fullComment = `[Консультация ЭТРН через MAX] Тема: ${topic}. ${comment ? 'Комментарий: ' + comment : ''}`;
+      const fullComment = `[Консультация по ЭТРН] Тема: ${topic}. Телефон клиента: ${formattedPhone}. ${comment ? 'Вопрос: ' + comment : ''}`;
 
       const payload = {
         orderSource: 'website_etrn_consult',
         storeName: 'Сайт tk501.ru (Консультация ЭТРН)',
         name: name,
         clientName: name,
-        phone: phone,
-        clientPhone: phone,
+        phone: formattedPhone,
+        clientPhone: formattedPhone,
         from: 'ЭТРН Консультация',
-        to: 'MAX Бот',
+        to: topic,
         notes: fullComment
       };
 
@@ -3566,8 +3674,17 @@ Email: uralavto707@mail.ru
       }
 
       closeEtrnModal();
-      showToast('Запрос на консультацию отправлен! Открываем MAX бот...');
-      window.open('https://max.ru/id660704814106_bot', '_blank');
+      showToast('Вопрос отправлен! Специалист свяжется с Вами в ближайшее время.');
+
+      // Очистка формы
+      document.getElementById('etrn-form-name').value = '';
+      document.getElementById('etrn-form-comment').value = '';
+      if (phoneInput) {
+        phoneInput.value = '';
+        phoneInput.classList.remove('border-emerald-500', 'border-red-500', 'ring-2', 'ring-red-500/30');
+      }
+      etrnPhoneDigits = '';
+      validateEtrnPhoneState();
     }
 
     // Инициализация
