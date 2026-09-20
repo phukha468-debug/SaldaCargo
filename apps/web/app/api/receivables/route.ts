@@ -12,8 +12,9 @@ export async function GET() {
         .from('trip_orders')
         .select(
           `id, amount, payment_method, created_at, description,
-           counterparty:counterparties(id, name, phone, email),
-           trip:trips!inner(trip_number, started_at, lifecycle_status, driver:users!trips_driver_id_fkey(name))`,
+           invoice_number, invoice_date, invoice_status, invoice_paid_at,
+           counterparty:counterparties(id, name, phone, email, is_legal_entity),
+           trip:trips!inner(trip_number, started_at, lifecycle_status, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number))`,
         )
         .eq('settlement_status', 'pending')
         .eq('lifecycle_status', 'approved')
@@ -22,7 +23,7 @@ export async function GET() {
       (supabase as any)
         .from('manual_receivables')
         .select(
-          'id, amount, date, description, counterparty:counterparties(id, name, phone, email)',
+          'id, amount, date, description, counterparty:counterparties(id, name, phone, email, is_legal_entity)',
         )
         .eq('settled', false)
         .order('date', { ascending: true }),
@@ -56,7 +57,9 @@ export async function GET() {
           counterparty_phone: hasCounterparty ? (order.counterparty?.phone ?? null) : null,
           counterparty_email: hasCounterparty ? (order.counterparty?.email ?? null) : null,
           counterparty_subname: hasDescription ? (order.counterparty?.name ?? null) : null,
-          is_individual: hasDescription,
+          is_individual:
+            hasDescription || (hasCounterparty && !order.counterparty?.is_legal_entity),
+          is_legal_entity: hasCounterparty ? !!order.counterparty?.is_legal_entity : false,
           total: 0,
           orders: [],
           oldest_at: order.created_at,
@@ -76,6 +79,12 @@ export async function GET() {
         trip_number: order.trip?.trip_number,
         started_at: order.trip?.started_at,
         driver_name: order.trip?.driver?.name,
+        asset_name: order.trip?.asset?.short_name ?? null,
+        asset_reg_number: order.trip?.asset?.reg_number ?? null,
+        invoice_number: order.invoice_number ?? null,
+        invoice_date: order.invoice_date ?? null,
+        invoice_status: order.invoice_status ?? 'unbilled',
+        invoice_paid_at: order.invoice_paid_at ?? null,
       });
     }
 

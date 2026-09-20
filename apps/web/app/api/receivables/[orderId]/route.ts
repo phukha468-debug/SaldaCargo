@@ -80,9 +80,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
   } else {
     // Помечаем заказ полностью оплаченным
+    const nowIso = new Date().toISOString();
     const { error: updateErr } = await (supabase
       .from('trip_orders')
-      .update({ settlement_status: 'completed', updated_at: new Date().toISOString() })
+      .update({
+        settlement_status: 'completed',
+        invoice_status: 'paid',
+        invoice_paid_at: nowIso,
+        updated_at: nowIso,
+      })
       .eq('id', orderId)
       .eq('settlement_status', 'pending') as any);
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });

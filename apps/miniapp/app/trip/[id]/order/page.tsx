@@ -72,20 +72,12 @@ const METHODS_INDIVIDUAL = [
 
 const METHODS_LEGAL = [
   {
-    value: 'cash' as const,
-    label: 'Наличные',
-    sublabel: 'Сдаст в конце смены',
-    icon: '💵',
-    wallet: '→ Касса',
-    color: 'peer-checked:border-green-600 peer-checked:bg-green-50',
-  },
-  {
     value: 'debt_cash' as const,
     label: 'Счёт / Долг',
-    sublabel: 'Оплата по выставленному счёту',
+    sublabel: 'Оплата по выставленному счёту (Р/С)',
     icon: '🧾',
     wallet: '→ Дебиторка → Р/С',
-    color: 'peer-checked:border-orange-500 peer-checked:bg-orange-50',
+    color: 'peer-checked:border-blue-500 peer-checked:bg-blue-50',
   },
 ];
 

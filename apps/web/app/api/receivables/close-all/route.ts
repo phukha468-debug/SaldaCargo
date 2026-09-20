@@ -52,7 +52,12 @@ export async function POST(req: Request) {
       ops.push(
         (supabase as any)
           .from('trip_orders')
-          .update({ settlement_status: 'completed', updated_at: nowIso })
+          .update({
+            settlement_status: 'completed',
+            invoice_status: 'paid',
+            invoice_paid_at: nowIso,
+            updated_at: nowIso,
+          })
           .in(
             'id',
             tripOrders.map((o) => o.id),
@@ -76,7 +81,7 @@ export async function POST(req: Request) {
 
     // Resolve counterparty_id from body or from first order
     let cpId: string | null = null;
-    if (tripOrders.length > 0) {
+    if (tripOrders.length > 0 && tripOrders[0]) {
       const { data: ord } = await (supabase as any)
         .from('trip_orders')
         .select('counterparty_id')
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
         .single();
       if (ord?.counterparty_id) cpId = ord.counterparty_id;
     }
-    if (!cpId && manuals.length > 0) {
+    if (!cpId && manuals.length > 0 && manuals[0]) {
       const { data: man } = await (supabase as any)
         .from('manual_receivables')
         .select('counterparty_id')

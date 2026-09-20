@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дебиторская задолженность и Счета — SaldaCargo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .filter-btn.active {
+      background-color: #0f172a;
+      color: #ffffff;
+      border-color: #0f172a;
+    }
+    .accordion-content {
+      transition: all 0.2s ease-in-out;
+    }
+  </style>
+</head>
+<body class="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 text-slate-800">
+
+  <!-- Шапка страницы -->
+  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl sm:text-2xl font-black text-slate-900">Дебиторская задолженность</h1>
+        <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full" id="totalDebtorsCount">4 контрагента</span>
+      </div>
+      <p class="text-xs text-slate-500 mt-0.5">
+        Единый список: кликните на контрагента, чтобы раскрыть рейсы, акты и историю
+      </p>
+    </div>
+
+    <!-- Общая сумма долга -->
+    <div class="flex items-center gap-4">
+      <div class="text-right">
+        <span class="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Всего к получению:</span>
+        <span class="text-xl sm:text-2xl font-black text-rose-600">278 500 ₽</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Компактная панель фильтров (маленькие кнопки, без огромных блоков) -->
+  <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <button onclick="setFilter('all')" id="btnFilterAll" class="filter-btn active px-3 py-1.5 rounded-xl border border-slate-200 font-bold transition-all">
+        Все должники (4)
+      </button>
+
+      <button onclick="setFilter('unbilled')" id="btnFilterUnbilled" class="filter-btn bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-all flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span>Ждут выставления счёта (1)</span>
+      </button>
+
+      <button onclick="setFilter('legal')" id="btnFilterLegal" class="filter-btn bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-all flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span>Только Юрлица (счета на Р/С)</span>
+      </button>
+
+      <button onclick="setFilter('individual')" id="btnFilterIndiv" class="filter-btn bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition-all flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+        <span>Физлица (в кассу)</span>
+      </button>
+    </div>
+
+    <!-- Быстрый поиск -->
+    <div class="relative min-w-[220px]">
+      <span class="material-symbols-outlined absolute left-2.5 top-2 text-slate-400 text-sm">search</span>
+      <input type="text" oninput="searchDebtor(this.value)" placeholder="Поиск контрагента, № акта..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none font-medium">
+    </div>
+  </div>
+
+  <!-- ЕДИНЫЙ СПИСОК ВСЕХ КОНТРАГЕНТОВ (АККОРДЕОН) -->
+  <div class="space-y-3" id="debtorsList">
+
+    <!-- 1. ООО ГЕОСТРОЙИНДУСТРИЯ (ЮРЛИЦО) -->
+    <div class="debtor-card bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all" id="card-geostroy" data-type="legal" data-unbilled="true">
+      <!-- Заголовок контрагента (нажимается для раскрытия) -->
+      <div onclick="toggleDebtor('geostroy')" class="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 select-none transition-colors">
+        <div class="flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-black text-sm shrink-0">
+            ГИ
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-black text-slate-900 text-sm sm:text-base">ООО "Геостройиндустрия"</h3>
+              <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">Юрлицо · Р/С</span>
+              <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>1 рейс ждёт счёта</span>
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">
+              <span>ИНН 7415089601</span> · <span class="text-slate-700 font-bold">6 рейсов на контроле</span> · <span>32 счёта в архиве</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="text-right">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">К оплате:</span>
+            <span class="text-lg sm:text-xl font-black text-slate-900" id="geostroyTotalSum">240 000 ₽</span>
+          </div>
+          <span class="material-symbols-outlined text-slate-400 text-xl transition-transform duration-200" id="icon-geostroy">expand_more</span>
+        </div>
+      </div>
+
+      <!-- ВЫПЛЫВАЮЩИЙ БЛОК ДЕТАЛЕЙ ГЕОСТРОЙИНДУСТРИИ -->
+      <div id="details-geostroy" class="accordion-content border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5 space-y-4 hidden">
+        
+        <!-- Внутренние мини-вкладки для этого клиента -->
+        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-2 text-xs">
+          <div class="flex gap-1.5">
+            <button onclick="switchClientTab('geostroy', 'active')" id="btnClientTabActive" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold transition-all">
+              Текущие счета и рейсы (6)
+            </button>
+            <button onclick="switchClientTab('geostroy', 'archive')" id="btnClientTabArchive" class="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-all">
+              Архив оплаченных (32)
+            </button>
+          </div>
+          <span class="text-[11px] text-slate-400 font-medium">Безналичный расчёт · Без НДС</span>
+        </div>
+
+        <!-- 1. ТЕКУЩИЕ СЧЕТА И РЕЙСЫ -->
+        <div id="clientContentActive" class="space-y-3">
+          
+          <!-- Блок: Ждут выставления счёта -->
+          <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-black text-amber-900 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-base text-amber-600">notification_important</span>
+                <span>Требует выставления счёта:</span>
+              </span>
+              <span class="font-bold text-amber-900">50 000 ₽</span>
+            </div>
+
+            <!-- Строка невыставленного рейса 693 -->
+            <div id="unbilled-693" class="bg-white p-3 rounded-lg border border-amber-200 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-100 text-amber-900 font-mono font-bold px-1.5 py-0.5 rounded">Рейс #693</span>
+                  <span class="font-bold text-slate-800">19.09.2026</span>
+                  <span class="text-slate-400">·</span>
+                  <span class="text-slate-600">Валдай А 096 МВ 196 (Нигамедьянов Е.З.)</span>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-0.5 font-medium">Маршрут: Шайтанка – Маминское</div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <span class="font-black text-slate-900 text-sm">50 000 ₽</span>
+                <button onclick="openIssueModal('693', 'ООО Геостройиндустрия', '50 000')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition-colors flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xs">edit_note</span>
+                  <span>Ввести номер счёта</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Блок: Выставленные счета (ждут оплаты) -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-500 px-1">
+              <span>Выставленные акты (ждут поступления на Р/С):</span>
+              <span id="issuedSumBadge">5 актов · 190 000 ₽</span>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs" id="issuedRowsContainer">
+              
+              <!-- Акт 37 -->
+              <div class="p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors" id="row-37">
+                <div class="flex items-center gap-3">
+                  <span class="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Акт № 37</span>
+                  <div>
+                    <div class="font-bold text-slate-800">Рейс #688 · Валдай У 883 АР 96 (Никифоров Д.В.)</div>
+                    <div class="text-[11px] text-slate-400 font-medium">Выставлен 18.09.2026 · Верхотурье – Карпинск – Шайтанка</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="font-black text-slate-900 text-sm">40 000 ₽</span>
+                  <button onclick="settleInvoice('37', 40000, 'Рейс #688')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors inline-flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">check</span>
+                    <span>Погасить (Р/С)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Акт 36 -->
+              <div class="p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors" id="row-36">
+                <div class="flex items-center gap-3">
+                  <span class="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Акт № 36</span>
+                  <div>
+                    <div class="font-bold text-slate-800">Рейс #683 · Валдай А 096 МВ 196 (Нигамедьянов Е.З.)</div>
+                    <div class="text-[11px] text-slate-400 font-medium">Выставлен 17.09.2026 · Шайтанка – Маминское</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="font-black text-slate-900 text-sm">30 000 ₽</span>
+                  <button onclick="settleInvoice('36', 30000, 'Рейс #683')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors inline-flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">check</span>
+                    <span>Погасить (Р/С)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Акт 35 -->
+              <div class="p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors" id="row-35">
+                <div class="flex items-center gap-3">
+                  <span class="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Акт № 35</span>
+                  <div>
+                    <div class="font-bold text-slate-800">Рейс #679 · Валдай А 096 МВ 196 (Нигамедьянов Е.З.)</div>
+                    <div class="text-[11px] text-slate-400 font-medium">Выставлен 15.09.2026 · Шайтанка – Маминское – Воронцовка</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="font-black text-slate-900 text-sm">50 000 ₽</span>
+                  <button onclick="settleInvoice('35', 50000, 'Рейс #679')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors inline-flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">check</span>
+                    <span>Погасить (Р/С)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Акт 34 -->
+              <div class="p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors" id="row-34">
+                <div class="flex items-center gap-3">
+                  <span class="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Акт № 34</span>
+                  <div>
+                    <div class="font-bold text-slate-800">Рейс #670 · Валдай У 883 АР 96 (Никифоров Д.В.)</div>
+                    <div class="text-[11px] text-slate-400 font-medium">Выставлен 14.09.2026 · Карпинск – В.Салда</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="font-black text-slate-900 text-sm">40 000 ₽</span>
+                  <button onclick="settleInvoice('34', 40000, 'Рейс #670')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors inline-flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">check</span>
+                    <span>Погасить (Р/С)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Акт 33 -->
+              <div class="p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors" id="row-33">
+                <div class="flex items-center gap-3">
+                  <span class="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Акт № 33</span>
+                  <div>
+                    <div class="font-bold text-slate-800">Рейс #667 · Валдай А 096 МВ 196 (Нигамедьянов Е.З.)</div>
+                    <div class="text-[11px] text-slate-400 font-medium">Выставлен 14.09.2026 · В.Салда – Маминское</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="font-black text-slate-900 text-sm">30 000 ₽</span>
+                  <button onclick="settleInvoice('33', 30000, 'Рейс #667')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors inline-flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">check</span>
+                    <span>Погасить (Р/С)</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. АРХИВ ОПЛАЧЕННЫХ СЧЕТОВ ДАННОГО КЛИЕНТА -->
+        <div id="clientContentArchive" class="space-y-2 hidden">
+          <div class="bg-white border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span class="font-bold text-emerald-800 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                <span>Архив: 32 счёта успешно оплачены</span>
+              </span>
+              <span class="text-slate-400 text-[11px]">Поступления на Расчётный счёт</span>
+            </div>
+
+            <!-- Список закрытых актов 1..32 -->
+            <div class="divide-y divide-slate-100 max-h-60 overflow-y-auto pr-1" id="archiveRowsContainer">
+              <div class="py-2 flex items-center justify-between text-slate-600">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px]">Акт № 32</span>
+                  <span>12.09.2026 (оплачен 14.09) · Рейс #660 (Нигамедьянов)</span>
+                </div>
+                <span class="font-bold text-slate-900">30 000 ₽</span>
+              </div>
+
+              <div class="py-2 flex items-center justify-between text-slate-600">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px]">Акт № 31</span>
+                  <span>12.09.2026 (оплачен 13.09) · Рейс #658 (Нигамедьянов)</span>
+                </div>
+                <span class="font-bold text-slate-900">50 000 ₽</span>
+              </div>
+
+              <div class="py-2 flex items-center justify-between text-slate-600">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px]">Акт № 30</span>
+                  <span>08.09.2026 (оплачен 10.09) · Рейс #635 (Нигамедьянов)</span>
+                </div>
+                <span class="font-bold text-slate-900">40 000 ₽</span>
+              </div>
+
+              <div class="py-2 text-center text-slate-400 text-[11px]">
+                ... ещё 29 закрытых счетов прошлых периодов (Акты с № 1 по № 29) ...
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- 2. ПАО «КОРПОРАЦИЯ ВСМПО-АВИСМА» (ЮРЛИЦО) -->
+    <div class="debtor-card bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all" id="card-vsmpo" data-type="legal" data-unbilled="false">
+      <div onclick="toggleDebtor('vsmpo')" class="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 select-none transition-colors">
+        <div class="flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-black text-sm shrink-0">
+            ВС
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-black text-slate-900 text-sm sm:text-base">ПАО «Корпорация ВСМПО-АВИСМА»</h3>
+              <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">Юрлицо · Р/С</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">
+              <span>ИНН 6607000556</span> · <span class="text-slate-700 font-bold">Все счета выставлены</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="text-right">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">К оплате:</span>
+            <span class="text-lg sm:text-xl font-black text-slate-900">0 ₽</span>
+          </div>
+          <span class="material-symbols-outlined text-slate-400 text-xl transition-transform duration-200" id="icon-vsmpo">expand_more</span>
+        </div>
+      </div>
+      <div id="details-vsmpo" class="accordion-content border-t border-slate-100 bg-slate-50/60 p-4 text-xs text-slate-500 hidden">
+        Текущей задолженности нет. Все выполненные рейсы закрыты.
+      </div>
+    </div>
+
+
+    <!-- 3. ИВАНОВ ИВАН (ФИЗЛИЦО / СТРОЙКА) -->
+    <div class="debtor-card bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all" id="card-ivanov" data-type="individual" data-unbilled="false">
+      <div onclick="toggleDebtor('ivanov')" class="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 select-none transition-colors">
+        <div class="flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-black text-sm shrink-0">
+            ИИ
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-black text-slate-900 text-sm sm:text-base">Иванов Иван (стройка на Ленина)</h3>
+              <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">Физлицо · Касса (нал)</span>
+              <span class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded">Обещает 22 сен</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">
+              <span>+7 (922) 123-45-67</span> · <span>Рейс #652 от 10.09.2026</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="text-right">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Долг:</span>
+            <span class="text-lg sm:text-xl font-black text-rose-600">18 500 ₽</span>
+          </div>
+          <span class="material-symbols-outlined text-slate-400 text-xl transition-transform duration-200" id="icon-ivanov">expand_more</span>
+        </div>
+      </div>
+
+      <!-- ВЫПЛЫВАЮЩИЙ БЛОК ДЛЯ ФИЗЛИЦА -->
+      <div id="details-ivanov" class="accordion-content border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5 space-y-3 text-xs hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
+          <div>
+            <div class="font-bold text-slate-800">Доставка стройматериалов · Газель 4м (Нигамедьянов Е.З.)</div>
+            <div class="text-slate-500 text-[11px] mt-0.5">Звонили 15.09: «Обещал закрыть наличными до конца недели»</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors">
+              Зафиксировать звонок
+            </button>
+            <button class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors">
+              Погасить в Кассу (нал)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- 4. СЕРГЕЙ (ФИЗЛИЦО / КИРПИЧ) -->
+    <div class="debtor-card bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all" id="card-sergey" data-type="individual" data-unbilled="false">
+      <div onclick="toggleDebtor('sergey')" class="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 select-none transition-colors">
+        <div class="flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-black text-sm shrink-0">
+            СП
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-black text-slate-900 text-sm sm:text-base">Сергей (Доставка кирпича)</h3>
+              <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">Физлицо · Касса (нал)</span>
+              <span class="text-[10px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded">Просрочка 14 дн</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">
+              <span>+7 (904) 987-65-43</span> · <span>Рейс #641 от 05.09.2026</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="text-right">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Долг:</span>
+            <span class="text-lg sm:text-xl font-black text-rose-600">20 000 ₽</span>
+          </div>
+          <span class="material-symbols-outlined text-slate-400 text-xl transition-transform duration-200" id="icon-sergey">expand_more</span>
+        </div>
+      </div>
+
+      <div id="details-sergey" class="accordion-content border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5 space-y-3 text-xs hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
+          <div>
+            <div class="font-bold text-slate-800">Рейс #641 · Валдай У 883 АР 96 (Никифоров Д.В.)</div>
+            <div class="text-slate-500 text-[11px] mt-0.5">Остаток долга с рейса</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors">
+              Зафиксировать звонок
+            </button>
+            <button class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors">
+              Погасить в Кассу (нал)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- МОДАЛКА: ВВОД НОМЕРА СЧЁТА / АКТА (БЫСТРАЯ ФОРМА) -->
+  <div id="modalIssue" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h2 class="text-base font-black text-slate-900">Ввести номер счёта</h2>
+          <p class="text-xs text-slate-500" id="modalTripInfo">Рейс #693 · ООО "Геостройиндустрия"</p>
+        </div>
+        <button onclick="closeIssueModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Номер счёта / Акта из банка:</label>
+          <div class="relative">
+            <span class="absolute left-3 top-2 text-slate-400 font-bold">№</span>
+            <input type="text" id="inputInvoiceNumber" value="38" class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Дата выставления:</label>
+          <input type="date" id="inputInvoiceDate" value="2026-09-20" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Сумма рейса:</label>
+          <div class="px-3 py-2 bg-slate-100 rounded-xl font-black text-slate-800 text-sm">
+            50 000 ₽
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeIssueModal()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors">Отмена</button>
+        <button onclick="saveIssuedInvoice()" class="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors">✓ Зафиксировать счёт</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    // Раскрытие/сворачивание карточки контрагента (аккордеон)
+    function toggleDebtor(id) {
+      const details = document.getElementById(`details-${id}`);
+      const icon = document.getElementById(`icon-${id}`);
+      
+      if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+      } else {
+        details.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    // Внутренние вкладки клиента: Текущие / Архив
+    function switchClientTab(clientId, tab) {
+      const btnActive = document.getElementById('btnClientTabActive');
+      const btnArchive = document.getElementById('btnClientTabArchive');
+      const contentActive = document.getElementById('clientContentActive');
+      const contentArchive = document.getElementById('clientContentArchive');
+
+      if (tab === 'active') {
+        btnActive.className = 'px-3 py-1 rounded-lg bg-slate-900 text-white font-bold transition-all';
+        btnArchive.className = 'px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-all';
+        contentActive.classList.remove('hidden');
+        contentArchive.classList.add('hidden');
+      } else {
+        btnArchive.className = 'px-3 py-1 rounded-lg bg-slate-900 text-white font-bold transition-all';
+        btnActive.className = 'px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition-all';
+        contentArchive.classList.remove('hidden');
+        contentActive.classList.add('hidden');
+      }
+    }
+
+    // Фильтры списка контрагентов
+    function setFilter(type) {
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('active');
+        b.classList.add('bg-white', 'text-slate-600');
+      });
+
+      const cards = document.querySelectorAll('.debtor-card');
+      let count = 0;
+
+      cards.forEach(card => {
+        const isLegal = card.dataset.type === 'legal';
+        const hasUnbilled = card.dataset.unbilled === 'true';
+
+        let visible = false;
+        if (type === 'all') visible = true;
+        else if (type === 'unbilled') visible = hasUnbilled;
+        else if (type === 'legal') visible = isLegal;
+        else if (type === 'individual') visible = !isLegal;
+
+        card.style.display = visible ? '' : 'none';
+        if (visible) count++;
+      });
+
+      if (type === 'all') document.getElementById('btnFilterAll').classList.add('active');
+      if (type === 'unbilled') document.getElementById('btnFilterUnbilled').classList.add('active');
+      if (type === 'legal') document.getElementById('btnFilterLegal').classList.add('active');
+      if (type === 'individual') document.getElementById('btnFilterIndiv').classList.add('active');
+
+      document.getElementById('totalDebtorsCount').innerText = `${count} контрагента`;
+    }
+
+    // Поиск
+    function searchDebtor(val) {
+      val = val.toLowerCase();
+      const cards = document.querySelectorAll('.debtor-card');
+      cards.forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(val) ? '' : 'none';
+      });
+    }
+
+    // Модалка ввода номера счёта
+    function openIssueModal(tripNum, cpName, amount) {
+      document.getElementById('modalTripInfo').innerText = `Рейс #${tripNum} · ${cpName}`;
+      document.getElementById('modalIssue').classList.remove('hidden');
+    }
+
+    function closeIssueModal() {
+      document.getElementById('modalIssue').classList.add('hidden');
+    }
+
+    // Сохранить номер счёта
+    function saveIssuedInvoice() {
+      const num = document.getElementById('inputInvoiceNumber').value || '38';
+      alert(`Акт № ${num} успешно зафиксирован! Рейс перенесён в список выставленных счетов.`);
+      closeIssueModal();
+
+      // Убираем блок невыставленного
+      const unb = document.getElementById('unbilled-693');
+      if (unb) {
+        unb.parentElement.innerHTML = `
+          <div class="text-xs text-emerald-800 font-bold flex items-center gap-1.5 py-1">
+            <span class="material-symbols-outlined text-emerald-600 text-sm">task_alt</span>
+            <span>Все выполненные рейсы этого клиента офактурены! Невыставленных нет.</span>
+          </div>
+        `;
+      }
+
+      // Добавляем строку в выставленные
+      const container = document.getElementById('issuedRowsContainer');
+      const div = document.createElement('div');
+      div.className = 'p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors bg-blue-50/40';
+      div.id = `row-${num}`;
+      div.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Акт № ${num}</span>
+          <div>
+            <div class="font-bold text-slate-800">Рейс #693 · Валдай А 096 МВ 196 (Нигамедьянов Е.З.)</div>
+            <div class="text-[11px] text-slate-400 font-medium">Выставлен сегодня · Шайтанка – Маминское</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="font-black text-slate-900 text-sm">50 000 ₽</span>
+          <button onclick="settleInvoice('${num}', 50000, 'Рейс #693')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors inline-flex items-center gap-1">
+            <span class="material-symbols-outlined text-xs">check</span>
+            <span>Погасить (Р/С)</span>
+          </button>
+        </div>
+      `;
+      container.insertBefore(div, container.firstChild);
+      document.getElementById('issuedSumBadge').innerText = '6 актов · 240 000 ₽';
+    }
+
+    // Погасить счёт
+    function settleInvoice(num, amount, tripLabel) {
+      if (!confirm(`Погасить Акт № ${num} на сумму ${amount.toLocaleString('ru-RU')} ₽?\nДеньги поступят на Расчётный счёт, а счёт переместится в Архив этого контрагента.`)) {
+        return;
+      }
+
+      const row = document.getElementById(`row-${num}`);
+      if (row) row.remove();
+
+      // Добавляем в архив клиента
+      const archiveContainer = document.getElementById('archiveRowsContainer');
+      const div = document.createElement('div');
+      div.className = 'py-2 flex items-center justify-between text-slate-800 bg-emerald-50/40 px-2 rounded font-medium';
+      div.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="font-mono font-bold bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-[11px]">Акт № ${num}</span>
+          <span>Сегодня · ${tripLabel} (поступило на Р/С)</span>
+        </div>
+        <span class="font-black text-slate-900">${amount.toLocaleString('ru-RU')} ₽</span>
+      `;
+      archiveContainer.insertBefore(div, archiveContainer.firstChild);
+
+      alert(`✓ Акт № ${num} закрыт! Расчётный счёт пополнен.`);
+    }
+
+    // Раскрыть Геострой по умолчанию для наглядности демо
+    window.addEventListener('DOMContentLoaded', () => {
+      toggleDebtor('geostroy');
+    });
+  </script>
+</body>
+</html>
