@@ -1122,77 +1122,76 @@ export default function ReceivablesPage() {
         </div>
       )}
 
-      <div className="space-y-5 p-3 sm:p-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-        {/* Header */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="space-y-3 p-2 sm:p-4 max-w-7xl mx-auto animate-in fade-in duration-300">
+        {/* Compact Header */}
+        <div className="bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900">
+              <h1 className="text-lg sm:text-xl font-black text-slate-900">
                 Дебиторская задолженность
               </h1>
               <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                 {allDebtors.length} {allDebtors.length === 1 ? 'контрагент' : 'контрагентов'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Единый список: кликните на контрагента, чтобы раскрыть рейсы, акты и историю счетов
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
                 Всего к получению:
               </span>
-              <span className="text-xl sm:text-2xl font-black text-rose-600">
+              <span className="text-lg sm:text-xl font-black text-rose-600">
                 <Money amount={data?.totalAmount ?? '0'} />
               </span>
             </div>
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors"
             >
-              <span className="material-symbols-outlined text-base">add</span>
+              <span className="material-symbols-outlined text-sm">add</span>
               <span>Добавить долг</span>
             </button>
           </div>
         </div>
 
-        {/* KPI Cards */}
+        {/* Compact KPI Cards */}
         {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-pulse">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 animate-pulse">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-20 bg-slate-200 rounded-xl" />
+              <div key={i} className="h-14 bg-slate-200 rounded-xl" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                 Всего к получению
               </p>
-              <p className="text-xl font-black text-rose-600 mt-1">
+              <p className="text-base sm:text-lg font-black text-rose-600 mt-0.5">
                 <Money amount={data?.totalAmount ?? '0'} />
               </p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                 Всего должников
               </p>
-              <p className="text-xl font-black text-slate-800 mt-1">{allDebtors.length}</p>
+              <p className="text-base sm:text-lg font-black text-slate-800 mt-0.5">
+                {allDebtors.length}
+              </p>
             </div>
             <div
-              className={`border rounded-xl p-3.5 shadow-xs ${
+              className={`border rounded-xl p-2.5 shadow-xs ${
                 (data?.overdueCount ?? 0) > 0
                   ? 'bg-rose-50 border-rose-200'
                   : 'bg-white border-slate-200'
               }`}
             >
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                 Просрочено (&gt;30 дн.)
               </p>
               <p
-                className={`text-xl font-black mt-1 ${
+                className={`text-base sm:text-lg font-black mt-0.5 ${
                   (data?.overdueCount ?? 0) > 0 ? 'text-rose-600' : 'text-emerald-600'
                 }`}
               >
@@ -1200,15 +1199,15 @@ export default function ReceivablesPage() {
               </p>
             </div>
             <div
-              className={`border rounded-xl p-3.5 shadow-xs ${
+              className={`border rounded-xl p-2.5 shadow-xs ${
                 promisedCount > 0 ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'
               }`}
             >
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                 Обещали заплатить
               </p>
               <p
-                className={`text-xl font-black mt-1 ${
+                className={`text-base sm:text-lg font-black mt-0.5 ${
                   promisedCount > 0 ? 'text-blue-600' : 'text-slate-400'
                 }`}
               >
@@ -1330,19 +1329,19 @@ export default function ReceivablesPage() {
         </div>
 
         {/* Debtors List (Accordion) */}
-        <section className="space-y-3">
+        <section className="space-y-1.5">
           {isLoading ? (
-            <div className="p-6 bg-white rounded-2xl border border-slate-200 space-y-3 animate-pulse">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 bg-slate-100 rounded-xl" />
+            <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 animate-pulse">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-10 bg-slate-100 rounded-lg" />
               ))}
             </div>
           ) : filteredDebtors.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
-              <span className="material-symbols-outlined text-slate-200 text-[64px]">
+            <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
+              <span className="material-symbols-outlined text-slate-200 text-[56px]">
                 check_circle
               </span>
-              <p className="text-slate-500 font-bold mt-2">
+              <p className="text-slate-500 font-bold mt-2 text-xs">
                 {categoryFilter === 'all' && !searchQuery
                   ? 'Дебиторской задолженности нет'
                   : 'По выбранным фильтрам контрагентов не найдено'}
@@ -1361,7 +1360,7 @@ export default function ReceivablesPage() {
               )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-1.5">
               {filteredDebtors.map((debtor) => {
                 const days = daysAgo(debtor.oldest_at);
                 const isOverdue = days > 30;
@@ -1396,7 +1395,7 @@ export default function ReceivablesPage() {
                   <div
                     key={debtor.counterparty_id}
                     data-debtor-id={debtor.counterparty_id}
-                    className={`bg-white border rounded-2xl shadow-xs overflow-hidden transition-all ${
+                    className={`bg-white border rounded-xl shadow-xs overflow-hidden transition-all ${
                       isExpanded
                         ? 'border-blue-300 ring-2 ring-blue-50'
                         : unbilledOrders.length > 0 && isLegal
@@ -1404,19 +1403,20 @@ export default function ReceivablesPage() {
                           : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    {/* Debtor Header Row */}
+                    {/* Debtor Compact Single-Line Header Row */}
                     <div
-                      className={`p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 select-none transition-colors ${
-                        isExpanded ? 'bg-slate-50/70' : ''
+                      className={`px-3 py-2 sm:px-4 sm:py-2.5 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-slate-50 select-none transition-colors ${
+                        isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : ''
                       }`}
                       onClick={() => {
                         setExpandedId(isExpanded ? null : debtor.counterparty_id);
                         setEditingFollowUpId(null);
                       }}
                     >
-                      <div className="flex items-center gap-3.5">
+                      {/* Left: Avatar, Name, Badges, Info all in 1 single row */}
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                          className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] shrink-0 ${
                             isLegal
                               ? 'bg-blue-100 text-blue-800'
                               : isOverdue
@@ -1426,134 +1426,119 @@ export default function ReceivablesPage() {
                         >
                           {debtor.counterparty_name.slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-black text-slate-900 text-sm sm:text-base">
-                              {debtor.counterparty_name}
-                            </h3>
 
-                            {isLegal ? (
-                              <span className="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
-                                Юрлицо · Р/С
-                              </span>
-                            ) : (
-                              <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                                Физлицо
-                              </span>
-                            )}
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[200px] lg:max-w-xs">
+                          {debtor.counterparty_name}
+                        </span>
 
-                            {debtor.counterparty_subname && (
-                              <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                {debtor.counterparty_subname}
-                              </span>
-                            )}
+                        {debtor.counterparty_subname && (
+                          <span className="text-[9px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 hidden sm:inline">
+                            {debtor.counterparty_subname}
+                          </span>
+                        )}
 
-                            {unbilledOrders.length > 0 && isLegal && (
-                              <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                <span>
-                                  {unbilledOrders.length}{' '}
-                                  {unbilledOrders.length === 1
-                                    ? 'рейс ждёт счёта'
-                                    : 'рейса ждут счёта'}
-                                </span>
-                              </span>
-                            )}
+                        {isLegal ? (
+                          <span className="text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                            Юрлицо
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                            Физлицо
+                          </span>
+                        )}
 
-                            {statusCfg && (
-                              <span
-                                className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${statusCfg.bg}`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
-                                {statusCfg.label}
-                              </span>
-                            )}
-                          </div>
+                        {unbilledOrders.length > 0 && isLegal && (
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            <span>{unbilledOrders.length} ждут счёта</span>
+                          </span>
+                        )}
 
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <p className="text-xs text-slate-500 font-medium">
-                              <span>
-                                {debtor.orders.length}{' '}
-                                {debtor.orders.length === 1 ? 'запись' : 'записей'}
-                              </span>
-                              {' · '}
-                              {isOverdue ? (
-                                <span className="text-rose-600 font-bold">
-                                  просрочка {days} дн.
-                                </span>
-                              ) : (
-                                <span>{days} дн. назад</span>
-                              )}
-                            </p>
-                            {debtor.counterparty_phone && (
-                              <a
-                                href={`tel:${debtor.counterparty_phone}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-[10px] text-blue-600 font-bold hover:text-blue-800 flex items-center gap-0.5"
-                              >
-                                <span className="material-symbols-outlined text-xs">call</span>
-                                <span className="font-mono">
-                                  {formatPhone(debtor.counterparty_phone)}
-                                </span>
-                              </a>
-                            )}
-                            {debtor.counterparty_email && (
-                              <EmailCopyButton email={debtor.counterparty_email} />
-                            )}
-                            <PromiseDateBadge follow_up={fu} />
-                          </div>
-                        </div>
+                        {statusCfg && (
+                          <span
+                            className={`hidden md:inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${statusCfg.bg}`}
+                          >
+                            <span className={`w-1 h-1 rounded-full ${statusCfg.dot}`} />
+                            {statusCfg.label}
+                          </span>
+                        )}
+
+                        <span className="text-[11px] text-slate-400 shrink-0 hidden md:inline">
+                          {debtor.orders.length} зап. ·{' '}
+                          {isOverdue ? (
+                            <span className="text-rose-600 font-bold">просрочка {days} дн.</span>
+                          ) : (
+                            <span>{days} дн.</span>
+                          )}
+                        </span>
+
+                        {debtor.counterparty_phone && (
+                          <a
+                            href={`tel:${debtor.counterparty_phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] text-blue-600 font-medium hover:text-blue-800 hidden lg:flex items-center gap-0.5 shrink-0"
+                            title={debtor.counterparty_phone}
+                          >
+                            <span className="material-symbols-outlined text-xs">call</span>
+                            <span className="font-mono">
+                              {formatPhone(debtor.counterparty_phone)}
+                            </span>
+                          </a>
+                        )}
+
+                        {debtor.counterparty_email && (
+                          <span className="hidden xl:inline shrink-0">
+                            <EmailCopyButton email={debtor.counterparty_email} />
+                          </span>
+                        )}
+
+                        <PromiseDateBadge follow_up={fu} />
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                            К оплате:
-                          </span>
-                          <span
-                            className={`text-lg sm:text-xl font-black ${
-                              isOverdue ? 'text-rose-600' : 'text-slate-900'
-                            }`}
-                          >
-                            <Money amount={debtor.total} />
-                          </span>
-                        </div>
+                      {/* Right: Sum + Actions in 1 single row */}
+                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        <span
+                          className={`text-xs sm:text-sm font-black tracking-tight ${
+                            isOverdue ? 'text-rose-600' : 'text-slate-900'
+                          }`}
+                        >
+                          <Money amount={debtor.total} />
+                        </span>
 
-                        {/* Quick action: Link */}
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpandedId(debtor.counterparty_id);
                             setLinkingOrderId(debtor.counterparty_id);
                           }}
-                          className="px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
+                          className="px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
                           title="Привязать к контрагенту"
                         >
                           <span className="material-symbols-outlined text-xs">link</span>
-                          {isReal ? 'Сменить' : 'Привязать'}
+                          <span className="hidden sm:inline">
+                            {isReal ? 'Сменить' : 'Привязать'}
+                          </span>
                         </button>
 
-                        {/* Expand toggle */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpandedId(isExpanded ? null : debtor.counterparty_id);
                           }}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-1"
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
                         >
-                          <span className="material-symbols-outlined text-xs">
-                            {isExpanded ? 'unfold_less' : 'unfold_more'}
+                          <span
+                            className="material-symbols-outlined text-sm transition-transform duration-200"
+                            style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
+                          >
+                            expand_more
                           </span>
-                          <span>{isExpanded ? 'Свернуть' : 'Подробнее'}</span>
+                          <span className="hidden sm:inline">
+                            {isExpanded ? 'Свернуть' : 'Подробнее'}
+                          </span>
                         </button>
-
-                        <span
-                          className="material-symbols-outlined text-slate-400 text-xl transition-transform duration-200"
-                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                        >
-                          expand_more
-                        </span>
                       </div>
                     </div>
 
