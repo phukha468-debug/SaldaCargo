@@ -826,29 +826,6 @@
           </p>
         </div>
 
-        <!-- Плашка бесплатной консультации (светлая, компактная, без лишней воды) -->
-        <div class="theme-card p-4 sm:p-5 rounded-2xl border border-emerald-300 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-          <div class="flex items-center gap-3.5 text-left">
-            <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
-              <i data-lucide="sparkles" class="w-5 h-5 text-emerald-600"></i>
-            </div>
-            <div>
-              <div class="font-black text-sm sm:text-base" style="color: #171310 !important;">
-                Бесплатная консультация и настройка ЭТРН для ваших рейсов
-              </div>
-              <div class="text-xs text-slate-600 mt-0.5">
-                Поможем настроить роуминг (Диадок, СБИС, 1С-ЭПД), оформить МЧД и без задержек провести первый рейс.
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 shrink-0 w-full sm:w-auto">
-            <a href="tel:+79630501501" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider transition transform active:scale-95 shadow-sm shadow-emerald-900/20 whitespace-nowrap">
-              <i data-lucide="phone" class="w-3.5 h-3.5"></i>
-              <span>Задать вопрос: +7-963-0-501-501</span>
-            </a>
-          </div>
-        </div>
-
         <!-- Основная схема: Цикл ЭТРН (4 титула — кто, где и что подписывает) -->
         <div class="theme-card p-6 sm:p-8 rounded-3xl border border-[#e8e3d6] bg-white shadow-sm space-y-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
@@ -878,21 +855,21 @@
                   <span class="text-[10px] text-slate-500 font-bold uppercase">1. Погрузка</span>
                 </div>
                 <div class="font-black text-base" style="color: #171310 !important;">Погрузка груза</div>
-                <div class="text-xs text-slate-700">
+                <div class="text-xs text-slate-700 leading-snug">
                   <span class="text-slate-500 font-medium">Кто подписывает:</span><br/>
-                  <strong class="font-bold text-slate-950">Грузоотправитель</strong> (склад / логист).
+                  <strong class="font-bold text-slate-950">Грузоотправитель или ЛОП</strong> (лицо, осуществившее погрузку: чужой склад, поставщик при самовывозе), логист или руководитель.
                 </div>
                 <div class="text-xs text-slate-600 leading-snug">
                   <span class="text-slate-500 font-medium">Подпись:</span><br/>
-                  <strong class="font-bold text-slate-950">КЭП</strong> сотрудника + <strong class="font-bold text-slate-950">МЧД</strong>.
+                  <strong class="font-bold text-slate-950">КЭП руководителя</strong> либо <strong class="font-bold text-slate-950">КЭП сотрудника + МЧД</strong>.
                 </div>
                 <p class="text-[11px] text-slate-500 leading-tight">
-                  Фиксирует массу, пломбы, количество мест и факт выезда со склада.
+                  Фиксирует массу, пломбы, количество мест, состояние груза и факт отправки.
                 </p>
               </div>
               <div class="pt-2 border-t border-slate-200 text-[11px] text-emerald-800 font-bold flex items-center gap-1">
                 <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span>Старт рейса</span>
+                <span>Старт рейса • Т1</span>
               </div>
             </div>
 
@@ -904,21 +881,21 @@
                   <span class="text-[10px] text-slate-500 font-bold uppercase">2. Приёмка в рейс</span>
                 </div>
                 <div class="font-black text-base" style="color: #171310 !important;">Приёмка перевозчиком</div>
-                <div class="text-xs text-slate-700">
+                <div class="text-xs text-slate-700 leading-snug">
                   <span class="text-slate-500 font-medium">Кто подписывает:</span><br/>
-                  <strong class="font-bold text-slate-950">Водитель ТК501</strong> (перевозчик).
+                  <strong class="font-bold text-slate-950">Водитель, логист перевозчика или руководитель (ТК501)</strong>.
                 </div>
                 <div class="text-xs text-slate-600 leading-snug">
                   <span class="text-slate-500 font-medium">Подпись:</span><br/>
-                  <strong class="font-bold text-slate-950">ПЭП</strong> в приложении или <strong class="font-bold text-slate-950">Госключ</strong>.
+                  <strong class="font-bold text-slate-950">ПЭП / Госключ</strong> водителя либо <strong class="font-bold text-slate-950">КЭП / МЧД</strong> логиста или ИП.
                 </div>
                 <p class="text-[11px] text-slate-500 leading-tight">
-                  Подтверждает приём груза. Формирует динамический QR-код для проверки ГИБДД.
+                  Подтверждает приём груза к перевозке и фиксирует оговорки при погрузке.
                 </p>
               </div>
               <div class="pt-2 border-t border-slate-200 text-[11px] text-amber-800 font-bold flex items-center gap-1">
-                <i data-lucide="qr-code" class="w-3.5 h-3.5 text-amber-600"></i>
-                <span>QR-код для ГИБДД</span>
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>Принят к перевозке • Т2</span>
               </div>
             </div>
 
@@ -930,21 +907,21 @@
                   <span class="text-[10px] text-slate-500 font-bold uppercase">3. Выгрузка</span>
                 </div>
                 <div class="font-black text-base" style="color: #171310 !important;">Приёмка получателем</div>
-                <div class="text-xs text-slate-700">
+                <div class="text-xs text-slate-700 leading-snug">
                   <span class="text-slate-500 font-medium">Кто подписывает:</span><br/>
-                  <strong class="font-bold text-slate-950">Грузополучатель</strong> (склад клиента).
+                  <strong class="font-bold text-slate-950">Грузополучатель</strong> (руководитель, логист или кладовщик склада с МЧД).
                 </div>
                 <div class="text-xs text-slate-600 leading-snug">
                   <span class="text-slate-500 font-medium">Подпись:</span><br/>
-                  <strong class="font-bold text-slate-950">КЭП</strong> сотрудника + <strong class="font-bold text-slate-950">МЧД</strong>.
+                  <strong class="font-bold text-slate-950">КЭП руководителя</strong> либо <strong class="font-bold text-slate-950">КЭП сотрудника + МЧД</strong>.
                 </div>
                 <p class="text-[11px] text-slate-500 leading-tight">
-                  Фиксирует прибытие, фактическую приёмку и расхождения (если есть).
+                  Фиксирует прибытие, фактическую выгрузку, приёмку и расхождения/претензии (если есть).
                 </p>
               </div>
               <div class="pt-2 border-t border-slate-200 text-[11px] text-blue-800 font-bold flex items-center gap-1">
                 <i data-lucide="package-check" class="w-3.5 h-3.5 text-blue-600"></i>
-                <span>Груз принят складом</span>
+                <span>Груз принят складом • Т3</span>
               </div>
             </div>
 
@@ -956,36 +933,58 @@
                   <span class="text-[10px] text-slate-500 font-bold uppercase">4. Завершение</span>
                 </div>
                 <div class="font-black text-base" style="color: #171310 !important;">Выдача груза</div>
-                <div class="text-xs text-slate-700">
+                <div class="text-xs text-slate-700 leading-snug">
                   <span class="text-slate-500 font-medium">Кто подписывает:</span><br/>
-                  <strong class="font-bold text-slate-950">Водитель + Перевозчик ТК501</strong>.
+                  <strong class="font-bold text-slate-950">Водитель, логист или руководитель перевозчика (ТК501)</strong>.
                 </div>
                 <div class="text-xs text-slate-600 leading-snug">
                   <span class="text-slate-500 font-medium">Подпись:</span><br/>
-                  <strong class="font-bold text-slate-950">ПЭП</strong> водителя + <strong class="font-bold text-slate-950">КЭП</strong> ТК501.
+                  <strong class="font-bold text-slate-950">ПЭП / Госключ</strong> водителя либо <strong class="font-bold text-slate-950">КЭП / МЧД</strong> ТК501.
                 </div>
                 <p class="text-[11px] text-slate-500 leading-tight">
-                  Юридически закрывает рейс. Документ мгновенно попадает в ФНС и бухгалтерию.
+                  Юридически закрывает рейс. Документ моментально регистрируется в ГИС ЭПД Минтранса РФ и ФНС.
                 </p>
               </div>
               <div class="pt-2 border-t border-slate-200 text-[11px] text-emerald-800 font-bold flex items-center gap-1">
                 <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span>Рейс закрыт в ГИС ЭПД</span>
+                <span>Рейс закрыт в ГИС ЭПД • Т4</span>
               </div>
             </div>
 
           </div>
 
-          <!-- Контроль на дороге ГИБДД (аккуратная светлая плашка) -->
-          <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center gap-3 text-xs">
-            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold border border-amber-300">
-              <i data-lucide="shield" class="w-4 h-4 text-amber-700"></i>
+          <!-- Задать вопрос / консультация: через MAX бот или телефон -->
+          <div class="p-4 sm:p-5 rounded-2xl bg-[#faf8f4] border border-[#e8e3d6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
+            <div class="flex items-center gap-3.5 text-left">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                <i data-lucide="help-circle" class="w-5 h-5 text-blue-600"></i>
+              </div>
+              <div>
+                <div class="font-black text-sm sm:text-base" style="color: #171310 !important;">
+                  Задать вопрос или запросить консультацию по ЭТРН
+                </div>
+                <div class="text-xs text-slate-500 mt-0.5">
+                  Поможем с роумингом, МЧД или самовывозом со склада. Ответим в чат-боте MAX или по телефону.
+                </div>
+              </div>
             </div>
-            <div class="leading-snug text-slate-800">
-              <strong style="color: #171310 !important;">Проверка на трассе:</strong> Инспектор ГИБДД считывает динамический QR-код со смартфона водителя ТК501 и мгновенно проверяет легальность рейса в ГИС ЭПД офлайн (без интернета на дороге).
+            
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+              <!-- Кнопка вызова формы для вопроса через MAX бот -->
+              <button type="button" onclick="openEtrnModal()" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider transition transform active:scale-95 shadow-sm shadow-blue-900/20 whitespace-nowrap cursor-pointer">
+                <i data-lucide="bot" class="w-4 h-4"></i>
+                <span>Вопрос через MAX бот</span>
+              </button>
+
+              <!-- Кнопка прямого звонка по номеру +7 922 18 00 911 -->
+              <a href="tel:+79221800911" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider transition transform active:scale-95 shadow-sm shadow-emerald-900/20 whitespace-nowrap">
+                <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                <span>+7 (922) 180-09-11</span>
+              </a>
             </div>
           </div>
         </div>
+
 
         <!-- ========================================================================= -->
         <!-- СПОЙЛЕР: ВСЁ ЧТО НУЖНО ДЛЯ РАБОТЫ С ЭТРН (ДОКУМЕНТЫ, КЭП, УКЭП, МЧД) ПО РОЛЯМ -->
@@ -1015,29 +1014,29 @@
             <div class="p-6 sm:p-8 pt-2 border-t border-slate-200 space-y-6 bg-[#faf8f4]">
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                 
-                <!-- Роль 1: Грузоотправитель -->
+                <!-- Роль 1: Грузоотправитель или ЛОП -->
                 <div class="p-5 rounded-2xl bg-white border border-[#e8e3d6] shadow-2xs space-y-3.5">
                   <div class="flex items-center gap-2.5 pb-2.5 border-b border-slate-100">
                     <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs border border-emerald-200">
                       1
                     </div>
                     <div>
-                      <div class="font-black text-sm text-slate-950">Грузоотправитель</div>
-                      <div class="text-[11px] text-slate-500">Заказчик рейса / Склад</div>
+                      <div class="font-black text-sm text-slate-950">Грузоотправитель / ЛОП</div>
+                      <div class="text-[11px] text-slate-500">Склад отгрузки / Самовывоз</div>
                     </div>
                   </div>
                   <ul class="space-y-2 text-xs text-slate-700">
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>Оператор ИС ЭПД:</strong> подключение к Диадок, СБИС (Тензор), 1С-ЭПД или другому аккредитованному оператору Минтранса.</span>
+                      <span><strong>Оператор ИС ЭПД:</strong> Диадок, СБИС (Тензор), 1С-ЭПД или любой аккредитованный оператор Минтранса.</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>Электронная подпись:</strong> КЭП / УКЭП руководителя юрлица (ФНС) либо КЭП сотрудника (физлица).</span>
+                      <span><strong>Электронная подпись:</strong> КЭП / УКЭП руководителя юрлица либо КЭП сотрудника (физлица) с МЧД.</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>МЧД (формат ФНС / Минцифры 003):</strong> зарегистрирована в реестре ФНС, если накладную подписывает кладовщик или логист.</span>
+                      <span><strong>Самовывоз и ЛОП:</strong> если компания сама заказывает перевозку с чужого склада, Т1 подписывает Лицо, осуществившее погрузку (ЛОП).</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
@@ -1046,15 +1045,15 @@
                   </ul>
                 </div>
 
-                <!-- Роль 2: Перевозчик и Водитель -->
+                <!-- Роль 2: Перевозчик (Водитель / Логист / Руководитель) -->
                 <div class="p-5 rounded-2xl bg-white border border-[#e8e3d6] shadow-2xs space-y-3.5">
                   <div class="flex items-center gap-2.5 pb-2.5 border-b border-slate-100">
                     <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xs border border-amber-200">
                       2
                     </div>
                     <div>
-                      <div class="font-black text-sm text-slate-950">Перевозчик и Водитель</div>
-                      <div class="text-[11px] text-slate-500">ТК501 (ИП Нигамедьянов)</div>
+                      <div class="font-black text-sm text-slate-950">Перевозчик (ТК501)</div>
+                      <div class="text-[11px] text-slate-500">Водитель / Логист / Руководитель</div>
                     </div>
                   </div>
                   <ul class="space-y-2 text-xs text-slate-700">
@@ -1064,15 +1063,15 @@
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>Подпись водителя:</strong> ПЭП в мобильном приложении оператора либо УКЭП через Госключ за 1 минуту.</span>
+                      <span><strong>Кто может подписать:</strong> Водитель рейса, логист компании-перевозчика либо сам руководитель ТК501.</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>КЭП Перевозчика:</strong> электронная подпись ИП Нигамедьянов для итогового закрытия рейса.</span>
+                      <span><strong>Электронная подпись:</strong> ПЭП / Госключ водителя в приложении либо КЭП / МЧД логиста или ИП Нигамедьянов.</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>Подписывает:</strong> Титул Т2 (приёмка в рейс) и Титул Т4 (сдача груза).</span>
+                      <span><strong>Подписывает:</strong> Титул Т2 (приёмка в рейс) и Титул Т4 (сдача груза и закрытие).</span>
                     </li>
                   </ul>
                 </div>
@@ -1085,7 +1084,7 @@
                     </div>
                     <div>
                       <div class="font-black text-sm text-slate-950">Грузополучатель</div>
-                      <div class="text-[11px] text-slate-500">Клиент / Склад приёмки</div>
+                      <div class="text-[11px] text-slate-500">Руководитель / Логист / Кладовщик</div>
                     </div>
                   </div>
                   <ul class="space-y-2 text-xs text-slate-700">
@@ -1095,11 +1094,11 @@
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>Электронная подпись:</strong> КЭП / УКЭП сотрудника приёмки + зарегистрированная МЧД в ФНС.</span>
+                      <span><strong>Кто подписывает:</strong> Руководитель организации, логист или кладовщик склада приёмки с оформленной МЧД.</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
-                      <span><strong>Устройство:</strong> рабочий ПК или защищённый складской планшет/смартфон с выходом в интернет.</span>
+                      <span><strong>Электронная подпись:</strong> КЭП руководителя либо КЭП сотрудника + зарегистрированная МЧД в реестре ФНС.</span>
                     </li>
                     <li class="flex items-start gap-2">
                       <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i>
@@ -1107,6 +1106,7 @@
                     </li>
                   </ul>
                 </div>
+
 
               </div>
 
@@ -2401,6 +2401,75 @@
     </div>
   </div>
 
+  <!-- 5. Модальное окно: Задать вопрос / Консультация по ЭТРН через MAX бот -->
+  <div id="etrn-consult-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="theme-card max-w-lg w-full rounded-3xl p-5 sm:p-7 space-y-4 border border-blue-500/40 shadow-2xl relative my-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+            <i data-lucide="bot" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-black text-white">Консультация по ЭТРН через MAX</h3>
+            <p class="text-[11px] text-slate-400">Форма для вопроса и открытия диалога в боте</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEtrnModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700 active:scale-95 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="etrn-modal-form" onsubmit="submitEtrnConsultForm(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">
+            Ваше имя или организация <span class="text-blue-400">*</span>
+          </label>
+          <input type="text" id="etrn-form-name" required placeholder="Например: ООО 'Логистика' или Роман" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">
+            Телефон для обратной связи <span class="text-blue-400">*</span>
+          </label>
+          <input type="tel" id="etrn-form-phone" required placeholder="+7 (922) 000-00-00" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition font-mono">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">
+            Тема вопроса / Описание ситуации
+          </label>
+          <select id="etrn-form-topic" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition mb-2">
+            <option value="Консультация по 4 титулам ЭТРН">Консультация по 4 титулам ЭТРН</option>
+            <option value="Оформление МЧД для склада / ЛОП / водителя">Оформление МЧД для склада / ЛОП / водителя</option>
+            <option value="Самовывоз и участие стороннего склада (ЛОП)">Самовывоз и участие стороннего склада (ЛОП)</option>
+            <option value="Настройка роуминга операторов (Диадок, СБИС, 1С)">Настройка роуминга операторов (Диадок, СБИС, 1С)</option>
+            <option value="Подготовка первого рейса по ЭТРН">Подготовка первого рейса по ЭТРН</option>
+            <option value="Другой вопрос">Другой вопрос</option>
+          </select>
+          <textarea id="etrn-form-comment" rows="2" placeholder="Опишите вопрос подробнее (необязательно)..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-blue-500 focus:outline-none transition"></textarea>
+        </div>
+
+        <div class="pt-2 space-y-2">
+          <button type="submit" id="etrn-submit-btn" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-900/40 transition transform active:scale-95 flex items-center justify-center gap-2">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>Отправить заявку и открыть MAX бот</span>
+          </button>
+          
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <a href="https://max.ru/id660704814106_bot" target="_blank" rel="noopener noreferrer" class="flex-1 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="message-square" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Открыть @id660704814106_bot</span>
+            </a>
+            <a href="tel:+79221800911" class="flex-1 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="phone-call" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>+7 (922) 180-09-11</span>
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ========================================================================= -->
   <!-- 📱 МОБИЛЬНАЯ НИЖНЯЯ ПАНЕЛЬ (ВСЕГО 3 КНОПКИ: 1. ЗВОНОК | 2. РАСЧЕТ | 3. ЗАЯВКА) -->
   <!-- ========================================================================= -->
@@ -3420,6 +3489,85 @@ Email: uralavto707@mail.ru
       etrnBtn.addEventListener('mouseenter', () => {
         etrnBtn.classList.remove('is-flipped');
       });
+    }
+
+    // Модальное окно: консультация по ЭТРН через MAX бот
+    function openEtrnModal() {
+      const modal = document.getElementById('etrn-consult-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    function closeEtrnModal() {
+      const modal = document.getElementById('etrn-consult-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function submitEtrnConsultForm(e) {
+      e.preventDefault();
+      const name = document.getElementById('etrn-form-name').value.trim();
+      const phone = document.getElementById('etrn-form-phone').value.trim();
+      const topic = document.getElementById('etrn-form-topic').value;
+      const comment = document.getElementById('etrn-form-comment').value.trim();
+
+      if (!name || !phone) {
+        showToast('Пожалуйста, укажите имя и телефон');
+        return;
+      }
+
+      const submitBtn = document.getElementById('etrn-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+      }
+
+      const fullComment = `[Консультация ЭТРН через MAX] Тема: ${topic}. ${comment ? 'Комментарий: ' + comment : ''}`;
+
+      const payload = {
+        orderSource: 'website_etrn_consult',
+        storeName: 'Сайт tk501.ru (Консультация ЭТРН)',
+        name: name,
+        clientName: name,
+        phone: phone,
+        clientPhone: phone,
+        from: 'ЭТРН Консультация',
+        to: 'MAX Бот',
+        notes: fullComment
+      };
+
+      const API_ENDPOINTS = [
+        'https://app.ancargo66.ru/api/public/delivery-order',
+        'https://app.tk501.ru/api/public/delivery-order'
+      ];
+
+      for (const endpoint of API_ENDPOINTS) {
+        try {
+          await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } catch (err) {
+          console.warn('API submit warning:', err);
+        }
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+      }
+
+      closeEtrnModal();
+      showToast('Запрос на консультацию отправлен! Открываем MAX бот...');
+      window.open('https://max.ru/id660704814106_bot', '_blank');
     }
 
     // Инициализация
