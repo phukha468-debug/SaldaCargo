@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
   // Resolve counterparty_id from first order
   let cpId: string | null = null;
-  if (tripOrders.length > 0) {
+  if (tripOrders.length > 0 && tripOrders[0]) {
     const { data: ord } = await (supabase as any)
       .from('trip_orders')
       .select('counterparty_id')
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       .single();
     if (ord?.counterparty_id) cpId = ord.counterparty_id;
   }
-  if (!cpId && manuals.length > 0) {
+  if (!cpId && manuals.length > 0 && manuals[0]) {
     const { data: man } = await (supabase as any)
       .from('manual_receivables')
       .select('counterparty_id')

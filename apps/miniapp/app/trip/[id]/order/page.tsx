@@ -72,6 +72,14 @@ const METHODS_INDIVIDUAL = [
 
 const METHODS_LEGAL = [
   {
+    value: 'cash' as const,
+    label: 'Наличные',
+    sublabel: 'Сдаст в конце смены',
+    icon: '💵',
+    wallet: '→ Касса',
+    color: 'peer-checked:border-green-600 peer-checked:bg-green-50',
+  },
+  {
     value: 'debt_cash' as const,
     label: 'Счёт / Долг',
     sublabel: 'Оплата по выставленному счёту',
@@ -752,24 +760,22 @@ export default function AddOrderPage() {
           </div>
 
           {/* Подсказка для юрлиц */}
-          {clientType === 'legal' && (
+          {clientType === 'legal' && selectedPaymentMethod === 'debt_cash' && (
             <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide px-1">
               🏢 Юрлицо оплачивает по счёту → деньги придут на Р/С
             </p>
           )}
 
           {/* Подсказка для налички */}
-          {selectedPaymentMethod === 'cash' &&
-            clientType !== 'legal' &&
-            !selectedCounterparty?.is_legal_entity && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
-                <span className="text-sm leading-none">💡</span>
-                <span>
-                  Деньги физически у вас или вы лично своими глазами видели перевод. Описание можно
-                  не заполнять.
-                </span>
-              </div>
-            )}
+          {selectedPaymentMethod === 'cash' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
+              <span className="text-sm leading-none">💡</span>
+              <span>
+                Деньги физически у вас или вы лично своими глазами видели перевод. Описание можно не
+                заполнять.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── Комментарий к долгу (только для физлиц в долг) ── */}
