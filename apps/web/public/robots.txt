@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /*?*
+
+Sitemap: https://tk501.ru/sitemap.xml
+Host: https://tk501.ru
