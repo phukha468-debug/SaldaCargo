@@ -1,22 +1,30 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 async function main() {
-  const { data: users } = await supabase.from('users').select('id, name').ilike('name', '%Никифоров%');
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, name')
+    .ilike('name', '%Никифоров%');
   const userId = users[0].id;
 
   // get category_id of trip 363
-  const { data: refTx } = await supabase.from('transactions')
+  const { data: refTx } = await supabase
+    .from('transactions')
     .select('category_id')
     .eq('description', 'ЗП: Никифоров Д.В. — рейс №363')
     .single();
 
   const categoryId = refTx.category_id;
-  
+
   // insert 6000 tx
-  const { data: newTx, error } = await supabase.from('transactions')
+  const { data: newTx, error } = await supabase
+    .from('transactions')
     .insert({
       direction: 'expense',
       amount: '6000.00',
@@ -27,7 +35,7 @@ async function main() {
       lifecycle_status: 'approved',
       from_wallet_id: null, // payroll doesn't have wallet until settled
       to_wallet_id: null,
-      created_by: userId // or admin
+      created_by: userId, // or admin
     })
     .select()
     .single();

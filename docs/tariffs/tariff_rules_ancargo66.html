@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Регламент тарификации доставки и ПРР — ancargo66</title>
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.45;
+    font-size: 12px;
+    margin: 0;
+    padding: 0;
+  }
+  .header {
+    border-bottom: 2px solid #ea580c;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .brand-title {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: -0.5px;
+  }
+  .brand-title span {
+    color: #ea580c;
+  }
+  .brand-sub {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .meta-right {
+    text-align: right;
+    font-size: 11px;
+    color: #475569;
+  }
+  .doc-title {
+    background: #f8fafc;
+    border-left: 4px solid #ea580c;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+  }
+  .doc-title h1 {
+    font-size: 16px;
+    margin: 0;
+    color: #0f172a;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .doc-title p {
+    margin: 4px 0 0 0;
+    color: #64748b;
+    font-size: 11px;
+  }
+  h2 {
+    font-size: 13px;
+    color: #0f172a;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 4px;
+    margin-top: 14px;
+    margin-bottom: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+    font-size: 11px;
+  }
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 6px 8px;
+  }
+  td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 10px;
+  }
+  .badge-orange { background: #ffedd5; color: #c2410c; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-blue { background: #e0f2fe; color: #0369a1; }
+  
+  .formula-box {
+    background: #fff7ed;
+    border: 1px dashed #fdba74;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 10px 0;
+    font-size: 11px;
+  }
+  .formula-box strong {
+    color: #c2410c;
+  }
+  
+  .cases-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .case-card {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .case-card h4 {
+    margin: 0 0 6px 0;
+    font-size: 11px;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 4px;
+  }
+  .case-card ul {
+    margin: 0;
+    padding-left: 14px;
+    font-size: 10.5px;
+    color: #475569;
+  }
+  .case-total {
+    margin-top: 6px;
+    font-weight: 800;
+    color: #ea580c;
+    font-size: 12px;
+    text-align: right;
+  }
+  
+  .sign-block {
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 2px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+  }
+  .sign-col {
+    width: 45%;
+  }
+  .sign-line {
+    margin-top: 28px;
+    border-bottom: 1px solid #0f172a;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #64748b;
+    padding-bottom: 2px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="brand-title">ancargo<span>66</span> · Логистика</div>
+      <div class="brand-sub">ИП Нигамедьянов А.С. · Служба грузоперевозок и доставки</div>
+    </div>
+    <div class="meta-right">
+      <strong>г. Верхняя Салда, Свердловская обл.</strong><br>
+      Тел: +7 (963) 050-15-01 · Сайт: ancargo66.ru<br>
+      Дата редакции: 05.09.2026 г.
+    </div>
+  </div>
+
+  <!-- Title -->
+  <div class="doc-title">
+    <h1>РЕГЛАМЕНТ И МЕТОДИКА ТАРИФИКАЦИИ ДОСТАВКИ И ПРР</h1>
+    <p>Базовые нормативы для автоматического расчёта в онлайн-калькуляторе партнёрских магазинов</p>
+  </div>
+
+  <!-- 1. Транспорт -->
+  <h2>1. Транспортная часть (Автомобиль)</h2>
+  <div class="formula-box">
+    <strong>Формула стоимости авто:</strong> Стоимость = Подача магазина + (Расстояние по Яндекс.Картам, км × Тариф за 1 км).<br>
+    <em>Пример базовой настройки:</em> Подача — <strong>200 ₽</strong>, стоимость 1 км — <strong>100 ₽</strong>. Минимальная поездка — 500 ₽.
+  </div>
+
+  <!-- 2. ПРР Категории -->
+  <h2>2. Погрузочно-разгрузочные работы (ПРР) — Категории груза</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 22%;">Категория груза</th>
+        <th style="width: 36%;">Характеристики и примеры</th>
+        <th style="width: 20%;">Погрузка / Вынос</th>
+        <th style="width: 22%;">Подъём на этаж (пешком)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. Стандартный</strong><br><span class="badge badge-green">До 25–30 кг</span></td>
+        <td>Груз несет 1 человек. Стулья, тумбы, мелкая мебель, коробки, бытовая техника, светильники.</td>
+        <td><strong>0 ₽ (Бесплатно)</strong><br><span style="color:#64748b; font-size:10px;">Погрузка водителем</span></td>
+        <td><strong>+100 ₽ / этаж</strong><br><span style="color:#64748b; font-size:10px;">(100 ₽ фикс при лифте)</span></td>
+      </tr>
+      <tr>
+        <td><strong>2. Негабаритный</strong><br><span class="badge badge-orange">Не унести в одиночку</span></td>
+        <td>Требуются 2 грузчика. Угловой диван, матрас 160+, 2-3 ств. шкаф, длинная столешница.</td>
+        <td><strong>+200 ₽</strong><br><span style="color:#64748b; font-size:10px;">Считается как 1 этаж</span></td>
+        <td><strong>+200 ₽ / этаж</strong><br><span style="color:#64748b; font-size:10px;">За каждый этаж пешком</span></td>
+      </tr>
+      <tr>
+        <td><strong>3. Тяжёлый</strong><br><span class="badge badge-blue">Вес более 45 кг</span></td>
+        <td>Повышенная трудоёмкость. Входные металл. двери, сейфы, ванны, керамогранит, массив.</td>
+        <td><strong>+300 ₽</strong><br><span style="color:#64748b; font-size:10px;">Считается как 1 этаж</span></td>
+        <td><strong>+300 ₽ / этаж</strong><br><span style="color:#64748b; font-size:10px;">За каждый этаж пешком</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 3. Ответственность и Лифт -->
+  <h2>3. Дополнительные коэффициенты и правила</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30%;">Условие / Параметр</th>
+        <th style="width: 45%;">Правило тарификации</th>
+        <th style="width: 25%;">Тариф</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ценность груза (> 30 000 ₽)</strong></td>
+        <td>Коэффициент материальной ответственности за дорогостоящий товар (зеркала, дорогая мебель).</td>
+        <td><strong>+100 ₽ / этаж</strong><br><span style="color:#64748b; font-size:10px;">И на вынос, и на каждый этаж</span></td>
+      </tr>
+      <tr>
+        <td><strong>Грузовой лифт</strong></td>
+        <td>Любой этаж (хоть 16-й) оплачивается как 1 фиксированный этаж (занос в лифт + в квартиру).</td>
+        <td><strong>Оплата за 1 этаж</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Пассажирский лифт</strong></td>
+        <td>Стандартные грузы — 1 этаж. Если груз <em>негабарит</em> (диван), калькулятор автоматически считает подъём пешком.</td>
+        <td><strong>По габаритам груза</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Длинный пронос (> 25 метров)</strong></td>
+        <td>Если во дворе шлагбаум, сугробы или нет проезда вплотную к подъезду (каждые 25 м).</td>
+        <td><strong>= +1 этаж подъёма</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. Примеры расчётов -->
+  <h2>4. Примеры сквозных расчётов</h2>
+  <div class="cases-grid">
+    <div class="case-card">
+      <h4>КЕЙС 1: Комод (12 000 ₽)</h4>
+      <ul>
+        <li>Расстояние: 5 км</li>
+        <li>Подъём: 3 этаж пешком</li>
+        <li>Категория: Стандартный</li>
+        <li>Машина: 200 + 5×100 = 700 ₽</li>
+        <li>Погрузка: 0 ₽</li>
+        <li>Подъём: 3 эт × 100 ₽ = 300 ₽</li>
+      </ul>
+      <div class="case-total">ИТОГО: 1 000 ₽</div>
+    </div>
+    <div class="case-card">
+      <h4>КЕЙС 2: Угловой диван (28 000 ₽)</h4>
+      <ul>
+        <li>Расстояние: 8 км</li>
+        <li>Подъём: 4 этаж (без лифта)</li>
+        <li>Категория: Негабарит</li>
+        <li>Машина: 200 + 8×100 = 1 000 ₽</li>
+        <li>Погрузка: 200 ₽ (1 этаж)</li>
+        <li>Подъём: 4 эт × 200 ₽ = 800 ₽</li>
+      </ul>
+      <div class="case-total">ИТОГО: 2 000 ₽</div>
+    </div>
+    <div class="case-card">
+      <h4>КЕЙС 3: Дверь 65 кг (45 000 ₽)</h4>
+      <ul>
+        <li>Расстояние: 6 км</li>
+        <li>Подъём: 5 этаж пешком</li>
+        <li>Категория: Тяжёлый (>45 кг)</li>
+        <li>Ответственность: +100 ₽/эт</li>
+        <li>Машина: 200 + 6×100 = 800 ₽</li>
+        <li>Погрузка: 300 + 100 = 400 ₽</li>
+        <li>Подъём: 5 эт × 400 ₽ = 2 000 ₽</li>
+      </ul>
+      <div class="case-total">ИТОГО: 3 200 ₽</div>
+    </div>
+  </div>
+
+  <!-- Согласование -->
+  <div class="sign-block">
+    <div class="sign-col">
+      <strong>Разработчик системы:</strong><br>
+      Служба автоматизации ancargo66<br>
+      <div class="sign-line">
+        <span>/ Инженер-разработчик /</span>
+        <span>«____» ____________ 2026 г.</span>
+      </div>
+    </div>
+    <div class="sign-col">
+      <strong>СОГЛАСОВАНО:</strong><br>
+      Индивидуальный предприниматель Нигамедьянов А.С.<br>
+      <div class="sign-line">
+        <span>/ Нигамедьянов А.С. /</span>
+        <span>«____» ____________ 2026 г.</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

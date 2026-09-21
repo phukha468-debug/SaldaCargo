@@ -21,7 +21,7 @@ PASS = "9L4Rb1EVhX7tVefb"
 TARGET_DIRS = ["www/tk501.ru", "www/ancargo66.ru"]
 
 # Выгружаем файлы непосредственно из apps/web/public (где находится актуальный calc.html)
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOCAL_DIR = os.path.join(REPO_ROOT, "apps", "web", "public")
 if not os.path.isdir(LOCAL_DIR):
     raise FileNotFoundError(f"Папка с файлами для выгрузки не найдена: {LOCAL_DIR}")

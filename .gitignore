@@ -49,3 +49,8 @@ coverage/
 
 # Claude Code (may contain API keys)
 .claude/
+
+# Temporary and local scratch files
+scratch/
+*.apk
+*.jfif

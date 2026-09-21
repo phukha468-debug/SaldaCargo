@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Классификатор и тарифы ПРР мебельного магазина — ancargo66</title>
+<style>
+  @page {
+    size: A4;
+    margin: 8mm 10mm 8mm 10mm;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #0f172a;
+    line-height: 1.25;
+    font-size: 10px;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+  .header {
+    border-bottom: 2px solid #d97706;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .brand-title {
+    font-size: 20px;
+    font-weight: 900;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: -0.5px;
+  }
+  .brand-title span {
+    color: #d97706;
+  }
+  .brand-sub {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 1px;
+  }
+  .meta-right {
+    text-align: right;
+    font-size: 10px;
+    color: #475569;
+  }
+  .doc-title {
+    background: #f8fafc;
+    border-left: 4px solid #d97706;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    border-radius: 0 6px 6px 0;
+  }
+  .doc-title h1 {
+    font-size: 14px;
+    margin: 0;
+    color: #0f172a;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .doc-title p {
+    margin: 3px 0 0 0;
+    font-size: 10px;
+    color: #64748b;
+  }
+  
+  h2 {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #0f172a;
+    border-bottom: 1.5px solid #e2e8f0;
+    padding-bottom: 3px;
+    margin: 6px 0 3px 0;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .badge-orange { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .badge-blue { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+  .badge-green { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 3.5px 6px;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td {
+    padding: 2.5px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+  
+  .rate-cell {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap;
+    text-align: right;
+  }
+  .rate-strong {
+    font-size: 10px;
+    color: #b45309;
+  }
+
+  .grid-2 {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .col {
+    flex: 1;
+  }
+
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 8px;
+  }
+  .card-title {
+    font-weight: 800;
+    font-size: 10.5px;
+    color: #0f172a;
+    margin-bottom: 3px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .card p {
+    margin: 0;
+    font-size: 9.5px;
+    color: #475569;
+    line-height: 1.25;
+  }
+
+  .highlight-box {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-left: 3px solid #f59e0b;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 8px 0;
+    font-size: 9.5px;
+  }
+  .highlight-box strong {
+    color: #92400e;
+  }
+
+  .signatures {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1.5px dashed #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .sign-col {
+    flex: 1;
+    font-size: 9.5px;
+    color: #334155;
+  }
+  .sign-line {
+    margin-top: 14px;
+    border-top: 1px solid #64748b;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5px;
+    color: #64748b;
+    padding-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="brand-title">AN<span>CARGO66</span>.RU</div>
+      <div class="brand-sub">Транспортно-логистическая служба | ИП Нигамедьянов А.С.</div>
+    </div>
+    <div class="meta-right">
+      <strong>Система автоматизации доставок</strong><br>
+      Свердловская обл., Верхняя Салда<br>
+      Сентябрь 2026 г.
+    </div>
+  </div>
+
+  <!-- DOC TITLE -->
+  <div class="doc-title">
+    <h1>Обобщенный классификатор тарифов ПРР для мебельных магазинов</h1>
+    <p>Анализ исходного прейскуранта магазина (20 позиций) и переход на единую унифицированную 4-уровневую систему расчёта подъёма на этаж</p>
+  </div>
+
+  <!-- SECTION 1: АНАЛИЗ ИСХОДНОГО ПРАЙСА -->
+  <h2>1. Исходные данные: анализ существующего прейскуранта магазина</h2>
+  <table style="margin-bottom: 6px;">
+    <thead>
+      <tr>
+        <th style="width: 18%;">Ценовой кластер</th>
+        <th style="width: 52%;">Номенклатура мебели из исходного списка</th>
+        <th style="width: 30%;">Особенности перемещения груза</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="rate-cell"><strong>80 – 100 ₽ / эт.</strong></td>
+        <td>• Кух. Верхний модуль (80 ₽)<br>• Кух. Нижний модуль (100 ₽)</td>
+        <td>1 место, переносит 1 грузчик, малый вес (до 15–20 кг), удобный хват.</td>
+      </tr>
+      <tr>
+        <td class="rate-cell"><strong>150 ₽ / эт.</strong></td>
+        <td>• Кровать КР-3 (150 ₽)<br>• Тумбы, столы журнальные / стол-книжка (150 ₽)<br>• Матрас 800 / 900 мм (150 ₽)</td>
+        <td>Лёгкий объёмный груз. Переносит 1-2 человека, компактный занос.</td>
+      </tr>
+      <tr>
+        <td class="rate-cell"><strong>200 ₽ / эт.</strong></td>
+        <td>• Шкаф 2-х дверный в сборе / в разборе (200 ₽)<br>• Комод малый в сборе (200 ₽)<br>• Кровать КР-16 / КР-710 / Кр-71 (200 ₽)<br>• Прихожие в сборе (200 ₽)<br>• Стол компьютерный прямой (200 ₽)<br>• Кресло-кровать (200 ₽)</td>
+        <td><strong>Базовая корпусная мебель.</strong> Требуется 2 грузчика. Стандартный вес (25–45 кг), габариты проходят в дверные проёмы.</td>
+      </tr>
+      <tr>
+        <td class="rate-cell"><strong>250 ₽ / эт.</strong></td>
+        <td>• Обеденная зона (стол + стулья) (250 ₽)<br>• Комод большой в сборе (250 ₽)<br>• Стол компьютерный угловой (250 ₽)<br>• Матрас 1400 / 1600 мм (250 ₽)</td>
+        <td>Широкие неделимые габариты или повышенный вес. Сложный поворот на лестничных маршах.</td>
+      </tr>
+      <tr>
+        <td class="rate-cell"><strong>300 ₽ / эт.</strong></td>
+        <td>• Диван прямой (300 ₽)<br>• Канапе (300 ₽)<br>• Стенка большая в разборе (300 ₽)</td>
+        <td>Крупная мягкая мебель / тяжелые длинномерные пачки ДСП (длина 1.8–2.2 м).</td>
+      </tr>
+      <tr>
+        <td class="rate-cell"><strong>350 – 400 ₽ / эт.</strong></td>
+        <td>• Диван угловой (350 ₽)<br>• Диван тройной / модульный (400 ₽)</td>
+        <td><strong>Максимальный негабарит.</strong> 2–3 тяжелые секции, большой вес (>60–80 кг), не входит в пассажирский лифт.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 2: УНИФИЦИРОВАННАЯ 4-УРОВНЕВАЯ СИСТЕМА -->
+  <h2>2. Унифицированная 4-классовая система расчёта (Предложение к утверждению)</h2>
+  <p style="margin: 0 0 6px 0; font-size: 9.5px; color: #475569;">
+    Для исключения ошибок менеджеров и ускорения расчёта (с 3-5 минут до 15 секунд) 20 разрозненных позиций сведены в <strong>4 понятных тарифных класса с круглым шагом 100 ₽</strong>:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 14%;">Класс тарифа</th>
+        <th style="width: 14%; text-align: right;">Ставка за этаж</th>
+        <th style="width: 44%;">Что входит (номенклатура мебельного магазина)</th>
+        <th style="width: 28%;">Правило переноса</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background: #f0fdf4;">
+        <td><span class="badge badge-green">1. Мелкий / Модуль</span></td>
+        <td class="rate-cell rate-strong" style="color: #16a34a;">100 ₽ / эт.</td>
+        <td><strong>Кухонные шкафы (верх/низ)</strong>, тумбочки, столики журнальные, стол-книжка, матрас 1-сп (80–90 см)</td>
+        <td>1 место, до 20 кг. Несёт 1 грузчик. Погрузка в магазине — <strong>0 ₽</strong>.</td>
+      </tr>
+      <tr style="background: #f0f9ff;">
+        <td><span class="badge badge-blue">2. Стандарт мебель</span></td>
+        <td class="rate-cell rate-strong" style="color: #0284c7;">200 ₽ / эт.</td>
+        <td><strong>Шкафы 2-дв.</strong> (сбор/разбор), <strong>комоды</strong>, <strong>кровати</strong> (все модели), прихожие, столы письменные, кресло-кровать</td>
+        <td>Базовая корпусная мебель. Переносят 2 грузчика. Вынос из магазина = 200 ₽.</td>
+      </tr>
+      <tr style="background: #fffbeb;">
+        <td><span class="badge badge-orange">3. Крупный / Диван</span></td>
+        <td class="rate-cell rate-strong" style="color: #d97706;">300 ₽ / эт.</td>
+        <td><strong>Диван прямой</strong>, канапе, <strong>обеденная зона в сборе</strong>, матрас 2-сп (140–180 см), стенка большая в разборе, комод большой</td>
+        <td>Объёмные или тяжёлые предметы. Несут 2 грузчика. Вынос из магазина = 300 ₽.</td>
+      </tr>
+      <tr style="background: #fef2f2;">
+        <td><span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">4. Макси / Угловой</span></td>
+        <td class="rate-cell rate-strong" style="color: #dc2626;">400 ₽ / эт.</td>
+        <td><strong>Диван угловой</strong>, диван тройной / модульный (П-образный), крупногабаритные монолитные изделия, шкафы-купе 3+ двери</td>
+        <td>Крупный негабарит (несколько секций). 2 грузчика. Вынос из магазина = 400 ₽.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3: ПРАВИЛА ЛИФТОВ И ВЫНОСА -->
+  <h2>3. Регламент расчёта для лифта и выноса из магазина</h2>
+  <div class="grid-2">
+    <div class="col card">
+      <div class="card-title">
+        <span>🛗 Подъём на лифте</span>
+        <span style="color: #0284c7;">Грузовой vs Пассажирский</span>
+      </div>
+      <p>
+        • <strong>Грузовой лифт есть:</strong> подъём всех позиций рассчитывается как за <strong>1 фиксированный этаж</strong> (независимо от 2-го или 9-го этажа).<br>
+        • <strong>Только пассажирский лифт:</strong><br>
+        &nbsp;&nbsp;— <em>Классы 1 и 2:</em> поднимаются на лифте (тарифицируются как 1 этаж);<br>
+        &nbsp;&nbsp;— <em>Классы 3 и 4 (диваны, матрасы 140+, стенки):</em> в пассажирский лифт <u>не помещаются</u> — расчёт производится <strong>вручную по лестнице за каждый этаж</strong>.
+      </p>
+    </div>
+
+    <div class="col card">
+      <div class="card-title">
+        <span>🏬 Вынос мебели из магазина</span>
+        <span style="color: #d97706;">Погрузка в авто</span>
+      </div>
+      <p>
+        • <strong>Класс 1 (Мелкий/модуль):</strong> погрузка в машину — <strong>БЕСПЛАТНО (0 ₽)</strong> при заказе перевозки.<br>
+        • <strong>Классы 2, 3, 4 (Габарит/Негабарит):</strong> вынос и аккуратная укладка в кузов с фиксацией стяжными ремнями тарифицируется по ставке <strong>1 этажа</strong> соответствующего класса.
+      </p>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <strong>Преимущество для мебельного магазина:</strong> В онлайн-калькуляторе на <em>ancargo66.ru/calc.html</em> менеджер выбирает мебель кнопками со счётчиком предметов (например: [Диван угловой: 1 шт] + [Стулья/модули: 4 шт]). Система моментально выдаёт точную и прозрачную сумму клиенту без споров о стоимости подъёма.
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="signatures">
+    <div class="sign-col">
+      <strong>РАЗРАБОТАНО И ПРЕДЛОЖЕНО:</strong><br>
+      Служба логистики и IT-автоматизации ancargo66.ru<br>
+      ИП Нигамедьянов А.С.<br>
+      <div class="sign-line">
+        <span>/ Нигамедьянов А.С. /</span>
+        <span>«____» ____________ 2026 г.</span>
+      </div>
+    </div>
+    <div class="sign-col">
+      <strong>СОГЛАСОВАНО:</strong><br>
+      Руководство / Директор мебельного магазина<br>
+      Наименование магазина: _______________________<br>
+      <div class="sign-line">
+        <span>/ __________________________ /</span>
+        <span>«____» ____________ 2026 г.</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

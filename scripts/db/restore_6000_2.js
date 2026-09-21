@@ -2,20 +2,28 @@ const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 require('dotenv').config({ path: '.env.local' });
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 async function main() {
-  const { data: users } = await supabase.from('users').select('id, name').ilike('name', '%Никифоров%');
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, name')
+    .ilike('name', '%Никифоров%');
   const userId = users[0].id;
 
-  const { data: refTx } = await supabase.from('transactions')
+  const { data: refTx } = await supabase
+    .from('transactions')
     .select('category_id')
     .eq('description', 'ЗП: Никифоров Д.В. — рейс №363')
     .single();
 
   const categoryId = refTx.category_id;
-  
-  const { data: newTx, error } = await supabase.from('transactions')
+
+  const { data: newTx, error } = await supabase
+    .from('transactions')
     .insert({
       direction: 'expense',
       amount: '6000.00',
@@ -28,7 +36,7 @@ async function main() {
       to_wallet_id: null,
       created_by: userId,
       idempotency_key: crypto.randomUUID(),
-      created_at: '2026-07-18T14:26:18.000Z'
+      created_at: '2026-07-18T14:26:18.000Z',
     })
     .select()
     .single();

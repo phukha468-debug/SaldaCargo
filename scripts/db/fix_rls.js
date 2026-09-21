@@ -10,9 +10,13 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const { Pool } = require('pg');
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL || supabaseUrl.replace('https://', 'postgres://postgres:PASSWORD@').replace('.supabase.co', '.supabase.co:5432/postgres');
-  // Wait, I don't have the DB password. 
+  const connectionString =
+    process.env.DATABASE_URL ||
+    supabaseUrl
+      .replace('https://', 'postgres://postgres:PASSWORD@')
+      .replace('.supabase.co', '.supabase.co:5432/postgres');
+  // Wait, I don't have the DB password.
   // Let's try to see if there's a way.
-  console.log("Please check if RLS is enabled.");
+  console.log('Please check if RLS is enabled.');
 }
 main();
