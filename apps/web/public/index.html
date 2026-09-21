@@ -2,7 +2,7 @@
 <html lang="ru" class="scroll-smooth overflow-x-hidden">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Грузоперевозки Верхняя Салда — ТК501 | Заказ ГАЗели, переезды, грузчики | ИП Нигамедьянов А.С.</title>
   <meta name="description" content="Грузоперевозки от 1 до 20 тонн в Верхней Салде, Нижнем Тагиле, Екатеринбурге и по всей России. Собственный автопарк 11 единиц (ГАЗели 3–6м, Валдай 5т). Быстрый заказ от 1000 ₽, штатные грузчики 1000 ₽/час, онлайн-калькулятор. Диспетчер: +7 (963) 0-501-501." />
   <meta name="keywords" content="грузоперевозки Верхняя Салда, заказ газели Верхняя Салда, переезд Верхняя Салда, грузовое такси Салда, грузчики Верхняя Салда, доставка грузов Нижний Тагил Салда, грузоперевозки Екатеринбург Верхняя Салда, ТК501, ИП Нигамедьянов, грузоперевозки межгород Свердловская область, перевозка мебели Салда" />
@@ -22,6 +22,9 @@
   <meta property="og:title" content="Грузоперевозки Верхняя Салда — ТК501 | Автопарк, калькулятор, грузчики" />
   <meta property="og:description" content="Грузоперевозки по Верхней Салде, УрФО и всей России от 1 до 20 тонн. Собственный автопарк 11 машин, штатные грузчики, 100% ЭТРН/ЭДО. Рассчитайте стоимость онлайн!" />
   <meta property="og:image" content="https://tk501.ru/trucks-fleet-hero.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Автопарк ТК501 — Грузоперевозки Верхняя Салда" />
   <meta property="og:locale" content="ru_RU" />
   <meta property="og:site_name" content="Транспортная компания ТК501 | Верхняя Салда" />
 
@@ -35,143 +38,225 @@
   <link rel="icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-  <!-- Микроразметка Schema.org (JSON-LD) -->
+  <!-- Микроразметка Schema.org (JSON-LD: Организация + Рейтинг + FAQ + Хлебные крошки) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "MovingCompany",
-    "name": "ТК501 — Грузоперевозки Верхняя Салда",
-    "alternateName": ["TK501", "ТК 501", "ИП Нигамедьянов А.С."],
-    "legalName": "Индивидуальный предприниматель Нигамедьянов Александр Сергеевич",
-    "url": "https://tk501.ru/",
-    "logo": "https://tk501.ru/logo.png",
-    "image": "https://tk501.ru/trucks-fleet-hero.jpg",
-    "description": "Служба грузоперевозок и переездов в Верхней Салде, Нижнем Тагиле, Екатеринбурге и по всей России. Собственный автопарк 11 машин (ГАЗель NEXT, Валдай 5т, длинномеры 6м), опытные штатные грузчики, работа с НДС и УСН, ЭТРН и ЭДО.",
-    "telephone": "+7-963-0-501-501",
-    "priceRange": "1000 RUB - 50000 RUB",
-    "currenciesAccepted": "RUB",
-    "paymentAccepted": "Наличные, Безналичный расчет с НДС и без НДС, СБП, Банковская карта",
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": "Верхняя Салда",
-      "addressRegion": "Свердловская область",
-      "addressCountry": "RU"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": 58.046337,
-      "longitude": 60.551064
-    },
-    "openingHoursSpecification": [
+    "@graph": [
       {
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": [
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-          "Sunday"
+        "@type": "MovingCompany",
+        "@id": "https://tk501.ru/#organization",
+        "name": "ТК501 — Грузоперевозки Верхняя Салда",
+        "alternateName": ["TK501", "ТК 501", "ИП Нигамедьянов А.С."],
+        "legalName": "Индивидуальный предприниматель Нигамедьянов Александр Сергеевич",
+        "url": "https://tk501.ru/",
+        "logo": "https://tk501.ru/logo.png",
+        "image": "https://tk501.ru/trucks-fleet-hero.jpg",
+        "description": "Служба грузоперевозок и переездов в Верхней Салде, Нижнем Тагиле, Екатеринбурге и по всей России. Собственный автопарк 11 машин (ГАЗель NEXT, Валдай 5т, длинномеры 6м), опытные штатные грузчики, работа с НДС и УСН, ЭТРН и ЭДО.",
+        "telephone": "+7-963-0-501-501",
+        "priceRange": "1000 RUB - 50000 RUB",
+        "currenciesAccepted": "RUB",
+        "paymentAccepted": "Наличные, Безналичный расчет с НДС и без НДС, СБП, Банковская карта",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Верхняя Салда",
+          "addressRegion": "Свердловская область",
+          "addressCountry": "RU"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 58.046337,
+          "longitude": 60.551064
+        },
+        "hasMap": "https://yandex.ru/maps/?text=Верхняя+Салда",
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "5.0",
+          "reviewCount": "128",
+          "bestRating": "5",
+          "worstRating": "1"
+        },
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "telephone": "+7-963-0-501-501",
+          "contactType": "customer service",
+          "areaServed": "RU",
+          "availableLanguage": ["Russian"]
+        },
+        "openingHoursSpecification": [
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+            "opens": "00:00",
+            "closes": "23:59"
+          }
         ],
-        "opens": "00:00",
-        "closes": "23:59"
-      }
-    ],
-    "areaServed": [
-      { "@type": "City", "name": "Верхняя Салда" },
-      { "@type": "City", "name": "Нижняя Салда" },
-      { "@type": "City", "name": "Нижний Тагил" },
-      { "@type": "City", "name": "Екатеринбург" },
-      { "@type": "AdministrativeArea", "name": "Свердловская область" },
-      { "@type": "Country", "name": "Россия" }
-    ],
-    "hasOfferCatalog": {
-      "@type": "OfferCatalog",
-      "name": "Тарифы на грузоперевозки и погрузо-разгрузочные работы",
-      "itemListElement": [
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Быстрый заказ доставки по Верхней Салде (до 30 мин)",
-            "description": "Оперативная подача ГАЗели по городу без деления на зоны"
-          },
-          "price": "1000",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Почасовая аренда ГАЗели с водителем (>30 мин)",
-            "description": "Почасовая перевозка грузов по Верхней Салде"
-          },
-          "price": "1500",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Переезд под ключ (автомобиль + 2 грузчика)",
-            "description": "Комплексный переезд квартиры или офиса по Верхней Салде"
-          },
-          "price": "3500",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "ГАЗель 6 метров (длинномеры)",
-            "description": "Перевозка пиломатериалов, профильной трубы, бруса до 6м"
-          },
-          "price": "1500",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Валдай 5 тонн (кузов 36 м³)",
-            "description": "Перевозка крупногабаритных грузов и партий до 5 тонн"
-          },
-          "price": "2000",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Услуги грузчиков (почасовая оплата)",
-            "description": "Штатные аккуратные грузчики, бережный занос и ответственность за вещи"
-          },
-          "price": "1000",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Рейс Верхняя Салда — Нижний Тагил (Вагонка)",
-            "description": "Фиксированная доставка до Вагонки"
-          },
-          "price": "4000",
-          "priceCurrency": "RUB"
-        },
-        {
-          "@type": "Offer",
-          "itemOffered": {
-            "@type": "Service",
-            "name": "Рейс Верхняя Салда — Екатеринбург",
-            "description": "Прямой рейс до Екатеринбурга"
-          },
-          "price": "16000",
-          "priceCurrency": "RUB"
+        "areaServed": [
+          { "@type": "City", "name": "Верхняя Салда" },
+          { "@type": "City", "name": "Нижняя Салда" },
+          { "@type": "City", "name": "Нижний Тагил" },
+          { "@type": "City", "name": "Екатеринбург" },
+          { "@type": "AdministrativeArea", "name": "Свердловская область" },
+          { "@type": "Country", "name": "Россия" }
+        ],
+        "hasOfferCatalog": {
+          "@type": "OfferCatalog",
+          "name": "Тарифы на грузоперевозки и погрузо-разгрузочные работы",
+          "itemListElement": [
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Быстрый заказ доставки по Верхней Салде (до 30 мин)",
+                "description": "Оперативная подача ГАЗели по городу без деления на зоны"
+              },
+              "price": "1000",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Почасовая аренда ГАЗели с водителем (>30 мин)",
+                "description": "Почасовая перевозка грузов по Верхней Салде"
+              },
+              "price": "1500",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Переезд под ключ (автомобиль + 2 грузчика)",
+                "description": "Комплексный переезд квартиры или офиса по Верхней Салде"
+              },
+              "price": "3500",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "ГАЗель 6 метров (длинномеры)",
+                "description": "Перевозка пиломатериалов, профильной трубы, бруса до 6м"
+              },
+              "price": "1500",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Валдай 5 тонн (кузов 36 м³)",
+                "description": "Перевозка крупногабаритных грузов и партий до 5 тонн"
+              },
+              "price": "2000",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Услуги грузчиков (почасовая оплата)",
+                "description": "Штатные аккуратные грузчики, бережный занос и ответственность за вещи"
+              },
+              "price": "1000",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Рейс Верхняя Салда — Нижний Тагил (Вагонка)",
+                "description": "Фиксированная доставка до Вагонки"
+              },
+              "price": "4000",
+              "priceCurrency": "RUB"
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Рейс Верхняя Салда — Екатеринбург",
+                "description": "Прямой рейс до Екатеринбурга"
+              },
+              "price": "16000",
+              "priceCurrency": "RUB"
+            }
+          ]
         }
-      ]
-    }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://tk501.ru/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Как быстро подаётся машина и сколько стоит доставка по городу?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Подача автомобиля по Верхней Салде занимает от 15 до 30 минут. Быстрый заказ (до 30 мин) стоит 1 000 ₽. Почасовая аренда при заказе более 30 минут — 1 500 ₽/час. Для магазинов-партнёров действуют спецтарифы от 700 ₽."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Сколько стоят услуги грузчиков и как рассчитывается подъём на этаж?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Стоимость работы штатного грузчика — 1 000 ₽/час с гарантией сохранности ваших вещей. Комплексный квартирный или офисный переезд под ключ (автомобиль + 2 грузчика) стоит 3 500 ₽/час. Для магазинов доступен поштучный расчёт подъёма по этажам."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Какие фиксированные цены на междугородние рейсы (Тагил, Екатеринбург)?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Фиксированные расценки: Верхняя Салда — Нижний Тагил (Вагонка) — 4 000 ₽, Тагилстрой — 5 000 ₽, Центр / ГГМ — 6 000 ₽. Прямой рейс Верхняя Салда — Екатеринбург — 16 000 ₽."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Работаете ли вы с НДС, по безналичному расчету и с ЭТРН / ЭДО?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Да, мы работаем с юридическими лицами и ИП по официальному договору, с НДС и без НДС (УСН). 100% готовность к электронным накладным (ЭТРН) в ГИС ЭПД Минтранса РФ, документооборот через Диадок и СБИС."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Какие автомобили есть в автопарке и можно ли перевезти груз 6 метров?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "В собственном парке 11 единиц: стандартные ГАЗели NEXT (16–22 м³, до 2т), специализированные ГАЗели 6 метров для бруса и труб (от 1 500 ₽), грузовики ГАЗ «Валдай» (36 м³, до 5т, до 15 паллет), а также партнёрская сеть до 20 тонн."
+            }
+          }
+        ]
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": "https://tk501.ru/#breadcrumb",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Главная",
+            "item": "https://tk501.ru/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Тарифы",
+            "item": "https://tk501.ru/#tariffs"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Калькулятор",
+            "item": "https://tk501.ru/#calculator"
+          }
+        ]
+      }
+    ]
   }
   </script>
 
@@ -618,7 +703,21 @@
           <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
         </a>
 
-        <!-- 4. Блок для связи и заявка -->
+        <!-- 4. Часто задаваемые вопросы (FAQ) -->
+        <a href="#faq" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold">4. Вопросы и ответы (FAQ)</div>
+              <div class="text-[11px] text-slate-400 font-normal">Подача машин, грузчики, межгород, ЭТРН</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+        </a>
+
+        <!-- 5. Блок для связи и заявка -->
         <a href="#contact" class="drawer-link flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold transition active:scale-[0.98]">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -765,6 +864,7 @@
             <span>Тарифы</span>
           </a>
           <a href="#requisites" class="py-1 px-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors whitespace-nowrap">Реквизиты</a>
+          <a href="#faq" class="py-1 px-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors whitespace-nowrap">Вопросы</a>
         </nav>
 
         <!-- Правая часть: Телефон + Кнопка "ДЛЯ МАГАЗИНОВ" + КНОПКА "РАЗДЕЛЫ" -->
@@ -807,7 +907,7 @@
 
             <!-- Главный конверсионный заголовок -->
             <h1 class="text-2xl sm:text-4xl xl:text-5xl font-black text-white tracking-tight leading-tight">
-              Грузоперевозки от 1 до 20 тонн по <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-amber-300 to-amber-500">В.Салде</span> и всей РФ
+              Грузоперевозки от 1 до 20 тонн по <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-amber-300 to-amber-500">Верхней Салде</span>, УрФО и всей РФ
             </h1>
 
             <!-- Подзаголовок с доказательствами -->
@@ -910,9 +1010,9 @@
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div class="flex items-center gap-2.5">
               <span class="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-sm flex-shrink-0"></span>
-              <h2 class="text-sm sm:text-base font-black tracking-tight uppercase" style="color: #171310 !important;">
+              <h3 class="text-sm sm:text-base font-black tracking-tight uppercase" style="color: #171310 !important;">
                 Нам доверяют свои грузы лидеры промышленности:
-              </h2>
+              </h3>
             </div>
             <span class="text-xs font-semibold" style="color: #524b42 !important;">
               Регулярные рейсы по В.Салде, УрФО и всей РФ
@@ -2114,6 +2214,111 @@
               <div class="text-[10px] text-slate-400 mt-0.5">Паспорт и транспорт подтверждены</div>
             </div>
           </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- ❓ ЧАСТО ЗАДАВАЕМЫЕ ВОПРОСЫ (FAQ / SEO ВОПРОС-ОТВЕТ) -->
+    <!-- ========================================================================= -->
+    <section id="faq" class="py-14 sm:py-18 bg-dark-900 border-t border-slate-800 transition-colors w-full">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        
+        <div class="text-center space-y-2">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-400 text-xs font-bold rounded-full border border-amber-500/20 uppercase tracking-wider mb-1">
+            <i data-lucide="help-circle" class="w-3.5 h-3.5"></i> Ответы на частые вопросы
+          </div>
+          <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+            Часто задаваемые вопросы о грузоперевозках
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400">
+            Всё, что нужно знать о заказе машин, тарифах, грузчиках и документообороте в Верхней Салде
+          </p>
+        </div>
+
+        <div class="space-y-3" id="faq-accordion">
+          
+          <!-- Вопрос 1 -->
+          <details class="group theme-card rounded-2xl border border-slate-800 p-4 sm:p-5 transition hover:border-brand-500/40">
+            <summary class="flex justify-between items-center font-bold text-white text-sm sm:text-base cursor-pointer list-none select-none">
+              <span class="flex items-center gap-2.5">
+                <i data-lucide="clock" class="w-4 h-4 text-brand-400 flex-shrink-0"></i>
+                <span>Как быстро подаётся машина и сколько стоит доставка по городу?</span>
+              </span>
+              <span class="ml-2 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-brand-400 group-open:rotate-180 transition-transform flex-shrink-0">
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+              </span>
+            </summary>
+            <div class="pt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 mt-3">
+              Подача автомобиля по Верхней Салде обычно занимает от 15 до 30 минут. «Быстрый заказ» (до 30 мин) стоит 1 000 ₽ без деления на районы города. При заказе свыше 30 минут действует почасовая оплата — 1 500 ₽/час. Для магазинов-партнёров по договору действует спецтариф от 700 ₽.
+            </div>
+          </details>
+
+          <!-- Вопрос 2 -->
+          <details class="group theme-card rounded-2xl border border-slate-800 p-4 sm:p-5 transition hover:border-brand-500/40">
+            <summary class="flex justify-between items-center font-bold text-white text-sm sm:text-base cursor-pointer list-none select-none">
+              <span class="flex items-center gap-2.5">
+                <i data-lucide="users" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                <span>Сколько стоят услуги грузчиков и как рассчитывается подъём на этаж?</span>
+              </span>
+              <span class="ml-2 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-brand-400 group-open:rotate-180 transition-transform flex-shrink-0">
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+              </span>
+            </summary>
+            <div class="pt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 mt-3">
+              Стоимость работы штатного грузчика — 1 000 ₽/час с гарантией сохранности и бережным обращением с вашим имуществом. Комплексный квартирный или офисный переезд «под ключ» (автомобиль + 2 грузчика) стоит 3 500 ₽/час. Для магазинов сантехники, мебели и дверей доступен поштучный расчёт подъёма по этажам через партнёрский калькулятор.
+            </div>
+          </details>
+
+          <!-- Вопрос 3 -->
+          <details class="group theme-card rounded-2xl border border-slate-800 p-4 sm:p-5 transition hover:border-brand-500/40">
+            <summary class="flex justify-between items-center font-bold text-white text-sm sm:text-base cursor-pointer list-none select-none">
+              <span class="flex items-center gap-2.5">
+                <i data-lucide="navigation" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
+                <span>Какие фиксированные цены на междугородние рейсы (Тагил, Екатеринбург)?</span>
+              </span>
+              <span class="ml-2 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-brand-400 group-open:rotate-180 transition-transform flex-shrink-0">
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+              </span>
+            </summary>
+            <div class="pt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 mt-3">
+              Мы предлагаем прозрачные фиксированные тарифы на популярные маршруты: Верхняя Салда — Нижний Тагил (Вагонка) — 4 000 ₽, Тагилстрой — 5 000 ₽, Центр / ГГМ — 6 000 ₽. Прямой рейс Верхняя Салда — Екатеринбург — 16 000 ₽. Также выполняем рейсы в любые города Свердловской области, УрФО и всей России по согласованию с диспетчером.
+            </div>
+          </details>
+
+          <!-- Вопрос 4 -->
+          <details class="group theme-card rounded-2xl border border-slate-800 p-4 sm:p-5 transition hover:border-brand-500/40">
+            <summary class="flex justify-between items-center font-bold text-white text-sm sm:text-base cursor-pointer list-none select-none">
+              <span class="flex items-center gap-2.5">
+                <i data-lucide="file-check-2" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+                <span>Работаете ли вы с НДС, по безналичному расчету и с ЭТРН / ЭДО?</span>
+              </span>
+              <span class="ml-2 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-brand-400 group-open:rotate-180 transition-transform flex-shrink-0">
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+              </span>
+            </summary>
+            <div class="pt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 mt-3">
+              Да, мы работаем с юридическими лицами и ИП по официальному договору, принимаем оплату с НДС и без НДС (УСН). 100% готовность к электронным транспортным накладным (ЭТРН) в государственной информационной системе ГИС ЭПД Минтранса РФ, документооборот через Диадок и СБИС.
+            </div>
+          </details>
+
+          <!-- Вопрос 5 -->
+          <details class="group theme-card rounded-2xl border border-slate-800 p-4 sm:p-5 transition hover:border-brand-500/40">
+            <summary class="flex justify-between items-center font-bold text-white text-sm sm:text-base cursor-pointer list-none select-none">
+              <span class="flex items-center gap-2.5">
+                <i data-lucide="truck" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
+                <span>Какие автомобили есть в автопарке и можно ли перевезти груз 6 метров?</span>
+              </span>
+              <span class="ml-2 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-brand-400 group-open:rotate-180 transition-transform flex-shrink-0">
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+              </span>
+            </summary>
+            <div class="pt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 mt-3">
+              В собственном парке 11 единиц: стандартные ГАЗели NEXT (16–22 м³, до 2т), специализированные ГАЗели 6 метров для бруса, досок и профильной трубы (от 1 500 ₽), вместительные грузовики ГАЗ «Валдай» (36 м³, до 5 тонн, до 15 европаллет), а также партнёрская сеть грузоподъёмностью до 20 тонн.
+            </div>
+          </details>
 
         </div>
 
