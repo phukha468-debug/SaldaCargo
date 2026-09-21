@@ -9,7 +9,9 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   let query = (supabase.from('users') as any)
-    .select('id, name, phone, max_user_id, roles, current_asset_id, is_active, notes, created_at')
+    .select(
+      'id, name, phone, max_user_id, roles, current_asset_id, is_active, notes, created_at, is_officially_employed, official_salary_amount, official_salary_day, has_court_orders, court_order_pct, court_order_notes',
+    )
     .not('name', 'ilike', '%STRESS%')
     .not('name', 'ilike', '%TEST%')
     .order('name');
@@ -49,6 +51,12 @@ export async function POST(request: Request) {
         current_asset_id: current_asset_id || null,
         auto_settle: body.auto_settle ?? false,
         notes: notes || null,
+        is_officially_employed: body.is_officially_employed ?? false,
+        official_salary_amount: body.official_salary_amount ?? 10000,
+        official_salary_day: body.official_salary_day ?? 10,
+        has_court_orders: body.has_court_orders ?? false,
+        court_order_pct: body.court_order_pct ?? 50,
+        court_order_notes: body.court_order_notes || null,
         is_active: true,
       })
       .select()

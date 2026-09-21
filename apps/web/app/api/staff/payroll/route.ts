@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       (supabase as any)
         .from('users')
         .select(
-          'id, name, roles, auto_settle, max_user_id, current_asset_id, is_active, phone, notes',
+          'id, name, roles, auto_settle, max_user_id, current_asset_id, is_active, phone, notes, is_officially_employed, official_salary_amount, official_salary_day, has_court_orders, court_order_pct, court_order_notes',
         )
         .eq('is_active', true)
         .order('name'),
@@ -347,6 +347,12 @@ export async function GET(request: Request) {
         max_user_id: u.max_user_id,
         phone: u.phone,
         notes: u.notes,
+        is_officially_employed: Boolean(u.is_officially_employed),
+        official_salary_amount: parseFloat(u.official_salary_amount ?? '10000').toFixed(2),
+        official_salary_day: parseInt(u.official_salary_day ?? '10', 10),
+        has_court_orders: Boolean(u.has_court_orders),
+        court_order_pct: parseFloat(u.court_order_pct ?? '50').toFixed(2),
+        court_order_notes: u.court_order_notes ?? null,
         current_asset_id: u.current_asset_id,
         asset: u.current_asset_id ? (assetMap[u.current_asset_id] ?? null) : null,
         // Этот месяц

@@ -29,6 +29,12 @@ type PayrollUser = {
   max_user_id: string | null;
   phone: string | null;
   notes: string | null;
+  is_officially_employed?: boolean;
+  official_salary_amount?: string;
+  official_salary_day?: number;
+  has_court_orders?: boolean;
+  court_order_pct?: string;
+  court_order_notes?: string | null;
   asset: { short_name: string; reg_number: string } | null;
   shifts: number; // количество начислений за месяц
   earned: string; // начислено за месяц
@@ -75,6 +81,12 @@ type StaffUser = {
   auto_settle: boolean;
   is_active: boolean;
   notes: string | null;
+  is_officially_employed?: boolean;
+  official_salary_amount?: string;
+  official_salary_day?: number;
+  has_court_orders?: boolean;
+  court_order_pct?: string;
+  court_order_notes?: string | null;
 };
 
 type Asset = { id: string; short_name: string; reg_number: string };
@@ -151,6 +163,12 @@ const emptyForm = {
   current_asset_id: '',
   auto_settle: false,
   notes: '',
+  is_officially_employed: false,
+  official_salary_amount: '10000',
+  official_salary_day: 10,
+  has_court_orders: false,
+  court_order_pct: '50',
+  court_order_notes: '',
 };
 
 // ─── StaffModal ───────────────────────────────────────────────────────────────
@@ -176,6 +194,12 @@ function StaffModal({
           current_asset_id: editUser.current_asset_id ?? '',
           auto_settle: editUser.auto_settle,
           notes: editUser.notes ?? '',
+          is_officially_employed: editUser.is_officially_employed ?? false,
+          official_salary_amount: editUser.official_salary_amount ?? '10000',
+          official_salary_day: editUser.official_salary_day ?? 10,
+          has_court_orders: editUser.has_court_orders ?? false,
+          court_order_pct: editUser.court_order_pct ?? '50',
+          court_order_notes: editUser.court_order_notes ?? '',
         }
       : emptyForm,
   );
@@ -212,6 +236,12 @@ function StaffModal({
       current_asset_id: form.current_asset_id || null,
       auto_settle: form.auto_settle,
       notes: form.notes || null,
+      is_officially_employed: form.is_officially_employed,
+      official_salary_amount: parseFloat(form.official_salary_amount || '10000') || 10000,
+      official_salary_day: parseInt(String(form.official_salary_day || '10'), 10) || 10,
+      has_court_orders: form.has_court_orders,
+      court_order_pct: parseFloat(form.court_order_pct || '50') || 50,
+      court_order_notes: form.court_order_notes || null,
     };
     const url = editUser ? `/api/users/${editUser.id}` : '/api/users';
     const method = editUser ? 'PATCH' : 'POST';
@@ -327,6 +357,125 @@ function StaffModal({
               </p>
             </div>
           </label>
+
+          {/* ТК РФ (Официальное трудоустройство) */}
+          <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.is_officially_employed}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, is_officially_employed: e.target.checked }))
+                  }
+                  className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="font-bold text-emerald-950 text-sm">ТК РФ</span>
+              </label>
+              {form.is_officially_employed && (
+                <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
+                  Вычет из рейсов 1-го числа
+                </span>
+              )}
+            </div>
+
+            {form.is_officially_employed && (
+              <div className="grid grid-cols-2 gap-3 pt-0.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                    Сумма вычета (₽)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={form.official_salary_amount}
+                    onChange={f('official_salary_amount')}
+                    className="w-full border border-emerald-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-emerald-700">Официальная часть ЗП</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                    День выплаты ЗП
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={form.official_salary_day}
+                    onChange={f('official_salary_day')}
+                    className="w-full border border-emerald-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-emerald-700">Напоминание в МАКС</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Исполнительный лист (ФССП 50%) */}
+          {form.is_officially_employed && (
+            <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={form.has_court_orders}
+                    onChange={(e) => setForm((p) => ({ ...p, has_court_orders: e.target.checked }))}
+                    className="w-4 h-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                  />
+                  <span className="font-bold text-rose-950 text-sm">
+                    Исполнительный лист (ФССП)
+                  </span>
+                </label>
+                {form.has_court_orders && (
+                  <span className="text-[10px] bg-rose-200 text-rose-900 font-bold px-2 py-0.5 rounded-full">
+                    Удержание 50%
+                  </span>
+                )}
+              </div>
+
+              {form.has_court_orders && (
+                <div className="space-y-2 pt-0.5">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 bg-rose-100/80 rounded-lg border border-rose-200 font-bold text-rose-900">
+                      <div className="text-[9px] uppercase text-rose-700">🏛️ Приставам (50%):</div>
+                      <div className="text-sm font-black text-rose-950">
+                        {Math.round(
+                          (parseFloat(form.official_salary_amount || '10000') || 10000) * 0.5,
+                        ).toLocaleString('ru-RU')}{' '}
+                        ₽
+                      </div>
+                    </div>
+                    <div className="p-2 bg-emerald-100/80 rounded-lg border border-emerald-200 font-bold text-emerald-900">
+                      <div className="text-[9px] uppercase text-emerald-700">
+                        💳 Водителю на карту:
+                      </div>
+                      <div className="text-sm font-black text-emerald-950">
+                        {Math.round(
+                          (parseFloat(form.official_salary_amount || '10000') || 10000) * 0.5,
+                        ).toLocaleString('ru-RU')}{' '}
+                        ₽
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-rose-900 mb-1">
+                      Реквизиты ИП / РОСП
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ИП № 12345/26/66001-ИП, Верхнесалдинское РОСП"
+                      value={form.court_order_notes}
+                      onChange={f('court_order_notes')}
+                      className="w-full border border-rose-300 bg-white rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Примечание</label>
             <textarea
@@ -3327,6 +3476,22 @@ function PayrollRow({
                 день
               </span>
             )}
+            {user.is_officially_employed && (
+              <span
+                className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0"
+                title={`ТК РФ: вычет ${parseFloat(user.official_salary_amount || '10000').toLocaleString('ru-RU')} ₽ 1-го числа`}
+              >
+                💼 ТК РФ
+              </span>
+            )}
+            {user.has_court_orders && (
+              <span
+                className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 shrink-0"
+                title={`ФССП 50% удержания: ${user.court_order_notes || 'Исполнительный лист'}`}
+              >
+                ⚖️ ФССП 50%
+              </span>
+            )}
           </div>
           <span className="font-bold text-slate-900 text-sm truncate block">{user.name}</span>
           {user.asset && (
@@ -4273,6 +4438,7 @@ export default function StaffPage() {
     user?: PayrollUser;
     action?: 'add' | 'repay' | 'adjust';
   } | null>(null);
+  const [driverFilter, setDriverFilter] = useState<'all' | 'official' | 'court'>('all');
 
   const shiftMonth = (delta: number) => {
     const d = new Date(year, month - 1 + delta, 1);
@@ -4322,6 +4488,12 @@ export default function StaffPage() {
       auto_settle: u.auto_settle,
       is_active: true,
       notes: u.notes,
+      is_officially_employed: u.is_officially_employed,
+      official_salary_amount: u.official_salary_amount,
+      official_salary_day: u.official_salary_day,
+      has_court_orders: u.has_court_orders,
+      court_order_pct: u.court_order_pct,
+      court_order_notes: u.court_order_notes,
     });
   };
 
@@ -4337,7 +4509,20 @@ export default function StaffPage() {
   const totalStaff = allStaffUsers.length;
 
   const cfg = GROUP_CONFIG[activeGroup];
-  const activeUsers = payroll ? cfg.getUsers(payroll) : [];
+  const rawUsers = payroll ? cfg.getUsers(payroll) : [];
+  const activeUsers =
+    activeGroup === 'drivers'
+      ? rawUsers.filter((u) => {
+          if (driverFilter === 'official') return u.is_officially_employed;
+          if (driverFilter === 'court') return u.is_officially_employed && u.has_court_orders;
+          return true;
+        })
+      : rawUsers;
+
+  const officialDriversCount =
+    payroll?.drivers?.filter((d) => d.is_officially_employed).length ?? 0;
+  const courtDriversCount =
+    payroll?.drivers?.filter((d) => d.is_officially_employed && d.has_court_orders).length ?? 0;
 
   return (
     <div className="space-y-3 max-w-5xl mx-auto animate-in fade-in duration-500">
@@ -4379,7 +4564,20 @@ export default function StaffPage() {
       {/* Сводка — компактная */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Сотрудников', value: totalStaff, color: 'text-slate-900' },
+          {
+            label: 'Сотрудников',
+            value: (
+              <span className="flex items-baseline gap-2">
+                <span>{totalStaff}</span>
+                {officialDriversCount > 0 && (
+                  <span className="text-xs font-bold text-emerald-600">
+                    💼 {officialDriversCount} ТК РФ
+                  </span>
+                )}
+              </span>
+            ),
+            color: 'text-slate-900',
+          },
           {
             label: 'Фонд ЗП (мес)',
             value: isLoading ? '—' : <Money amount={totalFundMonth.toFixed(2)} />,
@@ -4452,6 +4650,64 @@ export default function StaffPage() {
           </button>
         </div>
       </div>
+
+      {/* Баннер ТК РФ и фильтр для группы водителей */}
+      {activeGroup === 'drivers' && (
+        <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-lg shrink-0">
+              ТК РФ
+            </span>
+            <span className="text-emerald-950 font-medium">
+              1-го числа каждого месяца из сдельных рейсов автоматически вычитается официальная
+              часть (10 000 ₽). Напоминание в МАКС приходит в день выплаты (10-го числа).
+            </span>
+          </div>
+          <div className="flex items-center gap-1 bg-emerald-100/70 p-1 rounded-xl shrink-0 self-end sm:self-auto font-bold text-xs">
+            <button
+              onClick={() => setDriverFilter('all')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg transition-all',
+                driverFilter === 'all'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-emerald-800 hover:text-emerald-950',
+              )}
+            >
+              Все ({rawUsers.length})
+            </button>
+            <button
+              onClick={() => setDriverFilter('official')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg transition-all flex items-center gap-1',
+                driverFilter === 'official'
+                  ? 'bg-white text-emerald-900 shadow-sm'
+                  : 'text-emerald-800 hover:text-emerald-950',
+              )}
+            >
+              <span>💼 ТК РФ</span>
+              <span className="text-[10px] font-black bg-emerald-200 px-1.5 py-0.2 rounded-full">
+                {officialDriversCount}
+              </span>
+            </button>
+            {courtDriversCount > 0 && (
+              <button
+                onClick={() => setDriverFilter('court')}
+                className={cn(
+                  'px-2.5 py-1 rounded-lg transition-all flex items-center gap-1',
+                  driverFilter === 'court'
+                    ? 'bg-white text-rose-900 shadow-sm'
+                    : 'text-rose-800 hover:text-rose-950',
+                )}
+              >
+                <span>⚖️ ФССП</span>
+                <span className="text-[10px] font-black bg-rose-200 px-1.5 py-0.2 rounded-full">
+                  {courtDriversCount}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Таблица активной группы */}
       {isLoading ? (

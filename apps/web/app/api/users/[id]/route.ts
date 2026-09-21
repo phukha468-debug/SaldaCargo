@@ -16,6 +16,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'is_active',
       'auto_settle',
       'notes',
+      'is_officially_employed',
+      'official_salary_amount',
+      'official_salary_day',
+      'has_court_orders',
+      'court_order_pct',
+      'court_order_notes',
     ];
     const update: Record<string, any> = {};
     for (const key of allowed) {
