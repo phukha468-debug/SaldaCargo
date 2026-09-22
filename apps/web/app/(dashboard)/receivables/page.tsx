@@ -52,9 +52,12 @@ type ReceivablesData = {
   overdueCount: number;
 };
 
+const BANK_ID = '10000000-0000-0000-0000-000000000001';
+const CASH_ID = '10000000-0000-0000-0000-000000000002';
+
 const WALLET_OPTIONS = [
-  { id: '10000000-0000-0000-0000-000000000001', label: 'Расчётный счёт' },
-  { id: '10000000-0000-0000-0000-000000000002', label: 'Касса (наличные)' },
+  { id: BANK_ID, label: 'Расчётный счёт' },
+  { id: CASH_ID, label: 'Касса (наличные)' },
 ];
 
 type Counterparty = { id: string; name: string };
@@ -527,8 +530,171 @@ function InvoiceModal({
   );
 }
 
+type UnsettleModalData = {
+  id: string;
+  type: 'trip_order' | 'manual';
+  counterpartyName: string;
+  amount: string;
+  invoiceNumber?: string;
+  tripNumber?: number | null;
+  isLegal?: boolean;
+};
+
+function UnsettleModal({
+  data,
+  onClose,
+  onSuccess,
+}: {
+  data: UnsettleModalData;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [walletId, setWalletId] = useState(data.isLegal ? BANK_ID : CASH_ID);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch('/api/receivables/unsettle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: data.id,
+          type: data.type,
+          from_wallet_id: walletId,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Ошибка возврата счёта');
+      onSuccess();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка при возврате');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-600">history_toggle_off</span>
+            <h2 className="text-base font-black text-slate-900">Вернуть счёт в дебиторку</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5 text-xs text-amber-900">
+          <div className="flex items-center gap-1.5 font-bold">
+            <span className="material-symbols-outlined text-sm text-amber-600">warning</span>
+            <span>Обратный финансовый механизм (сторно)</span>
+          </div>
+          <p className="text-[11px] text-amber-800 leading-relaxed">
+            Заказ вернётся в активную дебиторку клиента, а сумма оплаты будет{' '}
+            <b>списана с нашего счёта</b> в учётной системе.
+          </p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-xs">
+          <div className="flex justify-between">
+            <span className="text-slate-400">Клиент:</span>
+            <span className="font-bold text-slate-800 text-right">{data.counterpartyName}</span>
+          </div>
+          {data.tripNumber && (
+            <div className="flex justify-between">
+              <span className="text-slate-400">Рейс:</span>
+              <span className="font-bold text-slate-800">№ {data.tripNumber}</span>
+            </div>
+          )}
+          {data.invoiceNumber && (
+            <div className="flex justify-between">
+              <span className="text-slate-400">Счёт / Акт:</span>
+              <span className="font-bold text-blue-700">№ {data.invoiceNumber}</span>
+            </div>
+          )}
+          <div className="flex justify-between pt-1 border-t border-slate-200">
+            <span className="text-slate-500 font-bold">Сумма возврата в долг:</span>
+            <span className="text-base font-black text-rose-600">
+              {parseFloat(data.amount).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+            Списать средства с нашего счёта
+          </label>
+          <div className="space-y-2">
+            {WALLET_OPTIONS.map((w) => (
+              <label
+                key={w.id}
+                className="flex items-center gap-3 p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition-colors has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/50"
+              >
+                <input
+                  type="radio"
+                  name="unsettleWallet"
+                  value={w.id}
+                  checked={walletId === w.id}
+                  onChange={() => setWalletId(w.id)}
+                  className="accent-amber-600"
+                />
+                <span className="text-xs font-bold text-slate-700">{w.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold text-rose-600">
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={saving}
+            className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Возвращаем...' : 'Вернуть в долг'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function CounterpartyArchiveList({ counterpartyId }: { counterpartyId: string }) {
+function CounterpartyArchiveList({
+  counterpartyId,
+  counterpartyName,
+  isLegal,
+  onEditInvoice,
+  onUnsettle,
+}: {
+  counterpartyId: string;
+  counterpartyName: string;
+  isLegal: boolean;
+  onEditInvoice: (data: InvoiceModalData) => void;
+  onUnsettle: (data: UnsettleModalData) => void;
+}) {
   const { data, isLoading, isError } = useQuery<{ archive: any[] }>({
     queryKey: ['receivables-archive', counterpartyId],
     queryFn: () => fetch(`/api/receivables/archive/${counterpartyId}`).then((r) => r.json()),
@@ -568,18 +734,43 @@ function CounterpartyArchiveList({ counterpartyId }: { counterpartyId: string })
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs shadow-xs">
       <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
-        <span>Оплаченные акты и рейсы ({archive.length})</span>
-        <span>Безналичный расчёт</span>
+        <span>Оплаченные акты и заказы ({archive.length})</span>
+        <span>{isLegal ? 'Безналичный расчёт на Р/С' : 'Оплата в кассу'}</span>
       </div>
       {archive.map((item) => (
         <div
-          key={item.id}
-          className="p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 transition-colors"
+          key={`${item.type}-${item.id}`}
+          className="p-3 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <span className="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs">
-              {item.invoice_number ? `Акт № ${item.invoice_number}` : 'Б/н'}
-            </span>
+            {item.type === 'trip_order' ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onEditInvoice({
+                    orderId: item.id,
+                    tripNumber: item.trip?.trip_number ?? null,
+                    counterpartyName,
+                    amount: item.amount,
+                    currentNumber: item.invoice_number || '',
+                    currentDate: item.invoice_date || '',
+                  })
+                }
+                title="Нажмите, чтобы указать или изменить номер акта/счёта"
+                className="group inline-flex items-center gap-1.5 font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-2 py-1 rounded text-xs transition-colors cursor-pointer"
+              >
+                <span>
+                  {item.invoice_number ? `Акт № ${item.invoice_number}` : 'Б/н (Указать №)'}
+                </span>
+                <span className="material-symbols-outlined text-xs text-blue-500 opacity-60 group-hover:opacity-100">
+                  edit
+                </span>
+              </button>
+            ) : (
+              <span className="font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded text-xs">
+                Ручной долг
+              </span>
+            )}
             <div>
               <div className="font-bold text-slate-800">
                 {item.trip?.trip_number
@@ -594,17 +785,326 @@ function CounterpartyArchiveList({ counterpartyId }: { counterpartyId: string })
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <span className="font-black text-slate-800 text-sm">
               <Money amount={item.amount} />
             </span>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <span className="material-symbols-outlined text-xs">check_circle</span>
-              <span>Оплачено на Р/С</span>
+              <span>{isLegal ? 'Оплачено на Р/С' : 'Оплачено в кассу'}</span>
             </span>
+            <button
+              type="button"
+              onClick={() =>
+                onUnsettle({
+                  id: item.id,
+                  type: item.type,
+                  counterpartyName,
+                  amount: item.amount,
+                  invoiceNumber: item.invoice_number,
+                  tripNumber: item.trip?.trip_number,
+                  isLegal,
+                })
+              }
+              title="Вернуть заказ в дебиторку и списать деньги со счёта"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-xs">undo</span>
+              <span>Вернуть в долг</span>
+            </button>
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function GlobalArchiveView({
+  onEditInvoice,
+  onUnsettle,
+}: {
+  onEditInvoice: (data: InvoiceModalData) => void;
+  onUnsettle: (data: UnsettleModalData) => void;
+}) {
+  const [selectedCpId, setSelectedCpId] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  const { data: counterparties = [] } = useQuery<Counterparty[]>({
+    queryKey: ['counterparties-all'],
+    queryFn: () => fetch('/api/counterparties?active=1').then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const queryParams = new URLSearchParams();
+  if (selectedCpId && selectedCpId !== 'all') queryParams.set('counterparty_id', selectedCpId);
+  if (searchQuery.trim()) queryParams.set('q', searchQuery.trim());
+  if (fromDate) queryParams.set('from', fromDate);
+  if (toDate) queryParams.set('to', toDate);
+
+  const { data, isLoading, isError } = useQuery<{
+    orders: any[];
+    summary: { total_count: number; total_amount: string };
+  }>({
+    queryKey: ['receivables-global-archive', selectedCpId, searchQuery, fromDate, toDate],
+    queryFn: () =>
+      fetch(`/api/receivables/archive?${queryParams.toString()}`).then((r) => r.json()),
+    staleTime: 30000,
+  });
+
+  const orders = data?.orders ?? [];
+  const summary = data?.summary ?? { total_count: 0, total_amount: '0.00' };
+
+  return (
+    <div className="space-y-3">
+      {/* Filters bar */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-slate-700 text-lg">history_edu</span>
+            <h2 className="text-sm font-black text-slate-900">
+              Архив всех оплаченных счетов и сверка за период
+            </h2>
+          </div>
+          {(searchQuery || fromDate || toDate || selectedCpId !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCpId('all');
+                setSearchQuery('');
+                setFromDate('');
+                setToDate('');
+              }}
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-xs">restart_alt</span>
+              <span>Сбросить фильтры</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+          {/* Counterparty filter */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Контрагент
+            </label>
+            <select
+              value={selectedCpId}
+              onChange={(e) => setSelectedCpId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Все контрагенты</option>
+              {counterparties.map((cp) => (
+                <option key={cp.id} value={cp.id}>
+                  {cp.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quick search input */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Поиск
+            </label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-slate-400 text-sm">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="№ счёта, рейс, авто..."
+                className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Date from */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Оплата с
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Date to */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Оплата по
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Summary stats pill */}
+      <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-emerald-600 text-lg">verified</span>
+          <span className="font-bold text-emerald-950">
+            Оплачено за выбранный период:{' '}
+            <span className="font-black text-emerald-700">{summary.total_count} счетов</span> на
+            сумму:
+          </span>
+        </div>
+        <div className="text-base font-black text-emerald-700">
+          <Money amount={summary.total_amount} />
+        </div>
+      </div>
+
+      {/* List of archived orders */}
+      {isLoading ? (
+        <div className="p-8 bg-white rounded-xl border border-slate-200 space-y-3 animate-pulse">
+          <div className="h-10 bg-slate-100 rounded-lg" />
+          <div className="h-10 bg-slate-100 rounded-lg" />
+          <div className="h-10 bg-slate-100 rounded-lg" />
+        </div>
+      ) : isError ? (
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl">
+          Ошибка загрузки архива
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="p-12 text-center bg-white rounded-xl border border-slate-200 space-y-2">
+          <span className="material-symbols-outlined text-slate-300 text-4xl">inventory_2</span>
+          <p className="text-xs text-slate-500 font-bold">
+            Оплаченных счетов по выбранным условиям не найдено
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Попробуйте изменить диапазон дат или очистить фильтр поиска
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-xs">
+          <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="col-span-2">Номер счёта / Акта</div>
+            <div className="col-span-3">Контрагент</div>
+            <div className="col-span-3">Рейс / Описание</div>
+            <div className="col-span-2">Даты (Счёт / Оплата)</div>
+            <div className="col-span-2 text-right">Сумма и действие</div>
+          </div>
+
+          {orders.map((item: any) => {
+            const cpName = item.counterparty?.name || 'Контрагент';
+            const isLegal = item.counterparty?.is_legal_entity ?? false;
+            return (
+              <div
+                key={`${item.type}-${item.id}`}
+                className="p-3 sm:px-4 sm:py-3 hover:bg-slate-50/80 transition-colors flex flex-col md:grid md:grid-cols-12 gap-2 items-start md:items-center text-xs"
+              >
+                {/* Invoice badge */}
+                <div className="col-span-2">
+                  {item.type === 'trip_order' ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onEditInvoice({
+                          orderId: item.id,
+                          tripNumber: item.trip?.trip_number ?? null,
+                          counterpartyName: cpName,
+                          amount: item.amount,
+                          currentNumber: item.invoice_number || '',
+                          currentDate: item.invoice_date || '',
+                        })
+                      }
+                      title="Нажмите, чтобы указать или изменить номер акта/счёта"
+                      className="group inline-flex items-center gap-1.5 font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-2 py-1 rounded text-xs transition-colors cursor-pointer"
+                    >
+                      <span>
+                        {item.invoice_number ? `Акт № ${item.invoice_number}` : 'Б/н (Указать №)'}
+                      </span>
+                      <span className="material-symbols-outlined text-xs text-blue-500 opacity-60 group-hover:opacity-100">
+                        edit
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded text-xs">
+                      Ручной долг
+                    </span>
+                  )}
+                </div>
+
+                {/* Counterparty */}
+                <div className="col-span-3 font-bold text-slate-900">
+                  <div className="truncate">{cpName}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">
+                    {isLegal ? 'Юрлицо (Р/С)' : 'Физлицо (Касса)'}
+                    {item.counterparty?.phone ? ` · ${formatPhone(item.counterparty.phone)}` : ''}
+                  </div>
+                </div>
+
+                {/* Trip / Description */}
+                <div className="col-span-3 text-slate-700">
+                  <div className="font-semibold truncate">
+                    {item.trip?.trip_number
+                      ? `Рейс №${item.trip.trip_number}`
+                      : item.description || 'Заказ'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">
+                    {item.trip?.driver?.name ? item.trip.driver.name : ''}
+                    {item.trip?.asset?.reg_number ? ` (${item.trip.asset.reg_number})` : ''}
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="col-span-2 text-[10px] text-slate-500 space-y-0.5">
+                  <div>
+                    <span className="text-slate-400">Счёт: </span>
+                    <span className="font-medium">
+                      {item.invoice_date ? formatDate(item.invoice_date) : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Оплачен: </span>
+                    <span className="font-bold text-emerald-700">
+                      {item.invoice_paid_at ? formatDate(item.invoice_paid_at) : 'Погашен'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Amount & Actions */}
+                <div className="col-span-2 flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+                  <span className="font-black text-slate-900 text-sm">
+                    <Money amount={item.amount} />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUnsettle({
+                        id: item.id,
+                        type: item.type,
+                        counterpartyName: cpName,
+                        amount: item.amount,
+                        invoiceNumber: item.invoice_number,
+                        tripNumber: item.trip?.trip_number,
+                        isLegal,
+                      })
+                    }
+                    title="Вернуть заказ в дебиторку и списать деньги со счёта"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xs">undo</span>
+                    <span>Вернуть в долг</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -661,6 +1161,10 @@ export default function ReceivablesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
+
+  // Top Tab & Modals
+  const [mainViewTab, setMainViewTab] = useState<'active' | 'archive'>('active');
+  const [unsettleModalData, setUnsettleModalData] = useState<UnsettleModalData | null>(null);
 
   // Filters & Search
   const [categoryFilter, setCategoryFilter] = useState<DebtorCategoryFilter>('all');
@@ -947,8 +1451,29 @@ export default function ReceivablesPage() {
           onClose={() => setInvoiceModalOrder(null)}
           onSuccess={async () => {
             setInvoiceModalOrder(null);
-            await queryClient.invalidateQueries({ queryKey: ['receivables'] });
-            await queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['receivables'] }),
+              queryClient.invalidateQueries({ queryKey: ['receivables-archive'] }),
+              queryClient.invalidateQueries({ queryKey: ['receivables-global-archive'] }),
+              queryClient.invalidateQueries({ queryKey: ['receivables-summary'] }),
+            ]);
+          }}
+        />
+      )}
+
+      {unsettleModalData && (
+        <UnsettleModal
+          data={unsettleModalData}
+          onClose={() => setUnsettleModalData(null)}
+          onSuccess={async () => {
+            setUnsettleModalData(null);
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['receivables'] }),
+              queryClient.invalidateQueries({ queryKey: ['receivables-archive'] }),
+              queryClient.invalidateQueries({ queryKey: ['receivables-global-archive'] }),
+              queryClient.invalidateQueries({ queryKey: ['receivables-summary'] }),
+              queryClient.invalidateQueries({ queryKey: ['wallets'] }),
+            ]);
           }}
         />
       )}
@@ -1123,14 +1648,38 @@ export default function ReceivablesPage() {
       <div className="space-y-3 p-2 sm:p-4 max-w-7xl mx-auto animate-in fade-in duration-300">
         {/* Compact Header */}
         <div className="bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-black text-slate-900">
-                Дебиторская задолженность
-              </h1>
-              <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {allDebtors.length} {allDebtors.length === 1 ? 'контрагент' : 'контрагентов'}
-              </span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-black text-slate-900">Дебиторка</h1>
+
+            {/* Top view switcher */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setMainViewTab('active')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  mainViewTab === 'active'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">account_balance_wallet</span>
+                <span>Текущая дебиторка</span>
+                <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full font-extrabold">
+                  {allDebtors.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMainViewTab('archive')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  mainViewTab === 'archive'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">history_edu</span>
+                <span>Архив счетов и сверка</span>
+              </button>
             </div>
           </div>
 
@@ -1145,7 +1694,7 @@ export default function ReceivablesPage() {
             </div>
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">add</span>
               <span>Добавить долг</span>
@@ -1153,1029 +1702,1057 @@ export default function ReceivablesPage() {
           </div>
         </div>
 
-        {isError && (
-          <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 font-bold">
-            Ошибка загрузки данных
-          </div>
-        )}
+        {mainViewTab === 'archive' ? (
+          <GlobalArchiveView
+            onEditInvoice={(modalData) => setInvoiceModalOrder(modalData)}
+            onUnsettle={(modalData) => setUnsettleModalData(modalData)}
+          />
+        ) : (
+          <>
+            {isError && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 font-bold">
+                Ошибка загрузки данных
+              </div>
+            )}
 
-        {/* Compact Filters & Quick Search (как в согласованном макете) */}
-        <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('all')}
-              className={`px-3 py-1.5 rounded-xl border font-bold transition-all ${
-                categoryFilter === 'all'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              Все должники ({allDebtors.length})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('unbilled')}
-              className={`px-3 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 ${
-                categoryFilter === 'unbilled'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span>Ждут выставления счёта ({unbilledCount})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('legal')}
-              className={`px-3 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 ${
-                categoryFilter === 'legal'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span>Только Юрлица (Р/С) ({legalCount})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('individual')}
-              className={`px-3 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 ${
-                categoryFilter === 'individual'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-slate-400" />
-              <span>Физлица (в кассу) ({individualCount})</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Quick search input */}
-            <div className="relative min-w-[220px]">
-              <span className="material-symbols-outlined absolute left-2.5 top-2 text-slate-400 text-sm">
-                search
-              </span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск контрагента, № акта..."
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none font-medium"
-              />
-              {searchQuery && (
+            {/* Compact Filters & Quick Search (как в согласованном макете) */}
+            <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
-                >
-                  <span className="material-symbols-outlined text-xs">close</span>
-                </button>
-              )}
-            </div>
-
-            {/* Aging filter dropdown / pills */}
-            <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-0.5 text-[11px]">
-              {(
-                [
-                  { key: 'all', label: 'Все сроки' },
-                  { key: '0-30', label: `0–30 дн. (${countByAging('0-30')})` },
-                  { key: '31-60', label: `31–60 дн. (${countByAging('31-60')})` },
-                  { key: '60+', label: `60+ дн. (${countByAging('60+')})` },
-                ] as { key: AgingFilter; label: string }[]
-              ).map(({ key, label }) => (
-                <button
-                  key={key}
                   type="button"
-                  onClick={() => setAgingFilter(key)}
-                  className={`px-2 py-1 rounded-lg font-bold transition-colors ${
-                    agingFilter === key
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-500 hover:text-slate-800'
+                  onClick={() => setCategoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl border font-bold transition-all ${
+                    categoryFilter === 'all'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  {label}
+                  Все должники ({allDebtors.length})
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        {/* Debtors List (Accordion) */}
-        <section className="space-y-1.5">
-          {isLoading ? (
-            <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 animate-pulse">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-10 bg-slate-100 rounded-lg" />
-              ))}
-            </div>
-          ) : filteredDebtors.length === 0 ? (
-            <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
-              <span className="material-symbols-outlined text-slate-200 text-[56px]">
-                check_circle
-              </span>
-              <p className="text-slate-500 font-bold mt-2 text-xs">
-                {categoryFilter === 'all' && !searchQuery
-                  ? 'Дебиторской задолженности нет'
-                  : 'По выбранным фильтрам контрагентов не найдено'}
-              </p>
-              {(categoryFilter !== 'all' || searchQuery) && (
                 <button
-                  onClick={() => {
-                    setCategoryFilter('all');
-                    setSearchQuery('');
-                    setAgingFilter('all');
-                  }}
-                  className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                  type="button"
+                  onClick={() => setCategoryFilter('unbilled')}
+                  className={`px-3 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 ${
+                    categoryFilter === 'unbilled'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
                 >
-                  Сбросить фильтры
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Ждут выставления счёта ({unbilledCount})</span>
                 </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {filteredDebtors.map((debtor) => {
-                const days = daysAgo(debtor.oldest_at);
-                const isOverdue = days > 30;
-                const isExpanded = expandedId === debtor.counterparty_id;
-                const isReal =
-                  !debtor.is_individual && !String(debtor.counterparty_id).startsWith('__');
-                const isLegal = !!debtor.is_legal_entity;
-                const fu = debtor.follow_up;
-                const statusCfg = fu ? STATUS_CONFIG[fu.status] : null;
 
-                // Trip orders requiring invoice issuance
-                const unbilledOrders = debtor.orders.filter(
-                  (o) =>
-                    o.type === 'trip_order' &&
-                    (!o.invoice_number || o.invoice_status === 'unbilled'),
-                );
-                const issuedOrders = debtor.orders.filter(
-                  (o) =>
-                    o.type === 'manual' ||
-                    (o.type === 'trip_order' &&
-                      o.invoice_number &&
-                      o.invoice_status !== 'unbilled'),
-                );
-                const unbilledOrdersSum = unbilledOrders.reduce(
-                  (sum, o) => sum + parseFloat(o.amount || '0'),
-                  0,
-                );
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('legal')}
+                  className={`px-3 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 ${
+                    categoryFilter === 'legal'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span>Только Юрлица (Р/С) ({legalCount})</span>
+                </button>
 
-                const activeTab = clientTabs[debtor.counterparty_id] ?? 'active';
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('individual')}
+                  className={`px-3 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 ${
+                    categoryFilter === 'individual'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  <span>Физлица (в кассу) ({individualCount})</span>
+                </button>
+              </div>
 
-                return (
-                  <div
-                    key={debtor.counterparty_id}
-                    data-debtor-id={debtor.counterparty_id}
-                    className={`bg-white border rounded-lg shadow-none overflow-hidden transition-all ${
-                      isExpanded
-                        ? 'border-blue-300 ring-2 ring-blue-50'
-                        : unbilledOrders.length > 0 && isLegal
-                          ? 'border-amber-200 hover:border-amber-300'
-                          : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {/* Debtor Compact Single-Line Header Row */}
-                    <div
-                      className={`px-2.5 py-1 sm:py-1.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 select-none transition-colors ${
-                        isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : ''
-                      }`}
-                      onClick={() => {
-                        setExpandedId(isExpanded ? null : debtor.counterparty_id);
-                        setEditingFollowUpId(null);
-                      }}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Quick search input */}
+                <div className="relative min-w-[220px]">
+                  <span className="material-symbols-outlined absolute left-2.5 top-2 text-slate-400 text-sm">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Поиск контрагента, № акта..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
                     >
-                      {/* Left: Avatar, Name, Badges, Info all in 1 single row */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
+                      <span className="material-symbols-outlined text-xs">close</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Aging filter dropdown / pills */}
+                <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-0.5 text-[11px]">
+                  {(
+                    [
+                      { key: 'all', label: 'Все сроки' },
+                      { key: '0-30', label: `0–30 дн. (${countByAging('0-30')})` },
+                      { key: '31-60', label: `31–60 дн. (${countByAging('31-60')})` },
+                      { key: '60+', label: `60+ дн. (${countByAging('60+')})` },
+                    ] as { key: AgingFilter; label: string }[]
+                  ).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAgingFilter(key)}
+                      className={`px-2 py-1 rounded-lg font-bold transition-colors ${
+                        agingFilter === key
+                          ? 'bg-slate-800 text-white'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Debtors List (Accordion) */}
+            <section className="space-y-1.5">
+              {isLoading ? (
+                <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 animate-pulse">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-10 bg-slate-100 rounded-lg" />
+                  ))}
+                </div>
+              ) : filteredDebtors.length === 0 ? (
+                <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
+                  <span className="material-symbols-outlined text-slate-200 text-[56px]">
+                    check_circle
+                  </span>
+                  <p className="text-slate-500 font-bold mt-2 text-xs">
+                    {categoryFilter === 'all' && !searchQuery
+                      ? 'Дебиторской задолженности нет'
+                      : 'По выбранным фильтрам контрагентов не найдено'}
+                  </p>
+                  {(categoryFilter !== 'all' || searchQuery) && (
+                    <button
+                      onClick={() => {
+                        setCategoryFilter('all');
+                        setSearchQuery('');
+                        setAgingFilter('all');
+                      }}
+                      className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                    >
+                      Сбросить фильтры
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredDebtors.map((debtor) => {
+                    const days = daysAgo(debtor.oldest_at);
+                    const isOverdue = days > 30;
+                    const isExpanded = expandedId === debtor.counterparty_id;
+                    const isReal =
+                      !debtor.is_individual && !String(debtor.counterparty_id).startsWith('__');
+                    const isLegal = !!debtor.is_legal_entity;
+                    const fu = debtor.follow_up;
+                    const statusCfg = fu ? STATUS_CONFIG[fu.status] : null;
+
+                    // Trip orders requiring invoice issuance
+                    const unbilledOrders = debtor.orders.filter(
+                      (o) =>
+                        o.type === 'trip_order' &&
+                        (!o.invoice_number || o.invoice_status === 'unbilled'),
+                    );
+                    const issuedOrders = debtor.orders.filter(
+                      (o) =>
+                        o.type === 'manual' ||
+                        (o.type === 'trip_order' &&
+                          o.invoice_number &&
+                          o.invoice_status !== 'unbilled'),
+                    );
+                    const unbilledOrdersSum = unbilledOrders.reduce(
+                      (sum, o) => sum + parseFloat(o.amount || '0'),
+                      0,
+                    );
+
+                    const activeTab = clientTabs[debtor.counterparty_id] ?? 'active';
+
+                    return (
+                      <div
+                        key={debtor.counterparty_id}
+                        data-debtor-id={debtor.counterparty_id}
+                        className={`bg-white border rounded-lg shadow-none overflow-hidden transition-all ${
+                          isExpanded
+                            ? 'border-blue-300 ring-2 ring-blue-50'
+                            : unbilledOrders.length > 0 && isLegal
+                              ? 'border-amber-200 hover:border-amber-300'
+                              : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Debtor Compact Single-Line Header Row */}
                         <div
-                          className={`w-5 h-5 rounded flex items-center justify-center font-black text-[9px] shrink-0 ${
-                            isLegal
-                              ? 'bg-blue-100 text-blue-800'
-                              : isOverdue
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-slate-100 text-slate-700'
+                          className={`px-2.5 py-1 sm:py-1.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 select-none transition-colors ${
+                            isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : ''
                           }`}
+                          onClick={() => {
+                            setExpandedId(isExpanded ? null : debtor.counterparty_id);
+                            setEditingFollowUpId(null);
+                          }}
                         >
-                          {debtor.counterparty_name.slice(0, 2).toUpperCase()}
+                          {/* Left: Avatar, Name, Badges, Info all in 1 single row */}
+                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
+                            <div
+                              className={`w-5 h-5 rounded flex items-center justify-center font-black text-[9px] shrink-0 ${
+                                isLegal
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : isOverdue
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {debtor.counterparty_name.slice(0, 2).toUpperCase()}
+                            </div>
+
+                            <span className="text-xs font-bold text-slate-900 truncate shrink-0 max-w-[140px] sm:max-w-[200px]">
+                              {debtor.counterparty_name}
+                            </span>
+
+                            {debtor.counterparty_subname && (
+                              <span className="text-[8px] font-medium text-slate-400 bg-slate-100 px-1 py-0.5 rounded shrink-0 hidden sm:inline">
+                                {debtor.counterparty_subname}
+                              </span>
+                            )}
+
+                            {isLegal ? (
+                              <span className="text-[8px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                                Юрлицо
+                              </span>
+                            ) : (
+                              <span className="text-[8px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                                Физлицо
+                              </span>
+                            )}
+
+                            {unbilledOrders.length > 0 && isLegal && (
+                              <span className="text-[8px] font-bold bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                <span>{unbilledOrders.length} ждут счёта</span>
+                              </span>
+                            )}
+
+                            {statusCfg && (
+                              <span
+                                className={`hidden md:inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${statusCfg.bg}`}
+                              >
+                                <span className={`w-1 h-1 rounded-full ${statusCfg.dot}`} />
+                                {statusCfg.label}
+                              </span>
+                            )}
+
+                            <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
+                              {debtor.orders.length} зап. ·{' '}
+                              {isOverdue ? (
+                                <span className="text-rose-600 font-bold">
+                                  просрочка {days} дн.
+                                </span>
+                              ) : (
+                                <span>{days} дн.</span>
+                              )}
+                            </span>
+
+                            {debtor.counterparty_phone && (
+                              <a
+                                href={`tel:${debtor.counterparty_phone}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] text-blue-600 font-medium hover:text-blue-800 hidden lg:flex items-center gap-0.5 shrink-0"
+                                title={debtor.counterparty_phone}
+                              >
+                                <span className="material-symbols-outlined text-xs">call</span>
+                                <span className="font-mono">
+                                  {formatPhone(debtor.counterparty_phone)}
+                                </span>
+                              </a>
+                            )}
+
+                            {debtor.counterparty_email && (
+                              <span className="hidden xl:inline shrink-0">
+                                <EmailCopyButton email={debtor.counterparty_email} />
+                              </span>
+                            )}
+
+                            <PromiseDateBadge follow_up={fu} />
+                          </div>
+
+                          {/* Right: Sum + Actions in 1 single row */}
+                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                            <span
+                              className={`text-xs sm:text-sm font-black tracking-tight ${
+                                isOverdue ? 'text-rose-600' : 'text-slate-900'
+                              }`}
+                            >
+                              <Money amount={debtor.total} />
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedId(debtor.counterparty_id);
+                                setLinkingOrderId(debtor.counterparty_id);
+                              }}
+                              className="px-1.5 py-0.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[9px] font-bold rounded uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
+                              title="Привязать к контрагенту"
+                            >
+                              <span className="material-symbols-outlined text-xs">link</span>
+                              <span className="hidden sm:inline">
+                                {isReal ? 'Сменить' : 'Привязать'}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedId(isExpanded ? null : debtor.counterparty_id);
+                              }}
+                              className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold rounded uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
+                            >
+                              <span
+                                className="material-symbols-outlined text-xs transition-transform duration-200"
+                                style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
+                              >
+                                expand_more
+                              </span>
+                              <span className="hidden sm:inline">
+                                {isExpanded ? 'Свернуть' : 'Подробнее'}
+                              </span>
+                            </button>
+                          </div>
                         </div>
 
-                        <span className="text-xs font-bold text-slate-900 truncate shrink-0 max-w-[140px] sm:max-w-[200px]">
-                          {debtor.counterparty_name}
-                        </span>
-
-                        {debtor.counterparty_subname && (
-                          <span className="text-[8px] font-medium text-slate-400 bg-slate-100 px-1 py-0.5 rounded shrink-0 hidden sm:inline">
-                            {debtor.counterparty_subname}
-                          </span>
-                        )}
-
-                        {isLegal ? (
-                          <span className="text-[8px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
-                            Юрлицо
-                          </span>
-                        ) : (
-                          <span className="text-[8px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
-                            Физлицо
-                          </span>
-                        )}
-
-                        {unbilledOrders.length > 0 && isLegal && (
-                          <span className="text-[8px] font-bold bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                            <span>{unbilledOrders.length} ждут счёта</span>
-                          </span>
-                        )}
-
-                        {statusCfg && (
-                          <span
-                            className={`hidden md:inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${statusCfg.bg}`}
-                          >
-                            <span className={`w-1 h-1 rounded-full ${statusCfg.dot}`} />
-                            {statusCfg.label}
-                          </span>
-                        )}
-
-                        <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
-                          {debtor.orders.length} зап. ·{' '}
-                          {isOverdue ? (
-                            <span className="text-rose-600 font-bold">просрочка {days} дн.</span>
-                          ) : (
-                            <span>{days} дн.</span>
-                          )}
-                        </span>
-
-                        {debtor.counterparty_phone && (
-                          <a
-                            href={`tel:${debtor.counterparty_phone}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[10px] text-blue-600 font-medium hover:text-blue-800 hidden lg:flex items-center gap-0.5 shrink-0"
-                            title={debtor.counterparty_phone}
-                          >
-                            <span className="material-symbols-outlined text-xs">call</span>
-                            <span className="font-mono">
-                              {formatPhone(debtor.counterparty_phone)}
-                            </span>
-                          </a>
-                        )}
-
-                        {debtor.counterparty_email && (
-                          <span className="hidden xl:inline shrink-0">
-                            <EmailCopyButton email={debtor.counterparty_email} />
-                          </span>
-                        )}
-
-                        <PromiseDateBadge follow_up={fu} />
-                      </div>
-
-                      {/* Right: Sum + Actions in 1 single row */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        <span
-                          className={`text-xs sm:text-sm font-black tracking-tight ${
-                            isOverdue ? 'text-rose-600' : 'text-slate-900'
-                          }`}
-                        >
-                          <Money amount={debtor.total} />
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedId(debtor.counterparty_id);
-                            setLinkingOrderId(debtor.counterparty_id);
-                          }}
-                          className="px-1.5 py-0.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[9px] font-bold rounded uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
-                          title="Привязать к контрагенту"
-                        >
-                          <span className="material-symbols-outlined text-xs">link</span>
-                          <span className="hidden sm:inline">
-                            {isReal ? 'Сменить' : 'Привязать'}
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedId(isExpanded ? null : debtor.counterparty_id);
-                          }}
-                          className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold rounded uppercase tracking-wide transition-colors shrink-0 flex items-center gap-0.5"
-                        >
-                          <span
-                            className="material-symbols-outlined text-xs transition-transform duration-200"
-                            style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
-                          >
-                            expand_more
-                          </span>
-                          <span className="hidden sm:inline">
-                            {isExpanded ? 'Свернуть' : 'Подробнее'}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Accordion Expanded Details */}
-                    {isExpanded && (
-                      <div className="border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5 space-y-4">
-                        {/* Sub-tabs for Legal Entity: Current vs Archive */}
-                        {isLegal && (
-                          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-2 text-xs">
-                            <div className="flex gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setClientTabs((prev) => ({
-                                    ...prev,
-                                    [debtor.counterparty_id]: 'active',
-                                  }))
-                                }
-                                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                                  activeTab === 'active'
-                                    ? 'bg-slate-900 text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                                }`}
-                              >
-                                <span>Текущие счета и рейсы ({debtor.orders.length})</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setClientTabs((prev) => ({
-                                    ...prev,
-                                    [debtor.counterparty_id]: 'archive',
-                                  }))
-                                }
-                                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                                  activeTab === 'archive'
-                                    ? 'bg-slate-900 text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                                }`}
-                              >
-                                <span className="material-symbols-outlined text-sm">history</span>
-                                <span>Архив оплаченных</span>
-                              </button>
-                            </div>
-                            <span className="text-[11px] text-slate-400 font-medium">
-                              Безналичный расчёт на Р/С · Без НДС
-                            </span>
-                          </div>
-                        )}
-
-                        {/* If archive tab is selected for legal entity */}
-                        {isLegal && activeTab === 'archive' ? (
-                          <CounterpartyArchiveList counterpartyId={debtor.counterparty_id} />
-                        ) : (
-                          <>
-                            {/* Counterparty linking input if opened */}
-                            {linkingOrderId === debtor.counterparty_id && (
-                              <div className="p-3 bg-violet-50 border border-violet-200 rounded-xl space-y-2">
-                                <p className="text-[10px] font-bold text-violet-800 uppercase tracking-widest">
-                                  Выберите контрагента для привязки
-                                </p>
-                                <input
-                                  type="text"
-                                  value={linkCpSearch}
-                                  onChange={(e) => setLinkCpSearch(e.target.value)}
-                                  placeholder="Поиск по названию..."
-                                  autoFocus
-                                  className="w-full bg-white border border-violet-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                />
-                                {(Array.isArray(counterparties) ? counterparties : []).filter(
-                                  (cp) =>
-                                    !linkCpSearch ||
-                                    cp.name.toLowerCase().includes(linkCpSearch.toLowerCase()),
-                                ).length > 0 && (
-                                  <div className="max-h-40 overflow-y-auto border border-violet-200 rounded-lg divide-y divide-violet-100 bg-white shadow-xs">
-                                    {(Array.isArray(counterparties) ? counterparties : [])
-                                      .filter(
-                                        (cp) =>
-                                          !linkCpSearch ||
-                                          cp.name
-                                            .toLowerCase()
-                                            .includes(linkCpSearch.toLowerCase()),
-                                      )
-                                      .map((cp) => (
-                                        <button
-                                          key={cp.id}
-                                          type="button"
-                                          onClick={() => handleLinkToCounterparty(debtor, cp.id)}
-                                          disabled={linkingPending}
-                                          className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-violet-100 hover:text-violet-800 transition-colors disabled:opacity-50 font-medium"
-                                        >
-                                          {cp.name}
-                                        </button>
-                                      ))}
-                                  </div>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setLinkingOrderId(null);
-                                    setLinkCpSearch('');
-                                  }}
-                                  className="text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors"
-                                >
-                                  Отмена
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Follow-up panel for real counterparties */}
-                            {isReal && (
-                              <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-                                {fu ? (
-                                  <div className="flex items-start justify-between gap-4">
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span
-                                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${statusCfg?.bg}`}
-                                        >
-                                          <span
-                                            className={`w-1.5 h-1.5 rounded-full ${statusCfg?.dot}`}
-                                          />
-                                          {statusCfg?.label}
-                                        </span>
-                                        {fu.last_contact_at && (
-                                          <span className="text-[10px] text-slate-400">
-                                            Последний звонок: {formatDate(fu.last_contact_at)}
-                                          </span>
-                                        )}
-                                        {fu.next_contact_at && (
-                                          <span className="text-[10px] text-blue-600 font-bold">
-                                            Следующий:{' '}
-                                            {new Date(
-                                              fu.next_contact_at + 'T12:00:00',
-                                            ).toLocaleDateString('ru-RU', {
-                                              day: 'numeric',
-                                              month: 'short',
-                                            })}
-                                          </span>
-                                        )}
-                                      </div>
-                                      {fu.notes && (
-                                        <p className="text-xs text-slate-600 italic">
-                                          «{fu.notes}»
-                                        </p>
-                                      )}
-                                    </div>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingFollowUpId(
-                                          editingFollowUpId === debtor.counterparty_id
-                                            ? null
-                                            : debtor.counterparty_id,
-                                        );
-                                      }}
-                                      className="shrink-0 px-2.5 py-1 text-[10px] font-bold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors uppercase tracking-wide bg-white"
-                                    >
-                                      <span className="material-symbols-outlined text-xs align-middle mr-1">
-                                        call
-                                      </span>
-                                      Обновить
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-xs text-slate-400 font-medium">
-                                      История звонков не зафиксирована
-                                    </p>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingFollowUpId(
-                                          editingFollowUpId === debtor.counterparty_id
-                                            ? null
-                                            : debtor.counterparty_id,
-                                        );
-                                      }}
-                                      className="px-2.5 py-1 text-[10px] font-bold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors uppercase tracking-wide"
-                                    >
-                                      <span className="material-symbols-outlined text-xs align-middle mr-1">
-                                        add_call
-                                      </span>
-                                      Зафиксировать звонок
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {isReal && editingFollowUpId === debtor.counterparty_id && (
-                              <div data-followup-id={debtor.counterparty_id}>
-                                <FollowUpForm
-                                  counterpartyId={debtor.counterparty_id}
-                                  current={debtor.follow_up}
-                                  onClose={() => setEditingFollowUpId(null)}
-                                  onSaved={handleFollowUpSaved}
-                                />
-                              </div>
-                            )}
-
-                            {/* Unbilled Notice Banner for Legal Entity */}
-                            {isLegal && unbilledOrders.length > 0 && (
-                              <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5 space-y-2">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-black text-amber-900 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-base text-amber-600">
-                                      notification_important
+                        {/* Accordion Expanded Details */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5 space-y-4">
+                            {/* Sub-tabs for Legal Entity: Current vs Archive */}
+                            {isLegal && (
+                              <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-2 text-xs">
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setClientTabs((prev) => ({
+                                        ...prev,
+                                        [debtor.counterparty_id]: 'active',
+                                      }))
+                                    }
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                      activeTab === 'active'
+                                        ? 'bg-slate-900 text-white shadow-xs'
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>Текущие счета и рейсы ({debtor.orders.length})</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setClientTabs((prev) => ({
+                                        ...prev,
+                                        [debtor.counterparty_id]: 'archive',
+                                      }))
+                                    }
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                                      activeTab === 'archive'
+                                        ? 'bg-slate-900 text-white shadow-xs'
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-sm">
+                                      history
                                     </span>
-                                    <span>
-                                      Требует выставления счёта ({unbilledOrders.length}{' '}
-                                      {unbilledOrders.length === 1 ? 'рейс' : 'рейсов'}):
-                                    </span>
-                                  </span>
-                                  <span className="font-black text-amber-900">
-                                    {unbilledOrdersSum.toLocaleString('ru-RU')} ₽
-                                  </span>
+                                    <span>Архив оплаченных</span>
+                                  </button>
                                 </div>
+                                <span className="text-[11px] text-slate-400 font-medium">
+                                  Безналичный расчёт на Р/С · Без НДС
+                                </span>
+                              </div>
+                            )}
 
-                                <div className="space-y-2">
-                                  {unbilledOrders.map((unb) => (
-                                    <div
-                                      key={unb.id}
-                                      className="bg-white p-3 rounded-lg border border-amber-200 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs"
+                            {isLegal && activeTab === 'archive' ? (
+                              <CounterpartyArchiveList
+                                counterpartyId={debtor.counterparty_id}
+                                counterpartyName={debtor.counterparty_name}
+                                isLegal={!!debtor.is_legal_entity}
+                                onEditInvoice={(modalData) => setInvoiceModalOrder(modalData)}
+                                onUnsettle={(modalData) => setUnsettleModalData(modalData)}
+                              />
+                            ) : (
+                              <>
+                                {/* Counterparty linking input if opened */}
+                                {linkingOrderId === debtor.counterparty_id && (
+                                  <div className="p-3 bg-violet-50 border border-violet-200 rounded-xl space-y-2">
+                                    <p className="text-[10px] font-bold text-violet-800 uppercase tracking-widest">
+                                      Выберите контрагента для привязки
+                                    </p>
+                                    <input
+                                      type="text"
+                                      value={linkCpSearch}
+                                      onChange={(e) => setLinkCpSearch(e.target.value)}
+                                      placeholder="Поиск по названию..."
+                                      autoFocus
+                                      className="w-full bg-white border border-violet-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    />
+                                    {(Array.isArray(counterparties) ? counterparties : []).filter(
+                                      (cp) =>
+                                        !linkCpSearch ||
+                                        cp.name.toLowerCase().includes(linkCpSearch.toLowerCase()),
+                                    ).length > 0 && (
+                                      <div className="max-h-40 overflow-y-auto border border-violet-200 rounded-lg divide-y divide-violet-100 bg-white shadow-xs">
+                                        {(Array.isArray(counterparties) ? counterparties : [])
+                                          .filter(
+                                            (cp) =>
+                                              !linkCpSearch ||
+                                              cp.name
+                                                .toLowerCase()
+                                                .includes(linkCpSearch.toLowerCase()),
+                                          )
+                                          .map((cp) => (
+                                            <button
+                                              key={cp.id}
+                                              type="button"
+                                              onClick={() =>
+                                                handleLinkToCounterparty(debtor, cp.id)
+                                              }
+                                              disabled={linkingPending}
+                                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-violet-100 hover:text-violet-800 transition-colors disabled:opacity-50 font-medium"
+                                            >
+                                              {cp.name}
+                                            </button>
+                                          ))}
+                                      </div>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setLinkingOrderId(null);
+                                        setLinkCpSearch('');
+                                      }}
+                                      className="text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors"
                                     >
-                                      <div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="bg-amber-100 text-amber-900 font-mono font-bold px-1.5 py-0.5 rounded">
-                                            {unb.trip_number ? `Рейс #${unb.trip_number}` : 'Заказ'}
-                                          </span>
-                                          <span className="font-bold text-slate-800">
-                                            {unb.started_at
-                                              ? formatDate(unb.started_at)
-                                              : formatDate(unb.created_at)}
-                                          </span>
-                                          {(unb.asset_reg_number || unb.asset_name) && (
-                                            <>
-                                              <span className="text-slate-300">·</span>
-                                              <span className="text-slate-600 font-medium">
-                                                {unb.asset_reg_number ?? ''} {unb.asset_name ?? ''}
+                                      Отмена
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Follow-up panel for real counterparties */}
+                                {isReal && (
+                                  <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                                    {fu ? (
+                                      <div className="flex items-start justify-between gap-4">
+                                        <div className="space-y-1">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span
+                                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${statusCfg?.bg}`}
+                                            >
+                                              <span
+                                                className={`w-1.5 h-1.5 rounded-full ${statusCfg?.dot}`}
+                                              />
+                                              {statusCfg?.label}
+                                            </span>
+                                            {fu.last_contact_at && (
+                                              <span className="text-[10px] text-slate-400">
+                                                Последний звонок: {formatDate(fu.last_contact_at)}
                                               </span>
-                                            </>
-                                          )}
-                                          {unb.driver_name && (
-                                            <>
-                                              <span className="text-slate-300">·</span>
-                                              <span className="text-slate-500">
-                                                {unb.driver_name}
+                                            )}
+                                            {fu.next_contact_at && (
+                                              <span className="text-[10px] text-blue-600 font-bold">
+                                                Следующий:{' '}
+                                                {new Date(
+                                                  fu.next_contact_at + 'T12:00:00',
+                                                ).toLocaleDateString('ru-RU', {
+                                                  day: 'numeric',
+                                                  month: 'short',
+                                                })}
                                               </span>
-                                            </>
+                                            )}
+                                          </div>
+                                          {fu.notes && (
+                                            <p className="text-xs text-slate-600 italic">
+                                              «{fu.notes}»
+                                            </p>
                                           )}
                                         </div>
-                                        {unb.description && (
-                                          <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                                            {unb.description}
-                                          </div>
-                                        )}
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingFollowUpId(
+                                              editingFollowUpId === debtor.counterparty_id
+                                                ? null
+                                                : debtor.counterparty_id,
+                                            );
+                                          }}
+                                          className="shrink-0 px-2.5 py-1 text-[10px] font-bold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors uppercase tracking-wide bg-white"
+                                        >
+                                          <span className="material-symbols-outlined text-xs align-middle mr-1">
+                                            call
+                                          </span>
+                                          Обновить
+                                        </button>
                                       </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-xs text-slate-400 font-medium">
+                                          История звонков не зафиксирована
+                                        </p>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingFollowUpId(
+                                              editingFollowUpId === debtor.counterparty_id
+                                                ? null
+                                                : debtor.counterparty_id,
+                                            );
+                                          }}
+                                          className="px-2.5 py-1 text-[10px] font-bold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors uppercase tracking-wide"
+                                        >
+                                          <span className="material-symbols-outlined text-xs align-middle mr-1">
+                                            add_call
+                                          </span>
+                                          Зафиксировать звонок
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
 
-                                      <div className="flex items-center gap-3">
-                                        <span className="font-black text-slate-900 text-sm">
-                                          <Money amount={unb.amount} />
+                                {isReal && editingFollowUpId === debtor.counterparty_id && (
+                                  <div data-followup-id={debtor.counterparty_id}>
+                                    <FollowUpForm
+                                      counterpartyId={debtor.counterparty_id}
+                                      current={debtor.follow_up}
+                                      onClose={() => setEditingFollowUpId(null)}
+                                      onSaved={handleFollowUpSaved}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Unbilled Notice Banner for Legal Entity */}
+                                {isLegal && unbilledOrders.length > 0 && (
+                                  <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5 space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-black text-amber-900 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-base text-amber-600">
+                                          notification_important
+                                        </span>
+                                        <span>
+                                          Требует выставления счёта ({unbilledOrders.length}{' '}
+                                          {unbilledOrders.length === 1 ? 'рейс' : 'рейсов'}):
+                                        </span>
+                                      </span>
+                                      <span className="font-black text-amber-900">
+                                        {unbilledOrdersSum.toLocaleString('ru-RU')} ₽
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      {unbilledOrders.map((unb) => (
+                                        <div
+                                          key={unb.id}
+                                          className="bg-white p-3 rounded-lg border border-amber-200 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs"
+                                        >
+                                          <div>
+                                            <div className="flex items-center gap-2">
+                                              <span className="bg-amber-100 text-amber-900 font-mono font-bold px-1.5 py-0.5 rounded">
+                                                {unb.trip_number
+                                                  ? `Рейс #${unb.trip_number}`
+                                                  : 'Заказ'}
+                                              </span>
+                                              <span className="font-bold text-slate-800">
+                                                {unb.started_at
+                                                  ? formatDate(unb.started_at)
+                                                  : formatDate(unb.created_at)}
+                                              </span>
+                                              {(unb.asset_reg_number || unb.asset_name) && (
+                                                <>
+                                                  <span className="text-slate-300">·</span>
+                                                  <span className="text-slate-600 font-medium">
+                                                    {unb.asset_reg_number ?? ''}{' '}
+                                                    {unb.asset_name ?? ''}
+                                                  </span>
+                                                </>
+                                              )}
+                                              {unb.driver_name && (
+                                                <>
+                                                  <span className="text-slate-300">·</span>
+                                                  <span className="text-slate-500">
+                                                    {unb.driver_name}
+                                                  </span>
+                                                </>
+                                              )}
+                                            </div>
+                                            {unb.description && (
+                                              <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                                                {unb.description}
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-3">
+                                            <span className="font-black text-slate-900 text-sm">
+                                              <Money amount={unb.amount} />
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setInvoiceModalOrder({
+                                                  orderId: unb.id,
+                                                  tripNumber: unb.trip_number,
+                                                  counterpartyName: debtor.counterparty_name,
+                                                  amount: unb.amount,
+                                                  currentNumber: unb.invoice_number || '',
+                                                  currentDate:
+                                                    unb.invoice_date ||
+                                                    new Date().toISOString().slice(0, 10),
+                                                })
+                                              }
+                                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition-colors flex items-center gap-1 text-xs"
+                                            >
+                                              <span className="material-symbols-outlined text-xs">
+                                                edit_note
+                                              </span>
+                                              <span>Ввести номер счёта</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Batch Actions & Lump Sum auto-selection bar */}
+                                <div className="p-3 bg-slate-100/90 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-slate-700">
+                                      Погасить на сумму:
+                                    </span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="100"
+                                      placeholder="Сумма, ₽"
+                                      value={lumpSumAmounts[debtor.counterparty_id] ?? ''}
+                                      onChange={(e) =>
+                                        setLumpSumAmounts((prev) => ({
+                                          ...prev,
+                                          [debtor.counterparty_id]: e.target.value,
+                                        }))
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          const val = parseFloat(
+                                            lumpSumAmounts[debtor.counterparty_id] || '0',
+                                          );
+                                          const res = selectByAmount(debtor.orders, val);
+                                          setSelectedOrderIds((prev) => {
+                                            const next = new Set(prev);
+                                            debtor.orders.forEach((o) => next.delete(o.id));
+                                            res.selectedIds.forEach((id) => next.add(id));
+                                            return next;
+                                          });
+                                          setLumpSumInfo((prev) => ({
+                                            ...prev,
+                                            [debtor.counterparty_id]: res.info,
+                                          }));
+                                        }
+                                      }}
+                                      className="w-28 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const val = parseFloat(
+                                          lumpSumAmounts[debtor.counterparty_id] || '0',
+                                        );
+                                        const res = selectByAmount(debtor.orders, val);
+                                        setSelectedOrderIds((prev) => {
+                                          const next = new Set(prev);
+                                          debtor.orders.forEach((o) => next.delete(o.id));
+                                          res.selectedIds.forEach((id) => next.add(id));
+                                          return next;
+                                        });
+                                        setLumpSumInfo((prev) => ({
+                                          ...prev,
+                                          [debtor.counterparty_id]: res.info,
+                                        }));
+                                      }}
+                                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors"
+                                    >
+                                      Подобрать
+                                    </button>
+
+                                    <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const allSelected = debtor.orders.every((o) =>
+                                          selectedOrderIds.has(o.id),
+                                        );
+                                        if (allSelected) deselectAllDebtorOrders(debtor);
+                                        else selectAllDebtorOrders(debtor);
+                                      }}
+                                      className="font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                                    >
+                                      {debtor.orders.every((o) => selectedOrderIds.has(o.id))
+                                        ? 'Снять выбор'
+                                        : `Выбрать все (${debtor.orders.length})`}
+                                    </button>
+                                  </div>
+
+                                  {(() => {
+                                    const selectedOrders = debtor.orders.filter((o) =>
+                                      selectedOrderIds.has(o.id),
+                                    );
+                                    const sumSelected = selectedOrders.reduce(
+                                      (s, o) => s + parseFloat(o.amount || '0'),
+                                      0,
+                                    );
+                                    const sumSelectedStr = sumSelected.toFixed(2);
+
+                                    if (selectedOrders.length === 0) {
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setCloseAllModal({
+                                              debtor,
+                                              orders: debtor.orders,
+                                              walletId: isLegal
+                                                ? '10000000-0000-0000-0000-000000000001'
+                                                : '10000000-0000-0000-0000-000000000002',
+                                            })
+                                          }
+                                          disabled={closingAllId === debtor.counterparty_id}
+                                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-xs"
+                                        >
+                                          {closingAllId === debtor.counterparty_id
+                                            ? 'Закрываем...'
+                                            : 'Закрыть весь долг'}
+                                        </button>
+                                      );
+                                    }
+
+                                    return (
+                                      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+                                        <span className="font-black text-emerald-900">
+                                          Выбрано {selectedOrders.length}:{' '}
+                                          <Money amount={sumSelectedStr} />
                                         </span>
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            setInvoiceModalOrder({
-                                              orderId: unb.id,
-                                              tripNumber: unb.trip_number,
-                                              counterpartyName: debtor.counterparty_name,
-                                              amount: unb.amount,
-                                              currentNumber: unb.invoice_number || '',
-                                              currentDate:
-                                                unb.invoice_date ||
-                                                new Date().toISOString().slice(0, 10),
+                                            setCloseAllModal({
+                                              debtor,
+                                              orders: selectedOrders,
+                                              walletId: isLegal
+                                                ? '10000000-0000-0000-0000-000000000001'
+                                                : '10000000-0000-0000-0000-000000000002',
                                             })
                                           }
-                                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition-colors flex items-center gap-1 text-xs"
+                                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-md shadow-xs transition-colors flex items-center gap-1"
                                         >
-                                          <span className="material-symbols-outlined text-xs">
-                                            edit_note
+                                          <span className="material-symbols-outlined text-sm">
+                                            done_all
                                           </span>
-                                          <span>Ввести номер счёта</span>
+                                          Погасить ({selectedOrders.length})
                                         </button>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })()}
                                 </div>
-                              </div>
-                            )}
 
-                            {/* Batch Actions & Lump Sum auto-selection bar */}
-                            <div className="p-3 bg-slate-100/90 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-slate-700">Погасить на сумму:</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="100"
-                                  placeholder="Сумма, ₽"
-                                  value={lumpSumAmounts[debtor.counterparty_id] ?? ''}
-                                  onChange={(e) =>
-                                    setLumpSumAmounts((prev) => ({
-                                      ...prev,
-                                      [debtor.counterparty_id]: e.target.value,
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const val = parseFloat(
-                                        lumpSumAmounts[debtor.counterparty_id] || '0',
-                                      );
-                                      const res = selectByAmount(debtor.orders, val);
-                                      setSelectedOrderIds((prev) => {
-                                        const next = new Set(prev);
-                                        debtor.orders.forEach((o) => next.delete(o.id));
-                                        res.selectedIds.forEach((id) => next.add(id));
-                                        return next;
-                                      });
-                                      setLumpSumInfo((prev) => ({
-                                        ...prev,
-                                        [debtor.counterparty_id]: res.info,
-                                      }));
-                                    }
-                                  }}
-                                  className="w-28 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const val = parseFloat(
-                                      lumpSumAmounts[debtor.counterparty_id] || '0',
-                                    );
-                                    const res = selectByAmount(debtor.orders, val);
-                                    setSelectedOrderIds((prev) => {
-                                      const next = new Set(prev);
-                                      debtor.orders.forEach((o) => next.delete(o.id));
-                                      res.selectedIds.forEach((id) => next.add(id));
-                                      return next;
-                                    });
-                                    setLumpSumInfo((prev) => ({
-                                      ...prev,
-                                      [debtor.counterparty_id]: res.info,
-                                    }));
-                                  }}
-                                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors"
-                                >
-                                  Подобрать
-                                </button>
-
-                                <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const allSelected = debtor.orders.every((o) =>
-                                      selectedOrderIds.has(o.id),
-                                    );
-                                    if (allSelected) deselectAllDebtorOrders(debtor);
-                                    else selectAllDebtorOrders(debtor);
-                                  }}
-                                  className="font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2"
-                                >
-                                  {debtor.orders.every((o) => selectedOrderIds.has(o.id))
-                                    ? 'Снять выбор'
-                                    : `Выбрать все (${debtor.orders.length})`}
-                                </button>
-                              </div>
-
-                              {(() => {
-                                const selectedOrders = debtor.orders.filter((o) =>
-                                  selectedOrderIds.has(o.id),
-                                );
-                                const sumSelected = selectedOrders.reduce(
-                                  (s, o) => s + parseFloat(o.amount || '0'),
-                                  0,
-                                );
-                                const sumSelectedStr = sumSelected.toFixed(2);
-
-                                if (selectedOrders.length === 0) {
-                                  return (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setCloseAllModal({
-                                          debtor,
-                                          orders: debtor.orders,
-                                          walletId: isLegal
-                                            ? '10000000-0000-0000-0000-000000000001'
-                                            : '10000000-0000-0000-0000-000000000002',
-                                        })
-                                      }
-                                      disabled={closingAllId === debtor.counterparty_id}
-                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-xs"
-                                    >
-                                      {closingAllId === debtor.counterparty_id
-                                        ? 'Закрываем...'
-                                        : 'Закрыть весь долг'}
-                                    </button>
-                                  );
-                                }
-
-                                return (
-                                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
-                                    <span className="font-black text-emerald-900">
-                                      Выбрано {selectedOrders.length}:{' '}
-                                      <Money amount={sumSelectedStr} />
+                                {lumpSumInfo[debtor.counterparty_id] && (
+                                  <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs font-semibold text-blue-800 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-base text-blue-600">
+                                      info
                                     </span>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setCloseAllModal({
-                                          debtor,
-                                          orders: selectedOrders,
-                                          walletId: isLegal
-                                            ? '10000000-0000-0000-0000-000000000001'
-                                            : '10000000-0000-0000-0000-000000000002',
-                                        })
-                                      }
-                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-md shadow-xs transition-colors flex items-center gap-1"
-                                    >
-                                      <span className="material-symbols-outlined text-sm">
-                                        done_all
-                                      </span>
-                                      Погасить ({selectedOrders.length})
-                                    </button>
+                                    {lumpSumInfo[debtor.counterparty_id]}
                                   </div>
-                                );
-                              })()}
-                            </div>
+                                )}
 
-                            {lumpSumInfo[debtor.counterparty_id] && (
-                              <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs font-semibold text-blue-800 flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-base text-blue-600">
-                                  info
-                                </span>
-                                {lumpSumInfo[debtor.counterparty_id]}
-                              </div>
-                            )}
+                                {/* Orders Table / Cards */}
+                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                                  {isLegal && (
+                                    <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex justify-between">
+                                      <span>
+                                        {issuedOrders.length > 0
+                                          ? `Выставленные акты (ждут оплаты): ${issuedOrders.length}`
+                                          : 'Все текущие записи'}
+                                      </span>
+                                      <span>Оплата на Расчётный счёт</span>
+                                    </div>
+                                  )}
 
-                            {/* Orders Table / Cards */}
-                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                              {isLegal && (
-                                <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex justify-between">
-                                  <span>
-                                    {issuedOrders.length > 0
-                                      ? `Выставленные акты (ждут оплаты): ${issuedOrders.length}`
-                                      : 'Все текущие записи'}
-                                  </span>
-                                  <span>Оплата на Расчётный счёт</span>
-                                </div>
-                              )}
-
-                              <table className="w-full text-left">
-                                <thead className="bg-slate-100/60 border-b border-slate-100">
-                                  <tr>
-                                    <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest w-10 text-center">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          debtor.orders.length > 0 &&
-                                          debtor.orders.every((o) => selectedOrderIds.has(o.id))
-                                        }
-                                        onChange={(e) => {
-                                          if (e.target.checked) selectAllDebtorOrders(debtor);
-                                          else deselectAllDebtorOrders(debtor);
-                                        }}
-                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                        title="Выбрать все"
-                                      />
-                                    </th>
-                                    {isLegal && (
-                                      <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                        Акт / Счёт
-                                      </th>
-                                    )}
-                                    <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                      Рейс / Описание
-                                    </th>
-                                    <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                      Транспорт / Водитель
-                                    </th>
-                                    <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                      Дата
-                                    </th>
-                                    <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                      Тип
-                                    </th>
-                                    <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest text-right">
-                                      Сумма
-                                    </th>
-                                    <th className="px-3 py-2" />
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs">
-                                  {debtor.orders.map((order) => {
-                                    const isSelected = selectedOrderIds.has(order.id);
-                                    const isTrip = order.type === 'trip_order';
-                                    const hasInvoice = !!order.invoice_number;
-
-                                    return (
-                                      <tr
-                                        key={order.id}
-                                        className={`transition-colors ${
-                                          isSelected
-                                            ? 'bg-emerald-50/60 hover:bg-emerald-50'
-                                            : 'hover:bg-slate-50/60'
-                                        }`}
-                                      >
-                                        <td className="px-3 py-2.5 text-center">
+                                  <table className="w-full text-left">
+                                    <thead className="bg-slate-100/60 border-b border-slate-100">
+                                      <tr>
+                                        <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest w-10 text-center">
                                           <input
                                             type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleOrderSelection(order.id)}
+                                            checked={
+                                              debtor.orders.length > 0 &&
+                                              debtor.orders.every((o) => selectedOrderIds.has(o.id))
+                                            }
+                                            onChange={(e) => {
+                                              if (e.target.checked) selectAllDebtorOrders(debtor);
+                                              else deselectAllDebtorOrders(debtor);
+                                            }}
                                             className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                            title="Выбрать все"
                                           />
-                                        </td>
-
-                                        {/* Invoice Column for Legal Entity */}
+                                        </th>
                                         {isLegal && (
-                                          <td className="px-3 py-2.5 whitespace-nowrap">
-                                            {hasInvoice ? (
-                                              <div className="flex items-center gap-1.5">
-                                                <span className="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11px]">
-                                                  Акт № {order.invoice_number}
-                                                </span>
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    setInvoiceModalOrder({
-                                                      orderId: order.id,
-                                                      tripNumber: order.trip_number,
-                                                      counterpartyName: debtor.counterparty_name,
-                                                      amount: order.amount,
-                                                      currentNumber: order.invoice_number || '',
-                                                      currentDate:
-                                                        order.invoice_date ||
-                                                        new Date().toISOString().slice(0, 10),
-                                                    })
-                                                  }
-                                                  className="text-slate-400 hover:text-blue-600 transition-colors"
-                                                  title="Изменить номер или дату счёта"
-                                                >
-                                                  <span className="material-symbols-outlined text-sm">
-                                                    edit
-                                                  </span>
-                                                </button>
-                                              </div>
-                                            ) : isTrip ? (
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  setInvoiceModalOrder({
-                                                    orderId: order.id,
-                                                    tripNumber: order.trip_number,
-                                                    counterpartyName: debtor.counterparty_name,
-                                                    amount: order.amount,
-                                                    currentNumber: '',
-                                                    currentDate: new Date()
-                                                      .toISOString()
-                                                      .slice(0, 10),
-                                                  })
-                                                }
-                                                className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded font-bold text-[10px] transition-colors inline-flex items-center gap-0.5"
-                                              >
-                                                <span className="material-symbols-outlined text-xs">
-                                                  add
-                                                </span>
-                                                <span>Ввести счёт</span>
-                                              </button>
-                                            ) : (
-                                              <span className="text-slate-400 text-[10px]">—</span>
-                                            )}
-                                          </td>
+                                          <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                            Акт / Счёт
+                                          </th>
                                         )}
+                                        <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                          Рейс / Описание
+                                        </th>
+                                        <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                          Транспорт / Водитель
+                                        </th>
+                                        <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                          Дата
+                                        </th>
+                                        <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                          Тип
+                                        </th>
+                                        <th className="px-3 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest text-right">
+                                          Сумма
+                                        </th>
+                                        <th className="px-3 py-2" />
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-xs">
+                                      {debtor.orders.map((order) => {
+                                        const isSelected = selectedOrderIds.has(order.id);
+                                        const isTrip = order.type === 'trip_order';
+                                        const hasInvoice = !!order.invoice_number;
 
-                                        <td className="px-3 py-2.5 font-semibold text-slate-800">
-                                          {order.type === 'manual' ? (
-                                            <span className="text-blue-600 font-bold">
-                                              Ручная запись
-                                            </span>
-                                          ) : (
-                                            <span className="font-bold text-slate-800">
-                                              Рейс №{order.trip_number}
-                                            </span>
-                                          )}
-                                          {order.description && (
-                                            <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
-                                              {order.description}
-                                            </span>
-                                          )}
-                                        </td>
+                                        return (
+                                          <tr
+                                            key={order.id}
+                                            className={`transition-colors ${
+                                              isSelected
+                                                ? 'bg-emerald-50/60 hover:bg-emerald-50'
+                                                : 'hover:bg-slate-50/60'
+                                            }`}
+                                          >
+                                            <td className="px-3 py-2.5 text-center">
+                                              <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleOrderSelection(order.id)}
+                                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                              />
+                                            </td>
 
-                                        <td className="px-3 py-2.5 text-slate-600">
-                                          {order.asset_reg_number ? (
-                                            <div>
-                                              <span className="font-semibold text-slate-800">
-                                                {order.asset_reg_number}
-                                              </span>
-                                              {order.asset_name && (
-                                                <span className="text-slate-400 ml-1">
-                                                  ({order.asset_name})
+                                            {/* Invoice Column for Legal Entity */}
+                                            {isLegal && (
+                                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                                {hasInvoice ? (
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11px]">
+                                                      Акт № {order.invoice_number}
+                                                    </span>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        setInvoiceModalOrder({
+                                                          orderId: order.id,
+                                                          tripNumber: order.trip_number,
+                                                          counterpartyName:
+                                                            debtor.counterparty_name,
+                                                          amount: order.amount,
+                                                          currentNumber: order.invoice_number || '',
+                                                          currentDate:
+                                                            order.invoice_date ||
+                                                            new Date().toISOString().slice(0, 10),
+                                                        })
+                                                      }
+                                                      className="text-slate-400 hover:text-blue-600 transition-colors"
+                                                      title="Изменить номер или дату счёта"
+                                                    >
+                                                      <span className="material-symbols-outlined text-sm">
+                                                        edit
+                                                      </span>
+                                                    </button>
+                                                  </div>
+                                                ) : isTrip ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      setInvoiceModalOrder({
+                                                        orderId: order.id,
+                                                        tripNumber: order.trip_number,
+                                                        counterpartyName: debtor.counterparty_name,
+                                                        amount: order.amount,
+                                                        currentNumber: '',
+                                                        currentDate: new Date()
+                                                          .toISOString()
+                                                          .slice(0, 10),
+                                                      })
+                                                    }
+                                                    className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded font-bold text-[10px] transition-colors inline-flex items-center gap-0.5"
+                                                  >
+                                                    <span className="material-symbols-outlined text-xs">
+                                                      add
+                                                    </span>
+                                                    <span>Ввести счёт</span>
+                                                  </button>
+                                                ) : (
+                                                  <span className="text-slate-400 text-[10px]">
+                                                    —
+                                                  </span>
+                                                )}
+                                              </td>
+                                            )}
+
+                                            <td className="px-3 py-2.5 font-semibold text-slate-800">
+                                              {order.type === 'manual' ? (
+                                                <span className="text-blue-600 font-bold">
+                                                  Ручная запись
+                                                </span>
+                                              ) : (
+                                                <span className="font-bold text-slate-800">
+                                                  Рейс №{order.trip_number}
                                                 </span>
                                               )}
-                                            </div>
-                                          ) : null}
-                                          <div className="text-[10px] text-slate-400">
-                                            {order.driver_name ?? '—'}
-                                          </div>
-                                        </td>
-
-                                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
-                                          {order.started_at
-                                            ? formatDate(order.started_at)
-                                            : formatDate(order.created_at)}
-                                        </td>
-
-                                        <td className="px-3 py-2.5">
-                                          {order.type === 'manual' ? (
-                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold uppercase">
-                                              Ист. долг
-                                            </span>
-                                          ) : (
-                                            <span className="px-2 py-0.5 bg-amber-50 text-amber-800 rounded text-[9px] font-bold uppercase">
-                                              {PAYMENT_LABELS[order.payment_method ?? ''] ??
-                                                order.payment_method ??
-                                                '—'}
-                                            </span>
-                                          )}
-                                        </td>
-
-                                        <td className="px-3 py-2.5 text-right font-black text-slate-900 text-sm">
-                                          <Money amount={order.amount} />
-                                        </td>
-
-                                        <td className="px-3 py-2.5 text-right">
-                                          <div className="flex items-center justify-end gap-1.5">
-                                            <button
-                                              onClick={() => {
-                                                setPartialModalOrder(order);
-                                                setPartialAmount('');
-                                                setPartialError('');
-                                              }}
-                                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition-colors shrink-0"
-                                              title="Частичная оплата"
-                                            >
-                                              Частично
-                                            </button>
-                                            {order.type === 'manual' && (
-                                              <button
-                                                onClick={() => handleDeleteManual(order.id)}
-                                                disabled={deletingId === order.id}
-                                                className="px-1.5 py-1 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                                                title="Удалить запись"
-                                              >
-                                                <span className="material-symbols-outlined text-base">
-                                                  delete
+                                              {order.description && (
+                                                <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                                                  {order.description}
                                                 </span>
-                                              </button>
-                                            )}
-                                            <button
-                                              onClick={() =>
-                                                handleMarkPaid(
-                                                  order,
-                                                  isLegal
-                                                    ? '10000000-0000-0000-0000-000000000001'
-                                                    : undefined,
-                                                )
-                                              }
-                                              disabled={markingId === order.id}
-                                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow-xs transition-colors disabled:opacity-50"
-                                              title={
-                                                isLegal
-                                                  ? 'Погасить платёж на Расчётный счёт'
-                                                  : 'Погасить'
-                                              }
-                                            >
-                                              {markingId === order.id
-                                                ? '...'
-                                                : isLegal
-                                                  ? 'Погасить (Р/С)'
-                                                  : 'Погасить'}
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </>
+                                              )}
+                                            </td>
+
+                                            <td className="px-3 py-2.5 text-slate-600">
+                                              {order.asset_reg_number ? (
+                                                <div>
+                                                  <span className="font-semibold text-slate-800">
+                                                    {order.asset_reg_number}
+                                                  </span>
+                                                  {order.asset_name && (
+                                                    <span className="text-slate-400 ml-1">
+                                                      ({order.asset_name})
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              ) : null}
+                                              <div className="text-[10px] text-slate-400">
+                                                {order.driver_name ?? '—'}
+                                              </div>
+                                            </td>
+
+                                            <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                                              {order.started_at
+                                                ? formatDate(order.started_at)
+                                                : formatDate(order.created_at)}
+                                            </td>
+
+                                            <td className="px-3 py-2.5">
+                                              {order.type === 'manual' ? (
+                                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold uppercase">
+                                                  Ист. долг
+                                                </span>
+                                              ) : (
+                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-800 rounded text-[9px] font-bold uppercase">
+                                                  {PAYMENT_LABELS[order.payment_method ?? ''] ??
+                                                    order.payment_method ??
+                                                    '—'}
+                                                </span>
+                                              )}
+                                            </td>
+
+                                            <td className="px-3 py-2.5 text-right font-black text-slate-900 text-sm">
+                                              <Money amount={order.amount} />
+                                            </td>
+
+                                            <td className="px-3 py-2.5 text-right">
+                                              <div className="flex items-center justify-end gap-1.5">
+                                                <button
+                                                  onClick={() => {
+                                                    setPartialModalOrder(order);
+                                                    setPartialAmount('');
+                                                    setPartialError('');
+                                                  }}
+                                                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition-colors shrink-0"
+                                                  title="Частичная оплата"
+                                                >
+                                                  Частично
+                                                </button>
+                                                {order.type === 'manual' && (
+                                                  <button
+                                                    onClick={() => handleDeleteManual(order.id)}
+                                                    disabled={deletingId === order.id}
+                                                    className="px-1.5 py-1 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                                                    title="Удалить запись"
+                                                  >
+                                                    <span className="material-symbols-outlined text-base">
+                                                      delete
+                                                    </span>
+                                                  </button>
+                                                )}
+                                                <button
+                                                  onClick={() =>
+                                                    handleMarkPaid(
+                                                      order,
+                                                      isLegal
+                                                        ? '10000000-0000-0000-0000-000000000001'
+                                                        : undefined,
+                                                    )
+                                                  }
+                                                  disabled={markingId === order.id}
+                                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow-xs transition-colors disabled:opacity-50"
+                                                  title={
+                                                    isLegal
+                                                      ? 'Погасить платёж на Расчётный счёт'
+                                                      : 'Погасить'
+                                                  }
+                                                >
+                                                  {markingId === order.id
+                                                    ? '...'
+                                                    : isLegal
+                                                      ? 'Погасить (Р/С)'
+                                                      : 'Погасить'}
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </>
   );

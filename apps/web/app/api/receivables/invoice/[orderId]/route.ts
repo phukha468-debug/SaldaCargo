@@ -14,11 +14,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
 
     const supabase = createAdminClient();
 
+    const { data: currentOrder } = await (supabase.from('trip_orders') as any)
+      .select('settlement_status, invoice_status')
+      .eq('id', orderId)
+      .single();
+
+    const isPaid =
+      currentOrder?.settlement_status === 'completed' || currentOrder?.invoice_status === 'paid';
+    const newStatus = isPaid ? 'paid' : 'issued';
+
     const { data, error } = await (supabase.from('trip_orders') as any)
       .update({
         invoice_number: String(invoice_number).trim(),
         invoice_date: invoice_date || new Date().toISOString().slice(0, 10),
-        invoice_status: 'issued',
+        invoice_status: newStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId)
