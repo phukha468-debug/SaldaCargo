@@ -17,43 +17,32 @@ export async function GET(req: Request) {
       .select(
         `id, amount, payment_method, created_at, description,
          invoice_number, invoice_date, invoice_status, invoice_paid_at, counterparty_id,
-         counterparty:counterparties(id, name, is_legal_entity, inn, phone),
+         counterparty:counterparties(id, name, is_legal_entity, email, phone),
          trip:trips(id, trip_number, started_at, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number))`,
       )
       .eq('settlement_status', 'completed')
-      .neq('lifecycle_status', 'cancelled');
+      .neq('lifecycle_status', 'cancelled')
+      .or('payment_method.in.(debt_cash,bank_invoice),counterparty_id.not.is.null');
 
     if (counterpartyId && counterpartyId !== 'all') {
       ordersQuery = ordersQuery.eq('counterparty_id', counterpartyId);
-    }
-    if (fromDate) {
-      ordersQuery = ordersQuery.gte('invoice_paid_at', `${fromDate}T00:00:00.000Z`);
-    }
-    if (toDate) {
-      ordersQuery = ordersQuery.lte('invoice_paid_at', `${toDate}T23:59:59.999Z`);
     }
 
     let manualsQuery = (supabase.from('manual_receivables') as any)
       .select(
         `id, amount, date, description, settled, settled_at, created_at, counterparty_id,
-         counterparty:counterparties(id, name, is_legal_entity, inn, phone)`,
+         counterparty:counterparties(id, name, is_legal_entity, email, phone)`,
       )
       .eq('settled', true);
 
     if (counterpartyId && counterpartyId !== 'all') {
       manualsQuery = manualsQuery.eq('counterparty_id', counterpartyId);
     }
-    if (fromDate) {
-      manualsQuery = manualsQuery.gte('settled_at', `${fromDate}T00:00:00.000Z`);
-    }
-    if (toDate) {
-      manualsQuery = manualsQuery.lte('settled_at', `${toDate}T23:59:59.999Z`);
-    }
 
     const [{ data: orders, error: ordersErr }, { data: manuals, error: manualsErr }] =
       await Promise.all([
-        ordersQuery.order('invoice_paid_at', { ascending: false, nullsFirst: false }),
-        manualsQuery.order('settled_at', { ascending: false, nullsFirst: false }),
+        ordersQuery.order('created_at', { ascending: false }),
+        manualsQuery.order('created_at', { ascending: false }),
       ]);
 
     if (ordersErr) {
@@ -74,6 +63,7 @@ export async function GET(req: Request) {
       invoice_date: o.invoice_date,
       invoice_status: o.invoice_status || 'paid',
       invoice_paid_at: o.invoice_paid_at,
+      effective_date: o.invoice_paid_at || o.invoice_date || o.created_at,
       counterparty_id: o.counterparty_id,
       counterparty: o.counterparty,
       trip: o.trip,
@@ -90,16 +80,31 @@ export async function GET(req: Request) {
       invoice_date: m.date,
       invoice_status: 'paid',
       invoice_paid_at: m.settled_at,
+      effective_date: m.settled_at || m.date || m.created_at,
       counterparty_id: m.counterparty_id,
       counterparty: m.counterparty,
       trip: null,
     }));
 
     let allItems = [...tripItems, ...manualItems].sort((a, b) => {
-      const da = new Date(a.invoice_paid_at || a.created_at).getTime();
-      const db = new Date(b.invoice_paid_at || b.created_at).getTime();
+      const da = new Date(a.effective_date).getTime();
+      const db = new Date(b.effective_date).getTime();
       return db - da;
     });
+
+    if (fromDate) {
+      allItems = allItems.filter((item) => {
+        const itemD = item.effective_date ? String(item.effective_date).slice(0, 10) : '';
+        return !itemD || itemD >= fromDate;
+      });
+    }
+
+    if (toDate) {
+      allItems = allItems.filter((item) => {
+        const itemD = item.effective_date ? String(item.effective_date).slice(0, 10) : '';
+        return !itemD || itemD <= toDate;
+      });
+    }
 
     if (q) {
       allItems = allItems.filter((item) => {

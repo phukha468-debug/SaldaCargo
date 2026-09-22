@@ -848,8 +848,14 @@ function GlobalArchiveView({
     summary: { total_count: number; total_amount: string };
   }>({
     queryKey: ['receivables-global-archive', selectedCpId, searchQuery, fromDate, toDate],
-    queryFn: () =>
-      fetch(`/api/receivables/archive?${queryParams.toString()}`).then((r) => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`/api/receivables/archive?${queryParams.toString()}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Ошибка загрузки архива');
+      }
+      return res.json();
+    },
     staleTime: 30000,
   });
 
