@@ -403,10 +403,6 @@
           >
             <i data-lucide="store" class="w-4 h-4"></i> 1. Профиль магазина и точка отгрузки
           </label>
-          <span
-            class="text-[11px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"
-            >Подача 700 ₽ • до 1.5 км бесплатно • далее 80 ₽/км</span
-          >
         </div>
 
         <!-- Плашка активного магазина-партнёра (для авторизованного магазина) -->
@@ -425,74 +421,6 @@
             <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
               ✓ Индивидуальный каталог ПРР
             </span>
-          </div>
-        </div>
-
-        <!-- 📄 ОФИЦИАЛЬНЫЙ ПРЕЙСКУРАНТ МАГАЗИНА «ЛАЙМ» (виден сразу при входе по PIN-коду) -->
-        <div
-          id="limeHeaderDocBanner"
-          class="hidden p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/40 shadow-lg"
-        >
-          <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <!-- Превью документа -->
-            <div
-              class="relative w-full sm:w-48 aspect-[297/210] rounded-lg overflow-hidden border border-emerald-500/40 cursor-pointer group shrink-0 shadow-md bg-slate-950 flex items-center justify-center"
-              onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Утверждённый прейскурант ПРР мебели — Магазин «Лайм»')"
-            >
-              <img
-                src="/tarify_prr_mebel_lime.png"
-                alt="Прейскурант ПРР мебели Магазин Лайм Верхняя Салда"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div
-                class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-[11px] font-bold backdrop-blur-[2px]"
-              >
-                <i data-lucide="zoom-in" class="w-4 h-4 text-emerald-400"></i>
-                <span>Увеличить</span>
-              </div>
-              <div
-                class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/85 text-[9px] font-mono text-emerald-400 border border-emerald-500/30"
-              >
-                🔍 Нажмите для просмотра
-              </div>
-            </div>
-
-            <!-- Текст + Кнопки -->
-            <div class="flex-1 space-y-1.5 w-full">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span
-                  class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"
-                >
-                  <i data-lucide="file-check" class="w-3 h-3 text-emerald-400"></i> Официальный прейскурант
-                </span>
-                <span class="text-[10px] font-mono text-slate-400">Для сотрудников и дирекции</span>
-              </div>
-              <h4 class="text-xs sm:text-sm font-black text-white">
-                Прейскурант поштучной оплаты подъёма мебели (22 позиции)
-              </h4>
-              <p class="text-[11px] text-slate-300 leading-snug">
-                Утверждённые расценки поэтажного подъёма с круглой печатью ИП Нигамедьянов А.С. и кодом в ATI.SU: 2811269. Все цены уже подключены к расчёту ниже.
-              </p>
-              <div class="flex items-center gap-2 pt-1 flex-wrap">
-                <button
-                  type="button"
-                  onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Утверждённый прейскурант ПРР мебели — Магазин «Лайм»')"
-                  class="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow"
-                >
-                  <i data-lucide="zoom-in" class="w-3.5 h-3.5 text-emerald-400"></i>
-                  <span>Увеличить фото (Превью)</span>
-                </button>
-                <a
-                  href="/tarify_prr_mebel_lime.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow"
-                >
-                  <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
-                  <span>Скачать оригинал PDF</span>
-                </a>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -603,16 +531,16 @@
 
       <div class="route-line w-full rounded-full"></div>
 
-      <!-- 2. АДРЕС ДОСТАВКИ И КАРТА ЯНДЕКС — НА ВСЮ ШИРИНУ ЭКРАНА (100% ШИРИНЫ!) -->
+      <!-- 2. АДРЕС ДОСТАВКИ -->
       <div class="theme-card rounded-2xl p-4 sm:p-5 space-y-3.5">
         <div class="flex items-center justify-between">
           <label
             class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5"
           >
-            <i data-lucide="map-pin" class="w-4 h-4"></i> 2. Адреса маршрута и карта
+            <i data-lucide="map-pin" class="w-4 h-4"></i> 2. Адрес доставки
           </label>
           <span id="routeStatus" class="text-[11px] font-bold text-slate-400"
-            >Введите адрес или укажите точку на карте</span
+            >Введите адрес в Салде или выберите кнопку ниже</span
           >
         </div>
 
@@ -816,39 +744,11 @@
           <option value="г. Нижняя Салда, ул. Ломоносова, "></option>
           <option value="г. Нижняя Салда, ул. Фрунзе, "></option>
         </datalist>
-
-        <!-- ПОЛНОРАЗМЕРНАЯ КАРТА НА ВСЮ ШИРИНУ (ВЫСОТА 460-500px, 100% ШИРИНЫ) -->
-        <div
-          class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-100 shadow-inner min-h-[380px]"
-        >
-          <div id="deliveryMap" class="w-full h-[380px] sm:h-[460px] lg:h-[500px]">
-            <div id="mapFallbackNotice" class="w-full h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
-              <div class="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mb-3"></div>
-              <span class="text-sm font-medium text-slate-300">Загрузка интерактивной карты...</span>
-              <span class="text-xs text-slate-500 mt-1">Определение маршрута и расчёт километров</span>
-            </div>
-          </div>
-
-          <!-- Плашка со статусом над картой -->
-          <div
-            class="map-hud absolute bottom-2.5 left-2.5 right-2.5 p-2.5 rounded-xl bg-slate-950/90 backdrop-blur-md border border-slate-800 flex items-center justify-between text-xs"
-          >
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span class="text-slate-300">Расстояние по дорогам:</span>
-              <strong class="font-mono text-brand-400 text-sm" id="distanceDisplay">3.5 км</strong>
-              <span class="text-slate-500 text-[11px] hidden sm:inline" id="durationDisplay"
-                >(~7 мин)</span
-              >
-            </div>
-            <span class="text-[10px] text-slate-400 font-mono hidden sm:inline"
-              >Кликните по карте для смены точки</span
-            >
-          </div>
-        </div>
       </div>
 
-      <!-- НИЖНЯЯ ЧАСТЬ: 2 КОЛОНКИ (ПРР + КОНТАКТЫ СЛЕВА, СМЕТА СПРАВА) -->
+      <div class="route-line w-full rounded-full"></div>
+
+      <!-- ОСНОВНОЙ РАБОЧИЙ БЛОК: ПРР, ДАТА, КОНТАКТЫ И ОФОРМЛЕНИЕ ЗАКАЗА (СВЕРХУ КАРТЫ!) -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <!-- ЛЕВАЯ КОЛОНКА: ПРР И КОНТАКТЫ (7 из 12) -->
         <div class="lg:col-span-7 space-y-5">
@@ -865,7 +765,7 @@
                 <button
                   type="button"
                   id="limeQuickPdfBtn"
-                  onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
+                  onclick="openLightbox('/tarify_prr_mebel_lime.png?v=20260923_v3', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
                   class="hidden text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg"
                 >
                   <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
@@ -893,66 +793,6 @@
             </div>
 
             <div id="loadersSettingsBlock" class="hidden space-y-4">
-              <!-- Карточка официального прейскуранта для Магазина «Лайм» (PDF + Увеличение фото) -->
-              <div id="limePriceDocCard" class="hidden p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900/90 to-slate-900/90 border border-emerald-500/30 space-y-3 shadow-lg">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="space-y-0.5">
-                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      <i data-lucide="file-check" class="w-3 h-3 text-emerald-400"></i> Прейскурант партнёра
-                    </span>
-                    <h4 class="text-xs sm:text-sm font-black text-white pt-1">Прейскурант ПРР мебели — Магазин «Лайм»</h4>
-                    <p class="text-[11px] text-slate-300 leading-snug">
-                      Официальные поштучные тарифы подъёма мебели на этаж (22 позиции) с круглой печатью ИП Нигамедьянов А.С. и кодом ATI.SU: 2811269.
-                    </p>
-                  </div>
-                  <span class="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-900/50 px-2 py-1 rounded border border-emerald-500/20 shrink-0">
-                    2026 г.
-                  </span>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                  <!-- Превью с эффектом зума -->
-                  <div class="sm:col-span-5 relative rounded-lg overflow-hidden bg-slate-950 border border-slate-700/80 cursor-pointer aspect-[297/210] flex items-center justify-center group shadow-md"
-                       onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')">
-                    <img src="/tarify_prr_mebel_lime.png" alt="Прейскурант ПРР мебели Магазин Лайм Верхняя Салда" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <div class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-[11px] font-bold backdrop-blur-[2px]">
-                      <i data-lucide="zoom-in" class="w-4 h-4 text-emerald-400"></i>
-                      <span>Увеличить фото</span>
-                    </div>
-                    <div class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/85 text-[9px] font-mono text-emerald-400 border border-emerald-500/30">
-                      🔍 Нажмите для просмотра
-                    </div>
-                  </div>
-
-                  <!-- Описание + Кнопки -->
-                  <div class="sm:col-span-7 flex flex-col justify-between space-y-2.5">
-                    <div class="text-[11px] text-slate-300 space-y-1">
-                      <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
-                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
-                        <span>Все 22 позиции настроены для автовыбора ниже</span>
-                      </div>
-                      <p class="text-[10px] text-slate-400 leading-relaxed">
-                        Нажмите «Увеличить» для просмотра на полный экран со старыми тарифами или скачайте оригинальный PDF-файл А4 для дирекции магазина.
-                      </p>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-2 pt-1">
-                      <button type="button"
-                              onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
-                              class="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
-                        <i data-lucide="zoom-in" class="w-3.5 h-3.5 text-emerald-400"></i>
-                        <span>Увеличить</span>
-                      </button>
-                      <a href="/tarify_prr_mebel_lime.pdf" target="_blank" rel="noopener noreferrer"
-                         class="flex-1 py-2 px-3 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
-                        <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
-                        <span>Скачать PDF</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <!-- ВЫБОР И ДОБАВЛЕНИЕ ПОЗИЦИЙ В СМЕТУ -->
               <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
                 <div class="flex items-center justify-between">
@@ -1569,6 +1409,116 @@
             >
               ⚠️ Заполните: адрес доставки, имя и телефон клиента
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="route-line w-full rounded-full"></div>
+
+      <!-- ИНТЕРАКТИВНАЯ КАРТА МАРШРУТА ЯНДЕКС (СНИЗУ РАБОЧЕГО БЛОКА) -->
+      <div class="theme-card rounded-2xl p-4 sm:p-5 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <label
+            class="text-xs font-black uppercase tracking-wider text-brand-400 flex items-center gap-1.5"
+          >
+            <i data-lucide="map" class="w-4 h-4"></i> Карта маршрута и километраж
+          </label>
+          <span class="text-[11px] font-bold text-slate-400"
+            >Кликните по карте для смены точки доставки</span
+          >
+        </div>
+
+        <div
+          class="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-100 shadow-inner min-h-[380px]"
+        >
+          <div id="deliveryMap" class="w-full h-[380px] sm:h-[460px] lg:h-[500px]">
+            <div id="mapFallbackNotice" class="w-full h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+              <div class="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mb-3"></div>
+              <span class="text-sm font-medium text-slate-300">Загрузка интерактивной карты...</span>
+              <span class="text-xs text-slate-500 mt-1">Определение маршрута и расчёт километров</span>
+            </div>
+          </div>
+
+          <!-- Плашка со статусом над картой -->
+          <div
+            class="map-hud absolute bottom-2.5 left-2.5 right-2.5 p-2.5 rounded-xl bg-slate-950/90 backdrop-blur-md border border-slate-800 flex items-center justify-between text-xs"
+          >
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="text-slate-300">Расстояние по дорогам:</span>
+              <strong class="font-mono text-brand-400 text-sm" id="distanceDisplay">3.5 км</strong>
+              <span class="text-slate-500 text-[11px] hidden sm:inline" id="durationDisplay"
+                >(~7 мин)</span
+              >
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono hidden sm:inline"
+              >Кликните по карте для смены точки</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 📄 ВТОРОСТЕПЕННЫЙ СПРАВОЧНЫЙ БЛОК: ОФИЦИАЛЬНЫЙ ПРЕЙСКУРАНТ МАГАЗИНА «ЛАЙМ» (СНИЗУ) -->
+      <div
+        id="limeFooterDocCard"
+        class="hidden theme-card rounded-2xl p-4 sm:p-5 border border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-slate-900/90 to-slate-900/90 shadow-xl space-y-4"
+      >
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <i data-lucide="file-check" class="w-3.5 h-3.5 text-emerald-400"></i> Официальный документ
+              </span>
+              <span class="text-[10px] font-mono text-slate-400">Для дирекции и сотрудников магазина</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-white">
+              Прейскурант поштучной оплаты подъёма мебели (Магазин «Лайм», 22 позиции)
+            </h3>
+            <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              Утверждённый прейскурант поэтажного подъёма с круглой печатью ИП Нигамедьянов А.С. и кодом в ATI.SU: <strong>2811269 (⭐ 5.0)</strong>. Все тарифы активны в расчёте выше.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              onclick="openLightbox('/tarify_prr_mebel_lime.png?v=20260923_v3', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
+              class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow"
+            >
+              <i data-lucide="zoom-in" class="w-4 h-4 text-emerald-400"></i>
+              <span>Увеличить фото (Превью)</span>
+            </button>
+            <a
+              href="/tarify_prr_mebel_lime.pdf?v=20260923_v3"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="px-4 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow"
+            >
+              <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+              <span>Скачать оригинал PDF</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Превью прейскуранта -->
+        <div
+          class="relative w-full max-w-3xl mx-auto aspect-[297/210] rounded-xl overflow-hidden border border-emerald-500/30 cursor-pointer group shadow-lg bg-slate-950 flex items-center justify-center"
+          onclick="openLightbox('/tarify_prr_mebel_lime.png?v=20260923_v3', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
+        >
+          <img
+            src="/tarify_prr_mebel_lime.png?v=20260923_v3"
+            alt="Прейскурант ПРР мебели Магазин Лайм Верхняя Салда"
+            class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+          />
+          <div
+            class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]"
+          >
+            <i data-lucide="zoom-in" class="w-5 h-5 text-emerald-400"></i>
+            <span>Нажмите для просмотра прейскуранта в полный экран</span>
+          </div>
+          <div
+            class="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/85 text-[10px] font-mono text-emerald-400 border border-emerald-500/30"
+          >
+            🔍 Увеличить на весь экран
           </div>
         </div>
       </div>
@@ -2731,16 +2681,11 @@
 
       function updatePartnerDocVisibility() {
         const isLime = currentStoreKey === 'mebel_angela';
-        const headerBanner = document.getElementById('limeHeaderDocBanner');
-        const limeCard = document.getElementById('limePriceDocCard');
+        const footerCard = document.getElementById('limeFooterDocCard');
         const quickBtn = document.getElementById('limeQuickPdfBtn');
-        if (headerBanner) {
-          if (isLime) headerBanner.classList.remove('hidden');
-          else headerBanner.classList.add('hidden');
-        }
-        if (limeCard) {
-          if (isLime) limeCard.classList.remove('hidden');
-          else limeCard.classList.add('hidden');
+        if (footerCard) {
+          if (isLime) footerCard.classList.remove('hidden');
+          else footerCard.classList.add('hidden');
         }
         if (quickBtn) {
           if (isLime) quickBtn.classList.remove('hidden');
@@ -4436,7 +4381,7 @@
           <p id="lightbox-caption" class="text-slate-300 text-xs sm:text-sm text-center font-medium flex-1"></p>
           <a
             id="lightbox-download-btn"
-            href="/tarify_prr_mebel_lime.pdf"
+            href="/tarify_prr_mebel_lime.pdf?v=20260923_v3"
             target="_blank"
             rel="noopener noreferrer"
             onclick="event.stopPropagation()"

@@ -197,26 +197,26 @@ def generate_html():
   table {{
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 14px;
   }}
   thead tr {{
     background: #1e293b;
   }}
   th {{
     color: #ffffff;
-    padding: 6px 10px;
+    padding: 7px 10px;
     text-align: left;
-    font-size: 11.5px;
-    font-weight: 800;
+    font-size: 12px;
+    font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.5px;
     border-bottom: 2px solid #ea580c;
   }}
   th.th-center, td.col-num, td.col-crew, td.col-price {{
     text-align: center;
   }}
   td {{
-    padding: 5.2px 10px;
+    padding: 5.5px 10px;
     border-bottom: 1px solid #e2e8f0;
     line-height: 1.25;
   }}
@@ -224,16 +224,16 @@ def generate_html():
     width: 28px;
     font-weight: 900;
     color: #64748b;
-    font-size: 12.5px;
+    font-size: 13px;
   }}
   .col-name {{
-    font-weight: 700;
-    color: #0f172a;
-    font-size: 13.5px;
-    letter-spacing: -0.2px;
+    font-weight: 800;
+    color: #090d16;
+    font-size: 15.5px;
+    letter-spacing: -0.3px;
   }}
   .col-crew {{
-    width: 84px;
+    width: 86px;
   }}
   .badge-crew-1 {{
     display: inline-block;
@@ -242,7 +242,7 @@ def generate_html():
     background: #e0f2fe;
     color: #0369a1;
     font-weight: 800;
-    font-size: 11.5px;
+    font-size: 12px;
   }}
   .badge-crew-2 {{
     display: inline-block;
@@ -251,15 +251,15 @@ def generate_html():
     background: #fef3c7;
     color: #b45309;
     font-weight: 800;
-    font-size: 11.5px;
+    font-size: 12px;
   }}
   .col-price {{
-    width: 90px;
+    width: 92px;
     font-weight: 900;
     color: #ea580c;
     background: #fff7ed;
-    font-size: 16px;
-    border-left: 1px solid #fed7aa;
+    font-size: 17.5px;
+    border-left: 1.5px solid #fed7aa;
   }}
 
   /* ПОДВАЛ */
@@ -268,8 +268,8 @@ def generate_html():
     justify-content: space-between;
     align-items: center;
     border-top: 2px solid #cbd5e1;
-    padding-top: 7px;
-    margin-top: 6px;
+    padding-top: 6px;
+    margin-top: 5px;
   }}
   .footer-left {{
     font-size: 11px;
@@ -384,7 +384,7 @@ def generate_html():
   <div class="footer">
     <div class="footer-left">
       <div>📞 Диспетчерская служба: <b>+7-963-0-501-501</b> &nbsp;•&nbsp; Сайт: <b>tk501.ru</b> &nbsp;•&nbsp; <b>ancargo66.ru</b></div>
-      <div class="footer-note">* Пронос мебели от машины до подъезда свыше 30 метров оплачивается как +1 этаж. Вывоз старой мебели: +1 000 ₽.</div>
+      <div class="footer-note">* Пронос мебели от машины до подъезда свыше 30 метров оплачивается как +1 этаж. Подъём осуществляется аккуратно опытными грузчиками.</div>
     </div>
     <div class="footer-right">
       <div class="sign-block">
