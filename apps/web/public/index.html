@@ -2150,36 +2150,58 @@
           </div>
 
           <!-- 🛗 ПРАВИЛА ПОДЪЁМА НА ЭТАЖ И ЛИФТОВ -->
-          <div class="p-4 sm:p-5 rounded-2xl theme-card border border-slate-800 bg-slate-900/60 text-xs text-slate-300 space-y-3">
-            <div class="flex items-center gap-2 text-brand-400 font-bold uppercase tracking-wider text-xs">
-              <i data-lucide="info" class="w-4 h-4 text-brand-400 shrink-0"></i>
+          <div class="p-4 sm:p-5 rounded-2xl theme-card border border-amber-500/30 space-y-3.5 shadow-sm" style="background: #ffffff !important; color: #171310 !important;">
+            <div class="flex items-center gap-2 font-black uppercase tracking-wider text-xs" style="color: #c2410c !important;">
+              <i data-lucide="info" class="w-4 h-4 shrink-0" style="color: #ea580c !important;"></i>
               <span>Поэтажный подъём (ПРР) и расчёт при наличии лифта:</span>
             </div>
-            <div class="grid sm:grid-cols-3 gap-3 text-xs leading-relaxed">
-              <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                <div class="font-bold text-white mb-1 flex items-center gap-1.5">
-                  <span>🚶 По Салде (без лифта):</span>
+            <div class="grid sm:grid-cols-3 gap-3.5 text-xs leading-relaxed">
+              
+              <!-- 1. Без лифта -->
+              <div class="p-3.5 rounded-xl border border-slate-300 shadow-sm flex flex-col justify-between" style="background: #f8fafc !important; color: #0f172a !important;">
+                <div>
+                  <div class="font-black text-sm mb-1.5 flex items-center gap-1.5" style="color: #0f172a !important;">
+                    <span>🚶 По Салде (без лифта):</span>
+                  </div>
+                  <p class="text-xs leading-normal" style="color: #334155 !important;">
+                    В Верхней Салде преимущественно дома без лифтов. Оплата подъёма рассчитывается <b style="color: #0f172a !important;">строго за каждый фактический этаж</b> заноса товара в квартиру.
+                  </p>
                 </div>
-                <p class="text-slate-400 text-[11px]">
-                  В Верхней Салде преимущественно дома без лифтов. Оплата подъёма рассчитывается <b>строго за каждый фактический этаж</b> заноса товара в квартиру.
-                </p>
-              </div>
-              <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/25">
-                <div class="font-bold text-emerald-300 mb-1 flex items-center gap-1.5">
-                  <span>🛗 Грузовой лифт = 1 этаж:</span>
+                <div class="mt-2.5 text-[11px] font-black" style="color: #c2410c !important;">
+                  Тариф × кол-во × этаж
                 </div>
-                <p class="text-slate-400 text-[11px]">
-                  При наличии и исправности грузового лифта подъём всего объёма заказа считается <strong class="text-emerald-300">как за 1 этаж</strong>, независимо от фактического этажа (хоть 5-й, хоть 9-й).
-                </p>
               </div>
-              <div class="p-3 rounded-xl bg-blue-950/30 border border-blue-500/25">
-                <div class="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
-                  <span>🚪 Пассажирский лифт:</span>
+
+              <!-- 2. Грузовой лифт -->
+              <div class="p-3.5 rounded-xl border border-emerald-300 shadow-sm flex flex-col justify-between" style="background: #f0fdf4 !important; color: #064e3b !important;">
+                <div>
+                  <div class="font-black text-sm mb-1.5 flex items-center gap-1.5" style="color: #14532d !important;">
+                    <span>🛗 Грузовой лифт = 1 этаж:</span>
+                  </div>
+                  <p class="text-xs leading-normal" style="color: #166534 !important;">
+                    При наличии и исправности грузового лифта подъём всего объёма заказа считается <b class="underline font-black" style="color: #14532d !important;">как за 1 этаж</b> независимо от фактического этажа (хоть 5-й, хоть 9-й).
+                  </p>
                 </div>
-                <p class="text-slate-400 text-[11px]">
-                  Товары, помещающиеся в пассажирский лифт, оплачиваются по ставке 1-го этажа. Негабарит и не входящие модули поднимаются вручную по этажам.
-                </p>
+                <div class="mt-2.5 text-[11px] font-black" style="color: #15803d !important;">
+                  ✓ Фиксированная ставка 1-го этажа
+                </div>
               </div>
+
+              <!-- 3. Пассажирский лифт -->
+              <div class="p-3.5 rounded-xl border border-blue-300 shadow-sm flex flex-col justify-between" style="background: #eff6ff !important; color: #1e3a8a !important;">
+                <div>
+                  <div class="font-black text-sm mb-1.5 flex items-center gap-1.5" style="color: #1e3a8a !important;">
+                    <span>🚪 Пассажирский лифт:</span>
+                  </div>
+                  <p class="text-xs leading-normal" style="color: #1e40af !important;">
+                    Товары, помещающиеся в пассажирский лифт, оплачиваются по ставке 1-го этажа. Негабарит и не входящие модули поднимаются вручную по этажам.
+                  </p>
+                </div>
+                <div class="mt-2.5 text-[11px] font-black" style="color: #1d4ed8 !important;">
+                  В лифт — 1 эт, негабарит — пешком
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

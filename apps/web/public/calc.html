@@ -428,6 +428,74 @@
           </div>
         </div>
 
+        <!-- 📄 ОФИЦИАЛЬНЫЙ ПРЕЙСКУРАНТ МАГАЗИНА «ЛАЙМ» (виден сразу при входе по PIN-коду) -->
+        <div
+          id="limeHeaderDocBanner"
+          class="hidden p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/40 shadow-lg"
+        >
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <!-- Превью документа -->
+            <div
+              class="relative w-full sm:w-48 aspect-[297/210] rounded-lg overflow-hidden border border-emerald-500/40 cursor-pointer group shrink-0 shadow-md bg-slate-950 flex items-center justify-center"
+              onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Утверждённый прейскурант ПРР мебели — Магазин «Лайм»')"
+            >
+              <img
+                src="/tarify_prr_mebel_lime.png"
+                alt="Прейскурант ПРР мебели Магазин Лайм Верхняя Салда"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div
+                class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-[11px] font-bold backdrop-blur-[2px]"
+              >
+                <i data-lucide="zoom-in" class="w-4 h-4 text-emerald-400"></i>
+                <span>Увеличить</span>
+              </div>
+              <div
+                class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/85 text-[9px] font-mono text-emerald-400 border border-emerald-500/30"
+              >
+                🔍 Нажмите для просмотра
+              </div>
+            </div>
+
+            <!-- Текст + Кнопки -->
+            <div class="flex-1 space-y-1.5 w-full">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span
+                  class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"
+                >
+                  <i data-lucide="file-check" class="w-3 h-3 text-emerald-400"></i> Официальный прейскурант
+                </span>
+                <span class="text-[10px] font-mono text-slate-400">Для сотрудников и дирекции</span>
+              </div>
+              <h4 class="text-xs sm:text-sm font-black text-white">
+                Прейскурант поштучной оплаты подъёма мебели (22 позиции)
+              </h4>
+              <p class="text-[11px] text-slate-300 leading-snug">
+                Утверждённые расценки поэтажного подъёма с круглой печатью ИП Нигамедьянов А.С. и кодом в ATI.SU: 2811269. Все цены уже подключены к расчёту ниже.
+              </p>
+              <div class="flex items-center gap-2 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Утверждённый прейскурант ПРР мебели — Магазин «Лайм»')"
+                  class="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow"
+                >
+                  <i data-lucide="zoom-in" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Увеличить фото (Превью)</span>
+                </button>
+                <a
+                  href="/tarify_prr_mebel_lime.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow"
+                >
+                  <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Скачать оригинал PDF</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 2 Базовые категории (видны только диспетчеру/админу) -->
         <div id="storeCategoryBlock" class="hidden grid-cols-1 sm:grid-cols-2 gap-2.5">
           <button
@@ -1844,6 +1912,8 @@
           calculateTotal();
         }
 
+        updatePartnerDocVisibility();
+
         // ДИНАМИЧЕСКАЯ БЕЗОПАСНАЯ ПОДГРУЗКА ЯНДЕКС.КАРТ
         loadYandexMapsDynamic(yandexKey || DEFAULT_YANDEX_KEY);
 
@@ -1858,6 +1928,8 @@
         localStorage.removeItem('salda_partner_cat');
         localStorage.removeItem('salda_yandex_key');
         onPinClear();
+        currentStoreKey = '';
+        updatePartnerDocVisibility();
         const modal = document.getElementById('pinModal');
         const appContainer = document.getElementById('mainAppContainer');
         if (modal) {
@@ -2659,8 +2731,13 @@
 
       function updatePartnerDocVisibility() {
         const isLime = currentStoreKey === 'mebel_angela';
+        const headerBanner = document.getElementById('limeHeaderDocBanner');
         const limeCard = document.getElementById('limePriceDocCard');
         const quickBtn = document.getElementById('limeQuickPdfBtn');
+        if (headerBanner) {
+          if (isLime) headerBanner.classList.remove('hidden');
+          else headerBanner.classList.add('hidden');
+        }
         if (limeCard) {
           if (isLime) limeCard.classList.remove('hidden');
           else limeCard.classList.add('hidden');
