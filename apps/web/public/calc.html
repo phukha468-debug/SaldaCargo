@@ -793,7 +793,18 @@
                 <i data-lucide="package" class="w-4 h-4"></i> 3. Погрузочно-разгрузочные работы
                 (ПРР)
               </label>
-              <span class="text-[11px] text-emerald-400 font-bold">Поштучный расчёт</span>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  id="limeQuickPdfBtn"
+                  onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
+                  class="hidden text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg"
+                >
+                  <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                  <span>Прейскурант Лайм (PDF)</span>
+                </button>
+                <span class="text-[11px] text-emerald-400 font-bold">Поштучный расчёт</span>
+              </div>
             </div>
 
             <div
@@ -814,6 +825,66 @@
             </div>
 
             <div id="loadersSettingsBlock" class="hidden space-y-4">
+              <!-- Карточка официального прейскуранта для Магазина «Лайм» (PDF + Увеличение фото) -->
+              <div id="limePriceDocCard" class="hidden p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900/90 to-slate-900/90 border border-emerald-500/30 space-y-3 shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="space-y-0.5">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <i data-lucide="file-check" class="w-3 h-3 text-emerald-400"></i> Прейскурант партнёра
+                    </span>
+                    <h4 class="text-xs sm:text-sm font-black text-white pt-1">Прейскурант ПРР мебели — Магазин «Лайм»</h4>
+                    <p class="text-[11px] text-slate-300 leading-snug">
+                      Утверждённые поштучные тарифы подъёма мебели (22 позиции) со сравнением со старыми ценами и круглой печатью ИП Нигамедьянов А.С.
+                    </p>
+                  </div>
+                  <span class="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-900/50 px-2 py-1 rounded border border-emerald-500/20 shrink-0">
+                    2026 г.
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  <!-- Превью с эффектом зума -->
+                  <div class="sm:col-span-5 relative rounded-lg overflow-hidden bg-slate-950 border border-slate-700/80 cursor-pointer aspect-[297/210] flex items-center justify-center group shadow-md"
+                       onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')">
+                    <img src="/tarify_prr_mebel_lime.png" alt="Прейскурант ПРР мебели Магазин Лайм Верхняя Салда" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-[11px] font-bold backdrop-blur-[2px]">
+                      <i data-lucide="zoom-in" class="w-4 h-4 text-emerald-400"></i>
+                      <span>Увеличить фото</span>
+                    </div>
+                    <div class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/85 text-[9px] font-mono text-emerald-400 border border-emerald-500/30">
+                      🔍 Нажмите для просмотра
+                    </div>
+                  </div>
+
+                  <!-- Описание + Кнопки -->
+                  <div class="sm:col-span-7 flex flex-col justify-between space-y-2.5">
+                    <div class="text-[11px] text-slate-300 space-y-1">
+                      <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+                        <span>Все 22 позиции настроены для автовыбора ниже</span>
+                      </div>
+                      <p class="text-[10px] text-slate-400 leading-relaxed">
+                        Нажмите «Увеличить» для просмотра на полный экран со старыми тарифами или скачайте оригинальный PDF-файл А4 для дирекции магазина.
+                      </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                      <button type="button"
+                              onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Официальный прейскурант ПРР мебели — Магазин «Лайм»')"
+                              class="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
+                        <i data-lucide="zoom-in" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <span>Увеличить</span>
+                      </button>
+                      <a href="/tarify_prr_mebel_lime.pdf" target="_blank" rel="noopener noreferrer"
+                         class="flex-1 py-2 px-3 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
+                        <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <span>Скачать PDF</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- ВЫБОР И ДОБАВЛЕНИЕ ПОЗИЦИЙ В СМЕТУ -->
               <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
                 <div class="flex items-center justify-between">
@@ -1945,53 +2016,53 @@
       };
 
       // 2.1 ИНДИВИДУАЛЬНЫЕ ПРАЙСЫ ПРР ДЛЯ МАГАЗИНОВ-ПАРТНЁРОВ
-            // ЕДИНЫЙ ПРАЙС-ЛИСТ МЕБЕЛИ (22 ПОЗИЦИИ)
+      // ЕДИНЫЙ ПРАЙС-ЛИСТ МЕБЕЛИ ДЛЯ МАГАЗИНА «ЛАЙМ» (22 ПОЗИЦИИ)
       const FURNITURE_CATALOG = [
         {
           group: 'Кухня и столовая',
           items: [
             { id: 'ang_kitch_up', name: 'Кухонный гарнитур — Верхний модуль', pricePerFloor: 100, requiresTwo: false, weightKg: 15, unit: 'секц', fitsElevator: true, carryOutPrice: 0 },
-            { id: 'ang_kitch_down', name: 'Кухонный гарнитур — Нижний модуль', pricePerFloor: 150, requiresTwo: false, weightKg: 25, unit: 'секц', fitsElevator: true, carryOutPrice: 150 },
+            { id: 'ang_kitch_down', name: 'Кухонный гарнитур — Нижний модуль', pricePerFloor: 120, requiresTwo: false, weightKg: 25, unit: 'секц', fitsElevator: true, carryOutPrice: 120 },
             { id: 'ang_table_top', name: 'Столешница', pricePerFloor: 200, requiresTwo: true, weightKg: 30, unit: 'шт', fitsElevator: false, carryOutPrice: 200 },
-            { id: 'ang_dining_zone', name: 'Обеденная зона', pricePerFloor: 300, requiresTwo: true, weightKg: 45, unit: 'компл', fitsElevator: true, carryOutPrice: 300 },
+            { id: 'ang_dining_zone', name: 'Обеденная зона', pricePerFloor: 250, requiresTwo: true, weightKg: 45, unit: 'компл', fitsElevator: true, carryOutPrice: 250 },
           ],
         },
         {
           group: 'Шкафы и комоды',
           items: [
-            { id: 'ang_shkaf_2_sborka', name: 'Шкаф 2-х дверный в сборе', pricePerFloor: 250, requiresTwo: true, weightKg: 65, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
-            { id: 'ang_shkaf_razbor', name: 'Шкаф в разборе', pricePerFloor: 250, requiresTwo: false, weightKg: 50, unit: 'компл', fitsElevator: true, carryOutPrice: 250 },
-            { id: 'ang_komod_small', name: 'Комод малый в сборе', pricePerFloor: 250, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 250 },
-            { id: 'ang_komod_big', name: 'Комод большой в сборе', pricePerFloor: 300, requiresTwo: true, weightKg: 55, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
-            { id: 'ang_prihozhaya_sborka', name: 'Прихожая в сборе', pricePerFloor: 250, requiresTwo: true, weightKg: 50, unit: 'модуль', fitsElevator: false, carryOutPrice: 250 },
+            { id: 'ang_shkaf_2_sborka', name: 'Шкаф 2-х дверный в сборе', pricePerFloor: 200, requiresTwo: true, weightKg: 65, unit: 'шт', fitsElevator: false, carryOutPrice: 200 },
+            { id: 'ang_shkaf_razbor', name: 'Шкаф в разборе', pricePerFloor: 200, requiresTwo: false, weightKg: 50, unit: 'компл', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_komod_small', name: 'Комод малый в сборе', pricePerFloor: 200, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_komod_big', name: 'Комод большой в сборе', pricePerFloor: 250, requiresTwo: true, weightKg: 55, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
+            { id: 'ang_prihozhaya_sborka', name: 'Прихожая в сборе', pricePerFloor: 200, requiresTwo: true, weightKg: 50, unit: 'модуль', fitsElevator: false, carryOutPrice: 200 },
             { id: 'ang_stenka_razbor', name: 'Стенка большая в разборе', pricePerFloor: 400, requiresTwo: true, weightKg: 100, unit: 'компл', fitsElevator: false, carryOutPrice: 400 },
           ],
         },
         {
           group: 'Кровати и спальня',
           items: [
-            { id: 'ang_bed_single', name: 'Кровать односпальная / серия КР-3', pricePerFloor: 200, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
-            { id: 'ang_bed_double', name: 'Кровать двуспальная / серии КР-16, КР-710, Кр-71', pricePerFloor: 250, requiresTwo: true, weightKg: 55, unit: 'шт', fitsElevator: true, carryOutPrice: 250 },
-            { id: 'ang_matras_small', name: 'Матрас малый (800–900 мм)', pricePerFloor: 200, requiresTwo: false, weightKg: 15, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
-            { id: 'ang_matras_big', name: 'Матрас большой (1400–1600 мм)', pricePerFloor: 300, requiresTwo: true, weightKg: 35, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+            { id: 'ang_bed_single', name: 'Кровать односпальная / серия КР-3', pricePerFloor: 150, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 150 },
+            { id: 'ang_bed_double', name: 'Кровать двуспальная / серии КР-16, КР-710, Кр-71', pricePerFloor: 200, requiresTwo: true, weightKg: 55, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_matras_small', name: 'Матрас малый (800–900 мм)', pricePerFloor: 150, requiresTwo: false, weightKg: 15, unit: 'шт', fitsElevator: true, carryOutPrice: 150 },
+            { id: 'ang_matras_big', name: 'Матрас большой (1400–1600 мм)', pricePerFloor: 250, requiresTwo: true, weightKg: 35, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
           ],
         },
         {
           group: 'Мягкая мебель',
           items: [
             { id: 'ang_kreslo_krovat', name: 'Кресло-кровать', pricePerFloor: 250, requiresTwo: true, weightKg: 45, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
-            { id: 'ang_kanape', name: 'Канапе', pricePerFloor: 400, requiresTwo: true, weightKg: 65, unit: 'шт', fitsElevator: false, carryOutPrice: 400 },
-            { id: 'ang_divan_standart', name: 'Диван прямой (стандартный 2-местный)', pricePerFloor: 400, requiresTwo: true, weightKg: 75, unit: 'шт', fitsElevator: false, carryOutPrice: 400 },
-            { id: 'ang_divan_ugol', name: 'Диван угловой', pricePerFloor: 450, requiresTwo: true, weightKg: 100, unit: 'шт', fitsElevator: false, carryOutPrice: 450 },
+            { id: 'ang_kanape', name: 'Канапе', pricePerFloor: 300, requiresTwo: true, weightKg: 65, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+            { id: 'ang_divan_standart', name: 'Диван прямой (стандартный 2-местный)', pricePerFloor: 300, requiresTwo: true, weightKg: 75, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+            { id: 'ang_divan_ugol', name: 'Диван угловой', pricePerFloor: 400, requiresTwo: true, weightKg: 100, unit: 'шт', fitsElevator: false, carryOutPrice: 400 },
             { id: 'ang_divan_3mest', name: 'Диван прямой 3-местный (тройной)', pricePerFloor: 500, requiresTwo: true, weightKg: 110, unit: 'шт', fitsElevator: false, carryOutPrice: 500 },
           ],
         },
         {
           group: 'Столы и тумбы',
           items: [
-            { id: 'ang_tumba_zhurn', name: 'Тумбы прикроватные / Столы журнальные', pricePerFloor: 200, requiresTwo: false, weightKg: 15, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
-            { id: 'ang_stol_komp_pryam', name: 'Стол компьютерный прямой', pricePerFloor: 250, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 250 },
-            { id: 'ang_stol_komp_ugol', name: 'Стол компьютерный угловой', pricePerFloor: 300, requiresTwo: true, weightKg: 45, unit: 'шт', fitsElevator: false, carryOutPrice: 300 },
+            { id: 'ang_tumba_zhurn', name: 'Тумбы прикроватные / Столы журнальные / стол-книжка', pricePerFloor: 150, requiresTwo: false, weightKg: 15, unit: 'шт', fitsElevator: true, carryOutPrice: 150 },
+            { id: 'ang_stol_komp_pryam', name: 'Стол компьютерный прямой', pricePerFloor: 200, requiresTwo: false, weightKg: 30, unit: 'шт', fitsElevator: true, carryOutPrice: 200 },
+            { id: 'ang_stol_komp_ugol', name: 'Стол компьютерный угловой', pricePerFloor: 250, requiresTwo: true, weightKg: 45, unit: 'шт', fitsElevator: false, carryOutPrice: 250 },
           ],
         },
       ];
@@ -2509,6 +2580,7 @@
 
         populateStoresDropdown();
         populateItemsDropdown();
+        updatePartnerDocVisibility();
         calculateTotal();
       }
 
@@ -2570,6 +2642,8 @@
           noPickupNotice?.classList.add('hidden');
         }
 
+        updatePartnerDocVisibility();
+
         currentStoreCoords = currentStore.coords;
         if (storePlacemark) {
           storePlacemark.geometry.setCoordinates(currentStoreCoords);
@@ -2581,6 +2655,23 @@
         }
         updateRouteAndDistance(currentStoreCoords, currentClientCoords);
         calculateTotal();
+      }
+
+      function updatePartnerDocVisibility() {
+        const isLime =
+          currentStoreKey === 'mebel_angela' ||
+          (currentMainCategory === 'furniture' &&
+            (!currentStoreKey || currentStoreKey === 'mebel_angela' || currentStoreKey.startsWith('custom_')));
+        const limeCard = document.getElementById('limePriceDocCard');
+        const quickBtn = document.getElementById('limeQuickPdfBtn');
+        if (limeCard) {
+          if (isLime) limeCard.classList.remove('hidden');
+          else limeCard.classList.add('hidden');
+        }
+        if (quickBtn) {
+          if (isLime) quickBtn.classList.remove('hidden');
+          else quickBtn.classList.add('hidden');
+        }
       }
 
       // 5. ПОЗИЦИОННЫЙ КАТАЛОГ ПРР
@@ -4215,7 +4306,73 @@
         if (window.lucide) lucide.createIcons();
       }
 
+      // Лайтбокс для просмотра прейскуранта / фото в высоком разрешении
+      function openLightbox(src, caption) {
+        const modal = document.getElementById('lightbox-modal');
+        const img = document.getElementById('lightbox-img');
+        const cap = document.getElementById('lightbox-caption');
+        if (!modal || !img) return;
+        img.src = src;
+        if (cap) cap.innerText = caption || '';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function closeLightbox() {
+        const modal = document.getElementById('lightbox-modal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeLightbox();
+      });
+
       window.addEventListener('DOMContentLoaded', init);
     </script>
+
+    <!-- Модальное окно Lightbox для полноразмерного просмотра документов и фото -->
+    <div
+      id="lightbox-modal"
+      class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden items-center justify-center p-3 sm:p-5"
+      onclick="closeLightbox()"
+    >
+      <div class="relative max-w-5xl max-h-[92vh] flex flex-col items-center">
+        <button
+          type="button"
+          onclick="closeLightbox()"
+          class="absolute -top-11 right-0 text-white hover:text-brand-400 p-2 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition"
+          aria-label="Закрыть"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+          <span>Закрыть (Esc)</span>
+        </button>
+        <img
+          id="lightbox-img"
+          src=""
+          alt="Увеличенный документ"
+          class="max-w-full max-h-[82vh] rounded-2xl object-contain shadow-2xl border border-slate-700 bg-slate-950"
+          onclick="event.stopPropagation()"
+        />
+        <div class="flex items-center justify-between w-full mt-3 px-3 gap-3 flex-wrap">
+          <p id="lightbox-caption" class="text-slate-300 text-xs sm:text-sm text-center font-medium flex-1"></p>
+          <a
+            id="lightbox-download-btn"
+            href="/tarify_prr_mebel_lime.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            onclick="event.stopPropagation()"
+            class="py-1.5 px-3 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition"
+          >
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Скачать оригинал PDF</span>
+          </a>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
