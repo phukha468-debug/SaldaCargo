@@ -577,7 +577,7 @@
             </button>
           </div>
 
-          <!-- Быстрые кнопки адресов в Салде -->
+          <!-- Быстрые кнопки адресов в Салде и направлений -->
           <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
             <span class="text-[10px] text-slate-500 font-bold uppercase mr-1">Быстро:</span>
             <button
@@ -603,17 +603,35 @@
             </button>
             <button
               type="button"
-              onclick="setQuickAddress('ул. Районная, 23')"
-              class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition"
+              onclick="setQuickAddress('г. Нижняя Салда (до плотины)')"
+              class="px-2 py-0.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/70 text-[11px] text-emerald-300 font-semibold transition"
+              title="г. Нижняя Салда до плотины — 1 500 ₽"
             >
-              ул. Районная, 23
+              Н. Салда (до плотины) 1 500 ₽
             </button>
             <button
               type="button"
-              onclick="setQuickAddress('г. Нижняя Салда, ул. Ленина, 1')"
-              class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition"
+              onclick="setQuickAddress('г. Нижняя Салда (после плотины)')"
+              class="px-2 py-0.5 rounded-lg bg-blue-950/40 hover:bg-blue-900/60 border border-blue-500/40 hover:border-blue-500/70 text-[11px] text-blue-300 font-semibold transition"
+              title="г. Нижняя Салда после плотины — 2 000 ₽"
             >
-              Нижняя Салда
+              Н. Салда (после плотины) 2 000 ₽
+            </button>
+            <button
+              type="button"
+              onclick="setQuickAddress('п. Басьяновский')"
+              class="px-2 py-0.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/40 hover:border-purple-500/70 text-[11px] text-purple-300 font-semibold transition"
+              title="п. Басьяновский — 5 000 ₽"
+            >
+              Басьяновский 5 000 ₽
+            </button>
+            <button
+              type="button"
+              onclick="setQuickAddress('п. Северный')"
+              class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition"
+              title="п. Северный — 1 000 ₽"
+            >
+              Северный 1 000 ₽
             </button>
           </div>
         </div>
@@ -712,7 +730,9 @@
           <option value="ул. Чехова, "></option>
           <option value="ул. Крупской, "></option>
           <option value="ул. Мира, "></option>
+          <option value="п. Басьяновский"></option>
           <option value="п. Басьяновский, "></option>
+          <option value="п. Северный"></option>
           <option value="п. Северный, "></option>
           <option value="п. Песчаный карьер, "></option>
           <option value="Сады №1"></option>
@@ -722,6 +742,8 @@
           <option value="Сады №5"></option>
           <option value="Сады №7"></option>
           <option value="Сады «Металлург»"></option>
+          <option value="г. Нижняя Салда (до плотины)"></option>
+          <option value="г. Нижняя Салда (после плотины)"></option>
           <option value="г. Нижняя Салда, ул. Ленина, "></option>
           <option value="г. Нижняя Салда, ул. Ломоносова, "></option>
           <option value="г. Нижняя Салда, ул. Фрунзе, "></option>
@@ -2278,7 +2300,10 @@
         крупской: [58.052, 60.574],
         мира: [58.0495, 60.572],
         басьяновский: [58.148, 60.83],
+        'п. басьяновский': [58.148, 60.83],
+        басьяновка: [58.148, 60.83],
         северный: [58.065, 60.585],
+        'п. северный': [58.065, 60.585],
         песчаный: [58.072, 60.54],
         'сады 1': [58.035, 60.535],
         'сады 2': [58.032, 60.53],
@@ -2287,7 +2312,19 @@
         'сады 5': [58.028, 60.545],
         'сады 7': [58.025, 60.55],
         металлург: [58.034, 60.528],
+        'г. нижняя салда (до плотины)': [58.0716, 60.705],
+        'нижняя салда (до плотины)': [58.0716, 60.705],
+        'нижняя салда до плотины': [58.0716, 60.705],
+        'нижняя салда до платины': [58.0716, 60.705],
+        'г. нижняя салда (после плотины)': [58.0714, 60.725],
+        'нижняя салда (после плотины)': [58.0714, 60.725],
+        'нижняя салда после плотины': [58.0714, 60.725],
+        'нижняя салда после платины': [58.0714, 60.725],
+        'нижняя салда за плотиной': [58.0714, 60.725],
         'нижняя салда': [58.0718, 60.7137],
+        'г. нижняя салда': [58.0718, 60.7137],
+        'нижний тагил': [57.919, 59.965],
+        'г. нижний тагил': [57.919, 59.965],
       };
 
       function roundUp100(val) {
@@ -2413,6 +2450,12 @@
             updateSubmitButtonState();
             const val = addrInput.value.trim();
             if (val.length >= 3) {
+              const fullLower = val.toLowerCase().trim();
+              if (SALDA_GEO_CACHE[fullLower]) {
+                clearTimeout(addrDebounceTimer);
+                moveClientPoint(SALDA_GEO_CACHE[fullLower]);
+                return;
+              }
               const norm = val.toLowerCase().replace(/^(г\.?|город)?\s*(верхняя\s+салда|нижняя\s+салда)[,\s]*/i, '').trim();
               if (SALDA_GEO_CACHE[norm]) {
                 clearTimeout(addrDebounceTimer);
@@ -2950,25 +2993,132 @@
         calculateTotal();
       }
 
+      // 6.9 ОПРЕДЕЛЕНИЕ ФИКСИРОВАННЫХ ТАРИФОВ ПО ЗОНАМ И НАПРАВЛЕНИЯМ (ПРАЙС-ЛИСТ ТК501)
+      function getSpecialDestinationTariff(addressText, coords, km) {
+        const text = (addressText || '').toLowerCase().trim();
+        const lat = coords ? coords[0] : 0;
+        const lon = coords ? coords[1] : 0;
+
+        // 1. Басьяновский (5 000 ₽)
+        if (text.includes('басьяновск') || text.includes('басьяновк') || (lat >= 58.12 && lon >= 60.75)) {
+          return {
+            name: 'п. Басьяновский (фикс)',
+            price: 5000,
+          };
+        }
+
+        // 2. Нижняя Салда: до плотины (1 500 ₽) или после плотины (2 000 ₽)
+        const isNSaldaText = (text.includes('нижн') && text.includes('салд')) || text.includes('н.салд') || text.includes('н. салд');
+        const isNSaldaAfterDamText = /после\s*пл[оа]тин|за\s*пл[оа]тин/i.test(text);
+        const isNSaldaBeforeDamText = /до\s*пл[оа]тин/i.test(text);
+
+        // Улицы Верхней Салды, которые ни при каких условиях не должны попадать в Нижнюю Салду
+        const isVSaldaOnly = text.includes('верхн') || text.includes('воронова') || text.includes('евстигнеева') || text.includes('устинова') || text.includes('спортивная') || text.includes('парковая');
+        const isNSaldaGeo = !isVSaldaOnly && (lat >= 58.04 && lat <= 58.11 && lon >= 60.67 && lon <= 60.78);
+
+        if (!isVSaldaOnly && (isNSaldaText || isNSaldaGeo || isNSaldaAfterDamText || isNSaldaBeforeDamText)) {
+          if (isNSaldaAfterDamText) {
+            return {
+              name: 'г. Нижняя Салда (после плотины)',
+              price: 2000,
+            };
+          }
+          if (isNSaldaBeforeDamText) {
+            return {
+              name: 'г. Нижняя Салда (до плотины)',
+              price: 1500,
+            };
+          }
+
+          // Автоопределение по координатам и улицам восточной части:
+          // Плотина Нижнесалдинского пруда на реке Салда: долгота ~60.713
+          const streetsAfterDam = ['ломоносова', 'луначарского', 'дзержинского', 'карла маркса', 'розы люксембург', 'труда', 'красноармейская', 'маяковского', 'кирова', 'парижской коммуны'];
+          const hasStreetAfterDam = streetsAfterDam.some((s) => text.includes(s));
+          const isEastOfDam = lon >= 60.7135 || km >= 16.8;
+
+          if (hasStreetAfterDam || isEastOfDam) {
+            return {
+              name: 'г. Нижняя Салда (после плотины)',
+              price: 2000,
+            };
+          } else {
+            return {
+              name: 'г. Нижняя Салда (до плотины)',
+              price: 1500,
+            };
+          }
+        }
+
+        // 3. Другие направления из официального прайса ТК501
+        if ((text.includes('северный') && !text.includes('северная')) || (lat >= 58.06 && lat <= 58.08 && lon >= 60.58 && lon <= 60.62)) {
+          return {
+            name: 'п. Северный (фикс)',
+            price: 1000,
+          };
+        }
+        if (text.includes('титанов') && text.includes('долин')) {
+          return {
+            name: 'Титановая Долина (фикс)',
+            price: 1200,
+          };
+        }
+        if (text.includes('свободный') || text.includes('никитино')) {
+          return {
+            name: text.includes('никитино') ? 'Никитино (фикс)' : 'п. Свободный (фикс)',
+            price: 2000,
+          };
+        }
+        if (text.includes('нелоба') || text.includes('покровск') || text.includes('шмаринск')) {
+          return {
+            name: text.includes('нелоба') ? 'Нелоба (фикс)' : text.includes('покровск') ? 'Покровское (фикс)' : 'Шмаринские дачи (фикс)',
+            price: 2500,
+          };
+        }
+        if (text.includes('акинфиево') || text.includes('медведево') || text.includes('песчаный') || text.includes('бобровка') || text.includes('тагильский кордон')) {
+          return {
+            name: 'Акинфиево / Медведево (фикс)',
+            price: 4000,
+          };
+        }
+        if ((text.includes('тагил') && !text.includes('тагильский кордон')) || (lat >= 57.85 && lat <= 57.98 && lon >= 59.85 && lon <= 60.15)) {
+          return {
+            name: 'г. Нижний Тагил (фикс)',
+            price: 5000,
+          };
+        }
+
+        return null;
+      }
+
       // 7. ПОЛНЫЙ РАСЧЁТ СТОИМОСТИ
       function calculateTotal() {
         const basePrice = currentStore.basePrice || 700;
         const kmPrice = currentStore.kmPrice || 80;
         const freeRadius = currentStore.freeRadius || 1.5;
 
-        // 1. Авто: Подача + километраж до клиента
+        // 1. Авто: Проверка специального тарифа по направлению/зоне или расчёт по километражу
+        const addrInput = document.getElementById('deliveryAddress')?.value || '';
+        const specialTariff = getSpecialDestinationTariff(addrInput, currentClientCoords, distanceKm);
+
         let carPrice = basePrice;
-        if (distanceKm > freeRadius) {
-          const extraKm = distanceKm - freeRadius;
-          carPrice = basePrice + extraKm * kmPrice;
+        let carPriceLabel = 'Машина (подача + км):';
+
+        if (specialTariff) {
+          carPrice = specialTariff.price;
+          carPriceLabel = `Машина (${specialTariff.name}):`;
+        } else {
+          if (distanceKm > freeRadius) {
+            const extraKm = distanceKm - freeRadius;
+            carPrice = basePrice + extraKm * kmPrice;
+          }
+          carPrice = roundUp100(carPrice);
         }
-        carPrice = roundUp100(carPrice);
 
         const breakdownCar = document.getElementById('breakdownCarPrice');
         const breakdownCarLabel = document.getElementById('breakdownCarLabel');
         if (breakdownCar) breakdownCar.innerText = `${carPrice.toLocaleString('ru-RU')} ₽`;
         if (breakdownCarLabel) {
-          breakdownCarLabel.innerText = 'Машина (подача + км):';
+          breakdownCarLabel.innerText = carPriceLabel;
         }
 
         // 2. Дополнительная услуга: Выбросить старую мебель (+1 000 ₽ фикс)
@@ -3522,6 +3672,14 @@
         document.getElementById('routeStatus').innerText = 'Поиск адреса в Верхней Салде...';
         document.getElementById('routeStatus').className = 'text-[11px] font-bold text-amber-400';
 
+        const fullLower = addr.toLowerCase().trim();
+        for (const [key, coords] of Object.entries(SALDA_GEO_CACHE)) {
+          if (fullLower === key || fullLower.startsWith(key + ' ') || fullLower.startsWith(key + ',') || fullLower.startsWith(key + '(')) {
+            moveClientPoint(coords);
+            return;
+          }
+        }
+
         const norm = addr
           .toLowerCase()
           .replace(/^(г\.?|город)?\s*(верхняя\s+салда|нижняя\s+салда)[,\s]*/i, '')
@@ -3534,8 +3692,12 @@
           }
         }
 
+        const isNSaldaQuery = /нижн(яя|ей)?\s*салд|н\.?\s*салд/i.test(addr);
+        const isBasyanQuery = /басьяновск|басьяновк/i.test(addr);
+        const cityPrefix = isBasyanQuery ? 'п. Басьяновский' : isNSaldaQuery ? 'Нижняя Салда' : 'Верхняя Салда';
+
         try {
-          const q = `Свердловская область, Верхняя Салда, ${addr}`;
+          const q = `Свердловская область, ${cityPrefix}, ${addr}`;
           const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ru&limit=5`;
           const resp = await fetch(url, { headers: { 'Accept-Language': 'ru' } });
           const results = await resp.json();
@@ -3544,7 +3706,11 @@
             const inBounds = results.find((r) => {
               const lat = parseFloat(r.lat);
               const lon = parseFloat(r.lon);
-              return lat >= 58.0 && lat <= 58.12 && lon >= 60.5 && lon <= 60.75;
+              return isBasyanQuery
+                ? lat >= 58.12 && lon >= 60.75
+                : isNSaldaQuery
+                  ? lat >= 58.04 && lat <= 58.11 && lon >= 60.67 && lon <= 60.78
+                  : lat >= 58.0 && lat <= 58.12 && lon >= 60.5 && lon <= 60.75;
             });
             const target = inBounds || results[0];
             moveClientPoint([parseFloat(target.lat), parseFloat(target.lon)]);
@@ -3554,7 +3720,7 @@
 
         if (ymaps && ymaps.geocode) {
           try {
-            const res = await ymaps.geocode(`Свердловская область, Верхняя Салда, ${addr}`);
+            const res = await ymaps.geocode(`Свердловская область, ${cityPrefix}, ${addr}`);
             const first = res.geoObjects.get(0);
             if (first) {
               moveClientPoint(first.geometry.getCoordinates());
@@ -3573,6 +3739,7 @@
         if (clientPlacemark) {
           clientPlacemark.geometry.setCoordinates(coords);
         }
+        calculateTotal();
         updateRouteAndDistance(currentStoreCoords, coords);
       }
 
