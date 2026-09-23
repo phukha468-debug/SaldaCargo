@@ -1967,7 +1967,7 @@
             <span>Внимание: Окончательный расчёт стоимости перевозки и рейсов согласовывается с диспетчером службы: <b>+7-963-0-<span class="text-amber-400 font-black">501</span>-<span class="text-amber-400 font-black">501</span></b></span>
           </div>
 
-          <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             
             <!-- Документ 1: Стандартная ГАЗель -->
             <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
@@ -2018,7 +2018,7 @@
             </div>
 
             <!-- Документ 3: Валдай 5т -->
-            <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
+            <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-brand-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md sm:col-span-2 lg:col-span-1">
               <div class="space-y-3">
                 <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_dostavka_valday.png', 'Прейскурант: Валдай / Fuso до 5 тонн')">
                   <img src="tarify_dostavka_valday.png" alt="Прейскурант Валдай 5т кузов 36 кубов Верхняя Салда" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
@@ -2037,30 +2037,6 @@
               </div>
               <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition">
                 <i data-lucide="download" class="w-4 h-4 text-purple-400"></i>
-                <span>Скачать PDF с печатью</span>
-              </a>
-            </div>
-
-            <!-- Документ 4: Магазин Лайм (Мебель: ПРР) -->
-            <div class="theme-card rounded-2xl p-4 border border-slate-800 hover:border-emerald-500/50 transition flex flex-col justify-between space-y-3.5 group shadow-md">
-              <div class="space-y-3">
-                <div class="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer aspect-[297/210] flex items-center justify-center shadow-inner" onclick="openLightbox('/tarify_prr_mebel_lime.png', 'Прейскурант: ПРР мебели — Магазин «Лайм»')">
-                  <img src="tarify_prr_mebel_lime.png" alt="Прейскурант ПРР мебели Магазин Лайм Верхняя Салда" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300">
-                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold backdrop-blur-[2px]">
-                    <i data-lucide="zoom-in" class="w-5 h-5 text-emerald-400"></i>
-                    <span>Увеличить фото</span>
-                  </div>
-                  <div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-emerald-400 border border-emerald-500/30">
-                    Нажмите для просмотра
-                  </div>
-                </div>
-                <div>
-                  <div class="text-sm font-black text-white group-hover:text-emerald-300 transition-colors">Тарифы: Магазин «Лайм»</div>
-                  <div class="text-[11px] text-slate-400 mt-1 leading-relaxed">Поштучные расценки ПРР и подъёма мебели (22 позиции) со сравнением цен и печатью</div>
-                </div>
-              </div>
-              <a href="/tarify_prr_mebel_lime.pdf" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition">
-                <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
                 <span>Скачать PDF с печатью</span>
               </a>
             </div>
@@ -2172,6 +2148,40 @@
               <span>Рассчитать переезд</span>
             </a>
           </div>
+
+          <!-- 🛗 ПРАВИЛА ПОДЪЁМА НА ЭТАЖ И ЛИФТОВ -->
+          <div class="p-4 sm:p-5 rounded-2xl theme-card border border-slate-800 bg-slate-900/60 text-xs text-slate-300 space-y-3">
+            <div class="flex items-center gap-2 text-brand-400 font-bold uppercase tracking-wider text-xs">
+              <i data-lucide="info" class="w-4 h-4 text-brand-400 shrink-0"></i>
+              <span>Поэтажный подъём (ПРР) и расчёт при наличии лифта:</span>
+            </div>
+            <div class="grid sm:grid-cols-3 gap-3 text-xs leading-relaxed">
+              <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                <div class="font-bold text-white mb-1 flex items-center gap-1.5">
+                  <span>🚶 По Салде (без лифта):</span>
+                </div>
+                <p class="text-slate-400 text-[11px]">
+                  В Верхней Салде преимущественно дома без лифтов. Оплата подъёма рассчитывается <b>строго за каждый фактический этаж</b> заноса товара в квартиру.
+                </p>
+              </div>
+              <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/25">
+                <div class="font-bold text-emerald-300 mb-1 flex items-center gap-1.5">
+                  <span>🛗 Грузовой лифт = 1 этаж:</span>
+                </div>
+                <p class="text-slate-400 text-[11px]">
+                  При наличии и исправности грузового лифта подъём всего объёма заказа считается <strong class="text-emerald-300">как за 1 этаж</strong>, независимо от фактического этажа (хоть 5-й, хоть 9-й).
+                </p>
+              </div>
+              <div class="p-3 rounded-xl bg-blue-950/30 border border-blue-500/25">
+                <div class="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
+                  <span>🚪 Пассажирский лифт:</span>
+                </div>
+                <p class="text-slate-400 text-[11px]">
+                  Товары, помещающиеся в пассажирский лифт, оплачиваются по ставке 1-го этажа. Негабарит и не входящие модули поднимаются вручную по этажам.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -2223,6 +2233,7 @@
               </div>
               <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">ИНН:</span><span class="font-mono font-bold text-white">660704814106</span></div>
               <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">ОГРНИП:</span><span class="font-mono font-bold text-white">321665800053976</span></div>
+              <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">Номер в ATI.SU:</span><a href="https://ati.su/firms/2811269/info" target="_blank" rel="noopener noreferrer" class="font-mono font-bold text-brand-400 hover:underline flex items-center gap-1.5"><span>Код 2811269</span><span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">⭐ 5.0</span></a></div>
               <div class="flex justify-between py-2 border-b border-slate-800/80"><span class="text-slate-400">Налогообложение:</span><span class="font-bold text-emerald-400">УСН (Без НДС)</span></div>
               <div class="py-2 border-b border-slate-800/80">
                 <span class="text-slate-400 block mb-0.5">Юридический адрес:</span>
@@ -2256,10 +2267,10 @@
               <div class="text-xs font-bold text-emerald-400">💳 Безнал (Без НДС)</div>
               <div class="text-[10px] text-slate-400 mt-0.5">Счета и закрывающие документы</div>
             </div>
-            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div class="text-xs font-bold text-brand-400">⭐ Биржа ATI.SU 5.0</div>
-              <div class="text-[10px] text-slate-400 mt-0.5">Паспорт и транспорт подтверждены</div>
-            </div>
+            <a href="https://ati.su/firms/2811269/info" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-brand-500/40 transition block group">
+              <div class="text-xs font-bold text-brand-400 group-hover:text-brand-300">⭐ Биржа ATI.SU (Код: 2811269)</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Рейтинг 5.0 • Паспорт и транспорт подтверждены</div>
+            </a>
           </div>
 
         </div>
@@ -2655,22 +2666,18 @@
       <!-- Ссылки на PDF -->
       <div class="space-y-2 pt-1">
         <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Официальные прайсы в PDF (скачать):</div>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+        <div class="grid sm:grid-cols-3 gap-2 text-xs">
           <a href="/tarify_dostavka_salda.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 flex items-center gap-2 text-slate-200 hover:text-blue-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
             <span class="truncate">ГАЗель до 3–4м (PDF)</span>
           </a>
           <a href="/tarify_dostavka_gazel_6m.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 flex items-center gap-2 text-slate-200 hover:text-indigo-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-indigo-400 flex-shrink-0"></i>
-            <span class="truncate">ГАЗель 6м (PDF)</span>
+            <span class="truncate">ГАЗель 6м длинномеры (PDF)</span>
           </a>
           <a href="/tarify_dostavka_valday.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/50 flex items-center gap-2 text-slate-200 hover:text-purple-300 transition">
             <i data-lucide="download" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
-            <span class="truncate">Валдай 5 тонн (PDF)</span>
-          </a>
-          <a href="/tarify_prr_mebel_lime.pdf" target="_blank" rel="noopener noreferrer" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 flex items-center gap-2 text-slate-200 hover:text-emerald-300 transition">
-            <i data-lucide="download" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-            <span class="truncate">Лайм мебель ПРР (PDF)</span>
+            <span class="truncate">Валдай до 5 тонн (PDF)</span>
           </a>
         </div>
       </div>
@@ -3005,6 +3012,7 @@
       const reqText = `ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ НИГАМЕДЬЯНОВ АЛЕКСАНДР СЕРГЕЕВИЧ
 ИНН: 660704814106
 ОГРНИП: 321665800053976
+Код в ATI.SU: 2811269 (рейтинг 5.0 ⭐)
 Система налогообложения: УСН (Без НДС)
 Юридический адрес: 624760, Россия, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22
 Email: uralavto707@mail.ru

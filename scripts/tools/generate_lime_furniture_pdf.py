@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Генерация официального PDF-прейскуранта и PNG-превью ПРР для мебельного магазина «ЛАЙМ»
+Генерация официального крупношрифтового PDF-прейскуранта и PNG-превью ПРР для мебельного магазина «ЛАЙМ»
 ТК501 (ИП Нигамедьянов А.С.)
+Убраны: старая цена, сравнение, лифт.
+Увеличен шрифт для максимальной читаемости превью без распечатки.
+Указан номер в АТИ.su: 2811269.
 """
 import os
 import fitz
@@ -11,33 +14,31 @@ pdf_filename = "apps/web/public/tarify_prr_mebel_lime.pdf"
 png_filename = "apps/web/public/tarify_prr_mebel_lime.png"
 
 items_data = [
-    # (№, Группа, Название, Старая цена, Новая цена, Экономия, Лифт)
-    (1, "Кухня", "Кухонный гарнитур — Верхний модуль", "100 ₽", "100 ₽", "Вынос 0 ₽", "В лифт"),
-    (2, "Кухня", "Кухонный гарнитур — Нижний модуль", "150 ₽", "120 ₽", "-30 ₽ (-20%)", "В лифт"),
-    (3, "Кухня", "Обеденная зона (стол + стулья)", "300 ₽", "250 ₽", "-50 ₽ (-17%)", "В лифт"),
-    (4, "Кухня", "Столешница кухонная", "200 ₽", "200 ₽", "Базовая ставка", "Пешком"),
+    # (№, Название, Новая цена, Грузчики)
+    (1, "Кухонный гарнитур — Верхний модуль", "100 ₽", "1 чел"),
+    (2, "Кухонный гарнитур — Нижний модуль", "120 ₽", "1 чел"),
+    (3, "Столешница кухонная", "200 ₽", "2 чел"),
+    (4, "Обеденная зона (стол + стулья)", "250 ₽", "2 чел"),
     
-    (5, "Шкафы", "Шкаф 2-х дверный в сборе", "250 ₽", "200 ₽", "-50 ₽ (-20%)", "Пешком"),
-    (6, "Шкафы", "Шкаф в разборе (комплект)", "250 ₽", "200 ₽", "-50 ₽ (-20%)", "В лифт"),
-    (7, "Шкафы", "Комод малый в сборе", "250 ₽", "200 ₽", "-50 ₽ (-20%)", "В лифт"),
-    (8, "Шкафы", "Комод большой в сборе", "300 ₽", "250 ₽", "-50 ₽ (-17%)", "Пешком"),
-    (9, "Шкафы", "Прихожая в сборе", "250 ₽", "200 ₽", "-50 ₽ (-20%)", "Пешком"),
-    (10, "Шкафы", "Стенка большая в разборе", "400 ₽", "400 ₽", "Спец. тариф", "Пешком"),
+    (5, "Шкаф 2-х дверный в сборе", "200 ₽", "2 чел"),
+    (6, "Шкаф в разборе (комплект)", "200 ₽", "1 чел"),
+    (7, "Комод малый в сборе", "200 ₽", "1 чел"),
+    (8, "Комод большой в сборе", "250 ₽", "2 чел"),
+    (9, "Прихожая в сборе", "200 ₽", "2 чел"),
+    (10, "Стенка большая в разборе", "400 ₽", "2 чел"),
+    (11, "Кровать 1-спальная (серия КР-3)", "150 ₽", "1 чел"),
     
-    (11, "Спальня", "Кровать односпальная (серия КР-3)", "200 ₽", "150 ₽", "-50 ₽ (-25%)", "В лифт"),
-    (12, "Спальня", "Кровать 2-спальная (КР-16, КР-710, Кр-71)", "250 ₽", "200 ₽", "-50 ₽ (-20%)", "В лифт"),
-    (13, "Спальня", "Матрас малый (800–900 мм)", "200 ₽", "150 ₽", "-50 ₽ (-25%)", "В лифт"),
-    (14, "Спальня", "Матрас большой (1400–1600 мм)", "300 ₽", "250 ₽", "-50 ₽ (-17%)", "Пешком"),
-    
-    (15, "Столы", "Тумбы, журнальные столы / стол-книжка", "200 ₽", "150 ₽", "-50 ₽ (-25%)", "В лифт"),
-    (16, "Столы", "Стол компьютерный прямой", "250 ₽", "200 ₽", "-50 ₽ (-20%)", "В лифт"),
-    (17, "Столы", "Стол компьютерный угловой", "300 ₽", "250 ₽", "-50 ₽ (-17%)", "Пешком"),
-    
-    (18, "Мягкая", "Кресло-кровать", "250 ₽", "250 ₽", "Базовая ставка", "Пешком"),
-    (19, "Мягкая", "Канапе", "400 ₽", "300 ₽", "-100 ₽ (-25%)", "Пешком"),
-    (20, "Мягкая", "Диван прямой (стандартный)", "400 ₽", "300 ₽", "-100 ₽ (-25%)", "Пешком"),
-    (21, "Мягкая", "Диван угловой", "450 ₽", "400 ₽", "-50 ₽ (-11%)", "Пешком"),
-    (22, "Мягкая", "Диван прямой 3-местный (тройной)", "500 ₽", "500 ₽", "Негабарит", "Пешком"),
+    (12, "Кровать 2-спальная (КР-16, КР-710, КР-71)", "200 ₽", "2 чел"),
+    (13, "Матрас малый (800–900 мм)", "150 ₽", "1 чел"),
+    (14, "Матрас большой (1400–1600 мм)", "250 ₽", "2 чел"),
+    (15, "Тумбы / столики журнальные / стол-книжка", "150 ₽", "1 чел"),
+    (16, "Стол компьютерный прямой", "200 ₽", "1 чел"),
+    (17, "Стол компьютерный угловой", "250 ₽", "2 чел"),
+    (18, "Кресло-кровать", "250 ₽", "2 чел"),
+    (19, "Канапе", "300 ₽", "2 чел"),
+    (20, "Диван прямой (стандартный 2-местный)", "300 ₽", "2 чел"),
+    (21, "Диван угловой", "400 ₽", "2 чел"),
+    (22, "Диван прямой 3-местный (тройной)", "500 ₽", "2 чел"),
 ]
 
 def generate_html():
@@ -48,19 +49,16 @@ def generate_html():
     def render_table_rows(items):
         html_rows = ""
         for i, it in enumerate(items):
-            num, grp, name, old_p, new_p, diff, lift = it
+            num, name, price, crew = it
             bg = "#ffffff" if i % 2 == 0 else "#f8fafc"
-            lift_badge = f'<span class="badge-lift-in">{lift}</span>' if lift == "В лифт" else f'<span class="badge-lift-out">{lift}</span>'
-            diff_color = "#16a34a" if diff.startswith("-") else "#64748b"
+            crew_badge = f'<span class="badge-crew-2">👥 {crew}</span>' if "2" in crew else f'<span class="badge-crew-1">👤 {crew}</span>'
             
             html_rows += f"""
             <tr style="background: {bg};">
               <td class="col-num">{num}</td>
               <td class="col-name">{name}</td>
-              <td class="col-old">{old_p}</td>
-              <td class="col-new">{new_p}</td>
-              <td class="col-diff" style="color: {diff_color}; font-weight: 700;">{diff}</td>
-              <td class="col-lift">{lift_badge}</td>
+              <td class="col-crew">{crew_badge}</td>
+              <td class="col-price">{price}</td>
             </tr>
             """
         return html_rows
@@ -76,7 +74,7 @@ def generate_html():
 <style>
   @page {{
     size: 297mm 210mm;
-    margin: 5mm 8mm 5mm 8mm;
+    margin: 6mm 10mm 6mm 10mm;
   }}
   * {{
     box-sizing: border-box;
@@ -87,8 +85,8 @@ def generate_html():
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: #0f172a;
     background: #ffffff;
-    width: 281mm;
-    height: 198mm;
+    width: 277mm;
+    height: 196mm;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -100,178 +98,168 @@ def generate_html():
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 2px solid #ea580c;
-    padding-bottom: 6px;
-    margin-bottom: 6px;
+    border-bottom: 3px solid #ea580c;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
   }}
   .logo-block {{
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }}
   .brand-title {{
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 900;
     letter-spacing: -0.5px;
     color: #0f172a;
-    line-height: 1.1;
+    line-height: 1.15;
   }}
   .brand-title span {{
     color: #ea580c;
   }}
   .brand-sub {{
-    font-size: 9.5px;
-    color: #64748b;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 11px;
+    color: #475569;
+    font-weight: 700;
+    margin-top: 2px;
+  }}
+  .ati-badge {{
+    display: inline-block;
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #86efac;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 800;
+    font-size: 10px;
+    margin-left: 6px;
   }}
   .partner-badge {{
     text-align: right;
     background: #fff7ed;
-    border: 1px solid #fdba74;
-    border-radius: 8px;
-    padding: 6px 12px;
+    border: 1.5px solid #ea580c;
+    border-radius: 10px;
+    padding: 6px 16px;
+    box-shadow: 0 2px 4px rgba(234, 88, 12, 0.08);
   }}
   .partner-title {{
-    font-size: 12.5px;
+    font-size: 15px;
     font-weight: 900;
     color: #c2410c;
+    letter-spacing: 0.2px;
   }}
   .partner-sub {{
-    font-size: 9.5px;
+    font-size: 11px;
     color: #7c2d12;
-    font-weight: 600;
+    font-weight: 700;
+    margin-top: 1px;
   }}
 
-  /* ЗАГОЛОВОК */
+  /* ЗАГОЛОВОК ДОКУМЕНТА */
   .doc-title-bar {{
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 6px;
-  }}
-  .doc-main-title {{
-    font-size: 13.5px;
-    font-weight: 900;
-    text-transform: uppercase;
-    color: #0f172a;
-    letter-spacing: 0.3px;
-  }}
-  .doc-desc {{
-    font-size: 10px;
-    color: #475569;
-    font-weight: 500;
-  }}
-
-  /* КАРТОЧКИ РЕГЛАМЕНТА ЛИФТОВ */
-  .rules-grid {{
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
+    align-items: center;
+    background: #0f172a;
+    color: #ffffff;
+    padding: 7px 14px;
+    border-radius: 8px;
     margin-bottom: 8px;
   }}
-  .rule-box {{
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 9.5px;
-    line-height: 1.25;
+  .doc-main-title {{
+    font-size: 15px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }}
-  .rule-box-cargo {{
-    background: #ecfdf5;
-    border: 1px solid #6ee7b7;
-    color: #065f46;
+  .doc-desc {{
+    font-size: 11.5px;
+    color: #cbd5e1;
+    font-weight: 600;
   }}
-  .rule-box-pass {{
-    background: #eff6ff;
-    border: 1px solid #93c5fd;
-    color: #1e40af;
-  }}
-  .rule-box-stairs {{
-    background: #faf5ff;
-    border: 1px solid #d8b4fe;
-    color: #6b21a8;
-  }}
-  .rule-box b {{
-    font-weight: 800;
+  .doc-desc b {{
+    color: #fba94b;
   }}
 
-  /* ОСНОВНАЯ ТАБЛИЦА (2 КОЛОНКИ СТОРОНА К СТОРОНЕ) */
+  /* ОСНОВНАЯ ТАБЛИЦА (2 КРУПНЫЕ КОЛОНКИ СТОРОНА К СТОРОНЕ) */
   .tables-container {{
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    flex-grow: 1;
+    gap: 14px;
+    margin-bottom: auto;
+  }}
+  .table-box {{
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
   }}
   table {{
     width: 100%;
     border-collapse: collapse;
-    font-size: 9px;
+    font-size: 13px;
+  }}
+  thead tr {{
+    background: #1e293b;
   }}
   th {{
-    background: #0f172a;
     color: #ffffff;
-    padding: 4px 6px;
+    padding: 6px 10px;
     text-align: left;
-    font-size: 8.5px;
-    font-weight: 700;
+    font-size: 11.5px;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.4px;
+    border-bottom: 2px solid #ea580c;
   }}
-  th.th-center, td.col-num, td.col-old, td.col-new, td.col-diff, td.col-lift {{
+  th.th-center, td.col-num, td.col-crew, td.col-price {{
     text-align: center;
   }}
   td {{
-    padding: 3.5px 6px;
+    padding: 5.2px 10px;
     border-bottom: 1px solid #e2e8f0;
-    line-height: 1.2;
+    line-height: 1.25;
   }}
   .col-num {{
-    width: 18px;
-    font-weight: 800;
-    color: #94a3b8;
+    width: 28px;
+    font-weight: 900;
+    color: #64748b;
+    font-size: 12.5px;
   }}
   .col-name {{
-    font-weight: 600;
-    color: #1e293b;
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 13.5px;
+    letter-spacing: -0.2px;
   }}
-  .col-old {{
-    width: 48px;
-    color: #94a3b8;
-    text-decoration: line-through;
-    font-weight: 500;
+  .col-crew {{
+    width: 84px;
   }}
-  .col-new {{
-    width: 52px;
+  .badge-crew-1 {{
+    display: inline-block;
+    padding: 2.5px 8px;
+    border-radius: 6px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 800;
+    font-size: 11.5px;
+  }}
+  .badge-crew-2 {{
+    display: inline-block;
+    padding: 2.5px 8px;
+    border-radius: 6px;
+    background: #fef3c7;
+    color: #b45309;
+    font-weight: 800;
+    font-size: 11.5px;
+  }}
+  .col-price {{
+    width: 90px;
     font-weight: 900;
     color: #ea580c;
     background: #fff7ed;
-    font-size: 10px;
-  }}
-  .col-diff {{
-    width: 76px;
-    font-size: 8.5px;
-  }}
-  .col-lift {{
-    width: 56px;
-  }}
-  .badge-lift-in {{
-    display: inline-block;
-    padding: 1px 4px;
-    border-radius: 4px;
-    background: #dcfce7;
-    color: #15803d;
-    font-weight: 800;
-    font-size: 8px;
-  }}
-  .badge-lift-out {{
-    display: inline-block;
-    padding: 1px 4px;
-    border-radius: 4px;
-    background: #f1f5f9;
-    color: #64748b;
-    font-weight: 700;
-    font-size: 8px;
+    font-size: 16px;
+    border-left: 1px solid #fed7aa;
   }}
 
   /* ПОДВАЛ */
@@ -279,47 +267,54 @@ def generate_html():
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid #cbd5e1;
-    padding-top: 5px;
+    border-top: 2px solid #cbd5e1;
+    padding-top: 7px;
     margin-top: 6px;
   }}
   .footer-left {{
-    font-size: 9px;
-    color: #475569;
-    line-height: 1.3;
+    font-size: 11px;
+    color: #334155;
+    line-height: 1.4;
   }}
   .footer-left b {{
     color: #0f172a;
   }}
+  .footer-note {{
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 2px;
+  }}
   .footer-right {{
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 22px;
   }}
   .sign-block {{
-    font-size: 9px;
-    color: #334155;
-    line-height: 1.25;
+    font-size: 11px;
+    color: #1e293b;
+    line-height: 1.35;
   }}
   .sign-line {{
     display: inline-block;
-    width: 80px;
-    border-bottom: 1px solid #0f172a;
+    width: 90px;
+    border-bottom: 1.5px solid #0f172a;
     margin: 0 4px;
   }}
   .stamp-box {{
-    width: 48px;
-    height: 48px;
-    border: 1.5px dashed #0284c7;
+    width: 54px;
+    height: 54px;
+    border: 2px dashed #0284c7;
     border-radius: 50%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 7px;
+    font-size: 8px;
     color: #0284c7;
     font-weight: 900;
     text-transform: uppercase;
+    background: #f0f9ff;
   }}
 </style>
 </head>
@@ -330,7 +325,10 @@ def generate_html():
     <div class="logo-block">
       <div>
         <div class="brand-title">ТК<span>501</span> &nbsp;|&nbsp; СЛУЖБА ДОСТАВКИ И ПРР</div>
-        <div class="brand-sub">ИП Нигамедьянов А.С. • ИНН 660702652150 • ОГРНИП 324665800043812 • г. Верхняя Салда</div>
+        <div class="brand-sub">
+          ИП Нигамедьянов А.С. • ОГРНИП 321665800053976 • ИНН 660704814106 • г. Верхняя Салда
+          <span class="ati-badge">ATI.SU: 2811269 ⭐ 5.0</span>
+        </div>
       </div>
     </div>
     <div class="partner-badge">
@@ -342,64 +340,51 @@ def generate_html():
   <!-- ЗАГОЛОВОК ДОКУМЕНТА -->
   <div class="doc-title-bar">
     <div class="doc-main-title">Прейскурант поштучной оплаты подъёма мебели на этаж (ПРР)</div>
-    <div class="doc-desc">Утверждено для интеграции в онлайн-калькулятор доставки <b>tk501.ru/calc.html</b></div>
+    <div class="doc-desc">Тариф за <b>1 этаж</b> заноса • В калькуляторе: <b>tk501.ru/calc.html</b></div>
   </div>
 
-  <!-- РЕГЛАМЕНТ ЛИФТОВ -->
-  <div class="rules-grid">
-    <div class="rule-box rule-box-cargo">
-      🛗 <b>Грузовой лифт:</b> Подъём всего заказа считается <b>как за 1 этаж</b> независимо от фактического этажа!
-    </div>
-    <div class="rule-box rule-box-pass">
-      🚪 <b>Пассажирский лифт:</b> Позиции со статусом «В лифт» (до 200 ₽) — как 1 этаж; негабарит/диваны — пешком.
-    </div>
-    <div class="rule-box rule-box-stairs">
-      🚶 <b>Без лифта:</b> Оплата строго по позиции &times; количество &times; номер фактического этажа заноса.
-    </div>
-  </div>
-
-  <!-- ТАБЛИЦА В ДВЕ КОЛОНКИ ДЛЯ ИДЕАЛЬНОЙ ЧИТАЕМОСТИ -->
+  <!-- ТАБЛИЦА В ДВЕ КОЛОНКИ С КРУПНЫМ ШРИФТОМ -->
   <div class="tables-container">
-    <!-- Левая колонка -->
-    <table>
-      <thead>
-        <tr>
-          <th class="th-center">№</th>
-          <th>Наименование мебели</th>
-          <th class="th-center">Старая</th>
-          <th class="th-center">Тариф Лайм</th>
-          <th class="th-center">Сравнение</th>
-          <th class="th-center">Лифт</th>
-        </tr>
-      </thead>
-      <tbody>
-        {left_rows_html}
-      </tbody>
-    </table>
+    <!-- Левая колонка (позиции 1-11) -->
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-center">№</th>
+            <th>Наименование мебели</th>
+            <th class="th-center">Состав</th>
+            <th class="th-center">Тариф / эт</th>
+          </tr>
+        </thead>
+        <tbody>
+          {left_rows_html}
+        </tbody>
+      </table>
+    </div>
 
-    <!-- Правая колонка -->
-    <table>
-      <thead>
-        <tr>
-          <th class="th-center">№</th>
-          <th>Наименование мебели</th>
-          <th class="th-center">Старая</th>
-          <th class="th-center">Тариф Лайм</th>
-          <th class="th-center">Сравнение</th>
-          <th class="th-center">Лифт</th>
-        </tr>
-      </thead>
-      <tbody>
-        {right_rows_html}
-      </tbody>
-    </table>
+    <!-- Правая колонка (позиции 12-22) -->
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-center">№</th>
+            <th>Наименование мебели</th>
+            <th class="th-center">Состав</th>
+            <th class="th-center">Тариф / эт</th>
+          </tr>
+        </thead>
+        <tbody>
+          {right_rows_html}
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- ПОДВАЛ -->
   <div class="footer">
     <div class="footer-left">
-      <div>📞 Диспетчерская служба: <b>+7-963-0-501-501</b> &nbsp;•&nbsp; Сайт: <b>tk501.ru</b> / <b>ancargo66.ru</b></div>
-      <div style="font-size: 8px; color: #64748b; margin-top: 2px;">* Пронос мебели от машины до подъезда свыше 30 метров оплачивается дополнительно как +1 этаж. Вывоз старой мебели: +1 000 ₽.</div>
+      <div>📞 Диспетчерская служба: <b>+7-963-0-501-501</b> &nbsp;•&nbsp; Сайт: <b>tk501.ru</b> &nbsp;•&nbsp; <b>ancargo66.ru</b></div>
+      <div class="footer-note">* Пронос мебели от машины до подъезда свыше 30 метров оплачивается как +1 этаж. Вывоз старой мебели: +1 000 ₽.</div>
     </div>
     <div class="footer-right">
       <div class="sign-block">
@@ -412,7 +397,7 @@ def generate_html():
       </div>
       <div class="stamp-box">
         <div>М. П.</div>
-        <div style="font-size: 6px;">ТК501</div>
+        <div style="font-size: 7px; color: #0369a1;">ТК501</div>
       </div>
     </div>
   </div>
@@ -439,7 +424,7 @@ def main():
             format="A4",
             landscape=True,
             print_background=True,
-            margin={"top": "5mm", "bottom": "5mm", "left": "8mm", "right": "8mm"}
+            margin={"top": "6mm", "bottom": "6mm", "left": "10mm", "right": "10mm"}
         )
         
         if os.path.exists(temp_html):
@@ -448,7 +433,7 @@ def main():
         # Render high-resolution preview image (.png)
         doc = fitz.open(pdf_filename)
         print(f"Generated PDF: {pdf_filename}, pages: {len(doc)}, size: {os.path.getsize(pdf_filename)} bytes")
-        pix = doc[0].get_pixmap(dpi=175)
+        pix = doc[0].get_pixmap(dpi=185)
         pix.save(png_filename)
         print(f"Generated Image Preview: {png_filename}, size: {os.path.getsize(png_filename)} bytes")
             

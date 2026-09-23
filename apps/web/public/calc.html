@@ -834,7 +834,7 @@
                     </span>
                     <h4 class="text-xs sm:text-sm font-black text-white pt-1">Прейскурант ПРР мебели — Магазин «Лайм»</h4>
                     <p class="text-[11px] text-slate-300 leading-snug">
-                      Утверждённые поштучные тарифы подъёма мебели (22 позиции) со сравнением со старыми ценами и круглой печатью ИП Нигамедьянов А.С.
+                      Официальные поштучные тарифы подъёма мебели на этаж (22 позиции) с круглой печатью ИП Нигамедьянов А.С. и кодом ATI.SU: 2811269.
                     </p>
                   </div>
                   <span class="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-900/50 px-2 py-1 rounded border border-emerald-500/20 shrink-0">
@@ -2658,10 +2658,7 @@
       }
 
       function updatePartnerDocVisibility() {
-        const isLime =
-          currentStoreKey === 'mebel_angela' ||
-          (currentMainCategory === 'furniture' &&
-            (!currentStoreKey || currentStoreKey === 'mebel_angela' || currentStoreKey.startsWith('custom_')));
+        const isLime = currentStoreKey === 'mebel_angela';
         const limeCard = document.getElementById('limePriceDocCard');
         const quickBtn = document.getElementById('limeQuickPdfBtn');
         if (limeCard) {
