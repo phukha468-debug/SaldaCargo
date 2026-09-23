@@ -514,7 +514,7 @@
                 <input
                   type="number"
                   id="customKmPrice"
-                  value="80"
+                  value="90"
                   class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
                 />
               </div>
@@ -524,7 +524,7 @@
                   type="number"
                   step="0.1"
                   id="customRadius"
-                  value="1.5"
+                  value="1.2"
                   class="w-full bg-slate-100 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
                 />
               </div>
@@ -1867,8 +1867,8 @@
           address: 'г. Верхняя Салда, ул. Рабочей Молодёжи, 41',
           coords: [58.04036, 60.53966],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'build',
           hasPickupCarry: false,
         },
@@ -1877,8 +1877,8 @@
           address: 'г. Верхняя Салда, ул. Спортивная, 2, корп. 7',
           coords: [58.05236, 60.58412],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'build',
           hasPickupCarry: false,
         },
@@ -1887,8 +1887,8 @@
           address: 'г. Верхняя Салда, ул. 25 Октября, 3',
           coords: [58.05393, 60.54575],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'build',
           hasPickupCarry: true,
         },
@@ -1897,8 +1897,8 @@
           address: 'г. Верхняя Салда',
           coords: [58.04036, 60.53966],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'build',
           hasPickupCarry: true,
         },
@@ -1907,8 +1907,8 @@
           address: 'г. Верхняя Салда, ул. Энгельса, 87, корп. 1',
           coords: [58.04838, 60.5803],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'furniture',
           hasPickupCarry: true,
         },
@@ -1917,8 +1917,8 @@
           address: 'г. Верхняя Салда, ул. Парковая, 5, корп. 1',
           coords: [58.05525, 60.55718],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'furniture',
           hasPickupCarry: true,
         },
@@ -1927,8 +1927,8 @@
           address: 'г. Верхняя Салда, ул. Воронова, 4, корп. 1',
           coords: [58.05073, 60.57737],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'furniture',
           hasPickupCarry: true,
         },
@@ -1937,8 +1937,8 @@
           address: 'г. Верхняя Салда',
           coords: [58.04838, 60.5803],
           basePrice: 700,
-          kmPrice: 80,
-          freeRadius: 1.5,
+          kmPrice: 90,
+          freeRadius: 1.2,
           category: 'furniture',
           hasPickupCarry: true,
         },
@@ -2552,8 +2552,8 @@
             coords:
               currentMainCategory === 'build' ? STORES.tiles.coords : STORES.mebel_angela.coords,
             basePrice: parseFloat(document.getElementById('customBasePrice')?.value) || 700,
-            kmPrice: parseFloat(document.getElementById('customKmPrice')?.value) || 80,
-            freeRadius: parseFloat(document.getElementById('customRadius')?.value) || 1.5,
+            kmPrice: parseFloat(document.getElementById('customKmPrice')?.value) || 90,
+            freeRadius: parseFloat(document.getElementById('customRadius')?.value) || 1.2,
             category: currentMainCategory,
             hasPickupCarry: true,
           };
@@ -3093,10 +3093,10 @@
       // 7. ПОЛНЫЙ РАСЧЁТ СТОИМОСТИ
       function calculateTotal() {
         const basePrice = currentStore.basePrice || 700;
-        const kmPrice = currentStore.kmPrice || 80;
-        const freeRadius = currentStore.freeRadius || 1.5;
+        const kmPrice = currentStore.kmPrice || 90;
+        const freeRadius = currentStore.freeRadius || 1.2;
 
-        // 1. Авто: Проверка специального тарифа по направлению/зоне или расчёт по километражу
+        // 1. Авто: Проверка специального тарифа по направлению/зоне или расчёт по зонам километража
         const addrInput = document.getElementById('deliveryAddress')?.value || '';
         const specialTariff = getSpecialDestinationTariff(addrInput, currentClientCoords, distanceKm);
 
@@ -3107,11 +3107,29 @@
           carPrice = specialTariff.price;
           carPriceLabel = `Машина (${specialTariff.name}):`;
         } else {
-          if (distanceKm > freeRadius) {
-            const extraKm = distanceKm - freeRadius;
-            carPrice = basePrice + extraKm * kmPrice;
+          // ТАРИФНАЯ СЕТКА:
+          // 1) 1.2 км вокруг магазина = 700 ₽
+          // 2) 3 км от радиуса магазина (до 4.2 км) = 1 000 ₽
+          // 3) Дальше чем 4.2 км от магазина = 1 000 ₽ + 90 ₽/км (до 200 км)
+          // 4) При выезде за зону 200 км тариф падает до 80 ₽/км
+          if (distanceKm <= 1.2) {
+            carPrice = basePrice;
+            carPriceLabel = 'Машина (до 1.2 км):';
+          } else if (distanceKm <= 4.2) {
+            carPrice = 1000;
+            carPriceLabel = 'Машина (до 4.2 км):';
+          } else if (distanceKm <= 200) {
+            const extraKm = distanceKm - 4.2;
+            carPrice = 1000 + extraKm * kmPrice;
+            carPrice = roundUp100(carPrice);
+            carPriceLabel = 'Машина (1 000 ₽ + 90 ₽/км):';
+          } else {
+            const kmUnder200 = 200 - 4.2;
+            const extraKmOver200 = distanceKm - 200;
+            carPrice = 1000 + kmUnder200 * kmPrice + extraKmOver200 * 80;
+            carPrice = roundUp100(carPrice);
+            carPriceLabel = 'Машина (межгород >200 км: 80 ₽/км):';
           }
-          carPrice = roundUp100(carPrice);
         }
 
         const breakdownCar = document.getElementById('breakdownCarPrice');
