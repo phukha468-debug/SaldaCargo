@@ -375,12 +375,17 @@ const emptyForm = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+function fmtDate(s: string | null | undefined) {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return '—';
+  }
 }
 function moneyVal(s: string | null | undefined): number {
   return parseFloat(s ?? '0');
@@ -7038,8 +7043,9 @@ function MaintenanceSection() {
     asset_id: '',
     work_name: '',
     interval_km: '',
-    interval_months: '',
+    interval_months: '6',
     last_done_km: '',
+    last_done_at: todayStr(),
   });
 
   const { data: assets = [] } = useQuery<Asset[]>({
@@ -7069,8 +7075,9 @@ function MaintenanceSection() {
         asset_id: '',
         work_name: '',
         interval_km: '',
-        interval_months: '',
+        interval_months: '6',
         last_done_km: '',
+        last_done_at: todayStr(),
       });
     },
   });
@@ -7123,7 +7130,7 @@ function MaintenanceSection() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Регламенты ТО</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            Плановое техническое обслуживание и контроль сроков
+            Плановое техническое обслуживание и контроль сроков по дате и пробегу
           </p>
         </div>
         <button
@@ -7147,7 +7154,9 @@ function MaintenanceSection() {
                     <div>
                       <div className="font-semibold text-slate-900 text-sm">{asset.short_name}</div>
                       <div className="text-xs text-slate-400">
-                        {asset.odometer_current?.toLocaleString('ru-RU') ?? '—'} км
+                        {asset.odometer_current
+                          ? `${asset.odometer_current.toLocaleString('ru-RU')} км`
+                          : 'Одометр не указан'}
                       </div>
                     </div>
                     {overdue > 0 ? (
@@ -7179,23 +7188,38 @@ function MaintenanceSection() {
 
       {showCreate && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto"
           onClick={() => setShowCreate(false)}
         >
           <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-6 my-8"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-bold text-slate-900 mb-4">Новый регламент ТО</h2>
-            <div className="space-y-3">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">
+                <h2 className="text-base font-bold text-slate-900">Новый регламент ТО</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Контроль срока по дате и/или пробегу
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
                   Автомобиль *
                 </label>
                 <select
                   value={createForm.asset_id}
                   onChange={(e) => setCreateForm({ ...createForm, asset_id: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
                   <option value="">— Выберите —</option>
                   {assets.map((a) => (
@@ -7205,86 +7229,184 @@ function MaintenanceSection() {
                   ))}
                 </select>
               </div>
+
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
                   Вид работы *
                 </label>
                 <input
                   value={createForm.work_name}
                   onChange={(e) => setCreateForm({ ...createForm, work_name: e.target.value })}
-                  placeholder="Замена масла двигателя"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Замена масла двигателя и всех фильтров"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">
-                    Интервал (км)
-                  </label>
-                  <input
-                    type="number"
-                    value={createForm.interval_km}
-                    onChange={(e) => setCreateForm({ ...createForm, interval_km: e.target.value })}
-                    placeholder="10000"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                  />
+
+              {/* DATE SECTION (Primary for broken odometers or past replacement dates) */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>📅</span> Контроль по дате и сроку
+                  </span>
+                  <span className="text-[11px] text-blue-600 font-medium">
+                    Основное, если одометр не работает
+                  </span>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">
-                    Интервал (мес.)
-                  </label>
-                  <input
-                    type="number"
-                    value={createForm.interval_months}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, interval_months: e.target.value })
-                    }
-                    placeholder="6"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">
+                      Дата последней замены *
+                    </label>
+                    <input
+                      type="date"
+                      value={createForm.last_done_at}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, last_done_at: e.target.value })
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Сегодня или прошлая дата
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">
+                      Интервал (мес.)
+                    </label>
+                    <input
+                      type="number"
+                      value={createForm.interval_months}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, interval_months: e.target.value })
+                      }
+                      placeholder="6"
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Обычно 3, 6 или 12 мес.
+                    </span>
+                  </div>
                 </div>
+
+                {(() => {
+                  if (!createForm.last_done_at || !createForm.interval_months) return null;
+                  const d = new Date(createForm.last_done_at);
+                  d.setMonth(d.getMonth() + Number(createForm.interval_months));
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const targetDay = new Date(d);
+                  targetDay.setHours(0, 0, 0, 0);
+                  const diff = Math.ceil(
+                    (targetDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+                  );
+                  const dateStr = d.toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  });
+                  return (
+                    <div
+                      className={cn(
+                        'text-xs p-2.5 rounded-lg border flex items-center justify-between',
+                        diff < 0
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : diff === 0
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : diff <= 30
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                      )}
+                    >
+                      <div>
+                        Следующая замена: <strong>{dateStr}</strong>
+                      </div>
+                      <div className="font-semibold text-[11px]">
+                        {diff < 0
+                          ? `Просрочено на ${Math.abs(diff)} дн.`
+                          : diff === 0
+                            ? 'Срок наступил сегодня!'
+                            : `Через ${diff} дн.`}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">
-                  Последнее выполнено (км)
-                </label>
-                <input
-                  type="number"
-                  value={createForm.last_done_km}
-                  onChange={(e) => setCreateForm({ ...createForm, last_done_km: e.target.value })}
-                  placeholder="80000"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                />
+
+              {/* ODOMETER SECTION */}
+              <div className="border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>🚗</span> Контроль по пробегу
+                  </span>
+                  <span className="text-[11px] text-slate-400">Необязательно</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">
+                      Интервал (км)
+                    </label>
+                    <input
+                      type="number"
+                      value={createForm.interval_km}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, interval_km: e.target.value })
+                      }
+                      placeholder="10000"
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">
+                      Пробег при замене (км)
+                    </label>
+                    <input
+                      type="number"
+                      value={createForm.last_done_km}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, last_done_km: e.target.value })
+                      }
+                      placeholder="80000"
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Если одометр не работает, оставьте поля пробега пустыми — система будет
+                  ориентироваться на дату.
+                </p>
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={() => setShowCreate(false)}
-                  className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold"
+                  className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-50 transition"
                 >
                   Отмена
                 </button>
                 <button
+                  type="button"
                   onClick={() =>
                     createMutation.mutate({
                       asset_id: createForm.asset_id,
                       work_name: createForm.work_name,
-                      interval_km: createForm.interval_km
-                        ? Number(createForm.interval_km)
-                        : undefined,
+                      interval_km: createForm.interval_km ? Number(createForm.interval_km) : null,
                       interval_months: createForm.interval_months
                         ? Number(createForm.interval_months)
-                        : undefined,
+                        : null,
                       last_done_km: createForm.last_done_km
                         ? Number(createForm.last_done_km)
-                        : undefined,
+                        : null,
+                      last_done_at: createForm.last_done_at || null,
                     })
                   }
                   disabled={
                     createMutation.isPending || !createForm.asset_id || !createForm.work_name.trim()
                   }
-                  className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+                  className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 transition"
                 >
-                  Создать
+                  {createMutation.isPending ? 'Сохранение...' : 'Создать регламент'}
                 </button>
               </div>
             </div>
@@ -7309,16 +7431,16 @@ function MaintenanceSection() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
                   Работа
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
                   Интервал
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Последнее (км)
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
+                  Последнее ТО
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  След. (км)
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
+                  Следующее ТО
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
                   Остаток
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
@@ -7331,84 +7453,215 @@ function MaintenanceSection() {
               {items.map((item) => {
                 const rem = remainingKm(item);
                 const isEditing = editingId === item.id;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dueTime = item.next_due_at ? new Date(item.next_due_at).getTime() : null;
+                const diffDays =
+                  dueTime !== null
+                    ? Math.ceil((dueTime - today.getTime()) / (1000 * 60 * 60 * 24))
+                    : null;
+
                 return (
                   <tr
                     key={item.id}
                     className={cn(
                       item.alert_status === 'overdue'
-                        ? 'bg-red-50'
+                        ? 'bg-red-50/70 hover:bg-red-50'
                         : item.alert_status === 'soon'
-                          ? 'bg-amber-50'
-                          : '',
+                          ? 'bg-amber-50/70 hover:bg-amber-50'
+                          : 'hover:bg-slate-50/60',
                     )}
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {item.asset?.short_name ?? '—'}
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-900">
+                        {item.asset?.short_name ?? '—'}
+                      </div>
+                      {item.asset?.reg_number && (
+                        <div className="text-xs text-slate-400 font-mono">
+                          {item.asset.reg_number}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="px-4 py-3 text-slate-800">
                       {isEditing ? (
                         <input
                           value={editForm.work_name ?? ''}
                           onChange={(e) => setEditForm({ ...editForm, work_name: e.target.value })}
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-full"
+                          className="border border-slate-200 rounded-lg px-2 py-1 text-sm w-full"
                         />
                       ) : (
-                        item.work_name
+                        <span className="font-medium">{item.work_name}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-500">
-                      {item.interval_km ? `${item.interval_km.toLocaleString('ru-RU')} км` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-700">
+                    <td className="px-4 py-3">
                       {isEditing ? (
-                        <input
-                          type="number"
-                          value={editForm.last_done_km ?? ''}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, last_done_km: Number(e.target.value) })
-                          }
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-20 text-right"
-                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              placeholder="мес."
+                              value={editForm.interval_months ?? ''}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  interval_months: e.target.value ? Number(e.target.value) : null,
+                                })
+                              }
+                              className="border border-slate-200 rounded px-1.5 py-0.5 text-xs w-16"
+                              title="Интервал в месяцах"
+                            />
+                            <span className="text-[11px] text-slate-400">мес.</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              placeholder="км"
+                              value={editForm.interval_km ?? ''}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  interval_km: e.target.value ? Number(e.target.value) : null,
+                                })
+                              }
+                              className="border border-slate-200 rounded px-1.5 py-0.5 text-xs w-16"
+                              title="Интервал в км"
+                            />
+                            <span className="text-[11px] text-slate-400">км</span>
+                          </div>
+                        </div>
                       ) : (
-                        (item.last_done_km?.toLocaleString('ru-RU') ?? '—')
+                        <div>
+                          {item.interval_months ? (
+                            <div className="font-medium text-slate-800">
+                              {item.interval_months} мес.
+                            </div>
+                          ) : null}
+                          {item.interval_km ? (
+                            <div className="text-xs text-slate-500 font-mono">
+                              {item.interval_km.toLocaleString('ru-RU')} км
+                            </div>
+                          ) : null}
+                          {!item.interval_months && !item.interval_km && (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-700">
+                    <td className="px-4 py-3">
                       {isEditing ? (
-                        <input
-                          type="number"
-                          value={editForm.next_due_km ?? ''}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, next_due_km: Number(e.target.value) })
-                          }
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-20 text-right"
-                        />
+                        <div className="space-y-1">
+                          <input
+                            type="date"
+                            value={editForm.last_done_at ? editForm.last_done_at.slice(0, 10) : ''}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, last_done_at: e.target.value })
+                            }
+                            className="border border-slate-200 rounded px-1.5 py-0.5 text-xs w-full"
+                            title="Дата последней замены"
+                          />
+                          <input
+                            type="number"
+                            placeholder="км"
+                            value={editForm.last_done_km ?? ''}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                last_done_km: e.target.value ? Number(e.target.value) : null,
+                              })
+                            }
+                            className="border border-slate-200 rounded px-1.5 py-0.5 text-xs w-full font-mono"
+                            title="Пробег при последней замене"
+                          />
+                        </div>
                       ) : (
-                        (item.next_due_km?.toLocaleString('ru-RU') ?? '—')
+                        <div>
+                          {item.last_done_at ? (
+                            <div className="font-medium text-slate-800">
+                              {fmtDate(item.last_done_at)}
+                            </div>
+                          ) : null}
+                          {item.last_done_km ? (
+                            <div className="text-xs text-slate-500 font-mono">
+                              {item.last_done_km.toLocaleString('ru-RU')} км
+                            </div>
+                          ) : null}
+                          {!item.last_done_at && !item.last_done_km && (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </div>
                       )}
                     </td>
-                    <td
-                      className={cn(
-                        'px-4 py-3 text-right font-semibold',
-                        rem !== null
-                          ? rem < 0
-                            ? 'text-red-600'
-                            : rem < 2000
-                              ? 'text-amber-600'
-                              : 'text-emerald-600'
-                          : 'text-slate-400',
-                      )}
-                    >
-                      {rem !== null ? `${rem.toLocaleString('ru-RU')} км` : '—'}
+                    <td className="px-4 py-3">
+                      <div>
+                        {item.next_due_at ? (
+                          <div className="font-medium text-slate-800">
+                            {fmtDate(item.next_due_at)}
+                          </div>
+                        ) : null}
+                        {item.next_due_km ? (
+                          <div className="text-xs text-slate-500 font-mono">
+                            {item.next_due_km.toLocaleString('ru-RU')} км
+                          </div>
+                        ) : null}
+                        {!item.next_due_at && !item.next_due_km && (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>
+                        {diffDays !== null && (
+                          <div
+                            className={cn(
+                              'font-semibold text-xs',
+                              diffDays < 0
+                                ? 'text-red-600'
+                                : diffDays === 0
+                                  ? 'text-red-600'
+                                  : diffDays <= 30
+                                    ? 'text-amber-600'
+                                    : 'text-slate-700',
+                            )}
+                          >
+                            {diffDays < 0
+                              ? `Просрочено на ${Math.abs(diffDays)} дн.`
+                              : diffDays === 0
+                                ? 'Срок сегодня!'
+                                : `${diffDays} дн. осталось`}
+                          </div>
+                        )}
+                        {rem !== null && (
+                          <div
+                            className={cn(
+                              'text-xs font-mono',
+                              rem < 0
+                                ? 'text-red-500 font-medium'
+                                : rem < 1500
+                                  ? 'text-amber-600'
+                                  : 'text-slate-400',
+                            )}
+                          >
+                            {rem < 0
+                              ? `Просрочено: ${Math.abs(rem).toLocaleString('ru-RU')} км`
+                              : `${rem.toLocaleString('ru-RU')} км`}
+                          </div>
+                        )}
+                        {diffDays === null && rem === null && (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          'badge text-xs px-2 py-0.5 rounded-full',
-                          ALERT_COLOR[item.alert_status],
+                          'badge text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1',
+                          ALERT_COLOR[item.alert_status] ?? 'bg-slate-100 text-slate-700',
                         )}
                       >
-                        {ALERT_LABEL[item.alert_status]}
+                        {item.alert_status === 'overdue' && '⚠️ '}
+                        {item.alert_status === 'soon' && '⏳ '}
+                        {item.alert_status === 'ok' && '✓ '}
+                        {ALERT_LABEL[item.alert_status] ?? item.alert_status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -7416,13 +7669,15 @@ function MaintenanceSection() {
                         <div className="flex gap-1 justify-end">
                           <button
                             onClick={() => updateMutation.mutate({ id: item.id, body: editForm })}
-                            className="text-xs font-bold px-2 py-1 rounded bg-emerald-600 text-white"
+                            className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                            title="Сохранить"
                           >
                             ✓
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            className="text-xs font-bold px-2 py-1 rounded border border-slate-200 text-slate-500"
+                            className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition"
+                            title="Отмена"
                           >
                             ×
                           </button>
@@ -7431,13 +7686,15 @@ function MaintenanceSection() {
                         <div className="flex gap-1 justify-end">
                           <button
                             onClick={() => startEdit(item)}
-                            className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded border border-slate-200"
+                            className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+                            title="Редактировать регламент"
                           >
                             ✏️
                           </button>
                           <button
                             onClick={() => deleteMutation.mutate(item.id)}
-                            className="text-xs text-slate-400 hover:text-red-600 px-2 py-1 rounded border border-slate-200"
+                            className="text-xs text-slate-400 hover:text-red-600 px-2 py-1 rounded-lg border border-slate-200 hover:bg-red-50 transition"
+                            title="Удалить регламент"
                           >
                             🗑
                           </button>
