@@ -164,7 +164,7 @@ const emptyForm = {
   auto_settle: false,
   notes: '',
   is_officially_employed: false,
-  official_salary_amount: '10000',
+  official_salary_amount: '22500',
   official_salary_day: 10,
   has_court_orders: false,
   court_order_pct: '50',
@@ -195,7 +195,7 @@ function StaffModal({
           auto_settle: editUser.auto_settle,
           notes: editUser.notes ?? '',
           is_officially_employed: editUser.is_officially_employed ?? false,
-          official_salary_amount: editUser.official_salary_amount ?? '10000',
+          official_salary_amount: editUser.official_salary_amount ?? '22500',
           official_salary_day: editUser.official_salary_day ?? 10,
           has_court_orders: editUser.has_court_orders ?? false,
           court_order_pct: editUser.court_order_pct ?? '50',
@@ -237,7 +237,7 @@ function StaffModal({
       auto_settle: form.auto_settle,
       notes: form.notes || null,
       is_officially_employed: form.is_officially_employed,
-      official_salary_amount: parseFloat(form.official_salary_amount || '10000') || 10000,
+      official_salary_amount: parseFloat(form.official_salary_amount || '22500') || 22500,
       official_salary_day: parseInt(String(form.official_salary_day || '10'), 10) || 10,
       has_court_orders: form.has_court_orders,
       court_order_pct: parseFloat(form.court_order_pct || '50') || 50,
@@ -374,46 +374,60 @@ function StaffModal({
               </label>
               {form.is_officially_employed && (
                 <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
-                  Вычет из рейсов 1-го числа
+                  Налог 10 000 ₽ в долг 1-го числа
                 </span>
               )}
             </div>
 
             {form.is_officially_employed && (
-              <div className="grid grid-cols-2 gap-3 pt-0.5">
-                <div>
-                  <label className="block text-[11px] font-bold text-emerald-950 mb-1">
-                    Сумма вычета (₽)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="500"
-                    value={form.official_salary_amount}
-                    onChange={f('official_salary_amount')}
-                    className="w-full border border-emerald-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <span className="text-[10px] text-emerald-700">Официальная часть ЗП</span>
+              <div className="space-y-2 pt-0.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                      Официальная ЗП (₽)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="500"
+                      value={form.official_salary_amount}
+                      onChange={f('official_salary_amount')}
+                      className="w-full border border-emerald-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-emerald-700">
+                      Официальная выплата (22 500 ₽)
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                      День выплаты ЗП
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={form.official_salary_day}
+                      onChange={f('official_salary_day')}
+                      className="w-full border border-emerald-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-emerald-700">Напоминание в МАКС</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-emerald-950 mb-1">
-                    День выплаты ЗП
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={form.official_salary_day}
-                    onChange={f('official_salary_day')}
-                    className="w-full border border-emerald-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <span className="text-[10px] text-emerald-700">Напоминание в МАКС</span>
+
+                <div className="p-2 bg-emerald-100/60 rounded-lg border border-emerald-200/80 text-[11px] text-emerald-900 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <span>🏛️ Налог в счёт компании:</span>
+                    <strong className="text-emerald-950 font-black">10 000 ₽ / мес</strong>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 font-semibold">
+                    1-го числа в долг сотрудника
+                  </span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Исполнительный лист (ФССП 50%) */}
+          {/* Исполнительный лист (ФССП / Алименты) */}
           {form.is_officially_employed && (
             <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl space-y-2.5">
               <div className="flex items-center justify-between">
@@ -430,35 +444,86 @@ function StaffModal({
                 </label>
                 {form.has_court_orders && (
                   <span className="text-[10px] bg-rose-200 text-rose-900 font-bold px-2 py-0.5 rounded-full">
-                    Удержание 50%
+                    Удержание {parseFloat(form.court_order_pct || '50') || 50}%
                   </span>
                 )}
               </div>
 
               {form.has_court_orders && (
-                <div className="space-y-2 pt-0.5">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 bg-rose-100/80 rounded-lg border border-rose-200 font-bold text-rose-900">
-                      <div className="text-[9px] uppercase text-rose-700">🏛️ Приставам (50%):</div>
-                      <div className="text-sm font-black text-rose-950">
-                        {Math.round(
-                          (parseFloat(form.official_salary_amount || '10000') || 10000) * 0.5,
-                        ).toLocaleString('ru-RU')}{' '}
-                        ₽
+                <div className="space-y-2.5 pt-0.5">
+                  {/* Ввод процента удержания */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-rose-900 mb-1">
+                      Размер удержания (алименты / исп. лист, %)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-28 shrink-0">
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="1"
+                          value={form.court_order_pct}
+                          onChange={f('court_order_pct')}
+                          className="w-full border border-rose-300 bg-white rounded-lg px-2.5 py-1.5 font-black text-rose-950 text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none pr-6"
+                        />
+                        <span className="absolute right-2.5 top-1.5 text-xs font-bold text-rose-500">
+                          %
+                        </span>
                       </div>
-                    </div>
-                    <div className="p-2 bg-emerald-100/80 rounded-lg border border-emerald-200 font-bold text-emerald-900">
-                      <div className="text-[9px] uppercase text-emerald-700">
-                        💳 Водителю на карту:
-                      </div>
-                      <div className="text-sm font-black text-emerald-950">
-                        {Math.round(
-                          (parseFloat(form.official_salary_amount || '10000') || 10000) * 0.5,
-                        ).toLocaleString('ru-RU')}{' '}
-                        ₽
+                      <div className="flex flex-wrap gap-1">
+                        {[25, 33, 34, 50, 70].map((pctVal) => (
+                          <button
+                            key={pctVal}
+                            type="button"
+                            onClick={() =>
+                              setForm((p) => ({ ...p, court_order_pct: String(pctVal) }))
+                            }
+                            className={cn(
+                              'px-2 py-1 text-[11px] font-bold rounded-lg border transition-all',
+                              String(form.court_order_pct) === String(pctVal)
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                                : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-100/70',
+                            )}
+                          >
+                            {pctVal}%
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
+
+                  {(() => {
+                    const salary = parseFloat(form.official_salary_amount || '22500') || 22500;
+                    const pct = Math.min(
+                      100,
+                      Math.max(0, parseFloat(form.court_order_pct || '50') || 50),
+                    );
+                    const courtSum = Math.round(salary * (pct / 100));
+                    const driverSum = Math.max(0, salary - courtSum);
+                    const driverPct = 100 - pct;
+
+                    return (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 bg-rose-100/80 rounded-lg border border-rose-200 font-bold text-rose-900">
+                          <div className="text-[9px] uppercase text-rose-700">
+                            🏛️ Приставам ({pct}%):
+                          </div>
+                          <div className="text-sm font-black text-rose-950">
+                            {courtSum.toLocaleString('ru-RU')} ₽
+                          </div>
+                        </div>
+                        <div className="p-2 bg-emerald-100/80 rounded-lg border border-emerald-200 font-bold text-emerald-900">
+                          <div className="text-[9px] uppercase text-emerald-700">
+                            💳 Водителю на карту ({driverPct}%):
+                          </div>
+                          <div className="text-sm font-black text-emerald-950">
+                            {driverSum.toLocaleString('ru-RU')} ₽
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div>
                     <label className="block text-[11px] font-bold text-rose-900 mb-1">
@@ -2240,16 +2305,23 @@ function classifyStaffTx(tx: StaffTx) {
   }
 
   if (isAdvanceGiven) {
-    const walletName =
-      tx.from_wallet?.name ||
-      (tx.description?.includes('Касса') ? '💵 Касса наличные' : '💰 Аванс');
+    const isTax =
+      tx.description?.includes('Налог') ||
+      tx.description?.includes('ТК РФ') ||
+      tx.description?.includes('Вычет по ТК РФ');
+    const walletName = isTax
+      ? '💼 Налог по ТК РФ'
+      : tx.from_wallet?.name ||
+        (tx.description?.includes('Касса') ? '💵 Касса наличные' : '💰 Аванс');
     return {
       type: 'advance' as const,
       isIncome: false,
-      badgeText: 'Выдан аванс',
-      badgeCls: 'bg-purple-50 text-purple-700 border-purple-200',
+      badgeText: isTax ? 'Налог ТК РФ' : 'Выдан аванс',
+      badgeCls: isTax
+        ? 'bg-amber-50 text-amber-900 border-amber-300'
+        : 'bg-purple-50 text-purple-700 border-purple-200',
       source: walletName,
-      title: tx.description || 'Выдан аванс',
+      title: tx.description || (isTax ? 'Налог ТК РФ' : 'Выдан аванс'),
     };
   }
 
@@ -3479,7 +3551,7 @@ function PayrollRow({
             {user.is_officially_employed && (
               <span
                 className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0"
-                title={`ТК РФ: вычет ${parseFloat(user.official_salary_amount || '10000').toLocaleString('ru-RU')} ₽ 1-го числа`}
+                title={`ТК РФ: выплата ${parseFloat(user.official_salary_amount || '22500').toLocaleString('ru-RU')} ₽ (налог 10 000 ₽ в долг 1-го числа)`}
               >
                 💼 ТК РФ
               </span>
@@ -3487,9 +3559,9 @@ function PayrollRow({
             {user.has_court_orders && (
               <span
                 className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 shrink-0"
-                title={`ФССП 50% удержания: ${user.court_order_notes || 'Исполнительный лист'}`}
+                title={`ФССП ${Math.round(parseFloat(user.court_order_pct || '50'))}% удержания: ${user.court_order_notes || 'Исполнительный лист'}`}
               >
-                ⚖️ ФССП 50%
+                ⚖️ ФССП {Math.round(parseFloat(user.court_order_pct || '50'))}%
               </span>
             )}
           </div>
@@ -4484,7 +4556,7 @@ export default function StaffPage() {
       phone: u.phone,
       max_user_id: u.max_user_id,
       roles: u.roles,
-      current_asset_id: null,
+      current_asset_id: u.current_asset_id ?? null,
       auto_settle: u.auto_settle,
       is_active: true,
       notes: u.notes,
@@ -4659,8 +4731,9 @@ export default function StaffPage() {
               ТК РФ
             </span>
             <span className="text-emerald-950 font-medium">
-              1-го числа каждого месяца из сдельных рейсов автоматически вычитается официальная
-              часть (10 000 ₽). Напоминание в МАКС приходит в день выплаты (10-го числа).
+              1-го числа каждого месяца в долг сотрудника начисляется налог за официальное
+              трудоустройство (10 000 ₽), вычитаемый из рейсов. Выплата официальной части (22 500 ₽)
+              производится в назначенный день ЗП за вычетом исполнительных листов (ФССП).
             </span>
           </div>
           <div className="flex items-center gap-1 bg-emerald-100/70 p-1 rounded-xl shrink-0 self-end sm:self-auto font-bold text-xs">

@@ -5,14 +5,15 @@
  * Расписание: каждое утро в 09:00 МСК (06:00 UTC) через Vercel Cron.
  *
  * Выполняет 2 автоматические задачи:
- * 1. 1-го числа каждого месяца в автоматическом режиме создаёт запись вычета по ТК РФ
- *    (10 000 ₽ или персональная сумма) в долг сотрудника (ADVANCE_CATEGORY_ID).
+ * 1. 1-го числа каждого месяца в автоматическом режиме создаёт запись налога за
+ *    официальное трудоустройство (10 000 ₽) в долг сотрудника (ADVANCE_CATEGORY_ID).
  *    Эта сумма автоматически вычитается из сдельных рейсов водителя при расчёте выплаты.
  *
- * 2. В назначенный день выплаты (по умолчанию 10-е число месяца) автоматически отправляет
- *    напоминание в мессенджер МАКС директору и администраторам:
- *    - компактный красный блок для водителей с исполнительными листами приставов (ФССП 50/50);
- *    - подробные карточки остальных водителей по ТК РФ (100% на карту с автомобилем);
+ * 2. В назначенный день выплаты (например, 25-е или 10-е число месяца) автоматически
+ *    отправляет напоминание в мессенджер МАКС директору и администраторам:
+ *    - официальная ЗП (22 500 ₽) сотрудникам по ТК РФ;
+ *    - удержание приставам (ФССП / алименты) согласно персональной процентовке (например, 34% или 50%);
+ *    - остаток на карту водителю;
  *    - сводный расчёт сумм.
  */
 
@@ -107,17 +108,25 @@ async function handleOfficialPayrollCron(req: NextRequest) {
     const officialList = (officialUsers as any[]) ?? [];
 
     // ──────────────────────────────────────────────────────────────────────────
-    // ЗАДАЧА 1: 1-е число месяца — Автоматический вычет из сдельных рейсов
+    // ЗАДАЧА 1: 1-е число месяца — Автоматический платёж за налоги в долг сотрудника (10 000 ₽)
     // ──────────────────────────────────────────────────────────────────────────
     if (currentDay === 1 || searchParams.get('force_accrual') === 'true') {
       const monthStart = new Date(currentYear, currentMonth, 1).toISOString();
       const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).toISOString();
 
-      for (const user of officialList) {
-        const amount = parseFloat(user.official_salary_amount ?? '10000');
-        if (amount <= 0) continue;
+      const MONTHLY_TAX_AMOUNT = 10000; // Каждый сотрудник с официальной ЗП платит 10 000 ₽ в счёт компании за налоги
 
-        // Проверяем, нет ли уже вычета по ТК РФ за этот месяц
+      const { data: adminUser } = await (supabase as any)
+        .from('users')
+        .select('id')
+        .or('roles.cs.{owner},roles.cs.{admin}')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      const adminCreatedBy = adminUser?.id ?? officialList[0]?.id;
+
+      for (const user of officialList) {
+        // Проверяем, нет ли уже начисления налога за этот месяц
         const { data: existing } = await (supabase as any)
           .from('transactions')
           .select('id')
@@ -125,50 +134,56 @@ async function handleOfficialPayrollCron(req: NextRequest) {
           .eq('related_user_id', user.id)
           .gte('transaction_date', monthStart)
           .lte('transaction_date', monthEnd)
-          .ilike('description', 'Вычет по ТК РФ%')
+          .or('description.ilike.%Налог%ТК РФ%,description.ilike.%Вычет по ТК РФ%')
           .limit(1);
 
         if (existing && existing.length > 0) {
           results.details.push(
-            `Вычет для ${user.name} уже был создан ранее за ${monthName} ${currentYear}`,
+            `Платёж за налоги для ${user.name} уже был создан ранее за ${monthName} ${currentYear}`,
           );
           continue;
         }
 
-        const description = `Вычет по ТК РФ: ${user.name} — ${monthName} ${currentYear}`;
+        const description = `Налог за официальное трудоустройство (ТК РФ): ${user.name} — ${monthName} ${currentYear}`;
+
+        const idempotencyKey = crypto.randomUUID();
 
         const { error: insErr } = await (supabase as any).from('transactions').insert({
           direction: 'expense',
           category_id: ADVANCE_CATEGORY_ID,
-          amount: amount.toFixed(2),
+          amount: MONTHLY_TAX_AMOUNT.toFixed(2),
           description,
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           related_user_id: user.id,
-          from_wallet_id: null, // не списывает из кассы, формирует зачёт из сдельных рейсов
+          from_wallet_id: null, // не списывает из кассы, формирует долг сотрудника перед компанией (вычитается из сдельных рейсов)
           transaction_date: new Date(currentYear, currentMonth, 1, 0, 1, 0).toISOString(),
+          idempotency_key: idempotencyKey,
+          created_by: adminCreatedBy,
         });
 
         if (insErr) {
-          console.error(`Error inserting official deduction for ${user.name}:`, insErr);
-          results.details.push(`Ошибка вычета для ${user.name}: ${insErr.message}`);
+          console.error(`Error inserting tax deduction for ${user.name}:`, insErr);
+          results.details.push(`Ошибка начисления налога для ${user.name}: ${insErr.message}`);
         } else {
           results.accruals_created++;
-          results.details.push(`Создан вычет ${amount} ₽ для ${user.name}`);
+          results.details.push(
+            `Начислен налог ${MONTHLY_TAX_AMOUNT} ₽ в долг сотрудника: ${user.name}`,
+          );
         }
       }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // ЗАДАЧА 2: День выплаты (по умолчанию 10-е число) — Автонапоминание в МАКС
+    // ЗАДАЧА 2: День выплаты (по умолчанию 25-е или 10-е число) — Автонапоминание в МАКС
     // ──────────────────────────────────────────────────────────────────────────
-    const isPayDay = officialList.some((u) => (u.official_salary_day ?? 10) === currentDay);
+    const isPayDay = officialList.some((u) => (u.official_salary_day ?? 25) === currentDay);
 
     if (isPayDay || searchParams.get('force_notify') === 'true') {
       // Отбираем сотрудников, у которых день выплаты совпадает с текущим
       const dueUsers = officialList.filter(
         (u) =>
-          (u.official_salary_day ?? 10) === currentDay ||
+          (u.official_salary_day ?? 25) === currentDay ||
           searchParams.get('force_notify') === 'true',
       );
 
@@ -182,12 +197,12 @@ async function handleOfficialPayrollCron(req: NextRequest) {
         let totalCourtPay = 0;
 
         for (const u of dueUsers) {
-          const s = parseFloat(u.official_salary_amount ?? '10000');
+          const s = parseFloat(u.official_salary_amount ?? '22500') || 22500;
           totalSalary += s;
           if (u.has_court_orders) {
-            const pct = parseFloat(u.court_order_pct ?? '50') / 100;
-            const courtSum = Math.round(s * pct);
-            const driverSum = s - courtSum;
+            const pct = parseFloat(u.court_order_pct ?? '50') || 50;
+            const courtSum = Math.round(s * (pct / 100));
+            const driverSum = Math.max(0, s - courtSum);
             totalCourtPay += courtSum;
             totalDriversPay += driverSum;
           } else {
@@ -200,43 +215,44 @@ async function handleOfficialPayrollCron(req: NextRequest) {
 
         messageParts.push(`📢 НАПОМИНАНИЕ: ВЫПЛАТА ОФИЦИАЛЬНОЙ ЧАСТИ ЗП (ТК РФ)`);
         messageParts.push(
-          `Сегодня ${currentDay} ${monthName} — день выплаты официальной части (вычет из рейсов) сотрудникам ТК501.`,
+          `Сегодня ${currentDay} ${monthName} — день выплаты официальной части ЗП сотрудникам ТК501.`,
         );
 
         messageParts.push(
           `📊 СВОДНЫЙ РАСЧЁТ:\n` +
             `• Всего официальная часть: ${totalSalary.toLocaleString('ru-RU')} ₽\n` +
             `• ➜ Водителям на карты: ${totalDriversPay.toLocaleString('ru-RU')} ₽\n` +
-            `• ➜ Приставам (ФССП): ${totalCourtPay.toLocaleString('ru-RU')} ₽`,
+            `• ➜ Приставам (ФССП / Алименты): ${totalCourtPay.toLocaleString('ru-RU')} ₽`,
         );
 
-        // 1. Компактный красный блок предупреждения ФССП (уменьшен на 1/3)
+        // 1. Компактный красный блок предупреждения ФССП
         if (courtUsers.length > 0) {
           const courtLines = courtUsers.map((u) => {
-            const s = parseFloat(u.official_salary_amount ?? '10000');
-            const pct = parseFloat(u.court_order_pct ?? '50') / 100;
-            const courtSum = Math.round(s * pct);
-            const driverSum = s - courtSum;
+            const s = parseFloat(u.official_salary_amount ?? '22500') || 22500;
+            const pct = parseFloat(u.court_order_pct ?? '50') || 50;
+            const driverPct = 100 - pct;
+            const courtSum = Math.round(s * (pct / 100));
+            const driverSum = Math.max(0, s - courtSum);
             const note = u.court_order_notes ? `\n   📌 ${u.court_order_notes}` : '';
             return (
               `👤 ${u.name}\n` +
-              `   Сумма ТК РФ: ${s.toLocaleString('ru-RU')} ₽\n` +
-              `   ├ 🏛️ Приставам (50%): ${courtSum.toLocaleString('ru-RU')} ₽\n` +
-              `   └ 💳 Водителю на карту: ${driverSum.toLocaleString('ru-RU')} ₽${note}`
+              `   Официальная ЗП: ${s.toLocaleString('ru-RU')} ₽\n` +
+              `   ├ 🏛️ Приставам (${pct}%): ${courtSum.toLocaleString('ru-RU')} ₽\n` +
+              `   └ 💳 Водителю на карту (${driverPct}%): ${driverSum.toLocaleString('ru-RU')} ₽${note}`
             );
           });
 
           messageParts.push(
-            `🚨 ВНИМАНИЕ! ИСПОЛНИТЕЛЬНЫЙ ЛИСТ (ФССП 50%):\n` +
+            `🚨 ВНИМАНИЕ! ИСПОЛНИТЕЛЬНЫЙ ЛИСТ (ФССП / АЛИМЕНТЫ):\n` +
               courtLines.join('\n\n') +
-              `\n⚠️ НЕ ПЕРЕВОДИТЬ ВОДИТЕЛЮ 100%! Обязательно перечислить 50% в РОСП!`,
+              `\n⚠️ НЕ ПЕРЕВОДИТЬ ВОДИТЕЛЮ 100%! Обязательно перечислить указанный % в РОСП!`,
           );
         }
 
-        // 2. Подробный блок остальных водителей (+1/3 объема)
+        // 2. Подробный блок остальных водителей
         if (regularUsers.length > 0) {
           const regularLines = regularUsers.map((u) => {
-            const s = parseFloat(u.official_salary_amount ?? '10000');
+            const s = parseFloat(u.official_salary_amount ?? '22500') || 22500;
             const car = u.asset
               ? `${u.asset.short_name} (${u.asset.reg_number})`
               : 'Авто не привязано';
