@@ -2924,7 +2924,7 @@ export default function ReviewPage() {
                   {totalFleetLoaderProfit > 0 && (
                     <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
                       <span className="text-slate-400 font-medium">
-                        Заработано на погрузке (ПРР):
+                        в т.ч. заработано на ПРР (грузчики):
                       </span>
                       <span className="font-black bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded text-emerald-300">
                         +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
@@ -3004,11 +3004,11 @@ export default function ReviewPage() {
                           <span className="text-slate-600 text-sm hidden sm:block">|</span>
 
                           <div
-                            className="w-[95px] sm:w-[125px] text-center bg-slate-700/60 rounded-xl py-1 px-1.5 border border-slate-600/50"
-                            title={`Всего за ПРР клиенты заплатили ${Math.round(totalFleetLoadingBilled).toLocaleString('ru-RU')} ₽, выплачено рабочим ${Math.round(totalFleetLoadingPayroll).toLocaleString('ru-RU')} ₽ (маржа 30%)`}
+                            className="w-[95px] sm:w-[125px] text-center bg-emerald-950/40 rounded-xl py-1 px-1.5 border border-emerald-500/30 cursor-help"
+                            title={`Сумма уже включена в Чистый итог:\nВсего за ПРР клиенты заплатили ${Math.round(totalFleetLoadingBilled).toLocaleString('ru-RU')} ₽, выплачено рабочим ${Math.round(totalFleetLoadingPayroll).toLocaleString('ru-RU')} ₽, чистая прибыль компании 30% = +${Math.round(totalFleetLoaderProfit).toLocaleString('ru-RU')} ₽`}
                           >
-                            <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest block">
-                              Доход с ПРР
+                            <span className="text-[8px] font-bold text-emerald-300 uppercase tracking-widest block">
+                              в т.ч. с ПРР
                             </span>
                             <span className="text-sm sm:text-base font-black text-emerald-400">
                               +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
