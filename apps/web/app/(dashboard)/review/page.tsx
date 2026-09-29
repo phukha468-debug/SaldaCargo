@@ -190,7 +190,7 @@ function calcServiceOrder(o: ReviewServiceOrder) {
   return { partsCost, salaryCost, worksCost, totalCost, isExternal, contractorName, isEquipment };
 }
 
-function calcOrderLoaderProfit(o: TripOrder): number {
+function calcOrderLoaderMetrics(o: TripOrder) {
   const lp1 = parseFloat(o.loader_pay || '0');
   const lp2 = parseFloat(o.loader2_pay || '0');
   let thirdPartyPay = 0;
@@ -201,7 +201,9 @@ function calcOrderLoaderProfit(o: TripOrder): number {
   }
   const driverLoaderPay = o.is_driver_loader ? parseFloat(String(o.driver_loader_pay || '0')) : 0;
   const totalPaid = thirdPartyPay + driverLoaderPay;
-  if (totalPaid <= 0) return 0;
+  if (totalPaid <= 0) {
+    return { profit: 0, thirdPartyPay: 0, driverLoaderPay: 0, totalPaid: 0, loadersPool: 0 };
+  }
 
   const dcp = parseFloat(String(o.driver_car_pay || '0'));
   const amt = parseFloat(o.amount || '0');
@@ -213,7 +215,12 @@ function calcOrderLoaderProfit(o: TripOrder): number {
   if (loadersPool < totalPaid) {
     loadersPool = Math.round(totalPaid / 0.7);
   }
-  return Math.max(0, loadersPool - totalPaid);
+  const profit = Math.max(0, loadersPool - totalPaid);
+  return { profit, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool };
+}
+
+function calcOrderLoaderProfit(o: TripOrder): number {
+  return calcOrderLoaderMetrics(o).profit;
 }
 
 function calcTrip(trip: TripForReview) {
@@ -226,7 +233,23 @@ function calcTrip(trip: TripForReview) {
     0,
   );
   const totalPayroll = driverPay + loaderPay;
-  const loaderProfit = activeOrders.reduce((s, o) => s + calcOrderLoaderProfit(o), 0);
+
+  let loaderProfit = 0;
+  let driverLoaderPay = 0;
+  let thirdPartyLoaderPay = 0;
+  let loadingBilled = 0;
+
+  for (const o of activeOrders) {
+    const m = calcOrderLoaderMetrics(o);
+    loaderProfit += m.profit;
+    driverLoaderPay += m.driverLoaderPay;
+    thirdPartyLoaderPay += m.thirdPartyPay;
+    loadingBilled += m.loadersPool;
+  }
+
+  const driverCarPay = Math.max(0, driverPay - driverLoaderPay);
+  const totalLoadingPayroll = thirdPartyLoaderPay + driverLoaderPay;
+
   const fuelExpense = expenses
     .filter((e) => e.category?.name === 'ГСМ')
     .reduce((s, e) => s + parseFloat(e.amount), 0);
@@ -238,6 +261,11 @@ function calcTrip(trip: TripForReview) {
     expenses,
     revenue,
     driverPay,
+    driverCarPay,
+    driverLoaderPay,
+    thirdPartyLoaderPay,
+    totalLoadingPayroll,
+    loadingBilled,
     loaderPay,
     totalPayroll,
     loaderProfit,
@@ -2130,7 +2158,11 @@ export default function ReviewPage() {
         tripsRevenue: number;
         tripsPayroll: number;
         driverPayroll: number;
+        driverCarPayroll: number;
+        driverLoaderPayroll: number;
         loaderPayroll: number;
+        totalLoadingPayroll: number;
+        loadingBilled: number;
         loaderProfit: number;
         tripsFuel: number;
         tripsExpenses: number;
@@ -2155,7 +2187,11 @@ export default function ReviewPage() {
           tripsRevenue: 0,
           tripsPayroll: 0,
           driverPayroll: 0,
+          driverCarPayroll: 0,
+          driverLoaderPayroll: 0,
           loaderPayroll: 0,
+          totalLoadingPayroll: 0,
+          loadingBilled: 0,
           loaderProfit: 0,
           tripsFuel: 0,
           tripsExpenses: 0,
@@ -2172,7 +2208,11 @@ export default function ReviewPage() {
       g.tripsRevenue += ct.revenue;
       g.tripsPayroll += ct.totalPayroll;
       g.driverPayroll += ct.driverPay;
+      g.driverCarPayroll += ct.driverCarPay;
+      g.driverLoaderPayroll += ct.driverLoaderPay;
       g.loaderPayroll += ct.loaderPay;
+      g.totalLoadingPayroll += ct.totalLoadingPayroll;
+      g.loadingBilled += ct.loadingBilled;
       g.loaderProfit += ct.loaderProfit;
       g.tripsFuel += ct.fuelExpense;
       g.tripsExpenses += ct.totalExpenses;
@@ -2194,7 +2234,11 @@ export default function ReviewPage() {
             tripsRevenue: 0,
             tripsPayroll: 0,
             driverPayroll: 0,
+            driverCarPayroll: 0,
+            driverLoaderPayroll: 0,
             loaderPayroll: 0,
+            totalLoadingPayroll: 0,
+            loadingBilled: 0,
             loaderProfit: 0,
             tripsFuel: 0,
             tripsExpenses: 0,
@@ -2247,6 +2291,18 @@ export default function ReviewPage() {
   const totalFleetNetProfit = useMemo(
     () => totalFleetRevenue - totalFleetTripCosts - totalFleetMaintenance,
     [totalFleetRevenue, totalFleetTripCosts, totalFleetMaintenance],
+  );
+  const totalFleetLoaderProfit = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.loaderProfit, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetLoadingBilled = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.loadingBilled, 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetLoadingPayroll = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + g.totalLoadingPayroll, 0),
+    [combinedAssetGroups],
   );
 
   return (
@@ -2634,42 +2690,80 @@ export default function ReviewPage() {
                     {isExpanded && (
                       <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-4">
                         {/* Payroll & Loaders Profit Summary Banner */}
-                        <div className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-6">
-                            <div>
-                              <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
-                                ЗП водителей
-                              </span>
-                              <span className="font-extrabold text-slate-800 text-sm">
-                                <Money amount={group.driverPayroll.toFixed(2)} />
-                              </span>
-                            </div>
-                            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                            <div>
-                              <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
-                                Выплаты грузчикам
-                              </span>
-                              <span className="font-extrabold text-slate-700 text-sm">
-                                <Money amount={group.loaderPayroll.toFixed(2)} />
-                              </span>
-                            </div>
-                            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                            <div className="bg-emerald-50 border border-emerald-200/80 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                              <span className="material-symbols-outlined text-emerald-600 text-[18px]">
-                                payments
-                              </span>
+                        <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs space-y-2.5 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+                              {/* 1. Водители */}
                               <div>
-                                <span className="text-emerald-800 block text-[9px] uppercase font-black tracking-wider">
-                                  Прибыль с грузчиков (маржа 30%)
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
+                                  ЗП водителя (за руль)
                                 </span>
-                                <span className="font-black text-emerald-600 text-sm">
-                                  +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
+                                <span className="font-extrabold text-slate-800 text-sm">
+                                  <Money amount={group.driverCarPayroll.toFixed(2)} />
+                                </span>
+                                {group.driverLoaderPayroll > 0 && (
+                                  <span
+                                    className="block text-[10px] text-amber-600 font-semibold"
+                                    title="Доплата водителю за то, что грузил сам"
+                                  >
+                                    +{Math.round(group.driverLoaderPayroll).toLocaleString('ru-RU')}{' '}
+                                    ₽ за погрузку
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+
+                              {/* 2. Бригада грузчиков */}
+                              <div>
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
+                                  Выплаты бригаде грузчиков
+                                </span>
+                                <span className="font-extrabold text-slate-700 text-sm">
+                                  <Money amount={group.loaderPayroll.toFixed(2)} />
+                                </span>
+                                <span className="block text-[10px] text-slate-400">
+                                  Всего за ПРР:{' '}
+                                  {Math.round(group.totalLoadingPayroll).toLocaleString('ru-RU')} ₽
                                 </span>
                               </div>
+
+                              <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+
+                              {/* 3. Оплачено клиентами за ПРР */}
+                              <div>
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
+                                  Оплачено клиентами за ПРР
+                                </span>
+                                <span className="font-extrabold text-slate-900 text-sm">
+                                  <Money amount={group.loadingBilled.toFixed(2)} />
+                                </span>
+                                <span className="block text-[10px] text-slate-400">
+                                  в чеках заказов
+                                </span>
+                              </div>
+
+                              <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+
+                              {/* 4. Чистая прибыль с ПРР */}
+                              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-emerald-600 text-[20px]">
+                                  payments
+                                </span>
+                                <div>
+                                  <span className="text-emerald-800 block text-[9px] uppercase font-black tracking-wider">
+                                    Прибыль компании с ПРР
+                                  </span>
+                                  <span className="font-black text-emerald-600 text-sm sm:text-base">
+                                    +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="text-[11px] text-slate-400 italic">
-                            * Включает комиссию со сторонних бригад и погрузки силами водителя
+
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              ПРР: 70% оплата рабочим · 30% прибыль компании
+                            </div>
                           </div>
                         </div>
 
@@ -2816,7 +2910,7 @@ export default function ReviewPage() {
 
               {/* Unified Stats Strip */}
               <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
-                <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+                <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-slate-400 text-[16px]">
                       summarize
@@ -2827,6 +2921,16 @@ export default function ReviewPage() {
                         : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
                     </span>
                   </div>
+                  {totalFleetLoaderProfit > 0 && (
+                    <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span className="text-slate-400 font-medium">
+                        Заработано на погрузке (ПРР):
+                      </span>
+                      <span className="font-black bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded text-emerald-300">
+                        +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center px-4 py-3">
@@ -2894,6 +2998,24 @@ export default function ReviewPage() {
                           <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
                         </span>
                       </div>
+
+                      {totalFleetLoaderProfit > 0 && (
+                        <>
+                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                          <div
+                            className="w-[95px] sm:w-[125px] text-center bg-slate-700/60 rounded-xl py-1 px-1.5 border border-slate-600/50"
+                            title={`Всего за ПРР клиенты заплатили ${Math.round(totalFleetLoadingBilled).toLocaleString('ru-RU')} ₽, выплачено рабочим ${Math.round(totalFleetLoadingPayroll).toLocaleString('ru-RU')} ₽ (маржа 30%)`}
+                          >
+                            <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest block">
+                              Доход с ПРР
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-emerald-400">
+                              +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
