@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       trip_orders(
         id, amount, driver_pay, loader_pay, loader2_pay,
         loader_id, loader2_id,
+        direction, is_driver_loader, driver_car_pay, driver_loader_pay, loaders_data,
         loader:users!trip_orders_loader_id_fkey(id, name),
         loader2:users!trip_orders_loader2_id_fkey(id, name),
         payment_method, settlement_status, lifecycle_status,

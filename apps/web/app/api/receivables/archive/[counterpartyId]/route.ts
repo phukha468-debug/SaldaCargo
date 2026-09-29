@@ -14,7 +14,7 @@ export async function GET(
       await Promise.all([
         (supabase.from('trip_orders') as any)
           .select(
-            `id, amount, payment_method, created_at, description,
+            `id, amount, payment_method, created_at, updated_at, description,
              invoice_number, invoice_date, invoice_status, invoice_paid_at,
              trip:trips(trip_number, started_at, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number))`,
           )
@@ -37,10 +37,21 @@ export async function GET(
       return NextResponse.json({ error: manualsErr.message }, { status: 500 });
     }
 
-    const tripItems = (orders ?? []).map((o: any) => ({
-      ...o,
-      type: 'trip_order' as const,
-    }));
+    const tripItems = (orders ?? []).map((o: any) => {
+      const tripDate = o.trip?.started_at
+        ? String(o.trip.started_at).slice(0, 10)
+        : o.created_at
+          ? String(o.created_at).slice(0, 10)
+          : null;
+      const actDate = o.invoice_date || tripDate;
+      const paidDate = o.invoice_paid_at || o.updated_at;
+      return {
+        ...o,
+        invoice_date: actDate,
+        invoice_paid_at: paidDate,
+        type: 'trip_order' as const,
+      };
+    });
 
     const manualItems = (manuals ?? []).map((m: any) => ({
       id: m.id,

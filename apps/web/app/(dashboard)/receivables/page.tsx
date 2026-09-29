@@ -495,7 +495,7 @@ function InvoiceModal({
 
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-              Дата выставления
+              Дата акта (дата рейса)
             </label>
             <input
               type="date"
@@ -753,7 +753,11 @@ function CounterpartyArchiveList({
                     counterpartyName,
                     amount: item.amount,
                     currentNumber: item.invoice_number || '',
-                    currentDate: item.invoice_date || '',
+                    currentDate:
+                      item.invoice_date ||
+                      item.trip?.started_at?.slice(0, 10) ||
+                      item.created_at?.slice(0, 10) ||
+                      '',
                   })
                 }
                 title="Нажмите, чтобы указать или изменить номер акта/счёта"
@@ -779,9 +783,20 @@ function CounterpartyArchiveList({
                 {item.trip?.asset?.reg_number && ` · ${item.trip.asset.reg_number}`}
                 {item.trip?.driver?.name && ` (${item.trip.driver.name})`}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                {item.invoice_date && `Выставлен: ${formatDate(item.invoice_date)} · `}
-                {item.invoice_paid_at ? `Оплачен: ${formatDate(item.invoice_paid_at)}` : 'Погашен'}
+              <div className="text-[10px] text-slate-400 mt-0.5 font-medium flex items-center gap-1.5 flex-wrap">
+                <span>
+                  Акт:{' '}
+                  <span className="text-slate-600 font-semibold">
+                    {formatDate(item.invoice_date || item.trip?.started_at || item.created_at)}
+                  </span>
+                </span>
+                <span>·</span>
+                <span>
+                  Оплачен:{' '}
+                  <span className="font-bold text-emerald-700">
+                    {formatDate(item.invoice_paid_at || item.updated_at || item.created_at)}
+                  </span>
+                </span>
               </div>
             </div>
           </div>
@@ -999,7 +1014,7 @@ function GlobalArchiveView({
             <div className="col-span-2">Номер счёта / Акта</div>
             <div className="col-span-3">Контрагент</div>
             <div className="col-span-3">Рейс / Описание</div>
-            <div className="col-span-2">Даты (Счёт / Оплата)</div>
+            <div className="col-span-2">Даты (Акт / Оплата)</div>
             <div className="col-span-2 text-right">Сумма и действие</div>
           </div>
 
@@ -1023,7 +1038,11 @@ function GlobalArchiveView({
                           counterpartyName: cpName,
                           amount: item.amount,
                           currentNumber: item.invoice_number || '',
-                          currentDate: item.invoice_date || '',
+                          currentDate:
+                            item.invoice_date ||
+                            item.trip?.started_at?.slice(0, 10) ||
+                            item.created_at?.slice(0, 10) ||
+                            '',
                         })
                       }
                       title="Нажмите, чтобы указать или изменить номер акта/счёта"
@@ -1068,15 +1087,15 @@ function GlobalArchiveView({
                 {/* Dates */}
                 <div className="col-span-2 text-[10px] text-slate-500 space-y-0.5">
                   <div>
-                    <span className="text-slate-400">Счёт: </span>
-                    <span className="font-medium">
-                      {item.invoice_date ? formatDate(item.invoice_date) : '—'}
+                    <span className="text-slate-400">Акт: </span>
+                    <span className="font-semibold text-slate-800">
+                      {formatDate(item.invoice_date || item.trip?.started_at || item.created_at)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400">Оплачен: </span>
                     <span className="font-bold text-emerald-700">
-                      {item.invoice_paid_at ? formatDate(item.invoice_paid_at) : 'Погашен'}
+                      {formatDate(item.invoice_paid_at || item.updated_at || item.created_at)}
                     </span>
                   </div>
                 </div>
@@ -2325,6 +2344,8 @@ export default function ReceivablesPage() {
                                                   currentNumber: unb.invoice_number || '',
                                                   currentDate:
                                                     unb.invoice_date ||
+                                                    unb.started_at?.slice(0, 10) ||
+                                                    unb.created_at?.slice(0, 10) ||
                                                     new Date().toISOString().slice(0, 10),
                                                 })
                                               }
@@ -2591,6 +2612,8 @@ export default function ReceivablesPage() {
                                                           currentNumber: order.invoice_number || '',
                                                           currentDate:
                                                             order.invoice_date ||
+                                                            order.started_at?.slice(0, 10) ||
+                                                            order.created_at?.slice(0, 10) ||
                                                             new Date().toISOString().slice(0, 10),
                                                         })
                                                       }
@@ -2612,9 +2635,11 @@ export default function ReceivablesPage() {
                                                         counterpartyName: debtor.counterparty_name,
                                                         amount: order.amount,
                                                         currentNumber: '',
-                                                        currentDate: new Date()
-                                                          .toISOString()
-                                                          .slice(0, 10),
+                                                        currentDate:
+                                                          order.invoice_date ||
+                                                          order.started_at?.slice(0, 10) ||
+                                                          order.created_at?.slice(0, 10) ||
+                                                          new Date().toISOString().slice(0, 10),
                                                       })
                                                     }
                                                     className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded font-bold text-[10px] transition-colors inline-flex items-center gap-0.5"

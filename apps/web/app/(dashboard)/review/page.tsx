@@ -28,6 +28,11 @@ interface TripOrder {
   lifecycle_status: string;
   counterparty_id: string | null;
   counterparty: { name: string } | null;
+  direction?: string;
+  is_driver_loader?: boolean;
+  driver_car_pay?: string | number;
+  driver_loader_pay?: string | number;
+  loaders_data?: Array<{ id: string; name?: string; pay?: string | number }>;
 }
 
 interface TripForReview {
@@ -185,6 +190,32 @@ function calcServiceOrder(o: ReviewServiceOrder) {
   return { partsCost, salaryCost, worksCost, totalCost, isExternal, contractorName, isEquipment };
 }
 
+function calcOrderLoaderProfit(o: TripOrder): number {
+  const lp1 = parseFloat(o.loader_pay || '0');
+  const lp2 = parseFloat(o.loader2_pay || '0');
+  let thirdPartyPay = 0;
+  if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+    thirdPartyPay = o.loaders_data.reduce((s, l) => s + (parseFloat(String(l.pay)) || 0), 0);
+  } else {
+    thirdPartyPay = lp1 + lp2;
+  }
+  const driverLoaderPay = o.is_driver_loader ? parseFloat(String(o.driver_loader_pay || '0')) : 0;
+  const totalPaid = thirdPartyPay + driverLoaderPay;
+  if (totalPaid <= 0) return 0;
+
+  const dcp = parseFloat(String(o.driver_car_pay || '0'));
+  const amt = parseFloat(o.amount || '0');
+  let loadersPool = 0;
+  if (dcp > 0 && amt > 0) {
+    const mPool = Math.round(dcp / 0.3);
+    loadersPool = Math.max(0, amt - mPool);
+  }
+  if (loadersPool < totalPaid) {
+    loadersPool = Math.round(totalPaid / 0.7);
+  }
+  return Math.max(0, loadersPool - totalPaid);
+}
+
 function calcTrip(trip: TripForReview) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
   const expenses = trip.trip_expenses ?? [];
@@ -195,6 +226,7 @@ function calcTrip(trip: TripForReview) {
     0,
   );
   const totalPayroll = driverPay + loaderPay;
+  const loaderProfit = activeOrders.reduce((s, o) => s + calcOrderLoaderProfit(o), 0);
   const fuelExpense = expenses
     .filter((e) => e.category?.name === 'ГСМ')
     .reduce((s, e) => s + parseFloat(e.amount), 0);
@@ -208,6 +240,7 @@ function calcTrip(trip: TripForReview) {
     driverPay,
     loaderPay,
     totalPayroll,
+    loaderProfit,
     fuelExpense,
     totalExpenses,
     mileage,
@@ -1364,7 +1397,9 @@ function TripCard({
                       </td>
                       <td className="px-5 py-3 text-sm text-right font-medium text-slate-600">
                         {parseFloat(order.loader_pay) > 0 ||
-                        parseFloat(order.loader2_pay ?? '0') > 0 ? (
+                        parseFloat(order.loader2_pay ?? '0') > 0 ||
+                        (order.is_driver_loader &&
+                          parseFloat(String(order.driver_loader_pay || '0')) > 0) ? (
                           <div className="space-y-0.5">
                             {order.loader && parseFloat(order.loader_pay) > 0 && (
                               <div className="flex items-center justify-end gap-1.5">
@@ -1380,6 +1415,24 @@ function TripCard({
                                   {order.loader2.name.split(' ')[0]}
                                 </span>
                                 <Money amount={order.loader2_pay} />
+                              </div>
+                            )}
+                            {order.is_driver_loader &&
+                              parseFloat(String(order.driver_loader_pay || '0')) > 0 && (
+                                <div className="flex items-center justify-end gap-1.5 text-amber-600">
+                                  <span className="text-[10px] opacity-75 font-medium">
+                                    вод.-груз.
+                                  </span>
+                                  <Money amount={String(order.driver_loader_pay)} />
+                                </div>
+                              )}
+                            {calcOrderLoaderProfit(order) > 0 && (
+                              <div
+                                className="text-[9px] font-bold text-emerald-600 text-right leading-none"
+                                title="Прибыль компании с услуг погрузки (маржа 30%)"
+                              >
+                                +{Math.round(calcOrderLoaderProfit(order)).toLocaleString('ru-RU')}{' '}
+                                ₽ маржа
                               </div>
                             )}
                           </div>
@@ -2076,6 +2129,9 @@ export default function ReviewPage() {
         serviceOrders: ReviewServiceOrder[];
         tripsRevenue: number;
         tripsPayroll: number;
+        driverPayroll: number;
+        loaderPayroll: number;
+        loaderProfit: number;
         tripsFuel: number;
         tripsExpenses: number;
         tripsProfit: number;
@@ -2098,6 +2154,9 @@ export default function ReviewPage() {
           serviceOrders: [],
           tripsRevenue: 0,
           tripsPayroll: 0,
+          driverPayroll: 0,
+          loaderPayroll: 0,
+          loaderProfit: 0,
           tripsFuel: 0,
           tripsExpenses: 0,
           tripsProfit: 0,
@@ -2112,6 +2171,9 @@ export default function ReviewPage() {
       const ct = calcTrip(t);
       g.tripsRevenue += ct.revenue;
       g.tripsPayroll += ct.totalPayroll;
+      g.driverPayroll += ct.driverPay;
+      g.loaderPayroll += ct.loaderPay;
+      g.loaderProfit += ct.loaderProfit;
       g.tripsFuel += ct.fuelExpense;
       g.tripsExpenses += ct.totalExpenses;
       g.tripsProfit += ct.profit;
@@ -2131,6 +2193,9 @@ export default function ReviewPage() {
             serviceOrders: [],
             tripsRevenue: 0,
             tripsPayroll: 0,
+            driverPayroll: 0,
+            loaderPayroll: 0,
+            loaderProfit: 0,
             tripsFuel: 0,
             tripsExpenses: 0,
             tripsProfit: 0,
@@ -2477,13 +2542,21 @@ export default function ReviewPage() {
                             <Money amount={group.tripsRevenue.toFixed(2)} />
                           </span>
                         </div>
-                        <div className="text-right hidden sm:block">
+                        <div
+                          className="text-right hidden sm:block relative cursor-help"
+                          title={`ФОТ рейсов: Водители ${Math.round(group.driverPayroll).toLocaleString('ru-RU')} ₽ + Грузчики ${Math.round(group.loaderPayroll).toLocaleString('ru-RU')} ₽${group.loaderProfit > 0 ? `\nПрибыль компании с грузчиков: +${Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽ (маржа 30%)` : ''}`}
+                        >
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            ЗП
+                            ЗП (ФОТ)
                           </span>
                           <span className="text-sm font-black text-amber-500">
                             <Money amount={group.tripsPayroll.toFixed(2)} />
                           </span>
+                          {group.loaderProfit > 0 && (
+                            <span className="text-[9px] font-bold text-emerald-600 block leading-tight">
+                              +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽ с грузч.
+                            </span>
+                          )}
                         </div>
                         <div className="text-right hidden sm:block">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -2560,6 +2633,46 @@ export default function ReviewPage() {
                     {/* Group Content (Trips & Service Orders) */}
                     {isExpanded && (
                       <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-4">
+                        {/* Payroll & Loaders Profit Summary Banner */}
+                        <div className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
+                                ЗП водителей
+                              </span>
+                              <span className="font-extrabold text-slate-800 text-sm">
+                                <Money amount={group.driverPayroll.toFixed(2)} />
+                              </span>
+                            </div>
+                            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
+                                Выплаты грузчикам
+                              </span>
+                              <span className="font-extrabold text-slate-700 text-sm">
+                                <Money amount={group.loaderPayroll.toFixed(2)} />
+                              </span>
+                            </div>
+                            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                            <div className="bg-emerald-50 border border-emerald-200/80 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                              <span className="material-symbols-outlined text-emerald-600 text-[18px]">
+                                payments
+                              </span>
+                              <div>
+                                <span className="text-emerald-800 block text-[9px] uppercase font-black tracking-wider">
+                                  Прибыль с грузчиков (маржа 30%)
+                                </span>
+                                <span className="font-black text-emerald-600 text-sm">
+                                  +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-slate-400 italic">
+                            * Включает комиссию со сторонних бригад и погрузки силами водителя
+                          </div>
+                        </div>
+
                         {/* 1. Trips Section */}
                         {group.trips.length > 0 && (
                           <div className="space-y-2">

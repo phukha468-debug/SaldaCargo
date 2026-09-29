@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
     let ordersQuery = (supabase.from('trip_orders') as any)
       .select(
-        `id, amount, payment_method, created_at, description,
+        `id, amount, payment_method, created_at, updated_at, description,
          invoice_number, invoice_date, invoice_status, invoice_paid_at, counterparty_id,
          counterparty:counterparties(id, name, is_legal_entity, email, phone),
          trip:trips(id, trip_number, started_at, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number))`,
@@ -52,22 +52,32 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: manualsErr.message }, { status: 500 });
     }
 
-    const tripItems = (orders ?? []).map((o: any) => ({
-      id: o.id,
-      type: 'trip_order' as const,
-      amount: o.amount,
-      payment_method: o.payment_method,
-      created_at: o.created_at,
-      description: o.description,
-      invoice_number: o.invoice_number,
-      invoice_date: o.invoice_date,
-      invoice_status: o.invoice_status || 'paid',
-      invoice_paid_at: o.invoice_paid_at,
-      effective_date: o.invoice_paid_at || o.invoice_date || o.created_at,
-      counterparty_id: o.counterparty_id,
-      counterparty: o.counterparty,
-      trip: o.trip,
-    }));
+    const tripItems = (orders ?? []).map((o: any) => {
+      const tripDate = o.trip?.started_at
+        ? String(o.trip.started_at).slice(0, 10)
+        : o.created_at
+          ? String(o.created_at).slice(0, 10)
+          : null;
+      const actDate = o.invoice_date || tripDate;
+      const paidDate = o.invoice_paid_at || o.updated_at;
+      return {
+        id: o.id,
+        type: 'trip_order' as const,
+        amount: o.amount,
+        payment_method: o.payment_method,
+        created_at: o.created_at,
+        updated_at: o.updated_at,
+        description: o.description,
+        invoice_number: o.invoice_number,
+        invoice_date: actDate,
+        invoice_status: o.invoice_status || 'paid',
+        invoice_paid_at: paidDate,
+        effective_date: paidDate || actDate || o.created_at,
+        counterparty_id: o.counterparty_id,
+        counterparty: o.counterparty,
+        trip: o.trip,
+      };
+    });
 
     const manualItems = (manuals ?? []).map((m: any) => ({
       id: m.id,
