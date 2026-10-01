@@ -18,13 +18,20 @@ const MAX_BOT_API = 'https://botapi.max.ru';
 
 async function sendMaxMessage(maxUserId: string, text: string): Promise<void> {
   const token = process.env.MAX_BOT_TOKEN;
-  if (!token) return;
+  if (!token || !maxUserId) return;
 
-  await fetch(`${MAX_BOT_API}/sendMessage?access_token=${token}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: maxUserId, text }),
-  });
+  try {
+    await fetch(`${MAX_BOT_API}/messages?user_id=${maxUserId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+  } catch (e) {
+    console.error(`[MAX_BOT] Failed to send alert to ${maxUserId}:`, e);
+  }
 }
 
 function formatDocAlerts(fleet: any[]): string {

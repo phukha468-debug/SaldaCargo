@@ -190,7 +190,16 @@ function calcServiceOrder(o: ReviewServiceOrder) {
   return { partsCost, salaryCost, worksCost, totalCost, isExternal, contractorName, isEquipment };
 }
 
-function calcOrderLoaderMetrics(o: TripOrder) {
+// Систему заработка компании 30% с услуг грузчиков ввели 1 сентября 2026 года (миграция 20260901000000_order_payroll_v2.sql).
+// До 01.09.2026 компания не брала маржу с услуг погрузки, поэтому статистика прибыли с грузчиков ведётся строго с 01.09.2026.
+const LOADER_PROFIT_START_DATE = '2026-09-01';
+
+function isLoaderProfitEligible(tripStartedAt?: string | null): boolean {
+  if (!tripStartedAt) return true;
+  return tripStartedAt.slice(0, 10) >= LOADER_PROFIT_START_DATE;
+}
+
+function calcOrderLoaderMetrics(o: TripOrder, tripStartedAt?: string | null) {
   const lp1 = parseFloat(o.loader_pay || '0');
   const lp2 = parseFloat(o.loader2_pay || '0');
   let thirdPartyPay = 0;
@@ -203,6 +212,11 @@ function calcOrderLoaderMetrics(o: TripOrder) {
   const totalPaid = thirdPartyPay + driverLoaderPay;
   if (totalPaid <= 0) {
     return { profit: 0, thirdPartyPay: 0, driverLoaderPay: 0, totalPaid: 0, loadersPool: 0 };
+  }
+
+  // До 01.09.2026 система 30% с грузчиков не действовала — маржа компании 0, весь пул шёл рабочим
+  if (!isLoaderProfitEligible(tripStartedAt)) {
+    return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: totalPaid };
   }
 
   const dcp = parseFloat(String(o.driver_car_pay || '0'));
@@ -219,8 +233,8 @@ function calcOrderLoaderMetrics(o: TripOrder) {
   return { profit, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool };
 }
 
-function calcOrderLoaderProfit(o: TripOrder): number {
-  return calcOrderLoaderMetrics(o).profit;
+function calcOrderLoaderProfit(o: TripOrder, tripStartedAt?: string | null): number {
+  return calcOrderLoaderMetrics(o, tripStartedAt).profit;
 }
 
 function calcTrip(trip: TripForReview) {
@@ -240,7 +254,7 @@ function calcTrip(trip: TripForReview) {
   let loadingBilled = 0;
 
   for (const o of activeOrders) {
-    const m = calcOrderLoaderMetrics(o);
+    const m = calcOrderLoaderMetrics(o, trip.started_at);
     loaderProfit += m.profit;
     driverLoaderPay += m.driverLoaderPay;
     thirdPartyLoaderPay += m.thirdPartyPay;
@@ -1454,12 +1468,15 @@ function TripCard({
                                   <Money amount={String(order.driver_loader_pay)} />
                                 </div>
                               )}
-                            {calcOrderLoaderProfit(order) > 0 && (
+                            {calcOrderLoaderProfit(order, trip.started_at) > 0 && (
                               <div
                                 className="text-[9px] font-bold text-emerald-600 text-right leading-none"
                                 title="Прибыль компании с услуг погрузки (маржа 30%)"
                               >
-                                +{Math.round(calcOrderLoaderProfit(order)).toLocaleString('ru-RU')}{' '}
+                                +
+                                {Math.round(
+                                  calcOrderLoaderProfit(order, trip.started_at),
+                                ).toLocaleString('ru-RU')}{' '}
                                 ₽ маржа
                               </div>
                             )}
@@ -2728,42 +2745,52 @@ export default function ReviewPage() {
                                 </span>
                               </div>
 
-                              <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+                              {group.loaderProfit > 0 && (
+                                <>
+                                  <div className="h-8 w-px bg-slate-200 hidden sm:block" />
 
-                              {/* 3. Оплачено клиентами за ПРР */}
-                              <div>
-                                <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
-                                  Оплачено клиентами за ПРР
-                                </span>
-                                <span className="font-extrabold text-slate-900 text-sm">
-                                  <Money amount={group.loadingBilled.toFixed(2)} />
-                                </span>
-                                <span className="block text-[10px] text-slate-400">
-                                  в чеках заказов
-                                </span>
-                              </div>
+                                  {/* 3. Оплачено клиентами за ПРР */}
+                                  <div>
+                                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">
+                                      Оплачено клиентами за ПРР
+                                    </span>
+                                    <span className="font-extrabold text-slate-900 text-sm">
+                                      <Money amount={group.loadingBilled.toFixed(2)} />
+                                    </span>
+                                    <span className="block text-[10px] text-slate-400">
+                                      в чеках заказов
+                                    </span>
+                                  </div>
 
-                              <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+                                  <div className="h-8 w-px bg-slate-200 hidden sm:block" />
 
-                              {/* 4. Чистая прибыль с ПРР */}
-                              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-emerald-600 text-[20px]">
-                                  payments
-                                </span>
-                                <div>
-                                  <span className="text-emerald-800 block text-[9px] uppercase font-black tracking-wider">
-                                    Прибыль компании с ПРР
-                                  </span>
-                                  <span className="font-black text-emerald-600 text-sm sm:text-base">
-                                    +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
-                                  </span>
-                                </div>
-                              </div>
+                                  {/* 4. Чистая прибыль с ПРР */}
+                                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-emerald-600 text-[20px]">
+                                      payments
+                                    </span>
+                                    <div>
+                                      <span className="text-emerald-800 block text-[9px] uppercase font-black tracking-wider">
+                                        Прибыль компании с ПРР
+                                      </span>
+                                      <span className="font-black text-emerald-600 text-sm sm:text-base">
+                                        +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
+                                      </span>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
                             </div>
 
-                            <div className="text-[10px] text-slate-400 font-medium">
-                              ПРР: 70% оплата рабочим · 30% прибыль компании
-                            </div>
+                            {group.loaderProfit > 0 ? (
+                              <div className="text-[10px] text-slate-400 font-medium">
+                                ПРР: 70% оплата рабочим · 30% прибыль компании
+                              </div>
+                            ) : group.totalLoadingPayroll > 0 ? (
+                              <div className="text-[10px] text-slate-400 font-medium italic">
+                                * До 01.09.2026 маржа с ПРР не взималась (100% выплата рабочим)
+                              </div>
+                            ) : null}
                           </div>
                         </div>
 

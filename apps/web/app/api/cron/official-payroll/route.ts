@@ -43,11 +43,18 @@ async function sendMaxMessage(maxUserId: string, text: string): Promise<boolean>
   if (!token || !maxUserId) return false;
 
   try {
-    const res = await fetch(`${MAX_BOT_API}/sendMessage?access_token=${token}`, {
+    const res = await fetch(`${MAX_BOT_API}/messages?user_id=${maxUserId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: maxUserId, text }),
+      headers: {
+        Authorization: token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[MAX_BOT] Failed to send to ${maxUserId}: HTTP ${res.status} - ${errText}`);
+    }
     return res.ok;
   } catch (e) {
     console.error(`[MAX_BOT] Failed to send message to ${maxUserId}:`, e);
@@ -94,7 +101,7 @@ async function handleOfficialPayrollCron(req: NextRequest) {
         id, name, phone, roles, max_user_id, current_asset_id,
         is_officially_employed, official_salary_amount, official_salary_day,
         has_court_orders, court_order_pct, court_order_notes,
-        asset:assets(id, short_name, reg_number)
+        asset:assets!fk_users_current_asset(id, short_name, reg_number)
       `,
       )
       .eq('is_active', true)
@@ -172,18 +179,97 @@ async function handleOfficialPayrollCron(req: NextRequest) {
           );
         }
       }
+
+      // Если долг был начислен — сразу отправляем отчёт администраторам в МАКС
+      if (results.accruals_created > 0) {
+        const accrualLines = officialList.map(
+          (u) => `• 👤 ${u.name} — ${MONTHLY_TAX_AMOUNT.toLocaleString('ru-RU')} ₽`,
+        );
+        const totalTaxAccrued = results.accruals_created * MONTHLY_TAX_AMOUNT;
+        const accrualMsg = [
+          `📢 НАЧИСЛЕНИЕ ДОЛГА ПО ТК РФ (НАЛОГИ ЗА СОТРУДНИКОВ)`,
+          `Сегодня 1 ${monthName} — начислен ежемесячный налог за официальное трудоустройство в долг сотрудникам:\n\n${accrualLines.join('\n')}`,
+          `📊 Всего начислено долга: ${totalTaxAccrued.toLocaleString('ru-RU')} ₽`,
+          `ℹ️ Суммы зафиксированы в долг перед компанией и будут автоматически вычитаться из сдельных выплат за рейсы при расчёте ЗП.`,
+          `\n🤖 Сформировано автоматически ботом ТК501 для директора и администратора`,
+        ].join('\n\n');
+
+        const { data: admins } = await (supabase as any)
+          .from('users')
+          .select('id, name, max_user_id')
+          .or('roles.cs.{admin},roles.cs.{owner}')
+          .eq('is_active', true)
+          .not('max_user_id', 'is', null);
+
+        const recipients: string[] = ((admins as any[]) ?? [])
+          .map((a) => a.max_user_id)
+          .filter(Boolean);
+
+        for (const maxUserId of recipients) {
+          const sent = await sendMaxMessage(maxUserId, accrualMsg);
+          if (sent) results.notifications_sent++;
+        }
+      }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // ЗАДАЧА 2: День выплаты (по умолчанию 25-е или 10-е число) — Автонапоминание в МАКС
+    // ЗАДАЧА 1.5: За 1 день до 1-го числа месяца — Напоминание о начислении долга по налогам
+    // ──────────────────────────────────────────────────────────────────────────
+    const tomorrow = new Date(currentYear, currentMonth, currentDay + 1);
+    const isDayBeforeAccrual = tomorrow.getDate() === 1;
+
+    if (
+      (isDayBeforeAccrual || searchParams.get('force_tax_prealert') === 'true') &&
+      officialList.length > 0
+    ) {
+      const nextMonthName = MONTH_NAMES_RU[tomorrow.getMonth()] ?? 'месяца';
+      const totalTax = officialList.length * 10000;
+      const lines = officialList.map((u) => `• 👤 ${u.name} — 10 000 ₽`);
+
+      const preAlertMsg = [
+        `📢 НАПОМИНАНИЕ: ЗАВТРА 1 ${nextMonthName.toUpperCase()} — НАЧИСЛЕНИЕ ДОЛГА ПО ТК РФ`,
+        `Завтра в 09:00 МСК в систему будет автоматически начислено по 10 000 ₽ за официальное трудоустройство (налог) в долг сотрудникам:\n\n${lines.join('\n')}`,
+        `📊 Всего к начислению: ${totalTax.toLocaleString('ru-RU')} ₽`,
+        `ℹ️ Начисление сформирует долг сотрудников перед компанией и будет автоматически вычитаться из сдельной оплаты за рейсы.`,
+        `\n🤖 Сформировано автоматически ботом ТК501 для директора и администратора`,
+      ].join('\n\n');
+
+      const { data: admins } = await (supabase as any)
+        .from('users')
+        .select('id, name, max_user_id')
+        .or('roles.cs.{admin},roles.cs.{owner}')
+        .eq('is_active', true)
+        .not('max_user_id', 'is', null);
+
+      const recipients: string[] = ((admins as any[]) ?? [])
+        .map((a) => a.max_user_id)
+        .filter(Boolean);
+
+      let sentCount = 0;
+      for (const maxUserId of recipients) {
+        const sent = await sendMaxMessage(maxUserId, preAlertMsg);
+        if (sent) sentCount++;
+      }
+      results.notifications_sent += sentCount;
+      results.details.push(
+        `Отправлено напоминаний за 1 день до начисления долга: ${sentCount} из ${recipients.length}`,
+      );
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // ЗАДАЧА 2: День выплаты или за 1 день до выплаты — Напоминание в МАКС
     // ──────────────────────────────────────────────────────────────────────────
     const isPayDay = officialList.some((u) => (u.official_salary_day ?? 25) === currentDay);
+    const isDayBeforePayDay = officialList.some(
+      (u) => (u.official_salary_day ?? 25) === currentDay + 1,
+    );
 
-    if (isPayDay || searchParams.get('force_notify') === 'true') {
-      // Отбираем сотрудников, у которых день выплаты совпадает с текущим
+    if (isPayDay || isDayBeforePayDay || searchParams.get('force_notify') === 'true') {
+      // Отбираем сотрудников, у которых день выплаты сегодня или завтра
       const dueUsers = officialList.filter(
         (u) =>
           (u.official_salary_day ?? 25) === currentDay ||
+          (u.official_salary_day ?? 25) === currentDay + 1 ||
           searchParams.get('force_notify') === 'true',
       );
 
@@ -210,13 +296,25 @@ async function handleOfficialPayrollCron(req: NextRequest) {
           }
         }
 
+        const isAdvanceNotice = isDayBeforePayDay && !isPayDay;
+        const targetPayDay = dueUsers[0]?.official_salary_day ?? 25;
+
         // Формируем аккуратное сообщение в МАКС
         const messageParts: string[] = [];
 
-        messageParts.push(`📢 НАПОМИНАНИЕ: ВЫПЛАТА ОФИЦИАЛЬНОЙ ЧАСТИ ЗП (ТК РФ)`);
-        messageParts.push(
-          `Сегодня ${currentDay} ${monthName} — день выплаты официальной части ЗП сотрудникам ТК501.`,
-        );
+        if (isAdvanceNotice) {
+          messageParts.push(
+            `📢 НАПОМИНАНИЕ: ЗАВТРА ${targetPayDay} ${(monthName ?? '').toUpperCase()} — ВЫПЛАТА ОФИЦИАЛЬНОЙ ЧАСТИ ЗП (ТК РФ)`,
+          );
+          messageParts.push(
+            `Завтра день выплаты официальной части ЗП сотрудникам ТК501. Подготовьте переводы.`,
+          );
+        } else {
+          messageParts.push(`📢 НАПОМИНАНИЕ: ВЫПЛАТА ОФИЦИАЛЬНОЙ ЧАСТИ ЗП (ТК РФ)`);
+          messageParts.push(
+            `Сегодня ${currentDay} ${monthName ?? ''} — день выплаты официальной части ЗП сотрудникам ТК501.`,
+          );
+        }
 
         messageParts.push(
           `📊 СВОДНЫЙ РАСЧЁТ:\n` +

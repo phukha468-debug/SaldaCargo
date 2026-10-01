@@ -37,29 +37,50 @@ export default function RootDispatcher() {
   const [pinLoading, setPinLoading] = useState(false);
   const router = useRouter();
 
-  // При монтировании: проверяем сохранённую сессию
+  // При монтировании: проверяем сохранённую сессию с защитой от зависания
   useEffect(() => {
-    const existingUserId = getCookieValue('salda_user_id');
-    const savedRole = localStorage.getItem('selected_role');
-    if (existingUserId && savedRole) {
-      if (savedRole === 'driver') {
-        router.replace('/driver');
-      } else if (savedRole === 'admin' || savedRole === 'owner') {
-        router.replace('/admin');
-      } else if (savedRole === 'mechanic') {
-        router.replace('/mechanic');
+    let timer: NodeJS.Timeout | null = null;
+    try {
+      const existingUserId = getCookieValue('salda_user_id');
+      const savedRole =
+        typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
+      if (existingUserId && savedRole) {
+        if (savedRole === 'driver') {
+          router.replace('/driver');
+        } else if (savedRole === 'admin' || savedRole === 'owner') {
+          router.replace('/admin');
+        } else if (savedRole === 'mechanic') {
+          router.replace('/mechanic');
+        } else {
+          setStep('role');
+        }
       } else {
-        // Сессия есть, но роль неизвестна — показываем выбор
         setStep('role');
       }
-    } else {
+    } catch (e) {
+      console.error('Session restore error:', e);
       setStep('role');
     }
-  }, []);
+
+    // Страховочный таймаут: если редирект завис более 1.5 сек (например, в WebView МАКС), переходим на выбор роли
+    timer = setTimeout(() => {
+      setStep((current) => (current === 'restoring' ? 'role' : current));
+    }, 1500);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [router]);
 
   const handleResetAll = () => {
-    document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    localStorage.clear();
+    try {
+      document.cookie =
+        'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=None; Secure;';
+      document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      localStorage.clear();
+    } catch (e) {
+      console.error('Reset error:', e);
+    }
     setStep('role');
   };
 
@@ -79,8 +100,14 @@ export default function RootDispatcher() {
   };
 
   const finishLogin = (user: User) => {
-    document.cookie = `salda_user_id=${user.id}; path=/; max-age=${60 * 60 * 24 * 7}`;
-    localStorage.setItem('selected_role', selectedRole ?? '');
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const sameSitePolicy = isHttps ? '; SameSite=None; Secure' : '; SameSite=Lax';
+    document.cookie = `salda_user_id=${user.id}; path=/; max-age=${60 * 60 * 24 * 30}${sameSitePolicy}`;
+    try {
+      localStorage.setItem('selected_role', selectedRole ?? '');
+    } catch (e) {
+      console.warn('localStorage not accessible:', e);
+    }
   };
 
   const handlePinDigit = (digit: string) => {
@@ -170,11 +197,18 @@ export default function RootDispatcher() {
   const renderStep = () => {
     if (step === 'restoring' || loading) {
       return (
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 text-center">
           <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">
             {step === 'restoring' ? 'Восстановление...' : 'Загрузка...'}
           </p>
+          <button
+            type="button"
+            onClick={handleResetAll}
+            className="mt-4 text-xs font-bold text-zinc-400 hover:text-zinc-600 uppercase underline tracking-wider py-1 px-3"
+          >
+            Нажмите, если экран завис (сброс)
+          </button>
         </div>
       );
     }
