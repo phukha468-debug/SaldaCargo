@@ -13,7 +13,7 @@ import { Button } from '@saldacargo/ui';
 const schema = z.object({
   category_id: z.string().min(1, 'Выберите категорию'),
   amount: z.coerce.number().positive('Введите сумму'),
-  payment_method: z.enum(['cash', 'card_driver', 'fuel_card']),
+  payment_method: z.enum(['cash', 'fuel_card', 'card_driver']),
   description: z.string().optional(),
 });
 
@@ -21,8 +21,7 @@ type FormData = z.infer<typeof schema>;
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Наличные', icon: '💵' },
-  { value: 'card_driver', label: 'Карта', icon: '💳' },
-  { value: 'fuel_card', label: 'Топливная', icon: '⛽' },
+  { value: 'fuel_card', label: 'Топливная ТК', icon: '⛽' },
 ] as const;
 
 const PAYMENT_METHODS_FUEL = [

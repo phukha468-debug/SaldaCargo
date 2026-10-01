@@ -81,10 +81,8 @@ export async function syncTripFinancials(
       .join(' · ');
   }
 
-  // 3. Sync Cash Income (cash + card_driver)
-  const cashOrders = orders.filter(
-    (o: any) => o.payment_method === 'cash' || o.payment_method === 'card_driver',
-  );
+  // 3. Sync Cash Income (strictly cash)
+  const cashOrders = orders.filter((o: any) => o.payment_method === 'cash');
   const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
   const cashIdempotency = generateDeterministicUuid(`trip-income-cash-${tripId}`);
 
@@ -123,8 +121,10 @@ export async function syncTripFinancials(
     await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
   }
 
-  // 4. Sync QR Income
-  const qrOrders = orders.filter((o: any) => o.payment_method === 'qr');
+  // 4. Sync QR / Bank Income (qr + legacy card_driver)
+  const qrOrders = orders.filter(
+    (o: any) => o.payment_method === 'qr' || o.payment_method === 'card_driver',
+  );
   const qrTotal = qrOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
   const qrIdempotency = generateDeterministicUuid(`trip-income-qr-${tripId}`);
 

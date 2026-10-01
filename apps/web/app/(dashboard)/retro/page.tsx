@@ -784,13 +784,8 @@ const PAYMENT_METHODS = [
   },
   {
     value: 'qr',
-    label: '📱 QR-код / Эквайринг',
+    label: '⚡ QR-код (Т-Банк / СБП)',
     color: 'bg-purple-50 text-purple-800 border-purple-300',
-  },
-  {
-    value: 'card_driver',
-    label: '💳 На карту водителя',
-    color: 'bg-blue-50 text-blue-800 border-blue-300',
   },
   {
     value: 'bank_invoice',
@@ -1465,7 +1460,6 @@ export default function RetroPage() {
                   >
                     <option value="fuel_card">Топливная карта (ГСМ)</option>
                     <option value="cash">Наличные из кассы рейса</option>
-                    <option value="card_driver">Карта компании / водителя</option>
                   </select>
                 </div>
 

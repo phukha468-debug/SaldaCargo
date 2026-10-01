@@ -61,10 +61,15 @@ export default function FinishTripPage() {
   const activeOrders = (trip?.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
   const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
   const cashRevenue = activeOrders
-    .filter((o) => o.payment_method === 'cash' || o.payment_method === 'card_driver')
+    .filter((o) => o.payment_method === 'cash')
     .reduce((s, o) => s + parseFloat(o.amount), 0);
   const nonCashRevenue = activeOrders
-    .filter((o) => o.payment_method === 'qr' || o.payment_method === 'bank_invoice')
+    .filter(
+      (o) =>
+        o.payment_method === 'qr' ||
+        o.payment_method === 'bank_invoice' ||
+        o.payment_method === 'card_driver',
+    )
     .reduce((s, o) => s + parseFloat(o.amount), 0);
 
   const driverPay = activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0);

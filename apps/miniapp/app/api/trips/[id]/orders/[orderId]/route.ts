@@ -39,8 +39,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Рейс уже одобрен администратором' }, { status: 403 });
     }
 
-    const pendingMethods = ['debt_cash', 'qr', 'card_driver'];
-    const settlementStatus = pendingMethods.includes(body.payment_method) ? 'pending' : 'completed';
+    const pendingMethods = ['debt_cash', 'debt', 'debt_bank'];
+    const paymentMethod = body.payment_method === 'card_driver' ? 'qr' : body.payment_method;
+    const settlementStatus = pendingMethods.includes(paymentMethod) ? 'pending' : 'completed';
 
     const loaders = Array.isArray(body.loaders_data) ? body.loaders_data : [];
     const loader1 =
@@ -54,7 +55,7 @@ export async function PATCH(
       description: body.description || null,
       amount: body.amount,
       driver_pay: body.driver_pay,
-      payment_method: body.payment_method,
+      payment_method: paymentMethod,
       settlement_status: settlementStatus,
     };
 

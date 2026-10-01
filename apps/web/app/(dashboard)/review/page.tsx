@@ -100,7 +100,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   qr: '⚡ QR-код',
   bank_invoice: '🏛️ Безнал (Р/С)',
   debt_cash: '⏳ Долг',
-  card_driver: '💳 Карта',
+  card_driver: '⚡ QR-код',
   fuel_card: '⛽ Топливная карта ТК',
 };
 
@@ -109,14 +109,14 @@ const PAYMENT_STYLES: Record<string, string> = {
   qr: 'bg-purple-600 text-white font-black border-purple-700 shadow-xs ring-2 ring-purple-300',
   bank_invoice: 'bg-blue-600 text-white font-bold border-blue-700',
   debt_cash: 'bg-rose-600 text-white font-bold border-rose-700',
-  card_driver: 'bg-sky-600 text-white font-bold border-sky-700',
+  card_driver:
+    'bg-purple-600 text-white font-black border-purple-700 shadow-xs ring-2 ring-purple-300',
   fuel_card: 'bg-amber-600 text-white font-black border-amber-700 shadow-xs',
 };
 
 const PAYMENT_EDIT_OPTIONS = [
   { value: 'cash', label: 'Наличные' },
   { value: 'qr', label: 'QR-код' },
-  { value: 'card_driver', label: 'Карта' },
   { value: 'debt_cash', label: 'Долг' },
 ];
 

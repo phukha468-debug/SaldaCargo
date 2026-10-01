@@ -17,7 +17,7 @@ import {
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
   driver_pay: z.coerce.number().min(0).optional(),
-  payment_method: z.enum(['cash', 'debt_cash', 'card_driver']),
+  payment_method: z.enum(['cash', 'qr', 'debt_cash', 'card_driver']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
 });
@@ -36,9 +36,9 @@ interface SelectedLoader {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Наличные (сдаст)', icon: '💵' },
-  { value: 'card_driver', label: 'На карту', icon: '💳' },
-  { value: 'debt_cash', label: 'Долг', icon: '⏳' },
+  { value: 'cash', label: 'Наличные', icon: '💵' },
+  { value: 'qr', label: 'QR-код (Т-Банк)', icon: '⚡' },
+  { value: 'debt_cash', label: 'В долг', icon: '⏳' },
 ] as const;
 
 const SUGGEST_PERCENT = 30;
@@ -146,7 +146,8 @@ export default function EditOrderPage() {
     if (order && !initialized) {
       setValue('amount', parseFloat(order.amount));
       setValue('driver_pay', parseFloat(order.driver_pay));
-      setValue('payment_method', order.payment_method as any);
+      const pm = order.payment_method === 'card_driver' ? 'qr' : order.payment_method;
+      setValue('payment_method', (pm || 'cash') as any);
       setValue('description', order.description ?? '');
       if (order.counterparty_id) setValue('counterparty_id', order.counterparty_id);
 
@@ -326,7 +327,7 @@ export default function EditOrderPage() {
         loader_pay: loadersData[0]?.pay ?? '0',
         loader2_id: loadersData[1]?.id ?? null,
         loader2_pay: loadersData[1]?.pay ?? '0',
-        payment_method: data.payment_method,
+        payment_method: data.payment_method === 'card_driver' ? 'qr' : data.payment_method,
       }),
     });
 

@@ -138,9 +138,9 @@ export async function POST(request: Request) {
       loader2_pay: o.loader2_pay || '0',
       loader_id: body.loader_id || null,
       loader2_id: body.loader2_id || null,
-      payment_method: o.payment_method,
+      payment_method: o.payment_method === 'card_driver' ? 'qr' : o.payment_method,
       counterparty_id: o.counterparty_id || null,
-      settlement_status: ['debt_cash', 'qr', 'card_driver'].includes(o.payment_method)
+      settlement_status: ['debt_cash', 'debt', 'debt_bank'].includes(o.payment_method)
         ? 'pending'
         : 'completed',
       lifecycle_status: 'draft',

@@ -294,17 +294,14 @@ export default function TripDetailPage() {
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-xs">
                                   💵 Наличные
                                 </span>
-                              ) : order.payment_method === 'qr' ? (
+                              ) : order.payment_method === 'qr' ||
+                                order.payment_method === 'card_driver' ? (
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-purple-600 text-white shadow-xs">
                                   ⚡ QR-код
                                 </span>
                               ) : order.payment_method === 'debt_cash' ? (
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-600 text-white shadow-xs">
                                   ⏳ Долг
-                                </span>
-                              ) : order.payment_method === 'card_driver' ? (
-                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-sky-600 text-white shadow-xs">
-                                  💳 Карта
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-600 text-white shadow-xs">

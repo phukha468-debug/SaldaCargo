@@ -20,7 +20,7 @@ import {
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму'),
   driver_pay: z.coerce.number().min(0).optional(),
-  payment_method: z.enum(['cash', 'debt_cash']),
+  payment_method: z.enum(['cash', 'qr', 'debt_cash']),
   description: z.string().optional(),
   counterparty_id: z.string().optional(),
 });
@@ -55,17 +55,25 @@ const METHODS_INDIVIDUAL = [
   {
     value: 'cash' as const,
     label: 'Наличные',
-    sublabel: 'Сдаст в конце смены',
+    sublabel: 'Сдаст в кассу',
     icon: '💵',
-    wallet: '→ Касса',
+    wallet: '→ Сейф ТК',
     color: 'peer-checked:border-green-600 peer-checked:bg-green-50',
+  },
+  {
+    value: 'qr' as const,
+    label: 'QR-код',
+    sublabel: 'Т-Банк / СБП',
+    icon: '⚡',
+    wallet: '→ Расчётный счёт',
+    color: 'peer-checked:border-yellow-500 peer-checked:bg-yellow-50',
   },
   {
     value: 'debt_cash' as const,
     label: 'Долг',
     sublabel: 'Заплатит позднее',
     icon: '⏳',
-    wallet: '→ Дебиторка → Касса',
+    wallet: '→ Дебиторка',
     color: 'peer-checked:border-orange-500 peer-checked:bg-orange-50',
   },
 ];
@@ -78,6 +86,14 @@ const METHODS_LEGAL = [
     icon: '🧾',
     wallet: '→ Дебиторка → Р/С',
     color: 'peer-checked:border-blue-500 peer-checked:bg-blue-50',
+  },
+  {
+    value: 'qr' as const,
+    label: 'QR-код (СБП)',
+    sublabel: 'Оплата по QR сразу на Р/С',
+    icon: '⚡',
+    wallet: '→ Расчётный счёт',
+    color: 'peer-checked:border-yellow-500 peer-checked:bg-yellow-50',
   },
 ];
 
@@ -763,8 +779,17 @@ export default function AddOrderPage() {
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
               <span className="text-sm leading-none">💡</span>
               <span>
-                Деньги физически у вас или вы лично своими глазами видели перевод. Описание можно не
-                заполнять.
+                Деньги физически у вас в виде наличных. Сдаются в сейф/кассу ТК в конце смены.
+              </span>
+            </div>
+          )}
+
+          {/* Подсказка для QR */}
+          {selectedPaymentMethod === 'qr' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-yellow-900 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
+              <span className="text-sm leading-none">⚡</span>
+              <span>
+                Клиент перевёл по QR-коду / СБП на счёт Т-Банка. Наличные сдавать не нужно.
               </span>
             </div>
           )}
