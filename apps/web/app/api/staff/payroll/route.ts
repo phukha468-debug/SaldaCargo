@@ -9,6 +9,82 @@ const SALARY_CATEGORY_IDS = [
 ];
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
+const MONTH_NAMES_RU = [
+  'январь',
+  'февраль',
+  'март',
+  'апрель',
+  'май',
+  'июнь',
+  'июль',
+  'август',
+  'сентябрь',
+  'октябрь',
+  'ноябрь',
+  'декабрь',
+];
+
+async function ensureOfficialTaxDeductions(supabase: any, year: number, month: number) {
+  try {
+    const now = new Date();
+    // Начисляем только если целевой месяц уже наступил (1-е число месяца уже наступило)
+    const targetDate = new Date(year, month - 1, 1);
+    if (targetDate > now) return;
+
+    const monthStart = new Date(year, month - 1, 1).toISOString();
+    const monthEnd = new Date(year, month, 0, 23, 59, 59).toISOString();
+    const monthName = MONTH_NAMES_RU[month - 1] ?? 'месяца';
+
+    const { data: officialUsers } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('is_active', true)
+      .eq('is_officially_employed', true);
+
+    if (!officialUsers || officialUsers.length === 0) return;
+
+    const { data: adminUser } = await supabase
+      .from('users')
+      .select('id')
+      .or('roles.cs.{owner},roles.cs.{admin}')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    const adminId = adminUser?.id ?? officialUsers[0]?.id;
+
+    for (const u of officialUsers) {
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('category_id', ADVANCE_CATEGORY_ID)
+        .eq('related_user_id', u.id)
+        .gte('transaction_date', monthStart)
+        .lte('transaction_date', monthEnd)
+        .or('description.ilike.%Налог%ТК РФ%,description.ilike.%Вычет по ТК РФ%')
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        await supabase.from('transactions').insert({
+          direction: 'expense',
+          category_id: ADVANCE_CATEGORY_ID,
+          amount: '10000.00',
+          description: `Налог за официальное трудоустройство (ТК РФ): ${u.name} — ${monthName} ${year}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          related_user_id: u.id,
+          from_wallet_id: null,
+          transaction_date: new Date(year, month - 1, 1, 0, 1, 0).toISOString(),
+          idempotency_key: crypto.randomUUID(),
+          created_by: adminId,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to auto-ensure official tax deductions:', err);
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -19,6 +95,9 @@ export async function GET(request: Request) {
     const monthEnd = new Date(year, month, 0, 23, 59, 59).toISOString();
 
     const supabase = createAdminClient();
+
+    // Автоматическая проверка и начисление налога 10 000 ₽ за официальное трудоустройство (ТК РФ)
+    await ensureOfficialTaxDeductions(supabase, year, month);
 
     const [
       { data: users },
