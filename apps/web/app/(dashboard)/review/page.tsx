@@ -101,6 +101,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   bank_invoice: '🏛️ Безнал (Р/С)',
   debt_cash: '⏳ Долг',
   card_driver: '💳 Карта',
+  fuel_card: '⛽ Топливная карта ТК',
 };
 
 const PAYMENT_STYLES: Record<string, string> = {
@@ -109,6 +110,7 @@ const PAYMENT_STYLES: Record<string, string> = {
   bank_invoice: 'bg-blue-600 text-white font-bold border-blue-700',
   debt_cash: 'bg-rose-600 text-white font-bold border-rose-700',
   card_driver: 'bg-sky-600 text-white font-bold border-sky-700',
+  fuel_card: 'bg-amber-600 text-white font-black border-amber-700 shadow-xs',
 };
 
 const PAYMENT_EDIT_OPTIONS = [
