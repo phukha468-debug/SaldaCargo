@@ -73,7 +73,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
-  const totalBalance = bankNum + cashNum;
+  const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
+  const totalBalance = bankNum + cashNum + fuelNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
   const fleetAlertCount = alerts?.fleet?.length ?? 0;
@@ -252,12 +253,20 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               </div>
-              <div className="h-6 w-px bg-slate-700 mx-1 hidden md:block" />
-              <div className="text-xs text-slate-300 hidden md:block">
-                <span className="text-sky-400 font-bold">Банк:</span>{' '}
-                {bankNum.toLocaleString('ru-RU')} ₽ <br />
-                <span className="text-emerald-400 font-bold">Касса:</span>{' '}
-                {cashNum.toLocaleString('ru-RU')} ₽
+              <div className="h-9 w-px bg-slate-700 mx-1 hidden md:block" />
+              <div className="text-[11px] text-slate-300 hidden md:block leading-tight space-y-0.5">
+                <div>
+                  <span className="text-sky-400 font-bold">Банк:</span>{' '}
+                  {bankNum.toLocaleString('ru-RU')} ₽
+                </div>
+                <div>
+                  <span className="text-emerald-400 font-bold">Касса:</span>{' '}
+                  {cashNum.toLocaleString('ru-RU')} ₽
+                </div>
+                <div>
+                  <span className="text-amber-400 font-bold">ГСМ:</span>{' '}
+                  {fuelNum.toLocaleString('ru-RU')} ₽
+                </div>
               </div>
             </div>
 

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Money } from '@saldacargo/ui';
 import { cn } from '@saldacargo/ui';
 
-type WalletKey = 'bank' | 'cash';
+type WalletKey = 'bank' | 'cash' | 'fuel_card';
 type Period = 'day' | 'week' | 'month';
 
 type WalletHistoryItem = {
@@ -134,10 +134,11 @@ export default function DashboardHome() {
     refetchInterval: 30000,
   });
 
-  // Liquid Balances (только Р/С и Касса)
+  // Liquid Balances (Р/С, Касса, Топливные карты)
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
-  const totalLiquid = bankNum + cashNum;
+  const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
+  const totalLiquid = bankNum + cashNum + fuelNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
 
@@ -182,7 +183,7 @@ export default function DashboardHome() {
             </p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-700/60 grid grid-cols-2 gap-2 text-xs">
+          <div className="mt-4 pt-3 border-t border-slate-700/60 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
             <button
               onClick={() => setDrawerWallet('bank')}
               className="bg-slate-800/80 hover:bg-slate-700/80 p-2.5 rounded-xl border border-slate-700/50 text-left transition-colors cursor-pointer group"
@@ -207,8 +208,24 @@ export default function DashboardHome() {
               <span className="text-[10px] text-slate-400 uppercase font-bold block">
                 Касса (наличные)
               </span>
-              <span className="text-sm font-extrabold text-emerald-400">
+              <span className="text-sm font-extrabold text-emerald-400 mt-1 block">
                 {cashNum.toLocaleString('ru-RU')} ₽
+              </span>
+            </button>
+            <button
+              onClick={() => setDrawerWallet('fuel_card')}
+              className="bg-slate-800/80 hover:bg-slate-700/80 p-2.5 rounded-xl border border-slate-700/50 text-left transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Топливные карты
+                </span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ГСМ
+                </span>
+              </div>
+              <span className="text-sm font-extrabold text-amber-400 mt-1 block">
+                {fuelNum.toLocaleString('ru-RU')} ₽
               </span>
             </button>
           </div>
@@ -774,10 +791,21 @@ export default function DashboardHome() {
 const WALLET_LABELS: Record<WalletKey, { name: string; sub: string; color: string }> = {
   bank: { name: 'Банк', sub: 'Расчётный счёт', color: '#3b82f6' },
   cash: { name: 'Касса', sub: 'Наличные', color: '#10b981' },
+  fuel_card: { name: 'Топливные карты', sub: 'Баланс ГСМ / АЗС', color: '#f59e0b' },
 };
 const OTHER_WALLETS: Record<WalletKey, { key: WalletKey; label: string }[]> = {
-  bank: [{ key: 'cash', label: 'Касса' }],
-  cash: [{ key: 'bank', label: 'Банк' }],
+  bank: [
+    { key: 'cash', label: 'Касса' },
+    { key: 'fuel_card', label: 'ГСМ' },
+  ],
+  cash: [
+    { key: 'bank', label: 'Банк' },
+    { key: 'fuel_card', label: 'ГСМ' },
+  ],
+  fuel_card: [
+    { key: 'bank', label: 'Банк' },
+    { key: 'cash', label: 'Касса' },
+  ],
 };
 
 function getPeriodRange(
@@ -825,7 +853,7 @@ function WalletDrawer({
 }: {
   wallet: WalletKey;
   onClose: () => void;
-  wallets: { bank: { balance: string }; cash: { balance: string } } | undefined;
+  wallets: Wallets | undefined;
 }) {
   const [period, setPeriod] = useState<Period>('day');
   const [offset, setOffset] = useState(0);

@@ -5,11 +5,13 @@ import { NextResponse } from 'next/server';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const CARD_ID = '10000000-0000-0000-0000-000000000003';
+const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 
 const WALLET_META: Record<string, { id: string; name: string }> = {
   bank: { id: BANK_ID, name: 'Банк' },
   cash: { id: CASH_ID, name: 'Касса' },
   card: { id: CARD_ID, name: 'Карта' },
+  fuel_card: { id: FUEL_CARD_ID, name: 'Топливные карты' },
 };
 
 export type WalletHistoryItem = {

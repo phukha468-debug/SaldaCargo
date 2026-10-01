@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -65,12 +65,17 @@ export default function AddExpensePage() {
     selectedCategory?.name?.toUpperCase().includes('ТОПЛИВО');
 
   const selectedPaymentMethod = watch('payment_method');
-
   const availablePaymentMethods = isFuelCategory ? PAYMENT_METHODS_FUEL : PAYMENT_METHODS;
 
-  if (isFuelCategory && selectedPaymentMethod === 'card_driver') {
-    setValue('payment_method', 'cash');
-  }
+  const prevIsFuelRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (isFuelCategory && !prevIsFuelRef.current) {
+      setValue('payment_method', 'fuel_card');
+    } else if (!isFuelCategory && prevIsFuelRef.current && selectedPaymentMethod === 'fuel_card') {
+      setValue('payment_method', 'cash');
+    }
+    prevIsFuelRef.current = !!isFuelCategory;
+  }, [isFuelCategory, selectedPaymentMethod, setValue]);
 
   async function onSubmit(data: FormData) {
     if (submitting) return;

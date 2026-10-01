@@ -6,6 +6,7 @@ const WALLET_IDS: Record<string, string> = {
   bank: '10000000-0000-0000-0000-000000000001',
   cash: '10000000-0000-0000-0000-000000000002',
   card: '10000000-0000-0000-0000-000000000003',
+  fuel_card: '10000000-0000-0000-0000-000000000004',
 };
 
 const sum = (rows: any[]) =>
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     const BANK_ID = WALLET_IDS.bank!;
     const CASH_ID = WALLET_IDS.cash!;
     const CARD_ID = WALLET_IDS.card!;
+    const FUEL_CARD_ID = WALLET_IDS.fuel_card!;
 
     const [
       { data: bankOrders },
@@ -66,12 +68,12 @@ export async function POST(request: Request) {
       (supabase.from('cash_collections') as any).select('amount'),
       (supabase.from('transactions') as any)
         .select('amount, to_wallet_id')
-        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID])
+        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
       (supabase.from('transactions') as any)
         .select('amount, from_wallet_id')
-        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID])
+        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
     ]);
@@ -91,6 +93,9 @@ export async function POST(request: Request) {
         sum(cardOrders ?? []) +
         sumWhere(txIn ?? [], 'to_wallet_id', CARD_ID) -
         sumWhere(txOut ?? [], 'from_wallet_id', CARD_ID),
+      fuel_card:
+        sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
+        sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID),
     };
 
     const current = currentBalances[wallet] ?? 0;
