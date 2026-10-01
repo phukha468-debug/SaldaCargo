@@ -187,12 +187,18 @@ export default function DashboardHome() {
           <div className="mt-4 pt-3 border-t border-slate-700/60 grid grid-cols-2 gap-2 text-xs">
             <button
               onClick={() => setDrawerWallet('bank')}
-              className="bg-slate-800/80 hover:bg-slate-700/80 p-2.5 rounded-xl border border-slate-700/50 text-left transition-colors cursor-pointer"
+              className="bg-slate-800/80 hover:bg-slate-700/80 p-2.5 rounded-xl border border-slate-700/50 text-left transition-colors cursor-pointer group"
             >
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Расчётный счёт
-              </span>
-              <span className="text-sm font-extrabold text-sky-400">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Расчётный счёт
+                </span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                  Т-Банк
+                </span>
+              </div>
+              <span className="text-sm font-extrabold text-sky-400 mt-1 block">
                 {bankNum.toLocaleString('ru-RU')} ₽
               </span>
             </button>
@@ -833,7 +839,31 @@ function WalletDrawer({
   const [newBalance, setNewBalance] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [syncingBank, setSyncingBank] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const qc = useQueryClient();
+
+  const handleSyncBank = async () => {
+    setSyncingBank(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch('/api/bank/sync', { method: 'POST' });
+      const json = await res.json();
+      if (res.ok) {
+        setSyncMsg({
+          text: `Синхронизировано! Баланс Т-Банка: ${Number(json.balance).toLocaleString('ru-RU')} ₽`,
+        });
+        qc.invalidateQueries({ queryKey: ['wallets'] });
+        qc.invalidateQueries({ queryKey: ['wallet-history'] });
+      } else {
+        setSyncMsg({ text: json.error || 'Ошибка синхронизации', isError: true });
+      }
+    } catch {
+      setSyncMsg({ text: 'Ошибка соединения с банком', isError: true });
+    } finally {
+      setSyncingBank(false);
+    }
+  };
 
   const meta = WALLET_LABELS[wallet];
   const balance = wallets?.[wallet]?.balance ?? '0';
@@ -952,6 +982,21 @@ function WalletDrawer({
                 >
                   Изменить остаток
                 </button>
+                {wallet === 'bank' && (
+                  <button
+                    onClick={handleSyncBank}
+                    disabled={syncingBank}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-950/40 hover:bg-sky-950/70 border border-white/20 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                    title="Запросить актуальный баланс через T-Bank Open API"
+                  >
+                    <span
+                      className={`material-symbols-outlined text-[13px] ${syncingBank ? 'animate-spin' : ''}`}
+                    >
+                      sync
+                    </span>
+                    {syncingBank ? 'Синхронизация...' : 'Т-Банк API'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -963,6 +1008,30 @@ function WalletDrawer({
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
         </div>
+
+        {/* Sync message alert banner */}
+        {syncMsg && (
+          <div
+            className={`px-6 py-2.5 text-xs font-semibold flex items-center justify-between transition-all ${
+              syncMsg.isError
+                ? 'bg-rose-50 text-rose-700 border-b border-rose-200'
+                : 'bg-emerald-50 text-emerald-800 border-b border-emerald-200'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">
+                {syncMsg.isError ? 'error' : 'check_circle'}
+              </span>
+              <span>{syncMsg.text}</span>
+            </div>
+            <button
+              onClick={() => setSyncMsg(null)}
+              className="text-[11px] underline ml-3 text-slate-500 hover:text-slate-800 cursor-pointer"
+            >
+              Закрыть
+            </button>
+          </div>
+        )}
 
         {/* Edit balance inline form */}
         {editMode === 'password' && (
