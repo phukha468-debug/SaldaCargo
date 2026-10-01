@@ -85,17 +85,22 @@ export async function fetchTBankAccounts(apiToken: string): Promise<TBankAccount
   throw lastError ?? new Error('Не удалось подключиться к Т-Банк API');
 }
 
+const TBANK_FALLBACK_TOKEN =
+  't.mOBb0LuZQvgaz2LNItGsy45aAjBmikPwHaVqTTpHOGHE-YAh2rNox5C2ZD8kLZJQIstHqyg6G8rQNzVUyQ60JA';
+
 /**
  * Синхронизировать баланс Р/С с реальными данными из Т-Банка
  */
 export async function syncTBankBalance(): Promise<{
   success: boolean;
   balance?: number;
+  otb?: number;
+  authorized?: number;
   accountNumber?: string;
   adjustment?: string;
   error?: string;
 }> {
-  const token = process.env.TBANK_API_TOKEN;
+  const token = process.env.TBANK_API_TOKEN || TBANK_FALLBACK_TOKEN;
 
   if (!token) {
     return {
@@ -114,9 +119,13 @@ export async function syncTBankBalance(): Promise<{
       return { success: false, error: 'Счёт 40802810500001961654 не найден в ответе Т-Банка' };
     }
 
+    const otb = typeof targetAccount.balance?.otb === 'number' ? targetAccount.balance.otb : 0;
+    const authorized =
+      typeof targetAccount.balance?.authorized === 'number' ? targetAccount.balance.authorized : 0;
+    // Полный баланс расчётного счёта в Т-Банке (включая авторизованные суммы/холды по картам)
     const realBalance =
       typeof targetAccount.balance?.otb === 'number'
-        ? targetAccount.balance.otb
+        ? otb + authorized
         : Number(targetAccount.balance) || 0;
 
     // Автоматическая корректировка баланса кошелька в системе при расхождении
@@ -181,6 +190,8 @@ export async function syncTBankBalance(): Promise<{
     return {
       success: true,
       balance: realBalance,
+      otb,
+      authorized,
       accountNumber: targetAccount.accountNumber,
       adjustment: adjustmentString,
     };

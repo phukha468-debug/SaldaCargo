@@ -19,22 +19,21 @@ const sumWhere = (rows: any[], key: string, val: string, excludeTripOrders = fal
 
 export async function GET() {
   try {
-    let apiBalance: number | null = null;
-    let isApiSynced = false;
-    let tbankAccountNum = '';
+    let apiAuthorized = 0;
+    let apiOtb = 0;
 
     // Автоматическая синхронизация с Т-Банком (Open API имеет безусловный приоритет)
-    if (process.env.TBANK_API_TOKEN) {
-      try {
-        const syncResult = await syncTBankBalance();
-        if (syncResult?.success && typeof syncResult.balance === 'number') {
-          apiBalance = syncResult.balance;
-          isApiSynced = true;
-          tbankAccountNum = syncResult.accountNumber || '';
-        }
-      } catch (e) {
-        console.error('TBank auto-sync in wallets:', e);
+    try {
+      const syncResult = await syncTBankBalance();
+      if (syncResult?.success && typeof syncResult.balance === 'number') {
+        apiBalance = syncResult.balance;
+        apiAuthorized = syncResult.authorized || 0;
+        apiOtb = syncResult.otb || 0;
+        isApiSynced = true;
+        tbankAccountNum = syncResult.accountNumber || '';
       }
+    } catch (e) {
+      console.error('TBank auto-sync in wallets:', e);
     }
 
     const supabase = createAdminClient();
@@ -107,6 +106,8 @@ export async function GET() {
       bank: {
         name: 'Расчётный счёт',
         balance: bankBalance.toFixed(2),
+        available: (apiBalance !== null ? apiOtb : bankBalance).toFixed(2),
+        authorized: apiAuthorized.toFixed(2),
         api_synced: isApiSynced,
         account_number: tbankAccountNum,
       },

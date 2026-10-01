@@ -22,7 +22,14 @@ type WalletHistoryItem = {
 };
 
 type Wallets = {
-  bank: { name: string; balance: string; api_synced?: boolean; account_number?: string };
+  bank: {
+    name: string;
+    balance: string;
+    available?: string;
+    authorized?: string;
+    api_synced?: boolean;
+    account_number?: string;
+  };
   cash: { name: string; balance: string };
   card?: { name: string; balance: string };
   fuel_card?: { name: string; balance: string };
@@ -202,6 +209,11 @@ export default function DashboardHome() {
               <span className="text-sm font-extrabold text-sky-400 mt-1 block">
                 {bankNum.toLocaleString('ru-RU')} ₽
               </span>
+              {wallets?.bank?.authorized && parseFloat(wallets.bank.authorized) > 0 && (
+                <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
+                  ({parseFloat(wallets.bank.authorized).toLocaleString('ru-RU')} ₽ в холде карт)
+                </span>
+              )}
             </button>
             <button
               onClick={() => setDrawerWallet('cash')}
