@@ -158,6 +158,7 @@ type DashboardData = {
     completedOrders: number;
     revenue: string;
     salaryAccrued: string;
+    garageBalance?: string;
   };
   stats?: GarageStats;
 };
@@ -3838,6 +3839,7 @@ function DashboardSection({
   });
 
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
 
   if (isLoading)
     return (
@@ -3859,6 +3861,11 @@ function DashboardSection({
   };
   const m = data?.month ?? { completedOrders: 0, revenue: '0.00', salaryAccrued: '0.00' };
   const st = data?.stats ?? {
+    garageBalance: parseFloat(
+      data?.stats?.garageBalance !== undefined
+        ? String(data.stats.garageBalance)
+        : m.garageBalance || '0',
+    ),
     clientRevenueThisMonth: parseFloat(m.revenue || '0'),
     clientRevenueAllTime: parseFloat(m.revenue || '0'),
     clientProfitThisMonth: parseFloat(m.revenue || '0') - parseFloat(m.salaryAccrued || '0'),
@@ -3875,6 +3882,10 @@ function DashboardSection({
   };
   const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
   const clientProfit = st.clientProfitThisMonth ?? st.clientRevenueThisMonth - st.salaryThisMonth;
+  const currentGarageBalance =
+    typeof st.garageBalance === 'number'
+      ? st.garageBalance
+      : parseFloat(String(st.garageBalance || '0'));
 
   return (
     <div className="space-y-5">
@@ -3894,44 +3905,130 @@ function DashboardSection({
         </button>
       </div>
 
-      {/* 💰 Главный блок: Чистая прибыль с клиентов */}
-      <div
-        onClick={() => setShowStatsModal(true)}
-        className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl cursor-pointer hover:shadow-2xl transition-all border border-indigo-500/20 group"
-      >
-        <div className="absolute -top-12 -right-12 w-56 h-56 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all" />
+      {/* ── ОБОСОБЛЕННЫЙ ФИНАНСОВЫЙ СЧЁТ ГАРАЖА (СТО) ── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-indigo-500/30 group">
+        <div className="absolute -top-12 -right-12 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-2">
+        {/* Шапка плашки счёта */}
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-800/60 pb-5">
+          <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-emerald-500/25 border border-emerald-400/30 text-emerald-200 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
-                💰 ЗАРАБОТАЛИ С КЛИЕНТОВ (ЧИСТАЯ ПРИБЫЛЬ ЗА {monthName.toUpperCase()})
+              <span className="bg-indigo-500/25 border border-indigo-400/40 text-indigo-200 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                <span>🛠️</span>
+                <span>СЧЁТ ГАРАЖА И СТО</span>
               </span>
-              {st.clientActiveCount > 0 && (
-                <span className="bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[11px] font-bold px-3 py-1 rounded-full">
-                  ⏳ В работе: <Money amount={st.clientActiveSum} /> ({st.clientActiveCount}{' '}
-                  нарядов)
-                </span>
-              )}
+              <span className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold px-2.5 py-1 rounded-full">
+                Обособленный учёт
+              </span>
             </div>
-            <div className="text-4xl md:text-5xl font-black tracking-tight text-white pt-1">
-              <Money amount={clientProfit} />
-            </div>
-            <p className="text-xs text-indigo-200/80 font-medium">
-              Доход за вычетом ЗП механикам · Нажмите для подробной статистики
+            <p className="text-xs text-indigo-200/80 mt-1 font-medium">
+              Финансы автосервиса ведутся строго отдельно от расчётного счёта и кассы ТК
+              «СалдаКарго»
             </p>
           </div>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowStatsModal(true);
-            }}
-            className="self-start md:self-center bg-white hover:bg-slate-100 text-slate-900 text-xs font-black px-5 py-3 rounded-2xl transition-all flex items-center gap-2 shrink-0 shadow-lg active:scale-95"
-          >
-            <span>📊 Вся статистика</span>
-            <span className="text-sm">➔</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowBalanceModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <span>⚙️ Управление кассой СТО</span>
+            </button>
+            <button
+              onClick={() => setShowStatsModal(true)}
+              className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <span>📊 Аналитика</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Сетка баланса и ключевых показателей счёта Гаража */}
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
+          {/* Баланс кассы/счёта СТО */}
+          <div className="bg-slate-800/80 border border-indigo-500/40 rounded-2xl p-4 flex flex-col justify-between shadow-inner">
+            <div>
+              <div className="flex items-center justify-between text-xs text-indigo-300 font-bold uppercase tracking-wider mb-1">
+                <span>Остаток кассы СТО</span>
+                <span className="text-[10px] text-indigo-400 font-normal">нал / safe</span>
+              </div>
+              <div className="text-3xl font-black text-white tracking-tight mt-1">
+                <Money amount={currentGarageBalance} />
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-indigo-200/70">
+              <span>Счёт № 1000...005</span>
+              <button
+                onClick={() => setShowBalanceModal(true)}
+                className="text-indigo-300 hover:text-white font-bold underline cursor-pointer"
+              >
+                Изменить
+              </button>
+            </div>
+          </div>
+
+          {/* Выручка с клиентов */}
+          <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">
+                Выручка с клиентов ({monthName})
+              </div>
+              <div className="text-2xl font-black text-emerald-400 tracking-tight mt-1">
+                <Money amount={st.clientRevenueThisMonth} />
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[11px] text-slate-400">
+              За всё время:{' '}
+              <span className="text-slate-200 font-bold">
+                <Money amount={st.clientRevenueAllTime} />
+              </span>
+            </div>
+          </div>
+
+          {/* Чистая прибыль Гаража */}
+          <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="text-xs text-indigo-300 font-bold uppercase tracking-wider mb-1">
+                Чистая прибыль ({monthName})
+              </div>
+              <div className="text-2xl font-black text-white tracking-tight mt-1">
+                <Money amount={clientProfit} />
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[11px] text-slate-400">
+              За всё время:{' '}
+              <span className="text-slate-200 font-bold">
+                <Money amount={st.clientProfitAllTime ?? 0} />
+              </span>
+            </div>
+          </div>
+
+          {/* ФОТ Механиков */}
+          <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="text-xs text-violet-400 font-bold uppercase tracking-wider mb-1">
+                ЗП Механиков ({monthName})
+              </div>
+              <div className="text-2xl font-black text-violet-400 tracking-tight mt-1">
+                <Money amount={st.salaryThisMonth} />
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[11px] text-slate-400">
+              {st.clientActiveCount > 0 ? (
+                <span>
+                  В работе:{' '}
+                  <strong className="text-amber-300">
+                    <Money amount={st.clientActiveSum} />
+                  </strong>{' '}
+                  ({st.clientActiveCount} н.)
+                </span>
+              ) : (
+                <span>
+                  Всего начислено: <Money amount={st.salaryAllTime} />
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -4030,6 +4127,17 @@ function DashboardSection({
           stats={st}
           monthName={monthName}
           onClose={() => setShowStatsModal(false)}
+        />
+      )}
+
+      {showBalanceModal && (
+        <GarageBalanceModal
+          currentBalance={currentGarageBalance}
+          onClose={() => setShowBalanceModal(false)}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
+          }}
         />
       )}
 
@@ -10655,6 +10763,7 @@ function CreateVehicleModal({
 }
 
 type GarageStats = {
+  garageBalance?: number;
   clientRevenueThisMonth: number;
   clientRevenueAllTime: number;
   clientProfitThisMonth?: number;
@@ -10834,6 +10943,177 @@ function GarageStatsModal({
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function GarageBalanceModal({
+  currentBalance,
+  onClose,
+  onSuccess,
+}: {
+  currentBalance: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [mode, setMode] = useState<'set' | 'deposit' | 'withdraw'>('set');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(amount.replace(/\s+/g, '').replace(',', '.'));
+    if (isNaN(val) || val < 0) {
+      setError('Введите корректную сумму');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      let target = val;
+      if (mode === 'deposit') target = currentBalance + val;
+      if (mode === 'withdraw') target = Math.max(0, currentBalance - val);
+
+      const res = await fetch('/api/wallets/set-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet: 'garage', target_amount: target.toFixed(2), note }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка установки баланса');
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка установки баланса');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              🛠️ Касса Гаража (СТО)
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Текущий остаток: <strong>{currentBalance.toLocaleString('ru-RU')} ₽</strong>
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 transition-colors cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setMode('set')}
+            className={cn(
+              'py-1.5 rounded-lg transition-all cursor-pointer',
+              mode === 'set'
+                ? 'bg-white shadow-xs text-slate-900'
+                : 'text-slate-500 hover:text-slate-900',
+            )}
+          >
+            Установить
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('deposit')}
+            className={cn(
+              'py-1.5 rounded-lg transition-all cursor-pointer',
+              mode === 'deposit'
+                ? 'bg-white shadow-xs text-emerald-700'
+                : 'text-slate-500 hover:text-slate-900',
+            )}
+          >
+            + Внести
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('withdraw')}
+            className={cn(
+              'py-1.5 rounded-lg transition-all cursor-pointer',
+              mode === 'withdraw'
+                ? 'bg-white shadow-xs text-red-700'
+                : 'text-slate-500 hover:text-slate-900',
+            )}
+          >
+            - Выдать
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
+              {mode === 'set'
+                ? 'Фактическая сумма в кассе (₽)'
+                : mode === 'deposit'
+                  ? 'Сумма внесения (₽)'
+                  : 'Сумма выдачи (₽)'}
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={mode === 'set' ? currentBalance.toFixed(2) : '0.00'}
+              className="w-full text-xl font-bold p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
+              Примечание (необязательно)
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Инвентаризация кассы, выдача подотчёта и т.д."
+              className="w-full text-sm p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
+            />
+          </div>
+
+          {error && (
+            <div className="text-xs text-red-600 font-semibold bg-red-50 p-2.5 rounded-xl border border-red-200">
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !amount}
+              className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-black rounded-xl transition-colors shadow-md cursor-pointer"
+            >
+              {loading ? 'Сохранение...' : 'Подтвердить'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

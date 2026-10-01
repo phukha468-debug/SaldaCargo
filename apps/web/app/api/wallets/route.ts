@@ -7,20 +7,34 @@ const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const CARD_ID = '10000000-0000-0000-0000-000000000003';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
+const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
 
 const sum = (rows: any[]) =>
   (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
-const sumWhere = (rows: any[], key: string, val: string) =>
+const sumWhere = (rows: any[], key: string, val: string, excludeTripOrders = false) =>
   (rows ?? [])
-    .filter((r: any) => r[key] === val)
+    .filter((r: any) => r[key] === val && (!excludeTripOrders || !r.trip_order_id))
     .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
 export async function GET() {
   try {
-    // Автоматическая синхронизация с Т-Банком (не блокирующая критически при сетевых сбоях)
+    let apiBalance: number | null = null;
+    let isApiSynced = false;
+    let tbankAccountNum = '';
+
+    // Автоматическая синхронизация с Т-Банком (Open API имеет безусловный приоритет)
     if (process.env.TBANK_API_TOKEN) {
-      await syncTBankBalance().catch((e) => console.error('TBank auto-sync in wallets:', e));
+      try {
+        const syncResult = await syncTBankBalance();
+        if (syncResult?.success && typeof syncResult.balance === 'number') {
+          apiBalance = syncResult.balance;
+          isApiSynced = true;
+          tbankAccountNum = syncResult.accountNumber || '';
+        }
+      } catch (e) {
+        console.error('TBank auto-sync in wallets:', e);
+      }
     }
 
     const supabase = createAdminClient();
@@ -47,24 +61,29 @@ export async function GET() {
       (supabase.from('cash_collections') as any).select('amount'),
 
       (supabase.from('transactions') as any)
-        .select('amount, to_wallet_id')
-        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
+        .select('amount, to_wallet_id, trip_order_id')
+        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID, GARAGE_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
 
       (supabase.from('transactions') as any)
         .select('amount, from_wallet_id')
-        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
+        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID, GARAGE_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
     ]);
 
     const collectionsTotal = sum(collections ?? []);
 
-    const bankBalance =
+    // Резервный расчёт по БД без задвоения заказов
+    const fallbackBankBalance =
       sum(bankOrders ?? []) +
-      sumWhere(txIn ?? [], 'to_wallet_id', BANK_ID) -
+      sumWhere(txIn ?? [], 'to_wallet_id', BANK_ID, true) -
       sumWhere(txOut ?? [], 'from_wallet_id', BANK_ID);
+
+    // БЕЗУСЛОВНЫЙ ПРИОРИТЕТ ДАННЫХ АПИ Т-БАНКА:
+    // Если API вернул баланс, показываем строго его. Никакие отметки оплаченных счетов не завышают остаток.
+    const bankBalance = apiBalance !== null ? apiBalance : fallbackBankBalance;
 
     const cashBalance =
       collectionsTotal +
@@ -80,11 +99,25 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
 
+    const garageBalance =
+      sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
+      sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID);
+
     return NextResponse.json({
-      bank: { name: 'Расчётный счёт', balance: bankBalance.toFixed(2) },
-      cash: { name: 'Сейф (Наличные)', balance: cashBalance.toFixed(2) },
+      bank: {
+        name: 'Расчётный счёт',
+        balance: bankBalance.toFixed(2),
+        api_synced: isApiSynced,
+        account_number: tbankAccountNum,
+      },
+      cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
       card: { name: 'Карта', balance: cardBalance.toFixed(2) },
       fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
+      garage: {
+        id: GARAGE_ID,
+        name: 'Касса Гаража (СТО)',
+        balance: garageBalance.toFixed(2),
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

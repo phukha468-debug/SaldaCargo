@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 const PAYROLL_MECHANIC_CAT = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
+const GARAGE_WALLET_ID = '10000000-0000-0000-0000-000000000005';
 
 /** GET /api/garage/dashboard — сводка дашборда Гараж */
 export async function GET() {
@@ -18,6 +19,8 @@ export async function GET() {
     { data: maintenanceAlerts },
     { data: allServiceOrders },
     { data: salaryTxs },
+    { data: garageTxIn },
+    { data: garageTxOut },
   ] = await Promise.all([
     (supabase.from('repair_requests') as any)
       .select(
@@ -61,6 +64,19 @@ export async function GET() {
       .eq('category_id', PAYROLL_MECHANIC_CAT)
       .eq('lifecycle_status', 'approved')
       .is('from_wallet_id', null),
+
+    // Касса/Счёт Гаража (СТО)
+    (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('to_wallet_id', GARAGE_WALLET_ID)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed'),
+
+    (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('from_wallet_id', GARAGE_WALLET_ID)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed'),
   ]);
 
   const activeArr = activeOrders ?? [];
@@ -131,8 +147,9 @@ export async function GET() {
     .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
   const salaryAllTime = salaryArr.reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
 
-  const clientProfitThisMonth = clientRevenueThisMonth - salaryThisMonth;
-  const clientProfitAllTime = clientRevenueAllTime - salaryAllTime;
+  const sumAmounts = (rows: any[]) =>
+    (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
+  const garageBalance = sumAmounts(garageTxIn) - sumAmounts(garageTxOut);
 
   return NextResponse.json({
     repairRequests: repairRequests ?? [],
@@ -150,8 +167,10 @@ export async function GET() {
       completedOrders: completedOrdersThisMonth,
       revenue: clientProfitThisMonth.toFixed(2),
       salaryAccrued: salaryThisMonth.toFixed(2),
+      garageBalance: garageBalance.toFixed(2),
     },
     stats: {
+      garageBalance,
       clientRevenueThisMonth,
       clientRevenueAllTime,
       clientProfitThisMonth,

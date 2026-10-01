@@ -7,6 +7,7 @@ const WALLET_IDS: Record<string, string> = {
   cash: '10000000-0000-0000-0000-000000000002',
   card: '10000000-0000-0000-0000-000000000003',
   fuel_card: '10000000-0000-0000-0000-000000000004',
+  garage: '10000000-0000-0000-0000-000000000005',
 };
 
 // payment_method to use when moving trip_order income to a wallet
@@ -18,7 +19,7 @@ const WALLET_TO_METHOD: Record<string, string> = {
 
 /**
  * POST /api/wallets/transfer
- * Body: { item_id, source: 'trip_order'|'transaction', direction: 'in'|'out', target_wallet: 'bank'|'cash'|'card'|'fuel_card' }
+ * Body: { item_id, source: 'trip_order'|'transaction', direction: 'in'|'out', target_wallet: 'bank'|'cash'|'card'|'fuel_card'|'garage' }
  */
 export async function POST(request: Request) {
   try {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
       item_id: string;
       source: 'trip_order' | 'transaction';
       direction: 'in' | 'out';
-      target_wallet: 'bank' | 'cash' | 'card' | 'fuel_card';
+      target_wallet: 'bank' | 'cash' | 'card' | 'fuel_card' | 'garage';
     };
 
     if (!item_id || !source || !target_wallet) {

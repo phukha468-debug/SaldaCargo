@@ -21,10 +21,11 @@ const navItems = [
 const FINANCE_PATHS = ['/finance', '/receivables', '/loans', '/payables'];
 
 type Wallets = {
-  bank: { name: string; balance: string };
+  bank: { name: string; balance: string; api_synced?: boolean; account_number?: string };
   cash: { name: string; balance: string };
   card?: { name: string; balance: string };
   fuel_card?: { name: string; balance: string };
+  garage?: { id: string; name: string; balance: string };
 };
 
 type AlertsData = {
@@ -74,6 +75,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
   const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
+  const garageNum = parseFloat(wallets?.garage?.balance ?? '0');
   const totalBalance = bankNum + cashNum + fuelNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
@@ -246,7 +248,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                 </span>
                 <div>
                   <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
-                    Совокупный Баланс
+                    Баланс ТК
                   </div>
                   <div className="text-sm sm:text-base font-black text-white leading-none mt-0.5">
                     {totalBalance.toLocaleString('ru-RU')} ₽
@@ -255,12 +257,18 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
               <div className="h-9 w-px bg-slate-700 mx-1 hidden md:block" />
               <div className="text-[11px] text-slate-300 hidden md:block leading-tight space-y-0.5">
-                <div>
+                <div className="flex items-center gap-1.5">
                   <span className="text-sky-400 font-bold">Банк:</span>{' '}
-                  {bankNum.toLocaleString('ru-RU')} ₽
+                  <span>{bankNum.toLocaleString('ru-RU')} ₽</span>
+                  {wallets?.bank?.api_synced && (
+                    <span
+                      className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"
+                      title="Синхронизировано по API Т-Банка"
+                    />
+                  )}
                 </div>
                 <div>
-                  <span className="text-emerald-400 font-bold">Касса:</span>{' '}
+                  <span className="text-emerald-400 font-bold">Сейф:</span>{' '}
                   {cashNum.toLocaleString('ru-RU')} ₽
                 </div>
                 <div>
@@ -269,6 +277,23 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </div>
+
+            {/* Отдельный счёт Гаража / СТО */}
+            <Link
+              href="/garage"
+              className="hidden xl:flex items-center gap-2 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/50 text-white px-3 py-2 rounded-2xl shadow-sm transition-all"
+              title="Перейти в Гараж и СТО"
+            >
+              <span className="text-base">🛠️</span>
+              <div>
+                <div className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-300">
+                  Счёт Гаража
+                </div>
+                <div className="text-xs sm:text-sm font-black text-indigo-100 leading-none mt-0.5">
+                  {garageNum.toLocaleString('ru-RU')} ₽
+                </div>
+              </div>
+            </Link>
 
             <TodayDate />
           </div>

@@ -306,6 +306,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const revenueTotal = worksTotal + partsTotal;
 
         if (revenueTotal > 0) {
+          const GARAGE_WALLET_ID = '10000000-0000-0000-0000-000000000005';
           const { data: adminForRevenue } = await (supabase as any)
             .from('users')
             .select('id')
@@ -319,6 +320,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             amount: revenueTotal.toFixed(2),
             category_id: CAT_SERVICE_REVENUE,
             service_order_id: id,
+            to_wallet_id: GARAGE_WALLET_ID,
             created_by: adminForRevenue?.id ?? null,
             description: `Выручка — наряд #${order.order_number}`,
             idempotency_key: crypto.randomUUID(),

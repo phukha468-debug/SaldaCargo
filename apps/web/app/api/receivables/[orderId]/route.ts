@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { syncTBankBalance } from '@/lib/tbank';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
@@ -122,6 +123,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
   });
 
   if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
+
+  if (toWalletId === BANK_ID && process.env.TBANK_API_TOKEN) {
+    syncTBankBalance().catch((e) => console.error('TBank sync after receivable settlement:', e));
+  }
 
   return NextResponse.json({ ok: true, paid: payAmount.toFixed(2), partial: isPartial });
 }

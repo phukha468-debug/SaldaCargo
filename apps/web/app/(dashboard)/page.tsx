@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Money } from '@saldacargo/ui';
 import { cn } from '@saldacargo/ui';
 
-type WalletKey = 'bank' | 'cash' | 'fuel_card';
+type WalletKey = 'bank' | 'cash' | 'fuel_card' | 'garage';
 type Period = 'day' | 'week' | 'month';
 
 type WalletHistoryItem = {
@@ -22,10 +22,11 @@ type WalletHistoryItem = {
 };
 
 type Wallets = {
-  bank: { name: string; balance: string };
+  bank: { name: string; balance: string; api_synced?: boolean; account_number?: string };
   cash: { name: string; balance: string };
   card?: { name: string; balance: string };
   fuel_card?: { name: string; balance: string };
+  garage?: { id: string; name: string; balance: string };
 };
 
 type Summary = {
@@ -138,6 +139,7 @@ export default function DashboardHome() {
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
   const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
+  const garageNum = parseFloat(wallets?.garage?.balance ?? '0');
   const totalLiquid = bankNum + cashNum + fuelNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
@@ -333,6 +335,47 @@ export default function DashboardHome() {
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </Link>
           </div>
+        </div>
+      </div>
+
+      {/* ── ОБОСОБЛЕННЫЙ СЧЁТ ГАРАЖА (СТО) ── */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            🛠️
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-indigo-300 font-extrabold uppercase tracking-wider">
+                Счёт Гаража (СТО)
+              </span>
+              <span className="bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                Обособленный учёт
+              </span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+              {garageNum.toLocaleString('ru-RU')} ₽
+            </div>
+            <p className="text-xs text-indigo-200/80 mt-0.5 font-medium">
+              Касса и средства автосервиса ведутся строго отдельно от ТК «СалдаКарго»
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <button
+            onClick={() => setDrawerWallet('garage')}
+            className="flex-1 md:flex-initial bg-indigo-900/60 hover:bg-indigo-800 text-indigo-100 hover:text-white border border-indigo-700/60 text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer text-center"
+          >
+            ⚙️ Касса Гаража
+          </button>
+          <Link
+            href="/garage"
+            className="flex-1 md:flex-initial bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <span>В Гараж / СТО</span>
+            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </Link>
         </div>
       </div>
 
@@ -792,19 +835,28 @@ const WALLET_LABELS: Record<WalletKey, { name: string; sub: string; color: strin
   bank: { name: 'Банк', sub: 'Расчётный счёт', color: '#3b82f6' },
   cash: { name: 'Касса', sub: 'Наличные', color: '#10b981' },
   fuel_card: { name: 'Топливные карты', sub: 'Баланс ГСМ / АЗС', color: '#f59e0b' },
+  garage: { name: 'Касса Гаража (СТО)', sub: 'Обособленный счёт автосервиса', color: '#6366f1' },
 };
 const OTHER_WALLETS: Record<WalletKey, { key: WalletKey; label: string }[]> = {
   bank: [
     { key: 'cash', label: 'Касса' },
     { key: 'fuel_card', label: 'ГСМ' },
+    { key: 'garage', label: 'Гараж' },
   ],
   cash: [
     { key: 'bank', label: 'Банк' },
     { key: 'fuel_card', label: 'ГСМ' },
+    { key: 'garage', label: 'Гараж' },
   ],
   fuel_card: [
     { key: 'bank', label: 'Банк' },
     { key: 'cash', label: 'Касса' },
+    { key: 'garage', label: 'Гараж' },
+  ],
+  garage: [
+    { key: 'bank', label: 'Банк' },
+    { key: 'cash', label: 'Касса' },
+    { key: 'fuel_card', label: 'ГСМ' },
   ],
 };
 

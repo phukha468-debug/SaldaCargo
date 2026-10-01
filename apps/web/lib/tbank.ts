@@ -137,7 +137,7 @@ export async function syncTBankBalance(): Promise<{
           .eq('settlement_status', 'completed')
           .eq('lifecycle_status', 'approved'),
         (supabase.from('transactions') as any)
-          .select('amount')
+          .select('amount, trip_order_id')
           .eq('to_wallet_id', BANK_WALLET_ID)
           .eq('lifecycle_status', 'approved')
           .eq('settlement_status', 'completed'),
@@ -151,7 +151,9 @@ export async function syncTBankBalance(): Promise<{
       const sum = (rows: any[]) =>
         (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
-      const currentBalance = sum(bankOrders ?? []) + sum(txIn ?? []) - sum(txOut ?? []);
+      // Исключаем транзакции с trip_order_id, так как эти заказы уже учтены в bankOrders
+      const txInFiltered = (txIn ?? []).filter((r: any) => !r.trip_order_id);
+      const currentBalance = sum(bankOrders ?? []) + sum(txInFiltered) - sum(txOut ?? []);
       const delta = realBalance - currentBalance;
 
       if (Math.abs(delta) >= 0.01) {
