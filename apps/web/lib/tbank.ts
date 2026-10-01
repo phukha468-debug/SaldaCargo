@@ -95,9 +95,7 @@ export async function syncTBankBalance(): Promise<{
   adjustment?: string;
   error?: string;
 }> {
-  const token =
-    process.env.TBANK_API_TOKEN ||
-    't.mOBb0LuZQvgaz2LNItGsy45aAjBmikPwHaVqTTpHOGHE-YAh2rNox5C2ZD8kLZJQIstHqyg6G8rQNzVUyQ60JA';
+  const token = process.env.TBANK_API_TOKEN;
 
   if (!token) {
     return {
