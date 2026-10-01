@@ -90,7 +90,7 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
 
-    const totalLiquid = bankBalance + cashBalance + cardBalance + fuelBalance;
+    const totalLiquid = bankBalance + cashBalance;
 
     const loansTotal = (loans ?? []).reduce(
       (s: number, l: any) => s + parseFloat(l.remaining_amount ?? '0'),

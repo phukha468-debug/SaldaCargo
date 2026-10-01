@@ -73,9 +73,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
-  const cardNum = parseFloat(wallets?.card?.balance ?? '0');
-  const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
-  const totalBalance = bankNum + cashNum + cardNum + fuelNum;
+  const totalBalance = bankNum + cashNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
   const fleetAlertCount = alerts?.fleet?.length ?? 0;

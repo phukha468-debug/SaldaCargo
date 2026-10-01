@@ -134,12 +134,10 @@ export default function DashboardHome() {
     refetchInterval: 30000,
   });
 
-  // Liquid Balances
+  // Liquid Balances (только Р/С и Касса)
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
-  const cardNum = parseFloat(wallets?.card?.balance ?? '0');
-  const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
-  const totalLiquid = bankNum + cashNum + cardNum + fuelNum;
+  const totalLiquid = bankNum + cashNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
 
