@@ -290,17 +290,27 @@ export default function TripDetailPage() {
                         <div className="pl-2 flex justify-between items-start gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                              <span className="text-zinc-400 text-lg flex-shrink-0">
-                                {order.payment_method === 'cash'
-                                  ? '💵'
-                                  : order.payment_method === 'bank_invoice'
-                                    ? '🏦'
-                                    : order.payment_method === 'qr'
-                                      ? '📱'
-                                      : order.payment_method === 'debt_cash'
-                                        ? '⏳'
-                                        : '💳'}
-                              </span>
+                              {order.payment_method === 'cash' ? (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-xs">
+                                  💵 Наличные
+                                </span>
+                              ) : order.payment_method === 'qr' ? (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-purple-600 text-white shadow-xs">
+                                  ⚡ QR-код
+                                </span>
+                              ) : order.payment_method === 'debt_cash' ? (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-600 text-white shadow-xs">
+                                  ⏳ Долг
+                                </span>
+                              ) : order.payment_method === 'card_driver' ? (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-sky-600 text-white shadow-xs">
+                                  💳 Карта
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-600 text-white shadow-xs">
+                                  🏛️ Безнал
+                                </span>
+                              )}
                               <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight truncate">
                                 {order.counterparty?.name ?? order.description ?? 'Без названия'}
                               </h3>

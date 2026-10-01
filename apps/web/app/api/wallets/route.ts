@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { syncTBankBalance } from '@/lib/tbank';
 import { NextResponse } from 'next/server';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
@@ -17,6 +18,11 @@ const sumWhere = (rows: any[], key: string, val: string) =>
 
 export async function GET() {
   try {
+    // Автоматическая синхронизация с Т-Банком (не блокирующая критически при сетевых сбоях)
+    if (process.env.TBANK_API_TOKEN) {
+      await syncTBankBalance().catch((e) => console.error('TBank auto-sync in wallets:', e));
+    }
+
     const supabase = createAdminClient();
 
     const [

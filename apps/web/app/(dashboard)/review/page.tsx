@@ -96,19 +96,19 @@ interface ReviewServiceOrder {
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
-  cash: 'Наличные',
-  qr: 'QR-код',
-  bank_invoice: 'Безнал',
-  debt_cash: 'Долг',
-  card_driver: 'Карта',
+  cash: '💵 Наличные',
+  qr: '⚡ QR-код',
+  bank_invoice: '🏛️ Безнал (Р/С)',
+  debt_cash: '⏳ Долг',
+  card_driver: '💳 Карта',
 };
 
 const PAYMENT_STYLES: Record<string, string> = {
-  cash: 'bg-amber-50 text-amber-700 border-amber-200',
-  qr: 'bg-purple-50 text-purple-700 border-purple-200',
-  bank_invoice: 'bg-slate-100 text-slate-600 border-slate-200',
-  debt_cash: 'bg-rose-50 text-rose-700 border-rose-200',
-  card_driver: 'bg-blue-50 text-blue-700 border-blue-200',
+  cash: 'bg-emerald-600 text-white font-black border-emerald-700 shadow-xs',
+  qr: 'bg-purple-600 text-white font-black border-purple-700 shadow-xs ring-2 ring-purple-300',
+  bank_invoice: 'bg-blue-600 text-white font-bold border-blue-700',
+  debt_cash: 'bg-rose-600 text-white font-bold border-rose-700',
+  card_driver: 'bg-sky-600 text-white font-bold border-sky-700',
 };
 
 const PAYMENT_EDIT_OPTIONS = [
@@ -1323,6 +1323,19 @@ function TripCard({
             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold shrink-0">
               #{trip.trip_number}
             </span>
+            {/* Яркие бейджи способов оплаты в рейсе */}
+            <div className="flex items-center gap-1 shrink-0">
+              {activeOrders.some((o) => o.payment_method === 'qr') && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-purple-600 text-white shadow-xs flex items-center gap-0.5">
+                  ⚡ QR
+                </span>
+              )}
+              {activeOrders.some((o) => o.payment_method === 'cash') && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-xs flex items-center gap-0.5">
+                  💵 Нал
+                </span>
+              )}
+            </div>
             <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden sm:block">
               {formatDate(trip.started_at)}
             </span>
