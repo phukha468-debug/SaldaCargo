@@ -69,7 +69,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const { data: wallets } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: async () => {
-      const res = await fetch('/api/wallets');
+      const res = await fetch('/api/wallets', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data?.error) throw new Error(data.error);

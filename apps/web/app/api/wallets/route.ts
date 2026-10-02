@@ -113,25 +113,32 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID);
 
-    return NextResponse.json({
-      bank: {
-        name: 'Расчётный счёт',
-        balance: bankBalance.toFixed(2),
-        available: (apiBalance !== null ? apiOtb : bankBalance).toFixed(2),
-        authorized: apiAuthorized.toFixed(2),
-        api_synced: isApiSynced,
-        synced_at: new Date().toISOString(),
-        account_number: tbankAccountNum,
+    return NextResponse.json(
+      {
+        bank: {
+          name: 'Расчётный счёт',
+          balance: bankBalance.toFixed(2),
+          available: (apiBalance !== null ? apiOtb : bankBalance).toFixed(2),
+          authorized: apiAuthorized.toFixed(2),
+          api_synced: isApiSynced,
+          synced_at: new Date().toISOString(),
+          account_number: tbankAccountNum,
+        },
+        cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
+        card: { name: 'Карта', balance: cardBalance.toFixed(2) },
+        fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
+        garage: {
+          id: GARAGE_ID,
+          name: 'Касса Гаража (СТО)',
+          balance: garageBalance.toFixed(2),
+        },
       },
-      cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
-      card: { name: 'Карта', balance: cardBalance.toFixed(2) },
-      fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
-      garage: {
-        id: GARAGE_ID,
-        name: 'Касса Гаража (СТО)',
-        balance: garageBalance.toFixed(2),
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
       },
-    });
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
