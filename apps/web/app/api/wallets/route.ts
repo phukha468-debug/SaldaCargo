@@ -17,6 +17,10 @@ const sumWhere = (rows: any[], key: string, val: string, excludeTripOrders = fal
     .filter((r: any) => r[key] === val && (!excludeTripOrders || !r.trip_order_id))
     .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const maxDuration = 15;
+
 export async function GET() {
   try {
     let apiBalance: number | null = null;
@@ -25,9 +29,13 @@ export async function GET() {
     let apiAuthorized = 0;
     let apiOtb = 0;
 
-    // Автоматическая синхронизация с Т-Банком (Open API имеет безусловный приоритет)
+    // Автоматическая синхронизация с Т-Банком с защитой от зависания (макс 2.5 сек)
     try {
-      const syncResult = await syncTBankBalance();
+      const syncPromise = syncTBankBalance();
+      const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
+        setTimeout(() => resolve({ success: false, error: 'TBank timeout' }), 2500),
+      );
+      const syncResult = (await Promise.race([syncPromise, timeoutPromise])) as any;
       if (syncResult?.success && typeof syncResult.balance === 'number') {
         apiBalance = syncResult.balance;
         apiAuthorized = syncResult.authorized || 0;

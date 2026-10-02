@@ -18,6 +18,9 @@ const sumWhere = (rows: any[], key: string, val: string, excludeOrderTx = false)
     .filter((r: any) => r[key] === val && (!excludeOrderTx || !r.trip_order_id))
     .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function requestTBankApi(host: string, path: string, token: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -32,7 +35,7 @@ function requestTBankApi(host: string, path: string, token: string): Promise<any
           Accept: 'application/json',
         },
         rejectUnauthorized: false,
-        timeout: 8000,
+        timeout: 2500,
       },
       (res) => {
         let body = '';

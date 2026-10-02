@@ -68,9 +68,16 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   const { data: wallets } = useQuery<Wallets>({
     queryKey: ['wallets'],
-    queryFn: () => fetch('/api/wallets').then((r) => r.json()),
+    queryFn: async () => {
+      const res = await fetch('/api/wallets');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
     staleTime: 30000,
     refetchInterval: 60000,
+    placeholderData: (previousData) => previousData,
   });
 
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');

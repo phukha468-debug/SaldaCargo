@@ -2,7 +2,6 @@
 import https from 'https';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const TBANK_API_HOSTS = ['business.tbank.ru', 'business.tinkoff.ru'];
 const BANK_WALLET_ID = '10000000-0000-0000-0000-000000000001';
 const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
 
@@ -36,7 +35,7 @@ function requestTBankApi(host: string, path: string, token: string): Promise<any
           Accept: 'application/json',
         },
         rejectUnauthorized: false, // Т-Банк использует сертификаты Национального удостоверяющего центра Минцифры
-        timeout: 10000,
+        timeout: 2500,
       },
       (res) => {
         let body = '';
@@ -70,19 +69,33 @@ function requestTBankApi(host: string, path: string, token: string): Promise<any
  * Получить список счетов и актуальные остатки через Open API Т-Банка
  */
 export async function fetchTBankAccounts(apiToken: string): Promise<TBankAccount[]> {
-  let lastError: Error | null = null;
-
-  for (const host of TBANK_API_HOSTS) {
-    try {
-      const data = await requestTBankApi(host, '/openapi/api/v3/bank-accounts', apiToken);
-      if (Array.isArray(data)) return data;
-      if (Array.isArray(data?.accounts)) return data.accounts;
-    } catch (err: any) {
-      lastError = err;
+  try {
+    const data = await requestTBankApi(
+      'business.tbank.ru',
+      '/openapi/api/v3/bank-accounts',
+      apiToken,
+    );
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.accounts)) return data.accounts;
+  } catch (err: any) {
+    // Если ошибка не по таймауту, пробуем резервный хост
+    if (!err?.message?.includes('Таймаут')) {
+      try {
+        const data2 = await requestTBankApi(
+          'business.tinkoff.ru',
+          '/openapi/api/v3/bank-accounts',
+          apiToken,
+        );
+        if (Array.isArray(data2)) return data2;
+        if (Array.isArray(data2?.accounts)) return data2.accounts;
+      } catch {
+        // ignore
+      }
     }
+    throw err;
   }
 
-  throw lastError ?? new Error('Не удалось подключиться к Т-Банк API');
+  throw new Error('Не удалось подключиться к Т-Банк API');
 }
 
 const TBANK_FALLBACK_TOKEN =
