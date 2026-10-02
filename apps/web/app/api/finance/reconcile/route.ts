@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
-const CARD_ID = '10000000-0000-0000-0000-000000000003';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
+const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
 
 const sum = (rows: any[]) =>
   (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
@@ -24,7 +24,6 @@ export async function GET() {
 
     const [
       { data: bankOrders },
-      { data: cardOrders },
       { data: collections },
       { data: txIn },
       { data: txOut },
@@ -38,23 +37,17 @@ export async function GET() {
         .eq('settlement_status', 'completed')
         .eq('lifecycle_status', 'approved'),
 
-      (supabase.from('trip_orders') as any)
-        .select('amount')
-        .eq('payment_method', 'card_driver')
-        .eq('settlement_status', 'completed')
-        .eq('lifecycle_status', 'approved'),
-
       (supabase.from('cash_collections') as any).select('amount'),
 
       (supabase.from('transactions') as any)
         .select('amount, to_wallet_id')
-        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
+        .in('to_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
 
       (supabase.from('transactions') as any)
         .select('amount, from_wallet_id')
-        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID])
+        .in('from_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
 
@@ -81,16 +74,15 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', CASH_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', CASH_ID);
 
-    const cardBalance =
-      sum(cardOrders ?? []) +
-      sumWhere(txIn ?? [], 'to_wallet_id', CARD_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', CARD_ID);
-
     const fuelBalance =
       sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
 
-    const totalLiquid = bankBalance + cashBalance + fuelBalance;
+    const garageBalance =
+      sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
+      sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID);
+
+    const totalLiquid = bankBalance + cashBalance + fuelBalance + garageBalance;
 
     const loansTotal = (loans ?? []).reduce(
       (s: number, l: any) => s + parseFloat(l.remaining_amount ?? '0'),
@@ -106,8 +98,8 @@ export async function GET() {
       liquid_assets: {
         bank: bankBalance.toFixed(2),
         cash: cashBalance.toFixed(2),
-        card: cardBalance.toFixed(2),
         fuel_card: fuelBalance.toFixed(2),
+        garage: garageBalance.toFixed(2),
         total: totalLiquid.toFixed(2),
       },
       receivables: receivablesTotal.toFixed(2),

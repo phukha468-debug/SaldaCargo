@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
-const CARD_ID = '10000000-0000-0000-0000-000000000003';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
 const TBANK_API_HOSTS = ['business.tbank.ru', 'business.tinkoff.ru'];
@@ -103,43 +102,32 @@ export async function GET() {
 
     const supabase = createAdminClient();
 
-    const [
-      { data: bankOrders },
-      { data: cardOrders },
-      { data: collections },
-      { data: txIn },
-      { data: txOut },
-    ] = await Promise.all([
-      // Р/С: bank_invoice + qr (оплаченные)
-      (supabase.from('trip_orders') as any)
-        .select('amount')
-        .in('payment_method', ['bank_invoice', 'qr'])
-        .eq('settlement_status', 'completed')
-        .eq('lifecycle_status', 'approved'),
+    const [{ data: bankOrders }, { data: collections }, { data: txIn }, { data: txOut }] =
+      await Promise.all([
+        // Р/С: bank_invoice + qr (оплаченные)
+        (supabase.from('trip_orders') as any)
+          .select('amount')
+          .in('payment_method', ['bank_invoice', 'qr'])
+          .eq('settlement_status', 'completed')
+          .eq('lifecycle_status', 'approved'),
 
-      (supabase.from('trip_orders') as any)
-        .select('amount')
-        .eq('payment_method', 'card_driver')
-        .eq('settlement_status', 'completed')
-        .eq('lifecycle_status', 'approved'),
+        // Инкассации → Сейф
+        (supabase.from('cash_collections') as any).select('amount'),
 
-      // Инкассации → Сейф
-      (supabase.from('cash_collections') as any).select('amount'),
+        // Входящие транзакции на кошельки (переводы, прямые доходы)
+        (supabase.from('transactions') as any)
+          .select('amount, to_wallet_id, trip_order_id')
+          .in('to_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed'),
 
-      // Входящие транзакции на кошельки (переводы, прямые доходы)
-      (supabase.from('transactions') as any)
-        .select('amount, to_wallet_id, trip_order_id')
-        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID, GARAGE_ID])
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
-
-      // Исходящие транзакции из кошельков
-      (supabase.from('transactions') as any)
-        .select('amount, from_wallet_id')
-        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID, GARAGE_ID])
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
-    ]);
+        // Исходящие транзакции из кошельков
+        (supabase.from('transactions') as any)
+          .select('amount, from_wallet_id')
+          .in('from_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed'),
+      ]);
 
     const collectionsTotal = sum(collections ?? []);
 
@@ -154,11 +142,6 @@ export async function GET() {
       collectionsTotal +
       sumWhere(txIn ?? [], 'to_wallet_id', CASH_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', CASH_ID);
-
-    const cardBalance =
-      sum(cardOrders ?? []) +
-      sumWhere(txIn ?? [], 'to_wallet_id', CARD_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', CARD_ID);
 
     const fuelBalance =
       sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
@@ -179,7 +162,6 @@ export async function GET() {
           account_number: TARGET_ACCOUNT_NUMBER,
         },
         cash: { id: CASH_ID, name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
-        card: { id: CARD_ID, name: 'Карта', balance: cardBalance.toFixed(2) },
         fuel_card: {
           id: FUEL_CARD_ID,
           name: 'Топливные карты (ГСМ)',

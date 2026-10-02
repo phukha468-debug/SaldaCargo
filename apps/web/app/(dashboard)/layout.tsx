@@ -23,7 +23,6 @@ const FINANCE_PATHS = ['/finance', '/receivables', '/loans', '/payables'];
 type Wallets = {
   bank: { name: string; balance: string; api_synced?: boolean; account_number?: string };
   cash: { name: string; balance: string };
-  card?: { name: string; balance: string };
   fuel_card?: { name: string; balance: string };
   garage?: { id: string; name: string; balance: string };
 };

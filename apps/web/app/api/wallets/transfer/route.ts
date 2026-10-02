@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server';
 const WALLET_IDS: Record<string, string> = {
   bank: '10000000-0000-0000-0000-000000000001',
   cash: '10000000-0000-0000-0000-000000000002',
-  card: '10000000-0000-0000-0000-000000000003',
   fuel_card: '10000000-0000-0000-0000-000000000004',
   garage: '10000000-0000-0000-0000-000000000005',
 };
@@ -14,7 +13,6 @@ const WALLET_IDS: Record<string, string> = {
 const WALLET_TO_METHOD: Record<string, string> = {
   bank: 'bank_invoice',
   cash: 'cash',
-  card: 'card_driver',
 };
 
 /**

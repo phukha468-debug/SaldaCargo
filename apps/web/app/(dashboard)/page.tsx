@@ -31,7 +31,6 @@ type Wallets = {
     account_number?: string;
   };
   cash: { name: string; balance: string };
-  card?: { name: string; balance: string };
   fuel_card?: { name: string; balance: string };
   garage?: { id: string; name: string; balance: string };
 };

@@ -32,7 +32,8 @@ type Wallet = {
 type WalletsResponse = {
   bank: Wallet;
   cash: Wallet;
-  card: Wallet;
+  fuel_card?: Wallet;
+  garage?: Wallet;
 };
 
 // ── Helpers ────────────────────────────────────────────────────
