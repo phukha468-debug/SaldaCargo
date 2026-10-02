@@ -34,11 +34,17 @@ export default function AdminDashboard() {
     refetchInterval: 60000,
   });
 
-  const { data: wallets, isLoading: walletsLoading } = useQuery<Wallets>({
+  const {
+    data: wallets,
+    isLoading: walletsLoading,
+    isFetching: walletsFetching,
+    refetch: refetchWallets,
+  } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
+    staleTime: 5000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   const handleLogout = () => {
@@ -75,6 +81,8 @@ export default function AdminDashboard() {
       <WalletsSection
         wallets={wallets}
         isLoading={walletsLoading}
+        isFetching={walletsFetching}
+        onRefresh={() => refetchWallets()}
         onTransferred={() => qc.invalidateQueries({ queryKey: ['wallets'] })}
       />
 
@@ -151,10 +159,14 @@ export default function AdminDashboard() {
 function WalletsSection({
   wallets,
   isLoading,
+  isFetching,
+  onRefresh,
   onTransferred,
 }: {
   wallets: Wallets | undefined;
   isLoading: boolean;
+  isFetching?: boolean;
+  onRefresh?: () => void;
   onTransferred: () => void;
 }) {
   const [showTransfer, setShowTransfer] = useState(false);
@@ -183,9 +195,21 @@ function WalletsSection({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-          Деньги компании
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            Деньги компании
+          </h2>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isFetching}
+              title="Обновить с Т-Банком"
+              className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg transition-colors"
+            >
+              <span className={`inline-block text-xs ${isFetching ? 'animate-spin' : ''}`}>🔄</span>
+            </button>
+          )}
+        </div>
         <button
           onClick={() => setShowTransfer((v) => !v)}
           className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl transition-colors ${

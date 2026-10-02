@@ -99,8 +99,9 @@ export default function DashboardHome() {
   const { data: wallets, isFetching: walletsFetching } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 15000,
-    refetchInterval: 60000,
+    staleTime: 5000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   // 2. Summary (Alerts)

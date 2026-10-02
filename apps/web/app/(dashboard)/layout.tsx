@@ -65,7 +65,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     staleTime: 30000,
   });
 
-  const { data: wallets } = useQuery<Wallets>({
+  const {
+    data: wallets,
+    isFetching: walletsFetching,
+    refetch: refetchWallets,
+  } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: async () => {
       const res = await fetch('/api/wallets', { cache: 'no-store' });
@@ -74,8 +78,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    staleTime: 30000,
-    refetchInterval: 60000,
+    staleTime: 5000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
   });
 
@@ -283,6 +288,20 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   {fuelNum.toLocaleString('ru-RU')} ₽
                 </div>
               </div>
+              <button
+                onClick={() => refetchWallets()}
+                disabled={walletsFetching}
+                title="Синхронизировать баланс с Т-Банком сейчас"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <span
+                  className={`material-symbols-outlined text-[18px] block ${
+                    walletsFetching ? 'animate-spin text-sky-400' : ''
+                  }`}
+                >
+                  sync
+                </span>
+              </button>
             </div>
 
             {/* Отдельный счёт Гаража / СТО */}
