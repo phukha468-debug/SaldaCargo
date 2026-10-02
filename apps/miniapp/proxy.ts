@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
   const isPublicApi =
     pathname.startsWith('/api/users/public') ||
     pathname === '/api/vehicles/public' ||
-    pathname.startsWith('/api/public/');
+    pathname.startsWith('/api/public/') ||
+    pathname.startsWith('/api/wallets');
 
   if (!userId && !isAuthApi && !isPublicApi && pathname !== '/') {
     return NextResponse.redirect(new URL('/', request.url));

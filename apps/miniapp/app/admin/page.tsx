@@ -9,6 +9,8 @@ import { Money } from '@saldacargo/ui';
 type Wallets = {
   bank: { id: string; name: string; balance: string };
   cash: { id: string; name: string; balance: string };
+  fuel_card?: { id: string; name: string; balance: string };
+  garage?: { id: string; name: string; balance: string };
 };
 
 const WALLET_OPTIONS = [
@@ -170,6 +172,12 @@ function WalletsSection({
       color: 'bg-emerald-50 border-emerald-200',
       textColor: 'text-emerald-700',
     },
+    {
+      key: 'fuel_card' as const,
+      icon: '⛽',
+      color: 'bg-amber-50 border-amber-200',
+      textColor: 'text-amber-700',
+    },
   ];
 
   return (
@@ -188,7 +196,7 @@ function WalletsSection({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {WALLET_CONFIGS.map(({ key, icon, color, textColor }) => (
           <div key={key} className={`rounded-2xl border-2 p-3 ${color}`}>
             <p className="text-lg mb-1">{icon}</p>

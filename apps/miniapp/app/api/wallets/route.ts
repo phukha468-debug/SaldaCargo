@@ -5,6 +5,9 @@ import { NextResponse } from 'next/server';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
+const CARD_ID = '10000000-0000-0000-0000-000000000003';
+const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
+const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
 const TBANK_API_HOSTS = ['business.tbank.ru', 'business.tinkoff.ru'];
 const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
 const TBANK_FALLBACK_TOKEN =
@@ -100,32 +103,43 @@ export async function GET() {
 
     const supabase = createAdminClient();
 
-    const [{ data: bankOrders }, { data: collections }, { data: txIn }, { data: txOut }] =
-      await Promise.all([
-        // Р/С: bank_invoice + qr (оплаченные)
-        (supabase.from('trip_orders') as any)
-          .select('amount')
-          .in('payment_method', ['bank_invoice', 'qr'])
-          .eq('settlement_status', 'completed')
-          .eq('lifecycle_status', 'approved'),
+    const [
+      { data: bankOrders },
+      { data: cardOrders },
+      { data: collections },
+      { data: txIn },
+      { data: txOut },
+    ] = await Promise.all([
+      // Р/С: bank_invoice + qr (оплаченные)
+      (supabase.from('trip_orders') as any)
+        .select('amount')
+        .in('payment_method', ['bank_invoice', 'qr'])
+        .eq('settlement_status', 'completed')
+        .eq('lifecycle_status', 'approved'),
 
-        // Инкассации → Сейф
-        (supabase.from('cash_collections') as any).select('amount'),
+      (supabase.from('trip_orders') as any)
+        .select('amount')
+        .eq('payment_method', 'card_driver')
+        .eq('settlement_status', 'completed')
+        .eq('lifecycle_status', 'approved'),
 
-        // Входящие транзакции на кошельки (переводы, прямые доходы)
-        (supabase.from('transactions') as any)
-          .select('amount, to_wallet_id, trip_order_id')
-          .in('to_wallet_id', [BANK_ID, CASH_ID])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
+      // Инкассации → Сейф
+      (supabase.from('cash_collections') as any).select('amount'),
 
-        // Исходящие транзакции из кошельков
-        (supabase.from('transactions') as any)
-          .select('amount, from_wallet_id')
-          .in('from_wallet_id', [BANK_ID, CASH_ID])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-      ]);
+      // Входящие транзакции на кошельки (переводы, прямые доходы)
+      (supabase.from('transactions') as any)
+        .select('amount, to_wallet_id, trip_order_id')
+        .in('to_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID, GARAGE_ID])
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      // Исходящие транзакции из кошельков
+      (supabase.from('transactions') as any)
+        .select('amount, from_wallet_id')
+        .in('from_wallet_id', [BANK_ID, CASH_ID, CARD_ID, FUEL_CARD_ID, GARAGE_ID])
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+    ]);
 
     const collectionsTotal = sum(collections ?? []);
 
@@ -141,16 +155,48 @@ export async function GET() {
       sumWhere(txIn ?? [], 'to_wallet_id', CASH_ID) -
       sumWhere(txOut ?? [], 'from_wallet_id', CASH_ID);
 
-    return NextResponse.json({
-      bank: {
-        id: BANK_ID,
-        name: 'Расчётный счёт',
-        balance: bankBalance.toFixed(2),
-        api_synced: isApiSynced,
-        synced_at: new Date().toISOString(),
+    const cardBalance =
+      sum(cardOrders ?? []) +
+      sumWhere(txIn ?? [], 'to_wallet_id', CARD_ID) -
+      sumWhere(txOut ?? [], 'from_wallet_id', CARD_ID);
+
+    const fuelBalance =
+      sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
+      sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
+
+    const garageBalance =
+      sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
+      sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID);
+
+    return NextResponse.json(
+      {
+        bank: {
+          id: BANK_ID,
+          name: 'Расчётный счёт',
+          balance: bankBalance.toFixed(2),
+          api_synced: isApiSynced,
+          synced_at: new Date().toISOString(),
+          account_number: TARGET_ACCOUNT_NUMBER,
+        },
+        cash: { id: CASH_ID, name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
+        card: { id: CARD_ID, name: 'Карта', balance: cardBalance.toFixed(2) },
+        fuel_card: {
+          id: FUEL_CARD_ID,
+          name: 'Топливные карты (ГСМ)',
+          balance: fuelBalance.toFixed(2),
+        },
+        garage: {
+          id: GARAGE_ID,
+          name: 'Касса Гаража (СТО)',
+          balance: garageBalance.toFixed(2),
+        },
       },
-      cash: { id: CASH_ID, name: 'Сейф (Наличные)', balance: cashBalance.toFixed(2) },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      },
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
