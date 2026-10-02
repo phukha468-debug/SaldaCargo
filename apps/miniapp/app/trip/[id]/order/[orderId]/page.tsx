@@ -36,9 +36,9 @@ interface SelectedLoader {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Наличные', icon: '💵' },
-  { value: 'qr', label: 'QR-код (Т-Банк)', icon: '⚡' },
-  { value: 'debt_cash', label: 'В долг', icon: '⏳' },
+  { value: 'qr', label: 'QR-код', icon: '⚡' },
+  { value: 'cash', label: 'Наличный', icon: '💵' },
+  { value: 'debt_cash', label: 'Долг', icon: '⏳' },
 ] as const;
 
 const SUGGEST_PERCENT = 30;
@@ -292,11 +292,9 @@ export default function EditOrderPage() {
       return;
     }
     const isDebt = data.payment_method === 'debt_cash';
-    const isLegal = selectedCounterparty?.is_legal_entity;
-
-    if (isDebt && !isLegal && !data.description?.trim()) {
-      setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
-      return;
+    let description = data.description?.trim() || '';
+    if (isDebt && !description) {
+      description = `Долг: ${selectedCounterparty?.name || 'Клиент'}`;
     }
 
     setSubmitting(true);
@@ -319,7 +317,7 @@ export default function EditOrderPage() {
         driver_car_pay: String(payroll.driverCarPay),
         driver_loader_pay: String(payroll.driverLoaderPay),
         counterparty_id: data.counterparty_id ?? null,
-        description: data.description ?? null,
+        description: description || null,
         amount: String(data.amount),
         driver_pay: driverPayValue,
         loaders_data: loadersData,

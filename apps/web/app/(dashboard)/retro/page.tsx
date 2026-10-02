@@ -773,19 +773,19 @@ type FormData = z.infer<typeof schema>;
 
 const PAYMENT_METHODS = [
   {
+    value: 'qr',
+    label: '⚡ QR-код (Т-Банк / СБП)',
+    color: 'bg-purple-50 text-purple-800 border-purple-300',
+  },
+  {
     value: 'cash',
-    label: '💵 Наличные',
+    label: '💵 Наличный',
     color: 'bg-emerald-50 text-emerald-800 border-emerald-300',
   },
   {
     value: 'debt_cash',
-    label: '⏳ Долг клиента (нал)',
-    color: 'bg-amber-50 text-amber-800 border-amber-300',
-  },
-  {
-    value: 'qr',
-    label: '⚡ QR-код (Т-Банк / СБП)',
-    color: 'bg-purple-50 text-purple-800 border-purple-300',
+    label: '⏳ Долг (в дебиторку)',
+    color: 'bg-rose-50 text-rose-800 border-rose-300',
   },
   {
     value: 'bank_invoice',

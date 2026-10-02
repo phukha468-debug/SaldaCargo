@@ -115,8 +115,8 @@ const PAYMENT_STYLES: Record<string, string> = {
 };
 
 const PAYMENT_EDIT_OPTIONS = [
-  { value: 'cash', label: 'Наличные' },
   { value: 'qr', label: 'QR-код' },
+  { value: 'cash', label: 'Наличный' },
   { value: 'debt_cash', label: 'Долг' },
 ];
 

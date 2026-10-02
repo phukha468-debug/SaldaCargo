@@ -49,51 +49,35 @@ interface SelectedLoader {
   pay: string;
 }
 
-// ─── Payment methods per client type ─────────────────────────────────────────
+// ─── Payment methods (1. QR-код, 2. Наличный, 3. Долг) ────────────────────────
 
-const METHODS_INDIVIDUAL = [
-  {
-    value: 'cash' as const,
-    label: 'Наличные',
-    sublabel: 'Сдаст в кассу',
-    icon: '💵',
-    wallet: '→ Сейф ТК',
-    color: 'peer-checked:border-green-600 peer-checked:bg-green-50',
-  },
+const PAYMENT_METHODS = [
   {
     value: 'qr' as const,
     label: 'QR-код',
     sublabel: 'Т-Банк / СБП',
     icon: '⚡',
     wallet: '→ Расчётный счёт',
-    color: 'peer-checked:border-yellow-500 peer-checked:bg-yellow-50',
+    color:
+      'peer-checked:border-purple-600 peer-checked:bg-purple-50 peer-checked:ring-2 peer-checked:ring-purple-300',
+  },
+  {
+    value: 'cash' as const,
+    label: 'Наличный',
+    sublabel: 'Сдаст в кассу',
+    icon: '💵',
+    wallet: '→ Сейф ТК',
+    color:
+      'peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:ring-2 peer-checked:ring-emerald-300',
   },
   {
     value: 'debt_cash' as const,
     label: 'Долг',
-    sublabel: 'Заплатит позднее',
+    sublabel: 'Не отдали (дебиторка)',
     icon: '⏳',
     wallet: '→ Дебиторка',
-    color: 'peer-checked:border-orange-500 peer-checked:bg-orange-50',
-  },
-];
-
-const METHODS_LEGAL = [
-  {
-    value: 'debt_cash' as const,
-    label: 'Счёт / Долг',
-    sublabel: 'Оплата по выставленному счёту (Р/С)',
-    icon: '🧾',
-    wallet: '→ Дебиторка → Р/С',
-    color: 'peer-checked:border-blue-500 peer-checked:bg-blue-50',
-  },
-  {
-    value: 'qr' as const,
-    label: 'QR-код (СБП)',
-    sublabel: 'Оплата по QR сразу на Р/С',
-    icon: '⚡',
-    wallet: '→ Расчётный счёт',
-    color: 'peer-checked:border-yellow-500 peer-checked:bg-yellow-50',
+    color:
+      'peer-checked:border-rose-600 peer-checked:bg-rose-50 peer-checked:ring-2 peer-checked:ring-rose-300',
   },
 ];
 
@@ -188,7 +172,7 @@ export default function AddOrderPage() {
 
   const availableLoaders = allLoaders.filter((l) => !loaders.find((s) => s.id === l.id));
   const isDebt = selectedPaymentMethod === 'debt_cash';
-  const paymentMethods = clientType === 'legal' ? METHODS_LEGAL : METHODS_INDIVIDUAL;
+  const paymentMethods = PAYMENT_METHODS;
 
   const DEFAULT_DIRECTION: OrderDirectionItem = {
     id: 'local',
@@ -210,13 +194,9 @@ export default function AddOrderPage() {
     const newType = c.is_legal_entity ? 'legal' : 'individual';
     setClientType(newType);
 
-    if (c.is_legal_entity) {
-      setValue('payment_method', 'debt_cash');
-    } else {
-      const current = watch('payment_method');
-      if (!current || current === 'debt_cash') {
-        setValue('payment_method', 'cash');
-      }
+    const current = watch('payment_method');
+    if (!current) {
+      setValue('payment_method', c.is_legal_entity ? 'debt_cash' : 'cash');
     }
   }
 
@@ -273,11 +253,9 @@ export default function AddOrderPage() {
       return;
     }
     const isDebt = data.payment_method === 'debt_cash';
-    const isLegal = clientType === 'legal' || selectedCounterparty?.is_legal_entity;
-
-    if (isDebt && !isLegal && !data.description?.trim()) {
-      setError('Обязательно укажите комментарий к долгу (имя и что обещал клиент)');
-      return;
+    let description = data.description?.trim() || '';
+    if (isDebt && !description) {
+      description = `Долг: ${selectedCounterparty?.name || 'Клиент'}`;
     }
 
     setSubmitting(true);
@@ -293,6 +271,7 @@ export default function AddOrderPage() {
 
     const payload = JSON.stringify({
       ...data,
+      description: description || null,
       direction,
       is_driver_loader: isDriverLoader,
       driver_car_pay: String(payroll.driverCarPay),
@@ -740,10 +719,7 @@ export default function AddOrderPage() {
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
             Способ оплаты
           </label>
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${paymentMethods.length}, 1fr)` }}
-          >
+          <div className="grid grid-cols-3 gap-2">
             {paymentMethods.map((m) => (
               <label key={m.value} className="cursor-pointer">
                 <input
@@ -753,10 +729,10 @@ export default function AddOrderPage() {
                   className="sr-only peer"
                 />
                 <div
-                  className={`flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-2xl p-3 h-24 transition-all active:scale-[0.97] ${m.color}`}
+                  className={`flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-2xl p-2.5 h-24 transition-all active:scale-[0.97] ${m.color}`}
                 >
                   <span className="text-2xl">{m.icon}</span>
-                  <span className="text-[10px] font-black text-center leading-tight uppercase tracking-tight">
+                  <span className="text-[11px] font-black text-center leading-tight uppercase tracking-tight text-zinc-900">
                     {m.label}
                   </span>
                   <span className="text-[8px] font-bold text-zinc-400 text-center leading-tight">
@@ -767,64 +743,53 @@ export default function AddOrderPage() {
             ))}
           </div>
 
-          {/* Подсказка для юрлиц */}
-          {clientType === 'legal' && selectedPaymentMethod === 'debt_cash' && (
-            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide px-1">
-              🏢 Юрлицо оплачивает по счёту → деньги придут на Р/С
-            </p>
-          )}
-
-          {/* Подсказка для налички */}
-          {selectedPaymentMethod === 'cash' && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
-              <span className="text-sm leading-none">💡</span>
-              <span>
-                Деньги физически у вас в виде наличных. Сдаются в сейф/кассу ТК в конце смены.
-              </span>
-            </div>
-          )}
-
           {/* Подсказка для QR */}
           {selectedPaymentMethod === 'qr' && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-yellow-900 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-purple-900 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
               <span className="text-sm leading-none">⚡</span>
               <span>
                 Клиент перевёл по QR-коду / СБП на счёт Т-Банка. Наличные сдавать не нужно.
               </span>
             </div>
           )}
+
+          {/* Подсказка для налички */}
+          {selectedPaymentMethod === 'cash' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
+              <span className="text-sm leading-none">💵</span>
+              <span>
+                Деньги физически у вас в виде наличных. Сдаются в сейф/кассу ТК в конце смены.
+              </span>
+            </div>
+          )}
+
+          {/* Подсказка для долга */}
+          {selectedPaymentMethod === 'debt_cash' && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-900 text-[10px] font-extrabold uppercase tracking-wide flex items-start gap-2 mt-2">
+              <span className="text-sm leading-none">⏳</span>
+              <span>
+                Деньги не отдали! Заказ зафиксирован как долг и автоматически попадает в Дебиторку.
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* ── Комментарий к долгу (только для физлиц в долг) ── */}
-        {isDebt && clientType !== 'legal' && !selectedCounterparty?.is_legal_entity && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest pl-1">
-              ⏳ Что обещал клиент? (важно!)
-            </label>
-            <input
-              type="text"
-              {...register('description')}
-              placeholder="Обещал заплатить в пятницу, наличными..."
-              autoFocus
-              className="w-full rounded-xl border-2 border-orange-400 bg-orange-50 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-600 focus:outline-none transition-colors placeholder:text-orange-300"
-            />
-          </div>
-        )}
-
-        {/* ── Описание (только для физлиц при оплате не в долг) ── */}
-        {!isDebt && clientType !== 'legal' && !selectedCounterparty?.is_legal_entity && (
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
-              Описание (опционально)
-            </label>
-            <input
-              type="text"
-              {...register('description')}
-              placeholder="Переезд, доставка плитки..."
-              className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-            />
-          </div>
-        )}
+        {/* ── Описание / Комментарий к заказу ── */}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
+            {isDebt ? '⏳ Комментарий к долгу (опционально)' : 'Описание (опционально)'}
+          </label>
+          <input
+            type="text"
+            {...register('description')}
+            placeholder={isDebt ? 'Обещал заплатить в пятницу...' : 'Переезд, доставка плитки...'}
+            className={`w-full rounded-xl border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
+              isDebt
+                ? 'border-rose-400 bg-rose-50/50 focus:border-rose-600'
+                : 'border-zinc-200 focus:border-orange-500'
+            }`}
+          />
+        </div>
 
         {error && (
           <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
