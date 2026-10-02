@@ -118,9 +118,6 @@ async function handleOfficialPayrollCron(req: NextRequest) {
     // ЗАДАЧА 1: 1-е число месяца — Автоматический платёж за налоги в долг сотрудника (10 000 ₽)
     // ──────────────────────────────────────────────────────────────────────────
     if (currentDay === 1 || searchParams.get('force_accrual') === 'true') {
-      const monthStart = new Date(currentYear, currentMonth, 1).toISOString();
-      const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).toISOString();
-
       const MONTHLY_TAX_AMOUNT = 10000; // Каждый сотрудник с официальной ЗП платит 10 000 ₽ в счёт компании за налоги
 
       const { data: adminUser } = await (supabase as any)
@@ -139,9 +136,7 @@ async function handleOfficialPayrollCron(req: NextRequest) {
           .select('id')
           .eq('category_id', ADVANCE_CATEGORY_ID)
           .eq('related_user_id', user.id)
-          .gte('transaction_date', monthStart)
-          .lte('transaction_date', monthEnd)
-          .or('description.ilike.%Налог%ТК РФ%,description.ilike.%Вычет по ТК РФ%')
+          .ilike('description', `%${monthName} ${currentYear}%`)
           .limit(1);
 
         if (existing && existing.length > 0) {

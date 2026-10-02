@@ -19,6 +19,9 @@ const sumWhere = (rows: any[], key: string, val: string, excludeTripOrders = fal
 
 export async function GET() {
   try {
+    let apiBalance: number | null = null;
+    let isApiSynced = false;
+    let tbankAccountNum = '';
     let apiAuthorized = 0;
     let apiOtb = 0;
 
