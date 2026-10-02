@@ -109,6 +109,7 @@ export async function GET() {
         available: (apiBalance !== null ? apiOtb : bankBalance).toFixed(2),
         authorized: apiAuthorized.toFixed(2),
         api_synced: isApiSynced,
+        synced_at: new Date().toISOString(),
         account_number: tbankAccountNum,
       },
       cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },

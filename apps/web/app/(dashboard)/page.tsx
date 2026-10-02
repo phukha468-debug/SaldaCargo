@@ -93,13 +93,14 @@ export default function DashboardHome() {
   const [incomeExpanded, setIncomeExpanded] = useState(true);
   const [expenseExpanded, setExpenseExpanded] = useState(true);
 
+  const qc = useQueryClient();
   const [drawerWallet, setDrawerWallet] = useState<WalletKey | null>(null);
 
   // 1. Wallets
-  const { data: wallets } = useQuery<Wallets>({
+  const { data: wallets, isFetching: walletsFetching } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 15000,
     refetchInterval: 60000,
   });
 
@@ -201,10 +202,29 @@ export default function DashboardHome() {
                 <span className="text-[10px] text-slate-400 uppercase font-bold block">
                   Расчётный счёт
                 </span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                  Т-Банк
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                    Т-Банк
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      qc.invalidateQueries({ queryKey: ['wallets'] });
+                    }}
+                    title="Обновить баланс из Т-Банка прямо сейчас"
+                    className="p-0.5 rounded hover:bg-slate-700/80 text-slate-400 hover:text-sky-300 transition-colors"
+                  >
+                    <span
+                      className={`material-symbols-outlined text-[13px] block ${
+                        walletsFetching ? 'animate-spin' : ''
+                      }`}
+                    >
+                      sync
+                    </span>
+                  </button>
+                </div>
               </div>
               <span className="text-sm font-extrabold text-sky-400 mt-1 block">
                 {bankNum.toLocaleString('ru-RU')} ₽

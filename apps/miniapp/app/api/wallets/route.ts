@@ -144,6 +144,7 @@ export async function GET() {
         name: 'Расчётный счёт',
         balance: bankBalance.toFixed(2),
         api_synced: isApiSynced,
+        synced_at: new Date().toISOString(),
       },
       cash: { id: CASH_ID, name: 'Сейф (Наличные)', balance: cashBalance.toFixed(2) },
     });

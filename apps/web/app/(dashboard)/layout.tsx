@@ -70,6 +70,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
     staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
