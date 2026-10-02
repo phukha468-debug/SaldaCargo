@@ -4,8 +4,11 @@ import { generateDeterministicUuid } from '@saldacargo/shared';
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
+const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
 const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
+const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+const CAT_OTHER = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 
 export async function syncTripFinancials(
   supabase: any,
@@ -242,6 +245,76 @@ export async function syncTripFinancials(
           created_by: adminId,
           idempotency_key: generateDeterministicUuid(`trip-payroll-loader-${tripId}-${userId}`),
         });
+      }
+    }
+  }
+
+  // 7. Sync Trip Expenses (Fuel Card, Cash, etc.)
+  const { data: tripExpenses } = await (supabase.from('trip_expenses') as any)
+    .select('id, amount, payment_method, category_id, description')
+    .eq('trip_id', tripId);
+
+  for (const exp of tripExpenses ?? []) {
+    const amountNum = parseFloat(exp.amount ?? '0');
+    if (amountNum <= 0) continue;
+
+    let walletId: string | null = null;
+    if (exp.payment_method === 'fuel_card') {
+      walletId = FUEL_CARD_ID;
+    } else if (exp.payment_method === 'cash') {
+      walletId = CASH_ID;
+    }
+
+    if (!walletId) continue;
+
+    const catId = exp.category_id || (exp.payment_method === 'fuel_card' ? CAT_FUEL : CAT_OTHER);
+    const desc = exp.description
+      ? `Расход рейса №${trip.trip_number}: ${exp.description}`
+      : `Расход рейса №${trip.trip_number} (${exp.payment_method === 'fuel_card' ? 'Топливная карта' : 'Наличные'})`;
+
+    const txIdemp = generateDeterministicUuid(`trip-expense-${exp.id}`);
+
+    const { data: existingExpTx } = await (supabase.from('transactions') as any)
+      .select('id')
+      .eq('idempotency_key', txIdemp)
+      .maybeSingle();
+
+    if (existingExpTx) {
+      await (supabase.from('transactions') as any)
+        .update({
+          amount: amountNum.toFixed(2),
+          description: desc,
+          category_id: catId,
+          from_wallet_id: walletId,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+        })
+        .eq('id', existingExpTx.id);
+
+      await (supabase.from('trip_expenses') as any)
+        .update({ linked_expense_tx_id: existingExpTx.id })
+        .eq('id', exp.id);
+    } else {
+      const { data: insertedTx } = await (supabase.from('transactions') as any)
+        .insert({
+          direction: 'expense',
+          category_id: catId,
+          amount: amountNum.toFixed(2),
+          from_wallet_id: walletId,
+          trip_id: tripId,
+          description: desc,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          created_by: adminId,
+          idempotency_key: txIdemp,
+        })
+        .select('id')
+        .single();
+
+      if (insertedTx?.id) {
+        await (supabase.from('trip_expenses') as any)
+          .update({ linked_expense_tx_id: insertedTx.id })
+          .eq('id', exp.id);
       }
     }
   }
