@@ -251,8 +251,10 @@ export async function syncTripFinancials(
 
   // 7. Sync Trip Expenses (Fuel Card, Cash, etc.)
   const { data: tripExpenses } = await (supabase.from('trip_expenses') as any)
-    .select('id, amount, payment_method, category_id, description')
+    .select('id, amount, payment_method, category_id, description, linked_expense_tx_id')
     .eq('trip_id', tripId);
+
+  const activeTxIds = new Set<string>();
 
   for (const exp of tripExpenses ?? []) {
     const amountNum = parseFloat(exp.amount ?? '0');
@@ -274,12 +276,25 @@ export async function syncTripFinancials(
 
     const txIdemp = generateDeterministicUuid(`trip-expense-${exp.id}`);
 
-    const { data: existingExpTx } = await (supabase.from('transactions') as any)
-      .select('id')
-      .eq('idempotency_key', txIdemp)
-      .maybeSingle();
+    let existingExpTx: any = null;
+    if (exp.linked_expense_tx_id) {
+      const { data } = await (supabase.from('transactions') as any)
+        .select('id')
+        .eq('id', exp.linked_expense_tx_id)
+        .maybeSingle();
+      existingExpTx = data;
+    }
+    if (!existingExpTx) {
+      const { data } = await (supabase.from('transactions') as any)
+        .select('id')
+        .eq('idempotency_key', txIdemp)
+        .maybeSingle();
+      existingExpTx = data;
+    }
 
     if (existingExpTx) {
+      activeTxIds.add(existingExpTx.id);
+      activeTxIds.add(txIdemp);
       await (supabase.from('transactions') as any)
         .update({
           amount: amountNum.toFixed(2),
@@ -312,10 +327,25 @@ export async function syncTripFinancials(
         .single();
 
       if (insertedTx?.id) {
+        activeTxIds.add(insertedTx.id);
+        activeTxIds.add(txIdemp);
         await (supabase.from('trip_expenses') as any)
           .update({ linked_expense_tx_id: insertedTx.id })
           .eq('id', exp.id);
       }
+    }
+  }
+
+  // Cleanup orphaned expense transactions for this trip
+  const { data: allTripExpenseTxs } = await (supabase.from('transactions') as any)
+    .select('id, idempotency_key')
+    .eq('trip_id', tripId)
+    .eq('direction', 'expense')
+    .in('category_id', [CAT_FUEL, CAT_OTHER]);
+
+  for (const tx of allTripExpenseTxs ?? []) {
+    if (!activeTxIds.has(tx.id) && !activeTxIds.has(tx.idempotency_key)) {
+      await (supabase.from('transactions') as any).delete().eq('id', tx.id);
     }
   }
 }

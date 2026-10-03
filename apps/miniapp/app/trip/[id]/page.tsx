@@ -121,6 +121,30 @@ export default function TripDetailPage() {
     },
   });
 
+  const [finishError, setFinishError] = useState<string | null>(null);
+
+  const finishTrip = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/trips/${id}/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'Ошибка завершения');
+      return body;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip', id] });
+      queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+      router.push('/');
+    },
+    onError: (err: Error) => {
+      setFinishError(err.message);
+    },
+  });
+
   function handleDeleteTripClick() {
     if (!confirmDeleteTrip) {
       setConfirmDeleteTrip(true);
@@ -132,7 +156,7 @@ export default function TripDetailPage() {
     }
   }
 
-  const isMutating = deleteExpense.isPending || cancelOrder.isPending;
+  const isMutating = deleteExpense.isPending || cancelOrder.isPending || finishTrip.isPending;
 
   if (isLoading) {
     return (
@@ -236,7 +260,7 @@ export default function TripDetailPage() {
             highlighted
           />
           <StatCard label="ЗП Водителя" value={<Money amount={totals.driverPay.toString()} />} />
-          <StatCard label="Расходы" value={<Money amount={totals.expenses.toString()} />} error />
+          <StatCard label="ГСМ" value={<Money amount={totals.expenses.toString()} />} error />
           {hasLoaders && (
             <StatCard label="ЗП Грузчики" value={<Money amount={totals.loadersPay.toString()} />} />
           )}
@@ -392,7 +416,7 @@ export default function TripDetailPage() {
         {/* Expenses */}
         <section className="space-y-3">
           <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pb-1 border-b-2 border-zinc-100">
-            Расходы
+            Заправки (ГСМ)
           </h2>
           {deleteError && (
             <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
@@ -402,7 +426,7 @@ export default function TripDetailPage() {
           {(trip.trip_expenses ?? []).length === 0 ? (
             <div className="bg-zinc-100 border-2 border-zinc-200 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center opacity-60">
               <p className="font-bold text-zinc-400 uppercase tracking-tight text-xs">
-                Расходов пока нет
+                Заправок пока нет
               </p>
             </div>
           ) : (
@@ -496,6 +520,11 @@ export default function TripDetailPage() {
       {/* Action Buttons */}
       {isActive && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50">
+          {finishError && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide text-center">
+              {finishError}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Link
               href={`/trip/${id}/order`}
@@ -505,17 +534,19 @@ export default function TripDetailPage() {
             </Link>
             <Link
               href={`/trip/${id}/expense`}
-              className="flex items-center justify-center gap-2 bg-zinc-800 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
+              className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
             >
-              <span>💸</span> Расход
+              <span>⛽</span> ГСМ
             </Link>
           </div>
-          <Link
-            href={`/trip/${id}/finish`}
-            className="flex items-center justify-center gap-2 w-full bg-zinc-900 text-white rounded-lg h-14 font-black uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all"
+          <button
+            type="button"
+            onClick={() => finishTrip.mutate()}
+            disabled={finishTrip.isPending}
+            className="flex items-center justify-center gap-2 w-full bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg h-14 font-black uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            <span>🏁</span> Завершить рейс
-          </Link>
+            <span>🏁</span> {finishTrip.isPending ? 'Завершаем смену...' : 'Завершить рейс'}
+          </button>
         </div>
       )}
     </div>

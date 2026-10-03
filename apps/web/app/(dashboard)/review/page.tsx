@@ -318,7 +318,7 @@ function formatPeriod(dateStr: string, period: 'day' | 'week' | 'month') {
     return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`;
   }
   const d = new Date(dateStr + 'T12:00:00');
-  let monthStr = d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+  const monthStr = d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
   return monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
 }
 
@@ -567,6 +567,15 @@ type EditableOrder = {
   _deleted?: boolean;
 };
 
+type EditableExpense = {
+  id: string;
+  isNew?: boolean;
+  amount: string;
+  payment_method: string;
+  description: string;
+  _deleted?: boolean;
+};
+
 function CounterpartySelect({
   value,
   inputValue,
@@ -579,12 +588,14 @@ function CounterpartySelect({
   onChange: (id: string | null, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [prevInputValue, setPrevInputValue] = useState(inputValue);
   const [query, setQuery] = useState(inputValue);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  if (inputValue !== prevInputValue) {
+    setPrevInputValue(inputValue);
     setQuery(inputValue);
-  }, [inputValue]);
+  }
 
   const filtered = query.trim()
     ? counterparties.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
@@ -715,6 +726,15 @@ function EditModal({
       _deleted: false,
     })),
   );
+  const [expenses, setExpenses] = useState<EditableExpense[]>(() =>
+    (trip.trip_expenses ?? []).map((e) => ({
+      id: e.id,
+      amount: e.amount || '0',
+      payment_method: e.payment_method || 'fuel_card',
+      description: e.description ?? '',
+      _deleted: false,
+    })),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -737,6 +757,37 @@ function EditModal({
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, _selectedId: cpId, _inputValue: cpName } : o)),
     );
+  };
+
+  const updateExpense = (id: string, field: keyof EditableExpense, value: string) => {
+    setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)));
+  };
+
+  const addExpense = () => {
+    const newExp: EditableExpense = {
+      id: `new-exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      isNew: true,
+      amount: '',
+      payment_method: 'fuel_card',
+      description: '',
+      _deleted: false,
+    };
+    setExpenses((prev) => [...prev, newExp]);
+  };
+
+  const removeExpense = (id: string) => {
+    setExpenses((prev) => {
+      const target = prev.find((e) => e.id === id);
+      if (!target) return prev;
+      if (target.isNew) {
+        return prev.filter((e) => e.id !== id);
+      }
+      return prev.map((e) => (e.id === id ? { ...e, _deleted: true } : e));
+    });
+  };
+
+  const restoreExpense = (id: string) => {
+    setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, _deleted: false } : e)));
   };
 
   const addOrder = () => {
@@ -801,6 +852,17 @@ function EditModal({
       }
     }
 
+    const nonDeletedExpenses = expenses.filter((e) => !e._deleted);
+    for (let i = 0; i < nonDeletedExpenses.length; i++) {
+      const e = nonDeletedExpenses[i];
+      if (!e) continue;
+      const amt = parseFloat(e.amount);
+      if (isNaN(amt) || amt < 0) {
+        setError(`Укажите корректную сумму для расхода ${i + 1}`);
+        return;
+      }
+    }
+
     setSaving(true);
     setError('');
 
@@ -822,6 +884,16 @@ function EditModal({
 
     const deletedIds = orders.filter((o) => o._deleted && !o.isNew).map((o) => o.id);
 
+    const expensesPayload = nonDeletedExpenses.map((e) => ({
+      id: e.id,
+      isNew: e.isNew,
+      amount: e.amount || '0',
+      payment_method: e.payment_method,
+      description: e.description,
+    }));
+
+    const deletedExpenseIds = expenses.filter((e) => e._deleted && !e.isNew).map((e) => e.id);
+
     try {
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: 'PATCH',
@@ -829,6 +901,8 @@ function EditModal({
         body: JSON.stringify({
           orders: payload,
           deleted_order_ids: deletedIds.length > 0 ? deletedIds : undefined,
+          expenses: expensesPayload,
+          deleted_expense_ids: deletedExpenseIds.length > 0 ? deletedExpenseIds : undefined,
         }),
       });
       const json = await res.json();
@@ -851,8 +925,8 @@ function EditModal({
     (s, o) => s + (parseFloat(o.loader_pay) || 0) + (parseFloat(o.loader2_pay ?? '0') || 0),
     0,
   );
-  const expenses = trip.trip_expenses ?? [];
-  const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const visibleExpenses = expenses.filter((e) => !e._deleted);
+  const totalExpenses = visibleExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const estimatedProfit = totalRevenue - totalDriverPay - totalLoaderPay - totalExpenses;
 
   const inputCls =
@@ -901,7 +975,7 @@ function EditModal({
         </div>
 
         {/* Live KPI Summary Ribbon */}
-        <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-3.5 grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Заявок в рейсе
@@ -927,6 +1001,20 @@ function EditModal({
             </span>
           </div>
           <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              ГСМ / Расходы
+            </span>
+            <span className="text-base font-black text-amber-600">
+              {totalExpenses > 0 ? (
+                <>
+                  -<Money amount={totalExpenses.toFixed(2)} />
+                </>
+              ) : (
+                '0 ₽'
+              )}
+            </span>
+          </div>
+          <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 shadow-2xs col-span-2 sm:col-span-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Прибыль рейса
             </span>
@@ -1177,6 +1265,145 @@ function EditModal({
             </div>
             <span className="text-sm">Добавить ещё одну заявку в этот рейс</span>
           </button>
+
+          {/* ── EXPENSES / FUEL SECTION ── */}
+          <div className="border-t border-slate-200/80 pt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⛽</span>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  ГСМ и Расходы рейса
+                </h3>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                  {visibleExpenses.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={addExpense}
+                className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <span>+</span>
+                <span>Добавить заправку (ГСМ)</span>
+              </button>
+            </div>
+
+            {expenses.length === 0 ? (
+              <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400 font-medium">
+                Расходов и заправок в этом рейсе нет
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {expenses.map((exp, expIdx) => {
+                  if (exp._deleted) {
+                    return (
+                      <div
+                        key={exp.id}
+                        className="border border-dashed border-rose-300 bg-rose-50/50 rounded-2xl p-3.5 flex items-center justify-between text-xs"
+                      >
+                        <span className="text-rose-800 font-medium">
+                          Расход {exp.amount || '0'} ₽ (
+                          {exp.payment_method === 'fuel_card' ? 'Топливная карта' : 'Наличные'})
+                          помечен на удаление
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => restoreExpense(exp.id)}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg"
+                        >
+                          Вернуть
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={exp.id}
+                      className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-2xs space-y-3"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>⛽</span> Заправка #{expIdx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeExpense(exp.id)}
+                          className="text-xs text-slate-400 hover:text-rose-600 px-2 py-0.5 rounded cursor-pointer"
+                          title="Удалить расход"
+                        >
+                          🗑️ Удалить
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Сумма, ₽
+                          </label>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            placeholder="0"
+                            className={inputCls}
+                            value={exp.amount}
+                            onChange={(e) => updateExpense(exp.id, 'amount', e.target.value)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Способ оплаты
+                          </label>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => updateExpense(exp.id, 'payment_method', 'fuel_card')}
+                              className={cn(
+                                'px-2 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
+                                exp.payment_method === 'fuel_card'
+                                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
+                              )}
+                            >
+                              <span>⛽</span>
+                              <span>Топл.карта</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateExpense(exp.id, 'payment_method', 'cash')}
+                              className={cn(
+                                'px-2 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
+                                exp.payment_method === 'cash'
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
+                              )}
+                            >
+                              <span>💵</span>
+                              <span>Наличные</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Примечание / АЗС
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="АЗС, литры..."
+                            className={inputCls}
+                            value={exp.description}
+                            onChange={(e) => updateExpense(exp.id, 'description', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Error Alert */}
@@ -1282,12 +1509,14 @@ function TripCard({
     }
   };
 
-  useEffect(() => {
-    if (!expanded) {
-      setDeleteConfirm(false);
-      if (deleteTimer.current) clearTimeout(deleteTimer.current);
-    }
-  }, [expanded]);
+  const [prevExpanded, setPrevExpanded] = useState(expanded);
+  if (!expanded && prevExpanded) {
+    setPrevExpanded(expanded);
+    setDeleteConfirm(false);
+    if (deleteTimer.current) clearTimeout(deleteTimer.current);
+  } else if (expanded !== prevExpanded) {
+    setPrevExpanded(expanded);
+  }
 
   return (
     <div

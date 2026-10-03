@@ -73,6 +73,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         counterparty_name?: string;
       }>;
       deleted_order_ids?: string[];
+      expenses?: Array<{
+        id?: string;
+        isNew?: boolean;
+        amount?: string;
+        payment_method?: string;
+        description?: string;
+        category_id?: string;
+      }>;
+      deleted_expense_ids?: string[];
     };
 
     const supabase = createAdminClient();
@@ -183,6 +192,54 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               .eq('id', order.id)
               .eq('trip_id', id);
             if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+          }
+        }
+      }
+    }
+
+    // 5. Обработка удалённых расходов
+    if (body.deleted_expense_ids?.length) {
+      const { error: delExpErr } = await (supabase.from('trip_expenses') as any)
+        .delete()
+        .in('id', body.deleted_expense_ids)
+        .eq('trip_id', id);
+      if (delExpErr) return NextResponse.json({ error: delExpErr.message }, { status: 500 });
+    }
+
+    // 6. Обработка расходов (создание новых или обновление существующих)
+    if (body.expenses?.length) {
+      const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+      for (const exp of body.expenses) {
+        const isNew =
+          exp.isNew || !exp.id || exp.id.startsWith('new-') || exp.id.startsWith('temp-');
+        const amountNum = parseFloat(exp.amount ?? '0');
+        const paymentMethod = exp.payment_method || 'fuel_card';
+
+        if (isNew) {
+          if (amountNum > 0) {
+            const { error: insExpErr } = await (supabase.from('trip_expenses') as any).insert({
+              trip_id: id,
+              category_id: exp.category_id || CAT_FUEL,
+              amount: amountNum.toFixed(2),
+              payment_method: paymentMethod,
+              description: exp.description?.trim() || null,
+              idempotency_key: crypto.randomUUID(),
+            });
+            if (insExpErr) return NextResponse.json({ error: insExpErr.message }, { status: 500 });
+          }
+        } else {
+          const update: Record<string, any> = {};
+          if (exp.amount !== undefined) update.amount = amountNum.toFixed(2);
+          if (exp.payment_method !== undefined) update.payment_method = paymentMethod;
+          if (exp.description !== undefined) update.description = exp.description?.trim() || null;
+          if (exp.category_id !== undefined) update.category_id = exp.category_id;
+
+          if (Object.keys(update).length > 0) {
+            const { error: updExpErr } = await (supabase.from('trip_expenses') as any)
+              .update(update)
+              .eq('id', exp.id)
+              .eq('trip_id', id);
+            if (updExpErr) return NextResponse.json({ error: updExpErr.message }, { status: 500 });
           }
         }
       }

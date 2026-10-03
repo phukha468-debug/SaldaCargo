@@ -11,8 +11,6 @@ import { Button, Money } from '@saldacargo/ui';
 
 const schema = z.object({
   odometer_end: z.coerce.number().optional(),
-  fuel_amount: z.coerce.number().optional(),
-  fuel_payment_method: z.enum(['fuel_card', 'cash']).default('fuel_card'),
   driver_note: z.string().optional(),
 });
 
@@ -53,9 +51,6 @@ export default function FinishTripPage() {
 
   const { register, handleSubmit } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
-    defaultValues: {
-      fuel_payment_method: 'fuel_card',
-    },
   });
 
   const activeOrders = (trip?.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
@@ -74,11 +69,6 @@ export default function FinishTripPage() {
 
   const driverPay = activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0);
   const expenses = (trip?.trip_expenses ?? []).reduce((s, e) => s + parseFloat(e.amount), 0);
-
-  const existingFuelExpenses = (trip?.trip_expenses ?? []).filter(
-    (e) => e.category?.name === 'ГСМ' || e.payment_method === 'fuel_card',
-  );
-  const existingFuelAmount = existingFuelExpenses.reduce((s, e) => s + parseFloat(e.amount), 0);
 
   const existingCashExpenses = (trip?.trip_expenses ?? [])
     .filter((e) => e.payment_method === 'cash')
@@ -164,65 +154,6 @@ export default function FinishTripPage() {
               }
             />
           )}
-        </div>
-
-        {/* Заправка / Топливо за смену */}
-        <div className="bg-white rounded-lg border-2 border-zinc-200 p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between border-b-2 border-zinc-50 pb-2">
-            <h2 className="text-[11px] font-black text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
-              <span>⛽</span> Заправка за смену (ГСМ)
-            </h2>
-            {existingFuelExpenses.length > 0 && (
-              <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                Внесено: {existingFuelAmount.toLocaleString('ru-RU')} ₽
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              {existingFuelExpenses.length > 0
-                ? 'Добавить ещё заправку, ₽ (если была)'
-                : 'Сумма заправки, ₽ (если заправлялись)'}
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              {...register('fuel_amount')}
-              placeholder="0"
-              className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-              Способ оплаты топлива
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="relative">
-                <input
-                  type="radio"
-                  value="fuel_card"
-                  {...register('fuel_payment_method')}
-                  className="sr-only peer"
-                />
-                <div className="border-2 border-zinc-200 rounded-lg p-3 text-center cursor-pointer peer-checked:border-amber-600 peer-checked:bg-amber-50 peer-checked:text-amber-800 font-bold text-xs uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-1.5">
-                  <span>⛽</span> Топливная карта ТК
-                </div>
-              </label>
-              <label className="relative">
-                <input
-                  type="radio"
-                  value="cash"
-                  {...register('fuel_payment_method')}
-                  className="sr-only peer"
-                />
-                <div className="border-2 border-zinc-200 rounded-lg p-3 text-center cursor-pointer peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-800 font-bold text-xs uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-1.5">
-                  <span>💵</span> Наличные
-                </div>
-              </label>
-            </div>
-          </div>
         </div>
 
         {/* Заметка */}
