@@ -107,7 +107,7 @@ export function formatPhone(raw: string | null | undefined): string {
  * Пример: addMoney("100.50", "200.00") → "300.50"
  */
 export function addMoney(...amounts: (string | number)[]): string {
-  const sum = amounts.reduce((acc: number, val) => {
+  const sum = amounts.reduce<number>((acc, val) => {
     return acc + (typeof val === 'string' ? parseFloat(val) : val);
   }, 0);
   return sum.toFixed(2);

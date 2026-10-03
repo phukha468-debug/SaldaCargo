@@ -60,19 +60,19 @@ importers:
         version: 3.10.0(react-hook-form@7.74.0(react@19.2.4))
       '@saldacargo/domain-identity':
         specifier: workspace:*
-        version: link:../../packages/domain/identity
+        version: link:../../packages/identity
       '@saldacargo/domain-payroll':
         specifier: workspace:*
-        version: link:../../packages/domain/payroll
+        version: link:../../packages/payroll
       '@saldacargo/domain-service':
         specifier: workspace:*
-        version: link:../../packages/domain/service
+        version: link:../../packages/service
       '@saldacargo/shared':
         specifier: workspace:*
-        version: link:../../packages/domain/shared
+        version: link:../../packages/shared
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../../packages/shared-types
+        version: link:../../packages/types
       '@saldacargo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -142,10 +142,10 @@ importers:
         version: 3.10.0(react-hook-form@7.74.0(react@19.2.4))
       '@saldacargo/shared':
         specifier: workspace:*
-        version: link:../../packages/domain/shared
+        version: link:../../packages/shared
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../../packages/shared-types
+        version: link:../../packages/types
       '@saldacargo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -205,41 +205,41 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  packages/domain/identity:
+  packages/identity:
     dependencies:
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../../shared-types
+        version: link:../types
     devDependencies:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
 
-  packages/domain/payroll:
+  packages/payroll:
     dependencies:
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../../shared-types
+        version: link:../types
     devDependencies:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
 
-  packages/domain/service:
+  packages/service:
     dependencies:
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../../shared-types
+        version: link:../types
     devDependencies:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
 
-  packages/domain/shared:
+  packages/shared:
     dependencies:
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../../shared-types
+        version: link:../types
       uuid:
         specifier: ^9.0.0
         version: 9.0.1
@@ -251,7 +251,7 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
-  packages/shared-types:
+  packages/types:
     devDependencies:
       typescript:
         specifier: ^5.4.5
@@ -261,7 +261,7 @@ importers:
     dependencies:
       '@saldacargo/shared-types':
         specifier: workspace:*
-        version: link:../shared-types
+        version: link:../types
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1

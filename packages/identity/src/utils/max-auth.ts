@@ -10,9 +10,7 @@ export function verifyMaxContact(vcfInfo: string, hash: string, botToken: string
   // Перед хешированием преобразуем символы \r\n в реальные переносы строк
   const normalizedVcf = vcfInfo.replace(/\\r\\n/g, '\r\n');
 
-  const computedHash = createHmac('sha256', botToken)
-    .update(normalizedVcf)
-    .digest('hex');
+  const computedHash = createHmac('sha256', botToken).update(normalizedVcf).digest('hex');
 
   return computedHash === hash;
 }

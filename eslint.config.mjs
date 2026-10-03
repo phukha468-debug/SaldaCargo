@@ -25,14 +25,13 @@ const config = [
         { type: 'app-web', pattern: 'apps/web/**' },
         { type: 'app-miniapp', pattern: 'apps/miniapp/**' },
         { type: 'pkg-ui', pattern: 'packages/ui/**' },
-        { type: 'pkg-shared-types', pattern: 'packages/shared-types/**' },
-        { type: 'domain-shared', pattern: 'packages/domain/shared/**' },
-        { type: 'domain-module', pattern: 'packages/domain/!(shared)/**' },
+        { type: 'pkg-types', pattern: 'packages/types/**' },
+        { type: 'pkg-shared', pattern: 'packages/shared/**' },
+        { type: 'domain-module', pattern: 'packages/!(shared|types|ui)/**' },
       ],
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      // domain-модули могут импортировать только из domain/shared и shared-types
       'boundaries/element-types': [
         'error',
         {
@@ -40,16 +39,16 @@ const config = [
           rules: [
             {
               from: 'app-web',
-              allow: ['pkg-ui', 'pkg-shared-types', 'domain-shared', 'domain-module'],
+              allow: ['pkg-ui', 'pkg-types', 'pkg-shared', 'domain-module'],
             },
             {
               from: 'app-miniapp',
-              allow: ['pkg-ui', 'pkg-shared-types', 'domain-shared', 'domain-module'],
+              allow: ['pkg-ui', 'pkg-types', 'pkg-shared', 'domain-module'],
             },
-            { from: 'pkg-ui', allow: ['pkg-shared-types'] },
-            { from: 'domain-module', allow: ['domain-shared', 'pkg-shared-types'] },
-            { from: 'domain-shared', allow: ['pkg-shared-types'] },
-            { from: 'pkg-shared-types', allow: [] },
+            { from: 'pkg-ui', allow: ['pkg-types'] },
+            { from: 'domain-module', allow: ['pkg-shared', 'pkg-types'] },
+            { from: 'pkg-shared', allow: ['pkg-types'] },
+            { from: 'pkg-types', allow: [] },
           ],
         },
       ],
@@ -58,4 +57,3 @@ const config = [
 ];
 
 export default config;
-

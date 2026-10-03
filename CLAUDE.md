@@ -252,13 +252,16 @@ const amount: number = 5000;
 
 ---
 
-## Система domain-модулей (`packages/domain/`)
+## Система модулей (`packages/`)
 
-Система существует и частично работает. Понимать её обязательно.
+Пакеты лежат плоско в директории `packages/` монорепозитория:
 
-### Что это
-
-9 пакетов с бизнес-логикой, разбитых по областям: `shared`, `identity`, `fleet`, `finance`, `logistics`, `service`, `payroll`, `receivables`, `integrations`. Каждый импортируется как `@saldacargo/domain-<имя>`. Правила импортов между ними описаны в `docs/architecture/02-modules.md`.
+- `packages/shared` (`@saldacargo/shared`)
+- `packages/payroll` (`@saldacargo/domain-payroll`)
+- `packages/service` (`@saldacargo/domain-service`)
+- `packages/identity` (`@saldacargo/domain-identity`)
+- `packages/types` (`@saldacargo/shared-types`)
+- `packages/ui` (`@saldacargo/ui`)
 
 ### Почему сейчас не используется полностью
 
@@ -298,6 +301,8 @@ export function calculateOverdueDays(dueDate: string): number { ... }
 | `identity` | verifyMaxContact, hasRole, getRoleLabel                                                                                        | `@saldacargo/domain-identity` |
 | `payroll`  | ORDER_DIRECTIONS, calculateDriverPayroll, getDirectionLabel                                                                    | `@saldacargo/domain-payroll`  |
 | `service`  | getMechanicSummary, startWork, stopWork                                                                                        | `@saldacargo/domain-service`  |
+| `types`    | Database, Tables, Enums, Models                                                                                                | `@saldacargo/shared-types`    |
+| `ui`       | Button, Card, Badge, Modal, Input, Design System                                                                               | `@saldacargo/ui`              |
 
 ### Что НЕ нужно делать
 
