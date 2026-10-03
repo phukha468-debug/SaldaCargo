@@ -126,7 +126,7 @@ export async function GET(request: Request) {
           monthly_fixed_cost, insurance_expires_at, inspection_expires_at,
           needs_update, notes,
           asset_type:asset_types(id, code, name, capacity_m, has_gps),
-          driver:users!assets_assigned_driver_id_fkey(id, name)
+          driver:users!assets_assigned_driver_id_fkey(id, name, is_active)
         `,
         )
         .not('status', 'in', '("sold","written_off")')
@@ -456,8 +456,13 @@ export async function GET(request: Request) {
         asset.inspection_expires_at,
       );
 
+      const activeDriver = asset.driver?.is_active
+        ? { id: asset.driver.id, name: asset.driver.name }
+        : null;
+
       return {
         ...asset,
+        driver: activeDriver,
         docs,
         monthly,
         trips: recentTrips,

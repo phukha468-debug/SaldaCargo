@@ -1658,7 +1658,8 @@ function VehicleEditModal({
     year: asset?.year?.toString() ?? '',
     status: asset?.status ?? 'active',
     odometer_current: asset?.odometer_current?.toString() ?? '0',
-    assigned_driver_id: asset?.driver?.id ?? '',
+    assigned_driver_id:
+      asset?.driver?.id && drivers.some((d) => d.id === asset.driver?.id) ? asset.driver.id : '',
     current_book_value: asset?.current_book_value ?? '',
     remaining_depreciation_months: asset?.remaining_depreciation_months?.toString() ?? '',
     monthly_fixed_cost: asset?.monthly_fixed_cost ?? '',
