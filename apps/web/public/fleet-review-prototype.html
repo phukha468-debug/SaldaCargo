@@ -1,0 +1,1894 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Концепты Автопарка: Фин-статистика, Регламенты и Ревью | SaldaCargo</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            salda: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .material-symbols-outlined.fill-1 {
+      font-variation-settings: 'FILL' 1;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.7); }
+    .sparkline-bar { transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 font-sans antialiased min-h-screen selection:bg-emerald-500 selection:text-white">
+
+  <!-- TOP APP NAV & DESIGN SWITCHER -->
+  <header class="sticky top-0 z-40 bg-slate-900 text-white shadow-xl border-b border-slate-800 backdrop-blur-md bg-slate-900/95">
+    <div class="max-w-[1460px] mx-auto px-4 sm:px-8 py-2.5 flex items-center justify-between gap-4 flex-wrap">
+      
+      <!-- Logo & Back to ERP -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center font-black text-white text-lg shadow-md shadow-emerald-900/40">
+          S
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-black text-base tracking-tight">СалдаКарго</span>
+            <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full">
+              Интерактивный Прототип
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400">Автопарк + История Ревью + Регламенты и Документы</p>
+        </div>
+      </div>
+
+      <!-- DESIGN PICKER TABS -->
+      <div class="flex items-center bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700/80 shadow-inner">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 hidden lg:inline-block">Дизайн:</span>
+        <button onclick="setDesign(1)" id="btn-design-1" class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+          <span class="material-symbols-outlined text-[16px]">grid_view</span>
+          <span>Вариант 1: Executive Matrix (ВЫБРАН)</span>
+        </button>
+        <button onclick="setDesign(2)" id="btn-design-2" class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-slate-700/60">
+          <span class="material-symbols-outlined text-[16px]">timeline</span>
+          <span>Вариант 2: Timeline Horizon</span>
+        </button>
+        <button onclick="setDesign(3)" id="btn-design-3" class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-slate-700/60">
+          <span class="material-symbols-outlined text-[16px]">terminal</span>
+          <span>Вариант 3: Fleet Command Deck</span>
+        </button>
+      </div>
+
+      <!-- Quick Summary Hint -->
+      <div class="hidden xl:flex items-center gap-3 text-xs bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-slate-300">Интерактивно: кликайте на месяцы, строки машин и кнопку "Редактировать регламенты"</span>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ROOT CONTAINER FOR THE 3 DESIGNS -->
+  <main class="max-w-[1460px] mx-auto px-4 sm:px-8 py-6 space-y-6">
+
+    <!-- ========================================================================= -->
+    <!-- DESIGN 1: EXECUTIVE FINANCIAL MATRIX (Dense Enterprise Grid)              -->
+    <!-- ========================================================================= -->
+    <section id="view-design-1" class="space-y-6 transition-all duration-300">
+      
+      <!-- Title & Context -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold uppercase bg-emerald-100 text-emerald-800">Основной выбор</span>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">Автопарк · Финансовая Матрица P&L</h1>
+          </div>
+          <p class="text-xs text-slate-500 mt-1 max-w-3xl">
+            Строгая корпоративная таблица со строками на всю ширину экрана. Включает помесячную матрицу прибыли, историю рейсов, заказ-наряды Гаража и контроль регламентных сроков (ОСАГО, ТО, пропуск в Москву, тахограф, замена масла).
+          </p>
+        </div>
+
+        <!-- Period Multi-Select & Quick Buttons -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200" id="d1-months-selector">
+            <!-- Will be populated by JS -->
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="selectPresetMonths('all')" class="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 transition">Все 4 мес</button>
+            <button onclick="selectPresetMonths('last3')" class="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 transition">3 мес</button>
+            <button onclick="selectPresetMonths('current')" class="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 transition">Тек. месяц</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- COHORTS KPI SUMMARY (Trucks / Gazelles / Loaders) - COMPACT HEIGHT (1/3 LOWER) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+        
+        <!-- Cohort: Trucks (Valdai / Canter) -->
+        <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs relative overflow-hidden group hover:border-slate-300 transition-all flex flex-col justify-between">
+          <div class="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-bl-full pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">🚛</span>
+                <div>
+                  <h3 class="text-xs font-black text-slate-900 leading-tight">Тяжелые грузовики</h3>
+                  <p class="text-[9px] text-slate-400 font-bold uppercase leading-tight">Валдаи 5-6м, Canter (4 ед)</p>
+                </div>
+              </div>
+              <span class="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" id="d1-kpi-trucks-trips">
+                0 рейсов
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-x-2 gap-y-1 pt-2">
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Выручка</span>
+                <span class="text-sm font-black text-slate-900" id="d1-kpi-trucks-rev">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Все расходы</span>
+                <span class="text-sm font-black text-rose-600" id="d1-kpi-trucks-costs">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Чистая прибыль</span>
+                <span class="text-base font-black text-emerald-600" id="d1-kpi-trucks-profit">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Маржа</span>
+                <span class="text-base font-black text-slate-800" id="d1-kpi-trucks-margin">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+            <span>ГСМ: <strong class="text-slate-700" id="d1-kpi-trucks-fuel">0 ₽</strong></span>
+            <span>Ремонты: <strong class="text-slate-700" id="d1-kpi-trucks-maint">0 ₽</strong></span>
+          </div>
+        </div>
+
+        <!-- Cohort: Gazelles -->
+        <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs relative overflow-hidden group hover:border-slate-300 transition-all flex flex-col justify-between">
+          <div class="absolute top-0 right-0 w-20 h-20 bg-amber-500/5 rounded-bl-full pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">🚐</span>
+                <div>
+                  <h3 class="text-xs font-black text-slate-900 leading-tight">Газели</h3>
+                  <p class="text-[9px] text-slate-400 font-bold uppercase leading-tight">3-4м, Фермер (3 ед)</p>
+                </div>
+              </div>
+              <span class="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200" id="d1-kpi-gazelles-trips">
+                0 рейсов
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-x-2 gap-y-1 pt-2">
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Выручка</span>
+                <span class="text-sm font-black text-slate-900" id="d1-kpi-gazelles-rev">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Все расходы</span>
+                <span class="text-sm font-black text-rose-600" id="d1-kpi-gazelles-costs">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Чистая прибыль</span>
+                <span class="text-base font-black text-emerald-600" id="d1-kpi-gazelles-profit">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Маржа</span>
+                <span class="text-base font-black text-slate-800" id="d1-kpi-gazelles-margin">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+            <span>ГСМ: <strong class="text-slate-700" id="d1-kpi-gazelles-fuel">0 ₽</strong></span>
+            <span>Ремонты: <strong class="text-slate-700" id="d1-kpi-gazelles-maint">0 ₽</strong></span>
+          </div>
+        </div>
+
+        <!-- Cohort: Loaders (Грузчики) -->
+        <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs relative overflow-hidden group hover:border-slate-300 transition-all flex flex-col justify-between">
+          <div class="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-bl-full pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">👷</span>
+                <div>
+                  <h3 class="text-xs font-black text-slate-900 leading-tight">Бригада грузчиков</h3>
+                  <p class="text-[9px] text-slate-400 font-bold uppercase leading-tight">Фонд оплаты и загрузка</p>
+                </div>
+              </div>
+              <span class="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                Команда ТК
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-x-2 gap-y-1 pt-2">
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Фонд ЗП</span>
+                <span class="text-sm font-black text-purple-700" id="d1-kpi-loaders-fund">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Заявок</span>
+                <span class="text-sm font-black text-slate-800" id="d1-kpi-loaders-count">0 шт</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Ср. ЗП / заказ</span>
+                <span class="text-base font-black text-slate-700" id="d1-kpi-loaders-avg">0 ₽</span>
+              </div>
+              <div>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Доля выручки</span>
+                <span class="text-base font-black text-purple-600" id="d1-kpi-loaders-share">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 font-medium truncate">
+            Исполнители: Колясик, Вадик, Азамат
+          </div>
+        </div>
+
+        <!-- Cohort: Total Fleet Result -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-3.5 shadow-lg border border-slate-800 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between pb-1.5 border-b border-slate-700/80">
+              <span class="text-[9px] font-black uppercase tracking-widest text-emerald-400">ИТОГ ЗА ПЕРИОД</span>
+              <span class="text-[10px] font-mono bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-200" id="d1-kpi-total-period-badge">Выбрано: 4 мес</span>
+            </div>
+            <div class="mt-1.5">
+              <span class="text-[10px] text-slate-400 block leading-tight">Чистая прибыль парка:</span>
+              <div class="text-2xl font-black text-emerald-400 tracking-tight" id="d1-kpi-total-profit">0 ₽</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/80 text-[11px]">
+            <div>
+              <span class="text-slate-400 text-[9px] block">Выручка всего:</span>
+              <span class="font-bold text-white text-xs" id="d1-kpi-total-rev">0 ₽</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-[9px] block">Ср. маржа парка:</span>
+              <span class="font-bold text-emerald-300 text-xs" id="d1-kpi-total-margin">0%</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FILTER CONTROLS BAR -->
+      <div class="flex items-center justify-between gap-4 flex-wrap bg-white p-3 rounded-2xl border border-slate-200">
+        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+          <button onclick="setVehicleFilter('all')" class="d1-filter-btn px-4 py-1.5 rounded-lg text-xs font-black transition-all bg-white text-slate-900 shadow-xs" data-filter="all">
+            Все машины (7)
+          </button>
+          <button onclick="setVehicleFilter('trucks')" class="d1-filter-btn px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-900 transition-all" data-filter="trucks">
+            🚛 Грузовики (4)
+          </button>
+          <button onclick="setVehicleFilter('gazelles')" class="d1-filter-btn px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-900 transition-all" data-filter="gazelles">
+            🚐 Газели (3)
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3 text-xs text-slate-500">
+          <span class="hidden sm:inline">Сортировка:</span>
+          <select id="d1-sort-select" onchange="renderDesign1()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold text-slate-700 cursor-pointer">
+            <option value="profit">По чистой прибыли (убывание)</option>
+            <option value="revenue">По выручке</option>
+            <option value="margin">По маржинальности %</option>
+            <option value="trips">По числу рейсов</option>
+          </select>
+          <button onclick="openAllDocsModal()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs">
+            <span class="material-symbols-outlined text-[16px] text-emerald-400">checklist</span>
+            <span>Шахматка документов</span>
+          </button>
+          <button onclick="toggleAllRows(1)" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">
+            Развернуть все
+          </button>
+        </div>
+      </div>
+
+      <!-- VEHICLE ROWS (Full-Width Accordions) -->
+      <div id="d1-vehicle-rows-container" class="space-y-3">
+        <!-- Rendered by JS -->
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- DESIGN 2: TIMELINE HORIZON (Modern Interactive SaaS)                      -->
+    <!-- ========================================================================= -->
+    <section id="view-design-2" class="space-y-6 hidden transition-all duration-300">
+      
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl shadow-xl border border-indigo-900/40 relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 relative z-10">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white">Концепция 2</span>
+              <span class="text-xs text-indigo-300 font-medium">Timeline & Horizon View</span>
+            </div>
+            <h1 class="text-2xl lg:text-3xl font-black tracking-tight">Интерактивный Таймлайн Автопарка</h1>
+            <p class="text-xs text-indigo-200/80 mt-1 max-w-2xl">
+              Визуализация структуры затрат прямо на строке машины.
+            </p>
+          </div>
+
+          <div class="bg-slate-800/80 p-3 rounded-2xl border border-indigo-800/50 backdrop-blur-md">
+            <div class="text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>Шкала периодов:</span>
+              <span id="d2-selected-count-label" class="text-emerald-400 font-mono">Выбрано: 4 мес</span>
+            </div>
+            <div class="flex items-center gap-2" id="d2-months-selector"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-indigo-900/60">
+          <div class="bg-slate-800/60 rounded-xl p-3 border border-indigo-800/30">
+            <span class="text-[10px] font-bold text-indigo-300 uppercase tracking-widest block">Общая выручка</span>
+            <span class="text-xl font-black text-white" id="d2-hero-rev">0 ₽</span>
+          </div>
+          <div class="bg-slate-800/60 rounded-xl p-3 border border-indigo-800/30">
+            <span class="text-[10px] font-bold text-rose-300 uppercase tracking-widest block">Топливо + Ремонты</span>
+            <span class="text-xl font-black text-rose-400" id="d2-hero-maint">0 ₽</span>
+          </div>
+          <div class="bg-slate-800/60 rounded-xl p-3 border border-indigo-800/30">
+            <span class="text-[10px] font-bold text-purple-300 uppercase tracking-widest block">Фонд ЗП</span>
+            <span class="text-xl font-black text-purple-300" id="d2-hero-payroll">0 ₽</span>
+          </div>
+          <div class="bg-slate-800/60 rounded-xl p-3 border border-indigo-800/30 bg-emerald-950/20">
+            <span class="text-[10px] font-bold text-emerald-300 uppercase tracking-widest block">Чистая прибыль</span>
+            <span class="text-xl font-black text-emerald-400" id="d2-hero-profit">0 ₽</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200">
+        <div class="flex items-center gap-1.5">
+          <button onclick="setVehicleFilter('all')" class="d2-filter-btn px-4 py-2 rounded-xl text-xs font-black transition-all bg-indigo-600 text-white shadow-md shadow-indigo-600/30" data-filter="all">Все машины</button>
+          <button onclick="setVehicleFilter('trucks')" class="d2-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all" data-filter="trucks">🚛 Грузовики</button>
+          <button onclick="setVehicleFilter('gazelles')" class="d2-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all" data-filter="gazelles">🚐 Газели</button>
+        </div>
+        <div class="flex items-center gap-4 text-xs font-bold flex-wrap">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Чистая прибыль</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500"></span> ГСМ</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500"></span> ЗП Водителей</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-purple-500"></span> ЗП Грузчиков</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500"></span> Гараж</span>
+        </div>
+      </div>
+
+      <div id="d2-vehicle-rows-container" class="space-y-4"></div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- DESIGN 3: FLEET COMMAND DARK DECK (High-Contrast Control Center)          -->
+    <!-- ========================================================================= -->
+    <section id="view-design-3" class="space-y-6 hidden transition-all duration-300">
+      
+      <div class="bg-slate-950 text-slate-100 p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase font-mono tracking-widest">
+                TERMINAL V3
+              </span>
+              <h1 class="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                <span>Fleet Command Deck</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              </h1>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 font-mono">[Управленческий пульт]: аудит ТС</p>
+          </div>
+          <div class="flex items-center gap-2 bg-slate-900/90 p-2 rounded-2xl border border-slate-800" id="d3-months-selector"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800/80 flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono font-bold text-slate-400 uppercase">🚛 ГРУЗОВИКИ 5-6М</div>
+              <div class="text-xl font-black text-white mt-1" id="d3-cohort-trucks-profit">0 ₽</div>
+              <div class="text-[11px] text-slate-400 mt-0.5" id="d3-cohort-trucks-sub">Выручка: 0 ₽</div>
+            </div>
+            <span class="text-xs font-black px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 font-mono" id="d3-cohort-trucks-pct">0% маржа</span>
+          </div>
+
+          <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800/80 flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono font-bold text-slate-400 uppercase">🚐 ГАЗЕЛИ 3-4М</div>
+              <div class="text-xl font-black text-white mt-1" id="d3-cohort-gazelles-profit">0 ₽</div>
+              <div class="text-[11px] text-slate-400 mt-0.5" id="d3-cohort-gazelles-sub">Выручка: 0 ₽</div>
+            </div>
+            <span class="text-xs font-black px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 font-mono" id="d3-cohort-gazelles-pct">0% маржа</span>
+          </div>
+
+          <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800/80 flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono font-bold text-purple-400 uppercase">👷 ЗП ГРУЗЧИКОВ</div>
+              <div class="text-xl font-black text-purple-300 mt-1" id="d3-cohort-loaders-fund">0 ₽</div>
+              <div class="text-[11px] text-slate-400 mt-0.5" id="d3-cohort-loaders-sub">Выплачено 100%</div>
+            </div>
+            <span class="text-xs font-black px-2 py-1 rounded bg-purple-500/20 text-purple-400 font-mono">100% выплачено</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 flex-wrap pt-2">
+          <div class="flex items-center gap-2">
+            <button onclick="setVehicleFilter('all')" class="d3-filter-btn px-4 py-1.5 rounded-xl text-xs font-mono font-bold transition-all bg-emerald-500 text-slate-950 font-black" data-filter="all">[ALL] ВСЕ (7)</button>
+            <button onclick="setVehicleFilter('trucks')" class="d3-filter-btn px-4 py-1.5 rounded-xl text-xs font-mono font-bold transition-all text-slate-400 hover:text-white bg-slate-900 border border-slate-800" data-filter="trucks">[TRUCK] ГРУЗОВИКИ (4)</button>
+            <button onclick="setVehicleFilter('gazelles')" class="d3-filter-btn px-4 py-1.5 rounded-xl text-xs font-mono font-bold transition-all text-slate-400 hover:text-white bg-slate-900 border border-slate-800" data-filter="gazelles">[GAZELLE] ГАЗЕЛИ (3)</button>
+          </div>
+        </div>
+
+        <div id="d3-vehicle-rows-container" class="space-y-3"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODALS                                                                    -->
+  <!-- ========================================================================= -->
+
+  <!-- 1. MODAL: EDIT VEHICLE DOCS & MAINTENANCE SCHEDULE -->
+  <div id="modal-edit-docs" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 hidden animate-in fade-in duration-150">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            📄
+          </div>
+          <div>
+            <h3 class="text-base font-black text-slate-900" id="modal-edit-title">Редактирование регламентов ТС</h3>
+            <p class="text-xs text-slate-500" id="modal-edit-sub">Сроки страховки, ТО, пропуска в Москву и регламенты масла</p>
+          </div>
+        </div>
+        <button onclick="closeEditModal()" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body (Form) -->
+      <div class="p-6 overflow-y-auto space-y-5 text-xs">
+        
+        <!-- OSAGO / KASKO -->
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+          <h4 class="font-black text-slate-800 text-sm flex items-center gap-2">
+            <span>📜</span>
+            <span>Страхование (ОСАГО / КАСКО)</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Дата окончания полиса:</label>
+              <input type="date" id="form-ins-date" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-emerald-500">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Серия, номер и компания:</label>
+              <input type="text" id="form-ins-policy" placeholder="ХХХ 0123456789 (РЕСО)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-emerald-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- INSPECTION (TO) -->
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+          <h4 class="font-black text-slate-800 text-sm flex items-center gap-2">
+            <span>🔍</span>
+            <span>Техосмотр (Диагностическая карта)</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Действует до:</label>
+              <input type="date" id="form-insp-date" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-emerald-500">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Номер ДК (ЕАИСТО):</label>
+              <input type="text" id="form-insp-num" placeholder="1249582019482" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-emerald-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- MOSCOW PASS (МКАД / ТТК / СК) -->
+        <div class="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-amber-900 text-sm flex items-center gap-2">
+              <span>🏛️</span>
+              <span>Разрешение / Пропуск в Москву (РНИС)</span>
+            </h4>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="form-moscow-required" onchange="toggleMoscowFields(this.checked)" class="w-4 h-4 text-emerald-600 rounded">
+              <span class="font-black text-slate-800 text-xs">Требуется для этой машины</span>
+            </label>
+          </div>
+          
+          <div id="moscow-fields-group" class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Зона пропуска:</label>
+              <select id="form-moscow-zone" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+                <option value="МКАД (круглосуточный)">МКАД (грузовики > 3.5т)</option>
+                <option value="МКАД + ТТК">МКАД + ТТК</option>
+                <option value="СК (Садовое Кольцо)">СК (Садовое Кольцо)</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Действует до:</label>
+              <input type="date" id="form-moscow-date" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Номер пропуска:</label>
+              <input type="text" id="form-moscow-num" placeholder="БП-2026/0948" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+          </div>
+          <p class="text-[11px] text-amber-700 italic">Напоминание руководителю в Макс отправится автоматически за 30 дней и за 14 дней до окончания.</p>
+        </div>
+
+        <!-- TACHOGRAPH & SKZI -->
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+          <h4 class="font-black text-slate-800 text-sm flex items-center gap-2">
+            <span>📟</span>
+            <span>Тахограф и блок СКЗИ</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Модель тахографа:</label>
+              <input type="text" id="form-tacho-model" placeholder="Атол Drive Smart" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Срок блока СКЗИ:</label>
+              <input type="date" id="form-tacho-skzi" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Срок калибровки:</label>
+              <input type="date" id="form-tacho-calib" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+          </div>
+        </div>
+
+        <!-- ENGINE OIL SERVICE (GARAGE LINK) -->
+        <div class="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-3">
+          <h4 class="font-black text-blue-950 text-sm flex items-center gap-2">
+            <span>🛢️</span>
+            <span>Регламент замены моторного масла (Связка с Гаражом)</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Дата последней замены:</label>
+              <input type="date" id="form-oil-date" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Пробег при замене (км):</label>
+              <input type="number" id="form-oil-km" placeholder="174000" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="font-bold text-slate-600 block mb-1">Интервал замены (км):</label>
+              <input type="number" id="form-oil-interval" placeholder="10000" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+        <span class="text-[11px] text-slate-400">Данные сохраняются сразу и обновляют статус машины</span>
+        <div class="flex items-center gap-2">
+          <button onclick="closeEditModal()" class="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition">Отмена</button>
+          <button onclick="saveVehicleDocs()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-sm shadow-emerald-500/30 flex items-center gap-1.5">
+            <span>Сохранить</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 2. MODAL: ALL FLEET DOCUMENTS MATRIX (СВОДНАЯ ШАХМАТКА) -->
+  <div id="modal-all-docs" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 hidden animate-in fade-in duration-150">
+    <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <span>📋</span>
+            <span>Сводный реестр регламентов и документов всего автопарка</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Единая шахматка для контроля просрочек и сроков продления</p>
+        </div>
+        <button onclick="closeAllDocsModal()" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 overflow-y-auto" id="all-docs-table-container">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50 text-xs text-slate-500 font-medium">
+        <div class="flex items-center gap-4">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Срочно (&lt; 14 дн / перепробег)</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Скоро (&lt; 30 дн)</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> В норме</span>
+        </div>
+        <button onclick="closeAllDocsModal()" class="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-slate-800 transition">Закрыть</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT DATA & LOGIC ENGINE                                            -->
+  <!-- ========================================================================= -->
+  <script>
+    // ── 1. REALISTIC FLEET & REVIEW DATA ─────────────────────────────────────
+    const MONTHS = [
+      { id: '2026-07', label: 'Июль 2026', short: 'Июл' },
+      { id: '2026-08', label: 'Август 2026', short: 'Авг' },
+      { id: '2026-09', label: 'Сентябрь 2026', short: 'Сен' },
+      { id: '2026-10', label: 'Октябрь 2026', short: 'Окт' },
+    ];
+
+    // CURRENT AUDIT DATE (Simulated as early October 2026)
+    const SIMULATED_TODAY = new Date('2026-10-03T12:00:00');
+
+    // Vehicles with detailed monthly metrics, actual trips, service orders AND REGULATIONS/DOCS
+    const VEHICLES = [
+      {
+        id: 'v-914',
+        name: 'Валдай 914',
+        regNumber: 'Е914КХ 96',
+        category: 'trucks',
+        categoryName: 'Валдай 6м',
+        driver: 'Фарух',
+        status: 'active',
+        statusLabel: 'Активна',
+        statusColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        odometer: 184200,
+        docs: {
+          insurance_expires_at: '2026-10-14', // 11 дней -> СРОЧНО
+          insurance_policy: 'ХХХ 0412847291 (РЕСО-Гарантия)',
+          inspection_expires_at: '2026-12-10',
+          inspection_number: '1249582019482',
+          moscow_pass_required: true,
+          moscow_pass_expires_at: '2026-10-17', // 14 дней -> СРОЧНО
+          moscow_pass_zone: 'МКАД (круглосуточный)',
+          moscow_pass_number: 'БП-2026/0948 (РНИС)',
+          tacho_skzi_expires_at: '2027-04-15',
+          tacho_calibration_expires_at: '2027-04-15',
+          tacho_model: 'Атол Drive Smart (СКЗИ)',
+          oil_last_date: '2026-08-10',
+          oil_last_km: 174000,
+          oil_interval_km: 10000, // одометр 184200 -> перепробег 200 км!
+          fire_extinguisher_expires_at: '2027-06-01'
+        },
+        monthly: {
+          '2026-07': { revenue: 210000, fuel: 48000, driverPay: 52000, loaderPay: 18000, maint: 12000, km: 3800, trips: 28 },
+          '2026-08': { revenue: 245000, fuel: 54000, driverPay: 61000, loaderPay: 22000, maint: 20000, km: 4400, trips: 32 },
+          '2026-09': { revenue: 268000, fuel: 59000, driverPay: 67000, loaderPay: 25000, maint: 8500, km: 4700, trips: 35 },
+          '2026-10': { revenue: 142000, fuel: 31000, driverPay: 35000, loaderPay: 14000, maint: 4500, km: 2400, trips: 18 },
+        },
+        trips: [
+          {
+            number: 757, date: '02.10.2026', driver: 'Фарух', loader: 'Вадик',
+            revenue: 13600, fuel: 3070, driverPay: 3400, loaderPay: 1800, profit: 5330,
+            km: 145,
+            orders: [
+              { desc: 'ООО МеталлТрейд · Арматура 3.5т', amount: 10100, method: 'cash', label: '💵 Наличные', status: 'completed' },
+              { desc: 'ИП Смирнов · Труба профильная', amount: 3500, method: 'qr', label: '⚡ QR-код', status: 'completed' },
+            ]
+          },
+          {
+            number: 752, date: '29.09.2026', driver: 'Фарух', loader: 'Колясик',
+            revenue: 18500, fuel: 4100, driverPay: 4600, loaderPay: 2400, profit: 7400,
+            km: 190,
+            orders: [
+              { desc: 'СтройБаза №1 · Кирпич 4 паллета', amount: 12500, method: 'bank_invoice', label: '🏛️ Р/С Т-Банк', status: 'completed' },
+              { desc: 'Частный заказ · Доски обрезные', amount: 6000, method: 'cash', label: '💵 Наличные', status: 'completed' },
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '854', date: '15.08.2026', desc: 'Замена шкворней и передних рессорных втулок', parts: 14000, works: 6000, isExternal: false, contractor: 'Свой Гараж' }
+        ]
+      },
+      {
+        id: 'v-524',
+        name: 'Валдай 524',
+        regNumber: 'В524ВУ 96',
+        category: 'trucks',
+        categoryName: 'Валдай 5м',
+        driver: 'Никифоров Д.В.',
+        status: 'active',
+        statusLabel: 'Активна',
+        statusColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        odometer: 245100,
+        docs: {
+          insurance_expires_at: '2027-02-20',
+          insurance_policy: 'ТТТ 0928174621 (АльфаСтрахование)',
+          inspection_expires_at: '2027-03-15',
+          inspection_number: '9847201948271',
+          moscow_pass_required: true,
+          moscow_pass_expires_at: '2027-05-10',
+          moscow_pass_zone: 'МКАД (круглосуточный)',
+          moscow_pass_number: 'БП-2026/1842 (РНИС)',
+          tacho_skzi_expires_at: '2026-11-28',
+          tacho_calibration_expires_at: '2026-11-28',
+          tacho_model: 'Штрих-Тахо RUS',
+          oil_last_date: '2026-09-18',
+          oil_last_km: 243000,
+          oil_interval_km: 10000,
+          fire_extinguisher_expires_at: '2027-08-01'
+        },
+        monthly: {
+          '2026-07': { revenue: 195000, fuel: 44000, driverPay: 48000, loaderPay: 15000, maint: 35000, km: 3500, trips: 26 },
+          '2026-08': { revenue: 230000, fuel: 51000, driverPay: 57000, loaderPay: 19000, maint: 9000, km: 4100, trips: 30 },
+          '2026-09': { revenue: 250000, fuel: 55000, driverPay: 62000, loaderPay: 21000, maint: 11000, km: 4400, trips: 33 },
+          '2026-10': { revenue: 125000, fuel: 28000, driverPay: 31000, loaderPay: 11000, maint: 3000, km: 2100, trips: 16 },
+        },
+        trips: [
+          {
+            number: 756, date: '01.10.2026', driver: 'Никифоров Д.В.', loader: 'Колясик',
+            revenue: 14200, fuel: 3200, driverPay: 3500, loaderPay: 1900, profit: 5600,
+            km: 150,
+            orders: [
+              { desc: 'ООО УралСталь · Швеллер 5м', amount: 8200, method: 'qr', label: '⚡ QR-код', status: 'completed' },
+              { desc: 'ИП Голубев · Цемент 50 мешков', amount: 6000, method: 'cash', label: '💵 Наличные', status: 'completed' },
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '840', date: '22.07.2026', desc: 'Капитальный ремонт сцепления + выжимной подшипник', parts: 22000, works: 13000, isExternal: false, contractor: 'Свой Гараж' }
+        ]
+      },
+      {
+        id: 'v-318',
+        name: 'Валдай Самосвал 318',
+        regNumber: 'С318ТХ 96',
+        category: 'trucks',
+        categoryName: 'Валдай Самосвал',
+        driver: 'Евгений Зеферович',
+        status: 'active',
+        statusLabel: 'Активна',
+        statusColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        odometer: 162400,
+        docs: {
+          insurance_expires_at: '2027-01-15',
+          insurance_policy: 'МММ 0592817293 (Ингосстрах)',
+          inspection_expires_at: '2027-02-01',
+          inspection_number: '7482910492819',
+          moscow_pass_required: false,
+          moscow_pass_expires_at: '',
+          moscow_pass_zone: 'Не требуется',
+          moscow_pass_number: '—',
+          tacho_skzi_expires_at: '2027-08-10',
+          tacho_calibration_expires_at: '2027-08-10',
+          tacho_model: 'Меркурий ТА-001',
+          oil_last_date: '2026-08-25',
+          oil_last_km: 156000,
+          oil_interval_km: 10000,
+          fire_extinguisher_expires_at: '2027-04-15'
+        },
+        monthly: {
+          '2026-07': { revenue: 230000, fuel: 58000, driverPay: 55000, loaderPay: 0, maint: 18000, km: 3100, trips: 34 },
+          '2026-08': { revenue: 260000, fuel: 65000, driverPay: 62000, loaderPay: 0, maint: 14000, km: 3500, trips: 38 },
+          '2026-09': { revenue: 280000, fuel: 71000, driverPay: 68000, loaderPay: 0, maint: 16000, km: 3800, trips: 41 },
+          '2026-10': { revenue: 150000, fuel: 37000, driverPay: 36000, loaderPay: 0, maint: 5000, km: 2000, trips: 22 },
+        },
+        trips: [
+          {
+            number: 755, date: '01.10.2026', driver: 'Евгений Зеферович', loader: null,
+            revenue: 9000, fuel: 2400, driverPay: 2200, loaderPay: 0, profit: 4400,
+            km: 95,
+            orders: [
+              { desc: 'Щебень фракция 20-40 · 5 тонн', amount: 9000, method: 'cash', label: '💵 Наличные', status: 'completed' }
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '859', date: '04.09.2026', desc: 'Замена гидроцилиндра кузова + РВД шланги', parts: 11000, works: 5000, isExternal: false, contractor: 'Свой Гараж' }
+        ]
+      },
+      {
+        id: 'v-702',
+        name: 'Mitsubishi Canter',
+        regNumber: 'М702ВР 96',
+        category: 'trucks',
+        categoryName: 'Японский 5т',
+        driver: 'Роман Радикович',
+        status: 'repair',
+        statusLabel: 'В ремонте',
+        statusColor: 'bg-amber-100 text-amber-800 border-amber-300',
+        odometer: 310500,
+        docs: {
+          insurance_expires_at: '2026-11-05', // 33 дня
+          insurance_policy: 'РРР 0918274615 (Согласие)',
+          inspection_expires_at: '2026-11-12',
+          inspection_number: '5928104829104',
+          moscow_pass_required: true, // Планируется на Москву!
+          moscow_pass_expires_at: '2026-10-25', // 22 дня -> ВНИМАНИЕ (<30 дней)
+          moscow_pass_zone: 'МКАД + ТТК',
+          moscow_pass_number: 'БП-2025/4491 (РНИС)',
+          tacho_skzi_expires_at: '2026-10-27', // 24 дня -> ВНИМАНИЕ (<30 дней)
+          tacho_calibration_expires_at: '2026-10-27',
+          tacho_model: 'Атол Drive 5 (СКЗИ)',
+          oil_last_date: '2026-09-01',
+          oil_last_km: 308000,
+          oil_interval_km: 10000,
+          fire_extinguisher_expires_at: '2027-01-20'
+        },
+        monthly: {
+          '2026-07': { revenue: 160000, fuel: 36000, driverPay: 40000, loaderPay: 12000, maint: 42000, km: 2800, trips: 22 },
+          '2026-08': { revenue: 175000, fuel: 39000, driverPay: 43000, loaderPay: 14000, maint: 28000, km: 3100, trips: 24 },
+          '2026-09': { revenue: 140000, fuel: 31000, driverPay: 35000, loaderPay: 10000, maint: 65000, km: 2400, trips: 18 },
+          '2026-10': { revenue: 45000, fuel: 10000, driverPay: 11000, loaderPay: 3000, maint: 48000, km: 700, trips: 5 },
+        },
+        trips: [
+          {
+            number: 740, date: '22.09.2026', driver: 'Роман Радикович', loader: 'Вадик',
+            revenue: 11500, fuel: 2600, driverPay: 2900, loaderPay: 1500, profit: 4500,
+            km: 140,
+            orders: [
+              { desc: 'ООО ЭнергоСеть · Кабельные барабаны', amount: 11500, method: 'bank_invoice', label: '🏛️ Р/С Т-Банк', status: 'completed' }
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '870', date: '01.10.2026', desc: 'Ремонт головки блока цилиндров [МоторЦентр]', parts: 32000, works: 16000, isExternal: true, contractor: 'МоторЦентр' }
+        ]
+      },
+      {
+        id: 'v-501',
+        name: 'Газель 501 Фермер',
+        regNumber: 'А501ХР 96',
+        category: 'gazelles',
+        categoryName: 'Газель 4.2м Фермер',
+        driver: 'Талачев Артур',
+        status: 'active',
+        statusLabel: 'Активна',
+        statusColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        odometer: 198000,
+        docs: {
+          insurance_expires_at: '2027-04-10',
+          insurance_policy: 'ААА 0492817492 (РЕСО-Гарантия)',
+          inspection_expires_at: '2027-04-10',
+          inspection_number: '3829104829104',
+          moscow_pass_required: false,
+          moscow_pass_expires_at: '',
+          moscow_pass_zone: 'Не требуется (< 3.5т)',
+          moscow_pass_number: '—',
+          tacho_skzi_expires_at: '—',
+          tacho_calibration_expires_at: '—',
+          tacho_model: 'Не требуется',
+          oil_last_date: '2026-09-12',
+          oil_last_km: 194000,
+          oil_interval_km: 10000,
+          fire_extinguisher_expires_at: '2027-09-10'
+        },
+        monthly: {
+          '2026-07': { revenue: 175000, fuel: 38000, driverPay: 44000, loaderPay: 22000, maint: 7500, km: 4100, trips: 36 },
+          '2026-08': { revenue: 195000, fuel: 42000, driverPay: 49000, loaderPay: 26000, maint: 11000, km: 4600, trips: 40 },
+          '2026-09': { revenue: 215000, fuel: 46000, driverPay: 54000, loaderPay: 29000, maint: 6500, km: 5000, trips: 44 },
+          '2026-10': { revenue: 110000, fuel: 24000, driverPay: 28000, loaderPay: 15000, maint: 2500, km: 2600, trips: 22 },
+        },
+        trips: [
+          {
+            number: 754, date: '01.10.2026', driver: 'Талачев Артур', loader: 'Вадик',
+            revenue: 9500, fuel: 2100, driverPay: 2400, loaderPay: 1600, profit: 3400,
+            km: 115,
+            orders: [
+              { desc: 'Квартирный переезд · Мебель и коробки', amount: 9500, method: 'cash', label: '💵 Наличные', status: 'completed' }
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '851', date: '20.08.2026', desc: 'Замена колодок передних + дисков', parts: 7500, works: 3500, isExternal: false, contractor: 'Свой Гараж' }
+        ]
+      },
+      {
+        id: 'v-771',
+        name: 'Газель 771',
+        regNumber: 'О771КЕ 96',
+        category: 'gazelles',
+        categoryName: 'Газель 4.2м Евротент',
+        driver: 'Вавилов А.В.',
+        status: 'active',
+        statusLabel: 'Активна',
+        statusColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        odometer: 172300,
+        docs: {
+          insurance_expires_at: '2027-03-01',
+          insurance_policy: 'ВВВ 0819284719 (АльфаСтрахование)',
+          inspection_expires_at: '2027-03-01',
+          inspection_number: '4829104829105',
+          moscow_pass_required: false,
+          moscow_pass_expires_at: '',
+          moscow_pass_zone: 'Не требуется (< 3.5т)',
+          moscow_pass_number: '—',
+          tacho_skzi_expires_at: '—',
+          tacho_calibration_expires_at: '—',
+          tacho_model: 'Не требуется',
+          oil_last_date: '2026-09-20',
+          oil_last_km: 168000,
+          oil_interval_km: 10000,
+          fire_extinguisher_expires_at: '2027-05-15'
+        },
+        monthly: {
+          '2026-07': { revenue: 165000, fuel: 35000, driverPay: 41000, loaderPay: 19000, maint: 8000, km: 3900, trips: 34 },
+          '2026-08': { revenue: 185000, fuel: 39000, driverPay: 46000, loaderPay: 23000, maint: 5000, km: 4300, trips: 38 },
+          '2026-09': { revenue: 205000, fuel: 43000, driverPay: 51000, loaderPay: 26000, maint: 9500, km: 4700, trips: 42 },
+          '2026-10': { revenue: 98000, fuel: 21000, driverPay: 25000, loaderPay: 13000, maint: 3200, km: 2300, trips: 20 },
+        },
+        trips: [
+          {
+            number: 753, date: '01.10.2026', driver: 'Вавилов А.В.', loader: 'Азамат',
+            revenue: 8800, fuel: 1900, driverPay: 2200, loaderPay: 1500, profit: 3200,
+            km: 105,
+            orders: [
+              { desc: 'ИП Кузнецов · Пластиковые окна', amount: 8800, method: 'qr', label: '⚡ QR-код', status: 'completed' }
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '856', date: '28.08.2026', desc: 'Замена газового редуктора Lovato', parts: 6500, works: 3000, isExternal: false, contractor: 'Свой Гараж' }
+        ]
+      },
+      {
+        id: 'v-602',
+        name: 'Газель 602 (3м)',
+        regNumber: 'У602ТО 96',
+        category: 'gazelles',
+        categoryName: 'Газель 3м Тент',
+        driver: 'Вадик',
+        status: 'reserve',
+        statusLabel: 'Резерв',
+        statusColor: 'bg-slate-100 text-slate-700 border-slate-300',
+        odometer: 289400,
+        docs: {
+          insurance_expires_at: '2026-11-20',
+          insurance_policy: 'ЕЕЕ 0293847192 (Ингосстрах)',
+          inspection_expires_at: '2026-11-20',
+          inspection_number: '6829104829106',
+          moscow_pass_required: false,
+          moscow_pass_expires_at: '',
+          moscow_pass_zone: 'Не требуется (< 3.5т)',
+          moscow_pass_number: '—',
+          tacho_skzi_expires_at: '—',
+          tacho_calibration_expires_at: '—',
+          tacho_model: 'Не требуется',
+          oil_last_date: '2026-07-15',
+          oil_last_km: 285000,
+          oil_interval_km: 10000,
+          fire_extinguisher_expires_at: '2027-03-10'
+        },
+        monthly: {
+          '2026-07': { revenue: 95000, fuel: 22000, driverPay: 24000, loaderPay: 11000, maint: 15000, km: 2200, trips: 20 },
+          '2026-08': { revenue: 110000, fuel: 25000, driverPay: 28000, loaderPay: 13000, maint: 8000, km: 2500, trips: 23 },
+          '2026-09': { revenue: 85000, fuel: 19000, driverPay: 21000, loaderPay: 9000, maint: 18000, km: 1900, trips: 17 },
+          '2026-10': { revenue: 35000, fuel: 8000, driverPay: 9000, loaderPay: 4000, maint: 2000, km: 800, trips: 7 },
+        },
+        trips: [
+          {
+            number: 744, date: '25.09.2026', driver: 'Вадик', loader: null,
+            revenue: 6500, fuel: 1400, driverPay: 1600, loaderPay: 0, profit: 3500,
+            km: 75,
+            orders: [
+              { desc: 'Доставка бытовой техники', amount: 6500, method: 'cash', label: '💵 Наличные', status: 'completed' }
+            ]
+          }
+        ],
+        serviceOrders: [
+          { number: '864', date: '21.09.2026', desc: 'Замена глушителя', parts: 5000, works: 3000, isExternal: false, contractor: 'Свой Гараж' }
+        ]
+      }
+    ];
+
+    // ── 2. STATE MANAGEMENT ──────────────────────────────────────────────────
+    let currentDesign = 1;
+    let selectedMonths = new Set(['2026-07', '2026-08', '2026-09', '2026-10']);
+    let currentFilter = 'all';
+    let expandedRows = new Set(['v-914']); // Open Валдай 914 by default to highlight docs!
+    let editingVehicleId = null;
+
+    // ── 3. REGULATIONS & HEALTH CALCULATOR ────────────────────────────────────
+    function getDaysUntil(dateStr) {
+      if (!dateStr || dateStr === '—') return null;
+      const target = new Date(dateStr + 'T12:00:00');
+      const diffTime = target.getTime() - SIMULATED_TODAY.getTime();
+      return Math.round(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    function checkVehicleHealth(v) {
+      const issues = [];
+      const d = v.docs;
+      if (!d) return { status: 'ok', issues: [] };
+
+      // 1. Insurance
+      const insDays = getDaysUntil(d.insurance_expires_at);
+      if (insDays !== null) {
+        if (insDays < 0) issues.push({ type: 'danger', text: `ОСАГО просрочен на ${Math.abs(insDays)} дн!`, item: 'ОСАГО' });
+        else if (insDays <= 14) issues.push({ type: 'danger', text: `ОСАГО истекает через ${insDays} дн! (за 2 нед.)`, item: 'ОСАГО' });
+        else if (insDays <= 30) issues.push({ type: 'warning', text: `ОСАГО истекает через ${insDays} дн. (за 1 мес.)`, item: 'ОСАГО' });
+      }
+
+      // 2. Inspection TO
+      const inspDays = getDaysUntil(d.inspection_expires_at);
+      if (inspDays !== null) {
+        if (inspDays < 0) issues.push({ type: 'danger', text: `ТО просрочен на ${Math.abs(inspDays)} дн!`, item: 'ТО' });
+        else if (inspDays <= 14) issues.push({ type: 'danger', text: `ТО истекает через ${inspDays} дн!`, item: 'ТО' });
+        else if (inspDays <= 30) issues.push({ type: 'warning', text: `ТО истекает через ${inspDays} дн.`, item: 'ТО' });
+      }
+
+      // 3. Moscow Pass
+      if (d.moscow_pass_required && d.moscow_pass_expires_at) {
+        const moscowDays = getDaysUntil(d.moscow_pass_expires_at);
+        if (moscowDays !== null) {
+          if (moscowDays < 0) issues.push({ type: 'danger', text: `Пропуск МКАД просрочен на ${Math.abs(moscowDays)} дн!`, item: 'Пропуск МКАД' });
+          else if (moscowDays <= 14) issues.push({ type: 'danger', text: `Пропуск МКАД истекает через ${moscowDays} дн!`, item: 'Пропуск МКАД' });
+          else if (moscowDays <= 30) issues.push({ type: 'warning', text: `Пропуск МКАД истекает через ${moscowDays} дн.`, item: 'Пропуск МКАД' });
+        }
+      }
+
+      // 4. Tachograph SKZI
+      if (d.tacho_skzi_expires_at && d.tacho_skzi_expires_at !== '—') {
+        const skziDays = getDaysUntil(d.tacho_skzi_expires_at);
+        if (skziDays !== null) {
+          if (skziDays < 0) issues.push({ type: 'danger', text: `Блок СКЗИ тахографа просрочен!`, item: 'Тахограф СКЗИ' });
+          else if (skziDays <= 14) issues.push({ type: 'danger', text: `Блок СКЗИ истекает через ${skziDays} дн!`, item: 'Тахограф СКЗИ' });
+          else if (skziDays <= 30) issues.push({ type: 'warning', text: `Блок СКЗИ истекает через ${skziDays} дн.`, item: 'Тахограф СКЗИ' });
+        }
+      }
+
+      // 5. Engine Oil Mileage
+      if (d.oil_last_km && d.oil_interval_km) {
+        const kmSince = v.odometer - d.oil_last_km;
+        const kmLeft = d.oil_interval_km - kmSince;
+        if (kmLeft < 0) {
+          issues.push({ type: 'danger', text: `Масло ДВС: перепробег +${Math.abs(kmLeft)} км! Пора в Гараж`, item: 'Масло ДВС' });
+        } else if (kmLeft <= 1000) {
+          issues.push({ type: 'warning', text: `Масло ДВС: осталось ${kmLeft} км до замены`, item: 'Масло ДВС' });
+        }
+      }
+
+      let overallStatus = 'ok';
+      if (issues.some(i => i.type === 'danger')) overallStatus = 'danger';
+      else if (issues.some(i => i.type === 'warning')) overallStatus = 'warning';
+
+      return { status: overallStatus, issues };
+    }
+
+    // ── 4. CALCULATION HELPERS ───────────────────────────────────────────────
+    function getVehiclePeriodData(vehicle, monthsSet) {
+      let revenue = 0, fuel = 0, driverPay = 0, loaderPay = 0, maint = 0, km = 0, trips = 0;
+      const monthDetails = [];
+
+      MONTHS.forEach(m => {
+        const isSelected = monthsSet.has(m.id);
+        const data = vehicle.monthly[m.id] || { revenue: 0, fuel: 0, driverPay: 0, loaderPay: 0, maint: 0, km: 0, trips: 0 };
+        const costs = data.fuel + data.driverPay + data.loaderPay + data.maint;
+        const profit = data.revenue - costs;
+        const margin = data.revenue > 0 ? Math.round((profit / data.revenue) * 100) : 0;
+
+        monthDetails.push({
+          month: m,
+          isSelected,
+          ...data,
+          costs,
+          profit,
+          margin
+        });
+
+        if (isSelected) {
+          revenue += data.revenue;
+          fuel += data.fuel;
+          driverPay += data.driverPay;
+          loaderPay += data.loaderPay;
+          maint += data.maint;
+          km += data.km;
+          trips += data.trips;
+        }
+      });
+
+      const totalCosts = fuel + driverPay + loaderPay + maint;
+      const profit = revenue - totalCosts;
+      const margin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+      const costPerKm = km > 0 ? Math.round(totalCosts / km) : 0;
+
+      return {
+        revenue, fuel, driverPay, loaderPay, maint, totalCosts, profit, margin, km, trips, costPerKm,
+        monthDetails
+      };
+    }
+
+    function calculateCohortStats(category, monthsSet) {
+      const filtered = category === 'all' 
+        ? VEHICLES 
+        : VEHICLES.filter(v => v.category === category);
+
+      let revenue = 0, fuel = 0, driverPay = 0, loaderPay = 0, maint = 0, totalCosts = 0, profit = 0, trips = 0, km = 0;
+
+      filtered.forEach(v => {
+        const d = getVehiclePeriodData(v, monthsSet);
+        revenue += d.revenue;
+        fuel += d.fuel;
+        driverPay += d.driverPay;
+        loaderPay += d.loaderPay;
+        maint += d.maint;
+        totalCosts += d.totalCosts;
+        profit += d.profit;
+        trips += d.trips;
+        km += d.km;
+      });
+
+      const margin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+      return { revenue, fuel, driverPay, loaderPay, maint, totalCosts, profit, margin, trips, km, count: filtered.length };
+    }
+
+    function formatMoney(num) {
+      return num.toLocaleString('ru-RU') + ' ₽';
+    }
+
+    // ── 5. MONTH SELECTOR CONTROLS ───────────────────────────────────────────
+    function toggleMonth(monthId) {
+      if (selectedMonths.has(monthId)) {
+        if (selectedMonths.size === 1) return;
+        selectedMonths.delete(monthId);
+      } else {
+        selectedMonths.add(monthId);
+      }
+      renderCurrentDesign();
+    }
+
+    function selectPresetMonths(type) {
+      if (type === 'all') selectedMonths = new Set(MONTHS.map(m => m.id));
+      else if (type === 'last3') selectedMonths = new Set(['2026-08', '2026-09', '2026-10']);
+      else if (type === 'current') selectedMonths = new Set(['2026-10']);
+      renderCurrentDesign();
+    }
+
+    function setVehicleFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.d1-filter-btn').forEach(b => {
+        const isActive = b.getAttribute('data-filter') === filter;
+        b.className = `d1-filter-btn px-4 py-1.5 rounded-lg text-xs font-black transition-all ${isActive ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`;
+      });
+      renderCurrentDesign();
+    }
+
+    function toggleRow(vehicleId) {
+      if (expandedRows.has(vehicleId)) expandedRows.delete(vehicleId);
+      else expandedRows.add(vehicleId);
+      renderCurrentDesign();
+    }
+
+    function toggleAllRows(designNum) {
+      if (expandedRows.size === VEHICLES.length) expandedRows.clear();
+      else VEHICLES.forEach(v => expandedRows.add(v.id));
+      renderCurrentDesign();
+    }
+
+    // ── 6. MODALS INTERACTION (EDIT DOCS & MATRIX) ───────────────────────────
+    function openEditModal(vehicleId) {
+      editingVehicleId = vehicleId;
+      const v = VEHICLES.find(x => x.id === vehicleId);
+      if (!v) return;
+
+      document.getElementById('modal-edit-title').innerText = `Редактирование регламентов: ${v.name} (${v.regNumber})`;
+      document.getElementById('modal-edit-sub').innerText = `Водитель: ${v.driver} · Текущий одометр: ${v.odometer.toLocaleString()} км`;
+
+      const d = v.docs || {};
+      document.getElementById('form-ins-date').value = d.insurance_expires_at || '';
+      document.getElementById('form-ins-policy').value = d.insurance_policy || '';
+
+      document.getElementById('form-insp-date').value = d.inspection_expires_at || '';
+      document.getElementById('form-insp-num').value = d.inspection_number || '';
+
+      const moscowCheck = Boolean(d.moscow_pass_required);
+      document.getElementById('form-moscow-required').checked = moscowCheck;
+      toggleMoscowFields(moscowCheck);
+      document.getElementById('form-moscow-zone').value = d.moscow_pass_zone || 'МКАД (круглосуточный)';
+      document.getElementById('form-moscow-date').value = d.moscow_pass_expires_at || '';
+      document.getElementById('form-moscow-num').value = d.moscow_pass_number || '';
+
+      document.getElementById('form-tacho-model').value = d.tacho_model || '';
+      document.getElementById('form-tacho-skzi').value = d.tacho_skzi_expires_at || '';
+      document.getElementById('form-tacho-calib').value = d.tacho_calibration_expires_at || '';
+
+      document.getElementById('form-oil-date').value = d.oil_last_date || '';
+      document.getElementById('form-oil-km').value = d.oil_last_km || '';
+      document.getElementById('form-oil-interval').value = d.oil_interval_km || 10000;
+
+      document.getElementById('modal-edit-docs').classList.remove('hidden');
+    }
+
+    function toggleMoscowFields(show) {
+      const g = document.getElementById('moscow-fields-group');
+      if (show) g.classList.remove('opacity-40', 'pointer-events-none');
+      else g.classList.add('opacity-40', 'pointer-events-none');
+    }
+
+    function closeEditModal() {
+      document.getElementById('modal-edit-docs').classList.add('hidden');
+      editingVehicleId = null;
+    }
+
+    function saveVehicleDocs() {
+      if (!editingVehicleId) return;
+      const v = VEHICLES.find(x => x.id === editingVehicleId);
+      if (!v) return;
+
+      v.docs = {
+        ...v.docs,
+        insurance_expires_at: document.getElementById('form-ins-date').value,
+        insurance_policy: document.getElementById('form-ins-policy').value,
+        inspection_expires_at: document.getElementById('form-insp-date').value,
+        inspection_number: document.getElementById('form-insp-num').value,
+        moscow_pass_required: document.getElementById('form-moscow-required').checked,
+        moscow_pass_zone: document.getElementById('form-moscow-zone').value,
+        moscow_pass_expires_at: document.getElementById('form-moscow-date').value,
+        moscow_pass_number: document.getElementById('form-moscow-num').value,
+        tacho_model: document.getElementById('form-tacho-model').value,
+        tacho_skzi_expires_at: document.getElementById('form-tacho-skzi').value,
+        tacho_calibration_expires_at: document.getElementById('form-tacho-calib').value,
+        oil_last_date: document.getElementById('form-oil-date').value,
+        oil_last_km: parseInt(document.getElementById('form-oil-km').value) || 0,
+        oil_interval_km: parseInt(document.getElementById('form-oil-interval').value) || 10000,
+      };
+
+      closeEditModal();
+      renderCurrentDesign();
+    }
+
+    function openAllDocsModal() {
+      const container = document.getElementById('all-docs-table-container');
+      container.innerHTML = `
+        <table class="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
+          <thead class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
+            <tr>
+              <th class="p-3">Машина</th>
+              <th class="p-3">Водитель</th>
+              <th class="p-3">ОСАГО</th>
+              <th class="p-3">Техосмотр (ТО)</th>
+              <th class="p-3">Пропуск Москва</th>
+              <th class="p-3">Тахограф (СКЗИ)</th>
+              <th class="p-3">Масло ДВС</th>
+              <th class="p-3 text-right">Действие</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            ${VEHICLES.map(v => {
+              const h = checkVehicleHealth(v);
+              const d = v.docs || {};
+              const insDays = getDaysUntil(d.insurance_expires_at);
+              const inspDays = getDaysUntil(d.inspection_expires_at);
+              const moscowDays = d.moscow_pass_required ? getDaysUntil(d.moscow_pass_expires_at) : null;
+              const skziDays = getDaysUntil(d.tacho_skzi_expires_at);
+              const kmSinceOil = v.odometer - (d.oil_last_km || 0);
+              const kmLeftOil = (d.oil_interval_km || 10000) - kmSinceOil;
+
+              const getPill = (days, label) => {
+                if (days === null) return '<span class="text-slate-300">—</span>';
+                if (days < 0) return `<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-700 font-bold">Просрочен ${Math.abs(days)}д</span>`;
+                if (days <= 14) return `<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-black animate-pulse">${days} дн!</span>`;
+                if (days <= 30) return `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">${days} дн.</span>`;
+                return `<span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">${days} дн.</span>`;
+              };
+
+              const getOilPill = (kmLeft) => {
+                if (kmLeft < 0) return `<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-700 font-black">+${Math.abs(kmLeft)} км перепробег</span>`;
+                if (kmLeft <= 1000) return `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">${kmLeft} км</span>`;
+                return `<span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">${kmLeft} км</span>`;
+              };
+
+              return `
+                <tr class="hover:bg-slate-50/80">
+                  <td class="p-3 font-black text-slate-900">${v.name} <span class="font-mono text-[10px] text-slate-400 block font-normal">${v.regNumber}</span></td>
+                  <td class="p-3 text-slate-700 font-medium">${v.driver}</td>
+                  <td class="p-3">${getPill(insDays)}</td>
+                  <td class="p-3">${getPill(inspDays)}</td>
+                  <td class="p-3">${d.moscow_pass_required ? getPill(moscowDays) : '<span class="text-slate-400 text-[10px]">Не треб.</span>'}</td>
+                  <td class="p-3">${getPill(skziDays)}</td>
+                  <td class="p-3">${getOilPill(kmLeftOil)}</td>
+                  <td class="p-3 text-right">
+                    <button onclick="closeAllDocsModal(); openEditModal('${v.id}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition">
+                      Изменить
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById('modal-all-docs').classList.remove('hidden');
+    }
+
+    function closeAllDocsModal() {
+      document.getElementById('modal-all-docs').classList.add('hidden');
+    }
+
+    
+    
+    // ── 7. RENDER DESIGN 1: EXECUTIVE MATRIX (100% FULL-WIDTH GRID) ──────────
+    function renderDesign1() {
+      // 1. Render month pills
+      const monthContainer = document.getElementById('d1-months-selector');
+      monthContainer.innerHTML = MONTHS.map(m => {
+        const active = selectedMonths.has(m.id);
+        return `
+          <button onclick="toggleMonth('${m.id}')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${active ? 'bg-emerald-600 text-white shadow-xs font-black' : 'text-slate-500 hover:text-slate-900'}">
+            <span>${active ? '✓' : ''}</span>
+            <span>${m.label}</span>
+          </button>
+        `;
+      }).join('');
+
+      // 2. Render Cohorts KPI
+      const trucks = calculateCohortStats('trucks', selectedMonths);
+      const gazelles = calculateCohortStats('gazelles', selectedMonths);
+      const total = calculateCohortStats('all', selectedMonths);
+
+      document.getElementById('d1-kpi-trucks-trips').innerText = `${trucks.trips} рейсов`;
+      document.getElementById('d1-kpi-trucks-rev').innerText = formatMoney(trucks.revenue);
+      document.getElementById('d1-kpi-trucks-costs').innerText = '-' + formatMoney(trucks.totalCosts);
+      document.getElementById('d1-kpi-trucks-profit').innerText = formatMoney(trucks.profit);
+      document.getElementById('d1-kpi-trucks-margin').innerText = `${trucks.margin}%`;
+      document.getElementById('d1-kpi-trucks-fuel').innerText = formatMoney(trucks.fuel);
+      document.getElementById('d1-kpi-trucks-maint').innerText = formatMoney(trucks.maint);
+
+      document.getElementById('d1-kpi-gazelles-trips').innerText = `${gazelles.trips} рейсов`;
+      document.getElementById('d1-kpi-gazelles-rev').innerText = formatMoney(gazelles.revenue);
+      document.getElementById('d1-kpi-gazelles-costs').innerText = '-' + formatMoney(gazelles.totalCosts);
+      document.getElementById('d1-kpi-gazelles-profit').innerText = formatMoney(gazelles.profit);
+      document.getElementById('d1-kpi-gazelles-margin').innerText = `${gazelles.margin}%`;
+      document.getElementById('d1-kpi-gazelles-fuel').innerText = formatMoney(gazelles.fuel);
+      document.getElementById('d1-kpi-gazelles-maint').innerText = formatMoney(gazelles.maint);
+
+      const totalLoaderPay = total.loaderPay;
+      const loaderOrdersCount = Math.round(total.trips * 0.75);
+      const avgLoaderPerOrder = loaderOrdersCount > 0 ? Math.round(totalLoaderPay / loaderOrdersCount) : 0;
+      const loaderShare = total.revenue > 0 ? Math.round((totalLoaderPay / total.revenue) * 100) : 0;
+
+      document.getElementById('d1-kpi-loaders-fund').innerText = formatMoney(totalLoaderPay);
+      document.getElementById('d1-kpi-loaders-count').innerText = `${loaderOrdersCount} заявок`;
+      document.getElementById('d1-kpi-loaders-avg').innerText = formatMoney(avgLoaderPerOrder);
+      document.getElementById('d1-kpi-loaders-share').innerText = `${loaderShare}% выручки`;
+
+      document.getElementById('d1-kpi-total-profit').innerText = formatMoney(total.profit);
+      document.getElementById('d1-kpi-total-rev').innerText = formatMoney(total.revenue);
+      document.getElementById('d1-kpi-total-margin').innerText = `${total.margin}%`;
+      document.getElementById('d1-kpi-total-period-badge').innerText = `Выбрано: ${selectedMonths.size} мес`;
+
+      // 3. Filter & Sort Vehicles
+      let rows = VEHICLES.filter(v => currentFilter === 'all' || v.category === currentFilter);
+      rows = rows.map(v => ({ v, d: getVehiclePeriodData(v, selectedMonths) }));
+
+      const sortKey = document.getElementById('d1-sort-select').value;
+      rows.sort((a, b) => {
+        if (sortKey === 'profit') return b.d.profit - a.d.profit;
+        if (sortKey === 'revenue') return b.d.revenue - a.d.revenue;
+        if (sortKey === 'margin') return b.d.margin - a.d.margin;
+        if (sortKey === 'trips') return b.d.trips - a.d.trips;
+        return 0;
+      });
+
+      // 4. Render Table: 9 Columns distributed across the entire interior card width
+      const container = document.getElementById('d1-vehicle-rows-container');
+
+      // 9 columns: 8 proportional data tracks + 1 fixed chevron track at the right end
+      const gridTemplate = 'grid-cols-[minmax(210px,2.2fr)_minmax(90px,1.1fr)_minmax(90px,1.1fr)_minmax(90px,1.1fr)_minmax(85px,1fr)_minmax(90px,1.1fr)_minmax(75px,0.9fr)_minmax(120px,1.4fr)_36px]';
+
+      // Table Header Row strictly aligned with vehicle rows across 100% width
+      let htmlOutput = `
+        <div class="hidden lg:grid ${gridTemplate} items-center w-full px-5 py-2.5 gap-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none pb-1">
+          <div>МАШИНА / ВОДИТЕЛЬ</div>
+          <div class="text-right">ВЫРУЧКА</div>
+          <div class="text-right text-amber-700/80">ГСМ (ТОПЛИВО)</div>
+          <div class="text-right">ЗП ВОДИТЕЛЯ</div>
+          <div class="text-right text-purple-700/80">ЗП ГРУЗЧИКОВ</div>
+          <div class="text-right text-rose-700/80">ГАРАЖ / РЕМОНТЫ</div>
+          <div class="text-center">ДИНАМИКА</div>
+          <div class="text-right text-emerald-700/80">ЧИСТАЯ ПРИБЫЛЬ</div>
+          <div></div>
+        </div>
+      `;
+
+      htmlOutput += rows.map(({ v, d }) => {
+        const isExp = expandedRows.has(v.id);
+        const profitClass = d.profit >= 0 ? 'text-emerald-600' : 'text-rose-600';
+        const borderClass = d.profit >= 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500';
+
+        // Monthly sparkline bars
+        const maxMonthProfit = Math.max(...d.monthDetails.map(m => Math.abs(m.profit)), 1);
+        const sparklineHtml = d.monthDetails.map(m => {
+          const h = Math.max(Math.round((Math.abs(m.profit) / maxMonthProfit) * 20), 4);
+          const color = !m.isSelected ? 'bg-slate-200' : (m.profit >= 0 ? 'bg-emerald-500' : 'bg-rose-500');
+          return `
+            <div class="flex flex-col items-center gap-0.5" title="${m.month.label}: ${formatMoney(m.profit)}">
+              <span class="text-[7px] font-mono text-slate-400">${m.month.short}</span>
+              <div class="w-1.5 bg-slate-100 rounded-xs h-5 flex items-end justify-center">
+                <div class="w-full ${color} rounded-xs" style="height: ${h}px"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition-all ${borderClass}">
+            
+            <!-- COLLAPSED ROW (EXPANDED TO END OF CARD, PERFECT VERTICAL ALIGNMENT) -->
+            <div onclick="toggleRow('${v.id}')" class="cursor-pointer hover:bg-slate-50/80 transition-colors select-none grid ${gridTemplate} items-center w-full px-5 py-3 gap-2.5">
+              
+              <!-- Column 1: Identity -->
+              <div class="flex items-center gap-2.5 min-w-0 pr-1">
+                <span class="text-xl shrink-0">${v.category === 'trucks' ? '🚛' : '🚐'}</span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-black text-slate-900 text-sm tracking-tight truncate">${v.name}</span>
+                    <span class="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">${v.regNumber}</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                    <span class="truncate">Водитель: <strong class="text-slate-700">${v.driver}</strong></span>
+                    <span>·</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${v.statusColor}">${v.statusLabel}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 2: Выручка -->
+              <div class="text-right">
+                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">Выручка</span>
+                <span class="text-sm font-bold text-slate-900 font-mono">${formatMoney(d.revenue)}</span>
+              </div>
+
+              <!-- Column 3: ГСМ (Топливо) -->
+              <div class="text-right">
+                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">ГСМ</span>
+                <span class="text-sm font-bold text-amber-600 font-mono">${formatMoney(d.fuel)}</span>
+              </div>
+
+              <!-- Column 4: ЗП Водителя -->
+              <div class="text-right">
+                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">ЗП Водителя</span>
+                <span class="text-sm font-bold text-slate-700 font-mono">${formatMoney(d.driverPay)}</span>
+              </div>
+
+              <!-- Column 5: ЗП Грузчиков -->
+              <div class="text-right">
+                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">ЗП Грузчиков</span>
+                <span class="text-sm font-bold text-purple-700 font-mono">${d.loaderPay > 0 ? formatMoney(d.loaderPay) : '—'}</span>
+              </div>
+
+              <!-- Column 6: Гараж / Ремонты -->
+              <div class="text-right">
+                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">Гараж</span>
+                <span class="text-sm font-bold text-rose-600 font-mono">${d.maint > 0 ? formatMoney(d.maint) : '0 ₽'}</span>
+              </div>
+
+              <!-- Column 7: Спарклайн динамики -->
+              <div class="flex items-center justify-center">
+                <div class="flex items-center gap-1 px-1.5 py-0.5 bg-slate-50 rounded border border-slate-100">
+                  ${sparklineHtml}
+                </div>
+              </div>
+
+              <!-- Column 8: Чистая прибыль -->
+              <div class="text-right">
+                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">Прибыль</span>
+                <span class="text-base font-black font-mono leading-tight ${profitClass}">${formatMoney(d.profit)}</span>
+                <span class="text-[10px] font-black ${d.margin >= 20 ? 'text-emerald-600' : 'text-amber-600'} block">${d.margin}% маржа</span>
+              </div>
+
+              <!-- Column 9: Шеврон (Кнопка разворота) -->
+              <div class="flex justify-center items-center">
+                <div class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 shadow-2xs transition-all shrink-0 ${isExp ? 'rotate-180 bg-emerald-100 text-emerald-800 border-emerald-300' : ''}">
+                  <span class="material-symbols-outlined text-[16px]">expand_more</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- EXPANDED REVIEW DETAILS (ACCORDION) -->
+            ${isExp ? `
+              <div class="border-t border-slate-200 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
+                
+                <!-- TOP HEADER OF EXPANDED CARD -->
+                <div class="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-200">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-black uppercase tracking-wider text-slate-700">Финансовая детализация ${v.name}:</span>
+                    <span class="text-xs font-bold text-slate-500">Пробег: ${d.km.toLocaleString()} км · Рейсов: ${d.trips} · Всего расходов: ${formatMoney(d.totalCosts)} · Себестоимость: ${d.costPerKm} ₽/км</span>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-bold text-slate-700">Одометр: ${v.odometer.toLocaleString()} км</span>
+                  </div>
+                </div>
+
+                <!-- 1. MONTH-BY-MONTH COMPARISON TABLE -->
+                <div>
+                  <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm">calendar_month</span>
+                    Помесячный финансовый результат
+                  </h4>
+                  <div class="overflow-x-auto bg-white rounded-xl border border-slate-200">
+                    <table class="w-full text-left text-xs">
+                      <thead class="bg-slate-100/80 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200">
+                        <tr>
+                          <th class="p-2.5">Месяц</th>
+                          <th class="p-2.5">Рейсов</th>
+                          <th class="p-2.5">Пробег</th>
+                          <th class="p-2.5 text-right">Выручка</th>
+                          <th class="p-2.5 text-right">ГСМ</th>
+                          <th class="p-2.5 text-right">ЗП Водителя</th>
+                          <th class="p-2.5 text-right">ЗП Грузчиков</th>
+                          <th class="p-2.5 text-right">Ремонты</th>
+                          <th class="p-2.5 text-right font-black">Чистая прибыль</th>
+                          <th class="p-2.5 text-right">Маржа</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100">
+                        ${d.monthDetails.map(m => `
+                          <tr class="${m.isSelected ? 'bg-emerald-50/20 font-semibold' : 'text-slate-400 opacity-60'}">
+                            <td class="p-2.5 flex items-center gap-1.5">
+                              <span class="w-2 h-2 rounded-full ${m.isSelected ? 'bg-emerald-500' : 'bg-slate-300'}"></span>
+                              ${m.month.label}
+                            </td>
+                            <td class="p-2.5">${m.trips}</td>
+                            <td class="p-2.5 font-mono">${m.km} км</td>
+                            <td class="p-2.5 text-right font-mono font-bold text-slate-900">${formatMoney(m.revenue)}</td>
+                            <td class="p-2.5 text-right font-mono text-amber-600">-${formatMoney(m.fuel)}</td>
+                            <td class="p-2.5 text-right font-mono text-slate-700">-${formatMoney(m.driverPay)}</td>
+                            <td class="p-2.5 text-right font-mono text-purple-700">${m.loaderPay > 0 ? '-' + formatMoney(m.loaderPay) : '—'}</td>
+                            <td class="p-2.5 text-right font-mono text-rose-600">${m.maint > 0 ? '-' + formatMoney(m.maint) : '0 ₽'}</td>
+                            <td class="p-2.5 text-right font-mono font-black ${m.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${formatMoney(m.profit)}</td>
+                            <td class="p-2.5 text-right font-mono font-bold">${m.margin}%</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- 2. TRIPS HISTORY (AS IN REVIEW PAGE) -->
+                <div>
+                  <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm">local_shipping</span>
+                    Последние утвержденные рейсы (из Истории Ревью)
+                  </h4>
+                  <div class="space-y-2">
+                    ${v.trips.map(t => `
+                      <div class="bg-white p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                        <div class="space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="font-black text-slate-900">Рейс №${t.number}</span>
+                            <span class="text-slate-400 font-mono">${t.date}</span>
+                            <span class="text-slate-400">·</span>
+                            <span class="font-bold text-slate-700">👤 ${t.driver}</span>
+                            ${t.loader ? `<span class="text-purple-700 font-bold">+ 👷 ${t.loader}</span>` : ''}
+                            <span class="text-slate-400">(${t.km} км)</span>
+                          </div>
+                          <div class="flex items-center gap-2 flex-wrap">
+                            ${t.orders.map(o => `
+                              <span class="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-[11px]">
+                                <span class="font-semibold text-slate-800">${o.desc}</span>
+                                <strong class="text-slate-900">${formatMoney(o.amount)}</strong>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${o.method === 'cash' ? 'bg-emerald-600 text-white' : o.method === 'qr' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white'}">${o.label}</span>
+                              </span>
+                            `).join('')}
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-4 shrink-0 text-right">
+                          <div>
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">Выручка</span>
+                            <span class="font-bold text-slate-800 font-mono">${formatMoney(t.revenue)}</span>
+                          </div>
+                          <div>
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">ГСМ</span>
+                            <span class="font-bold text-amber-600 font-mono">-${formatMoney(t.fuel)}</span>
+                          </div>
+                          <div>
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">ЗП (Вод+Груз)</span>
+                            <span class="font-bold text-slate-700 font-mono">-${formatMoney(t.driverPay + t.loaderPay)}</span>
+                          </div>
+                          <div class="pl-2 border-l border-slate-200">
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">Прибыль рейса</span>
+                            <span class="font-black text-emerald-600 text-sm font-mono">${formatMoney(t.profit)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <!-- 3. SERVICE ORDERS FROM GARAGE -->
+                <div>
+                  <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm">build</span>
+                    Заказ-наряды на ремонт из раздела Гараж
+                  </h4>
+                  <div class="space-y-2">
+                    ${v.serviceOrders.length > 0 ? v.serviceOrders.map(so => `
+                      <div class="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-3">
+                          <span class="font-mono font-black text-white px-2 py-0.5 rounded text-[11px] ${so.isExternal ? 'bg-purple-600' : 'bg-rose-600'}">НЗ-${so.number}</span>
+                          <div>
+                            <div class="flex items-center gap-2">
+                              <span class="font-bold text-slate-900">${so.desc}</span>
+                              <span class="text-slate-400 font-mono">${so.date}</span>
+                            </div>
+                            <span class="text-[11px] text-slate-500">Исполнитель: <strong>${so.contractor}</strong></span>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-4 text-right shrink-0">
+                          <div>
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">Запчасти</span>
+                            <span class="font-bold text-slate-700 font-mono">${formatMoney(so.parts)}</span>
+                          </div>
+                          <div>
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">Работы</span>
+                            <span class="font-bold text-slate-700 font-mono">${formatMoney(so.works)}</span>
+                          </div>
+                          <div class="pl-2 border-l border-slate-200">
+                            <span class="text-[9px] text-slate-400 uppercase font-bold block">Итого ремонт</span>
+                            <span class="font-black text-rose-600 font-mono">${formatMoney(so.parts + so.works)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    `).join('') : '<p class="text-xs text-slate-400 italic">Заказ-нарядов на ремонт за выбранный период нет.</p>'}
+                  </div>
+                </div>
+
+              </div>
+            ` : ''}
+
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = htmlOutput;
+    }
+
+    // ── 8. RENDER DESIGN 2: TIMELINE HORIZON ─────────────────────────────────
+    function renderDesign2() {
+      const monthContainer = document.getElementById('d2-months-selector');
+      monthContainer.innerHTML = MONTHS.map(m => {
+        const active = selectedMonths.has(m.id);
+        return `
+          <button onclick="toggleMonth('${m.id}')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${active ? 'bg-indigo-600 text-white font-black shadow-md shadow-indigo-600/40 ring-2 ring-indigo-400/30' : 'bg-slate-700/60 text-slate-300 hover:text-white'}">
+            <span>${active ? '●' : '○'}</span>
+            <span>${m.label}</span>
+          </button>
+        `;
+      }).join('');
+      document.getElementById('d2-selected-count-label').innerText = `Выбрано: ${selectedMonths.size} из ${MONTHS.length}`;
+
+      const total = calculateCohortStats('all', selectedMonths);
+      document.getElementById('d2-hero-rev').innerText = formatMoney(total.revenue);
+      document.getElementById('d2-hero-maint').innerText = formatMoney(total.fuel + total.maint);
+      document.getElementById('d2-hero-payroll').innerText = formatMoney(total.driverPay + total.loaderPay);
+      document.getElementById('d2-hero-profit').innerText = formatMoney(total.profit);
+
+      const rows = VEHICLES.filter(v => currentFilter === 'all' || v.category === currentFilter);
+      const container = document.getElementById('d2-vehicle-rows-container');
+      container.innerHTML = rows.map(v => {
+        const d = getVehiclePeriodData(v, selectedMonths);
+        const isExp = expandedRows.has(v.id);
+
+        const fuelPct = d.revenue > 0 ? Math.round((d.fuel / d.revenue) * 100) : 0;
+        const driverPct = d.revenue > 0 ? Math.round((d.driverPay / d.revenue) * 100) : 0;
+        const loaderPct = d.revenue > 0 ? Math.round((d.loaderPay / d.revenue) * 100) : 0;
+        const maintPct = d.revenue > 0 ? Math.round((d.maint / d.revenue) * 100) : 0;
+        const profitPct = Math.max(0, 100 - (fuelPct + driverPct + loaderPct + maintPct));
+
+        return `
+          <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all overflow-hidden">
+            <div onclick="toggleRow('${v.id}')" class="p-5 cursor-pointer select-none">
+              <div class="flex items-center justify-between gap-4 flex-wrap lg:flex-nowrap">
+                <div class="flex items-center gap-3 min-w-[220px]">
+                  <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-2xl shrink-0">
+                    ${v.category === 'trucks' ? '🚛' : '🚐'}
+                  </div>
+                  <div>
+                    <h3 class="font-black text-slate-900 text-base leading-tight">${v.name}</h3>
+                    <p class="text-xs text-slate-500 font-mono mt-0.5">${v.regNumber} · Водитель: <strong>${v.driver}</strong></p>
+                    <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${v.statusColor}">${v.statusLabel}</span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  ${d.monthDetails.map(m => `
+                    <div class="px-2.5 py-1 rounded-xl text-center border ${m.isSelected ? (m.profit >= 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800') : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'}">
+                      <span class="text-[9px] font-bold uppercase block">${m.month.short}</span>
+                      <span class="text-xs font-black font-mono">${formatMoney(m.profit)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+
+                <div class="flex items-center gap-6 shrink-0 text-right">
+                  <div>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Итого Выручка</span>
+                    <span class="text-sm font-bold text-slate-800">${formatMoney(d.revenue)}</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Чистая Прибыль</span>
+                    <span class="text-lg font-black ${d.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${formatMoney(d.profit)}</span>
+                  </div>
+                  <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 ${isExp ? 'rotate-180 bg-indigo-50 text-indigo-600' : ''}">
+                    <span class="material-symbols-outlined text-[18px]">expand_more</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-100">
+                <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1.5">
+                  <span class="font-bold">Структура себестоимости к выручке:</span>
+                  <span class="font-mono font-bold text-slate-700">Маржинальность: ${d.margin}% (${d.costPerKm} ₽/км)</span>
+                </div>
+                <div class="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                  <div style="width: ${profitPct}%" class="bg-emerald-500 h-full" title="Прибыль: ${profitPct}%"></div>
+                  <div style="width: ${fuelPct}%" class="bg-amber-500 h-full" title="ГСМ: ${fuelPct}%"></div>
+                  <div style="width: ${driverPct}%" class="bg-blue-500 h-full" title="ЗП Водителя: ${driverPct}%"></div>
+                  <div style="width: ${loaderPct}%" class="bg-purple-500 h-full" title="ЗП Грузчиков: ${loaderPct}%"></div>
+                  <div style="width: ${maintPct}%" class="bg-rose-500 h-full" title="Ремонт: ${maintPct}%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── 9. RENDER DESIGN 3: FLEET COMMAND DARK DECK ──────────────────────────
+    function renderDesign3() {
+      const monthContainer = document.getElementById('d3-months-selector');
+      monthContainer.innerHTML = MONTHS.map(m => {
+        const active = selectedMonths.has(m.id);
+        return `
+          <button onclick="toggleMonth('${m.id}')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 ${active ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white bg-slate-800/80'}">
+            <span>${active ? '✓' : '✗'}</span>
+            <span>${m.label}</span>
+          </button>
+        `;
+      }).join('');
+
+      const trucks = calculateCohortStats('trucks', selectedMonths);
+      const gazelles = calculateCohortStats('gazelles', selectedMonths);
+      const total = calculateCohortStats('all', selectedMonths);
+
+      document.getElementById('d3-cohort-trucks-profit').innerText = formatMoney(trucks.profit);
+      document.getElementById('d3-cohort-trucks-sub').innerText = `Выручка: ${formatMoney(trucks.revenue)} · Расход: ${formatMoney(trucks.totalCosts)}`;
+      document.getElementById('d3-cohort-trucks-pct').innerText = `${trucks.margin}% маржа`;
+
+      document.getElementById('d3-cohort-gazelles-profit').innerText = formatMoney(gazelles.profit);
+      document.getElementById('d3-cohort-gazelles-sub').innerText = `Выручка: ${formatMoney(gazelles.revenue)} · Расход: ${formatMoney(gazelles.totalCosts)}`;
+      document.getElementById('d3-cohort-gazelles-pct').innerText = `${gazelles.margin}% маржа`;
+
+      document.getElementById('d3-cohort-loaders-fund').innerText = formatMoney(total.loaderPay);
+      document.getElementById('d3-cohort-loaders-sub').innerText = `Загрузка: ${Math.round(total.trips * 0.75)} заявок`;
+
+      const rows = VEHICLES.filter(v => currentFilter === 'all' || v.category === currentFilter);
+      const container = document.getElementById('d3-vehicle-rows-container');
+      container.innerHTML = rows.map(v => {
+        const d = getVehiclePeriodData(v, selectedMonths);
+        const isExp = expandedRows.has(v.id);
+
+        return `
+          <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow-md overflow-hidden">
+            <div onclick="toggleRow('${v.id}')" class="px-5 py-3.5 cursor-pointer hover:bg-slate-800/60 transition-colors flex items-center justify-between gap-4 flex-wrap lg:flex-nowrap font-mono select-none">
+              <div class="flex items-center gap-3 min-w-[230px]">
+                <span class="text-xl">${v.category === 'trucks' ? '🚛' : '🚐'}</span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-black text-white text-sm font-sans tracking-wide">${v.name}</span>
+                    <span class="text-xs text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">${v.regNumber}</span>
+                  </div>
+                  <span class="text-[11px] text-slate-500 font-sans">Водитель: <strong class="text-slate-300">${v.driver}</strong></span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-6 text-xs flex-wrap">
+                <div>
+                  <span class="text-[9px] text-slate-500 uppercase block font-bold">ВЫРУЧКА</span>
+                  <span class="text-slate-100 font-bold">${formatMoney(d.revenue)}</span>
+                </div>
+                <div>
+                  <span class="text-[9px] text-amber-500 uppercase block font-bold">ГСМ</span>
+                  <span class="text-amber-400 font-bold">-${formatMoney(d.fuel)}</span>
+                </div>
+                <div>
+                  <span class="text-[9px] text-blue-400 uppercase block font-bold">ЗП ВОДИТЕЛЯ</span>
+                  <span class="text-blue-300 font-bold">-${formatMoney(d.driverPay)}</span>
+                </div>
+                <div>
+                  <span class="text-[9px] text-purple-400 uppercase block font-bold">ЗП ГРУЗЧИКОВ</span>
+                  <span class="text-purple-300 font-bold">${d.loaderPay > 0 ? '-' + formatMoney(d.loaderPay) : '0 ₽'}</span>
+                </div>
+                <div>
+                  <span class="text-[9px] text-rose-400 uppercase block font-bold">ГАРАЖ / РЕМОНТ</span>
+                  <span class="text-rose-400 font-bold">-${formatMoney(d.maint)}</span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-4 shrink-0 text-right">
+                <div>
+                  <span class="text-[9px] text-slate-500 uppercase block font-bold">ЧИСТАЯ ПРИБЫЛЬ</span>
+                  <span class="text-base font-black ${d.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${formatMoney(d.profit)}</span>
+                  <span class="text-[10px] text-slate-400 block">${d.margin}% маржа</span>
+                </div>
+                <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 ${isExp ? 'rotate-180 text-white bg-slate-700' : ''}">
+                  <span class="material-symbols-outlined text-[16px]">expand_more</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── 10. MASTER SWITCHER & INITIALIZATION ─────────────────────────────────
+    function setDesign(num) {
+      currentDesign = num;
+      document.getElementById('view-design-1').classList.add('hidden');
+      document.getElementById('view-design-2').classList.add('hidden');
+      document.getElementById('view-design-3').classList.add('hidden');
+
+      [1, 2, 3].forEach(i => {
+        const btn = document.getElementById(`btn-design-${i}`);
+        btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-slate-700/60';
+      });
+
+      document.getElementById(`view-design-${num}`).classList.remove('hidden');
+      document.getElementById(`btn-design-${num}`).className = 'px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30';
+
+      renderCurrentDesign();
+    }
+
+    function renderCurrentDesign() {
+      if (currentDesign === 1) renderDesign1();
+      else if (currentDesign === 2) renderDesign2();
+      else if (currentDesign === 3) renderDesign3();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderCurrentDesign();
+    });
+  </script>
+
+</body>
+</html>

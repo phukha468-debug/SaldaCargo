@@ -55,6 +55,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (update.short_name) update.short_name = update.short_name.trim();
     if (update.reg_number) update.reg_number = update.reg_number.trim();
 
+    // If docs metadata is provided, merge it into notes with [DOCS_DATA:...]
+    if (body.docs && typeof body.docs === 'object') {
+      let existingDocs: Record<string, any> = {};
+      const currentNotes = body.notes ?? '';
+      try {
+        const match = currentNotes.match(/\[DOCS_DATA:(.*?)\]/s);
+        if (match) existingDocs = JSON.parse(match[1]);
+      } catch {}
+      const mergedDocs = { ...existingDocs, ...body.docs };
+      const cleanUserNote = currentNotes.replace(/\[DOCS_DATA:.*?\]/s, '').trim();
+      update.notes = cleanUserNote
+        ? `${cleanUserNote}\n[DOCS_DATA:${JSON.stringify(mergedDocs)}]`
+        : `[DOCS_DATA:${JSON.stringify(mergedDocs)}]`;
+
+      if (body.docs.insurance_expires_at)
+        update.insurance_expires_at = body.docs.insurance_expires_at || null;
+      if (body.docs.inspection_expires_at)
+        update.inspection_expires_at = body.docs.inspection_expires_at || null;
+    }
+
     const supabase = createAdminClient();
     const { data, error } = await (supabase.from('assets') as any)
       .update(update)
