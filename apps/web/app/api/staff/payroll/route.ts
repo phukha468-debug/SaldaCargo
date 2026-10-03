@@ -376,38 +376,34 @@ export async function GET(request: Request) {
 
     const byRole = (role: string) => all.filter((u) => u.roles.includes(role));
 
-    // Деdup: каждый пользователь попадает только в один таб.
-    // Приоритет: mechanic_lead > mechanic > driver > loader > office.
-    const assignedIds = new Set<string>();
+    // Сотрудники с совмещением ролей (например, грузчик + механик) должны быть
+    // доступны во всех соответствующих вкладках, чтобы ни один наряд или рейс не терялся.
+    const mechanics = [
+      ...byRole('mechanic_lead'),
+      ...byRole('mechanic'),
+      ...byRole('welder'),
+      ...byRole('painter'),
+      ...byRole('electrician'),
+      ...byRole('handyman'),
+    ].filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i);
 
-    const mechanics = (() => {
-      const raw = [
-        ...byRole('mechanic_lead'),
-        ...byRole('mechanic'),
-        ...byRole('welder'),
-        ...byRole('painter'),
-        ...byRole('electrician'),
-        ...byRole('handyman'),
-      ]
-        .filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i)
-        .filter((u) => !assignedIds.has(u.id));
-      raw.forEach((u) => assignedIds.add(u.id));
-      return raw;
-    })();
-
-    const drivers = (() => {
-      const raw = byRole('driver').filter((u) => !assignedIds.has(u.id));
-      raw.forEach((u) => assignedIds.add(u.id));
-      return raw;
-    })();
-
-    const loaders = (() => {
-      const raw = byRole('loader').filter((u) => !assignedIds.has(u.id));
-      raw.forEach((u) => assignedIds.add(u.id));
-      return raw;
-    })();
-
-    const office = all.filter((u) => !assignedIds.has(u.id));
+    const drivers = byRole('driver');
+    const loaders = byRole('loader');
+    const office = all.filter(
+      (u) =>
+        !u.roles.some((r: string) =>
+          [
+            'mechanic_lead',
+            'mechanic',
+            'welder',
+            'painter',
+            'electrician',
+            'handyman',
+            'driver',
+            'loader',
+          ].includes(r),
+        ),
+    );
 
     return NextResponse.json({
       drivers,

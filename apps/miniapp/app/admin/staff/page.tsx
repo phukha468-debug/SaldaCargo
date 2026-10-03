@@ -54,12 +54,6 @@ const ROLE_LABELS: Record<string, string> = {
 
 type RoleGroup = 'drivers' | 'loaders' | 'workshop' | 'debts';
 
-function getRoleGroup(roles: string[]): RoleGroup {
-  if (roles.includes('driver')) return 'drivers';
-  if (roles.includes('loader')) return 'loaders';
-  return 'workshop';
-}
-
 function primaryRoleLabel(roles: string[]): string {
   const priority = [
     'driver',
@@ -250,9 +244,13 @@ function StaffContent() {
   };
 
   const grouped = {
-    drivers: payroll.filter((u) => getRoleGroup(u.roles) === 'drivers'),
-    loaders: payroll.filter((u) => getRoleGroup(u.roles) === 'loaders'),
-    workshop: payroll.filter((u) => getRoleGroup(u.roles) === 'workshop'),
+    drivers: payroll.filter((u) => u.roles.includes('driver')),
+    loaders: payroll.filter((u) => u.roles.includes('loader')),
+    workshop: payroll.filter((u) =>
+      u.roles.some((r) =>
+        ['mechanic', 'mechanic_lead', 'welder', 'painter', 'electrician', 'handyman'].includes(r),
+      ),
+    ),
     debts: payroll.filter((u) => parseFloat(u.advance_balance || '0') > 0),
   };
 
