@@ -417,19 +417,27 @@ export default function FleetPage() {
   };
 
   // Filter & calculate vehicles
+  // Filter & calculate vehicles
   const allAssets = data?.assets ?? [];
   const filteredAssets = useMemo(() => {
-    let list = allAssets.filter((a) => {
+    const list = allAssets.filter((a) => {
       const code = a.asset_type?.code ?? '';
       if (vehicleFilter === 'trucks') return TRUCKS_CODES.includes(code);
       if (vehicleFilter === 'gazelles') return GAZELLE_CODES.includes(code);
       return true;
     });
 
-    const withMetrics = list.map((v) => ({
-      v,
-      d: getVehiclePeriodData(v, selectedMonths, monthsList),
-    }));
+    const numMonths = Math.max(selectedMonths.size, 1);
+    const withMetrics = list.map((v) => {
+      const isTruck = TRUCKS_CODES.includes(v.asset_type?.code ?? '');
+      const d = getVehiclePeriodData(v, selectedMonths, monthsList);
+      const normRev = (isTruck ? 640000 : 430000) * numMonths;
+      const normTrips = (isTruck ? 15.5 : 30) * numMonths;
+      const revLoad = Math.min(100, (d.revenue / normRev) * 100);
+      const tripLoad = Math.min(100, (d.trips / normTrips) * 100);
+      const loadPct = Math.min(100, Math.round(0.7 * revLoad + 0.3 * tripLoad));
+      return { v, d, isTruck, loadPct };
+    });
 
     withMetrics.sort((a, b) => {
       if (sortKey === 'profit') return b.d.profit - a.d.profit;
@@ -441,6 +449,43 @@ export default function FleetPage() {
 
     return withMetrics;
   }, [allAssets, vehicleFilter, selectedMonths, monthsList, sortKey]);
+
+  // Sum totals across all displayed / filtered vehicles
+  const fleetTotals = useMemo(() => {
+    let revenue = 0;
+    let fuel = 0;
+    let driverPay = 0;
+    let loaderPay = 0;
+    let maint = 0;
+    let profit = 0;
+    let totalLoadSum = 0;
+
+    filteredAssets.forEach(({ d, loadPct }) => {
+      revenue += d.revenue;
+      fuel += d.fuel;
+      driverPay += d.driverPay;
+      loaderPay += d.loaderPay;
+      maint += d.maint;
+      profit += d.profit;
+      totalLoadSum += loadPct;
+    });
+
+    const margin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+    const avgLoad =
+      filteredAssets.length > 0 ? Math.round(totalLoadSum / filteredAssets.length) : 0;
+
+    return {
+      revenue,
+      fuel,
+      driverPay,
+      loaderPay,
+      maint,
+      profit,
+      margin,
+      avgLoad,
+      count: filteredAssets.length,
+    };
+  }, [filteredAssets]);
 
   // Cohort statistics calculation
   const cohortStats = useMemo(() => {
@@ -536,9 +581,9 @@ export default function FleetPage() {
     };
   }, [allAssets, selectedMonths, monthsList]);
 
-  // Uniform 9-column grid template matching Design 1 prototype
+  // Uniform 10-column grid template (added dedicated "Загрузка" column)
   const gridTemplate =
-    'grid-cols-[minmax(210px,2.2fr)_minmax(90px,1.1fr)_minmax(90px,1.1fr)_minmax(90px,1.1fr)_minmax(85px,1fr)_minmax(90px,1.1fr)_minmax(75px,0.9fr)_minmax(120px,1.4fr)_36px]';
+    'grid-cols-[minmax(190px,2fr)_minmax(75px,0.8fr)_minmax(95px,1.1fr)_minmax(95px,1.1fr)_minmax(95px,1.1fr)_minmax(85px,1fr)_minmax(85px,1fr)_minmax(75px,0.9fr)_minmax(120px,1.4fr)_36px]';
 
   return (
     <div className="space-y-6 max-w-[1920px] animate-in fade-in duration-500">
@@ -965,22 +1010,87 @@ export default function FleetPage() {
         </div>
       </div>
 
-      {/* ── TABLE HEADER ROW (STRICT UNIFORM 9 COLUMNS) ─────────────────── */}
-      <div
-        className={cn(
-          'hidden lg:grid items-center w-full px-5 py-2.5 gap-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none pb-1',
-          gridTemplate,
-        )}
-      >
-        <div>МАШИНА / ВОДИТЕЛЬ</div>
-        <div className="text-right">ВЫРУЧКА</div>
-        <div className="text-right text-amber-700/80">ГСМ (ТОПЛИВО)</div>
-        <div className="text-right">ЗП ВОДИТЕЛЯ</div>
-        <div className="text-right text-purple-700/80">ЗП ГРУЗЧИКОВ</div>
-        <div className="text-right text-rose-700/80">ГАРАЖ / РЕМОНТЫ</div>
-        <div className="text-center">ДИНАМИКА</div>
-        <div className="text-right text-emerald-700/80">ЧИСТАЯ ПРИБЫЛЬ</div>
-        <div />
+      {/* ── TABLE HEADER ROW & TOTALS SUMMARY (STRICT UNIFORM 10 COLUMNS) ── */}
+      <div className="hidden lg:block bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden mb-3">
+        {/* Column Titles */}
+        <div
+          className={cn(
+            'grid items-center w-full px-5 pt-3 pb-1 gap-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none border-b border-slate-100',
+            gridTemplate,
+          )}
+        >
+          <div>МАШИНА / ВОДИТЕЛЬ</div>
+          <div className="text-center text-slate-500 font-bold">ЗАГРУЗКА</div>
+          <div className="text-right">ВЫРУЧКА</div>
+          <div className="text-right text-amber-700/80">ГСМ (ТОПЛИВО)</div>
+          <div className="text-right">ЗП ВОДИТЕЛЯ</div>
+          <div className="text-right text-purple-700/80">ЗП ГРУЗЧИКОВ</div>
+          <div className="text-right text-rose-700/80">ГАРАЖ / РЕМОНТЫ</div>
+          <div className="text-center">ДИНАМИКА</div>
+          <div className="text-right text-emerald-700/80">ЧИСТАЯ ПРИБЫЛЬ</div>
+          <div />
+        </div>
+        {/* Sum totals across all displayed vehicles */}
+        <div
+          className={cn(
+            'grid items-center w-full px-5 py-2.5 gap-2.5 bg-slate-50/90 text-xs font-mono select-none',
+            gridTemplate,
+          )}
+        >
+          <div className="flex items-center gap-2 font-sans font-black text-slate-800 text-xs">
+            <span className="material-symbols-outlined text-slate-400 text-[18px]">functions</span>
+            <span>ИТОГО ПО ВЫБОРКЕ ({fleetTotals.count})</span>
+          </div>
+          <div className="flex justify-center">
+            <span
+              className={cn(
+                'px-2 py-0.5 rounded-lg text-xs font-black border tracking-tight',
+                fleetTotals.avgLoad >= 50
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-amber-100 text-amber-800 border-amber-300',
+              )}
+            >
+              {fleetTotals.avgLoad}% ср.
+            </span>
+          </div>
+          <div className="text-right font-black text-slate-900 text-sm">
+            <Money amount={fleetTotals.revenue} />
+          </div>
+          <div className="text-right font-black text-amber-600">
+            -<Money amount={fleetTotals.fuel} />
+          </div>
+          <div className="text-right font-black text-slate-700">
+            -<Money amount={fleetTotals.driverPay} />
+          </div>
+          <div className="text-right font-black text-purple-700">
+            {fleetTotals.loaderPay > 0 ? (
+              <>
+                -<Money amount={fleetTotals.loaderPay} />
+              </>
+            ) : (
+              '—'
+            )}
+          </div>
+          <div className="text-right font-black text-rose-600">
+            {fleetTotals.maint > 0 ? (
+              <>
+                -<Money amount={fleetTotals.maint} />
+              </>
+            ) : (
+              '0 ₽'
+            )}
+          </div>
+          <div className="text-center text-slate-300 font-sans text-[11px]">—</div>
+          <div className="text-right">
+            <span className="text-sm font-black text-emerald-600 block leading-tight">
+              +<Money amount={fleetTotals.profit} />
+            </span>
+            <span className="text-[10px] font-black text-emerald-700 font-sans block">
+              {fleetTotals.margin}% маржа
+            </span>
+          </div>
+          <div />
+        </div>
       </div>
 
       {/* ── VEHICLE ROWS (ACCORDION CARDS) ──────────────────────────────── */}
@@ -1000,21 +1110,12 @@ export default function FleetPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredAssets.map(({ v, d }) => {
+          {filteredAssets.map(({ v, d, isTruck, loadPct }) => {
             const isExp = expandedRows.has(v.id);
-            const isTruck = TRUCKS_CODES.includes(v.asset_type?.code ?? '');
             const profitClass = d.profit >= 0 ? 'text-emerald-600' : 'text-rose-600';
             const borderClass =
               d.profit >= 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500';
             const health = checkVehicleHealth(v);
-
-            // Capacity / Loading percentage calculation (70% revenue + 30% trips)
-            const numMonths = Math.max(selectedMonths.size, 1);
-            const normRev = (isTruck ? 640000 : 430000) * numMonths;
-            const normTrips = (isTruck ? 15.5 : 30) * numMonths;
-            const revLoad = Math.min(100, (d.revenue / normRev) * 100);
-            const tripLoad = Math.min(100, (d.trips / normTrips) * 100);
-            const loadPct = Math.min(100, Math.round(0.7 * revLoad + 0.3 * tripLoad));
 
             // Sparkline calculation
             const maxProfit = Math.max(...d.monthDetails.map((m) => Math.abs(m.profit)), 1);
@@ -1075,27 +1176,34 @@ export default function FleetPage() {
                         >
                           {STATUS_LABEL[v.status] ?? v.status}
                         </span>
-                        <span>·</span>
-                        <span
-                          className={cn(
-                            'text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0',
-                            loadPct >= 80
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : loadPct >= 50
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : loadPct > 0
-                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                  : 'bg-slate-100 text-slate-500 border-slate-200',
-                          )}
-                          title={`Загрузка: ${loadPct}% (Выручка: ${d.revenue.toLocaleString('ru-RU')} ₽, Рейсов: ${d.trips})`}
-                        >
-                          {loadPct}% загр.
-                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Column 2: Выручка */}
+                  {/* Column 2: Загрузка */}
+                  <div className="flex flex-col items-center justify-center">
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">
+                      Загрузка
+                    </span>
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-lg text-xs font-black border tracking-tight',
+                        loadPct >= 80
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : loadPct >= 50
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : loadPct > 0
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-100 text-slate-400 border-slate-200',
+                      )}
+                      title={`Загрузка: ${loadPct}% (Выручка: ${d.revenue.toLocaleString('ru-RU')} ₽, Рейсов: ${d.trips})`}
+                    >
+                      {loadPct}%
+                    </span>
+                    <span className="text-[9px] text-slate-400 font-mono mt-0.5">{d.trips} р.</span>
+                  </div>
+
+                  {/* Column 3: Выручка */}
                   <div className="text-right">
                     <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block lg:hidden">
                       Выручка
