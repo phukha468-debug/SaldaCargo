@@ -205,29 +205,6 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  packages/domain/finance:
-    dependencies:
-      '@saldacargo/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@saldacargo/shared-types':
-        specifier: workspace:*
-        version: link:../../shared-types
-    devDependencies:
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
-  packages/domain/fleet:
-    dependencies:
-      '@saldacargo/shared-types':
-        specifier: workspace:*
-        version: link:../../shared-types
-    devDependencies:
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
   packages/domain/identity:
     dependencies:
       '@saldacargo/shared-types':
@@ -238,27 +215,7 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
-  packages/domain/logistics:
-    dependencies:
-      '@saldacargo/shared-types':
-        specifier: workspace:*
-        version: link:../../shared-types
-    devDependencies:
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
   packages/domain/payroll:
-    dependencies:
-      '@saldacargo/shared-types':
-        specifier: workspace:*
-        version: link:../../shared-types
-    devDependencies:
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
-  packages/domain/receivables:
     dependencies:
       '@saldacargo/shared-types':
         specifier: workspace:*
@@ -290,16 +247,6 @@ importers:
       '@types/uuid':
         specifier: ^9.0.0
         version: 9.0.8
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
-  packages/domain/warehouse:
-    dependencies:
-      '@saldacargo/shared-types':
-        specifier: workspace:*
-        version: link:../../shared-types
-    devDependencies:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3

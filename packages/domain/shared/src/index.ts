@@ -253,3 +253,146 @@ export function calculateVehicleLoad(
 
   return { loadPct, revLoad, tripLoad };
 }
+
+// ─── Доменные хелперы автопарка, логистики, финансов, склада и дебиторки ───────
+
+/**
+ * Возвращает отображаемое название статуса машины.
+ */
+export function getAssetStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    active: '✅ В работе',
+    repair: '🔧 В ремонте',
+    reserve: '🛏 Резерв',
+    sold: 'Продана',
+    written_off: 'Списана',
+  };
+  return labels[status] ?? status;
+}
+
+/**
+ * Возвращает русское название типа рейса.
+ */
+export function getTripTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    local: 'По городу',
+    intercity: 'Межгород',
+    moving: 'Переезд',
+    hourly: 'Почасовой',
+  };
+  return labels[type] ?? type;
+}
+
+/**
+ * Вычисляет итоги рейса из списка заказов.
+ */
+export function calcTripTotals(
+  orders: Array<{
+    amount: string;
+    driver_pay: string;
+    loader_pay: string;
+    lifecycle_status: string;
+  }>,
+) {
+  const active = orders.filter((o) => o.lifecycle_status !== 'cancelled');
+  return {
+    revenue: active.reduce((s, o) => s + parseFloat(o.amount || '0'), 0).toFixed(2),
+    driverPay: active.reduce((s, o) => s + parseFloat(o.driver_pay || '0'), 0).toFixed(2),
+    loaderPay: active.reduce((s, o) => s + parseFloat(o.loader_pay || '0'), 0).toFixed(2),
+  };
+}
+
+/**
+ * Вычисляет дни просрочки от даты транзакции до сегодня.
+ */
+export function calcOverdueDays(transactionDate: string): number {
+  const diff = Date.now() - new Date(transactionDate).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Возвращает статус просрочки для UI.
+ */
+export function getOverdueStatus(days: number): 'ok' | 'warning' | 'critical' {
+  if (days <= 0) return 'ok';
+  if (days <= 7) return 'warning';
+  return 'critical';
+}
+
+/**
+ * Вычисляет остаток позиции склада из движений.
+ */
+export function calcPartStock(
+  movements: Array<{ quantity: number; direction: 'in' | 'out' }>,
+): number {
+  return movements.reduce((stock, m) => {
+    return m.direction === 'in' ? stock + m.quantity : stock - m.quantity;
+  }, 0);
+}
+
+/**
+ * Возвращает статус остатка запчасти на складе.
+ */
+export function getStockStatus(current: number, minimum: number): 'ok' | 'low' | 'empty' {
+  if (current <= 0) return 'empty';
+  if (current <= minimum) return 'low';
+  return 'ok';
+}
+
+/**
+ * Вычисляет баланс кошелька из завершённых и подтверждённых транзакций.
+ */
+export function calculateWalletBalance(
+  transactions: Array<{
+    direction: string;
+    amount: string;
+    from_wallet_id: string | null;
+    to_wallet_id: string | null;
+    lifecycle_status: string;
+    settlement_status: string;
+  }>,
+  walletId: string,
+): string {
+  const relevant = transactions.filter(
+    (t) =>
+      t.lifecycle_status === 'approved' &&
+      t.settlement_status === 'completed' &&
+      (t.from_wallet_id === walletId || t.to_wallet_id === walletId),
+  );
+
+  let balance = 0;
+  for (const t of relevant) {
+    const amount = parseFloat(t.amount || '0');
+    if (t.to_wallet_id === walletId) balance += amount;
+    if (t.from_wallet_id === walletId) balance -= amount;
+  }
+  return balance.toFixed(2);
+}
+
+/**
+ * Возвращает иконку способа оплаты.
+ */
+export function getPaymentMethodIcon(method: string): string {
+  const icons: Record<string, string> = {
+    cash: '💵',
+    qr: '📱',
+    bank_invoice: '🏦',
+    debt_cash: '⏳',
+    card_driver: '💳',
+  };
+  return icons[method] ?? '💰';
+}
+
+/**
+ * Возвращает русское название способа оплаты.
+ */
+export function getPaymentMethodLabel(method: string): string {
+  const labels: Record<string, string> = {
+    cash: 'Наличные',
+    qr: 'QR на р/с',
+    bank_invoice: 'Безнал по счёту',
+    debt_cash: 'Долг наличными',
+    card_driver: 'На карту водителя',
+  };
+  return labels[method] ?? method;
+}

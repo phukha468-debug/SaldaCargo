@@ -292,11 +292,12 @@ export function calculateOverdueDays(dueDate: string): number { ... }
 
 ### Что уже в domain и используется
 
-| Пакет     | Что внутри                                                | Импортируй как               |
-| --------- | --------------------------------------------------------- | ---------------------------- |
-| `shared`  | formatDate, formatMoney, addMoney, generateIdempotencyKey | `@saldacargo/shared`         |
-| `finance` | calculateWalletBalance, getPaymentMethodLabel             | `@saldacargo/domain-finance` |
-| `service` | getMechanicSummary, startWork, stopWork                   | `@saldacargo/domain-service` |
+| Пакет      | Что внутри                                                                                                                     | Импортируй как                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| `shared`   | formatDate, formatMoney, addMoney, calculateVehicleLoad, calcOrderLoaderMetrics, calculateWalletBalance, getPaymentMethodLabel | `@saldacargo/shared`          |
+| `identity` | verifyMaxContact, hasRole, getRoleLabel                                                                                        | `@saldacargo/domain-identity` |
+| `payroll`  | ORDER_DIRECTIONS, calculateDriverPayroll, getDirectionLabel                                                                    | `@saldacargo/domain-payroll`  |
+| `service`  | getMechanicSummary, startWork, stopWork                                                                                        | `@saldacargo/domain-service`  |
 
 ### Что НЕ нужно делать
 
