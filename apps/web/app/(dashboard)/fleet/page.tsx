@@ -32,6 +32,9 @@ type MonthlyData = {
   fuel: number;
   driverPay: number;
   loaderPay: number;
+  loadingBilled?: number;
+  loaderProfit?: number;
+  loaderOrdersCount?: number;
   maint: number;
   km: number;
   trips: number;
@@ -239,6 +242,9 @@ function getVehiclePeriodData(v: Asset, selectedMonths: Set<string>, monthsList:
   let fuel = 0;
   let driverPay = 0;
   let loaderPay = 0;
+  let loadingBilled = 0;
+  let loaderProfit = 0;
+  let loaderOrdersCount = 0;
   let maint = 0;
   let km = 0;
   let trips = 0;
@@ -250,6 +256,9 @@ function getVehiclePeriodData(v: Asset, selectedMonths: Set<string>, monthsList:
       fuel: 0,
       driverPay: 0,
       loaderPay: 0,
+      loadingBilled: 0,
+      loaderProfit: 0,
+      loaderOrdersCount: 0,
       maint: 0,
       km: 0,
       trips: 0,
@@ -265,6 +274,9 @@ function getVehiclePeriodData(v: Asset, selectedMonths: Set<string>, monthsList:
       fuel += data.fuel;
       driverPay += data.driverPay;
       loaderPay += data.loaderPay;
+      loadingBilled += data.loadingBilled ?? 0;
+      loaderProfit += data.loaderProfit ?? 0;
+      loaderOrdersCount += data.loaderOrdersCount ?? 0;
       maint += data.maint;
       km += data.km;
       trips += data.trips;
@@ -290,6 +302,9 @@ function getVehiclePeriodData(v: Asset, selectedMonths: Set<string>, monthsList:
     fuel,
     driverPay,
     loaderPay,
+    loadingBilled,
+    loaderProfit,
+    loaderOrdersCount,
     maint,
     totalCosts,
     profit,
@@ -460,22 +475,33 @@ export default function FleetPage() {
 
     // Loaders calculation across all assets
     let totalLoaderPay = 0;
+    let totalLoadingBilled = 0;
+    let totalLoaderProfit = 0;
+    let totalLoaderOrders = 0;
     let totalFleetRev = 0;
     let totalFleetProfit = 0;
-    let totalFleetTrips = 0;
 
     allAssets.forEach((v) => {
       const d = getVehiclePeriodData(v, selectedMonths, monthsList);
       totalLoaderPay += d.loaderPay;
+      totalLoadingBilled += d.loadingBilled;
+      totalLoaderProfit += d.loaderProfit;
+      totalLoaderOrders += d.loaderOrdersCount;
       totalFleetRev += d.revenue;
       totalFleetProfit += d.profit;
-      totalFleetTrips += d.trips;
     });
 
-    const loaderOrdersCount = Math.round(totalFleetTrips * 0.75);
-    const avgLoaderPerOrder =
-      loaderOrdersCount > 0 ? Math.round(totalLoaderPay / loaderOrdersCount) : 0;
-    const loaderShare = totalFleetRev > 0 ? Math.round((totalLoaderPay / totalFleetRev) * 100) : 0;
+    if (totalLoadingBilled === 0 && totalLoaderPay > 0) {
+      totalLoadingBilled = Math.round(totalLoaderPay / 0.7);
+      totalLoaderProfit = Math.max(0, totalLoadingBilled - totalLoaderPay);
+    }
+
+    const loaderMargin =
+      totalLoadingBilled > 0 ? Math.round((totalLoaderProfit / totalLoadingBilled) * 100) : 0;
+    const avgBilledPerOrder =
+      totalLoaderOrders > 0 ? Math.round(totalLoadingBilled / totalLoaderOrders) : 0;
+    const avgPayPerOrder =
+      totalLoaderOrders > 0 ? Math.round(totalLoaderPay / totalLoaderOrders) : 0;
     const fleetMargin =
       totalFleetRev > 0 ? Math.round((totalFleetProfit / totalFleetRev) * 100) : 0;
 
@@ -483,10 +509,13 @@ export default function FleetPage() {
       trucks,
       gazelles,
       loaders: {
+        billed: totalLoadingBilled,
         fund: totalLoaderPay,
-        count: loaderOrdersCount,
-        avg: avgLoaderPerOrder,
-        share: loaderShare,
+        profit: totalLoaderProfit,
+        margin: loaderMargin,
+        count: totalLoaderOrders,
+        avgBilled: avgBilledPerOrder,
+        avgPay: avgPayPerOrder,
       },
       total: {
         rev: totalFleetRev,
@@ -728,53 +757,64 @@ export default function FleetPage() {
                     Бригада грузчиков
                   </h3>
                   <p className="text-[9px] text-slate-400 font-bold uppercase leading-tight">
-                    Фонд оплаты и загрузка
+                    Погрузка и занос (ПРР)
                   </p>
                 </div>
               </div>
               <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                Команда ТК
+                {cohortStats.loaders.count} заявок
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-2">
               <div>
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Фонд ЗП
+                  Выручка (ПРР)
+                </span>
+                <span className="text-sm font-black text-slate-900">
+                  <Money amount={cohortStats.loaders.billed} />
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Выплаты бригаде
                 </span>
                 <span className="text-sm font-black text-purple-700">
-                  <Money amount={cohortStats.loaders.fund} />
+                  -<Money amount={cohortStats.loaders.fund} />
                 </span>
               </div>
               <div>
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Заявок
+                  Чистая прибыль
                 </span>
-                <span className="text-sm font-black text-slate-800">
-                  {cohortStats.loaders.count} шт
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Ср. ЗП / заказ
-                </span>
-                <span className="text-base font-black text-slate-700">
-                  <Money amount={cohortStats.loaders.avg} />
+                <span className="text-base font-black text-emerald-600">
+                  +<Money amount={cohortStats.loaders.profit} />
                 </span>
               </div>
               <div>
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Доля выручки
+                  Маржа компании
                 </span>
-                <span className="text-base font-black text-purple-600">
-                  {cohortStats.loaders.share}%
+                <span className="text-base font-black text-slate-800">
+                  {cohortStats.loaders.margin}%
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 font-medium truncate">
-            Исполнители: Колясик, Вадик, Азамат
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+            <span>
+              Ср. чек заявки:{' '}
+              <strong className="text-slate-700">
+                <Money amount={cohortStats.loaders.avgBilled} />
+              </strong>
+            </span>
+            <span>
+              Ср. ЗП / заказ:{' '}
+              <strong className="text-slate-700">
+                <Money amount={cohortStats.loaders.avgPay} />
+              </strong>
+            </span>
           </div>
         </div>
 

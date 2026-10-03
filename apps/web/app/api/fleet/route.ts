@@ -71,6 +71,49 @@ function parseVehicleDocs(
   };
 }
 
+const LOADER_PROFIT_START_DATE = '2026-09-01';
+
+function isLoaderProfitEligible(tripStartedAt?: string | null): boolean {
+  if (!tripStartedAt) return true;
+  return tripStartedAt.slice(0, 10) >= LOADER_PROFIT_START_DATE;
+}
+
+function calcOrderLoaderMetrics(o: any, tripStartedAt?: string | null) {
+  const lp1 = parseFloat(o.loader_pay || '0');
+  const lp2 = parseFloat(o.loader2_pay || '0');
+  let thirdPartyPay = 0;
+  if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+    thirdPartyPay = o.loaders_data.reduce(
+      (s: number, l: any) => s + (parseFloat(String(l.pay)) || 0),
+      0,
+    );
+  } else {
+    thirdPartyPay = lp1 + lp2;
+  }
+  const driverLoaderPay = o.is_driver_loader ? parseFloat(String(o.driver_loader_pay || '0')) : 0;
+  const totalPaid = thirdPartyPay + driverLoaderPay;
+  if (totalPaid <= 0) {
+    return { profit: 0, thirdPartyPay: 0, driverLoaderPay: 0, totalPaid: 0, loadersPool: 0 };
+  }
+
+  if (!isLoaderProfitEligible(tripStartedAt)) {
+    return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: totalPaid };
+  }
+
+  const dcp = parseFloat(String(o.driver_car_pay || '0'));
+  const amt = parseFloat(o.amount || '0');
+  let loadersPool = 0;
+  if (dcp > 0 && amt > 0) {
+    const mPool = Math.round(dcp / 0.3);
+    loadersPool = Math.max(0, amt - mPool);
+  }
+  if (loadersPool < totalPaid) {
+    loadersPool = Math.round(totalPaid / 0.7);
+  }
+  const profit = Math.max(0, loadersPool - totalPaid);
+  return { profit, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool };
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -212,6 +255,9 @@ export async function GET(request: Request) {
           fuel: number;
           driverPay: number;
           loaderPay: number;
+          loadingBilled: number;
+          loaderProfit: number;
+          loaderOrdersCount: number;
           maint: number;
           km: number;
           trips: number;
@@ -226,6 +272,9 @@ export async function GET(request: Request) {
           fuel: 0,
           driverPay: 0,
           loaderPay: 0,
+          loadingBilled: 0,
+          loaderProfit: 0,
+          loaderOrdersCount: 0,
           maint: 0,
           km: 0,
           trips: 0,
@@ -258,6 +307,19 @@ export async function GET(request: Request) {
           0,
         );
 
+        let tripLoadingBilled = 0;
+        let tripLoaderProfit = 0;
+        let tripLoaderOrders = 0;
+
+        activeOrders.forEach((o: any) => {
+          const m = calcOrderLoaderMetrics(o, t.started_at);
+          if (m.totalPaid > 0) {
+            tripLoadingBilled += m.loadersPool;
+            tripLoaderProfit += m.profit;
+            tripLoaderOrders += 1;
+          }
+        });
+
         const fuel = expenses
           .filter(
             (e: any) =>
@@ -277,6 +339,9 @@ export async function GET(request: Request) {
         monthly[dateKey].fuel += fuel;
         monthly[dateKey].driverPay += dPay;
         monthly[dateKey].loaderPay += lPay;
+        monthly[dateKey].loadingBilled += tripLoadingBilled;
+        monthly[dateKey].loaderProfit += tripLoaderProfit;
+        monthly[dateKey].loaderOrdersCount += tripLoaderOrders;
         monthly[dateKey].km += mileage;
         monthly[dateKey].trips += 1;
       });
