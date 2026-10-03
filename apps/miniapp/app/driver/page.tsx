@@ -356,17 +356,21 @@ export default function RootPage() {
   });
 
   useEffect(() => {
-    if (!isUserLoading && user) {
+    if (!isUserLoading) {
+      if (!user) {
+        window.location.replace('/');
+        return;
+      }
       const roles = user.roles || [];
       const isDriver =
         roles.includes('driver') || roles.includes('owner') || roles.includes('admin');
       const isMechanicOnly =
         !isDriver && (roles.includes('mechanic') || roles.includes('mechanic_lead'));
       if (isMechanicOnly) {
-        router.push('/mechanic');
+        window.location.replace('/mechanic');
       }
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading]);
 
   // 2. Загружаем данные водителя (если это водитель)
   const {

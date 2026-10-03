@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 type Step = 'restoring' | 'role' | 'user' | 'vehicle' | 'pin';
 
@@ -20,8 +19,22 @@ interface Vehicle {
 }
 
 function getCookieValue(name: string): string | null {
+  if (typeof document === 'undefined') return null;
   const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
   return match?.[2] ? decodeURIComponent(match[2]) : null;
+}
+
+function setClientCookie(name: string, value: string, maxAgeDays = 30) {
+  if (typeof document === 'undefined') return;
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const sameSitePolicy = isHttps ? '; SameSite=None; Secure' : '; SameSite=Lax';
+  document.cookie = `${name}=${value}; path=/; max-age=${60 * 60 * 24 * maxAgeDays}${sameSitePolicy}`;
+}
+
+function clearClientCookie(name: string) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=None; Secure;`;
+  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
 }
 
 export default function RootDispatcher() {
@@ -35,54 +48,88 @@ export default function RootDispatcher() {
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
-  const router = useRouter();
-
-  // При монтировании: проверяем сохранённую сессию с защитой от зависания
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    try {
-      const existingUserId = getCookieValue('salda_user_id');
-      const savedRole =
-        typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
-      if (existingUserId && savedRole) {
-        if (savedRole === 'driver') {
-          router.replace('/driver');
-        } else if (savedRole === 'admin' || savedRole === 'owner') {
-          router.replace('/admin');
-        } else if (savedRole === 'mechanic') {
-          router.replace('/mechanic');
-        } else {
-          setStep('role');
-        }
-      } else {
-        setStep('role');
-      }
-    } catch (e) {
-      console.error('Session restore error:', e);
-      setStep('role');
-    }
-
-    // Страховочный таймаут: если редирект завис более 1.5 сек (например, в WebView МАКС), переходим на выбор роли
-    timer = setTimeout(() => {
-      setStep((current) => (current === 'restoring' ? 'role' : current));
-    }, 1500);
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [router]);
 
   const handleResetAll = () => {
     try {
-      document.cookie =
-        'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=None; Secure;';
-      document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      clearClientCookie('salda_user_id');
       localStorage.clear();
+      fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
     } catch (e) {
       console.error('Reset error:', e);
     }
     setStep('role');
   };
+
+  // При монтировании: надёжно проверяем сохранённую сессию с защитой от зависания
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreSession() {
+      try {
+        const cookieId = getCookieValue('salda_user_id');
+        const localId =
+          typeof window !== 'undefined' ? localStorage.getItem('salda_user_id') : null;
+        const savedRole =
+          typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
+        const userId = cookieId || localId;
+
+        // Если сессия не сохранена — мгновенно открываем выбор роли без ожидания
+        if (!userId || !savedRole) {
+          if (!cancelled) setStep('role');
+          return;
+        }
+
+        // Синхронизируем куку, если она была только в localStorage
+        if (!cookieId && localId) {
+          setClientCookie('salda_user_id', localId);
+        }
+
+        // Проверяем валидность сессии через API
+        const res = await fetch('/api/driver/me', { cache: 'no-store' });
+        if (cancelled) return;
+
+        if (res.ok) {
+          const user = await res.json();
+          if (user && user.id) {
+            const targetPath =
+              savedRole === 'driver'
+                ? '/driver'
+                : savedRole === 'admin' || savedRole === 'owner'
+                  ? '/admin'
+                  : savedRole === 'mechanic'
+                    ? '/mechanic'
+                    : null;
+
+            if (targetPath) {
+              window.location.replace(targetPath);
+              return;
+            }
+          }
+        }
+
+        // Если сессия недействительна (пользователь удалён или 401) — сбрасываем и даём выбрать роль
+        console.warn('Session verification failed, resetting to role picker');
+        handleResetAll();
+      } catch (e) {
+        console.error('Session restore error:', e);
+        if (!cancelled) setStep('role');
+      }
+    }
+
+    restoreSession();
+
+    // Страховочный таймаут: не более 1.5 сек на проверку, затем принудительно открываем выбор роли
+    const timer = setTimeout(() => {
+      if (!cancelled) {
+        setStep((current) => (current === 'restoring' ? 'role' : current));
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleRoleSelect = async (role: string) => {
     setSelectedRole(role);
@@ -99,14 +146,22 @@ export default function RootDispatcher() {
     }
   };
 
-  const finishLogin = (user: User) => {
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    const sameSitePolicy = isHttps ? '; SameSite=None; Secure' : '; SameSite=Lax';
-    document.cookie = `salda_user_id=${user.id}; path=/; max-age=${60 * 60 * 24 * 30}${sameSitePolicy}`;
+  const finishLogin = async (user: User) => {
+    setClientCookie('salda_user_id', user.id);
     try {
+      localStorage.setItem('salda_user_id', user.id);
       localStorage.setItem('selected_role', selectedRole ?? '');
     } catch (e) {
       console.warn('localStorage not accessible:', e);
+    }
+    try {
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+    } catch (e) {
+      console.warn('Session API error:', e);
     }
   };
 
@@ -138,8 +193,8 @@ export default function RootDispatcher() {
         setPinValue('');
         return;
       }
-      finishLogin(pendingUser);
-      router.push('/admin');
+      await finishLogin(pendingUser);
+      window.location.replace('/admin');
     } catch {
       setPinError('Ошибка соединения');
       setPinValue('');
@@ -156,14 +211,13 @@ export default function RootDispatcher() {
       setStep('pin');
       return;
     }
-    finishLogin(user);
-    localStorage.setItem('selected_role', selectedRole ?? '');
+    await finishLogin(user);
 
     if (selectedRole === 'driver') {
       // Если машина уже закреплена — пропускаем выбор
       if (user.current_asset_id) {
         localStorage.setItem('active_vehicle_id', user.current_asset_id);
-        router.push('/driver');
+        window.location.replace('/driver');
         return;
       }
       setLoading(true);
@@ -180,18 +234,22 @@ export default function RootDispatcher() {
     } else {
       const path =
         selectedRole === 'admin' || selectedRole === 'owner' ? '/admin' : `/${selectedRole}`;
-      router.push(path);
+      window.location.replace(path);
     }
   };
 
-  const handleVehicleSelect = (vehicleId: string) => {
+  const handleVehicleSelect = async (vehicleId: string) => {
     localStorage.setItem('active_vehicle_id', vehicleId);
-    fetch('/api/driver/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ asset_id: vehicleId }),
-    }).catch((err) => console.error('Failed to sync active vehicle to DB:', err));
-    router.push('/driver');
+    try {
+      await fetch('/api/driver/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: vehicleId }),
+      });
+    } catch (err) {
+      console.error('Failed to sync active vehicle to DB:', err);
+    }
+    window.location.replace('/driver');
   };
 
   const renderStep = () => {
@@ -349,7 +407,7 @@ export default function RootDispatcher() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/driver')}
+                onClick={() => window.location.replace('/driver')}
                 className="w-full p-4 bg-zinc-50 border border-dashed border-zinc-200 rounded-3xl text-center text-zinc-400 font-bold uppercase tracking-widest hover:border-orange-200 text-xs"
               >
                 Пропустить выбор машины

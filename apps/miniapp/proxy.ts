@@ -4,8 +4,6 @@ export async function proxy(request: NextRequest) {
   const userId = request.cookies.get('salda_user_id')?.value;
   const { pathname } = request.nextUrl;
 
-  console.log(`[Proxy Debug] Path: ${pathname}, UserID in Cookie: ${userId || 'NONE'}`);
-
   const isAuthPage = pathname === '/login';
   const isAuthApi = pathname.startsWith('/api/auth/');
   const isPublicApi =
@@ -14,11 +12,21 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/api/public/') ||
     pathname.startsWith('/api/wallets');
 
-  if (!userId && !isAuthApi && !isPublicApi && pathname !== '/') {
+  // API-запросы не должны редиректиться на HTML страницу
+  if (pathname.startsWith('/api/')) {
+    if (!userId && !isAuthApi && !isPublicApi) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  // Устаревшая страница логина
+  if (isAuthPage) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  if (isAuthPage) {
+  // Защищенные экраны: если пользователь не авторизован, направляем на выбор роли
+  if (!userId && pathname !== '/') {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -26,5 +34,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|json)$).*)',
+  ],
 };
