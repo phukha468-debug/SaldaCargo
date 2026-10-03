@@ -37,7 +37,7 @@
 | Создаёшь миграцию БД                         | `kb/wiki/Миграции_БД.md`                            |
 | Работаешь с MiniApp API                      | `kb/wiki/MiniApp_API.md`                            |
 | Непонятна структура папок или команды        | `kb/wiki/Структура_монорепозитория.md`              |
-| Нужны UUID категорий транзакций              | `tasks/todo/tt.md`                                  |
+| Нужны UUID категорий транзакций              | `@saldacargo/shared` (`FINANCIAL_CATEGORIES`)       |
 | Данные автопарка и персонала                 | `docs/business/fleet.md`, `docs/business/people.md` |
 | Пользовательский сценарий                    | `docs/flows/<имя>.md`                               |
 | Непонятна архитектура в целом                | `kb/wiki/Архитектура.md`                            |
