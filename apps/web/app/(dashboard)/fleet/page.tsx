@@ -444,7 +444,7 @@ export default function FleetPage() {
 
   // Cohort statistics calculation
   const cohortStats = useMemo(() => {
-    const calcCohort = (filterFn: (code: string) => boolean) => {
+    const calcCohort = (filterFn: (code: string) => boolean, isTruckCohort: boolean) => {
       let revenue = 0;
       let totalCosts = 0;
       let profit = 0;
@@ -452,6 +452,11 @@ export default function FleetPage() {
       let maint = 0;
       let trips = 0;
       let count = 0;
+      let totalLoadSum = 0;
+
+      const numMonths = Math.max(selectedMonths.size, 1);
+      const normRev = (isTruckCohort ? 640000 : 430000) * numMonths;
+      const normTrips = (isTruckCohort ? 15.5 : 30) * numMonths;
 
       allAssets.forEach((v) => {
         const code = v.asset_type?.code ?? '';
@@ -464,14 +469,20 @@ export default function FleetPage() {
         fuel += d.fuel;
         maint += d.maint;
         trips += d.trips;
+
+        const revLoad = Math.min(100, (d.revenue / normRev) * 100);
+        const tripLoad = Math.min(100, (d.trips / normTrips) * 100);
+        const loadPct = Math.min(100, Math.round(0.7 * revLoad + 0.3 * tripLoad));
+        totalLoadSum += loadPct;
       });
 
       const margin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
-      return { revenue, totalCosts, profit, margin, fuel, maint, trips, count };
+      const avgLoad = count > 0 ? Math.round(totalLoadSum / count) : 0;
+      return { revenue, totalCosts, profit, margin, fuel, maint, trips, count, avgLoad };
     };
 
-    const trucks = calcCohort((c) => TRUCKS_CODES.includes(c));
-    const gazelles = calcCohort((c) => GAZELLE_CODES.includes(c));
+    const trucks = calcCohort((c) => TRUCKS_CODES.includes(c), true);
+    const gazelles = calcCohort((c) => GAZELLE_CODES.includes(c), false);
 
     // Loaders calculation across all assets
     let totalLoaderPay = 0;
@@ -666,6 +677,17 @@ export default function FleetPage() {
               </strong>
             </span>
             <span>
+              Ср. загр:{' '}
+              <strong
+                className={cn(
+                  'font-bold',
+                  cohortStats.trucks.avgLoad >= 50 ? 'text-emerald-700' : 'text-amber-700',
+                )}
+              >
+                {cohortStats.trucks.avgLoad}%
+              </strong>
+            </span>
+            <span>
               Ремонты:{' '}
               <strong className="text-slate-700">
                 <Money amount={cohortStats.trucks.maint} />
@@ -734,6 +756,17 @@ export default function FleetPage() {
               ГСМ:{' '}
               <strong className="text-slate-700">
                 <Money amount={cohortStats.gazelles.fuel} />
+              </strong>
+            </span>
+            <span>
+              Ср. загр:{' '}
+              <strong
+                className={cn(
+                  'font-bold',
+                  cohortStats.gazelles.avgLoad >= 50 ? 'text-emerald-700' : 'text-amber-700',
+                )}
+              >
+                {cohortStats.gazelles.avgLoad}%
               </strong>
             </span>
             <span>
@@ -975,6 +1008,14 @@ export default function FleetPage() {
               d.profit >= 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500';
             const health = checkVehicleHealth(v);
 
+            // Capacity / Loading percentage calculation (70% revenue + 30% trips)
+            const numMonths = Math.max(selectedMonths.size, 1);
+            const normRev = (isTruck ? 640000 : 430000) * numMonths;
+            const normTrips = (isTruck ? 15.5 : 30) * numMonths;
+            const revLoad = Math.min(100, (d.revenue / normRev) * 100);
+            const tripLoad = Math.min(100, (d.trips / normTrips) * 100);
+            const loadPct = Math.min(100, Math.round(0.7 * revLoad + 0.3 * tripLoad));
+
             // Sparkline calculation
             const maxProfit = Math.max(...d.monthDetails.map((m) => Math.abs(m.profit)), 1);
 
@@ -1019,7 +1060,7 @@ export default function FleetPage() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5 flex-wrap">
                         <span className="truncate">
                           Водитель:{' '}
                           <strong className="text-slate-700">{v.driver?.name || '—'}</strong>
@@ -1033,6 +1074,22 @@ export default function FleetPage() {
                           )}
                         >
                           {STATUS_LABEL[v.status] ?? v.status}
+                        </span>
+                        <span>·</span>
+                        <span
+                          className={cn(
+                            'text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0',
+                            loadPct >= 80
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : loadPct >= 50
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : loadPct > 0
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200',
+                          )}
+                          title={`Загрузка: ${loadPct}% (Выручка: ${d.revenue.toLocaleString('ru-RU')} ₽, Рейсов: ${d.trips})`}
+                        >
+                          {loadPct}% загр.
                         </span>
                       </div>
                     </div>
@@ -1162,7 +1219,20 @@ export default function FleetPage() {
                           Финансовая детализация {v.short_name}:
                         </span>
                         <span className="text-xs font-bold text-slate-500">
-                          Пробег: {d.km.toLocaleString('ru-RU')} км · Рейсов: {d.trips} · Всего
+                          Загрузка:{' '}
+                          <strong
+                            className={cn(
+                              'font-bold',
+                              loadPct >= 80
+                                ? 'text-emerald-700'
+                                : loadPct >= 50
+                                  ? 'text-amber-700'
+                                  : 'text-rose-700',
+                            )}
+                          >
+                            {loadPct}%
+                          </strong>{' '}
+                          · Пробег: {d.km.toLocaleString('ru-RU')} км · Рейсов: {d.trips} · Всего
                           расходов: <Money amount={d.totalCosts} /> · Себестоимость: {d.costPerKm}{' '}
                           ₽/км
                         </span>
