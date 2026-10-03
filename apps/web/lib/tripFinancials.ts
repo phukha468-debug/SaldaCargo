@@ -1,14 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { generateDeterministicUuid } from '@saldacargo/shared';
+import {
+  generateDeterministicUuid,
+  FINANCIAL_WALLETS,
+  FINANCIAL_CATEGORIES,
+} from '@saldacargo/shared';
 
-const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
-const CASH_ID = '10000000-0000-0000-0000-000000000002';
-const BANK_ID = '10000000-0000-0000-0000-000000000001';
-const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
-const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
-const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
-const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
-const CAT_OTHER = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
+const TRIP_REVENUE_CATEGORY = FINANCIAL_CATEGORIES.TRIP_REVENUE;
+const CASH_ID = FINANCIAL_WALLETS.CASH;
+const BANK_ID = FINANCIAL_WALLETS.BANK;
+const FUEL_CARD_ID = FINANCIAL_WALLETS.FUEL_CARD;
+const PAYROLL_DRIVER_CAT = FINANCIAL_CATEGORIES.PAYROLL_DRIVER;
+const PAYROLL_LOADER_CAT = FINANCIAL_CATEGORIES.PAYROLL_LOADER;
+const CAT_FUEL = FINANCIAL_CATEGORIES.FUEL;
+const CAT_OTHER = FINANCIAL_CATEGORIES.OTHER;
 
 export async function syncTripFinancials(
   supabase: any,

@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { Money, cn } from '@saldacargo/ui';
+import { calculateVehicleLoad, TRUCKS_CODES, GAZELLE_CODES } from '@saldacargo/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -103,9 +104,6 @@ type FleetApiResponse = {
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const TRUCKS_CODES = ['valdai_6m', 'valdai_5m', 'valdai_dump', 'canter'];
-const GAZELLE_CODES = ['gazelle_4m', 'gazelle_3m', 'gazelle_project'];
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Активна',
@@ -431,11 +429,7 @@ export default function FleetPage() {
     const withMetrics = list.map((v) => {
       const isTruck = TRUCKS_CODES.includes(v.asset_type?.code ?? '');
       const d = getVehiclePeriodData(v, selectedMonths, monthsList);
-      const normRev = (isTruck ? 640000 : 430000) * numMonths;
-      const normTrips = (isTruck ? 15.5 : 30) * numMonths;
-      const revLoad = Math.min(100, (d.revenue / normRev) * 100);
-      const tripLoad = Math.min(100, (d.trips / normTrips) * 100);
-      const loadPct = Math.min(100, Math.round(0.7 * revLoad + 0.3 * tripLoad));
+      const { loadPct } = calculateVehicleLoad(d.revenue, d.trips, isTruck, numMonths);
       return { v, d, isTruck, loadPct };
     });
 
@@ -500,8 +494,6 @@ export default function FleetPage() {
       let totalLoadSum = 0;
 
       const numMonths = Math.max(selectedMonths.size, 1);
-      const normRev = (isTruckCohort ? 640000 : 430000) * numMonths;
-      const normTrips = (isTruckCohort ? 15.5 : 30) * numMonths;
 
       allAssets.forEach((v) => {
         const code = v.asset_type?.code ?? '';
@@ -515,9 +507,7 @@ export default function FleetPage() {
         maint += d.maint;
         trips += d.trips;
 
-        const revLoad = Math.min(100, (d.revenue / normRev) * 100);
-        const tripLoad = Math.min(100, (d.trips / normTrips) * 100);
-        const loadPct = Math.min(100, Math.round(0.7 * revLoad + 0.3 * tripLoad));
+        const { loadPct } = calculateVehicleLoad(d.revenue, d.trips, isTruckCohort, numMonths);
         totalLoadSum += loadPct;
       });
 
@@ -882,16 +872,22 @@ export default function FleetPage() {
 
           <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-medium">
             <span>
-              Ср. чек заявки:{' '}
+              Ср. чек:{' '}
               <strong className="text-slate-700">
                 <Money amount={cohortStats.loaders.avgBilled} />
               </strong>
             </span>
             <span>
-              Ср. ЗП / заказ:{' '}
+              Ср. ЗП:{' '}
               <strong className="text-slate-700">
                 <Money amount={cohortStats.loaders.avgPay} />
               </strong>
+            </span>
+            <span
+              className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+              title="Чистая прибыль = Выручка от клиентов за ПРР минус ФОТ бригады"
+            >
+              Прибыль = Выручка − ФОТ
             </span>
           </div>
         </div>
