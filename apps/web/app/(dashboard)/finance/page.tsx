@@ -71,7 +71,9 @@ function todayMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 function formatMonthLabel(ym: string) {
-  const [y, m] = ym.split('-').map(Number);
+  const parts = ym.split('-').map(Number);
+  const y = parts[0] ?? new Date().getFullYear();
+  const m = parts[1] ?? new Date().getMonth() + 1;
   return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
 }
 function shortDate(dateStr: string) {
@@ -2425,7 +2427,8 @@ function PayablesPanel() {
   });
 
   const totalDebt = suppliers.reduce((s, sup) => s + n(sup.debt), 0);
-  const largest = suppliers.reduce((a, b) => (n(a.debt) > n(b.debt) ? a : b), suppliers[0]);
+  const largest =
+    suppliers.length > 0 ? suppliers.reduce((a, b) => (n(a.debt) > n(b.debt) ? a : b)) : undefined;
   const paidThisMonth = suppliers.reduce((s, sup) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();

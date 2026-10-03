@@ -34,8 +34,8 @@ export async function GET(request: Request) {
     const month = searchParams.get('month');
     if (month) {
       const [yearStr, monStr] = month.split('-');
-      const year = parseInt(yearStr);
-      const mon = parseInt(monStr);
+      const year = parseInt(yearStr ?? '0', 10);
+      const mon = parseInt(monStr ?? '1', 10);
       const monthStart = new Date(year, mon - 1, 1).toISOString();
       const monthEnd = new Date(year, mon, 0, 23, 59, 59, 999).toISOString();
 

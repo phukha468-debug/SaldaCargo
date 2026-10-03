@@ -145,7 +145,7 @@ function calcServiceOrder(o: ReviewServiceOrder) {
     contractorName = externalMatch[1].trim();
   } else if (note.includes('Исполнитель:')) {
     const m = note.match(/Исполнитель:\s*([^.]+)/i);
-    if (m) contractorName = m[1].trim();
+    if (m && m[1]) contractorName = m[1].trim();
   }
 
   // Equipment / tuning detection

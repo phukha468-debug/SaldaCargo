@@ -27,6 +27,7 @@ type PayrollUser = {
   roles: UserRole[];
   auto_settle: boolean;
   max_user_id: string | null;
+  current_asset_id?: string | null;
   phone: string | null;
   notes: string | null;
   is_officially_employed?: boolean;
@@ -589,6 +590,9 @@ function SettleModal({
   const maxOffset = Math.min(salaryTotal, advanceBalance);
 
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
+  const [walletMode, setWalletMode] = useState<'single' | 'split'>('single');
+  const [cashSplit, setCashSplit] = useState('');
+  const [bankSplit, setBankSplit] = useState('');
   // По умолчанию НЕ списываем аванс (0 ₽), чтобы исключить случайные удержания
   const [offsetInput, setOffsetInput] = useState('0');
   const [partialInput, setPartialInput] = useState(salaryTotal.toFixed(2));
@@ -608,14 +612,56 @@ function SettleModal({
   const remainingSalary = Math.max(0, salaryTotal - partialVal);
   const needsWallet = payout > 0;
 
+  const handleCashChange = (val: string) => {
+    setCashSplit(val);
+    const c = parseFloat(val.replace(',', '.')) || 0;
+    const b = Math.max(0, Math.round((payout - c) * 100) / 100);
+    setBankSplit(b > 0 ? b.toString() : '0');
+    setError('');
+  };
+
+  const handleBankChange = (val: string) => {
+    setBankSplit(val);
+    const b = parseFloat(val.replace(',', '.')) || 0;
+    const c = Math.max(0, Math.round((payout - b) * 100) / 100);
+    setCashSplit(c > 0 ? c.toString() : '0');
+    setError('');
+  };
+
+  const setSplit5050 = () => {
+    const half = Math.round((payout / 2) * 100) / 100;
+    setCashSplit(half.toString());
+    setBankSplit((Math.round((payout - half) * 100) / 100).toString());
+    setError('');
+  };
+
+  const cashVal = parseFloat(cashSplit.replace(',', '.')) || 0;
+  const bankVal = parseFloat(bankSplit.replace(',', '.')) || 0;
+  const totalSplit = Math.round((cashVal + bankVal) * 100) / 100;
+  const isSplitValid =
+    walletMode === 'single' || (!needsWallet ? true : Math.abs(totalSplit - payout) < 0.05);
+
+  const getSplitsPayload = () => {
+    if (!needsWallet) return undefined;
+    if (walletMode === 'single') {
+      return [{ wallet_id: walletId, amount: payout }];
+    }
+    return [
+      { wallet_id: WALLETS[1]!.id, amount: cashVal },
+      { wallet_id: WALLETS[0]!.id, amount: bankVal },
+    ].filter((s) => s.amount > 0);
+  };
+
   const mutation = useMutation({
-    mutationFn: () =>
-      fetch('/api/staff/settle', {
+    mutationFn: () => {
+      const splits = getSplitsPayload();
+      return fetch('/api/staff/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.id,
-          from_wallet_id: needsWallet ? walletId : undefined,
+          from_wallet_id: needsWallet && walletMode === 'single' ? walletId : undefined,
+          wallet_splits: needsWallet ? splits : undefined,
           partial_offset: effectiveOffset.toFixed(2),
           idempotency_key: idempotencyKey,
           ...(isPartial ? { partial_amount: partialVal.toFixed(2) } : {}),
@@ -624,7 +670,8 @@ function SettleModal({
         const data = await r.json();
         if (!r.ok) throw new Error(data.error ?? 'Ошибка');
         return data;
-      }),
+      });
+    },
     onSuccess,
     onError: (e: Error) => setError(e.message),
     onSettled: () => setIsSubmitting(false),
@@ -837,25 +884,121 @@ function SettleModal({
               )}
 
               {needsWallet && (
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
-                  <div className="flex gap-2">
-                    {WALLETS.map((w) => (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-slate-500">Списать с</label>
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold">
                       <button
-                        key={w.id}
                         type="button"
-                        onClick={() => setWalletId(w.id)}
+                        onClick={() => setWalletMode('single')}
                         className={cn(
-                          'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
-                          walletId === w.id
-                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                            : 'border-slate-200 text-slate-500',
+                          'px-2 py-0.5 rounded-md transition-all',
+                          walletMode === 'single'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800',
                         )}
                       >
-                        {w.label}
+                        Один кошелёк
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWalletMode('split');
+                          if (!cashSplit && !bankSplit) {
+                            setSplit5050();
+                          }
+                        }}
+                        className={cn(
+                          'px-2 py-0.5 rounded-md transition-all',
+                          walletMode === 'split'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800',
+                        )}
+                      >
+                        🔀 Разделить (Касса + Р/С)
+                      </button>
+                    </div>
                   </div>
+
+                  {walletMode === 'single' ? (
+                    <div className="flex gap-2">
+                      {WALLETS.map((w) => (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => setWalletId(w.id)}
+                          className={cn(
+                            'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
+                            walletId === w.id
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                              : 'border-slate-200 text-slate-500',
+                          )}
+                        >
+                          {w.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                          💵 Касса (наличные):
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            value={cashSplit}
+                            onChange={(e) => handleCashChange(e.target.value)}
+                            className="w-28 border border-slate-300 rounded-lg px-2 py-1 text-right text-xs font-black text-slate-900 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                            placeholder="0"
+                          />
+                          <span className="text-xs text-slate-500">₽</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                          🏦 Расчётный счёт:
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            value={bankSplit}
+                            onChange={(e) => handleBankChange(e.target.value)}
+                            className="w-28 border border-slate-300 rounded-lg px-2 py-1 text-right text-xs font-black text-slate-900 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                            placeholder="0"
+                          />
+                          <span className="text-xs text-slate-500">₽</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-200 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={setSplit5050}
+                          className="text-[10px] text-blue-600 hover:underline font-bold"
+                        >
+                          Пополам (50/50)
+                        </button>
+                        <span
+                          className={cn(
+                            'font-bold',
+                            isSplitValid ? 'text-emerald-700' : 'text-rose-600',
+                          )}
+                        >
+                          {isSplitValid ? (
+                            <>Итого: {totalSplit.toLocaleString('ru-RU')} ₽ ✓</>
+                          ) : (
+                            <>Разница: {(payout - totalSplit).toLocaleString('ru-RU')} ₽</>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -885,7 +1028,8 @@ function SettleModal({
             <div className="px-6 pb-6 flex gap-3">
               <button
                 onClick={() => {
-                  if (isSubmitting || mutation.isPending || salaryTotal <= 0) return;
+                  if (isSubmitting || mutation.isPending || salaryTotal <= 0 || !isSplitValid)
+                    return;
                   if (effectiveOffset > 0) {
                     setShowOffsetConfirm(true);
                     return;
@@ -893,7 +1037,7 @@ function SettleModal({
                   setIsSubmitting(true);
                   mutation.mutate();
                 }}
-                disabled={mutation.isPending || isSubmitting || salaryTotal <= 0}
+                disabled={mutation.isPending || isSubmitting || salaryTotal <= 0 || !isSplitValid}
                 className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
               >
                 {mutation.isPending || isSubmitting ? 'Проводим...' : '✓ Подтвердить'}
@@ -3878,33 +4022,80 @@ function ManualPayModal({
 }) {
   const [amount, setAmount] = useState('');
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
+  const [walletMode, setWalletMode] = useState<'single' | 'split'>('single');
+  const [cashSplit, setCashSplit] = useState('');
+  const [bankSplit, setBankSplit] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
+  const numAmount = parseFloat(amount.replace(',', '.')) || 0;
+
+  const handleCashChange = (val: string) => {
+    setCashSplit(val);
+    const c = parseFloat(val.replace(',', '.')) || 0;
+    const b = Math.max(0, Math.round((numAmount - c) * 100) / 100);
+    setBankSplit(b > 0 ? b.toString() : '0');
+    setError('');
+  };
+
+  const handleBankChange = (val: string) => {
+    setBankSplit(val);
+    const b = parseFloat(val.replace(',', '.')) || 0;
+    const c = Math.max(0, Math.round((numAmount - b) * 100) / 100);
+    setCashSplit(c > 0 ? c.toString() : '0');
+    setError('');
+  };
+
+  const setSplit5050 = () => {
+    const half = Math.round((numAmount / 2) * 100) / 100;
+    setCashSplit(half.toString());
+    setBankSplit((Math.round((numAmount - half) * 100) / 100).toString());
+    setError('');
+  };
+
+  const cashVal = parseFloat(cashSplit.replace(',', '.')) || 0;
+  const bankVal = parseFloat(bankSplit.replace(',', '.')) || 0;
+  const totalSplit = Math.round((cashVal + bankVal) * 100) / 100;
+  const isSplitValid =
+    walletMode === 'single' || (numAmount > 0 ? Math.abs(totalSplit - numAmount) < 0.05 : true);
+
   const mutation = useMutation({
-    mutationFn: () =>
-      fetch('/api/staff/pay-salary', {
+    mutationFn: () => {
+      const splitsPayload =
+        walletMode === 'split'
+          ? [
+              { wallet_id: WALLETS[1]!.id, amount: cashVal },
+              { wallet_id: WALLETS[0]!.id, amount: bankVal },
+            ].filter((s) => s.amount > 0)
+          : [{ wallet_id: walletId, amount: numAmount }];
+
+      return fetch('/api/staff/pay-salary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.id,
-          amount: parseFloat(amount.replace(',', '.')).toFixed(2),
-          from_wallet_id: walletId,
+          amount: numAmount.toFixed(2),
+          from_wallet_id: walletMode === 'single' ? walletId : undefined,
+          wallet_splits: splitsPayload,
           note: note.trim() || undefined,
         }),
       }).then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
         return d;
-      }),
+      });
+    },
     onSuccess,
     onError: (e: Error) => setError(e.message),
   });
 
   const handleSubmit = () => {
-    const val = parseFloat(amount.replace(',', '.'));
-    if (isNaN(val) || val <= 0) {
+    if (isNaN(numAmount) || numAmount <= 0) {
       setError('Введите сумму');
+      return;
+    }
+    if (walletMode === 'split' && !isSplitValid) {
+      setError('Сумма по кошелькам должна совпадать с общей суммой выплаты');
       return;
     }
     setError('');
@@ -3938,6 +4129,12 @@ function ManualPayModal({
               onChange={(e) => {
                 setAmount(e.target.value);
                 setError('');
+                if (walletMode === 'split') {
+                  const n = parseFloat(e.target.value.replace(',', '.')) || 0;
+                  const half = Math.round((n / 2) * 100) / 100;
+                  setCashSplit(half.toString());
+                  setBankSplit((Math.round((n - half) * 100) / 100).toString());
+                }
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               placeholder="0"
@@ -3945,25 +4142,112 @@ function ManualPayModal({
             />
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-2">Списать с</label>
-            <div className="flex gap-2">
-              {WALLETS.map((w) => (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-500">Списать с</label>
+              <div className="flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold">
                 <button
-                  key={w.id}
                   type="button"
-                  onClick={() => setWalletId(w.id)}
+                  onClick={() => setWalletMode('single')}
                   className={cn(
-                    'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
-                    walletId === w.id
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 text-slate-500',
+                    'px-2 py-0.5 rounded-md transition-all',
+                    walletMode === 'single'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800',
                   )}
                 >
-                  {w.label}
+                  Один кошелёк
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWalletMode('split');
+                    if (!cashSplit && !bankSplit && numAmount > 0) {
+                      setSplit5050();
+                    }
+                  }}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md transition-all',
+                    walletMode === 'split'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800',
+                  )}
+                >
+                  🔀 Разделить
+                </button>
+              </div>
             </div>
+
+            {walletMode === 'single' ? (
+              <div className="flex gap-2">
+                {WALLETS.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setWalletId(w.id)}
+                    className={cn(
+                      'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
+                      walletId === w.id
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 text-slate-500',
+                    )}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-700">💵 Касса (наличные):</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={cashSplit}
+                      onChange={(e) => handleCashChange(e.target.value)}
+                      className="w-24 border border-slate-300 rounded-lg px-2 py-1 text-right text-xs font-black text-slate-900 bg-white"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-slate-500">₽</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-700">🏦 Расчётный счёт:</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={bankSplit}
+                      onChange={(e) => handleBankChange(e.target.value)}
+                      className="w-24 border border-slate-300 rounded-lg px-2 py-1 text-right text-xs font-black text-slate-900 bg-white"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-slate-500">₽</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={setSplit5050}
+                    className="text-[10px] text-blue-600 hover:underline font-bold"
+                  >
+                    50/50
+                  </button>
+                  <span
+                    className={cn('font-bold', isSplitValid ? 'text-emerald-700' : 'text-rose-600')}
+                  >
+                    {isSplitValid
+                      ? `${totalSplit.toLocaleString('ru-RU')} ₽ ✓`
+                      : `Разница: ${(numAmount - totalSplit).toLocaleString('ru-RU')} ₽`}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -3982,7 +4266,7 @@ function ManualPayModal({
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={handleSubmit}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || (walletMode === 'split' && !isSplitValid)}
             className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
             {mutation.isPending ? 'Проводим...' : '✓ Выплатить'}

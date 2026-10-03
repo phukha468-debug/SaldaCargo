@@ -4870,7 +4870,9 @@ function AiImportModal({
                           setParsed((prev) => {
                             if (!prev) return prev;
                             const nextWorks = [...prev.works];
-                            nextWorks[i] = { ...nextWorks[i], custom_work_name: val };
+                            const cur = nextWorks[i];
+                            if (!cur) return prev;
+                            nextWorks[i] = { ...cur, custom_work_name: val };
                             return { ...prev, works: nextWorks };
                           });
                         }}
@@ -4887,7 +4889,9 @@ function AiImportModal({
                             setParsed((prev) => {
                               if (!prev) return prev;
                               const nextWorks = [...prev.works];
-                              nextWorks[i] = { ...nextWorks[i], price_client: val };
+                              const cur = nextWorks[i];
+                              if (!cur) return prev;
+                              nextWorks[i] = { ...cur, price_client: val };
                               return { ...prev, works: nextWorks };
                             });
                           }}
@@ -4906,8 +4910,10 @@ function AiImportModal({
                             setParsed((prev) => {
                               if (!prev) return prev;
                               const nextWorks = [...prev.works];
+                              const cur = nextWorks[i];
+                              if (!cur) return prev;
                               nextWorks[i] = {
-                                ...nextWorks[i],
+                                ...cur,
                                 norm_minutes: Math.max(1, Math.round(val * 60)),
                               };
                               return { ...prev, works: nextWorks };
@@ -6706,10 +6712,10 @@ function WorkOrdersSection() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {reminders.length > 0 && (
+            {reminders.length > 0 && reminders[0] && (
               <button
                 type="button"
-                onClick={() => markReminderDoneMutation.mutate(reminders[0].id)}
+                onClick={() => markReminderDoneMutation.mutate(reminders[0]!.id)}
                 disabled={markReminderDoneMutation.isPending}
                 className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
               >

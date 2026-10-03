@@ -129,8 +129,9 @@ export async function GET(request: Request) {
 
       for (const e of t.trip_expenses || []) {
         const amt = parseFloat(e.amount || '0');
-        const catCode = e.category?.code;
-        const catName = e.category?.name;
+        const cat = Array.isArray(e.category) ? e.category[0] : e.category;
+        const catCode = (cat as any)?.code;
+        const catName = (cat as any)?.name;
         if (catCode === 'FUEL' || catName === 'ГСМ' || catName?.toLowerCase().includes('топлив')) {
           tFuel += amt;
         } else {
@@ -142,9 +143,10 @@ export async function GET(request: Request) {
       tripFuel += tFuel;
       tripOtherExpenses += tExp;
 
-      const vId = t.asset?.id || 'other';
-      const vName = t.asset?.short_name || 'Автомобиль компании';
-      const vReg = t.asset?.reg_number || '';
+      const assetObj = Array.isArray(t.asset) ? t.asset[0] : t.asset;
+      const vId = (assetObj as any)?.id || 'other';
+      const vName = (assetObj as any)?.short_name || 'Автомобиль компании';
+      const vReg = (assetObj as any)?.reg_number || '';
       if (!vehicleMap[vId]) {
         vehicleMap[vId] = {
           id: vId,
@@ -207,8 +209,9 @@ export async function GET(request: Request) {
     let generalOpExpenses = 0;
     for (const tx of generalExpenses || []) {
       const desc = (tx.description || '').toLowerCase();
-      const catCode = tx.category?.code || '';
-      const catName = (tx.category?.name || '').toLowerCase();
+      const cat = Array.isArray(tx.category) ? tx.category[0] : tx.category;
+      const catCode = (cat as any)?.code || '';
+      const catName = ((cat as any)?.name || '').toLowerCase();
 
       // Skip internal transfers, loan repayments, and direct wage payouts (already tracked in trip payroll)
       if (

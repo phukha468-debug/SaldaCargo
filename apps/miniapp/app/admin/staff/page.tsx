@@ -124,6 +124,9 @@ function StaffContent() {
   const [settleTarget, setSettleTarget] = useState<PayrollEntry | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settleWallet, setSettleWallet] = useState('');
+  const [settleWalletMode, setSettleWalletMode] = useState<'single' | 'split'>('single');
+  const [settleCashSplit, setSettleCashSplit] = useState('');
+  const [settleBankSplit, setSettleBankSplit] = useState('');
   const [settleOffset, setSettleOffset] = useState('');
   const [maxAdvance, setMaxAdvance] = useState(0);
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
@@ -174,7 +177,8 @@ function StaffContent() {
     mutationFn: (body: {
       user_id: string;
       partial_amount: string;
-      from_wallet_id: string;
+      from_wallet_id?: string;
+      wallet_splits?: Array<{ wallet_id: string; amount: number }>;
       partial_offset: string;
       idempotency_key?: string;
     }) =>
@@ -275,6 +279,9 @@ function StaffContent() {
       setMaxAdvance(advanceBalance);
       setConfirmOffsetOpen(false);
       setSettleWallet(wallets?.cash.id ?? '');
+      setSettleWalletMode('single');
+      setSettleCashSplit('');
+      setSettleBankSplit('');
       setPendingTransactions(data.pending_transactions ?? []);
       setUnconfirmedCount(data.unconfirmed_count ?? 0);
       setSettleIdempotencyKey(crypto.randomUUID());
@@ -283,17 +290,67 @@ function StaffContent() {
     }
   };
 
+  const handleMiniappCashChange = (val: string) => {
+    setSettleCashSplit(val);
+    const payoutAmt = parseFloat(settleAmount) || 0;
+    const c = parseFloat(val.replace(',', '.')) || 0;
+    const b = Math.max(0, Math.round((payoutAmt - c) * 100) / 100);
+    setSettleBankSplit(b > 0 ? b.toString() : '0');
+  };
+
+  const handleMiniappBankChange = (val: string) => {
+    setSettleBankSplit(val);
+    const payoutAmt = parseFloat(settleAmount) || 0;
+    const b = parseFloat(val.replace(',', '.')) || 0;
+    const c = Math.max(0, Math.round((payoutAmt - b) * 100) / 100);
+    setSettleCashSplit(c > 0 ? c.toString() : '0');
+  };
+
+  const setMiniappSplit5050 = () => {
+    const payoutAmt = parseFloat(settleAmount) || 0;
+    const half = Math.round((payoutAmt / 2) * 100) / 100;
+    setSettleCashSplit(half.toString());
+    setSettleBankSplit((Math.round((payoutAmt - half) * 100) / 100).toString());
+  };
+
   const handleSettle = () => {
-    if (!settleTarget || !settleWallet || isSubmittingSettle || settleMutation.isPending) return;
+    if (!settleTarget || isSubmittingSettle || settleMutation.isPending) return;
     const payoutAmt = parseFloat(settleAmount) || 0;
     const offsetAmt = parseFloat(settleOffset) || 0;
 
     if (payoutAmt === 0 && offsetAmt === 0) return;
 
+    if (settleWalletMode === 'single' && !settleWallet && payoutAmt > 0) return;
+
+    const cashSplitVal = parseFloat(settleCashSplit.replace(',', '.')) || 0;
+    const bankSplitVal = parseFloat(settleBankSplit.replace(',', '.')) || 0;
+    const totalSplits = Math.round((cashSplitVal + bankSplitVal) * 100) / 100;
+
+    if (settleWalletMode === 'split' && payoutAmt > 0 && Math.abs(totalSplits - payoutAmt) > 0.05) {
+      alert(
+        `Сумма распределения (${totalSplits} ₽) должна быть равна сумме к выплате (${payoutAmt} ₽)`,
+      );
+      return;
+    }
+
     if (offsetAmt > 0 && !confirmOffsetOpen) {
       setConfirmOffsetOpen(true);
       return;
     }
+
+    const splitsPayload =
+      settleWalletMode === 'split'
+        ? [
+            {
+              wallet_id: wallets?.cash?.id ?? '10000000-0000-0000-0000-000000000002',
+              amount: cashSplitVal,
+            },
+            {
+              wallet_id: wallets?.bank?.id ?? '10000000-0000-0000-0000-000000000001',
+              amount: bankSplitVal,
+            },
+          ].filter((s) => s.amount > 0)
+        : [{ wallet_id: settleWallet, amount: payoutAmt }];
 
     setIsSubmittingSettle(true);
     settleMutation.mutate(
@@ -301,7 +358,8 @@ function StaffContent() {
         user_id: settleTarget.id,
         partial_amount: (payoutAmt + offsetAmt).toFixed(2),
         partial_offset: offsetAmt.toFixed(2),
-        from_wallet_id: settleWallet,
+        from_wallet_id: settleWalletMode === 'single' ? settleWallet : undefined,
+        wallet_splits: payoutAmt > 0 ? splitsPayload : undefined,
         idempotency_key: settleIdempotencyKey,
       },
       {
@@ -676,31 +734,124 @@ function StaffContent() {
 
             {/* Wallet selector */}
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
-                Источник средств
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {walletList.map((w) => (
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                  Источник средств
+                </label>
+                <div className="flex bg-zinc-100 p-1 rounded-xl text-[10px] font-black">
                   <button
-                    key={w.id}
-                    onClick={() => setSettleWallet(w.id)}
-                    className={`rounded-2xl p-4 border-2 text-left transition-all active:scale-[0.97] ${
-                      settleWallet === w.id
-                        ? 'border-orange-500 bg-orange-50 ring-4 ring-orange-500/10'
-                        : 'border-zinc-100 bg-zinc-50 text-zinc-600'
+                    type="button"
+                    onClick={() => setSettleWalletMode('single')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      settleWalletMode === 'single'
+                        ? 'bg-white text-zinc-900 shadow-sm'
+                        : 'text-zinc-500'
                     }`}
                   >
-                    <p className="text-xs font-black uppercase tracking-tight leading-tight">
-                      {w.name.split(' ')[0]}
-                    </p>
-                    <p
-                      className={`text-sm font-black mt-1 ${settleWallet === w.id ? 'text-orange-600' : 'text-zinc-900'}`}
-                    >
-                      <Money amount={w.balance} />
-                    </p>
+                    Один
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettleWalletMode('split');
+                      if (!settleCashSplit && !settleBankSplit) {
+                        setMiniappSplit5050();
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      settleWalletMode === 'split'
+                        ? 'bg-white text-zinc-900 shadow-sm'
+                        : 'text-zinc-500'
+                    }`}
+                  >
+                    🔀 Разделить
+                  </button>
+                </div>
               </div>
+
+              {settleWalletMode === 'single' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {walletList.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => setSettleWallet(w.id)}
+                      className={`rounded-2xl p-4 border-2 text-left transition-all active:scale-[0.97] ${
+                        settleWallet === w.id
+                          ? 'border-orange-500 bg-orange-50 ring-4 ring-orange-500/10'
+                          : 'border-zinc-100 bg-zinc-50 text-zinc-600'
+                      }`}
+                    >
+                      <p className="text-xs font-black uppercase tracking-tight leading-tight">
+                        {w.name.split(' ')[0]}
+                      </p>
+                      <p
+                        className={`text-sm font-black mt-1 ${settleWallet === w.id ? 'text-orange-600' : 'text-zinc-900'}`}
+                      >
+                        <Money amount={w.balance} />
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-black text-zinc-700">💵 Касса (наличные):</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={settleCashSplit}
+                        onChange={(e) => handleMiniappCashChange(e.target.value)}
+                        className="w-28 border-2 border-zinc-200 bg-white rounded-xl px-3 py-1.5 text-right font-black text-sm text-zinc-900 focus:outline-none focus:border-orange-500"
+                        placeholder="0"
+                      />
+                      <span className="text-xs font-bold text-zinc-400">₽</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-black text-zinc-700">🏦 Расчётный счёт:</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={settleBankSplit}
+                        onChange={(e) => handleMiniappBankChange(e.target.value)}
+                        className="w-28 border-2 border-zinc-200 bg-white rounded-xl px-3 py-1.5 text-right font-black text-sm text-zinc-900 focus:outline-none focus:border-orange-500"
+                        placeholder="0"
+                      />
+                      <span className="text-xs font-bold text-zinc-400">₽</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-zinc-200 text-xs">
+                    <button
+                      type="button"
+                      onClick={setMiniappSplit5050}
+                      className="text-[11px] font-black text-orange-600 uppercase tracking-wider"
+                    >
+                      50 / 50
+                    </button>
+                    <span
+                      className={`font-black text-xs ${
+                        Math.abs(
+                          (parseFloat(settleCashSplit) || 0) +
+                            (parseFloat(settleBankSplit) || 0) -
+                            (parseFloat(settleAmount) || 0),
+                        ) < 0.05
+                          ? 'text-emerald-600'
+                          : 'text-rose-600'
+                      }`}
+                    >
+                      Итого:{' '}
+                      {(
+                        (parseFloat(settleCashSplit) || 0) + (parseFloat(settleBankSplit) || 0)
+                      ).toLocaleString('ru-RU')}{' '}
+                      ₽
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {confirmOffsetOpen ? (
@@ -746,7 +897,13 @@ function StaffContent() {
                   disabled={
                     settleMutation.isPending ||
                     isSubmittingSettle ||
-                    !settleWallet ||
+                    (settleWalletMode === 'single'
+                      ? !settleWallet
+                      : Math.abs(
+                          (parseFloat(settleCashSplit) || 0) +
+                            (parseFloat(settleBankSplit) || 0) -
+                            (parseFloat(settleAmount) || 0),
+                        ) > 0.05) ||
                     (parseFloat(settleAmount || '0') <= 0 && parseFloat(settleOffset || '0') <= 0)
                   }
                   className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"

@@ -137,6 +137,55 @@ export async function GET(request: Request) {
   });
 }
 
+const WALLET_LABELS: Record<string, string> = {
+  '10000000-0000-0000-0000-000000000001': 'Р/С',
+  '10000000-0000-0000-0000-000000000002': 'Касса (Наличные)',
+  '10000000-0000-0000-0000-000000000003': 'Карта',
+};
+
+interface WalletSplit {
+  wallet_id: string;
+  amount: number;
+}
+
+function resolveSplits(
+  body: {
+    from_wallet_id?: string;
+    wallet_splits?: Array<{ wallet_id: string; amount: number | string }>;
+  },
+  requiredAmount: number,
+): { splits: WalletSplit[]; error?: string } {
+  let splits: WalletSplit[] = [];
+  if (Array.isArray(body.wallet_splits) && body.wallet_splits.length > 0) {
+    splits = body.wallet_splits
+      .map((s) => ({
+        wallet_id: String(s.wallet_id || '').trim(),
+        amount: Math.round((parseFloat(String(s.amount)) || 0) * 100) / 100,
+      }))
+      .filter((s) => s.amount > 0 && s.wallet_id);
+  } else if (body.from_wallet_id) {
+    splits = [{ wallet_id: body.from_wallet_id, amount: requiredAmount }];
+  }
+
+  if (requiredAmount > 0) {
+    if (splits.length === 0) {
+      return {
+        splits: [],
+        error: 'Укажите кошелёк (или распределение по кошелькам) для выплаты',
+      };
+    }
+    const sum = Math.round(splits.reduce((acc, s) => acc + s.amount, 0) * 100) / 100;
+    if (Math.abs(sum - requiredAmount) > 0.05) {
+      return {
+        splits,
+        error: `Сумма по кошелькам (${sum.toFixed(2)} ₽) не совпадает с суммой к выплате (${requiredAmount.toFixed(2)} ₽)`,
+      };
+    }
+  }
+
+  return { splits };
+}
+
 /**
  * POST /api/admin/staff-settle — выплатить ЗП сотруднику
  * (Синхронизировано с логикой WebApp: закрывает pending транзакции)
@@ -146,6 +195,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       user_id: string;
       from_wallet_id?: string;
+      wallet_splits?: Array<{ wallet_id: string; amount: number | string }>;
       partial_offset?: string;
       partial_amount?: string;
       action?: string;
@@ -294,30 +344,45 @@ export async function POST(request: Request) {
     if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
       if (partialAmountRaw && parseFloat(partialAmountRaw) > 0) {
         const directAmount = parseFloat(partialAmountRaw);
-        if (!body.from_wallet_id) {
-          return NextResponse.json({ error: 'from_wallet_id обязателен' }, { status: 400 });
+        const { splits, error: splitErr } = resolveSplits(body, directAmount);
+        if (splitErr) {
+          return NextResponse.json({ error: splitErr }, { status: 400 });
         }
 
-        const { error: insErr } = await (supabase.from('transactions') as any).insert({
-          direction: 'expense',
-          category_id: categoryId,
-          amount: directAmount.toFixed(2),
-          description: `Выплата зарплаты: ${employeeName} — ${dateLabel}`,
-          transaction_date: new Date().toISOString(),
-          lifecycle_status: 'approved',
-          settlement_status: 'completed',
-          related_user_id: body.user_id,
-          from_wallet_id: body.from_wallet_id,
-          created_by: adminId,
-          idempotency_key: body.idempotency_key || crypto.randomUUID(),
+        const baseKey = body.idempotency_key || crypto.randomUUID();
+        const insertOps = splits.map((s, idx) => {
+          const wLabel = WALLET_LABELS[s.wallet_id] || `Кошелёк ${idx + 1}`;
+          const desc =
+            splits.length > 1
+              ? `Выплата зарплаты (${wLabel}): ${employeeName} — ${dateLabel}`
+              : `Выплата зарплаты: ${employeeName} — ${dateLabel}`;
+          const idempKey = splits.length > 1 ? `${baseKey}_split_${s.wallet_id}` : baseKey;
+
+          return (supabase.from('transactions') as any).insert({
+            direction: 'expense',
+            category_id: categoryId,
+            amount: s.amount.toFixed(2),
+            description: desc,
+            transaction_date: new Date().toISOString(),
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            related_user_id: body.user_id,
+            from_wallet_id: s.wallet_id,
+            created_by: adminId,
+            idempotency_key: idempKey,
+          });
         });
-        if (insErr) throw new Error(insErr.message);
+
+        const insResults = await Promise.all(insertOps);
+        const insError = insResults.find((r) => r && r.error);
+        if (insError) throw new Error(insError.error.message);
 
         return NextResponse.json({
           ok: true,
           payout: directAmount.toFixed(2),
           offset: '0.00',
           settled_count: 0,
+          splits,
         });
       }
       return NextResponse.json({ error: 'Нет начисленной ЗП к выплате' }, { status: 400 });
@@ -380,6 +445,11 @@ export async function POST(request: Request) {
       actualPayout = salaryTotal - offset;
     }
 
+    const { splits, error: splitErr } = resolveSplits(body, actualPayout);
+    if (splitErr) {
+      return NextResponse.json({ error: splitErr }, { status: 400 });
+    }
+
     const settledTxns =
       (pendingPayroll as any[])?.filter((t: any) => idsToSettle.includes(t.id)) ?? [];
     if (splitTxn) settledTxns.push(splitTxn);
@@ -398,22 +468,31 @@ export async function POST(request: Request) {
     const ops: Promise<any>[] = [];
     const batchId = body.idempotency_key || crypto.randomUUID();
 
-    if (actualPayout > 0 && body.from_wallet_id) {
-      ops.push(
-        (supabase.from('transactions') as any).insert({
-          direction: 'expense',
-          category_id: categoryId,
-          amount: actualPayout.toFixed(2),
-          from_wallet_id: body.from_wallet_id,
-          description: payoutDescription,
-          transaction_date: new Date().toISOString(),
-          lifecycle_status: 'approved',
-          settlement_status: 'completed',
-          related_user_id: body.user_id,
-          created_by: adminId,
-          idempotency_key: batchId,
-        }),
-      );
+    if (actualPayout > 0 && splits.length > 0) {
+      splits.forEach((s, idx) => {
+        const wLabel = WALLET_LABELS[s.wallet_id] || `Кошелёк ${idx + 1}`;
+        const desc =
+          splits.length > 1
+            ? `Выплата зарплаты (${wLabel}): ${employeeName}${breakdownText}`
+            : payoutDescription;
+        const idempKey = splits.length > 1 ? `${batchId}_split_${s.wallet_id}` : batchId;
+
+        ops.push(
+          (supabase.from('transactions') as any).insert({
+            direction: 'expense',
+            category_id: categoryId,
+            amount: s.amount.toFixed(2),
+            from_wallet_id: s.wallet_id,
+            description: desc,
+            transaction_date: new Date().toISOString(),
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            related_user_id: body.user_id,
+            created_by: adminId,
+            idempotency_key: idempKey,
+          }),
+        );
+      });
     }
 
     if (idsToSettle.length > 0) {
@@ -489,6 +568,7 @@ export async function POST(request: Request) {
       payout: actualPayout.toFixed(2),
       offset: actualOffset.toFixed(2),
       settled_count: idsToSettle.length,
+      splits,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
