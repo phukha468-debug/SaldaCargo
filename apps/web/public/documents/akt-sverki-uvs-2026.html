@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Акт сверки взаимных расчетов — УВС (2026)</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 10mm 10mm;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0f172a;
+    background: #ffffff;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .header {
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  .title {
+    font-size: 17px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #0f172a;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-align: center;
+    margin-top: 2px;
+  }
+  .parties-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+  .party-box h3 {
+    font-size: 11px;
+    font-weight: 800;
+    color: #1e3a8a;
+    margin-bottom: 2px;
+  }
+  .party-box p {
+    font-size: 10px;
+    color: #334155;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 9.5px;
+  }
+  th {
+    background: #1e293b;
+    color: #ffffff;
+    padding: 5px 6px;
+    text-align: left;
+    font-weight: 800;
+    border: 1px solid #334155;
+    font-size: 9px;
+  }
+  td {
+    padding: 4px 6px;
+    border: 1px solid #cbd5e1;
+    line-height: 1.25;
+  }
+  .summary-box {
+    background: #f1f5f9;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    text-align: center;
+  }
+  .summary-item .label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+  .summary-item .val {
+    font-size: 14px;
+    font-weight: 900;
+    margin-top: 1px;
+  }
+  .val-deb { color: #0f172a; }
+  .val-cred { color: #15803d; }
+  .val-saldo { color: #b91c1c; }
+  .conclusion {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px dashed #94a3b8;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: center;
+  }
+  .conclusion span {
+    color: #b91c1c;
+    font-weight: 900;
+  }
+  .unpaid-section {
+    margin-top: 10px;
+    margin-bottom: 12px;
+    page-break-inside: avoid;
+  }
+  .unpaid-title {
+    font-size: 11px;
+    font-weight: 900;
+    color: #991b1b;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+  .signatures-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 15px;
+    page-break-inside: avoid;
+  }
+  .sign-col h4 {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 3px;
+    margin-bottom: 10px;
+  }
+  .sign-line {
+    margin-top: 25px;
+    border-bottom: 1px solid #475569;
+    width: 85%;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5px;
+    color: #64748b;
+    padding-bottom: 2px;
+  }
+  .stamp-place {
+    margin-top: 10px;
+    font-size: 9.5px;
+    font-weight: bold;
+    color: #64748b;
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title">Акт сверки взаимных расчетов</div>
+    <div class="subtitle">за период: с 18 мая 2026 г. по 04 октября 2026 г.</div>
+  </div>
+
+  <div class="parties-grid">
+    <div class="party-box">
+      <h3>Исполнитель:</h3>
+      <p><b>ИП Нигамедьянов А.С. (ТК501 / SaldaCargo)</b></p>
+    </div>
+    <div class="party-box">
+      <h3>Заказчик:</h3>
+      <p><b>ООО «Уралводстрой» (УВС)</b></p>
+    </div>
+  </div>
+
+  <!-- Таблица операций -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20px; text-align: center;">№</th>
+        <th style="width: 65px; text-align: center;">Дата</th>
+        <th>Документ / Основание</th>
+        <th style="width: 70px; text-align: center;">Рейс</th>
+        <th style="width: 120px;">Водитель</th>
+        <th style="width: 100px;">Автомобиль</th>
+        <th style="width: 85px; text-align: right;">Оказано, ₽</th>
+        <th style="width: 85px; text-align: right;">Оплачено, ₽</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">1</td>
+          <td style="text-align: center; white-space: nowrap;">18.05.2026</td>
+          <td><b>Счёт №1 от 18.05.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №88</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">7 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">2</td>
+          <td style="text-align: center; white-space: nowrap;">18.05.2026</td>
+          <td><b>Оплата по QR от 18.05.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №88</td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">—</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">7 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">3</td>
+          <td style="text-align: center; white-space: nowrap;">25.05.2026</td>
+          <td><b>Счёт №2 от 25.05.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №130</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">6 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">4</td>
+          <td style="text-align: center; white-space: nowrap;">25.05.2026</td>
+          <td><b>Оплата по QR от 25.05.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №130</td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">—</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">6 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">5</td>
+          <td style="text-align: center; white-space: nowrap;">18.06.2026</td>
+          <td><b>Счёт №3 от 18.06.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №249</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">5 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">6</td>
+          <td style="text-align: center; white-space: nowrap;">19.06.2026</td>
+          <td><b>Рейс №255</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №255</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">3 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">7</td>
+          <td style="text-align: center; white-space: nowrap;">21.06.2026</td>
+          <td><b>Рейс №259</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №259</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">6 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">8</td>
+          <td style="text-align: center; white-space: nowrap;">22.06.2026</td>
+          <td><b>Рейс №264</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №264</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">3 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">9</td>
+          <td style="text-align: center; white-space: nowrap;">24.06.2026</td>
+          <td><b>Рейс №275</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №275</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">6 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">10</td>
+          <td style="text-align: center; white-space: nowrap;">25.06.2026</td>
+          <td><b>Рейс №283</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №283</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">3 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">11</td>
+          <td style="text-align: center; white-space: nowrap;">25.06.2026</td>
+          <td><b>Счёт №15 от 25.06.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №286</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">8 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">12</td>
+          <td style="text-align: center; white-space: nowrap;">30.06.2026</td>
+          <td><b>Рейс №293</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №293</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">4 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">13</td>
+          <td style="text-align: center; white-space: nowrap;">01.07.2026</td>
+          <td><b>Платёж б/н от 01.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">—</td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">—</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">3 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">14</td>
+          <td style="text-align: center; white-space: nowrap;">01.07.2026</td>
+          <td><b>Платёж б/н от 01.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">—</td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">—</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">3 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">15</td>
+          <td style="text-align: center; white-space: nowrap;">07.07.2026</td>
+          <td><b>Счёт №10 от 13.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №319</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">12 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">16</td>
+          <td style="text-align: center; white-space: nowrap;">08.07.2026</td>
+          <td><b>Счёт №11 от 13.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №322</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">4 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">17</td>
+          <td style="text-align: center; white-space: nowrap;">09.07.2026</td>
+          <td><b>Счёт №12 от 12.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №329</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">6 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">18</td>
+          <td style="text-align: center; white-space: nowrap;">10.07.2026</td>
+          <td><b>Счёт №13 от 13.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №334</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">3 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">19</td>
+          <td style="text-align: center; white-space: nowrap;">14.07.2026</td>
+          <td><b>Счёт №14 от 26.08.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №350</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">6 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">20</td>
+          <td style="text-align: center; white-space: nowrap;">25.08.2026</td>
+          <td><b>Счёт №16 от 27.09.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №566</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">6 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">21</td>
+          <td style="text-align: center; white-space: nowrap;">27.08.2026</td>
+          <td><b>Счёт №17 от 27.08.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №578</td>
+          <td>Полещук В.В.</td>
+          <td>Газель</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">5 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">22</td>
+          <td style="text-align: center; white-space: nowrap;">04.09.2026</td>
+          <td><b>Платёж б/н от 04.09.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">—</td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">—</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">24 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">23</td>
+          <td style="text-align: center; white-space: nowrap;">08.09.2026</td>
+          <td><b>Счёт №18 от 10.09.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №639</td>
+          <td>Фарух</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">8 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+        <tr style="background: #f8fafc;">
+          <td style="text-align: center; color: #64748b;">24</td>
+          <td style="text-align: center; white-space: nowrap;">29.09.2026</td>
+          <td><b>Платёж б/н от 29.09.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">—</td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">—</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">15 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #ffffff;">
+          <td style="text-align: center; color: #64748b;">25</td>
+          <td style="text-align: center; white-space: nowrap;">02.10.2026</td>
+          <td><b>Счёт №19 от 03.10.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №756</td>
+          <td>Иван Фирсов</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a;">5 000.00 ₽</td>
+          <td style="text-align: right; font-weight: bold; color: #15803d;">—</td>
+        </tr>
+        
+    </tbody>
+  </table>
+
+  <!-- Сводный блок расчетов -->
+  <div class="summary-box">
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="label">Всего оказано услуг (Дебет)</div>
+        <div class="val val-deb">106 000,00 ₽</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Всего оплачено (Кредит)</div>
+        <div class="val val-cred">58 000,00 ₽</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Задолженность УВС (Сальдо)</div>
+        <div class="val val-saldo">48 000,00 ₽</div>
+      </div>
+    </div>
+    <div class="conclusion">
+      Задолженность ООО «Уралводстрой» (УВС) в пользу ИП Нигамедьянов А.С. составляет 
+      <span>48 000,00 (Сорок восемь тысяч) рублей 00 копеек</span>.
+    </div>
+  </div>
+
+  <!-- Реестр неоплаченных рейсов -->
+  <div class="unpaid-section">
+    <div class="unpaid-title">Реестр неоплаченных рейсов:</div>
+    <table>
+      <thead>
+        <tr style="background: #991b1b;">
+          <th style="width: 20px; text-align: center;">№</th>
+          <th style="width: 70px; text-align: center;">Дата</th>
+          <th>Счёт / Акт</th>
+          <th style="width: 70px; text-align: center;">Рейс</th>
+          <th>Водитель</th>
+          <th>Автомобиль</th>
+          <th style="width: 95px; text-align: right;">Сумма, ₽</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">1</td>
+          <td style="text-align: center; white-space: nowrap;">25.06.2026</td>
+          <td><b>Счёт №15 от 25.06.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №286</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">8 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">2</td>
+          <td style="text-align: center; white-space: nowrap;">08.07.2026</td>
+          <td><b>Счёт №11 от 13.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №322</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">4 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">3</td>
+          <td style="text-align: center; white-space: nowrap;">09.07.2026</td>
+          <td><b>Счёт №12 от 12.07.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №329</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">6 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">4</td>
+          <td style="text-align: center; white-space: nowrap;">14.07.2026</td>
+          <td><b>Счёт №14 от 26.08.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №350</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">6 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">5</td>
+          <td style="text-align: center; white-space: nowrap;">25.08.2026</td>
+          <td><b>Счёт №16 от 27.09.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №566</td>
+          <td>Никифоров Д.В.</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">6 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">6</td>
+          <td style="text-align: center; white-space: nowrap;">27.08.2026</td>
+          <td><b>Счёт №17 от 27.08.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №578</td>
+          <td>Полещук В.В.</td>
+          <td>Газель</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">5 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">7</td>
+          <td style="text-align: center; white-space: nowrap;">08.09.2026</td>
+          <td><b>Счёт №18 от 10.09.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №639</td>
+          <td>Фарух</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">8 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fff1f2;">
+          <td style="text-align: center; font-weight: bold; color: #991b1b;">8</td>
+          <td style="text-align: center; white-space: nowrap;">02.10.2026</td>
+          <td><b>Счёт №19 от 03.10.2026</b></td>
+          <td style="text-align: center; white-space: nowrap;">Рейс №756</td>
+          <td>Иван Фирсов</td>
+          <td>Газель Next</td>
+          <td style="text-align: right; font-weight: 900; color: #b91c1c; font-size: 13px;">5 000.00 ₽</td>
+        </tr>
+        
+        <tr style="background: #fee2e2; font-weight: 900;">
+          <td colspan="6" style="text-align: right; font-size: 10px; color: #991b1b;">ИТОГО К ОПЛАТЕ:</td>
+          <td style="text-align: right; color: #991b1b; font-size: 12px;">48 000,00 ₽</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Подписи сторон -->
+  <div class="signatures-grid">
+    <div class="sign-col">
+      <h4>От Исполнителя: ИП Нигамедьянов А.С.</h4>
+      <div class="sign-line">
+        <span>(подпись)</span>
+        <span>/ Нигамедьянов А.С. /</span>
+      </div>
+      <div class="stamp-place">М. П.</div>
+    </div>
+    <div class="sign-col">
+      <h4>От Заказчика: ООО «Уралводстрой» (УВС)</h4>
+      <div class="sign-line">
+        <span>(подпись)</span>
+        <span>/ ___________________________ /</span>
+      </div>
+      <div class="stamp-place">М. П.</div>
+    </div>
+  </div>
+
+</body>
+</html>

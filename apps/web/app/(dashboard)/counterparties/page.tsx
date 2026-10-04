@@ -7,19 +7,25 @@ import { formatPhone } from '@saldacargo/shared';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Client = {
+export type Counterparty = {
   id: string;
   name: string;
+  type: 'client' | 'supplier' | 'both';
   phone: string | null;
   email: string | null;
   notes: string | null;
   credit_limit: string | null;
+  payable_amount: string; // Наш долг поставщику
+  receivable_amount: string; // Долг клиента перед нами
+  net_balance: string; // Сальдо (положительное = нам должны, отрицательное = мы должны)
   is_active: boolean;
   is_regular: boolean;
   is_legal_entity: boolean;
+  supplier_category: string | null;
   total_revenue: string;
   revenue_30d: string;
   net_profit: string;
+  margin_pct: number;
   overhead_pct: number;
   trips_count: number;
   orders_count: number;
@@ -31,9 +37,10 @@ type Client = {
   month_labels: string[];
 };
 
-type TripRecord = {
+export type TripRecord = {
   id: string;
-  trip_id: string;
+  trip_id: string | null;
+  trip_number: number | null;
   started_at: string | null;
   driver_name: string | null;
   asset_name: string | null;
@@ -43,73 +50,41 @@ type TripRecord = {
   fuel_allocated: string;
   gross_profit: string;
   payment_method: string;
-};
-
-type RecvData = {
-  debtors: { counterparty_id: string; counterparty_name: string; total: string }[];
-  totalAmount: string;
-  overdueCount: number;
+  settlement_status: string;
+  description?: string;
 };
 
 const PAYMENT_LABEL: Record<string, string> = {
   cash: 'Наличные',
   qr: 'QR-код',
   card_driver: 'Карта вод.',
-  debt_cash: 'Долг',
+  debt_cash: 'Долг нал',
   bank_invoice: 'Безналичный',
+  fuel_card: 'Топливная карта',
 };
 
-const PAYMENT_COLOR: Record<string, string> = {
-  cash: 'bg-emerald-400',
-  qr: 'bg-violet-400',
-  card_driver: 'bg-blue-400',
-  debt_cash: 'bg-rose-400',
-  bank_invoice: 'bg-amber-400',
+const emptyForm = {
+  name: '',
+  type: 'client' as 'client' | 'supplier' | 'both',
+  phone: '',
+  email: '',
+  credit_limit: '',
+  payable_amount: '',
+  notes: '',
+  is_legal_entity: false,
+  is_regular: false,
 };
-
-const emptyForm = { name: '', phone: '', email: '', credit_limit: '', notes: '' };
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function daysAgo(dateStr: string | null): number | null {
   if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-function lastTripLabel(days: number | null) {
-  if (days === null) return 'нет рейсов';
+function lastActivityLabel(days: number | null) {
+  if (days === null) return 'нет операций';
   if (days === 0) return 'сегодня';
   if (days === 1) return 'вчера';
   return `${days} дн. назад`;
-}
-
-function actColor(days: number | null) {
-  if (days === null) return 'text-slate-300';
-  if (days <= 7) return 'text-emerald-600';
-  if (days <= 30) return 'text-slate-500';
-  if (days <= 90) return 'text-amber-500';
-  return 'text-rose-400';
-}
-
-function avatarCls(days: number | null) {
-  if (days !== null && days <= 7) return 'bg-emerald-100 text-emerald-700';
-  if (days !== null && days <= 30) return 'bg-orange-100 text-orange-700';
-  if (days !== null && days <= 90) return 'bg-amber-50 text-amber-600';
-  return 'bg-slate-100 text-slate-400';
-}
-
-function actBadge(days: number | null) {
-  if (days === null) return null;
-  if (days <= 7) return { label: 'Активен', cls: 'bg-emerald-50 text-emerald-700' };
-  if (days <= 30) return { label: 'Активен', cls: 'bg-slate-100 text-slate-500' };
-  if (days <= 90) return { label: 'Тихо', cls: 'bg-amber-50 text-amber-600' };
-  return { label: 'Спящий', cls: 'bg-rose-50 text-rose-500' };
-}
-
-function rubShort(n: number) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0', '') + ' M₽';
-  if (n >= 1000) return Math.round(n / 1000) + ' т₽';
-  return n + ' ₽';
 }
 
 function fmtDate(iso: string | null) {
@@ -117,1121 +92,186 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
-// ── Email copy ─────────────────────────────────────────────────────────────
-
-function CopyEmail({ email }: { email: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={() =>
-        navigator.clipboard.writeText(email).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
-      }
-      className="ml-1 text-[10px] px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
-    >
-      {copied ? '✓' : 'копир.'}
-    </button>
-  );
-}
-
-// ── Client list row ────────────────────────────────────────────────────────
-
-function ClientRow({
-  client: c,
-  debt,
-  selected,
-  mergeMode,
-  mergeSelected,
-  onSelect,
-  onMergeToggle,
-  onToggleLegal,
-}: {
-  client: Client;
-  debt: number;
-  selected: boolean;
-  mergeMode: boolean;
-  mergeSelected: boolean;
-  onSelect: () => void;
-  onMergeToggle: () => void;
-  onToggleLegal: () => void;
-}) {
-  const days = daysAgo(c.last_trip_at);
-  return (
-    <div
-      onClick={mergeMode ? onMergeToggle : onSelect}
-      className={[
-        'client-row flex items-center gap-3 px-4 py-3 cursor-pointer border-l-2 border-transparent transition-colors',
-        selected && !mergeMode ? 'selected' : 'hover:bg-slate-50',
-        mergeMode && mergeSelected ? 'bg-blue-50 !border-l-blue-400' : '',
-        !c.is_active ? 'opacity-40' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
-      {mergeMode ? (
-        <div
-          className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center ${mergeSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}
-        >
-          {mergeSelected && <span className="text-white text-[9px] font-black">✓</span>}
-        </div>
-      ) : (
-        <div
-          className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${avatarCls(days)}`}
-        >
-          {c.name.slice(0, 2).toUpperCase()}
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium text-slate-800 truncate leading-tight">
-            {c.name}
-          </span>
-          {c.is_legal_entity && (
-            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide bg-blue-100 text-blue-700 px-1.5 py-px rounded-full">
-              ЮЛ
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-slate-400">
-            <Money amount={c.total_revenue} />
-          </span>
-          {debt > 0 && (
-            <span className="text-[10px] bg-rose-50 text-rose-600 px-1 py-px rounded font-semibold">
-              Долг
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Юрлицо чекбокс */}
-        {!mergeMode && (
-          <button
-            type="button"
-            title={
-              c.is_legal_entity
-                ? 'Юрлицо — нажмите чтобы сменить на физлицо'
-                : 'Физлицо — нажмите чтобы отметить как юрлицо'
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleLegal();
-            }}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold transition-colors ${
-              c.is_legal_entity
-                ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'
-                : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
-            }`}
-          >
-            <span>{c.is_legal_entity ? '☑' : '☐'}</span>
-            <span>ЮЛ</span>
-          </button>
-        )}
-        <div className="text-right">
-          <div className={`text-[11px] ${actColor(days)}`}>{lastTripLabel(days)}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{c.trips_count} рейс.</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Detail panel ───────────────────────────────────────────────────────────
-
-function ClientDetail({
-  client: c,
-  debt,
-  tripHistory,
-  onEdit,
-  onToggleActive,
-  onPromote,
-  onDelete,
-}: {
-  client: Client;
-  debt: number;
-  tripHistory: TripRecord[] | undefined;
-  onEdit: () => void;
-  onToggleActive: () => void;
-  onPromote: () => void;
-  onDelete: () => void;
-}) {
-  const days = daysAgo(c.last_trip_at);
-  const badge = actBadge(days);
-  const monthly = c.monthly.map((v) => parseFloat(v));
-  const maxBar = Math.max(...monthly, 1);
-  const labels = c.month_labels;
-  const topPay = Object.entries(c.payment_breakdown)
-    .filter(([, v]) => v > 0)
-    .sort(([, a], [, b]) => b - a);
-
-  const overheadPct = c.overhead_pct;
-  const netProfit = parseFloat(c.net_profit);
-  const isNetPositive = netProfit >= 0;
-
-  return (
-    <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-      {/* Шапка клиента */}
-      <div className="flex items-start justify-between mb-5">
-        <div className="flex items-center gap-4">
-          <div
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0 ${avatarCls(days)}`}
-          >
-            {c.name.slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 leading-tight">{c.name}</h2>
-            <div className="flex flex-wrap items-center gap-2 mt-1.5">
-              {c.phone && (
-                <a href={`tel:${c.phone}`} className="text-sm text-slate-500 hover:text-slate-700">
-                  {formatPhone(c.phone)}
-                </a>
-              )}
-              {c.email && (
-                <span className="text-sm text-slate-400 flex items-center">
-                  {c.email}
-                  <CopyEmail email={c.email} />
-                </span>
-              )}
-              {badge && (
-                <span className={`text-[10px] ${badge.cls} px-1.5 py-0.5 rounded font-semibold`}>
-                  {badge.label}
-                </span>
-              )}
-              {c.is_regular && (
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">
-                  Постоянный
-                </span>
-              )}
-              {debt > 0 && (
-                <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded font-semibold">
-                  Долг: <Money amount={debt.toFixed(2)} />
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button
-            onClick={onEdit}
-            className="px-3 py-1.5 text-sm border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors"
-          >
-            Редакт.
-          </button>
-          <button
-            onClick={onPromote}
-            className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-medium"
-          >
-            {c.is_regular ? '↓ В разовые' : '★ В пост.'}
-          </button>
-        </div>
-      </div>
-
-      {/* KPI — 4 плитки */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        <div className="bg-slate-50 rounded-xl p-3.5">
-          <div className="text-xs text-slate-400 mb-1">Выручка всего</div>
-          <div className="text-lg font-bold text-slate-900">
-            {parseFloat(c.total_revenue) > 0 ? <Money amount={c.total_revenue} /> : '—'}
-          </div>
-        </div>
-        <div className={`rounded-xl p-3.5 ${isNetPositive ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-          <div className={`text-xs mb-1 ${isNetPositive ? 'text-emerald-600' : 'text-rose-500'}`}>
-            Чист. прибыль
-          </div>
-          <div
-            className={`text-lg font-bold ${isNetPositive ? 'text-emerald-700' : 'text-rose-600'}`}
-          >
-            {parseFloat(c.total_revenue) > 0 ? <Money amount={c.net_profit} /> : '—'}
-          </div>
-        </div>
-        <div className="bg-slate-50 rounded-xl p-3.5">
-          <div className="text-xs text-slate-400 mb-1">Рейсов</div>
-          <div className="text-lg font-bold text-slate-900">{c.trips_count}</div>
-        </div>
-        <div className="bg-slate-50 rounded-xl p-3.5">
-          <div className="text-xs text-slate-400 mb-1">Ср. выручка / рейс</div>
-          <div className="text-lg font-bold text-slate-900">
-            {parseFloat(c.avg_order) > 0 ? <Money amount={c.avg_order} /> : '—'}
-          </div>
-        </div>
-      </div>
-
-      {/* Состав чист. прибыли */}
-      {parseFloat(c.total_revenue) > 0 && (
-        <div className="mb-5 px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500 flex flex-wrap gap-x-4 gap-y-1">
-          <span>
-            Выручка{' '}
-            <span className="text-slate-700 font-semibold">
-              <Money amount={c.total_revenue} />
-            </span>
-          </span>
-          <span className="text-slate-300">−</span>
-          <span>
-            ЗП+ГСМ{' '}
-            <span className="text-slate-700 font-semibold">
-              <Money
-                amount={(
-                  parseFloat(c.total_revenue) * (1 - overheadPct) -
-                  parseFloat(c.net_profit)
-                ).toFixed(2)}
-              />
-            </span>
-          </span>
-          <span className="text-slate-300">−</span>
-          <span>
-            Накладные{' '}
-            <span className="text-slate-700 font-semibold">{Math.round(overheadPct * 100)}%</span>
-          </span>
-          <span className="text-slate-300">=</span>
-          <span
-            className={isNetPositive ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}
-          >
-            <Money amount={c.net_profit} />
-          </span>
-        </div>
-      )}
-
-      {/* Столбчатый график по месяцам */}
-      <div className="mb-5">
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Выручка по месяцам
-        </div>
-        <div className="flex items-end gap-2 h-20">
-          {monthly.map((v, i) => {
-            const h = v > 0 ? Math.max(Math.round((v / maxBar) * 72), 4) : 0;
-            const isLast = i === monthly.length - 1;
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="text-[10px] text-slate-400 font-medium">
-                  {v > 0 ? rubShort(v) : '—'}
-                </div>
-                <div
-                  className={`w-full rounded-t-lg transition-all ${isLast ? 'bg-slate-900' : 'bg-slate-200'}`}
-                  style={{ height: `${h}px`, minHeight: v > 0 ? '4px' : '0' }}
-                />
-                <div className="text-[10px] text-slate-400">{labels[i]}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Нижний ряд: оплата + детали */}
-      <div className="grid grid-cols-2 gap-4 mb-5">
-        <div>
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            Способы оплаты
-          </div>
-          {topPay.length > 0 ? (
-            <div className="space-y-2">
-              {topPay.map(([pm, pct]) => (
-                <div key={pm} className="flex items-center gap-2">
-                  <div className="w-28 text-xs text-slate-600 shrink-0">
-                    {PAYMENT_LABEL[pm] ?? pm}
-                  </div>
-                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`${PAYMENT_COLOR[pm] ?? 'bg-slate-400'} h-full rounded-full`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="text-xs font-bold text-slate-600 w-8 text-right">{pct}%</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-300">Нет данных</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            Детали
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Последний рейс</span>
-            <span className={`${actColor(days)} font-medium`}>{lastTripLabel(days)}</span>
-          </div>
-          {c.credit_limit && parseFloat(c.credit_limit) > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Кредитный лимит</span>
-              <span className="text-slate-700 font-medium">
-                <Money amount={c.credit_limit} />
-              </span>
-            </div>
-          )}
-          {debt > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Дебиторка</span>
-              <span className="text-rose-600 font-semibold">
-                <Money amount={debt.toFixed(2)} />
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Статус</span>
-            <span className="text-slate-700">{c.is_regular ? 'Постоянный' : 'Разовый'}</span>
-          </div>
-          {c.notes && (
-            <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 leading-relaxed">
-              {c.notes}
-            </div>
-          )}
-          <div className="pt-2 space-y-1.5">
-            <button
-              onClick={onToggleActive}
-              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-400 hover:bg-slate-50 transition-colors"
-            >
-              <span>{c.is_active ? '⊗' : '↺'}</span>
-              {c.is_active ? 'В архив' : 'Восстановить'}
-            </button>
-            {c.orders_count === 0 && (
-              <button
-                onClick={onDelete}
-                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl border border-rose-100 text-xs font-semibold text-rose-400 hover:bg-rose-50 transition-colors"
-              >
-                <span>🗑</span> Удалить
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* История рейсов */}
-      <div>
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          История рейсов
-        </div>
-        {tripHistory === undefined ? (
-          <div className="space-y-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 animate-pulse bg-slate-50 rounded-xl" />
-            ))}
-          </div>
-        ) : tripHistory.length === 0 ? (
-          <p className="text-xs text-slate-300 py-3 text-center">Нет завершённых рейсов</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[10px] text-slate-400 uppercase tracking-wide border-b border-slate-100">
-                  <th className="text-left pb-2 font-semibold">Дата</th>
-                  <th className="text-left pb-2 font-semibold">Водитель</th>
-                  <th className="text-left pb-2 font-semibold">Машина</th>
-                  <th className="text-right pb-2 font-semibold">Выручка</th>
-                  <th className="text-right pb-2 font-semibold">ЗП+Груз</th>
-                  <th className="text-right pb-2 font-semibold">ГСМ</th>
-                  <th className="text-right pb-2 font-semibold">Чистая</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {tripHistory.map((t) => {
-                  const amount = parseFloat(t.amount);
-                  const labor = parseFloat(t.driver_pay) + parseFloat(t.loader_pay);
-                  const fuel = parseFloat(t.fuel_allocated);
-                  const gross = parseFloat(t.gross_profit);
-                  const net = gross - amount * overheadPct;
-                  return (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 text-slate-500">{fmtDate(t.started_at)}</td>
-                      <td className="py-2.5 text-slate-700 font-medium max-w-[100px] truncate">
-                        {t.driver_name ?? '—'}
-                      </td>
-                      <td className="py-2.5 text-slate-500">{t.asset_name ?? '—'}</td>
-                      <td className="py-2.5 text-right text-slate-700 font-medium">
-                        <Money amount={t.amount} />
-                      </td>
-                      <td className="py-2.5 text-right text-slate-400">
-                        {labor > 0 ? <Money amount={labor.toFixed(2)} /> : '—'}
-                      </td>
-                      <td className="py-2.5 text-right text-slate-400">
-                        {fuel > 0 ? <Money amount={fuel.toFixed(2)} /> : '—'}
-                      </td>
-                      <td
-                        className={`py-2.5 text-right font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
-                      >
-                        <Money amount={net.toFixed(2)} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Merge panel ────────────────────────────────────────────────────────────
-
-function MergePanel({
-  clients,
-  selected,
-  onConfirm,
-  pending,
-  error,
-}: {
-  clients: Client[];
-  selected: Set<string>;
-  onConfirm: (sourceId: string, targetId: string) => void;
-  pending: boolean;
-  error: string;
-}) {
-  const [a, b] = Array.from(selected);
-  if (!a || !b) {
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 font-medium">
-        Выберите двух клиентов из списка ({selected.size} / 2)
-      </div>
-    );
-  }
-  const ca = clients.find((c) => c.id === a)!;
-  const cb = clients.find((c) => c.id === b)!;
-  const targetId = parseFloat(ca.total_revenue) >= parseFloat(cb.total_revenue) ? a : b;
-  const sourceId = targetId === a ? b : a;
-  const target = clients.find((c) => c.id === targetId)!;
-  const source = clients.find((c) => c.id === sourceId)!;
-  const mergedRevenue = (
-    parseFloat(source.total_revenue) + parseFloat(target.total_revenue)
-  ).toFixed(2);
-
-  return (
-    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-      <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-        Предпросмотр объединения
-      </p>
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-        <div className="bg-white rounded-lg border border-rose-200 px-3 py-2">
-          <p className="text-[9px] font-bold text-rose-400 uppercase">Будет деактивирован</p>
-          <p className="text-sm font-bold text-slate-800 truncate mt-0.5">{source.name}</p>
-        </div>
-        <span className="text-blue-300 font-black text-lg">+</span>
-        <div className="bg-white rounded-lg border border-emerald-200 px-3 py-2">
-          <p className="text-[9px] font-bold text-emerald-500 uppercase">Останется</p>
-          <p className="text-sm font-bold text-slate-800 truncate mt-0.5">{target.name}</p>
-        </div>
-      </div>
-      <div className="bg-white rounded-lg border-2 border-blue-300 px-3 py-2 flex items-center justify-between">
-        <p className="text-sm font-bold text-slate-900">{target.name}</p>
-        <p className="text-sm font-black text-slate-900">
-          <Money amount={mergedRevenue} />
-        </p>
-      </div>
-      {error && <p className="text-xs text-rose-600 font-semibold">{error}</p>}
-      <button
-        onClick={() => onConfirm(sourceId, targetId)}
-        disabled={pending}
-        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
-      >
-        {pending ? 'Объединяю...' : `Объединить → ${target.name}`}
-      </button>
-    </div>
-  );
-}
-
-// ── Client form modal ──────────────────────────────────────────────────────
-
-function ClientModal({
-  editId,
-  form,
-  setForm,
-  onSave,
-  onClose,
-  saving,
-  error,
-}: {
-  editId: string | null;
-  form: typeof emptyForm;
-  setForm: (f: typeof emptyForm) => void;
-  onSave: () => void;
-  onClose: () => void;
-  saving: boolean;
-  error: string;
-}) {
-  const inp =
-    'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-slate-300 outline-none';
-  return (
-    <div className="fixed inset-0 z-50" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-900">
-            {editId ? 'Редактировать клиента' : 'Новый клиент'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">
-              Название / Имя *
-            </label>
-            <input
-              className={inp}
-              placeholder="ООО Металлург или Иванов И.И."
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Телефон</label>
-            <input
-              type="tel"
-              className={inp}
-              placeholder="+7 922 000-00-00"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Email</label>
-            <input
-              type="email"
-              className={inp}
-              placeholder="client@company.ru"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">
-              Кредитный лимит
-            </label>
-            <input
-              type="number"
-              className={inp}
-              placeholder="0 — без лимита"
-              value={form.credit_limit}
-              onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              При превышении — предупреждение при создании рейса
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Заметки</label>
-            <textarea
-              rows={3}
-              className={`${inp} resize-none`}
-              placeholder="Особенности работы, контактное лицо..."
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
-          </div>
-        </div>
-        {error && <p className="mx-5 mb-2 text-xs text-rose-600 font-medium">{error}</p>}
-        <div className="p-5 border-t border-slate-100 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 text-sm border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="flex-1 py-2.5 text-sm bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Oneoff aggregate tab ───────────────────────────────────────────────────
-
-function OneoffAggregateTab({ irregular, regular }: { irregular: Client[]; regular: Client[] }) {
-  const overhead_pct = irregular[0]?.overhead_pct ?? regular[0]?.overhead_pct ?? 0;
-
-  const totalRevIrreg = irregular.reduce((s, c) => s + parseFloat(c.total_revenue), 0);
-  const totalRevReg = regular.reduce((s, c) => s + parseFloat(c.total_revenue), 0);
-  const totalRevAll = totalRevIrreg + totalRevReg;
-
-  const totalNetIrreg = irregular.reduce((s, c) => s + parseFloat(c.net_profit), 0);
-  const totalNetReg = regular.reduce((s, c) => s + parseFloat(c.net_profit), 0);
-  const totalNetAll = totalNetIrreg + totalNetReg;
-
-  const totalGrossIrreg = totalNetIrreg + totalRevIrreg * overhead_pct;
-  const totalGrossReg = totalNetReg + totalRevReg * overhead_pct;
-  const totalGrossAll = totalGrossIrreg + totalGrossReg;
-
-  const tripsIrreg = irregular.reduce((s, c) => s + c.trips_count, 0);
-  const tripsReg = regular.reduce((s, c) => s + c.trips_count, 0);
-
-  const avgRevIrreg = tripsIrreg > 0 ? totalRevIrreg / tripsIrreg : 0;
-  const avgRevReg = tripsReg > 0 ? totalRevReg / tripsReg : 0;
-  const avgNetIrreg = tripsIrreg > 0 ? totalNetIrreg / tripsIrreg : 0;
-  const avgNetReg = tripsReg > 0 ? totalNetReg / tripsReg : 0;
-  const marginIrreg = totalRevIrreg > 0 ? (totalNetIrreg / totalRevIrreg) * 100 : 0;
-  const marginReg = totalRevReg > 0 ? (totalNetReg / totalRevReg) * 100 : 0;
-
-  const revShareIrreg = totalRevAll > 0 ? Math.round((totalRevIrreg / totalRevAll) * 100) : 0;
-  const grossShareIrreg =
-    totalGrossAll > 0 ? Math.round((totalGrossIrreg / totalGrossAll) * 100) : 0;
-  const netShareIrreg =
-    totalNetAll !== 0 ? Math.round((totalNetIrreg / Math.abs(totalNetAll)) * 100) : 0;
-
-  const monthlyData =
-    irregular.length > 0 && irregular[0]
-      ? irregular[0].monthly.map((_, i) =>
-          irregular.reduce((s, c) => s + parseFloat(c.monthly[i] ?? '0'), 0),
-        )
-      : Array(6).fill(0);
-  const monthLabels = irregular[0]?.month_labels ?? [];
-  const maxMonthly = Math.max(...monthlyData, 1);
-
-  return (
-    <div className="space-y-4">
-      {/* KPI — 4 плитки */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 p-3">
-          <div className="text-[11px] text-slate-400 mb-1">Разовых клиентов</div>
-          <div className="text-xl font-bold text-slate-900">{irregular.length}</div>
-          <div className="text-[11px] text-amber-600 mt-1">{tripsIrreg} рейсов всего</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-3">
-          <div className="text-[11px] text-slate-400 mb-1">Выручка разовых</div>
-          <div className="text-xl font-bold text-slate-900">
-            {totalRevIrreg > 0 ? <Money amount={totalRevIrreg.toFixed(2)} /> : '—'}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">{revShareIrreg}% от общей выручки</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-3">
-          <div className="text-[11px] text-slate-400 mb-1">Валовая прибыль</div>
-          <div className="text-xl font-bold text-slate-900">
-            {totalGrossIrreg > 0 ? <Money amount={totalGrossIrreg.toFixed(2)} /> : '—'}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">{grossShareIrreg}% от общей вал.п.</div>
-        </div>
-        <div
-          className={`rounded-2xl border p-3 ${totalNetIrreg >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}
-        >
-          <div
-            className={`text-[11px] mb-1 ${totalNetIrreg >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
-          >
-            Чистая прибыль
-          </div>
-          <div
-            className={`text-xl font-bold ${totalNetIrreg >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}
-          >
-            {totalRevIrreg > 0 ? <Money amount={totalNetIrreg.toFixed(2)} /> : '—'}
-          </div>
-          <div
-            className={`text-[11px] mt-1 ${totalNetIrreg >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
-          >
-            {netShareIrreg}% от общей ЧП
-          </div>
-        </div>
-      </div>
-
-      {/* Сетка 2×1 */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Сравнение с постоянными */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <div className="text-sm font-semibold text-slate-800 mb-4">
-            Разовые vs Постоянные клиенты
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-slate-400 uppercase tracking-wide">
-                <th className="text-left pb-2 font-semibold">Метрика</th>
-                <th className="text-right pb-2 font-semibold text-slate-600">Пост.</th>
-                <th className="text-right pb-2 font-semibold text-amber-600">Разовые</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              <tr>
-                <td className="py-2.5 text-slate-500 text-xs">Рейсов</td>
-                <td className="py-2.5 text-right font-semibold text-slate-700">{tripsReg}</td>
-                <td className="py-2.5 text-right font-semibold text-amber-700">{tripsIrreg}</td>
-              </tr>
-              <tr>
-                <td className="py-2.5 text-slate-500 text-xs">Ср. выручка / рейс</td>
-                <td className="py-2.5 text-right font-semibold text-slate-700">
-                  {avgRevReg > 0 ? <Money amount={avgRevReg.toFixed(2)} /> : '—'}
-                </td>
-                <td className="py-2.5 text-right font-semibold text-amber-700">
-                  {avgRevIrreg > 0 ? <Money amount={avgRevIrreg.toFixed(2)} /> : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td className="py-2.5 text-slate-500 text-xs">Ср. ЧП / рейс</td>
-                <td className="py-2.5 text-right font-semibold text-slate-700">
-                  {avgNetReg !== 0 ? <Money amount={avgNetReg.toFixed(2)} /> : '—'}
-                </td>
-                <td className="py-2.5 text-right font-semibold text-amber-700">
-                  {avgNetIrreg !== 0 ? <Money amount={avgNetIrreg.toFixed(2)} /> : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td className="py-2.5 text-slate-500 text-xs">Маржинальность</td>
-                <td className="py-2.5 text-right">
-                  <span
-                    className={`font-bold text-sm ${marginReg >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-                  >
-                    {marginReg.toFixed(1)}%
-                  </span>
-                </td>
-                <td className="py-2.5 text-right">
-                  <span
-                    className={`font-bold text-sm ${marginIrreg >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-                  >
-                    {marginIrreg.toFixed(1)}%
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          {/* Доля в структуре */}
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2.5">
-              Доля в общей прибыли
-            </div>
-            {[
-              { label: 'Выручка', val: revShareIrreg },
-              { label: 'Вал. прибыль', val: grossShareIrreg },
-              { label: 'Чист. прибыль', val: netShareIrreg },
-            ].map(({ label, val }) => (
-              <div key={label} className="flex items-center gap-2 mb-1.5">
-                <span className="text-[11px] text-slate-500 w-24 shrink-0">{label}</span>
-                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="bg-amber-400 h-full rounded-full"
-                    style={{ width: `${Math.max(0, val)}%` }}
-                  />
-                </div>
-                <span className="text-[11px] font-bold text-amber-700 w-8 text-right">{val}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Динамика */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <div className="text-sm font-semibold text-slate-800 mb-4">Динамика выручки</div>
-          {monthlyData.some((v) => v > 0) ? (
-            <>
-              <div className="flex items-end gap-2 h-36">
-                {monthlyData.map((v, i) => {
-                  const h = v > 0 ? Math.max(Math.round((v / maxMonthly) * 130), 4) : 0;
-                  const isLast = i === monthlyData.length - 1;
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <div className="text-[10px] text-slate-400">{v > 0 ? rubShort(v) : ''}</div>
-                      <div
-                        className={`w-full rounded-t-lg ${isLast ? 'bg-amber-500' : 'bg-amber-200'}`}
-                        style={{ height: `${h}px`, minHeight: v > 0 ? '4px' : '0' }}
-                      />
-                      <div className="text-[10px] text-slate-400">{monthLabels[i]}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-slate-300 text-center py-10">Нет данных за 6 месяцев</p>
-          )}
-
-          <div className="mt-5 pt-4 border-t border-slate-100">
-            <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">
-              Вывод
-            </div>
-            {totalRevIrreg > 0 ? (
-              <div className="text-sm text-slate-600 leading-relaxed">
-                {marginIrreg > marginReg ? (
-                  <span>
-                    Разовые клиенты <strong className="text-emerald-700">выгоднее</strong>{' '}
-                    постоянных по маржинальности: {marginIrreg.toFixed(1)}% vs{' '}
-                    {marginReg.toFixed(1)}%.
-                  </span>
-                ) : marginIrreg > 0 ? (
-                  <span>
-                    Постоянные клиенты выгоднее: маржа {marginReg.toFixed(1)}% vs{' '}
-                    {marginIrreg.toFixed(1)}% у разовых.
-                  </span>
-                ) : (
-                  <span className="text-rose-600">
-                    Разовые клиенты убыточны при текущих расходах.
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400">Нет завершённых рейсов</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Client list panel (shared by both tabs) ────────────────────────────────
-
-function ClientListPanel({
-  list,
-  isLoading,
-  selectedId,
-  debtMap,
-  mergeMode,
-  mergeSelected,
-  showInactive,
-  search,
-  onSearch,
-  onSelect,
-  onMergeToggle,
-  onToggleInactive,
-  onToggleMerge,
-  onToggleLegal,
-}: {
-  list: Client[];
-  isLoading: boolean;
-  selectedId: string | null;
-  debtMap: Map<string, number>;
-  mergeMode: boolean;
-  mergeSelected: Set<string>;
-  showInactive: boolean;
-  search: string;
-  onSearch: (v: string) => void;
-  onSelect: (id: string) => void;
-  onMergeToggle: (id: string) => void;
-  onToggleInactive: () => void;
-  onToggleMerge: () => void;
-  onToggleLegal: (c: Client) => void;
-}) {
-  return (
-    <div className="w-80 flex-shrink-0">
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="p-3 border-b border-slate-100">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Поиск по имени..."
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-slate-300 outline-none"
-          />
-        </div>
-
-        <div className="overflow-y-auto divide-y divide-slate-100" style={{ maxHeight: '580px' }}>
-          {isLoading ? (
-            [1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="h-[60px] animate-pulse bg-slate-50 border-b border-slate-50"
-              />
-            ))
-          ) : list.length === 0 ? (
-            <div className="p-6 text-center text-sm text-slate-400">Нет клиентов</div>
-          ) : (
-            <>
-              {/* Секция Юрлиц */}
-              {list.some((c) => c.is_legal_entity) && (
-                <>
-                  <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                      🏢 Юрлица
-                    </span>
-                    <span className="text-[10px] text-blue-400">
-                      {list.filter((c) => c.is_legal_entity).length} кл.
-                    </span>
-                  </div>
-                  {list
-                    .filter((c) => c.is_legal_entity)
-                    .map((c) => (
-                      <ClientRow
-                        key={c.id}
-                        client={c}
-                        debt={debtMap.get(c.id) ?? 0}
-                        selected={selectedId === c.id}
-                        mergeMode={mergeMode}
-                        mergeSelected={mergeSelected.has(c.id)}
-                        onSelect={() => onSelect(c.id)}
-                        onMergeToggle={() => onMergeToggle(c.id)}
-                        onToggleLegal={() => onToggleLegal(c)}
-                      />
-                    ))}
-                </>
-              )}
-              {/* Секция Физлиц */}
-              {list.some((c) => !c.is_legal_entity) && (
-                <>
-                  <div className="px-4 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      👤 Физлица
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {list.filter((c) => !c.is_legal_entity).length} кл.
-                    </span>
-                  </div>
-                  {list
-                    .filter((c) => !c.is_legal_entity)
-                    .map((c) => (
-                      <ClientRow
-                        key={c.id}
-                        client={c}
-                        debt={debtMap.get(c.id) ?? 0}
-                        selected={selectedId === c.id}
-                        mergeMode={mergeMode}
-                        mergeSelected={mergeSelected.has(c.id)}
-                        onSelect={() => onSelect(c.id)}
-                        onMergeToggle={() => onMergeToggle(c.id)}
-                        onToggleLegal={() => onToggleLegal(c)}
-                      />
-                    ))}
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="p-3 border-t border-slate-100">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onToggleMerge}
-              className={`text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${mergeMode ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-            >
-              {mergeMode ? '✕ Отмена' : '⇋ Объединить'}
-            </button>
-            <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer ml-auto">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={onToggleInactive}
-                className="accent-slate-600"
-              />
-              Архив
-            </label>
-            <span className="text-[10px] text-slate-300">{list.length} кл.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main page ──────────────────────────────────────────────────────────────
-
-export default function ClientsPage() {
+export default function CounterpartiesPage() {
   const qc = useQueryClient();
 
-  const [tab, setTab] = useState<'regular' | 'oneoff'>('regular');
+  // Filters & State
   const [search, setSearch] = useState('');
+  const [segment, setSegment] = useState<
+    'all' | 'client' | 'supplier' | 'debtors' | 'creditors' | 'sleeping'
+  >('all');
+  const [legalFilter, setLegalFilter] = useState<'all' | 'legal' | 'individual'>('all');
   const [showInactive, setShowInactive] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [showForm, setShowForm] = useState(false);
+  // Selection & Drawer
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'finance' | 'history' | 'requisites' | 'crm'>(
+    'finance',
+  );
+
+  // Modals
+  const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
 
-  const [mergeMode, setMergeMode] = useState(false);
-  const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
-  const [mergeError, setMergeError] = useState('');
+  // Quick Pay Modal (Погашение долга поставщику)
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payWallet, setPayWallet] = useState<
+    '10000000-0000-0000-0000-000000000001' | '10000000-0000-0000-0000-000000000002'
+  >('10000000-0000-0000-0000-000000000001');
+  const [payDescription, setPayDescription] = useState('');
+  const [payPending, setPayPending] = useState(false);
 
-  const [oneoffView, setOneoffView] = useState<'analytics' | 'list'>('analytics');
+  // Sorting
+  const [sortCol, setSortCol] = useState<
+    'name' | 'revenue' | 'profit' | 'debt' | 'trips' | 'activity'
+  >('debt');
+  const [sortAsc, setSortAsc] = useState(false);
 
-  const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ['clients'],
+  // Queries
+  const { data: counterparties = [], isLoading } = useQuery<Counterparty[]>({
+    queryKey: ['counterparties'],
     queryFn: () => fetch('/api/counterparties').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
-  const { data: receivables } = useQuery<RecvData>({
-    queryKey: ['receivables'],
-    queryFn: () => fetch('/api/receivables').then((r) => r.json()),
-    staleTime: 2 * 60 * 1000,
-  });
+  const selectedCp = useMemo(() => {
+    return counterparties.find((c) => c.id === selectedId) || null;
+  }, [counterparties, selectedId]);
 
-  const { data: tripHistory } = useQuery<TripRecord[]>({
-    queryKey: ['client-trips', selectedId],
+  const { data: history = [], isLoading: historyLoading } = useQuery<TripRecord[]>({
+    queryKey: ['counterparty-history', selectedId],
     queryFn: () => fetch(`/api/counterparties/${selectedId!}/trips`).then((r) => r.json()),
-    enabled: !!selectedId,
-    staleTime: 5 * 60 * 1000,
+    enabled: Boolean(selectedId && drawerOpen),
+    staleTime: 60 * 1000,
   });
 
-  const debtMap = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const d of receivables?.debtors ?? []) {
-      if (!String(d.counterparty_id).startsWith('__')) {
-        m.set(d.counterparty_id, parseFloat(d.total));
+  // KPI Calculations
+  const metrics = useMemo(() => {
+    let clientsCount = 0;
+    let suppliersCount = 0;
+    let legalCount = 0;
+    let indCount = 0;
+    let rev30d = 0;
+    let netProfit30d = 0;
+    let totalClientDebt = 0; // дебиторка
+    let totalSupplierDebt = 0; // кредиторка
+    let debtorsCount = 0;
+    let creditorsCount = 0;
+
+    for (const cp of counterparties) {
+      if (!cp.is_active && !showInactive) continue;
+
+      if (cp.type === 'client') clientsCount++;
+      else if (cp.type === 'supplier') suppliersCount++;
+      else {
+        clientsCount++;
+        suppliersCount++;
+      }
+
+      if (cp.is_legal_entity) legalCount++;
+      else indCount++;
+
+      rev30d += parseFloat(cp.revenue_30d || '0');
+      netProfit30d += parseFloat(cp.net_profit || '0');
+
+      const rec = parseFloat(cp.receivable_amount || '0');
+      const pay = parseFloat(cp.payable_amount || '0');
+
+      if (rec > 0) {
+        totalClientDebt += rec;
+        debtorsCount++;
+      }
+      if (pay > 0) {
+        totalSupplierDebt += pay;
+        creditorsCount++;
       }
     }
-    return m;
-  }, [receivables]);
 
-  // Derived lists
-  const activeClients = clients.filter((c) => c.is_active);
-  const regular = activeClients.filter((c) => c.is_regular);
-  const irregular = activeClients.filter((c) => !c.is_regular);
-  const totalRevReg = regular.reduce((s, c) => s + parseFloat(c.total_revenue), 0);
-  const totalRevIrreg = irregular.reduce((s, c) => s + parseFloat(c.total_revenue), 0);
-  const totalRevAll = totalRevReg + totalRevIrreg;
-  const totalTripsIrreg = irregular.reduce((s, c) => s + c.trips_count, 0);
-  const revPctReg = totalRevAll > 0 ? Math.round((totalRevReg / totalRevAll) * 100) : 0;
-  const revPctIrreg = totalRevAll > 0 ? Math.round((totalRevIrreg / totalRevAll) * 100) : 0;
+    return {
+      total: counterparties.length,
+      clientsCount,
+      suppliersCount,
+      legalCount,
+      indCount,
+      rev30d,
+      netProfit30d,
+      totalClientDebt,
+      debtorsCount,
+      totalSupplierDebt,
+      creditorsCount,
+    };
+  }, [counterparties, showInactive]);
 
-  // Дубли: клиенты с одинаковым именем (нормализованным) — только активные
-  const duplicateGroups = useMemo(() => {
-    const nameMap = new Map<string, Client[]>();
-    for (const c of clients.filter((c) => c.is_active)) {
-      const key = c.name.trim().toLowerCase();
-      const arr = nameMap.get(key) ?? [];
-      arr.push(c);
-      nameMap.set(key, arr);
-    }
-    return Array.from(nameMap.values()).filter((arr) => arr.length > 1);
-  }, [clients]);
+  // Filtering & Sorting
+  const filteredList = useMemo(() => {
+    const q = search.trim().toLowerCase();
 
-  function getList(isRegular: boolean) {
-    const q = search.toLowerCase();
-    return (
-      clients
-        .filter((c) => {
-          if (!showInactive && !c.is_active) return false;
-          if (c.is_regular !== isRegular) return false;
-          if (q)
-            return (
-              c.name.toLowerCase().includes(q) ||
-              (c.phone ?? '').includes(q) ||
-              (c.email ?? '').toLowerCase().includes(q)
-            );
-          return true;
-        })
-        // Юрлица первыми, внутри группы — по выручке
-        .sort((a, b) => {
-          if (a.is_legal_entity !== b.is_legal_entity) return a.is_legal_entity ? -1 : 1;
-          return parseFloat(b.total_revenue) - parseFloat(a.total_revenue);
-        })
-    );
-  }
+    const list = counterparties.filter((cp) => {
+      if (!showInactive && !cp.is_active) return false;
 
-  const regularList = getList(true);
-  const currentList = tab === 'regular' ? regularList : getList(false);
-  const selectedClient = clients.find((c) => c.id === selectedId) ?? null;
+      // Text Search
+      if (q) {
+        const matchesName = cp.name.toLowerCase().includes(q);
+        const matchesPhone = (cp.phone ?? '').includes(q);
+        const matchesEmail = (cp.email ?? '').toLowerCase().includes(q);
+        const matchesNotes = (cp.notes ?? '').toLowerCase().includes(q);
+        if (!matchesName && !matchesPhone && !matchesEmail && !matchesNotes) return false;
+      }
 
-  // Auto-select first in regular list
-  const firstId = regularList[0]?.id;
-  if (tab === 'regular' && !selectedId && firstId) setSelectedId(firstId);
+      // Legal filter
+      if (legalFilter === 'legal' && !cp.is_legal_entity) return false;
+      if (legalFilter === 'individual' && cp.is_legal_entity) return false;
 
-  // ── Mutations ──
+      // Segment filter
+      if (segment === 'client' && cp.type === 'supplier') return false;
+      if (segment === 'supplier' && cp.type === 'client') return false;
+      if (segment === 'debtors' && parseFloat(cp.receivable_amount) <= 0) return false;
+      if (segment === 'creditors' && parseFloat(cp.payable_amount) <= 0) return false;
+      if (segment === 'sleeping') {
+        const days = daysAgo(cp.last_trip_at);
+        if (days === null || days <= 30) return false;
+      }
 
+      return true;
+    });
+
+    // Sort
+    list.sort((a, b) => {
+      let valA: number | string = 0;
+      let valB: number | string = 0;
+
+      if (sortCol === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (sortCol === 'revenue') {
+        valA = parseFloat(a.total_revenue || '0');
+        valB = parseFloat(b.total_revenue || '0');
+      } else if (sortCol === 'profit') {
+        valA = parseFloat(a.net_profit || '0');
+        valB = parseFloat(b.net_profit || '0');
+      } else if (sortCol === 'trips') {
+        valA = a.trips_count;
+        valB = b.trips_count;
+      } else if (sortCol === 'debt') {
+        valA = Math.abs(parseFloat(a.net_balance || '0'));
+        valB = Math.abs(parseFloat(b.net_balance || '0'));
+      } else if (sortCol === 'activity') {
+        valA = a.last_trip_at ? new Date(a.last_trip_at).getTime() : 0;
+        valB = b.last_trip_at ? new Date(b.last_trip_at).getTime() : 0;
+      }
+
+      if (sortAsc) return valA > valB ? 1 : -1;
+      return valA < valB ? 1 : -1;
+    });
+
+    return list;
+  }, [counterparties, search, segment, legalFilter, showInactive, sortCol, sortAsc]);
+
+  // Mutations
   const saveMutation = useMutation({
     mutationFn: (body: typeof emptyForm) => {
       const url = editId ? `/api/counterparties/${editId}` : '/api/counterparties';
@@ -1246,8 +286,8 @@ export default function ClientsPage() {
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['clients'] });
-      setShowForm(false);
+      qc.invalidateQueries({ queryKey: ['counterparties'] });
+      setShowModal(false);
       setEditId(null);
       setForm(emptyForm);
       setFormError('');
@@ -1255,374 +295,1178 @@ export default function ClientsPage() {
     onError: (e: Error) => setFormError(e.message),
   });
 
-  const mergeMutation = useMutation({
-    mutationFn: ({ source_id, target_id }: { source_id: string; target_id: string }) =>
-      fetch('/api/counterparties/merge', {
+  const toggleLegal = (cp: Counterparty) => {
+    fetch(`/api/counterparties/${cp.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_legal_entity: !cp.is_legal_entity }),
+    }).then(() => qc.invalidateQueries({ queryKey: ['counterparties'] }));
+  };
+
+  const toggleRegular = (cp: Counterparty) => {
+    fetch(`/api/counterparties/${cp.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_regular: !cp.is_regular }),
+    }).then(() => qc.invalidateQueries({ queryKey: ['counterparties'] }));
+  };
+
+  const handlePaySupplier = async () => {
+    if (!selectedCp || !payAmount || parseFloat(payAmount) <= 0) return;
+    setPayPending(true);
+    try {
+      const res = await fetch(`/api/counterparties/${selectedCp.id}/pay-debt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source_id, target_id }),
-      }).then(async (r) => {
-        const json = await r.json();
-        if (!r.ok) throw new Error(json.error ?? 'Ошибка');
-        return json;
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['clients'] });
-      setMergeMode(false);
-      setMergeSelected(new Set());
-      setMergeError('');
-    },
-    onError: (e: Error) => setMergeError(e.message),
-  });
+        body: JSON.stringify({
+          amount: parseFloat(payAmount),
+          wallet_id: payWallet,
+          description: payDescription || `Оплата поставщику ${selectedCp.name}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка выплаты');
 
-  const toggleActive = (c: Client) =>
-    fetch(`/api/counterparties/${c.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !c.is_active }),
-    }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
-
-  const toggleLegal = (c: Client) =>
-    fetch(`/api/counterparties/${c.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_legal_entity: !c.is_legal_entity }),
-    }).then(() => qc.invalidateQueries({ queryKey: ['clients'] }));
-
-  const promoteClient = (c: Client) =>
-    fetch(`/api/counterparties/${c.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_regular: !c.is_regular }),
-    }).then(() => {
-      qc.invalidateQueries({ queryKey: ['clients'] });
-      setSelectedId(null);
-    });
-
-  const deleteClient = async (c: Client) => {
-    if (!confirm(`Удалить «${c.name}»? Это действие необратимо.`)) return;
-    const res = await fetch(`/api/counterparties/${c.id}`, { method: 'DELETE' });
-    const json = await res.json();
-    if (!res.ok) {
-      alert(json.error ?? 'Ошибка удаления');
-      return;
+      qc.invalidateQueries({ queryKey: ['counterparties'] });
+      qc.invalidateQueries({ queryKey: ['wallets'] });
+      qc.invalidateQueries({ queryKey: ['counterparty-history', selectedCp.id] });
+      setShowPayModal(false);
+      setPayAmount('');
+      setPayDescription('');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Ошибка выплаты');
+    } finally {
+      setPayPending(false);
     }
-    if (selectedId === c.id) setSelectedId(null);
-    qc.invalidateQueries({ queryKey: ['clients'] });
   };
 
-  const openCreate = () => {
-    setEditId(null);
-    setForm(emptyForm);
-    setFormError('');
-    setShowForm(true);
+  const handleOpenRow = (cp: Counterparty) => {
+    setSelectedId(cp.id);
+    setDrawerOpen(true);
   };
 
-  const openEdit = (c: Client) => {
-    setEditId(c.id);
+  const handleEdit = (cp: Counterparty) => {
+    setEditId(cp.id);
     setForm({
-      name: c.name,
-      phone: c.phone ?? '',
-      email: c.email ?? '',
-      credit_limit: c.credit_limit ?? '',
-      notes: c.notes ?? '',
+      name: cp.name,
+      type: cp.type,
+      phone: cp.phone ?? '',
+      email: cp.email ?? '',
+      credit_limit: cp.credit_limit ?? '',
+      payable_amount: cp.payable_amount ?? '',
+      notes: cp.notes ?? '',
+      is_legal_entity: cp.is_legal_entity,
+      is_regular: cp.is_regular,
     });
     setFormError('');
-    setShowForm(true);
+    setShowModal(true);
   };
 
-  const handleMergeToggle = (id: string) => {
-    setMergeSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else if (next.size < 2) {
-        next.add(id);
-      }
-      return next;
-    });
-    setMergeError('');
+  const handleToggleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortAsc(!sortAsc);
+    else {
+      setSortCol(col);
+      setSortAsc(false);
+    }
   };
-
-  const switchTab = (t: 'regular' | 'oneoff') => {
-    setTab(t);
-    setSelectedId(null);
-    setSearch('');
-    setMergeMode(false);
-    if (t === 'regular') setOneoffView('analytics');
-    setMergeSelected(new Set());
-  };
-
-  // ── Render ──
 
   return (
-    <>
-      <style>{`
-        .client-row { border-left: 2px solid transparent; }
-        .client-row.selected { background: #f8fafc; border-left-color: #0f172a; }
-        .client-row:not(.selected):hover { background: #f8fafc; }
-      `}</style>
-
-      <div className="flex flex-col max-w-7xl mx-auto animate-in fade-in duration-300">
-        {/* ── KPI плитки — grid 5 колонок ── */}
-        <div className="grid grid-cols-5 gap-3 mb-4 pt-2">
-          <div className="bg-white rounded-2xl border border-slate-200 p-3">
-            <div className="text-[11px] text-slate-400 mb-0.5">Постоянных клиентов</div>
-            <div className="text-xl font-bold text-slate-900">{regular.length}</div>
-            <div className="text-[11px] text-emerald-600 mt-0.5">
-              {irregular.length > 0 ? `+ ${irregular.length} разовых` : 'все активны'}
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-3">
-            <div className="text-[11px] text-slate-400 mb-0.5">Выручка постоянных</div>
-            <div className="text-xl font-bold text-slate-900">
-              {totalRevReg > 0 ? <Money amount={totalRevReg.toFixed(2)} /> : '—'}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
-              {revPctReg > 0 ? `${revPctReg}% от общей` : '—'}
-            </div>
-          </div>
-          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3">
-            <div className="text-[11px] text-amber-600 mb-0.5">Разовых рейсов</div>
-            <div className="text-xl font-bold text-amber-700">{totalTripsIrreg}</div>
-            <div className="text-[11px] text-amber-500 mt-0.5">за всё время</div>
-          </div>
-          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3">
-            <div className="text-[11px] text-amber-600 mb-0.5">Выручка разовых</div>
-            <div className="text-xl font-bold text-amber-700">
-              {totalRevIrreg > 0 ? <Money amount={totalRevIrreg.toFixed(2)} /> : '—'}
-            </div>
-            <div className="text-[11px] text-amber-500 mt-0.5">
-              {revPctIrreg > 0 ? `${revPctIrreg}% от общей` : '—'}
-            </div>
-          </div>
-          <div className="bg-slate-900 rounded-2xl p-3 text-white">
-            <div className="text-[11px] text-slate-400 mb-0.5">Всего выручки</div>
-            <div className="text-xl font-bold">
-              {totalRevAll > 0 ? <Money amount={totalRevAll.toFixed(2)} /> : '—'}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">все клиенты</div>
+    <div className="space-y-4 max-w-[1720px] mx-auto animate-in fade-in duration-300">
+      {/* ── 5 Верхних KPI Карточек ── */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="text-[11px] text-slate-400 font-medium">Всего в реестре</div>
+          <div className="text-xl font-black text-slate-900 mt-0.5">{metrics.total}</div>
+          <div className="text-[10px] text-slate-500 mt-1">
+            {metrics.clientsCount} кл. · {metrics.suppliersCount} пост. · {metrics.legalCount} ЮЛ
           </div>
         </div>
 
-        {/* ── Табы + кнопка ── */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-            <button
-              onClick={() => switchTab('regular')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === 'regular' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
-            >
-              Постоянные клиенты
-              <span className="ml-1.5 text-xs bg-white text-slate-600 px-1.5 py-0.5 rounded-md font-semibold">
-                {regular.length}
-              </span>
-            </button>
-            <button
-              onClick={() => switchTab('oneoff')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === 'oneoff' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
-            >
-              Разовые клиенты
-              <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-semibold">
-                {irregular.length}
-              </span>
-            </button>
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="text-[11px] text-slate-400 font-medium">Оборот за 30 дней</div>
+          <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">
+            {metrics.rev30d > 0 ? <Money amount={metrics.rev30d.toFixed(2)} /> : '—'}
           </div>
-
-          {tab === 'oneoff' && (
-            <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-              <button
-                onClick={() => {
-                  setOneoffView('analytics');
-                  setSelectedId(null);
-                  setSearch('');
-                  setMergeMode(false);
-                  setMergeSelected(new Set());
-                }}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${oneoffView === 'analytics' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                📊 Аналитика
-              </button>
-              <button
-                onClick={() => setOneoffView('list')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${oneoffView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                📋 Список
-              </button>
-            </div>
-          )}
-
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Добавить клиента
-          </button>
+          <div className="text-[10px] text-emerald-600 font-semibold mt-1">
+            Активные рейсы клиентов
+          </div>
         </div>
 
-        {/* ── Дубли-баннер ── */}
-        {duplicateGroups.length > 0 && !mergeMode && (
-          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <div className="flex items-start gap-3">
-              <span className="text-amber-500 text-lg mt-0.5">⚠</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-800 mb-1">
-                  Обнаружены дубли — {duplicateGroups.length} группы
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {duplicateGroups.map((group) => (
-                    <span
-                      key={group[0]!.id}
-                      className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium"
-                    >
-                      «{group[0]!.name}» × {group.length}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-xs text-amber-600 mt-2">
-                  Нажмите <strong>⇋ Объединить</strong> в панели слева, выберите двух дублей и
-                  нажмите «Объединить».
-                </p>
-              </div>
-            </div>
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="text-[11px] text-slate-400 font-medium">Чистая прибыль (30д)</div>
+          <div className="text-xl font-black text-emerald-700 mt-0.5 font-mono">
+            {metrics.netProfit30d !== 0 ? <Money amount={metrics.netProfit30d.toFixed(2)} /> : '—'}
           </div>
-        )}
+          <div className="text-[10px] text-slate-500 mt-1">После вычета ЗП, ГСМ и накладных</div>
+        </div>
 
-        {/* ── Merge panel ── */}
-        {mergeMode && (
-          <div className="mb-4">
-            <MergePanel
-              clients={clients}
-              selected={mergeSelected}
-              onConfirm={(s, t) => mergeMutation.mutate({ source_id: s, target_id: t })}
-              pending={mergeMutation.isPending}
-              error={mergeError}
-            />
+        <div className="bg-rose-50/70 p-3.5 rounded-2xl border border-rose-200 shadow-2xs">
+          <div className="text-[11px] text-rose-700 font-bold">Дебиторка (Клиенты нам)</div>
+          <div className="text-xl font-black text-rose-700 mt-0.5 font-mono">
+            {metrics.totalClientDebt > 0 ? (
+              <Money amount={metrics.totalClientDebt.toFixed(2)} />
+            ) : (
+              '0 ₽'
+            )}
           </div>
-        )}
-
-        {/* ══ Таб 1: Постоянные — список + детали ══ */}
-        {tab === 'regular' && (
-          <div className="flex gap-4">
-            <ClientListPanel
-              list={currentList}
-              isLoading={isLoading}
-              selectedId={selectedId}
-              debtMap={debtMap}
-              mergeMode={mergeMode}
-              mergeSelected={mergeSelected}
-              showInactive={showInactive}
-              search={search}
-              onSearch={setSearch}
-              onSelect={setSelectedId}
-              onMergeToggle={handleMergeToggle}
-              onToggleInactive={() => setShowInactive((v) => !v)}
-              onToggleMerge={() => {
-                setMergeMode((v) => !v);
-                setMergeSelected(new Set());
-                setMergeError('');
-              }}
-              onToggleLegal={toggleLegal}
-            />
-
-            <div className="flex-1 min-w-0">
-              <div className="bg-white rounded-2xl border border-slate-200">
-                {selectedClient ? (
-                  <ClientDetail
-                    client={selectedClient}
-                    debt={debtMap.get(selectedClient.id) ?? 0}
-                    tripHistory={tripHistory}
-                    onEdit={() => openEdit(selectedClient)}
-                    onToggleActive={() => toggleActive(selectedClient)}
-                    onPromote={() => promoteClient(selectedClient)}
-                    onDelete={() => deleteClient(selectedClient)}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                    <p className="text-3xl mb-3">👈</p>
-                    <p className="text-sm font-bold text-slate-400">Выберите клиента</p>
-                    <p className="text-xs text-slate-300 mt-1">Детали появятся здесь</p>
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className="text-[10px] text-rose-600 font-semibold mt-1">
+            {metrics.debtorsCount} должников
           </div>
-        )}
+        </div>
 
-        {/* ══ Таб 2: Разовые — аналитика или список ══ */}
-        {tab === 'oneoff' && oneoffView === 'analytics' && (
-          <OneoffAggregateTab irregular={irregular} regular={regular} />
-        )}
-        {tab === 'oneoff' && oneoffView === 'list' && (
-          <div className="flex gap-4">
-            <ClientListPanel
-              list={currentList}
-              isLoading={isLoading}
-              selectedId={selectedId}
-              debtMap={debtMap}
-              mergeMode={mergeMode}
-              mergeSelected={mergeSelected}
-              showInactive={showInactive}
-              search={search}
-              onSearch={setSearch}
-              onSelect={setSelectedId}
-              onMergeToggle={handleMergeToggle}
-              onToggleInactive={() => setShowInactive((v) => !v)}
-              onToggleMerge={() => {
-                setMergeMode((v) => !v);
-                setMergeSelected(new Set());
-                setMergeError('');
-              }}
-              onToggleLegal={toggleLegal}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="bg-white rounded-2xl border border-slate-200">
-                {selectedClient ? (
-                  <ClientDetail
-                    client={selectedClient}
-                    debt={debtMap.get(selectedClient.id) ?? 0}
-                    tripHistory={tripHistory}
-                    onEdit={() => openEdit(selectedClient)}
-                    onToggleActive={() => toggleActive(selectedClient)}
-                    onPromote={() => promoteClient(selectedClient)}
-                    onDelete={() => deleteClient(selectedClient)}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                    <p className="text-3xl mb-3">👈</p>
-                    <p className="text-sm font-bold text-slate-400">Выберите клиента</p>
-                    <p className="text-xs text-slate-300 mt-1">Детали появятся здесь</p>
-                  </div>
-                )}
-              </div>
-            </div>
+        <div className="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200 shadow-2xs">
+          <div className="text-[11px] text-amber-800 font-bold">Кредиторка (Мы поставщикам)</div>
+          <div className="text-xl font-black text-amber-800 mt-0.5 font-mono">
+            {metrics.totalSupplierDebt > 0 ? (
+              <Money amount={metrics.totalSupplierDebt.toFixed(2)} />
+            ) : (
+              '0 ₽'
+            )}
           </div>
-        )}
+          <div className="text-[10px] text-amber-700 font-semibold mt-1">
+            ГСМ, запчасти, сервисы ({metrics.creditorsCount})
+          </div>
+        </div>
       </div>
 
-      {/* ── Модалка ── */}
-      {showForm && (
-        <ClientModal
-          editId={editId}
-          form={form}
-          setForm={setForm}
-          onSave={() => saveMutation.mutate(form)}
-          onClose={() => {
-            setShowForm(false);
-            setEditId(null);
-            setFormError('');
-          }}
-          saving={saveMutation.isPending}
-          error={formError}
-        />
+      {/* ── Панель Управления и Фильтров (Operations Bar) ── */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Поиск */}
+          <div className="relative min-w-[260px]">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск: имя, телефон, email, заметки..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+            <span className="material-symbols-outlined text-[16px] text-slate-400 absolute left-2.5 top-2">
+              search
+            </span>
+          </div>
+
+          {/* Быстрые сегменты */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+            <button
+              onClick={() => setSegment('all')}
+              className={`px-3 py-1 rounded-lg transition-all ${segment === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Все ({metrics.total})
+            </button>
+            <button
+              onClick={() => setSegment('client')}
+              className={`px-3 py-1 rounded-lg transition-all ${segment === 'client' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Клиенты ({metrics.clientsCount})
+            </button>
+            <button
+              onClick={() => setSegment('supplier')}
+              className={`px-3 py-1 rounded-lg transition-all ${segment === 'supplier' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Поставщики ({metrics.suppliersCount})
+            </button>
+            <button
+              onClick={() => setSegment('debtors')}
+              className={`px-3 py-1 rounded-lg transition-all ${segment === 'debtors' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-600 hover:bg-rose-100'}`}
+            >
+              Должники ({metrics.debtorsCount})
+            </button>
+            <button
+              onClick={() => setSegment('creditors')}
+              className={`px-3 py-1 rounded-lg transition-all ${segment === 'creditors' ? 'bg-amber-600 text-white shadow-xs' : 'text-amber-800 hover:bg-amber-100'}`}
+            >
+              Мы должны ({metrics.creditorsCount})
+            </button>
+            <button
+              onClick={() => setSegment('sleeping')}
+              className={`px-3 py-1 rounded-lg transition-all ${segment === 'sleeping' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              Спящие &gt;30д
+            </button>
+          </div>
+
+          {/* Правовая форма */}
+          <select
+            value={legalFilter}
+            onChange={(e) => setLegalFilter(e.target.value as 'all' | 'legal' | 'individual')}
+            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none"
+          >
+            <option value="all">Форма: Все</option>
+            <option value="legal">Юрлица (ООО / АО)</option>
+            <option value="individual">Физлица / ИП</option>
+          </select>
+
+          <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer ml-1 select-none">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={() => setShowInactive(!showInactive)}
+              className="accent-slate-800 rounded"
+            />
+            Архив
+          </label>
+        </div>
+
+        {/* Действия */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setEditId(null);
+              setForm(emptyForm);
+              setFormError('');
+              setShowModal(true);
+            }}
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Добавить контрагента
+          </button>
+        </div>
+      </div>
+
+      {/* ── B2B Operations Grid (Таблица Реестра) ── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+              <tr>
+                <th
+                  className="py-3 px-3.5 cursor-pointer hover:text-slate-900"
+                  onClick={() => handleToggleSort('name')}
+                >
+                  Контрагент ⇕
+                </th>
+                <th className="py-3 px-3">Тип / Роль</th>
+                <th className="py-3 px-3">Контакты</th>
+                <th
+                  className="py-3 px-3 text-right cursor-pointer hover:text-slate-900"
+                  onClick={() => handleToggleSort('revenue')}
+                >
+                  Выручка / Оборот ⇕
+                </th>
+                <th
+                  className="py-3 px-3 text-right cursor-pointer hover:text-slate-900"
+                  onClick={() => handleToggleSort('profit')}
+                >
+                  Чист. прибыль ⇕
+                </th>
+                <th
+                  className="py-3 px-3 text-right cursor-pointer hover:text-slate-900"
+                  onClick={() => handleToggleSort('trips')}
+                >
+                  Рейсов ⇕
+                </th>
+                <th
+                  className="py-3 px-3 text-right cursor-pointer hover:text-slate-900"
+                  onClick={() => handleToggleSort('debt')}
+                >
+                  Сальдо / Долг ⇕
+                </th>
+                <th
+                  className="py-3 px-3 cursor-pointer hover:text-slate-900"
+                  onClick={() => handleToggleSort('activity')}
+                >
+                  Активность ⇕
+                </th>
+                <th className="py-3 px-3 text-center w-24">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-slate-300 border-t-slate-800 mb-2"></div>
+                    <div>Загрузка контрагентов...</div>
+                  </td>
+                </tr>
+              ) : filteredList.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                    Не найдено контрагентов по заданным фильтрам
+                  </td>
+                </tr>
+              ) : (
+                filteredList.map((cp) => {
+                  const days = daysAgo(cp.last_trip_at);
+                  const recDebt = parseFloat(cp.receivable_amount || '0');
+                  const payDebt = parseFloat(cp.payable_amount || '0');
+
+                  const isSupplier = cp.type === 'supplier';
+                  const isBoth = cp.type === 'both';
+
+                  return (
+                    <tr
+                      key={cp.id}
+                      onClick={() => handleOpenRow(cp)}
+                      className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${selectedId === cp.id && drawerOpen ? 'bg-blue-50/80 font-medium' : ''} ${!cp.is_active ? 'opacity-40' : ''}`}
+                    >
+                      {/* Контрагент */}
+                      <td className="py-2.5 px-3.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="font-bold text-slate-900 text-xs truncate max-w-[220px]"
+                            title={cp.name}
+                          >
+                            {cp.name}
+                          </span>
+                          {cp.is_legal_entity ? (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLegal(cp);
+                              }}
+                              className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                              title="Юрлицо (кликните для смены)"
+                            >
+                              ЮЛ
+                            </span>
+                          ) : (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLegal(cp);
+                              }}
+                              className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition"
+                              title="Физлицо (кликните для смены)"
+                            >
+                              ФЛ
+                            </span>
+                          )}
+                        </div>
+                        {cp.notes && (
+                          <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">
+                            {cp.notes}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Тип / Роль */}
+                      <td className="py-2.5 px-3">
+                        {isSupplier ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                            <span>⛽</span> {cp.supplier_category || 'Поставщик'}
+                          </span>
+                        ) : isBoth ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                            Клиент + Пост.
+                          </span>
+                        ) : cp.is_regular ? (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleRegular(cp);
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer"
+                            title="Постоянный клиент"
+                          >
+                            ★ Постоянный
+                          </span>
+                        ) : (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleRegular(cp);
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer"
+                            title="Разовый клиент"
+                          >
+                            Разовый
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Контакты */}
+                      <td className="py-2.5 px-3">
+                        {cp.phone ? (
+                          <a
+                            href={`tel:${cp.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-slate-700 hover:text-blue-600 font-mono text-[11px] block"
+                          >
+                            {formatPhone(cp.phone)}
+                          </a>
+                        ) : (
+                          <span className="text-slate-300 text-[11px]">—</span>
+                        )}
+                        {cp.email && (
+                          <span
+                            className="text-[10px] text-slate-400 truncate block max-w-[130px]"
+                            title={cp.email}
+                          >
+                            {cp.email}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Выручка */}
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                        {parseFloat(cp.total_revenue) > 0 ? (
+                          <Money amount={cp.total_revenue} />
+                        ) : (
+                          <span className="text-slate-300 font-normal">—</span>
+                        )}
+                      </td>
+
+                      {/* Чистая прибыль */}
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        {parseFloat(cp.total_revenue) > 0 ? (
+                          <div>
+                            <span
+                              className={`font-bold ${parseFloat(cp.net_profit) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}
+                            >
+                              <Money amount={cp.net_profit} />
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              {cp.margin_pct}% маржа
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Рейсов */}
+                      <td className="py-2.5 px-3 text-right">
+                        {cp.trips_count > 0 ? (
+                          <span className="font-bold text-slate-800">{cp.trips_count}</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Сальдо / Долг */}
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        {recDebt > 0 ? (
+                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-700">
+                            нам: <Money amount={recDebt.toFixed(2)} />
+                          </span>
+                        ) : payDebt > 0 ? (
+                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800">
+                            наш долг: <Money amount={payDebt.toFixed(2)} />
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">0 ₽</span>
+                        )}
+                      </td>
+
+                      {/* Активность */}
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`text-[11px] font-medium ${days !== null && days > 30 ? 'text-amber-600' : 'text-slate-600'}`}
+                        >
+                          {lastActivityLabel(days)}
+                        </span>
+                      </td>
+
+                      {/* Действия */}
+                      <td className="py-2.5 px-3 text-center">
+                        <div
+                          className="flex items-center justify-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => handleOpenRow(cp)}
+                            className="p-1 hover:bg-slate-200 text-slate-600 rounded-lg transition"
+                            title="Открыть досье"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              visibility
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleEdit(cp)}
+                            className="p-1 hover:bg-slate-200 text-slate-600 rounded-lg transition"
+                            title="Редактировать"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Футер таблицы */}
+        <div className="p-3 bg-slate-50/60 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-500">
+          <span>
+            Показано: <strong className="text-slate-800">{filteredList.length}</strong> контрагентов
+          </span>
+          <span className="text-slate-400">
+            Кликните по любой строке для быстрого открытия досье
+          </span>
+        </div>
+      </div>
+
+      {/* ── Slide-over Drawer (Инспектор Контрагента на 650px) ── */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            onClick={() => setDrawerOpen(false)}
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-300"
+          />
+
+          <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col border-l border-slate-200">
+              {/* Шапка Досье */}
+              {selectedCp && (
+                <>
+                  <div className="p-5 border-b border-slate-100 bg-slate-50/70 flex items-start justify-between">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-700 text-white font-bold text-lg flex items-center justify-center shrink-0 shadow-xs">
+                        {selectedCp.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-lg font-bold text-slate-900 leading-snug">
+                            {selectedCp.name}
+                          </h2>
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${selectedCp.is_legal_entity ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}
+                          >
+                            {selectedCp.is_legal_entity ? 'ЮРЛИЦО' : 'ФИЗЛИЦО'}
+                          </span>
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${selectedCp.type === 'supplier' ? 'bg-purple-100 text-purple-800' : selectedCp.is_regular ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}
+                          >
+                            {selectedCp.type === 'supplier'
+                              ? 'ПОСТАВЩИК'
+                              : selectedCp.is_regular
+                                ? 'ПОСТОЯННЫЙ'
+                                : 'РАЗОВЫЙ'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
+                          {selectedCp.phone && (
+                            <a
+                              href={`tel:${selectedCp.phone}`}
+                              className="hover:text-blue-600 font-mono"
+                            >
+                              {formatPhone(selectedCp.phone)}
+                            </a>
+                          )}
+                          {selectedCp.email && <span>{selectedCp.email}</span>}
+                          <span>
+                            Последний рейс:{' '}
+                            <strong>{lastActivityLabel(daysAgo(selectedCp.last_trip_at))}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setDrawerOpen(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                  </div>
+
+                  {/* Быстрые Кнопки Действий */}
+                  <div className="px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {selectedCp.type === 'supplier' ? (
+                        <button
+                          onClick={() => {
+                            setPayAmount(selectedCp.payable_amount || '');
+                            setShowPayModal(true);
+                          }}
+                          className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">payments</span>
+                          Погасить долг поставщику
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            alert(`Создание нового рейса с заказчиком «${selectedCp.name}»`)
+                          }
+                          className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">
+                            local_shipping
+                          </span>
+                          Создать рейс
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleEdit(selectedCp)}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+                      >
+                        Редактировать
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {selectedCp.phone && (
+                        <a
+                          href={`https://wa.me/${selectedCp.phone.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl transition"
+                          title="Открыть диалог в WhatsApp"
+                        >
+                          💬 WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Вкладки Досье */}
+                  <div className="border-b border-slate-200 px-5 flex gap-6 text-xs bg-white font-semibold">
+                    <button
+                      onClick={() => setDrawerTab('finance')}
+                      className={`py-3 transition-colors ${drawerTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      Финансы и Взаиморасчеты
+                    </button>
+                    <button
+                      onClick={() => setDrawerTab('history')}
+                      className={`py-3 transition-colors ${drawerTab === 'history' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      {selectedCp.type === 'supplier' ? 'Поставки и Заправки' : 'История рейсов'} (
+                      {history.length})
+                    </button>
+                    <button
+                      onClick={() => setDrawerTab('requisites')}
+                      className={`py-3 transition-colors ${drawerTab === 'requisites' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      Реквизиты и Договор
+                    </button>
+                    <button
+                      onClick={() => setDrawerTab('crm')}
+                      className={`py-3 transition-colors ${drawerTab === 'crm' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      Заметки и CRM
+                    </button>
+                  </div>
+
+                  {/* Тело Досье */}
+                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    {/* Таб 1: Финансы и Сальдо */}
+                    {drawerTab === 'finance' && (
+                      <div className="space-y-4">
+                        {/* 4 KPI плитки */}
+                        <div className="grid grid-cols-4 gap-2.5">
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              Выручка за всё время
+                            </div>
+                            <div className="text-sm font-bold text-slate-900 font-mono mt-0.5">
+                              {parseFloat(selectedCp.total_revenue) > 0 ? (
+                                <Money amount={selectedCp.total_revenue} />
+                              ) : (
+                                '—'
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                            <div className="text-[10px] text-emerald-600 font-medium">
+                              Чистая прибыль
+                            </div>
+                            <div className="text-sm font-bold text-emerald-700 font-mono mt-0.5">
+                              {parseFloat(selectedCp.total_revenue) > 0 ? (
+                                <Money amount={selectedCp.net_profit} />
+                              ) : (
+                                '—'
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              Всего рейсов
+                            </div>
+                            <div className="text-sm font-bold text-slate-900 mt-0.5">
+                              {selectedCp.trips_count}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`p-3 rounded-xl border ${parseFloat(selectedCp.receivable_amount) > 0 ? 'bg-rose-50 border-rose-200 text-rose-700' : parseFloat(selectedCp.payable_amount) > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+                          >
+                            <div className="text-[10px] font-medium">
+                              {parseFloat(selectedCp.receivable_amount) > 0
+                                ? 'Дебиторка (долг нам)'
+                                : parseFloat(selectedCp.payable_amount) > 0
+                                  ? 'Кредиторка (наш долг)'
+                                  : 'Текущее сальдо'}
+                            </div>
+                            <div className="text-sm font-bold font-mono mt-0.5">
+                              {parseFloat(selectedCp.receivable_amount) > 0 ? (
+                                <Money amount={selectedCp.receivable_amount} />
+                              ) : parseFloat(selectedCp.payable_amount) > 0 ? (
+                                <Money amount={selectedCp.payable_amount} />
+                              ) : (
+                                '0 ₽'
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Плашка взаиморасчетов */}
+                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-800">
+                              Состояние взаиморасчетов:
+                            </span>
+                            {parseFloat(selectedCp.payable_amount) > 0 ? (
+                              <button
+                                onClick={() => {
+                                  setPayAmount(selectedCp.payable_amount);
+                                  setShowPayModal(true);
+                                }}
+                                className="px-3 py-1 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 transition"
+                              >
+                                Выплатить{' '}
+                                {parseFloat(selectedCp.payable_amount).toLocaleString('ru-RU')} ₽
+                              </button>
+                            ) : parseFloat(selectedCp.receivable_amount) > 0 ? (
+                              <span className="font-bold text-rose-600 font-mono">
+                                Клиент должен: <Money amount={selectedCp.receivable_amount} />
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 font-bold">
+                                Все расчеты закрыты (0 ₽)
+                              </span>
+                            )}
+                          </div>
+
+                          {selectedCp.credit_limit && parseFloat(selectedCp.credit_limit) > 0 && (
+                            <div className="pt-2 border-t border-slate-200 flex justify-between text-slate-500">
+                              <span>Кредитный лимит:</span>
+                              <span className="font-bold text-slate-800 font-mono">
+                                <Money amount={selectedCp.credit_limit} />
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* График по месяцам */}
+                        {selectedCp.monthly &&
+                          selectedCp.monthly.some((v) => parseFloat(v) > 0) && (
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+                                Динамика выручки по месяцам
+                              </div>
+                              <div className="flex items-end gap-2 h-20">
+                                {selectedCp.monthly.map((v, i) => {
+                                  const num = parseFloat(v);
+                                  const max = Math.max(
+                                    ...selectedCp.monthly.map((x) => parseFloat(x)),
+                                    1,
+                                  );
+                                  const h = num > 0 ? Math.max(Math.round((num / max) * 64), 4) : 0;
+                                  return (
+                                    <div
+                                      key={i}
+                                      className="flex-1 flex flex-col items-center gap-1"
+                                    >
+                                      <div className="text-[9px] text-slate-400 font-mono">
+                                        {num > 0 ? Math.round(num / 1000) + 'к' : ''}
+                                      </div>
+                                      <div
+                                        className="w-full bg-slate-800 rounded-t"
+                                        style={{
+                                          height: `${h}px`,
+                                          minHeight: num > 0 ? '4px' : '0',
+                                        }}
+                                      />
+                                      <div className="text-[10px] text-slate-400">
+                                        {selectedCp.month_labels[i]}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    )}
+
+                    {/* Таб 2: История рейсов / Заказов / Поставок */}
+                    {drawerTab === 'history' && (
+                      <div>
+                        {historyLoading ? (
+                          <div className="py-8 text-center text-slate-400 text-xs">
+                            Загрузка истории...
+                          </div>
+                        ) : history.length === 0 ? (
+                          <div className="py-8 text-center text-slate-400 text-xs">
+                            Нет зарегистрированных рейсов или поставок
+                          </div>
+                        ) : (
+                          <div className="border border-slate-200 rounded-xl overflow-hidden">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-[10px]">
+                                <tr>
+                                  <th className="p-2.5">Дата / Рейс</th>
+                                  <th className="p-2.5">Водитель / Машина</th>
+                                  <th className="p-2.5 text-right">Сумма</th>
+                                  <th className="p-2.5 text-right">Чистая</th>
+                                  <th className="p-2.5 text-center">Оплата</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-[11px]">
+                                {history.map((t) => (
+                                  <tr key={t.id} className="hover:bg-slate-50">
+                                    <td className="p-2.5">
+                                      <div className="font-bold text-slate-800">
+                                        {t.trip_number ? `#${t.trip_number}` : 'Заказ'}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">
+                                        {fmtDate(t.started_at)}
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-slate-600">
+                                      <div>{t.driver_name || '—'}</div>
+                                      <div className="text-[10px] text-slate-400">
+                                        {t.asset_name || '—'}
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-right font-bold font-mono text-slate-900">
+                                      <Money amount={t.amount} />
+                                    </td>
+                                    <td className="p-2.5 text-right font-bold font-mono text-emerald-600">
+                                      {parseFloat(t.gross_profit) !== 0 ? (
+                                        <Money amount={t.gross_profit} />
+                                      ) : (
+                                        '—'
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-center">
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[9px] font-bold ${t.settlement_status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'}`}
+                                      >
+                                        {t.settlement_status === 'completed' ? 'Оплачен' : 'Долг'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Таб 3: Реквизиты и Договор */}
+                    {drawerTab === 'requisites' && (
+                      <div className="space-y-4 text-xs">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                          <h4 className="font-bold text-slate-800">Юридический статус</h4>
+                          <div className="grid grid-cols-2 gap-2 text-slate-600">
+                            <div>
+                              <span className="text-slate-400">Форма:</span>{' '}
+                              {selectedCp.is_legal_entity ? 'Юрлицо (ООО/АО)' : 'Физлицо / ИП'}
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Статус клиента:</span>{' '}
+                              {selectedCp.is_regular ? 'Постоянный' : 'Разовый'}
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Телефон:</span>{' '}
+                              {selectedCp.phone || '—'}
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Email:</span>{' '}
+                              {selectedCp.email || '—'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                          <h4 className="font-bold text-slate-800">Условия сотрудничества</h4>
+                          <div className="text-slate-600 space-y-1">
+                            <div>
+                              Кредитный лимит:{' '}
+                              <strong>
+                                {selectedCp.credit_limit
+                                  ? `${parseFloat(selectedCp.credit_limit).toLocaleString('ru-RU')} ₽`
+                                  : 'Без лимита'}
+                              </strong>
+                            </div>
+                            <div>
+                              Основной способ оплаты:{' '}
+                              <strong>
+                                {PAYMENT_LABEL[selectedCp.preferred_payment || ''] || 'Не указан'}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Таб 4: Заметки и CRM */}
+                    {drawerTab === 'crm' && (
+                      <div className="space-y-4 text-xs">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                          <h4 className="font-bold text-slate-800">Заметки диспетчера</h4>
+                          <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                            {selectedCp.notes ||
+                              'Заметок пока нет. Нажмите «Редактировать», чтобы добавить контактных лиц или особенности работы.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-    </>
+
+      {/* ── Модалка Быстрой Выплаты Долга Поставщику ── */}
+      {showPayModal && selectedCp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-base text-slate-900">Выплата поставщику</h3>
+              <button
+                onClick={() => setShowPayModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-500 mb-1">Поставщик</label>
+                <div className="font-bold text-slate-800 text-sm">{selectedCp.name}</div>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Сумма выплаты (₽) *</label>
+                <input
+                  type="number"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full text-base font-bold font-mono px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Счёт списания *</label>
+                <select
+                  value={payWallet}
+                  onChange={(e) =>
+                    setPayWallet(
+                      e.target.value as
+                        | '10000000-0000-0000-0000-000000000001'
+                        | '10000000-0000-0000-0000-000000000002',
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                >
+                  <option value="10000000-0000-0000-0000-000000000001">
+                    Расчётный счёт (Т-Банк)
+                  </option>
+                  <option value="10000000-0000-0000-0000-000000000002">Касса (наличные)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Назначение / Комментарий</label>
+                <input
+                  type="text"
+                  value={payDescription}
+                  onChange={(e) => setPayDescription(e.target.value)}
+                  placeholder="Оплата по счету / акту..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setShowPayModal(false)}
+                className="flex-1 py-2 text-xs font-semibold border border-slate-200 rounded-xl hover:bg-slate-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handlePaySupplier}
+                disabled={payPending || !payAmount}
+                className="flex-1 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl disabled:opacity-50 transition"
+              >
+                {payPending ? 'Списание...' : 'Подтвердить оплату'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Модалка Создания / Редактирования Контрагента ── */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-base text-slate-900">
+                {editId ? 'Редактировать контрагента' : 'Новый контрагент'}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs max-h-[70vh] overflow-y-auto pr-1">
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">Название / Имя *</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="ООО Металлург или Иванов И.И."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Тип контрагента</label>
+                  <select
+                    value={form.type}
+                    onChange={(e) =>
+                      setForm({ ...form, type: e.target.value as 'client' | 'supplier' | 'both' })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  >
+                    <option value="client">Клиент (заказчик)</option>
+                    <option value="supplier">Поставщик (ГСМ/запчасти/услуги)</option>
+                    <option value="both">Клиент + Поставщик</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Правовая форма</label>
+                  <select
+                    value={form.is_legal_entity ? 'legal' : 'individual'}
+                    onChange={(e) =>
+                      setForm({ ...form, is_legal_entity: e.target.value === 'legal' })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  >
+                    <option value="legal">Юрлицо (ООО / АО)</option>
+                    <option value="individual">Физлицо / ИП</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Телефон</label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="+7 922 000-00-00"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="client@domain.ru"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">
+                    Кредитный лимит (₽)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.credit_limit}
+                    onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
+                    placeholder="0 — без лимита"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">
+                    Наш долг поставщику (₽)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.payable_amount}
+                    onChange={(e) => setForm({ ...form, payable_amount: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="chk_reg"
+                  checked={form.is_regular}
+                  onChange={(e) => setForm({ ...form, is_regular: e.target.checked })}
+                  className="accent-slate-900 rounded"
+                />
+                <label htmlFor="chk_reg" className="text-slate-700 font-medium cursor-pointer">
+                  Постоянный контрагент (регулярные отгрузки)
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Заметки и особенности
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Контактные лица, логист, отсрочка платежа, требования..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none resize-none"
+                />
+              </div>
+
+              {formError && (
+                <div className="p-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-semibold">
+                  {formError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => saveMutation.mutate(form)}
+                disabled={saveMutation.isPending}
+                className="flex-1 py-2.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition disabled:opacity-50"
+              >
+                {saveMutation.isPending ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

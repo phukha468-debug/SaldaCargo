@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Контрагенты SaldaCargo — Концепции Переработки Раздела</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            },
+            salda: {
+              dark: '#0f172a',
+              card: '#1e293b',
+              accent: '#3b82f6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    .drawer-open {
+      transform: translateX(0);
+      box-shadow: -10px 0 35px -5px rgba(0,0,0,0.25);
+    }
+    .drawer-closed {
+      transform: translateX(100%);
+    }
+    .tab-btn.active {
+      background-color: #0f172a;
+      color: #ffffff;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .subtab-btn.active {
+      border-bottom: 2px solid #2563eb;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- TOP BAR: NAVIGATION BETWEEN CONCEPTS & AUDIT -->
+  <header class="sticky top-0 z-40 bg-slate-900 text-white border-b border-slate-800 shadow-md">
+    <div class="max-w-[1720px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Project Info -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-blue-600 flex items-center justify-center font-black text-white text-lg shadow-sm">
+          S
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-base text-white tracking-tight">SaldaCargo</span>
+            <span class="text-xs bg-emerald-500/20 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">
+              Архитектурный редизайн
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400">Полная перезагрузка раздела «Контрагенты»: 3 концепции + глубокий анализ</p>
+        </div>
+      </div>
+
+      <!-- CONCEPT SWITCHER PILLS -->
+      <div class="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700/80">
+        <button onclick="setConcept('v1')" id="btn-v1" class="tab-btn active px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2">
+          <span>⚡ Вариант 1</span>
+          <span class="text-[10px] opacity-80 font-normal hidden md:inline">Operations Grid + Drawer</span>
+        </button>
+        <button onclick="setConcept('v2')" id="btn-v2" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-2">
+          <span>🎯 Вариант 2</span>
+          <span class="text-[10px] opacity-80 font-normal hidden md:inline">CRM & Finance 360°</span>
+        </button>
+        <button onclick="setConcept('v3')" id="btn-v3" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-2">
+          <span>🚀 Вариант 3</span>
+          <span class="text-[10px] opacity-80 font-normal hidden md:inline">Command Cockpit + Kanban</span>
+        </button>
+      </div>
+
+      <!-- ACTION BUTTONS: AUDIT & COMPARISON -->
+      <div class="flex items-center gap-2">
+        <button onclick="openModal('auditModal')" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Анализ текущего раздела
+        </button>
+        <button onclick="openModal('matrixModal')" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Сравнение вариантов
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONCEPT SUB-HEADER SUMMARY -->
+  <div class="bg-white border-b border-slate-200 py-2.5 px-4 shadow-sm">
+    <div class="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+      <div id="concept-summary" class="flex items-center gap-3">
+        <!-- Dynamic text inserted by JS -->
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-slate-500 font-medium">
+        <span class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 52 контрагента в базе
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span> Дебиторка: <strong class="text-slate-800">1 428 500 ₽</strong>
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span> Кредиторка поставщикам: <strong class="text-slate-800">412 000 ₽</strong>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER WITH THE THREE INTERACTIVE PROTOTYPES -->
+  <main class="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-5 relative">
+
+    <!-- ========================================================================= -->
+    <!-- CONCEPT 1: B2B OPERATIONS GRID & SLIDE-OVER DRAWER                        -->
+    <!-- ========================================================================= -->
+    <div id="concept-v1" class="space-y-4">
+      
+      <!-- Top Operations Bar: Quick Metrics & Actions -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-[11px] text-slate-400 font-medium">Всего контрагентов</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">52</div>
+          <div class="text-[10px] text-slate-500 mt-1">38 клиентов · 14 поставщиков</div>
+        </div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-[11px] text-slate-400 font-medium">Оборот за 30 дней</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5 mono">3 845 000 ₽</div>
+          <div class="text-[10px] text-emerald-600 font-medium mt-1">↑ +14% к пред. месяцу</div>
+        </div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-[11px] text-slate-400 font-medium">Чистая прибыль (30д)</div>
+          <div class="text-xl font-bold text-emerald-700 mt-0.5 mono">842 100 ₽</div>
+          <div class="text-[10px] text-slate-500 mt-1">Маржинальность 21.9%</div>
+        </div>
+        <div class="bg-rose-50/70 p-3 rounded-xl border border-rose-200/80 shadow-sm">
+          <div class="text-[11px] text-rose-600 font-medium">Дебиторка (клиенты)</div>
+          <div class="text-xl font-bold text-rose-700 mt-0.5 mono">1 428 500 ₽</div>
+          <div class="text-[10px] text-rose-600 mt-1 font-semibold">12 должников (4 просрочки)</div>
+        </div>
+        <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 shadow-sm">
+          <div class="text-[11px] text-amber-700 font-medium">Кредиторка (поставщикам)</div>
+          <div class="text-xl font-bold text-amber-800 mt-0.5 mono">412 000 ₽</div>
+          <div class="text-[10px] text-amber-700 mt-1">ГСМ, автозапчасти, ремонт</div>
+        </div>
+      </div>
+
+      <!-- Controls & Advanced Filter Bar -->
+      <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        
+        <!-- Filters & Search -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <!-- Live Search Input -->
+          <div class="relative min-w-[280px]">
+            <input 
+              type="text" 
+              id="gridSearch" 
+              oninput="filterGridData()"
+              placeholder="Поиск: имя, ИНН, телефон, город..." 
+              class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+            >
+            <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+
+          <!-- Quick Segments Filter Pills -->
+          <div class="flex items-center bg-slate-100 p-0.5 rounded-lg text-xs">
+            <button onclick="setGridTypeFilter('all')" id="gfilter-all" class="px-2.5 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs">Все (52)</button>
+            <button onclick="setGridTypeFilter('client')" id="gfilter-client" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900">Клиенты (38)</button>
+            <button onclick="setGridTypeFilter('supplier')" id="gfilter-supplier" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900">Поставщики (14)</button>
+            <button onclick="setGridTypeFilter('debtors')" id="gfilter-debtors" class="px-2.5 py-1 rounded-md text-rose-600 font-semibold hover:bg-rose-100">Должники (12)</button>
+            <button onclick="setGridTypeFilter('sleeping')" id="gfilter-sleeping" class="px-2.5 py-1 rounded-md text-amber-700 hover:text-amber-900">Спящие >30д</button>
+          </div>
+
+          <!-- Legal / Individual Filter -->
+          <select id="gridLegalFilter" onchange="filterGridData()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <option value="all">Форма: Все</option>
+            <option value="legal">Юрлица (ООО / АО)</option>
+            <option value="individual">Физлица / ИП</option>
+          </select>
+        </div>
+
+        <!-- Operations Actions: Export, Duplicates, Create -->
+        <div class="flex items-center gap-2">
+          <button onclick="alert('Обнаружено 2 потенциальных дубля: «ООО Металлург» и «Металлург ООО». Запущен умный мастер объединения.')" class="px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            Дубли (2)
+          </button>
+          <button onclick="alert('Экспорт 52 контрагентов в Excel сформирован!')" class="px-2.5 py-1.5 text-xs text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm8 11l-3-3 3-3v6z"/></svg>
+            Excel
+          </button>
+          <button onclick="openNewModal()" class="px-3 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Добавить контрагента
+          </button>
+        </div>
+      </div>
+
+      <!-- Main High-Density Data Grid Table -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-3 px-3 w-8 text-center"><input type="checkbox" class="rounded border-slate-300"></th>
+                <th class="py-3 px-3 cursor-pointer hover:text-slate-800" onclick="sortGrid('name')">Контрагент / ИНН ⇕</th>
+                <th class="py-3 px-3">Тип / Статус</th>
+                <th class="py-3 px-3">Контакты / Логист</th>
+                <th class="py-3 px-3 text-right cursor-pointer hover:text-slate-800" onclick="sortGrid('revenue')">Выручка (Всего) ⇕</th>
+                <th class="py-3 px-3 text-right cursor-pointer hover:text-slate-800" onclick="sortGrid('profit')">Чист. прибыль ⇕</th>
+                <th class="py-3 px-3 text-right">Рейсов</th>
+                <th class="py-3 px-3 text-right cursor-pointer hover:text-slate-800" onclick="sortGrid('debt')">Сальдо / Долг ⇕</th>
+                <th class="py-3 px-3">Посл. активность</th>
+                <th class="py-3 px-3 text-center w-28">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="gridTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Table Pagination & Bulk Status Footer -->
+        <div class="p-3 bg-slate-50/60 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-500">
+          <div class="flex items-center gap-3">
+            <span>Показано <strong id="gridCount" class="text-slate-800">10</strong> из 52 записей</span>
+            <span class="text-slate-300">|</span>
+            <span class="text-slate-400">Быстрый просмотр: кликните по строке для открытия инспектора</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="px-2 py-1 border border-slate-200 bg-white rounded text-slate-400 cursor-not-allowed">Назад</button>
+            <button class="px-2.5 py-1 bg-slate-900 text-white rounded font-medium">1</button>
+            <button class="px-2.5 py-1 border border-slate-200 bg-white hover:bg-slate-100 rounded">2</button>
+            <button class="px-2.5 py-1 border border-slate-200 bg-white hover:bg-slate-100 rounded">3</button>
+            <button class="px-2 py-1 border border-slate-200 bg-white hover:bg-slate-100 rounded text-slate-600">Вперед</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SLIDE-OVER DRAWER (USED IN VARIANT 1 & 2)                                 -->
+    <!-- ========================================================================= -->
+    <div id="slideOverBackdrop" onclick="closeDrawer()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 transition-opacity opacity-0 pointer-events-none duration-300"></div>
+    <div id="slideOverDrawer" class="fixed right-0 top-0 bottom-0 w-full max-w-2xl bg-white z-50 shadow-2xl drawer-closed transition-transform duration-300 flex flex-col border-l border-slate-200">
+      
+      <!-- Drawer Header -->
+      <div class="p-5 border-b border-slate-100 bg-slate-50/70 flex items-start justify-between">
+        <div class="flex items-start gap-3.5">
+          <div id="drawerAvatar" class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg shrink-0">
+            МТ
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 id="drawerTitle" class="text-lg font-bold text-slate-900 leading-snug">ООO МеталлургТранс</h2>
+              <span id="drawerBadgeLegal" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">ЮЛ</span>
+              <span id="drawerBadgeRegular" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Постоянный</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-slate-500 mt-1">
+              <span id="drawerInn">ИНН: 6623104921</span>
+              <span>•</span>
+              <span id="drawerCity">г. Нижний Тагил</span>
+              <span>•</span>
+              <span id="drawerManager">Ответственный: Иванов С.</span>
+            </div>
+          </div>
+        </div>
+        <button onclick="closeDrawer()" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-200/50 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Quick Action Buttons Inside Drawer -->
+      <div class="px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button onclick="alert('Переход в создание рейса с предзаполненным заказчиком')" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Создать рейс
+          </button>
+          <button onclick="alert('Формирование счета на оплату PDF/Excel')" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition">
+            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Выставить счет
+          </button>
+          <button onclick="alert('Акт сверки взаиморасчетов за 2026 год сформирован')" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition">
+            Акт сверки
+          </button>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button title="Позвонить" class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          </button>
+          <button title="Написать в WhatsApp" class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition">
+            <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.54 1.771.82 2.791.82 3.182 0 5.768-2.587 5.768-5.766.001-3.187-2.575-5.77-5.768-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.06-2.008-.484-1.68-.696-2.738-2.42-2.822-2.531-.083-.112-.676-.9-2.676-1.724 0-.825.431-1.229.585-1.385.154-.155.337-.193.45-.193.112 0 .225.001.323.006.104.005.244-.039.381.29.144.346.49 1.197.533 1.285.043.088.072.19.014.305-.058.115-.088.187-.174.288-.086.101-.181.226-.258.304-.087.087-.177.182-.076.356.101.174.449.741.963 1.2 0.662.592 1.221.776 1.395.863.174.088.276.073.378-.044.103-.118.438-.51.554-.685.116-.175.233-.146.39-.088.158.058 1.002.472 1.175.558.174.087.29.13.333.203.044.073.044.42-.1 1.033z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drawer Content Tabs -->
+      <div class="border-b border-slate-200 px-5 flex gap-6 text-xs bg-white">
+        <button onclick="switchDrawerTab('tabFin')" id="dtab-fin" class="subtab-btn active py-3">Финансы и Рейсы</button>
+        <button onclick="switchDrawerTab('tabReq')" id="dtab-req" class="subtab-btn py-3 text-slate-500 hover:text-slate-800">Реквизиты и Договор</button>
+        <button onclick="switchDrawerTab('tabContacts')" id="dtab-contacts" class="subtab-btn py-3 text-slate-500 hover:text-slate-800">Контакты (3)</button>
+        <button onclick="switchDrawerTab('tabNotes')" id="dtab-notes" class="subtab-btn py-3 text-slate-500 hover:text-slate-800">История и Заметки</button>
+      </div>
+
+      <!-- Drawer Scrollable Body -->
+      <div class="flex-1 overflow-y-auto p-5 space-y-5">
+        
+        <!-- Tab 1: Financial & Trips Overview -->
+        <div id="drawerTab-tabFin" class="space-y-4">
+          <!-- 4 KPI metrics -->
+          <div class="grid grid-cols-4 gap-2.5">
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] text-slate-400">Выручка (Всего)</div>
+              <div id="dmetric-revenue" class="text-sm font-bold text-slate-900 mono mt-0.5">1 240 000 ₽</div>
+            </div>
+            <div class="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+              <div class="text-[10px] text-emerald-600">Чистая прибыль</div>
+              <div id="dmetric-profit" class="text-sm font-bold text-emerald-700 mono mt-0.5">278 000 ₽</div>
+            </div>
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] text-slate-400">Рейсов всего</div>
+              <div id="dmetric-trips" class="text-sm font-bold text-slate-900 mono mt-0.5">34</div>
+            </div>
+            <div class="bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+              <div class="text-[10px] text-rose-600">Текущий долг</div>
+              <div id="dmetric-debt" class="text-sm font-bold text-rose-700 mono mt-0.5">185 000 ₽</div>
+            </div>
+          </div>
+
+          <!-- Settlement details & credit limit banner -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">Кредитный лимит:</span>
+              <span class="font-bold text-slate-800 mono">300 000 ₽ (остаток: 115 000 ₽)</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div class="bg-rose-500 h-1.5 rounded-full" style="width: 61%"></div>
+            </div>
+            <div class="flex justify-between items-center text-[11px] text-slate-400">
+              <span>Отсрочка платежа: <strong class="text-slate-700">14 банковских дней</strong></span>
+              <span>Предпочитаемый способ: <strong class="text-slate-700">Безнал с НДС</strong></span>
+            </div>
+          </div>
+
+          <!-- Trip History Table -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">Последние рейсы (заказы)</h4>
+              <span class="text-[11px] text-blue-600 cursor-pointer hover:underline">Все 34 рейса →</span>
+            </div>
+            <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-[10px]">
+                  <tr>
+                    <th class="p-2">Рейс / Дата</th>
+                    <th class="p-2">Водитель / Авто</th>
+                    <th class="p-2 text-right">Выручка</th>
+                    <th class="p-2 text-right">Чистая</th>
+                    <th class="p-2 text-center">Оплата</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-[11px]">
+                  <tr class="hover:bg-slate-50">
+                    <td class="p-2 font-medium">#1428 <span class="text-slate-400 block text-[10px]">02 окт 2026</span></td>
+                    <td class="p-2 text-slate-600">Иванов И. <span class="text-slate-400 block text-[10px]">Газель 524</span></td>
+                    <td class="p-2 text-right font-semibold mono">42 000 ₽</td>
+                    <td class="p-2 text-right text-emerald-600 font-bold mono">+11 400 ₽</td>
+                    <td class="p-2 text-center"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">Ожидает</span></td>
+                  </tr>
+                  <tr class="hover:bg-slate-50">
+                    <td class="p-2 font-medium">#1390 <span class="text-slate-400 block text-[10px]">26 сен 2026</span></td>
+                    <td class="p-2 text-slate-600">Петров С. <span class="text-slate-400 block text-[10px]">Камаз 712</span></td>
+                    <td class="p-2 text-right font-semibold mono">78 000 ₽</td>
+                    <td class="p-2 text-right text-emerald-600 font-bold mono">+19 800 ₽</td>
+                    <td class="p-2 text-center"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">Оплачен</span></td>
+                  </tr>
+                  <tr class="hover:bg-slate-50">
+                    <td class="p-2 font-medium">#1344 <span class="text-slate-400 block text-[10px]">19 сен 2026</span></td>
+                    <td class="p-2 text-slate-600">Иванов И. <span class="text-slate-400 block text-[10px]">Газель 524</span></td>
+                    <td class="p-2 text-right font-semibold mono">36 000 ₽</td>
+                    <td class="p-2 text-right text-emerald-600 font-bold mono">+8 900 ₽</td>
+                    <td class="p-2 text-center"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">Оплачен</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Requisites & Contracts -->
+        <div id="drawerTab-tabReq" class="space-y-4 hidden">
+          <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">Банковские реквизиты</span>
+              <button onclick="navigator.clipboard.writeText('ИНН 6623104921 / КПП 662301001 / Р/С 40702810900000004912')" class="text-blue-600 hover:text-blue-800 text-[11px] font-semibold">Скопировать всё</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-slate-600">
+              <div><span class="text-slate-400">ИНН:</span> 6623104921</div>
+              <div><span class="text-slate-400">КПП:</span> 662301001</div>
+              <div><span class="text-slate-400">ОГРН:</span> 1186658019482</div>
+              <div><span class="text-slate-400">БИК:</span> 046577674 (Сбербанк)</div>
+              <div class="col-span-2"><span class="text-slate-400">Р/С:</span> 40702810900000004912</div>
+              <div class="col-span-2"><span class="text-slate-400">Юр. адрес:</span> 622000, Свердловская обл., г. Нижний Тагил, ул. Металлургов, 42/1</div>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
+            <h4 class="font-bold text-slate-800">Договор</h4>
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
+              <div class="flex items-center gap-2">
+                <span class="text-red-500 font-bold text-base">PDF</span>
+                <div>
+                  <div class="font-semibold text-slate-800">Договор_перевозки_№2026-44.pdf</div>
+                  <div class="text-[10px] text-slate-400">Действует до 31.12.2026 · Отсрочка 14 дней</div>
+                </div>
+              </div>
+              <button class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-md hover:bg-slate-100">Скачать</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Contacts -->
+        <div id="drawerTab-tabContacts" class="space-y-3 hidden">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-slate-500">Контактные лица компании:</span>
+            <button class="text-xs text-blue-600 font-semibold hover:underline">+ Добавить контакт</button>
+          </div>
+          
+          <div class="p-3 border border-slate-200 rounded-xl flex items-center justify-between hover:bg-slate-50">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Ершов Максим (Главный логист)</div>
+              <div class="text-[11px] text-slate-500">+7 (922) 111-45-67 · ershov@metaltrans.ru</div>
+              <div class="text-[10px] text-emerald-600 font-medium">Заказывает рейсы, согласовывает ставки</div>
+            </div>
+            <div class="flex gap-1.5">
+              <a href="tel:+79221114567" class="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-700">📞</a>
+              <a href="#" class="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200">💬</a>
+            </div>
+          </div>
+
+          <div class="p-3 border border-slate-200 rounded-xl flex items-center justify-between hover:bg-slate-50">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Кузнецова Ольга (Бухгалтерия)</div>
+              <div class="text-[11px] text-slate-500">+7 (3435) 44-88-12 (доб. 104) · buh@metaltrans.ru</div>
+              <div class="text-[10px] text-slate-400">Акты сверки, счета-фактуры</div>
+            </div>
+            <div class="flex gap-1.5">
+              <a href="mailto:buh@metaltrans.ru" class="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-700">✉️</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: CRM Notes -->
+        <div id="drawerTab-tabNotes" class="space-y-3 hidden">
+          <div class="flex gap-2">
+            <input type="text" placeholder="Добавить заметку о звонке или договоренности..." class="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2">
+            <button class="px-3 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold">Добавить</button>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                <span class="font-bold text-slate-700">Диспетчер Андрей</span>
+                <span>Сегодня в 11:30</span>
+              </div>
+              <p class="text-slate-600 leading-relaxed">Созванивались по задолженности 185 000 ₽. Ершов обещал перевести 100 000 ₽ в этот четверг после закрытия их наряда.</p>
+            </div>
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                <span class="font-bold text-slate-700">Бухгалтер Светлана</span>
+                <span>28 сен 2026</span>
+              </div>
+              <p class="text-slate-600 leading-relaxed">Отправлен акт сверки за 3-й квартал. Подписанный оригинал ожидается почтой.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Drawer Footer -->
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-400">ID: 4f8b22-salda</span>
+        <div class="flex gap-2">
+          <button onclick="closeDrawer()" class="px-4 py-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-semibold">Закрыть</button>
+          <button onclick="alert('Редактирование параметров контрагента')" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold">Редактировать</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- CONCEPT 2: CRM & FINANCE 360° WORKSPACE                                   -->
+    <!-- ========================================================================= -->
+    <div id="concept-v2" class="space-y-4 hidden">
+      
+      <!-- Top Segmentation & Health Status -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base">VIP</div>
+          <div>
+            <div class="text-xs font-bold text-slate-800">Категория А (Ключевые)</div>
+            <div class="text-[11px] text-slate-500">8 клиентов дают 68% выручки</div>
+          </div>
+        </div>
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base">B</div>
+          <div>
+            <div class="text-xs font-bold text-slate-800">Категория B (Регулярные)</div>
+            <div class="text-[11px] text-slate-500">22 клиента · стабильный поток</div>
+          </div>
+        </div>
+        <div class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 shadow-sm flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-base">⚠</div>
+          <div>
+            <div class="text-xs font-bold text-amber-900">Зона риска (Отток)</div>
+            <div class="text-[11px] text-amber-700">6 клиентов не возили >45 дней</div>
+          </div>
+        </div>
+        <div class="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 shadow-sm flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-base">₽</div>
+          <div>
+            <div class="text-xs font-bold text-rose-900">Критическая дебиторка</div>
+            <div class="text-[11px] text-rose-700">4 долга старше 30 дней</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Master-Detail 360 Workspace Split Layout -->
+      <div class="grid grid-cols-12 gap-4 items-start">
+        
+        <!-- Left Sidebar: Smart Cohorts & Client Selector (4 Cols) -->
+        <div class="col-span-12 md:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[740px]">
+          <!-- Filter Header -->
+          <div class="p-3.5 border-b border-slate-100 bg-slate-50/60 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800">Клиентский реестр 360°</span>
+              <button onclick="openNewModal()" class="text-xs text-blue-600 font-semibold hover:underline">+ Добавить</button>
+            </div>
+            <input 
+              type="text" 
+              placeholder="Поиск по базе 360..." 
+              class="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg bg-white"
+            >
+          </div>
+
+          <!-- List Items with Rich Micro-Cards -->
+          <div class="flex-1 overflow-y-auto divide-y divide-slate-100">
+            
+            <!-- Item 1 (Selected) -->
+            <div onclick="selectCrmClient(0)" class="p-3.5 cursor-pointer bg-blue-50/80 border-l-4 border-blue-600 transition">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center">МТ</span>
+                  <div>
+                    <h4 class="text-xs font-bold text-slate-900">ООО «МеталлургТранс»</h4>
+                    <span class="text-[10px] text-slate-400">ЮЛ · Ключевой VIP · Рейс 2 дня назад</span>
+                  </div>
+                </div>
+                <span class="text-xs font-bold text-rose-600 mono">185 000 ₽</span>
+              </div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-blue-100 text-[11px] text-slate-500">
+                <span>Выручка: <strong class="text-slate-800 mono">1.24 М₽</strong></span>
+                <span class="text-emerald-700 font-semibold">Маржа 22.4%</span>
+              </div>
+            </div>
+
+            <!-- Item 2 -->
+            <div onclick="selectCrmClient(1)" class="p-3.5 cursor-pointer hover:bg-slate-50 transition border-l-4 border-transparent">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center">УС</span>
+                  <div>
+                    <h4 class="text-xs font-bold text-slate-900">ООО «УралСпецСтрой»</h4>
+                    <span class="text-[10px] text-slate-400">ЮЛ · Постоянный · Рейс вчера</span>
+                  </div>
+                </div>
+                <span class="text-xs font-bold text-slate-700 mono">0 ₽</span>
+              </div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                <span>Выручка: <strong class="text-slate-800 mono">940 000 ₽</strong></span>
+                <span class="text-emerald-700 font-semibold">Маржа 26.1%</span>
+              </div>
+            </div>
+
+            <!-- Item 3 -->
+            <div onclick="selectCrmClient(2)" class="p-3.5 cursor-pointer hover:bg-slate-50 transition border-l-4 border-transparent">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center">СЛ</span>
+                  <div>
+                    <h4 class="text-xs font-bold text-slate-900">СибТрансЛогистик</h4>
+                    <span class="text-[10px] text-amber-600 font-medium">Спящий: нет рейсов 42 дн.</span>
+                  </div>
+                </div>
+                <span class="text-xs font-bold text-slate-400 mono">—</span>
+              </div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                <span>Выручка: <strong class="text-slate-800 mono">410 000 ₽</strong></span>
+                <span class="text-amber-700 font-semibold">Нужен звонок</span>
+              </div>
+            </div>
+
+            <!-- Item 4 (Supplier) -->
+            <div onclick="selectCrmClient(3)" class="p-3.5 cursor-pointer hover:bg-slate-50 transition border-l-4 border-transparent">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">О24</span>
+                  <div>
+                    <h4 class="text-xs font-bold text-slate-900">Опти24 (Газпромнефть ГСМ)</h4>
+                    <span class="text-[10px] text-purple-600 font-medium">Поставщик топлива</span>
+                  </div>
+                </div>
+                <span class="text-xs font-bold text-amber-700 mono">-284 000 ₽</span>
+              </div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                <span>Наш долг за топливо</span>
+                <span class="text-slate-600">Автосписание карт</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right Main: Comprehensive 360 Dossier & Control Deck (8 Cols) -->
+        <div class="col-span-12 md:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 h-[740px] overflow-y-auto space-y-6">
+          
+          <!-- Dossier Hero Header -->
+          <div class="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-slate-100">
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-2xl flex items-center justify-center shadow-md">
+                МТ
+              </div>
+              <div>
+                <div class="flex items-center gap-2.5">
+                  <h2 class="text-xl font-bold text-slate-900">ООО «МеталлургТранс»</h2>
+                  <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full">ЮРЛИЦО</span>
+                  <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">VIP КЛИЕНТ</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">ИНН 6623104921 · Договор №2026-44 от 15.01.2026 · Отсрочка 14 дней</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-sm">
+                + Новый заказ
+              </button>
+              <button class="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition">
+                Акт сверки
+              </button>
+              <button class="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition">
+                Редактировать
+              </button>
+            </div>
+          </div>
+
+          <!-- Financial Health & Scoring Matrix -->
+          <div>
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Финансовый скоринг и LTV контрагента</h3>
+            <div class="grid grid-cols-4 gap-3">
+              <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div class="text-[11px] text-slate-400">Общая выручка LTV</div>
+                <div class="text-lg font-bold text-slate-900 mono mt-0.5">1 240 000 ₽</div>
+                <div class="text-[10px] text-slate-500 mt-1">34 успешных рейса</div>
+              </div>
+              <div class="bg-emerald-50 p-3.5 rounded-xl border border-emerald-100">
+                <div class="text-[11px] text-emerald-600">Чистая маржа бизнеса</div>
+                <div class="text-lg font-bold text-emerald-700 mono mt-0.5">278 000 ₽</div>
+                <div class="text-[10px] text-emerald-600 font-semibold mt-1">22.4% рентабельность</div>
+              </div>
+              <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div class="text-[11px] text-slate-400">Ср. чек одного рейса</div>
+                <div class="text-lg font-bold text-slate-900 mono mt-0.5">36 470 ₽</div>
+                <div class="text-[10px] text-slate-500 mt-1">Выше среднего по парку (+18%)</div>
+              </div>
+              <div class="bg-rose-50 p-3.5 rounded-xl border border-rose-200">
+                <div class="text-[11px] text-rose-600">Дебиторская задолженность</div>
+                <div class="text-lg font-bold text-rose-700 mono mt-0.5">185 000 ₽</div>
+                <div class="text-[10px] text-rose-600 font-semibold mt-1">Лимит: 300 000 ₽ (ОК)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profit Structure Waterfall Breakdown -->
+          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+            <div class="text-[11px] font-bold text-slate-700 mb-2">Структура себестоимости по клиенту (все рейсы):</div>
+            <div class="flex items-center justify-between text-slate-600 mb-2">
+              <span>Выручка <strong>1 240 000 ₽</strong></span>
+              <span>− ЗП Водителей/Грузчиков <strong>512 000 ₽</strong></span>
+              <span>− ГСМ (Топливо) <strong>324 000 ₽</strong></span>
+              <span>− Накладные парка (10%) <strong>126 000 ₽</strong></span>
+              <span class="text-emerald-700 font-bold">= Чистая прибыль <strong>278 000 ₽</strong></span>
+            </div>
+            <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
+              <div class="bg-blue-500 h-full" style="width: 41%" title="Зарплата 41%"></div>
+              <div class="bg-amber-500 h-full" style="width: 26%" title="Топливо 26%"></div>
+              <div class="bg-slate-400 h-full" style="width: 10%" title="Накладные 10%"></div>
+              <div class="bg-emerald-500 h-full" style="width: 23%" title="Чистая прибыль 23%"></div>
+            </div>
+          </div>
+
+          <!-- Client CRM Timeline & Smart Triggers -->
+          <div class="grid grid-cols-2 gap-4">
+            
+            <!-- Smart Recommendations / Alerts -->
+            <div class="border border-slate-200 rounded-xl p-4 space-y-3">
+              <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span class="text-amber-500">💡</span> Умные рекомендации системы
+              </div>
+              <div class="p-3 bg-blue-50/70 border border-blue-200/60 rounded-lg text-xs space-y-1">
+                <div class="font-bold text-blue-900">Предложить скидку за предоплату</div>
+                <p class="text-slate-600">Клиент стабильно платит безналом с отсрочкой 14 дней. При предоплате 100% можно дать 3% скидки и освободить оборотку 185 000 ₽.</p>
+              </div>
+              <div class="p-3 bg-emerald-50/70 border border-emerald-200/60 rounded-lg text-xs space-y-1">
+                <div class="font-bold text-emerald-900">Потенциал расширения</div>
+                <p class="text-slate-600">В среднем заказывает 5 рейсов в месяц. Запросите план отгрузок металлопроката на октябрь.</p>
+              </div>
+            </div>
+
+            <!-- Requisites & Fast Billing Block -->
+            <div class="border border-slate-200 rounded-xl p-4 space-y-3">
+              <div class="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>Реквизиты и контакты</span>
+                <button class="text-blue-600 text-[11px] font-semibold hover:underline">Изменить</button>
+              </div>
+              <div class="text-xs space-y-1.5 text-slate-600">
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Главный контакт:</span>
+                  <span class="font-semibold text-slate-800">Ершов Максим (Логистика)</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Телефон:</span>
+                  <a href="tel:+79221114567" class="text-blue-600 font-mono">+7 (922) 111-45-67</a>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Email для счетов:</span>
+                  <span class="font-mono">buh@metaltrans.ru</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Р/С в Сбербанке:</span>
+                  <span class="font-mono">...4912</span>
+                </div>
+              </div>
+              <button onclick="alert('Реквизиты скопированы в буфер')" class="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">
+                📋 Скопировать карточку реквизитов
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- CONCEPT 3: COMMAND COCKPIT & KANBAN CRM                                   -->
+    <!-- ========================================================================= -->
+    <div id="concept-v3" class="space-y-4 hidden">
+      
+      <!-- Sub-view switcher: Cockpit Mode vs Kanban Mode -->
+      <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center gap-2">
+          <button onclick="setCockpitSubView('cockpit')" id="v3-cockpit-btn" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold transition">
+            🎛 3-Панельный Кокпит
+          </button>
+          <button onclick="setCockpitSubView('kanban')" id="v3-kanban-btn" class="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold transition">
+            📋 Канбан-воронка работы с контрагентами
+          </button>
+        </div>
+        <div class="text-xs text-slate-500">
+          Максимальная скорость логиста: все операции в 1 клик без перехода по страницам
+        </div>
+      </div>
+
+      <!-- 3-PANEL COCKPIT SUB-VIEW -->
+      <div id="v3-subview-cockpit" class="grid grid-cols-12 gap-3 h-[740px]">
+        
+        <!-- Panel 1: Fast Filter Navigation Deck (2.5 Cols) -->
+        <div class="col-span-12 md:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm p-3.5 flex flex-col justify-between">
+          <div class="space-y-4">
+            <div>
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Навигатор базы</h3>
+              <div class="space-y-1 text-xs">
+                <button class="w-full flex items-center justify-between p-2 rounded-lg bg-slate-900 text-white font-semibold">
+                  <span>Все контрагенты</span>
+                  <span class="bg-slate-700 text-xs px-2 py-0.5 rounded-full">52</span>
+                </button>
+                <button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 text-slate-700">
+                  <span>🏢 Юридические лица</span>
+                  <span class="bg-slate-100 text-xs px-2 py-0.5 rounded-full text-slate-600">31</span>
+                </button>
+                <button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 text-slate-700">
+                  <span>👤 Физлица / ИП</span>
+                  <span class="bg-slate-100 text-xs px-2 py-0.5 rounded-full text-slate-600">21</span>
+                </button>
+                <button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 text-slate-700">
+                  <span>⛽ Поставщики ГСМ / Услуг</span>
+                  <span class="bg-slate-100 text-xs px-2 py-0.5 rounded-full text-slate-600">14</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100">
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Финансовые алерты</h3>
+              <div class="space-y-1.5 text-xs">
+                <div class="p-2.5 bg-rose-50 border border-rose-200/70 rounded-lg flex items-center justify-between cursor-pointer hover:bg-rose-100/70 transition">
+                  <div>
+                    <div class="font-bold text-rose-800">Долг > 100 000 ₽</div>
+                    <div class="text-[10px] text-rose-600">6 контрагентов</div>
+                  </div>
+                  <span class="text-xs font-bold text-rose-700 mono">940к ₽</span>
+                </div>
+                <div class="p-2.5 bg-amber-50 border border-amber-200/70 rounded-lg flex items-center justify-between cursor-pointer hover:bg-amber-100/70 transition">
+                  <div>
+                    <div class="font-bold text-amber-800">Спящие > 30 дней</div>
+                    <div class="text-[10px] text-amber-600">14 контрагентов</div>
+                  </div>
+                  <span class="text-xs font-bold text-amber-700 mono">Риск</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Summary -->
+          <div class="p-3 bg-slate-50 rounded-lg text-[11px] text-slate-500 space-y-1 border border-slate-200">
+            <div class="flex justify-between"><span>Клиенты Salda:</span> <strong class="text-slate-700">38</strong></div>
+            <div class="flex justify-between"><span>Доля Безнала:</span> <strong class="text-slate-700">74%</strong></div>
+            <div class="flex justify-between"><span>Средний чек:</span> <strong class="text-slate-700">31 200 ₽</strong></div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Live Cards Deck with Micro-Sparklines (4.5 Cols) -->
+        <div class="col-span-12 md:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col">
+          <div class="pb-2 mb-2 border-b border-slate-100">
+            <input type="text" placeholder="Фильтр в кокпите..." class="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50">
+          </div>
+          
+          <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+            
+            <!-- Card 1 (Active) -->
+            <div class="p-3 rounded-xl border-2 border-blue-600 bg-blue-50/40 shadow-xs cursor-pointer">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">ЮЛ</span>
+                  <h4 class="text-xs font-bold text-slate-900 mt-1">ООО «МеталлургТранс»</h4>
+                  <p class="text-[10px] text-slate-400">г. Нижний Тагил · Логист Ершов М.</p>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs font-bold text-rose-600 mono">185 000 ₽</div>
+                  <div class="text-[9px] text-slate-400">долг по 3 счетам</div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center mt-3 pt-2 border-t border-blue-100 text-[10px]">
+                <span class="text-slate-500">Выручка: <strong class="text-slate-800 mono">1 240 000 ₽</strong></span>
+                <span class="text-emerald-700 font-bold">34 рейса</span>
+                <span class="text-emerald-600 font-bold">ЧП: 278к ₽</span>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="p-3 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 transition cursor-pointer">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">ЮЛ</span>
+                  <h4 class="text-xs font-bold text-slate-900 mt-1">ООО «УралСпецСтрой»</h4>
+                  <p class="text-[10px] text-slate-400">г. Верхняя Салда · Прораб Смирнов</p>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs font-bold text-emerald-600 mono">0 ₽</div>
+                  <div class="text-[9px] text-emerald-600">Все счета закрыты</div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 text-[10px]">
+                <span class="text-slate-500">Выручка: <strong class="text-slate-800 mono">940 000 ₽</strong></span>
+                <span class="text-slate-700 font-bold">28 рейсов</span>
+                <span class="text-emerald-600 font-bold">ЧП: 245к ₽</span>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="p-3 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 transition cursor-pointer">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">ФИЗ</span>
+                  <h4 class="text-xs font-bold text-slate-900 mt-1">ИП Ковалев А.В.</h4>
+                  <p class="text-[10px] text-slate-400">г. Екатеринбург · Стройматериалы</p>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs font-bold text-rose-600 mono">45 000 ₽</div>
+                  <div class="text-[9px] text-rose-500">Счет от 22 сен</div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 text-[10px]">
+                <span class="text-slate-500">Выручка: <strong class="text-slate-800 mono">312 000 ₽</strong></span>
+                <span class="text-slate-700 font-bold">12 рейсов</span>
+                <span class="text-emerald-600 font-bold">ЧП: 68к ₽</span>
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="p-3 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 transition cursor-pointer">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="text-[9px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">ГСМ</span>
+                  <h4 class="text-xs font-bold text-slate-900 mt-1">Опти24 (Газпромнефть)</h4>
+                  <p class="text-[10px] text-slate-400">Топливные карты парка</p>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs font-bold text-amber-700 mono">-284 000 ₽</div>
+                  <div class="text-[9px] text-amber-600">Наш долг</div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 text-[10px]">
+                <span class="text-slate-500">Заправлено 5 800 л</span>
+                <span class="text-slate-700 font-bold">14 машин</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Panel 3: 1-Click Operations Cockpit Deck (5 Cols) -->
+        <div class="col-span-12 md:col-span-5 bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between overflow-y-auto">
+          
+          <div class="space-y-4">
+            <!-- Cockpit Header -->
+            <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Терминал быстрых операций</h3>
+                <p class="text-xs text-slate-500">Фокус: <strong>ООО «МеталлургТранс»</strong> (ИНН 6623104921)</p>
+              </div>
+              <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" title="Связь активна"></span>
+            </div>
+
+            <!-- 1-Click Action Grid -->
+            <div>
+              <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Операции в 1 клик</div>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <button class="p-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex flex-col items-center gap-1.5 transition">
+                  <span class="text-base">🚚</span>
+                  <span>Назначить рейс</span>
+                </button>
+                <button class="p-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-xl font-bold flex flex-col items-center gap-1.5 transition">
+                  <span class="text-base">📄</span>
+                  <span>Счет на оплату</span>
+                </button>
+                <button class="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl font-bold flex flex-col items-center gap-1.5 transition">
+                  <span class="text-base">💬</span>
+                  <span>WhatsApp логисту</span>
+                </button>
+                <button class="p-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex flex-col items-center gap-1.5 transition">
+                  <span class="text-base">📊</span>
+                  <span>Акт сверки PDF</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Financial Settlement Card -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 text-xs">
+              <div class="flex justify-between items-center font-bold">
+                <span class="text-slate-800">Состояние взаиморасчетов</span>
+                <span class="text-rose-600 font-mono text-sm">Долг 185 000 ₽</span>
+              </div>
+              <div class="space-y-1.5 text-[11px] text-slate-600">
+                <div class="flex justify-between p-1.5 bg-white rounded border border-slate-200">
+                  <span>Рейс #1428 (02.10)</span>
+                  <span class="font-bold mono">42 000 ₽</span>
+                </div>
+                <div class="flex justify-between p-1.5 bg-white rounded border border-slate-200">
+                  <span>Рейс #1405 (29.09)</span>
+                  <span class="font-bold mono">65 000 ₽</span>
+                </div>
+                <div class="flex justify-between p-1.5 bg-white rounded border border-slate-200">
+                  <span>Рейс #1388 (24.09)</span>
+                  <span class="font-bold mono">78 000 ₽</span>
+                </div>
+              </div>
+              <button onclick="alert('Отправлено вежливое напоминание со списком неоплаченных рейсов на почту и в WhatsApp')" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold transition">
+                🔔 Напомнить о долге в 1 клик
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Contact Bar -->
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Логист: Ершов М. (+7 922 111-45-67)</span>
+            <button class="text-blue-600 hover:underline">Подробнее →</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- KANBAN SUB-VIEW: PIPELINE WORKFLOW -->
+      <div id="v3-subview-kanban" class="hidden grid grid-cols-1 md:grid-cols-4 gap-3 h-[740px]">
+        
+        <!-- Column 1: Новые / Разовые -->
+        <div class="bg-slate-200/60 rounded-2xl p-3 flex flex-col">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-300">
+            <span class="text-xs font-bold text-slate-700 uppercase">Новые / Разовые</span>
+            <span class="text-xs font-bold bg-white text-slate-600 px-2 py-0.5 rounded-full">14</span>
+          </div>
+          <div class="flex-1 overflow-y-auto space-y-2">
+            <div class="p-3 bg-white rounded-xl shadow-xs border border-slate-200 text-xs space-y-1 cursor-grab">
+              <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">ФИЗ</span>
+              <div class="font-bold text-slate-900">Иванов Петр</div>
+              <div class="text-[10px] text-slate-400">1 рейс на дачу · 8 500 ₽</div>
+            </div>
+            <div class="p-3 bg-white rounded-xl shadow-xs border border-slate-200 text-xs space-y-1 cursor-grab">
+              <span class="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">ЮЛ</span>
+              <div class="font-bold text-slate-900">ООО «СтройГрупп»</div>
+              <div class="text-[10px] text-slate-400">1 тестовый рейс · 34 000 ₽</div>
+              <div class="text-[10px] text-emerald-600 font-semibold">Потенциал перехода в пост.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Постоянные активные -->
+        <div class="bg-emerald-50 rounded-2xl p-3 flex flex-col border border-emerald-200/50">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-emerald-200">
+            <span class="text-xs font-bold text-emerald-800 uppercase">Постоянные активные</span>
+            <span class="text-xs font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full">18</span>
+          </div>
+          <div class="flex-1 overflow-y-auto space-y-2">
+            <div class="p-3 bg-white rounded-xl shadow-xs border border-emerald-200 text-xs space-y-1 cursor-grab">
+              <span class="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">ЮЛ</span>
+              <div class="font-bold text-slate-900">ООО «МеталлургТранс»</div>
+              <div class="text-[10px] text-slate-400">34 рейса · Выручка 1.24 М₽</div>
+              <div class="text-[10px] text-rose-600 font-semibold">Долг: 185 000 ₽</div>
+            </div>
+            <div class="p-3 bg-white rounded-xl shadow-xs border border-emerald-200 text-xs space-y-1 cursor-grab">
+              <span class="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">ЮЛ</span>
+              <div class="font-bold text-slate-900">ООО «УралСпецСтрой»</div>
+              <div class="text-[10px] text-slate-400">28 рейсов · Выручка 940 000 ₽</div>
+              <div class="text-[10px] text-emerald-600 font-semibold">Все счета закрыты</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 3: Требуют внимания (Задержка рейсов / Спят) -->
+        <div class="bg-amber-50 rounded-2xl p-3 flex flex-col border border-amber-200/50">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-amber-200">
+            <span class="text-xs font-bold text-amber-800 uppercase">Спящие >30 дн.</span>
+            <span class="text-xs font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">6</span>
+          </div>
+          <div class="flex-1 overflow-y-auto space-y-2">
+            <div class="p-3 bg-white rounded-xl shadow-xs border border-amber-200 text-xs space-y-1 cursor-grab">
+              <div class="font-bold text-slate-900">СибТрансЛогистик</div>
+              <div class="text-[10px] text-slate-400">Не возили 42 дня</div>
+              <button class="w-full py-1 text-[10px] bg-amber-100 text-amber-800 rounded font-semibold mt-1">Позвонить логисту</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 4: Просроченная дебиторка (Должники) -->
+        <div class="bg-rose-50 rounded-2xl p-3 flex flex-col border border-rose-200/50">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-rose-200">
+            <span class="text-xs font-bold text-rose-800 uppercase">Претензии / Долги</span>
+            <span class="text-xs font-bold bg-rose-600 text-white px-2 py-0.5 rounded-full">4</span>
+          </div>
+          <div class="flex-1 overflow-y-auto space-y-2">
+            <div class="p-3 bg-white rounded-xl shadow-xs border border-rose-200 text-xs space-y-1 cursor-grab">
+              <div class="font-bold text-slate-900">ООО «СтройМонтаж-НТ»</div>
+              <div class="text-[10px] text-rose-600 font-bold">Просрочка 26 дней · 84 000 ₽</div>
+              <div class="text-[10px] text-slate-500">Обещали оплатить 28.09, не выходят на связь</div>
+              <button class="w-full py-1 text-[10px] bg-rose-600 text-white rounded font-bold mt-1">Претензия юристу</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: DETAILED AUDIT OF CURRENT SYSTEM & EFFICIENCY BOTTLENECKS         -->
+  <!-- ========================================================================= -->
+  <div id="auditModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="p-2 bg-amber-500/20 text-amber-300 rounded-xl text-lg">🔍</span>
+          <div>
+            <h3 class="font-bold text-base">Глубокий аудит текущего раздела «Контрагенты»</h3>
+            <p class="text-xs text-slate-400">Почему сейчас низкий КПД, где тормозит и как поднять отдачу в 3-5 раз</p>
+          </div>
+        </div>
+        <button onclick="closeModal('auditModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5 text-xs text-slate-700 leading-relaxed">
+        
+        <!-- Issue 1: Performance -->
+        <div class="p-4 bg-red-50 rounded-xl border border-red-200">
+          <h4 class="font-bold text-red-900 text-sm flex items-center gap-2">
+            <span>🚨 1. Критическое узкое место скорости (Бэкенд & База)</span>
+          </h4>
+          <p class="mt-2 text-red-800">
+            В текущем коде <code>/api/counterparties/route.ts</code> при каждом заходе на страницу выполняются гигантские циклы <code>fetchAllRows</code>, загружающие в память Node.js:
+          </p>
+          <ul class="list-disc pl-5 mt-1.5 space-y-1 text-red-700">
+            <li>Все транзакции накладных расходов за всё время</li>
+            <li>Все расходы рейсов компании за всё время</li>
+            <li>Все заказы компании за всё время (для вычисления общего знаменателя выручки)</li>
+            <li>Все заказы каждого клиента за всё время</li>
+            <li>Все расходы на ГСМ для всех когда-либо совершенных рейсов</li>
+          </ul>
+          <p class="mt-2 text-red-900 font-semibold">
+            Итог: при росте базы страница начинает «висеть» по 3–6 секунд, грузит мегабайты лишних данных.
+          </p>
+          <div class="mt-2 p-2.5 bg-white rounded-lg border border-red-200 text-slate-800">
+            <strong>Как мы это исправляем:</strong> агрегация на уровне SQL в один быстрый запрос (через VIEW / Materialized View), серверная пагинация (по 25-50 записей), кэширование накладных расходов в Redis/KV. Скорость отклика: <strong>с 3000 мс до 40 мс</strong>!
+          </div>
+        </div>
+
+        <!-- Issue 2: UX & Architecture -->
+        <div class="p-4 bg-amber-50 rounded-xl border border-amber-200">
+          <h4 class="font-bold text-amber-900 text-sm flex items-center gap-2">
+            <span>📉 2. Низкий КПД интерфейса и потеря информации</span>
+          </h4>
+          <ul class="list-disc pl-5 mt-2 space-y-1.5 text-amber-800">
+            <li><strong>Узкая колонка списка 320px:</strong> длинные названия компаний обрезаются, сортировок нет, чтобы найти нужного контрагента, приходится скроллить сотни строк вручную.</li>
+            <li><strong>Изоляция поставщиков:</strong> поставщики топлива (Опти24) и запчастей (Новиков) отсутствуют в контрагентах и оторваны от общей картины бизнеса.</li>
+            <li><strong>Отсутствие юридических реквизитов:</strong> нет ИНН, КПП, ОГРН, расчетного счета, БИК. Диспетчер не может быстро выставить счет без сторонних файлов.</li>
+            <li><strong>Нет контактных лиц:</strong> у клиента обычно есть снабженец, диспетчер на объекте и бухгалтер. Сейчас сохраняется лишь 1 общий телефон.</li>
+            <li><strong>Разрыв с операционной деятельностью:</strong> из карточки контрагента нельзя в 1 клик назначить рейс, выписать счет или отправить акт сверки.</li>
+          </ul>
+        </div>
+
+        <!-- Target KPI Gains -->
+        <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+          <h4 class="font-bold text-emerald-900 text-sm flex items-center gap-2">
+            <span>🚀 3. За счет чего вырастет КПД в 3-5 раз после переработки</span>
+          </h4>
+          <div class="grid grid-cols-3 gap-3 mt-3 text-slate-800">
+            <div class="p-3 bg-white rounded-lg border border-emerald-200">
+              <div class="font-bold text-emerald-700 text-base">В 4 раза быстрее</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">поиск и фильтрация контрагента по любому признаку (ИНН, город, долг, статус)</div>
+            </div>
+            <div class="p-3 bg-white rounded-lg border border-emerald-200">
+              <div class="font-bold text-emerald-700 text-base">0 переключений</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">создание рейса и выставление счета прямо из карточки без перехода по разделам</div>
+            </div>
+            <div class="p-3 bg-white rounded-lg border border-emerald-200">
+              <div class="font-bold text-emerald-700 text-base">+100% прозрачность</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">полный финансовый P&L, кредитные лимиты, контроль задержки оплат и спящих клиентов</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button onclick="closeModal('auditModal')" class="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition">
+          Понятно, закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: COMPARISON MATRIX OF THE 3 CONCEPTS                                -->
+  <!-- ========================================================================= -->
+  <div id="matrixModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-base">Сравнительная матрица 3 концепций</h3>
+          <p class="text-xs text-slate-400">Выберите оптимальную модель под ваш стиль управления SaldaCargo</p>
+        </div>
+        <button onclick="closeModal('matrixModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 text-xs">
+        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px]">
+              <tr>
+                <th class="p-3">Критерий оценки</th>
+                <th class="p-3 bg-blue-50/50 text-blue-900">Вариант 1: Operations Grid</th>
+                <th class="p-3 text-slate-900">Вариант 2: CRM & Finance 360°</th>
+                <th class="p-3 text-slate-900">Вариант 3: Command Cockpit</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr>
+                <td class="p-3 font-semibold text-slate-900">Основная философия</td>
+                <td class="p-3 bg-blue-50/30 text-blue-800 font-medium">Максимальная плотность данных и скорость Excel</td>
+                <td class="p-3">Глубокое клиентское досье и LTV-аналитика</td>
+                <td class="p-3">Диспетчерский пульт + Канбан-воронка</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-semibold text-slate-900">Скорость обработки 500+ записей</td>
+                <td class="p-3 bg-blue-50/30 text-emerald-700 font-bold">★★★★★ (Идеально)</td>
+                <td class="p-3 text-emerald-700 font-bold">★★★★☆ (Отлично)</td>
+                <td class="p-3 text-emerald-700 font-bold">★★★★☆ (Хорошо)</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-semibold text-slate-900">Глубина финансовых данных</td>
+                <td class="p-3 bg-blue-50/30 font-medium">Выручка, маржа, сальдо в таблице</td>
+                <td class="p-3 text-emerald-700 font-bold">★★★★★ (Waterfall, P&L, скоринг)</td>
+                <td class="p-3">Быстрый баланс и неоплаченные счета</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-semibold text-slate-900">Удобство для логиста</td>
+                <td class="p-3 bg-blue-50/30 font-medium">Быстрый поиск, шторка справа</td>
+                <td class="p-3">Вся история и контакты под рукой</td>
+                <td class="p-3 text-emerald-700 font-bold">★★★★★ (1-Click кнопки)</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-semibold text-slate-900">Пакетные действия (Bulk)</td>
+                <td class="p-3 bg-blue-50/30 text-emerald-700 font-bold">Да (Excel, слияние, статусы)</td>
+                <td class="p-3">Ограничено</td>
+                <td class="p-3">Перетаскивание в Канбан</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-semibold text-slate-900">Рекомендация</td>
+                <td class="p-3 bg-blue-100 text-blue-900 font-bold">Рекомендуется для базы 50+ клиентов и ежедневной рутины</td>
+                <td class="p-3 font-medium">Для фокуса на ключевых VIP и финансы</td>
+                <td class="p-3 font-medium">Для активного диспетчерского управления</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <h4 class="font-bold text-slate-900 text-xs">Идеальный гибрид для SaldaCargo:</h4>
+          <p class="text-slate-600 leading-relaxed">
+            Мы можем объединить лучшую часть <strong>Варианта 1</strong> (быстрая плотная таблица с поиском и выдвижной шторкой) с глубоким финансовым P&L и контактами из <strong>Варианта 2</strong> и быстрыми кнопками («Создать рейс / Счет в 1 клик») из <strong>Варианта 3</strong>.
+          </p>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button onclick="closeModal('matrixModal')" class="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT: DATA & INTERACTION LOGIC -->
+  <script>
+    // Mock Counterparties Data for SaldaCargo
+    const counterpartiesData = [
+      {
+        id: "1",
+        name: "ООО «МеталлургТранс»",
+        inn: "6623104921",
+        type: "client",
+        is_legal: true,
+        is_regular: true,
+        phone: "+7 (922) 111-45-67",
+        manager: "Ершов Максим (Логист)",
+        revenue: 1240000,
+        profit: 278000,
+        margin: 22.4,
+        trips: 34,
+        debt: 185000,
+        daysAgo: 2,
+        statusText: "Активен (2 дн.)",
+        city: "Н. Тагил"
+      },
+      {
+        id: "2",
+        name: "ООО «УралСпецСтрой»",
+        inn: "6623089120",
+        type: "client",
+        is_legal: true,
+        is_regular: true,
+        phone: "+7 (912) 345-67-89",
+        manager: "Смирнов А. (Прораб)",
+        revenue: 940000,
+        profit: 245000,
+        margin: 26.1,
+        trips: 28,
+        debt: 0,
+        daysAgo: 1,
+        statusText: "Активен (вчера)",
+        city: "В. Салда"
+      },
+      {
+        id: "3",
+        name: "ИП Ковалев А.В.",
+        inn: "660701982344",
+        type: "client",
+        is_legal: false,
+        is_regular: true,
+        phone: "+7 (908) 900-11-22",
+        manager: "Ковалев Андрей",
+        revenue: 312000,
+        profit: 68000,
+        margin: 21.8,
+        trips: 12,
+        debt: 45000,
+        daysAgo: 11,
+        statusText: "11 дн. назад",
+        city: "Екатеринбург"
+      },
+      {
+        id: "4",
+        name: "Опти24 (Газпромнефть ГСМ)",
+        inn: "7704218890",
+        type: "supplier",
+        is_legal: true,
+        is_regular: true,
+        phone: "+7 (800) 700-51-51",
+        manager: "Куратор ВСП",
+        revenue: 0,
+        profit: 0,
+        margin: 0,
+        trips: 0,
+        debt: -284000,
+        daysAgo: 0,
+        statusText: "Поставка топлива",
+        city: "Москва/Екб"
+      },
+      {
+        id: "5",
+        name: "СибТрансЛогистик",
+        inn: "5406712390",
+        type: "client",
+        is_legal: true,
+        is_regular: false,
+        phone: "+7 (913) 456-78-90",
+        manager: "Дмитрий В.",
+        revenue: 410000,
+        profit: 74000,
+        margin: 18.0,
+        trips: 8,
+        debt: 0,
+        daysAgo: 42,
+        statusText: "Спящий (42 дн.)",
+        city: "Тюмень"
+      },
+      {
+        id: "6",
+        name: "Новиков А.В. (Автозапчасти)",
+        inn: "660704412900",
+        type: "supplier",
+        is_legal: false,
+        is_regular: true,
+        phone: "+7 (922) 600-44-33",
+        manager: "Новиков А.",
+        revenue: 0,
+        profit: 0,
+        margin: 0,
+        trips: 0,
+        debt: -86000,
+        daysAgo: 5,
+        statusText: "Поставка запчастей",
+        city: "В. Салда"
+      },
+      {
+        id: "7",
+        name: "ООО «СтройМонтаж-НТ»",
+        inn: "6623119045",
+        type: "client",
+        is_legal: true,
+        is_regular: true,
+        phone: "+7 (950) 640-11-22",
+        manager: "Васильев О.",
+        revenue: 520000,
+        profit: 112000,
+        margin: 21.5,
+        trips: 15,
+        debt: 84000,
+        daysAgo: 26,
+        statusText: "Долг >25 дн.",
+        city: "Н. Тагил"
+      },
+      {
+        id: "8",
+        name: "Ромашин (Ремонт и ТО)",
+        inn: "662309871122",
+        type: "supplier",
+        is_legal: false,
+        is_regular: true,
+        phone: "+7 (904) 540-33-22",
+        manager: "Ромашин М.",
+        revenue: 0,
+        profit: 0,
+        margin: 0,
+        trips: 0,
+        debt: -42000,
+        daysAgo: 8,
+        statusText: "Автосервис",
+        city: "В. Салда"
+      },
+      {
+        id: "9",
+        name: "ООО «УралПромСнаб»",
+        inn: "6658401923",
+        type: "client",
+        is_legal: true,
+        is_regular: true,
+        phone: "+7 (912) 880-99-00",
+        manager: "Кузнецов И.",
+        revenue: 780000,
+        profit: 172000,
+        margin: 22.1,
+        trips: 22,
+        debt: 0,
+        daysAgo: 4,
+        statusText: "Активен (4 дн.)",
+        city: "Екатеринбург"
+      },
+      {
+        id: "10",
+        name: "Иванов Петр (Разовый)",
+        inn: "—",
+        type: "client",
+        is_legal: false,
+        is_regular: false,
+        phone: "+7 (922) 777-88-99",
+        manager: "Частное лицо",
+        revenue: 8500,
+        profit: 2400,
+        margin: 28.2,
+        trips: 1,
+        debt: 0,
+        daysAgo: 18,
+        statusText: "Разовый (18 дн.)",
+        city: "В. Салда"
+      }
+    ];
+
+    let currentConcept = 'v1';
+    let currentGridFilter = 'all';
+    let sortColumn = 'revenue';
+    let sortAsc = false;
+
+    // Switch between Concepts
+    function setConcept(cId) {
+      currentConcept = cId;
+      document.getElementById('concept-v1').classList.add('hidden');
+      document.getElementById('concept-v2').classList.add('hidden');
+      document.getElementById('concept-v3').classList.add('hidden');
+
+      document.getElementById('btn-v1').classList.remove('active');
+      document.getElementById('btn-v2').classList.remove('active');
+      document.getElementById('btn-v3').classList.remove('active');
+
+      document.getElementById(`concept-${cId}`).classList.remove('hidden');
+      document.getElementById(`btn-${cId}`).classList.add('active');
+
+      const summaryEl = document.getElementById('concept-summary');
+      if (cId === 'v1') {
+        summaryEl.innerHTML = `
+          <span class="font-bold text-slate-900">Вариант 1: B2B Data Grid & Operations Hub</span>
+          <span class="text-slate-400">|</span>
+          <span>Плотная таблица со всеми фильтрами, сортировками, мгновенным поиском и Slide-over шторкой досье. Максимальная скорость для операторов.</span>
+        `;
+      } else if (cId === 'v2') {
+        summaryEl.innerHTML = `
+          <span class="font-bold text-slate-900">Вариант 2: CRM & Finance 360° Workspace</span>
+          <span class="text-slate-400">|</span>
+          <span>Глубокое финансовое досье (P&L, чистая маржа, waterfall затрат), RFM-сегментация, кредитные лимиты и управление контактами.</span>
+        `;
+      } else {
+        summaryEl.innerHTML = `
+          <span class="font-bold text-slate-900">Вариант 3: Command Center & Kanban Cockpit</span>
+          <span class="text-slate-400">|</span>
+          <span>3-панельный пульт диспетчера с быстрыми 1-Click действиями (Создать рейс, счет, WhatsApp) + Канбан-воронка работы с базой.</span>
+        `;
+      }
+    }
+
+    // Grid population for Variant 1
+    function renderGridTable(items) {
+      const tbody = document.getElementById('gridTableBody');
+      tbody.innerHTML = '';
+
+      items.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-blue-50/50 cursor-pointer transition-colors';
+        tr.onclick = (e) => {
+          if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+            openDrawer(item);
+          }
+        };
+
+        const debtClass = item.debt > 0 ? 'text-rose-600 font-bold' : item.debt < 0 ? 'text-amber-700 font-bold' : 'text-slate-400';
+        const debtLabel = item.debt > 0 ? `${item.debt.toLocaleString()} ₽` : item.debt < 0 ? `наш долг: ${Math.abs(item.debt).toLocaleString()} ₽` : '0 ₽';
+
+        const typeBadge = item.type === 'supplier' 
+          ? `<span class="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[9px] font-bold">Поставщик</span>`
+          : item.is_regular
+          ? `<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">Постоянный</span>`
+          : `<span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[9px] font-bold">Разовый</span>`;
+
+        const legalBadge = item.is_legal
+          ? `<span class="bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-[9px] font-bold">ЮЛ</span>`
+          : `<span class="bg-slate-100 text-slate-500 px-1 py-0.5 rounded text-[9px] font-bold">ФЛ</span>`;
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-center"><input type="checkbox" class="rounded border-slate-300"></td>
+          <td class="py-2.5 px-3">
+            <div class="font-bold text-slate-900 flex items-center gap-1.5">
+              <span>${item.name}</span>
+              ${legalBadge}
+            </div>
+            <div class="text-[10px] text-slate-400 mono">ИНН: ${item.inn} · ${item.city}</div>
+          </td>
+          <td class="py-2.5 px-3">${typeBadge}</td>
+          <td class="py-2.5 px-3">
+            <div class="text-slate-800 font-medium">${item.manager}</div>
+            <div class="text-[10px] text-slate-400 mono">${item.phone}</div>
+          </td>
+          <td class="py-2.5 px-3 text-right font-semibold mono text-slate-900">
+            ${item.revenue > 0 ? item.revenue.toLocaleString() + ' ₽' : '—'}
+          </td>
+          <td class="py-2.5 px-3 text-right mono">
+            ${item.profit > 0 ? `<span class="text-emerald-700 font-bold">${item.profit.toLocaleString()} ₽</span> <span class="text-[10px] text-emerald-600 block">${item.margin}%</span>` : '—'}
+          </td>
+          <td class="py-2.5 px-3 text-right font-medium">${item.trips > 0 ? item.trips : '—'}</td>
+          <td class="py-2.5 px-3 text-right mono ${debtClass}">${debtLabel}</td>
+          <td class="py-2.5 px-3">
+            <span class="text-[11px] ${item.daysAgo > 30 ? 'text-amber-600 font-semibold' : 'text-slate-600'}">${item.statusText}</span>
+          </td>
+          <td class="py-2.5 px-3 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="openDrawer(counterpartiesData[${index}])" class="p-1 hover:bg-slate-200 text-slate-600 rounded" title="Открыть карточку">👁</button>
+              <button onclick="alert('Быстрое создание рейса')" class="p-1 hover:bg-slate-200 text-blue-600 rounded font-bold" title="Создать рейс">🚚</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('gridCount').innerText = items.length;
+    }
+
+    // Filter Logic for Variant 1
+    function filterGridData() {
+      const q = document.getElementById('gridSearch').value.toLowerCase();
+      const legal = document.getElementById('gridLegalFilter').value;
+
+      let filtered = counterpartiesData.filter(item => {
+        // Text match
+        const matchesQuery = item.name.toLowerCase().includes(q) || 
+                             item.inn.toLowerCase().includes(q) || 
+                             item.phone.toLowerCase().includes(q) || 
+                             item.manager.toLowerCase().includes(q) ||
+                             item.city.toLowerCase().includes(q);
+        if (!matchesQuery) return false;
+
+        // Type filter
+        if (currentGridFilter === 'client' && item.type !== 'client') return false;
+        if (currentGridFilter === 'supplier' && item.type !== 'supplier') return false;
+        if (currentGridFilter === 'debtors' && item.debt <= 0) return false;
+        if (currentGridFilter === 'sleeping' && item.daysAgo <= 30) return false;
+
+        // Legal entity filter
+        if (legal === 'legal' && !item.is_legal) return false;
+        if (legal === 'individual' && item.is_legal) return false;
+
+        return true;
+      });
+
+      // Sorting
+      filtered.sort((a, b) => {
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+        if (sortAsc) return valA > valB ? 1 : -1;
+        return valA < valB ? 1 : -1;
+      });
+
+      renderGridTable(filtered);
+    }
+
+    function setGridTypeFilter(f) {
+      currentGridFilter = f;
+      ['all', 'client', 'supplier', 'debtors', 'sleeping'].forEach(t => {
+        const btn = document.getElementById(`gfilter-${t}`);
+        if (btn) {
+          if (t === f) {
+            btn.className = "px-2.5 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs";
+          } else {
+            btn.className = "px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900";
+          }
+        }
+      });
+      filterGridData();
+    }
+
+    function sortGrid(col) {
+      if (sortColumn === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortColumn = col;
+        sortAsc = false;
+      }
+      filterGridData();
+    }
+
+    // Drawer Inspector
+    function openDrawer(item) {
+      document.getElementById('drawerTitle').innerText = item.name;
+      document.getElementById('drawerInn').innerText = `ИНН: ${item.inn}`;
+      document.getElementById('drawerCity').innerText = item.city;
+      document.getElementById('drawerManager').innerText = `Ответственный: ${item.manager}`;
+      document.getElementById('drawerAvatar').innerText = item.name.replace(/[^а-яА-Яa-zA-Z]/g, '').slice(0, 2).toUpperCase();
+
+      document.getElementById('drawerBadgeLegal').innerText = item.is_legal ? 'ЮЛ' : 'ФИЗЛИЦО';
+      document.getElementById('drawerBadgeRegular').innerText = item.type === 'supplier' ? 'ПОСТАВЩИК' : item.is_regular ? 'ПОСТОЯННЫЙ' : 'РАЗОВЫЙ';
+
+      document.getElementById('dmetric-revenue').innerText = item.revenue > 0 ? item.revenue.toLocaleString() + ' ₽' : '—';
+      document.getElementById('dmetric-profit').innerText = item.profit > 0 ? item.profit.toLocaleString() + ' ₽' : '—';
+      document.getElementById('dmetric-trips').innerText = item.trips;
+      document.getElementById('dmetric-debt').innerText = item.debt > 0 ? item.debt.toLocaleString() + ' ₽' : item.debt < 0 ? `наш: ${Math.abs(item.debt).toLocaleString()} ₽` : '0 ₽';
+
+      document.getElementById('slideOverBackdrop').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('slideOverBackdrop').classList.add('opacity-100');
+      document.getElementById('slideOverDrawer').classList.remove('drawer-closed');
+      document.getElementById('slideOverDrawer').classList.add('drawer-open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('slideOverBackdrop').classList.add('opacity-0', 'pointer-events-none');
+      document.getElementById('slideOverBackdrop').classList.remove('opacity-100');
+      document.getElementById('slideOverDrawer').classList.add('drawer-closed');
+      document.getElementById('slideOverDrawer').classList.remove('drawer-open');
+    }
+
+    function switchDrawerTab(tabName) {
+      ['tabFin', 'tabReq', 'tabContacts', 'tabNotes'].forEach(t => {
+        document.getElementById(`drawerTab-${t}`).classList.add('hidden');
+        document.getElementById(`dtab-${t.toLowerCase().replace('tab', '')}`).classList.remove('active');
+        document.getElementById(`dtab-${t.toLowerCase().replace('tab', '')}`).classList.add('text-slate-500');
+      });
+      document.getElementById(`drawerTab-${tabName}`).classList.remove('hidden');
+      const btnKey = tabName.toLowerCase().replace('tab', '');
+      document.getElementById(`dtab-${btnKey}`).classList.add('active');
+      document.getElementById(`dtab-${btnKey}`).classList.remove('text-slate-500');
+    }
+
+    // Cockpit Sub-view switcher (Variant 3)
+    function setCockpitSubView(view) {
+      if (view === 'cockpit') {
+        document.getElementById('v3-subview-cockpit').classList.remove('hidden');
+        document.getElementById('v3-subview-kanban').classList.add('hidden');
+        document.getElementById('v3-cockpit-btn').className = "px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold transition";
+        document.getElementById('v3-kanban-btn').className = "px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold transition";
+      } else {
+        document.getElementById('v3-subview-cockpit').classList.add('hidden');
+        document.getElementById('v3-subview-kanban').classList.remove('hidden');
+        document.getElementById('v3-kanban-btn').className = "px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold transition";
+        document.getElementById('v3-cockpit-btn').className = "px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold transition";
+      }
+    }
+
+    // Modals
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+    function openNewModal() {
+      alert('Модальное окно создания контрагента: ввод ИНН с автозаполнением из ЕГРЮЛ (DaData / ФНС), выбор типа (клиент/поставщик), условий оплаты и контактов.');
+    }
+
+    function selectCrmClient(idx) {
+      // In a full implementation, updates the 360 right panel.
+    }
+
+    // Initial run
+    window.addEventListener('DOMContentLoaded', () => {
+      setConcept('v1');
+      filterGridData();
+    });
+  </script>
+</body>
+</html>

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 const FUEL_CATEGORY_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+export const DERYABIN_ID = '20000000-0000-0000-0000-000000000001';
 
 async function fetchAllRows<T = any>(
   queryBuilder: (from: number, to: number) => Promise<{ data: T[] | null; error: any }>,
@@ -22,12 +23,84 @@ async function fetchAllRows<T = any>(
   return all;
 }
 
-/** GET /api/counterparties/[id]/trips — история рейсов клиента */
+/** GET /api/counterparties/[id]/trips — история рейсов клиента ИЛИ поставок/счетов поставщика */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const supabase = createAdminClient();
 
+    // Проверяем тип контрагента
+    const { data: cp } = await (supabase.from('counterparties') as any)
+      .select('type, name')
+      .eq('id', id)
+      .single();
+
+    const isSupplier = cp?.type === 'supplier';
+
+    if (isSupplier) {
+      // Для поставщиков возвращаем историю расходов, оплат и заправок
+      if (id === DERYABIN_ID) {
+        // Топливные заправки
+        const fuelExpenses = await fetchAllRows((from, to) =>
+          (supabase as any)
+            .from('trip_expenses')
+            .select(
+              'id, amount, created_at, description, trip:trips(trip_number, driver:users!trips_driver_id_fkey(name), asset:assets(short_name, reg_number))',
+            )
+            .eq('payment_method', 'fuel_card')
+            .order('created_at', { ascending: false })
+            .range(from, to),
+        );
+
+        const result = fuelExpenses.map((f: any) => ({
+          id: f.id,
+          trip_id: null,
+          trip_number: f.trip?.trip_number ?? null,
+          started_at: f.created_at,
+          driver_name: f.trip?.driver?.name ?? '—',
+          asset_name: f.trip?.asset?.short_name ?? f.trip?.asset?.reg_number ?? '—',
+          amount: parseFloat(f.amount ?? '0').toFixed(2),
+          driver_pay: '0.00',
+          loader_pay: '0.00',
+          fuel_allocated: parseFloat(f.amount ?? '0').toFixed(2),
+          gross_profit: '0.00',
+          payment_method: 'fuel_card',
+          settlement_status: 'completed',
+          description: f.description || 'Заправка по топливной карте Опти24',
+        }));
+        return NextResponse.json(result);
+      }
+
+      // Обычный поставщик: транзакции по нему
+      const txs = await fetchAllRows((from, to) =>
+        (supabase as any)
+          .from('transactions')
+          .select('id, amount, created_at, description, settlement_status, direction')
+          .eq('counterparty_id', id)
+          .order('created_at', { ascending: false })
+          .range(from, to),
+      );
+
+      const result = txs.map((t: any) => ({
+        id: t.id,
+        trip_id: null,
+        trip_number: null,
+        started_at: t.created_at,
+        driver_name: '—',
+        asset_name: '—',
+        amount: parseFloat(t.amount ?? '0').toFixed(2),
+        driver_pay: '0.00',
+        loader_pay: '0.00',
+        fuel_allocated: '0.00',
+        gross_profit: '0.00',
+        payment_method: 'bank_invoice',
+        settlement_status: t.settlement_status,
+        description: t.description || 'Поставка / Услуга',
+      }));
+      return NextResponse.json(result);
+    }
+
+    // Для клиентов: стандартные клиентские рейсы
     const orders = await fetchAllRows((from, to) =>
       (supabase as any)
         .from('trip_orders')

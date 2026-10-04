@@ -18,7 +18,7 @@ const navItems = [
   { href: '/retro', label: 'Ретро-ввод', icon: 'history' },
 ] as const;
 
-const FINANCE_PATHS = ['/finance', '/receivables', '/loans', '/payables'];
+const FINANCE_PATHS = ['/finance', '/receivables'];
 
 type Wallets = {
   bank: { name: string; balance: string; api_synced?: boolean; account_number?: string };
