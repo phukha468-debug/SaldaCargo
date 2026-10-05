@@ -4,12 +4,17 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const OBLIGATIONS_FILE = path.join(process.cwd(), 'data', 'payment_obligations.json');
-const SETTLEMENTS_FILE = path.join(process.cwd(), 'data', 'payment_settlements.json');
-
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001';
+
+function getLocalFilePath(filename: string): string {
+  const inAppsWeb = path.join(process.cwd(), 'apps', 'web', 'data', filename);
+  if (fs.existsSync(inAppsWeb)) return inAppsWeb;
+  const inCwd = path.join(process.cwd(), 'data', filename);
+  if (fs.existsSync(inCwd)) return inCwd;
+  return inAppsWeb;
+}
 
 function readJsonFile<T>(filePath: string, fallback: T): T {
   try {
@@ -27,8 +32,8 @@ function writeJsonFile<T>(filePath: string, data: T) {
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (e) {
-    console.error(`Error writing ${filePath}:`, e);
+  } catch {
+    // Ignore error in serverless read-only environments
   }
 }
 
@@ -90,20 +95,27 @@ export async function GET(request: Request) {
       '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
     ];
 
-    // 1. Получаем балансы кошельков, активные кредиты и живой долг по зарплате
-    const [{ data: walletsRes }, { data: loansRes }, { data: salaryPendingRes }] =
-      await Promise.all([
-        (supabase.from('wallets') as any).select('id, name, balance'),
-        (supabase.from('loans') as any).select('*').eq('is_active', true),
-        (supabase.from('transactions') as any)
-          .select('amount, description')
-          .eq('direction', 'expense')
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'pending')
-          .in('category_id', SALARY_CATEGORY_IDS)
-          .not('related_user_id', 'is', null)
-          .is('from_wallet_id', null),
-      ]);
+    // 1. Параллельно получаем балансы, кредиты, долг по ЗП, обязательства и переопределения из Supabase
+    const [
+      { data: walletsRes },
+      { data: loansRes },
+      { data: salaryPendingRes },
+      { data: dbObligations, error: dbOblErr },
+      { data: dbOverrides, error: dbOvrErr },
+    ] = await Promise.all([
+      (supabase.from('wallets') as any).select('id, name, balance'),
+      (supabase.from('loans') as any).select('*').eq('is_active', true),
+      (supabase.from('transactions') as any)
+        .select('amount, description')
+        .eq('direction', 'expense')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending')
+        .in('category_id', SALARY_CATEGORY_IDS)
+        .not('related_user_id', 'is', null)
+        .is('from_wallet_id', null),
+      (supabase.from('payment_calendar_obligations') as any).select('*').eq('is_active', true),
+      (supabase.from('payment_calendar_overrides') as any).select('*').eq('period', period),
+    ]);
 
     const liveSalaryDebt = (salaryPendingRes ?? []).reduce((sum: number, tx: any) => {
       if (tx.description && tx.description.startsWith('Выплата зарплаты')) return sum;
@@ -116,61 +128,91 @@ export async function GET(request: Request) {
     const cashBalance = parseFloat(cashWallet?.balance ?? '0');
     const totalCash = bankBalance + cashBalance;
 
-    // 2. Читаем сохраненные обязательства и факты оплат
-    const storedObligations = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
-    const settlementsMap = readJsonFile<
-      Record<
-        string,
-        Record<
-          string,
-          {
-            paid_amount?: number;
-            paid_at?: string;
-            wallet_id?: string;
-            deleted?: boolean;
-            custom_title?: string;
-            custom_due_day?: number;
-            custom_recipient?: string;
-            custom_notes?: string;
-            custom_amount?: number;
-          }
-        >
-      >
-    >(SETTLEMENTS_FILE, {});
-    const monthSettlements = settlementsMap[period] || {};
+    // Считываем локальные файлы как резервный источник
+    const localOblPath = getLocalFilePath('payment_obligations.json');
+    const localSetPath = getLocalFilePath('payment_settlements.json');
+    const fallbackObligations = readJsonFile<ObligationItem[]>(localOblPath, []);
+    const localSettlements = readJsonFile<Record<string, Record<string, any>>>(localSetPath, {});
+    const localMonthSettlements = localSettlements[period] || {};
 
-    // 3. Добавляем активные лизинги и кредиты из таблицы loans
-    const loanObligations: ObligationItem[] = (loansRes ?? [])
-      .map((l: any) => {
-        let dueDay = 15;
-        if (l.next_payment_date) {
-          dueDay = new Date(l.next_payment_date).getDate();
-        } else if (l.started_at) {
-          dueDay = new Date(l.started_at).getDate();
-        }
-
-        const isLeasing = l.loan_type === 'leasing';
-        return {
-          id: `loan-${l.id}`,
-          title: isLeasing
-            ? `Лизинг: ${l.lender_name}`
-            : `Кредит: ${l.lender_name} (${l.purpose || 'платеж'})`,
-          category: 'leasing_loan',
-          amount: parseFloat(l.monthly_payment ?? '0') || 0,
-          due_day: dueDay,
-          frequency: 'monthly',
-          payment_type: 'fixed',
-          preferred_wallet_id: BANK_ID,
-          recipient: l.lender_name,
-          notes: `Остаток долга: ${parseFloat(l.remaining_amount ?? '0').toLocaleString('ru-RU')} ₽${l.annual_rate ? `, ставка ${l.annual_rate}%` : ''}`,
-          is_active: true,
-          is_loan: true,
-          loan_id: l.id,
+    // Собираем карту переопределений для текущего месяца (Supabase приоритет, fallback из локального JSON)
+    const monthOverrides: Record<string, any> = { ...localMonthSettlements };
+    if (!dbOvrErr && Array.isArray(dbOverrides)) {
+      for (const ov of dbOverrides) {
+        monthOverrides[ov.obligation_id] = {
+          ...monthOverrides[ov.obligation_id],
+          ...ov,
         };
-      })
-      .filter((l: ObligationItem) => l.amount > 0);
+      }
+    }
 
-    // 3.1. Правило: каждую пятницу выплата Зарплаты (сумма подтягивается из раздела Персонал)
+    // 2. Формируем список базовых обязательств (из Supabase, либо fallback из файла)
+    let baseObligations: ObligationItem[] = [];
+    if (!dbOblErr && Array.isArray(dbObligations) && dbObligations.length > 0) {
+      baseObligations = dbObligations.map((o: any) => ({
+        id: o.id,
+        title: o.title,
+        category: o.category,
+        amount: parseFloat(o.amount ?? '0'),
+        due_day: o.due_day,
+        frequency: o.frequency,
+        payment_type: o.payment_type || 'fixed',
+        target_period: o.target_period || undefined,
+        preferred_wallet_id: o.preferred_wallet_id || BANK_ID,
+        recipient: o.recipient || '',
+        notes: o.notes || '',
+        is_active: o.is_active,
+      }));
+    } else {
+      baseObligations = fallbackObligations;
+    }
+
+    // 3. Добавляем активные лизинги и кредиты из таблицы loans с учетом переопределений
+    const loanObligations: ObligationItem[] = [];
+    for (const l of loansRes ?? []) {
+      const loanItemId = `loan-${l.id}`;
+      const override = monthOverrides[loanItemId];
+      if (override?.deleted) continue; // удалено пользователем
+
+      let defaultDay = 15;
+      if (l.next_payment_date) {
+        defaultDay = new Date(l.next_payment_date).getDate();
+      } else if (l.started_at) {
+        defaultDay = new Date(l.started_at).getDate();
+      }
+
+      const isLeasing = l.loan_type === 'leasing';
+      const defaultTitle = isLeasing
+        ? `Лизинг: ${l.lender_name}`
+        : `Кредит: ${l.lender_name} (${l.purpose || 'платеж'})`;
+
+      const amount =
+        typeof override?.custom_amount === 'number' && override.custom_amount > 0
+          ? override.custom_amount
+          : parseFloat(l.monthly_payment ?? '0') || 0;
+
+      if (amount <= 0 && !override?.custom_amount) continue;
+
+      loanObligations.push({
+        id: loanItemId,
+        title: override?.custom_title || defaultTitle,
+        category: override?.custom_category || 'leasing_loan',
+        amount,
+        due_day: override?.custom_due_day || defaultDay,
+        frequency: 'monthly',
+        payment_type: override?.payment_type || 'fixed',
+        preferred_wallet_id: override?.custom_wallet_id || BANK_ID,
+        recipient: override?.custom_recipient || l.lender_name,
+        notes:
+          override?.custom_notes ||
+          `Остаток долга: ${parseFloat(l.remaining_amount ?? '0').toLocaleString('ru-RU')} ₽${l.annual_rate ? `, ставка ${l.annual_rate}%` : ''}`,
+        is_active: true,
+        is_loan: true,
+        loan_id: l.id,
+      });
+    }
+
+    // 4. Правило: каждую пятницу выплата Зарплаты (сумма подтягивается из раздела Персонал)
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const fridayObligations: ObligationItem[] = [];
 
@@ -180,42 +222,37 @@ export async function GET(request: Request) {
         // 5 — пятница
         const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const fridayId = `salary-friday-${dateStr}`;
+        const override = monthOverrides[fridayId];
 
         // Проверяем, не удалил ли пользователь это событие
-        if (monthSettlements[fridayId]?.deleted) {
+        if (override?.deleted) {
           continue;
         }
 
-        const customTitle =
-          monthSettlements[fridayId]?.custom_title || 'Выплата зарплаты (Пятница)';
-        const customDueDay = monthSettlements[fridayId]?.custom_due_day || day;
-        const customRecipient =
-          monthSettlements[fridayId]?.custom_recipient ||
-          'Штат сотрудников (водители, механики, грузчики)';
-        const customNotes = monthSettlements[fridayId]?.custom_notes;
-
-        const settledInfo = monthSettlements[fridayId];
         const isSettled = Boolean(
-          settledInfo && typeof settledInfo.paid_amount === 'number' && settledInfo.paid_amount > 0,
+          override && typeof override.paid_amount === 'number' && override.paid_amount > 0,
         );
-        const amount =
-          isSettled && settledInfo && typeof settledInfo.paid_amount === 'number'
-            ? settledInfo.paid_amount
-            : (monthSettlements[fridayId]?.custom_amount ??
-              (liveSalaryDebt > 0 ? liveSalaryDebt : 120000));
+
+        const defaultAmount = liveSalaryDebt > 0 ? liveSalaryDebt : 120000;
+        const amount = isSettled
+          ? override.paid_amount
+          : typeof override?.custom_amount === 'number' && override.custom_amount > 0
+            ? override.custom_amount
+            : defaultAmount;
 
         fridayObligations.push({
           id: fridayId,
-          title: customTitle,
-          category: 'salary',
+          title: override?.custom_title || 'Выплата зарплаты (Пятница)',
+          category: override?.custom_category || 'salary',
           amount,
-          due_day: customDueDay,
+          due_day: override?.custom_due_day || day,
           frequency: 'weekly',
-          payment_type: 'fixed',
-          preferred_wallet_id: BANK_ID,
-          recipient: customRecipient,
+          payment_type: override?.payment_type || 'fixed',
+          preferred_wallet_id: override?.custom_wallet_id || BANK_ID,
+          recipient:
+            override?.custom_recipient || 'Штат сотрудников (водители, механики, грузчики)',
           notes:
-            customNotes ||
+            override?.custom_notes ||
             `Еженедельная выплата ЗП по пятницам (долг из раздела «Персонал»: ${liveSalaryDebt.toLocaleString('ru-RU')} ₽)`,
           is_active: true,
           is_salary_rule: true,
@@ -223,21 +260,37 @@ export async function GET(request: Request) {
       }
     }
 
-    // Фильтруем сохраненные обязательства:
-    // постоянные (fixed) повторяются каждый месяц,
-    // переменные (variable) отображаются только в их целевом периоде target_period.
-    const filteredStoredObligations: ObligationItem[] = storedObligations
+    // 5. Фильтруем и дополняем базовые обязательства переопределениями
+    const filteredStoredObligations: ObligationItem[] = baseObligations
       .filter((o) => {
+        const override = monthOverrides[o.id];
+        if (override?.deleted) return false;
         if (!o.is_active) return false;
-        if (o.payment_type === 'variable' && o.target_period) {
+
+        const effectiveType = override?.payment_type || o.payment_type || 'fixed';
+        if (effectiveType === 'variable' && o.target_period) {
           return o.target_period === period;
         }
         return true;
       })
-      .map((o) => ({
-        ...o,
-        payment_type: o.payment_type || 'fixed',
-      }));
+      .map((o) => {
+        const override = monthOverrides[o.id];
+        return {
+          ...o,
+          title: override?.custom_title || o.title,
+          category: override?.custom_category || o.category,
+          amount:
+            typeof override?.custom_amount === 'number' && override.custom_amount > 0
+              ? override.custom_amount
+              : o.amount,
+          due_day: override?.custom_due_day || o.due_day,
+          recipient:
+            override?.custom_recipient !== undefined ? override.custom_recipient : o.recipient,
+          notes: override?.custom_notes !== undefined ? override.custom_notes : o.notes,
+          preferred_wallet_id: override?.custom_wallet_id || o.preferred_wallet_id,
+          payment_type: override?.payment_type || o.payment_type || 'fixed',
+        };
+      });
 
     // Объединяем регулярные обязательства, лизинги и пятничные выплаты ЗП
     const allObligations: ObligationItem[] = [
@@ -246,11 +299,10 @@ export async function GET(request: Request) {
       ...fridayObligations,
     ];
 
-    // 4. Формируем позиции календаря с расчетом дней и статусов
+    // 6. Формируем позиции календаря с расчетом дней и статусов
     const todayZeroTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
     const calendarItems: CalendarResponseItem[] = allObligations.map((obl) => {
-      // Дата платежа в данном месяце
       const day = Math.min(Math.max(1, obl.due_day), 31);
       const dueDateObj = new Date(currentYear, currentMonth - 1, day);
       const dueDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -258,7 +310,7 @@ export async function GET(request: Request) {
       const diffDays = Math.round((dueDateObj.getTime() - todayZeroTime) / (1000 * 60 * 60 * 24));
 
       // Проверяем, оплачено ли
-      const paidInfo = monthSettlements[obl.id];
+      const paidInfo = monthOverrides[obl.id];
       const isPaid = Boolean(
         paidInfo && typeof paidInfo.paid_amount === 'number' && paidInfo.paid_amount >= obl.amount,
       );
@@ -288,7 +340,7 @@ export async function GET(request: Request) {
     // Сортировка по дню месяца
     calendarItems.sort((a, b) => a.due_day - b.due_day);
 
-    // 5. Расчет финансовой потребности и прогноза кассового разрыва
+    // 7. Расчет финансовой потребности и прогноза кассового разрыва
     let dueNext7Days = 0;
     let totalMonthObligations = 0;
     let paidThisMonth = 0;
@@ -315,12 +367,11 @@ export async function GET(request: Request) {
         if (item.days_left >= 0 && item.days_left <= 7) {
           dueNext7Days += item.amount;
         } else if (item.status === 'overdue') {
-          dueNext7Days += item.amount; // просроченные также требуют оплаты срочно
+          dueNext7Days += item.amount;
         }
       }
     }
 
-    // Прогноз разрыва
     const cashReserve7Days = totalCash - dueNext7Days;
     const cashReserveMonth = totalCash - remainingThisMonth;
 
@@ -340,7 +391,7 @@ export async function GET(request: Request) {
         fixedRemainingMonth,
         variableRemainingMonth,
         dueNext7Days,
-        cashReserve7Days, // > 0: профицит, < 0: кассовый разрыв
+        cashReserve7Days,
         cashReserveMonth,
         hasGap7Days: cashReserve7Days < 0,
         gapAmount7Days: Math.max(0, -cashReserve7Days),
@@ -350,15 +401,17 @@ export async function GET(request: Request) {
       items: calendarItems,
     });
   } catch (err: any) {
+    console.error('Error in GET /api/payment-calendar:', err);
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }
 
-/** POST /api/payment-calendar — управление календарем: отметка об оплате или добавление обязательства */
+/** POST /api/payment-calendar — отметка об оплате, добавление или редактирование обязательства */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const action = body.action || 'mark_paid';
+    const supabase = createAdminClient();
 
     if (action === 'mark_paid') {
       const { obligation_id, period, wallet_id, amount } = body;
@@ -371,25 +424,32 @@ export async function POST(request: Request) {
 
       const payAmount = parseFloat(amount || '0');
       const chosenWallet = wallet_id || BANK_ID;
+      const overrideId = `${period}:${obligation_id}`;
 
-      // 1. Сохраняем отметку об оплате в settlements
-      const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(
-        SETTLEMENTS_FILE,
-        {},
-      );
+      // 1. Сохраняем отметку в Supabase
+      await (supabase.from('payment_calendar_overrides') as any).upsert({
+        id: overrideId,
+        period,
+        obligation_id,
+        paid_amount: payAmount,
+        paid_at: new Date().toISOString(),
+        wallet_id: chosenWallet,
+        updated_at: new Date().toISOString(),
+      });
+
+      // 2. Локальный JSON резерв
+      const localSetPath = getLocalFilePath('payment_settlements.json');
+      const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(localSetPath, {});
       if (!settlementsMap[period]) settlementsMap[period] = {};
-
       settlementsMap[period][obligation_id] = {
         paid_amount: payAmount,
         paid_at: new Date().toISOString(),
         wallet_id: chosenWallet,
       };
+      writeJsonFile(localSetPath, settlementsMap);
 
-      writeJsonFile(SETTLEMENTS_FILE, settlementsMap);
-
-      // 2. Создаем транзакцию расхода в Supabase, если указан create_tx
+      // 3. Создаем расходную транзакцию
       if (body.create_tx !== false && payAmount > 0) {
-        const supabase = createAdminClient();
         const desc = body.title
           ? `Оплата по календарю: ${body.title}`
           : 'Плановый платеж по календарю';
@@ -430,7 +490,6 @@ export async function POST(request: Request) {
       }
 
       const pType: 'fixed' | 'variable' = payment_type === 'variable' ? 'variable' : 'fixed';
-      const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
       const newObl: ObligationItem = {
         id: `obl-${Date.now()}`,
         title: title.trim(),
@@ -449,8 +508,19 @@ export async function POST(request: Request) {
         is_active: true,
       };
 
+      // Сохраняем в Supabase
+      const { error: insErr } = await (supabase.from('payment_calendar_obligations') as any).insert(
+        newObl,
+      );
+      if (insErr) {
+        console.error('Error inserting into payment_calendar_obligations:', insErr);
+      }
+
+      // Сохраняем локально в JSON
+      const localOblPath = getLocalFilePath('payment_obligations.json');
+      const stored = readJsonFile<ObligationItem[]>(localOblPath, []);
       stored.push(newObl);
-      writeJsonFile(OBLIGATIONS_FILE, stored);
+      writeJsonFile(localOblPath, stored);
 
       return NextResponse.json({ success: true, obligation: newObl });
     }
@@ -475,72 +545,92 @@ export async function POST(request: Request) {
 
       const parsedAmount = parseFloat(amount || '0');
       const parsedDueDay = parseInt(due_day) || 1;
+      const activePeriod = period || new Date().toISOString().slice(0, 7);
+      const overrideId = `${activePeriod}:${id}`;
 
-      // 1. Если это обязательство из payment_obligations.json
-      const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
-      const idx = stored.findIndex((o) => o.id === id);
-
-      if (idx !== -1 && stored[idx]) {
-        const current = stored[idx]!;
-        const updatedItem: ObligationItem = {
-          ...current,
-          title: title !== undefined ? title.trim() : current.title,
-          category: category !== undefined ? category : current.category,
-          amount: !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : current.amount,
-          due_day: parsedDueDay,
-          preferred_wallet_id: preferred_wallet_id || current.preferred_wallet_id,
-          recipient: recipient !== undefined ? recipient.trim() : current.recipient,
-          notes: notes !== undefined ? notes.trim() : current.notes,
-          payment_type: payment_type !== undefined ? payment_type : current.payment_type || 'fixed',
-          target_period: target_period !== undefined ? target_period : current.target_period,
-        };
-        stored[idx] = updatedItem;
-        writeJsonFile(OBLIGATIONS_FILE, stored);
-        return NextResponse.json({ success: true, obligation: updatedItem });
-      }
+      // 1. Сохраняем универсальный override в Supabase (действует на любой тип обязательства)
+      await (supabase.from('payment_calendar_overrides') as any).upsert({
+        id: overrideId,
+        period: activePeriod,
+        obligation_id: id,
+        custom_title: title !== undefined ? title.trim() : undefined,
+        custom_amount: !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined,
+        custom_due_day: parsedDueDay,
+        custom_recipient: recipient !== undefined ? recipient.trim() : undefined,
+        custom_notes: notes !== undefined ? notes.trim() : undefined,
+        custom_category: category,
+        custom_wallet_id: preferred_wallet_id,
+        payment_type: payment_type || 'fixed',
+        updated_at: new Date().toISOString(),
+      });
 
       // 2. Если это лизинг или кредит (loan-...)
       if (id.startsWith('loan-')) {
         const loanId = id.replace('loan-', '');
-        const supabase = createAdminClient();
         const updateData: Record<string, any> = {};
         if (title) updateData.purpose = title.trim();
-        if (!isNaN(parsedAmount) && parsedAmount > 0)
+        if (recipient) updateData.lender_name = recipient.trim();
+        if (notes) updateData.notes = notes.trim();
+        if (!isNaN(parsedAmount) && parsedAmount > 0) {
           updateData.monthly_payment = parsedAmount.toFixed(2);
-
+        }
         await (supabase.from('loans') as any).update(updateData).eq('id', loanId);
-        return NextResponse.json({ success: true, message: 'Кредит/лизинг обновлён' });
-      }
-
-      // 3. Если это пятничное авто-событие (salary-friday-...)
-      if (id.startsWith('salary-friday-')) {
-        const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(
-          SETTLEMENTS_FILE,
-          {},
-        );
-        const parts = id.replace('salary-friday-', '').split('-');
-        const activePeriod =
-          period ||
-          (parts.length >= 2 ? `${parts[0]}-${parts[1]}` : new Date().toISOString().slice(0, 7));
-        if (!settlementsMap[activePeriod]) settlementsMap[activePeriod] = {};
-        settlementsMap[activePeriod][id] = {
-          ...settlementsMap[activePeriod][id],
-          custom_title: title?.trim(),
-          custom_amount: parsedAmount,
-          custom_due_day: parsedDueDay,
-          custom_recipient: recipient?.trim(),
-          custom_notes: notes?.trim(),
+      } else if (!id.startsWith('salary-friday-')) {
+        // 3. Базовое обязательство (payment_calendar_obligations)
+        const updateData: Record<string, any> = {
           updated_at: new Date().toISOString(),
         };
-        writeJsonFile(SETTLEMENTS_FILE, settlementsMap);
-        return NextResponse.json({ success: true, message: 'Событие обновлено' });
+        if (title !== undefined) updateData.title = title.trim();
+        if (category !== undefined) updateData.category = category;
+        if (!isNaN(parsedAmount) && parsedAmount > 0) updateData.amount = parsedAmount;
+        if (parsedDueDay) updateData.due_day = parsedDueDay;
+        if (preferred_wallet_id) updateData.preferred_wallet_id = preferred_wallet_id;
+        if (recipient !== undefined) updateData.recipient = recipient.trim();
+        if (notes !== undefined) updateData.notes = notes.trim();
+        if (payment_type !== undefined) updateData.payment_type = payment_type;
+        if (target_period !== undefined) updateData.target_period = target_period;
+
+        await (supabase.from('payment_calendar_obligations') as any)
+          .update(updateData)
+          .eq('id', id);
+
+        // Обновляем локальный JSON файл
+        const localOblPath = getLocalFilePath('payment_obligations.json');
+        const stored = readJsonFile<ObligationItem[]>(localOblPath, []);
+        const idx = stored.findIndex((o) => o.id === id);
+        if (idx !== -1 && stored[idx]) {
+          stored[idx] = {
+            ...stored[idx]!,
+            ...updateData,
+          };
+          writeJsonFile(localOblPath, stored);
+        }
       }
 
-      return NextResponse.json({ error: 'Событие не найдено' }, { status: 404 });
+      // Сохраняем локальный settlements JSON
+      const localSetPath = getLocalFilePath('payment_settlements.json');
+      const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(localSetPath, {});
+      if (!settlementsMap[activePeriod]) settlementsMap[activePeriod] = {};
+      settlementsMap[activePeriod][id] = {
+        ...settlementsMap[activePeriod][id],
+        custom_title: title?.trim(),
+        custom_amount: parsedAmount,
+        custom_due_day: parsedDueDay,
+        custom_recipient: recipient?.trim(),
+        custom_notes: notes?.trim(),
+        custom_category: category,
+        custom_wallet_id: preferred_wallet_id,
+        payment_type,
+        updated_at: new Date().toISOString(),
+      };
+      writeJsonFile(localSetPath, settlementsMap);
+
+      return NextResponse.json({ success: true, message: 'Событие успешно сохранено' });
     }
 
     return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });
   } catch (err: any) {
+    console.error('Error in POST /api/payment-calendar:', err);
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }
@@ -550,31 +640,47 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const period = searchParams.get('period') || new Date().toISOString().slice(0, 7);
     if (!id) return NextResponse.json({ error: 'ID обязателен' }, { status: 400 });
+
+    const supabase = createAdminClient();
+    const overrideId = `${period}:${id}`;
+
+    // Фиксируем флаг deleted в overrides
+    await (supabase.from('payment_calendar_overrides') as any).upsert({
+      id: overrideId,
+      period,
+      obligation_id: id,
+      deleted: true,
+      deleted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
     if (id.startsWith('loan-')) {
       const loanId = id.replace('loan-', '');
-      const supabase = createAdminClient();
       await (supabase.from('loans') as any).update({ is_active: false }).eq('id', loanId);
-    } else if (id.startsWith('salary-friday-')) {
-      const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(
-        SETTLEMENTS_FILE,
-        {},
-      );
-      const parts = id.replace('salary-friday-', '').split('-');
-      const period =
-        parts.length >= 2 ? `${parts[0]}-${parts[1]}` : new Date().toISOString().slice(0, 7);
-      if (!settlementsMap[period]) settlementsMap[period] = {};
-      settlementsMap[period][id] = { deleted: true, deleted_at: new Date().toISOString() };
-      writeJsonFile(SETTLEMENTS_FILE, settlementsMap);
-    } else {
-      const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
+    } else if (!id.startsWith('salary-friday-')) {
+      await (supabase.from('payment_calendar_obligations') as any)
+        .update({ is_active: false })
+        .eq('id', id);
+
+      // Локальный JSON
+      const localOblPath = getLocalFilePath('payment_obligations.json');
+      const stored = readJsonFile<ObligationItem[]>(localOblPath, []);
       const next = stored.filter((o) => o.id !== id);
-      writeJsonFile(OBLIGATIONS_FILE, next);
+      writeJsonFile(localOblPath, next);
     }
+
+    // Локальный settlements JSON
+    const localSetPath = getLocalFilePath('payment_settlements.json');
+    const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(localSetPath, {});
+    if (!settlementsMap[period]) settlementsMap[period] = {};
+    settlementsMap[period][id] = { deleted: true, deleted_at: new Date().toISOString() };
+    writeJsonFile(localSetPath, settlementsMap);
 
     return NextResponse.json({ success: true, message: 'Обязательство удалено' });
   } catch (err: any) {
+    console.error('Error in DELETE /api/payment-calendar:', err);
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }

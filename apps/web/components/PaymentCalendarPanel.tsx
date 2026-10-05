@@ -268,9 +268,12 @@ export function PaymentCalendarPanel() {
 
   const deleteObligationMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/payment-calendar?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(
+        `/api/payment-calendar?id=${encodeURIComponent(id)}&period=${encodeURIComponent(selectedPeriod)}`,
+        {
+          method: 'DELETE',
+        },
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Ошибка удаления обязательства');

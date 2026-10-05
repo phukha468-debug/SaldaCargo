@@ -1,0 +1,67 @@
+[
+  {
+    "id": "obl-rent-01",
+    "title": "Аренда базы и офиса",
+    "category": "rent",
+    "amount": 65000,
+    "due_day": 5,
+    "frequency": "monthly",
+    "payment_type": "fixed",
+    "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
+    "recipient": "ООO «ПромНедвижимость»",
+    "notes": "База в Верхней Салде, стоянка 8 машин + диспетчерская",
+    "is_active": true
+  },
+  {
+    "id": "obl-comms-02",
+    "title": "Корпоративная связь и ГЛОНАСС трекеры",
+    "category": "comms",
+    "amount": 14500,
+    "due_day": 1,
+    "frequency": "monthly",
+    "payment_type": "fixed",
+    "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
+    "recipient": "МТС / Omnicomm",
+    "notes": "SIM-карты водителей и спутниковый мониторинг транспорта",
+    "is_active": true
+  },
+  {
+    "id": "obl-fuel-03",
+    "title": "Пополнение топливных карт (ГСМ Опти24)",
+    "category": "fuel",
+    "amount": 150000,
+    "due_day": 10,
+    "frequency": "monthly",
+    "payment_type": "fixed",
+    "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
+    "recipient": "Газпромнефть (Опти24)",
+    "notes": "Плановое пополнение баланса карт для рейсов",
+    "is_active": true
+  },
+  {
+    "id": "obl-court-06",
+    "title": "Алименты и исполнительные листы (ФССП)",
+    "category": "court_order",
+    "amount": 22500,
+    "due_day": 15,
+    "frequency": "monthly",
+    "payment_type": "fixed",
+    "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
+    "recipient": "УФССП по Свердловской обл.",
+    "notes": "Обязательные удержания по постановлениям судебных приставов",
+    "is_active": true
+  },
+  {
+    "id": "obl-tax-07",
+    "title": "Налоги и единый налоговый платеж (ЕНП)",
+    "category": "tax",
+    "amount": 48000,
+    "due_day": 28,
+    "frequency": "monthly",
+    "payment_type": "fixed",
+    "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
+    "recipient": "ФНС России (ЕНС)",
+    "notes": "УСН Доходы-Расходы и страховые взносы за сотрудников",
+    "is_active": true
+  }
+]
