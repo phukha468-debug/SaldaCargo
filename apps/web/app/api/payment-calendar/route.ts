@@ -323,11 +323,17 @@ export async function DELETE(request: Request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID обязателен' }, { status: 400 });
 
-    const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
-    const next = stored.filter((o) => o.id !== id);
-    writeJsonFile(OBLIGATIONS_FILE, next);
+    if (id.startsWith('loan-')) {
+      const loanId = id.replace('loan-', '');
+      const supabase = createAdminClient();
+      await (supabase.from('loans') as any).update({ is_active: false }).eq('id', loanId);
+    } else {
+      const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
+      const next = stored.filter((o) => o.id !== id);
+      writeJsonFile(OBLIGATIONS_FILE, next);
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Обязательство удалено' });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

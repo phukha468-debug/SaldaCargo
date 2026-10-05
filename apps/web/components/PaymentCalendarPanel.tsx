@@ -197,6 +197,23 @@ export function PaymentCalendarPanel() {
     onError: (e: Error) => alert(e.message),
   });
 
+  const deleteObligationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/payment-calendar?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Ошибка удаления обязательства');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payment-calendar'] });
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
   if (isLoading || !data) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
@@ -505,31 +522,60 @@ export function PaymentCalendarPanel() {
 
                     {/* Действие */}
                     <td className="py-3 px-3 text-center">
-                      {isPaid ? (
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          {item.paid_at
-                            ? new Date(item.paid_at).toLocaleDateString('ru-RU', {
-                                day: 'numeric',
-                                month: 'short',
-                              })
-                            : 'Оплачен'}
-                        </span>
-                      ) : (
+                      <div className="flex items-center justify-center gap-1.5">
+                        {isPaid ? (
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {item.paid_at
+                              ? new Date(item.paid_at).toLocaleDateString('ru-RU', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                })
+                              : 'Оплачен'}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setPayModalItem(item);
+                              setPayAmount(String(item.amount));
+                              setPayWallet(
+                                item.preferred_wallet_id === '10000000-0000-0000-0000-000000000002'
+                                  ? '10000000-0000-0000-0000-000000000002'
+                                  : '10000000-0000-0000-0000-000000000001',
+                              );
+                            }}
+                            className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1"
+                          >
+                            <span>✓</span> Оплатить
+                          </button>
+                        )}
+
                         <button
                           onClick={() => {
-                            setPayModalItem(item);
-                            setPayAmount(String(item.amount));
-                            setPayWallet(
-                              item.preferred_wallet_id === '10000000-0000-0000-0000-000000000002'
-                                ? '10000000-0000-0000-0000-000000000002'
-                                : '10000000-0000-0000-0000-000000000001',
-                            );
+                            if (
+                              window.confirm(`Удалить «${item.title}» из платёжного календаря?`)
+                            ) {
+                              deleteObligationMutation.mutate(item.id);
+                            }
                           }}
-                          className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1 mx-auto"
+                          disabled={deleteObligationMutation.isPending}
+                          title="Удалить из календаря"
+                          className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                         >
-                          <span>✓</span> Оплатить
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 );
