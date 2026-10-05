@@ -7,49 +7,36 @@ const NOVIKOV_ID = '20000000-0000-0000-0000-000000000002';
 const ROMASHIM_ID = '20000000-0000-0000-0000-000000000003';
 
 const SUPPLIERS = [
-  { id: OPTI24_ID, name: 'Дерябин ГСМ', icon: '⛽', autoAccrue: true },
+  { id: OPTI24_ID, name: 'Дерябин ГСМ', icon: '⛽', autoAccrue: false },
   { id: NOVIKOV_ID, name: 'Новиков А.В. Запчасти', icon: '🔧', autoAccrue: false },
   { id: ROMASHIM_ID, name: 'Ромашин Запчасти', icon: '🔧', autoAccrue: false },
 ];
-
-const sum = (rows: any[]) =>
-  (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
 export async function GET() {
   try {
     const supabase = createAdminClient();
     const allIds = SUPPLIERS.map((s) => s.id);
 
-    const [
-      { data: fuelExpenses },
-      { data: txPending },
-      { data: txCompleted },
-      { data: counterparties },
-    ] = await Promise.all([
-      (supabase.from('trip_expenses') as any).select('amount').eq('payment_method', 'fuel_card'),
-      (supabase.from('transactions') as any)
-        .select('amount, counterparty_id')
-        .in('counterparty_id', allIds)
-        .eq('direction', 'expense')
-        .eq('settlement_status', 'pending')
-        .eq('lifecycle_status', 'approved'),
-      (supabase.from('transactions') as any)
-        .select('amount, counterparty_id')
-        .in('counterparty_id', allIds)
-        .eq('direction', 'expense')
-        .eq('settlement_status', 'completed')
-        .eq('lifecycle_status', 'approved'),
-      (supabase.from('counterparties') as any).select('id, payable_amount').in('id', allIds),
-    ]);
+    const [{ data: txPending }, { data: txCompleted }, { data: counterparties }] =
+      await Promise.all([
+        (supabase.from('transactions') as any)
+          .select('amount, counterparty_id')
+          .in('counterparty_id', allIds)
+          .eq('direction', 'expense')
+          .eq('settlement_status', 'pending')
+          .eq('lifecycle_status', 'approved'),
+        (supabase.from('transactions') as any)
+          .select('amount, counterparty_id')
+          .in('counterparty_id', allIds)
+          .eq('direction', 'expense')
+          .eq('settlement_status', 'completed')
+          .eq('lifecycle_status', 'approved'),
+        (supabase.from('counterparties') as any).select('id, payable_amount').in('id', allIds),
+      ]);
 
     const cpPayableMap = new Map<string, number>(
       (counterparties ?? []).map((c: any) => [c.id, parseFloat(c.payable_amount ?? '0')]),
     );
-
-    const opti24FuelTotal = sum(fuelExpenses ?? []);
-    const opti24Payments = (txCompleted ?? [])
-      .filter((t: any) => t.counterparty_id === OPTI24_ID)
-      .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
 
     const result = SUPPLIERS.map((s) => {
       let debt: number;
@@ -57,8 +44,6 @@ export async function GET() {
 
       if (manualDebt > 0) {
         debt = manualDebt;
-      } else if (s.autoAccrue) {
-        debt = Math.max(0, opti24FuelTotal - opti24Payments);
       } else {
         const pending = (txPending ?? [])
           .filter((t: any) => t.counterparty_id === s.id)

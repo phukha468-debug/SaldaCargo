@@ -9,7 +9,6 @@ const OVERHEAD_CODES = ['REPAIR_PARTS', 'REPAIR_EXTERNAL', 'TAX', 'INSURANCE'];
 export const DERYABIN_ID = '20000000-0000-0000-0000-000000000001';
 export const NOVIKOV_ID = '20000000-0000-0000-0000-000000000002';
 export const ROMASHIM_ID = '20000000-0000-0000-0000-000000000003';
-const DERYABIN_DISCOUNT_PCT = 12;
 
 function last6MonthKeys(): string[] {
   const now = new Date();
@@ -80,77 +79,63 @@ export async function GET(request: Request) {
     const overheadCatIds = (overheadCategories ?? []).map((c: any) => c.id);
 
     // Параллельная загрузка базовых данных
-    const [
-      overheadTxList,
-      overheadTripExpList,
-      allCompanyOrders,
-      orders,
-      fuelCardExpenses,
-      supplierTransactions,
-    ] = await Promise.all([
-      overheadCatIds.length > 0
-        ? fetchAllRows((from, to) =>
-            (supabase as any)
-              .from('transactions')
-              .select('amount')
-              .in('category_id', overheadCatIds)
-              .eq('direction', 'expense')
-              .eq('lifecycle_status', 'approved')
-              .eq('settlement_status', 'completed')
-              .range(from, to),
-          )
-        : Promise.resolve([]),
-      overheadCatIds.length > 0
-        ? fetchAllRows((from, to) =>
-            (supabase as any)
-              .from('trip_expenses')
-              .select('amount')
-              .in('category_id', overheadCatIds)
-              .range(from, to),
-          )
-        : Promise.resolve([]),
-      fetchAllRows((from, to) =>
-        (supabase as any)
-          .from('trip_orders')
-          .select('amount, trips!inner(lifecycle_status)')
-          .eq('lifecycle_status', 'approved')
-          .eq('trips.lifecycle_status', 'approved')
-          .range(from, to),
-      ),
-      // Заказы клиентов
-      fetchAllRows((from, to) =>
-        (supabase as any)
-          .from('trip_orders')
-          .select(
-            'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
-          )
-          .in('counterparty_id', cpIds)
-          .eq('lifecycle_status', 'approved')
-          .eq('trips.lifecycle_status', 'approved')
-          .range(from, to),
-      ),
-      // Расходы по топливным картам (для Дерябин ГСМ / Опти24)
-      fetchAllRows((from, to) =>
-        (supabase as any)
-          .from('trip_expenses')
-          .select('amount, created_at, description')
-          .eq('payment_method', 'fuel_card')
-          .range(from, to),
-      ),
-      // Транзакции по поставщикам
-      supplierIds.length > 0
-        ? fetchAllRows((from, to) =>
-            (supabase as any)
-              .from('transactions')
-              .select(
-                'id, amount, counterparty_id, settlement_status, description, created_at, direction',
-              )
-              .in('counterparty_id', supplierIds)
-              .eq('lifecycle_status', 'approved')
-              .range(from, to),
-          )
-        : Promise.resolve([]),
-    ]);
+    const [overheadTxList, overheadTripExpList, allCompanyOrders, orders, supplierTransactions] =
+      await Promise.all([
+        overheadCatIds.length > 0
+          ? fetchAllRows((from, to) =>
+              (supabase as any)
+                .from('transactions')
+                .select('amount')
+                .in('category_id', overheadCatIds)
+                .eq('direction', 'expense')
+                .eq('lifecycle_status', 'approved')
+                .eq('settlement_status', 'completed')
+                .range(from, to),
+            )
+          : Promise.resolve([]),
+        overheadCatIds.length > 0
+          ? fetchAllRows((from, to) =>
+              (supabase as any)
+                .from('trip_expenses')
+                .select('amount')
+                .in('category_id', overheadCatIds)
+                .range(from, to),
+            )
+          : Promise.resolve([]),
+        fetchAllRows((from, to) =>
+          (supabase as any)
+            .from('trip_orders')
+            .select('amount, trips!inner(lifecycle_status)')
+            .eq('lifecycle_status', 'approved')
+            .eq('trips.lifecycle_status', 'approved')
+            .range(from, to),
+        ),
+        // Заказы клиентов
+        fetchAllRows((from, to) =>
+          (supabase as any)
+            .from('trip_orders')
+            .select(
+              'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
+            )
+            .in('counterparty_id', cpIds)
+            .eq('lifecycle_status', 'approved')
+            .eq('trips.lifecycle_status', 'approved')
+            .range(from, to),
+        ),
+        // Транзакции по поставщикам
+        supplierIds.length > 0
+          ? fetchAllRows((from, to) =>
+              (supabase as any)
+                .from('transactions')
+                .select(
+                  'id, amount, counterparty_id, settlement_status, description, created_at, direction',
+                )
+                .in('counterparty_id', supplierIds)
+                .eq('lifecycle_status', 'approved')
+                .range(from, to),
+            )
+          : Promise.resolve([]),
+      ]);
 
     const totalOverhead = [...overheadTxList, ...overheadTripExpList].reduce(
       (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
@@ -211,7 +196,6 @@ export async function GET(request: Request) {
       (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
     const supplierDebtMap = new Map<string, number>();
-    const totalFuelCard = sumArr(fuelCardExpenses);
 
     for (const sId of supplierIds) {
       const sTx = supplierTransactions.filter((t: any) => t.counterparty_id === sId);
@@ -222,14 +206,7 @@ export async function GET(request: Request) {
         sTx.filter((t: any) => t.settlement_status === 'completed' && t.direction === 'expense'),
       );
 
-      if (sId === DERYABIN_ID) {
-        const accumulated = totalFuelCard + pending;
-        const discount = accumulated * (DERYABIN_DISCOUNT_PCT / 100);
-        const autoDebt = Math.max(0, accumulated - discount - payments);
-        supplierDebtMap.set(sId, autoDebt);
-      } else {
-        supplierDebtMap.set(sId, Math.max(0, pending - payments));
-      }
+      supplierDebtMap.set(sId, Math.max(0, pending - payments));
     }
 
     // Статистика по каждому контрагенту

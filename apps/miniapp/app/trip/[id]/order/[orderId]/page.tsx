@@ -86,8 +86,6 @@ export default function EditOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showNewClient, setShowNewClient] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
   const [initialized, setInitialized] = useState(false);
 
   // Направление заказа
@@ -122,6 +120,10 @@ export default function EditOrderPage() {
     queryFn: () => fetch('/api/driver/counterparties').then((r) => r.json()),
     staleTime: 5 * 60 * 1000,
   });
+
+  const genericClient = counterparties.find(
+    (c: any) => c.id === 'ba412028-ed45-4cf8-b365-ad76a93afd71' || c.name === 'Частный клиент',
+  );
 
   const { data: allLoaders = [] } = useQuery<Loader[]>({
     queryKey: ['driver', 'loaders'],
@@ -253,36 +255,6 @@ export default function EditOrderPage() {
 
   function setLoaderPay(id: string, pay: string) {
     setLoaders((prev) => prev.map((l) => (l.id === id ? { ...l, pay } : l)));
-  }
-
-  async function handleAddClient() {
-    if (!newClientName.trim()) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/driver/counterparties/new', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newClientName, type: 'client' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ['driver', 'counterparties'] });
-        setValue('counterparty_id', data.id);
-        setShowNewClient(false);
-        setNewClientName('');
-        setSearchTerm('');
-      } else if (res.status === 409 && data.existing?.length > 0) {
-        setShowNewClient(false);
-        setSearchTerm(newClientName);
-        setError(`Клиент «${data.existing[0].name}» уже есть — выберите из списка`);
-      } else {
-        setError(data.error || 'Ошибка при добавлении клиента');
-      }
-    } catch {
-      setError('Ошибка сети');
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function onSubmit(data: FormData) {
@@ -435,60 +407,65 @@ export default function EditOrderPage() {
                 ✕
               </button>
             </div>
-          ) : showNewClient ? (
-            <div className="space-y-2 p-3 border-2 border-orange-200 bg-orange-50 rounded-xl">
-              <label className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest">
-                Новый клиент
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  placeholder="Имя или название"
-                  className="flex-1 rounded-xl border-2 border-orange-400 px-4 h-12 font-bold text-zinc-900 focus:outline-none"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleAddClient}
-                  className="bg-orange-600 text-white rounded-xl px-4 font-bold"
-                >
-                  OK
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewClient(false)}
-                className="text-zinc-500 font-bold text-xs"
-              >
-                Отмена
-              </button>
-            </div>
           ) : (
             <div className="space-y-3">
-              {topCounterparties.length > 0 && searchTerm === '' && (
-                <div className="flex flex-wrap gap-2">
-                  {topCounterparties.map((c: any) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setValue('counterparty_id', c.id)}
-                      className="px-3 py-1.5 rounded-lg border-2 border-zinc-200 bg-white text-xs font-bold text-zinc-700 active:scale-95 flex items-center gap-1.5 shadow-sm"
-                    >
-                      <span className="text-sm">{c.is_legal_entity ? '🏢' : '👤'}</span>
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
+              {genericClient && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue('counterparty_id', genericClient.id);
+                    setSearchTerm('');
+                  }}
+                  className="w-full p-3.5 rounded-xl border-2 border-orange-500 bg-orange-50 hover:bg-orange-100 flex items-center justify-between text-left transition-all active:scale-[0.99] shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">👤</span>
+                    <div>
+                      <div className="font-black text-sm text-orange-950">{genericClient.name}</div>
+                      <div className="text-[11px] font-bold text-orange-700">
+                        Обычный разовый заказ (детали укажите в примечании)
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-black uppercase text-white bg-orange-600 px-3 py-1.5 rounded-lg shadow-xs">
+                    Выбрать
+                  </span>
+                </button>
               )}
+
+              {topCounterparties.filter((c: any) => c.id !== genericClient?.id).length > 0 &&
+                searchTerm === '' && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">
+                      Постоянные клиенты
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {topCounterparties
+                        .filter((c: any) => c.id !== genericClient?.id)
+                        .map((c: any) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setValue('counterparty_id', c.id);
+                              setSearchTerm('');
+                            }}
+                            className="px-3 py-1.5 rounded-lg border-2 border-zinc-200 bg-white text-xs font-bold text-zinc-700 active:scale-95 flex items-center gap-1.5 shadow-sm hover:border-zinc-300"
+                          >
+                            <span className="text-sm">{c.is_legal_entity ? '🏢' : '👤'}</span>
+                            {c.name}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
 
               <div className="relative">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Поиск клиента..."
+                  placeholder="Поиск по базе постоянных клиентов..."
                   className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-zinc-900 font-bold focus:border-orange-500 focus:outline-none transition-colors"
                 />
                 {searchTerm.length > 0 && (
@@ -501,9 +478,12 @@ export default function EditOrderPage() {
                           setValue('counterparty_id', c.id);
                           setSearchTerm('');
                         }}
-                        className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0 flex items-center gap-2"
+                        className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0 flex items-center justify-between gap-2"
                       >
-                        <span>{c.name}</span>
+                        <span className="flex items-center gap-2">
+                          <span>{c.is_legal_entity ? '🏢' : '👤'}</span>
+                          <span>{c.name}</span>
+                        </span>
                         {c.is_legal_entity && (
                           <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600">
                             ЮЛ
@@ -512,16 +492,26 @@ export default function EditOrderPage() {
                       </button>
                     ))}
                     {filteredCounterparties.length === 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewClientName(searchTerm);
-                          setShowNewClient(true);
-                        }}
-                        className="w-full text-left px-4 py-3 font-bold text-orange-600 hover:bg-orange-50"
-                      >
-                        + Создать клиента &quot;{searchTerm}&quot;
-                      </button>
+                      <div className="p-4 text-center space-y-2">
+                        <p className="text-xs font-bold text-zinc-600">
+                          Клиент «{searchTerm}» не найден в базе
+                        </p>
+                        {genericClient && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setValue('counterparty_id', genericClient.id);
+                              setSearchTerm('');
+                            }}
+                            className="w-full py-2.5 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wide shadow-sm"
+                          >
+                            Выбрать «Частный клиент»
+                          </button>
+                        )}
+                        <p className="text-[10px] text-zinc-400">
+                          Новых постоянных клиентов и юрлиц регистрирует администратор
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
@@ -762,10 +752,14 @@ export default function EditOrderPage() {
           </div>
         </div>
 
-        {/* ── Описание / Комментарий к долгу ── */}
+        {/* ── Описание / Комментарий / Примечание к заказу ── */}
         <div className="space-y-2">
           <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
-            {selectedPaymentMethod === 'debt_cash' ? '⏳ Комментарий к долгу' : 'Описание'}
+            {selectedPaymentMethod === 'debt_cash'
+              ? '⏳ Комментарий к долгу'
+              : selectedCounterparty?.name === 'Частный клиент'
+                ? '📝 Примечание к заказу (холодильник, диван, адрес...)'
+                : 'Примечание / Описание (опционально)'}
           </label>
           <input
             type="text"
@@ -773,10 +767,23 @@ export default function EditOrderPage() {
             placeholder={
               selectedPaymentMethod === 'debt_cash'
                 ? 'Обещал заплатить в пятницу...'
-                : 'Переезд, доставка...'
+                : selectedCounterparty?.name === 'Частный клиент'
+                  ? 'Детали заказа: холодильник, этаж, адрес...'
+                  : 'Переезд, доставка плитки, детали...'
             }
-            className="w-full rounded-xl border-2 border-zinc-200 px-4 h-14 text-sm font-bold text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+            className={`w-full rounded-xl border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
+              selectedPaymentMethod === 'debt_cash'
+                ? 'border-rose-400 bg-rose-50/50 focus:border-rose-600'
+                : selectedCounterparty?.name === 'Частный клиент'
+                  ? 'border-orange-300 bg-orange-50/20 focus:border-orange-500'
+                  : 'border-zinc-200 focus:border-orange-500'
+            }`}
           />
+          {selectedCounterparty?.name === 'Частный клиент' && (
+            <p className="text-[10px] font-medium text-zinc-400 pl-1">
+              Укажите детали груза, чтобы легко отличать заказы частных клиентов
+            </p>
+          )}
         </div>
 
         {error && (

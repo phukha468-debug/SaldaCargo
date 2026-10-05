@@ -673,8 +673,14 @@ export function PaymentCalendarPanel() {
                             </span>
                           )}
                           {item.is_salary_rule && (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                              ⚡ Авто-правило (из «Персонал»)
+                            <span
+                              className={`inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
+                                item.amount > 0
+                                  ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              {item.amount > 0 ? '⚡ Ближайшая выплата ЗП' : '📅 Плановая пятница'}
                             </span>
                           )}
                         </div>
@@ -781,6 +787,10 @@ export function PaymentCalendarPanel() {
                                     month: 'short',
                                   })
                                 : 'Оплачен'}
+                            </span>
+                          ) : item.is_salary_rule && item.amount === 0 ? (
+                            <span className="text-[11px] text-slate-400 font-medium italic">
+                              Копится
                             </span>
                           ) : (
                             <button

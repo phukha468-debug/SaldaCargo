@@ -12,8 +12,6 @@ export const OPTI24_ID = DERYABIN_ID;
 const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 const CAT_PARTS = '9d18370d-3228-4f2a-8530-52b168cfa8d7';
 
-const DERYABIN_DISCOUNT_PCT = 12;
-
 export const SUPPLIERS = [
   {
     id: DERYABIN_ID,
@@ -21,8 +19,8 @@ export const SUPPLIERS = [
     icon: '⛽',
     category: CAT_FUEL,
     debtDays: 15,
-    autoAccrue: true,
-    description: 'ГСМ · расход по карте → автоматически в долг',
+    autoAccrue: false,
+    description: 'ГСМ',
   },
   {
     id: NOVIKOV_ID,
@@ -80,8 +78,6 @@ export async function GET() {
 
     const result = SUPPLIERS.map((s) => {
       let debt: number;
-      let accumulated: number | null = null;
-      let discount: number | null = null;
 
       const manualDebt = cpPayableMap.get(s.id) ?? 0;
 
@@ -95,11 +91,6 @@ export async function GET() {
 
       if (manualDebt > 0) {
         debt = manualDebt;
-      } else if (s.id === DERYABIN_ID) {
-        const fuelTotal = sum(allFuel);
-        accumulated = fuelTotal + pending;
-        discount = accumulated * (DERYABIN_DISCOUNT_PCT / 100);
-        debt = Math.max(0, accumulated - discount - payments);
       } else {
         debt = Math.max(0, pending - payments);
       }
@@ -128,8 +119,8 @@ export async function GET() {
       return {
         ...s,
         debt: debt.toFixed(2),
-        accumulated: accumulated !== null ? accumulated.toFixed(2) : null,
-        discount: discount !== null ? discount.toFixed(2) : null,
+        accumulated: null as string | null,
+        discount: null as string | null,
         history,
       };
     });

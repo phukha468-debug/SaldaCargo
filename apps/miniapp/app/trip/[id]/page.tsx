@@ -345,6 +345,12 @@ export default function TripDetailPage() {
                               )}
                             </div>
 
+                            {order.counterparty?.name && order.description && (
+                              <p className="text-xs text-zinc-600 font-bold truncate mb-1">
+                                📝 {order.description}
+                              </p>
+                            )}
+
                             <p className="text-[11px] font-bold text-green-700 uppercase tracking-wide">
                               ЗП водителя: <Money amount={order.driver_pay} />
                               {hasDriverLoaderPay && (

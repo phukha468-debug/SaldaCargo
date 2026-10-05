@@ -57,10 +57,11 @@ export async function GET() {
   }));
 
   // Сортировка: по количеству заказов (убывание), затем по имени
-  const GENERIC_ID = '30fef3ce-2bf2-48fa-9b6e-5d1b7b94459a';
+  const GENERIC_ID = 'ba412028-ed45-4cf8-b365-ad76a93afd71'; // «Частный клиент»
   enriched.sort((a: any, b: any) => {
     if (a.id === GENERIC_ID) return -1;
     if (b.id === GENERIC_ID) return 1;
+    if (b.is_regular !== a.is_regular) return (b.is_regular ? 1 : 0) - (a.is_regular ? 1 : 0);
     if (b.order_count !== a.order_count) return b.order_count - a.order_count;
     return a.name.localeCompare(b.name, 'ru');
   });

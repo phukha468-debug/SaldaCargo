@@ -212,9 +212,22 @@ export async function GET(request: Request) {
       });
     }
 
-    // 4. Правило: каждую пятницу выплата Зарплаты (сумма подтягивается из раздела Персонал)
+    // 4. Правило: еженедельная выплата Зарплаты по пятницам.
+    // Текущий накопленный долг (liveSalaryDebt) относится только к БЛИЖАЙШЕЙ пятнице.
+    // Все последующие пятницы месяца пока равны 0 ₽ (накопятся по мере работы).
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-    const fridayObligations: ObligationItem[] = [];
+    const todayZeroTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const isCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth() + 1;
+
+    // Сначала собираем все пятницы выбранного месяца
+    const monthFridays: {
+      day: number;
+      dateStr: string;
+      fridayId: string;
+      override: any;
+      isSettled: boolean;
+      dueTime: number;
+    }[] = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dObj = new Date(currentYear, currentMonth - 1, day);
@@ -224,7 +237,6 @@ export async function GET(request: Request) {
         const fridayId = `salary-friday-${dateStr}`;
         const override = monthOverrides[fridayId];
 
-        // Проверяем, не удалил ли пользователь это событие
         if (override?.deleted) {
           continue;
         }
@@ -233,31 +245,79 @@ export async function GET(request: Request) {
           override && typeof override.paid_amount === 'number' && override.paid_amount > 0,
         );
 
-        const defaultAmount = liveSalaryDebt > 0 ? liveSalaryDebt : 120000;
-        const amount = isSettled
-          ? override.paid_amount
-          : typeof override?.custom_amount === 'number' && override.custom_amount > 0
-            ? override.custom_amount
-            : defaultAmount;
-
-        fridayObligations.push({
-          id: fridayId,
-          title: override?.custom_title || 'Выплата зарплаты (Пятница)',
-          category: override?.custom_category || 'salary',
-          amount,
-          due_day: override?.custom_due_day || day,
-          frequency: 'weekly',
-          payment_type: override?.payment_type || 'fixed',
-          preferred_wallet_id: override?.custom_wallet_id || BANK_ID,
-          recipient:
-            override?.custom_recipient || 'Штат сотрудников (водители, механики, грузчики)',
-          notes:
-            override?.custom_notes ||
-            `Еженедельная выплата ЗП по пятницам (долг из раздела «Персонал»: ${liveSalaryDebt.toLocaleString('ru-RU')} ₽)`,
-          is_active: true,
-          is_salary_rule: true,
+        monthFridays.push({
+          day,
+          dateStr,
+          fridayId,
+          override,
+          isSettled,
+          dueTime: new Date(currentYear, currentMonth - 1, day).getTime(),
         });
       }
+    }
+
+    // Определяем ближайшую активную пятницу для начисления текущего долга ЗП:
+    // Только в текущем месяце — первая пятница на сегодня или в будущем, которая еще не выплачена
+    let activeFridayId: string | null = null;
+    if (isCurrentMonth) {
+      const upcomingUnsettled = monthFridays.find(
+        (f) => f.dueTime >= todayZeroTime && !f.isSettled,
+      );
+      if (upcomingUnsettled) {
+        activeFridayId = upcomingUnsettled.fridayId;
+      }
+    }
+
+    const fridayObligations: ObligationItem[] = [];
+    for (const f of monthFridays) {
+      const { day, fridayId, override, isSettled, dueTime } = f;
+
+      let amount = 0;
+      let notes = '';
+
+      if (isSettled) {
+        amount = override.paid_amount;
+        notes = override?.custom_notes || 'Выплата зарплаты произведена';
+      } else if (typeof override?.custom_amount === 'number' && override.custom_amount >= 0) {
+        amount = override.custom_amount;
+        notes =
+          override?.custom_notes ||
+          (fridayId === activeFridayId
+            ? 'Ближайшая выплата ЗП (настроенная сумма)'
+            : 'Плановая дата выплаты ЗП');
+      } else if (fridayId === activeFridayId) {
+        // Только ближайшая пятница получает текущий накопленный долг
+        amount = liveSalaryDebt;
+        notes =
+          override?.custom_notes ||
+          (liveSalaryDebt > 0
+            ? `Ближайшая выплата ЗП (накопленный долг из «Персонал»: ${liveSalaryDebt.toLocaleString('ru-RU')} ₽)`
+            : 'Ближайшая выплата ЗП (накопленный долг: 0 ₽)');
+      } else {
+        // Все остальные пятницы (прошедшие без фиксации или будущие) стоят 0 ₽
+        amount = 0;
+        if (dueTime < todayZeroTime) {
+          notes = override?.custom_notes || 'Прошедшая дата выплаты ЗП';
+        } else {
+          notes =
+            override?.custom_notes || 'Плановая дата выплаты ЗП (сумма накопится к этой дате)';
+        }
+      }
+
+      fridayObligations.push({
+        id: fridayId,
+        title: override?.custom_title || 'Выплата зарплаты (Пятница)',
+        category: override?.custom_category || 'salary',
+        amount,
+        due_day: override?.custom_due_day || day,
+        frequency: 'weekly',
+        payment_type: override?.payment_type || 'fixed',
+        preferred_wallet_id: override?.custom_wallet_id || BANK_ID,
+        recipient: override?.custom_recipient || 'Штат сотрудников (водители, механики, грузчики)',
+        notes,
+        is_active: true,
+        is_salary_rule: true,
+      });
     }
 
     // 5. Фильтруем и дополняем базовые обязательства переопределениями
@@ -300,8 +360,6 @@ export async function GET(request: Request) {
     ];
 
     // 6. Формируем позиции календаря с расчетом дней и статусов
-    const todayZeroTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
     const calendarItems: CalendarResponseItem[] = allObligations.map((obl) => {
       const day = Math.min(Math.max(1, obl.due_day), 31);
       const dueDateObj = new Date(currentYear, currentMonth - 1, day);
@@ -316,12 +374,12 @@ export async function GET(request: Request) {
       );
 
       let status: CalendarStatus = 'planned';
-      if (isPaid) {
+      if (isPaid || (obl.amount === 0 && diffDays <= 0)) {
         status = 'paid';
       } else if (diffDays < 0) {
         status = 'overdue';
       } else if (diffDays === 0) {
-        status = 'due_today';
+        status = obl.amount > 0 ? 'due_today' : 'planned';
       } else {
         status = 'planned';
       }
