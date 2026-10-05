@@ -121,7 +121,17 @@ export async function GET(request: Request) {
         string,
         Record<
           string,
-          { paid_amount: number; paid_at: string; wallet_id: string; deleted?: boolean }
+          {
+            paid_amount?: number;
+            paid_at?: string;
+            wallet_id?: string;
+            deleted?: boolean;
+            custom_title?: string;
+            custom_due_day?: number;
+            custom_recipient?: string;
+            custom_notes?: string;
+            custom_amount?: number;
+          }
         >
       >
     >(SETTLEMENTS_FILE, {});
@@ -173,25 +183,36 @@ export async function GET(request: Request) {
           continue;
         }
 
+        const customTitle =
+          monthSettlements[fridayId]?.custom_title || 'Выплата зарплаты (Пятница)';
+        const customDueDay = monthSettlements[fridayId]?.custom_due_day || day;
+        const customRecipient =
+          monthSettlements[fridayId]?.custom_recipient ||
+          'Штат сотрудников (водители, механики, грузчики)';
+        const customNotes = monthSettlements[fridayId]?.custom_notes;
+
         const settledInfo = monthSettlements[fridayId];
-        const isSettled = Boolean(settledInfo && settledInfo.paid_amount > 0);
+        const isSettled = Boolean(
+          settledInfo && typeof settledInfo.paid_amount === 'number' && settledInfo.paid_amount > 0,
+        );
         const amount =
-          isSettled && settledInfo
+          isSettled && settledInfo && typeof settledInfo.paid_amount === 'number'
             ? settledInfo.paid_amount
-            : liveSalaryDebt > 0
-              ? liveSalaryDebt
-              : 120000;
+            : (monthSettlements[fridayId]?.custom_amount ??
+              (liveSalaryDebt > 0 ? liveSalaryDebt : 120000));
 
         fridayObligations.push({
           id: fridayId,
-          title: 'Выплата зарплаты (Пятница)',
+          title: customTitle,
           category: 'salary',
           amount,
-          due_day: day,
+          due_day: customDueDay,
           frequency: 'weekly',
           preferred_wallet_id: BANK_ID,
-          recipient: 'Штат сотрудников (водители, механики, грузчики)',
-          notes: `Еженедельная выплата ЗП по пятницам (долг из раздела «Персонал»: ${liveSalaryDebt.toLocaleString('ru-RU')} ₽)`,
+          recipient: customRecipient,
+          notes:
+            customNotes ||
+            `Еженедельная выплата ЗП по пятницам (долг из раздела «Персонал»: ${liveSalaryDebt.toLocaleString('ru-RU')} ₽)`,
           is_active: true,
           is_salary_rule: true,
         });
@@ -218,7 +239,9 @@ export async function GET(request: Request) {
 
       // Проверяем, оплачено ли
       const paidInfo = monthSettlements[obl.id];
-      const isPaid = Boolean(paidInfo && paidInfo.paid_amount >= obl.amount);
+      const isPaid = Boolean(
+        paidInfo && typeof paidInfo.paid_amount === 'number' && paidInfo.paid_amount >= obl.amount,
+      );
 
       let status: CalendarStatus = 'planned';
       if (isPaid) {
@@ -377,6 +400,86 @@ export async function POST(request: Request) {
       writeJsonFile(OBLIGATIONS_FILE, stored);
 
       return NextResponse.json({ success: true, obligation: newObl });
+    }
+
+    if (action === 'update_obligation') {
+      const {
+        id,
+        title,
+        category,
+        amount,
+        due_day,
+        preferred_wallet_id,
+        recipient,
+        notes,
+        period,
+      } = body;
+      if (!id) {
+        return NextResponse.json({ error: 'ID обязательства обязателен' }, { status: 400 });
+      }
+
+      const parsedAmount = parseFloat(amount || '0');
+      const parsedDueDay = parseInt(due_day) || 1;
+
+      // 1. Если это обязательство из payment_obligations.json
+      const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
+      const idx = stored.findIndex((o) => o.id === id);
+
+      if (idx !== -1 && stored[idx]) {
+        const current = stored[idx]!;
+        const updatedItem: ObligationItem = {
+          ...current,
+          title: title !== undefined ? title.trim() : current.title,
+          category: category !== undefined ? category : current.category,
+          amount: !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : current.amount,
+          due_day: parsedDueDay,
+          preferred_wallet_id: preferred_wallet_id || current.preferred_wallet_id,
+          recipient: recipient !== undefined ? recipient.trim() : current.recipient,
+          notes: notes !== undefined ? notes.trim() : current.notes,
+        };
+        stored[idx] = updatedItem;
+        writeJsonFile(OBLIGATIONS_FILE, stored);
+        return NextResponse.json({ success: true, obligation: updatedItem });
+      }
+
+      // 2. Если это лизинг или кредит (loan-...)
+      if (id.startsWith('loan-')) {
+        const loanId = id.replace('loan-', '');
+        const supabase = createAdminClient();
+        const updateData: Record<string, any> = {};
+        if (title) updateData.purpose = title.trim();
+        if (!isNaN(parsedAmount) && parsedAmount > 0)
+          updateData.monthly_payment = parsedAmount.toFixed(2);
+
+        await (supabase.from('loans') as any).update(updateData).eq('id', loanId);
+        return NextResponse.json({ success: true, message: 'Кредит/лизинг обновлён' });
+      }
+
+      // 3. Если это пятничное авто-событие (salary-friday-...)
+      if (id.startsWith('salary-friday-')) {
+        const settlementsMap = readJsonFile<Record<string, Record<string, any>>>(
+          SETTLEMENTS_FILE,
+          {},
+        );
+        const parts = id.replace('salary-friday-', '').split('-');
+        const activePeriod =
+          period ||
+          (parts.length >= 2 ? `${parts[0]}-${parts[1]}` : new Date().toISOString().slice(0, 7));
+        if (!settlementsMap[activePeriod]) settlementsMap[activePeriod] = {};
+        settlementsMap[activePeriod][id] = {
+          ...settlementsMap[activePeriod][id],
+          custom_title: title?.trim(),
+          custom_amount: parsedAmount,
+          custom_due_day: parsedDueDay,
+          custom_recipient: recipient?.trim(),
+          custom_notes: notes?.trim(),
+          updated_at: new Date().toISOString(),
+        };
+        writeJsonFile(SETTLEMENTS_FILE, settlementsMap);
+        return NextResponse.json({ success: true, message: 'Событие обновлено' });
+      }
+
+      return NextResponse.json({ error: 'Событие не найдено' }, { status: 404 });
     }
 
     return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });

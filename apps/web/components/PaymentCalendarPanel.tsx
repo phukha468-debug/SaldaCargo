@@ -215,6 +215,65 @@ export function PaymentCalendarPanel() {
     onError: (e: Error) => alert(e.message),
   });
 
+  // Edit obligation modal
+  const [editModalItem, setEditModalItem] = useState<CalendarItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState<CalendarItem['category']>('rent');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDueDay, setEditDueDay] = useState('10');
+  const [editWallet, setEditWallet] = useState<
+    '10000000-0000-0000-0000-000000000001' | '10000000-0000-0000-0000-000000000002'
+  >('10000000-0000-0000-0000-000000000001');
+  const [editRecipient, setEditRecipient] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+
+  const handleOpenEdit = (item: CalendarItem) => {
+    setEditModalItem(item);
+    setEditTitle(item.title);
+    setEditCategory(item.category);
+    setEditAmount(String(item.amount));
+    setEditDueDay(String(item.due_day));
+    setEditWallet(
+      item.preferred_wallet_id === '10000000-0000-0000-0000-000000000002'
+        ? '10000000-0000-0000-0000-000000000002'
+        : '10000000-0000-0000-0000-000000000001',
+    );
+    setEditRecipient(item.recipient || '');
+    setEditNotes(item.notes || '');
+  };
+
+  const updateObligationMutation = useMutation({
+    mutationFn: async () => {
+      if (!editModalItem || !data) return;
+      const res = await fetch('/api/payment-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_obligation',
+          id: editModalItem.id,
+          title: editTitle,
+          category: editCategory,
+          amount: parseFloat(editAmount),
+          due_day: parseInt(editDueDay),
+          preferred_wallet_id: editWallet,
+          recipient: editRecipient,
+          notes: editNotes,
+          period: data.period,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Ошибка обновления обязательства');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payment-calendar'] });
+      setEditModalItem(null);
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
   if (isLoading || !data) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
@@ -411,7 +470,7 @@ export function PaymentCalendarPanel() {
                 <th className="py-3 px-3">Срок / Осталось</th>
                 <th className="py-3 px-3">Счёт списания</th>
                 <th className="py-3 px-3 text-center">Статус</th>
-                <th className="py-3 px-3 text-center w-36">Действие</th>
+                <th className="py-3 px-3 text-center w-44">Действие</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -562,6 +621,27 @@ export function PaymentCalendarPanel() {
                             <span>✓</span> Оплатить
                           </button>
                         )}
+
+                        {/* Редактировать */}
+                        <button
+                          onClick={() => handleOpenEdit(item)}
+                          title="Редактировать событие"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        >
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            />
+                          </svg>
+                        </button>
 
                         <button
                           onClick={() => {
@@ -793,6 +873,149 @@ export function PaymentCalendarPanel() {
                 className="flex-1 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition"
               >
                 {addObligationMutation.isPending ? 'Сохранение...' : 'Добавить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Модалка Редактирования Обязательства / События ── */}
+      {editModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-base">✏️</span>
+                <h3 className="font-bold text-base text-slate-900">Редактировать событие</h3>
+              </div>
+              <button
+                onClick={() => setEditModalItem(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">Название статьи *</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Аренда, ГСМ, Зарплата..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Категория</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value as CalendarItem['category'])}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  >
+                    <option value="rent">🏢 Аренда</option>
+                    <option value="fuel">⛽ ГСМ / Топливо</option>
+                    <option value="comms">📱 Связь / ГЛОНАСС</option>
+                    <option value="salary">👥 Зарплаты</option>
+                    <option value="court_order">⚖️ Алименты / ФССП</option>
+                    <option value="leasing_loan">🏦 Лизинг / Кредит</option>
+                    <option value="tax">📑 Налоги</option>
+                    <option value="insurance">🛡️ Страховка</option>
+                    <option value="other">📦 Прочее</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">
+                    День месяца (1-31) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={editDueDay}
+                    onChange={(e) => setEditDueDay(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Сумма к оплате (₽) *
+                </label>
+                <input
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full text-base font-bold font-mono px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">Счёт списания</label>
+                <select
+                  value={editWallet}
+                  onChange={(e) =>
+                    setEditWallet(
+                      e.target.value as
+                        | '10000000-0000-0000-0000-000000000001'
+                        | '10000000-0000-0000-0000-000000000002',
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                >
+                  <option value="10000000-0000-0000-0000-000000000001">
+                    Расчётный счёт (Т-Банк)
+                  </option>
+                  <option value="10000000-0000-0000-0000-000000000002">Касса (наличные)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Получатель платежа
+                </label>
+                <input
+                  type="text"
+                  value={editRecipient}
+                  onChange={(e) => setEditRecipient(e.target.value)}
+                  placeholder="Кому платим (ООО / ФИО)..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Примечание / Назначение
+                </label>
+                <input
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Договор, особенности списания..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setEditModalItem(null)}
+                className="flex-1 py-2 text-xs font-semibold border border-slate-200 rounded-xl hover:bg-slate-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => updateObligationMutation.mutate()}
+                disabled={updateObligationMutation.isPending || !editTitle.trim() || !editAmount}
+                className="flex-1 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition"
+              >
+                {updateObligationMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
               </button>
             </div>
           </div>
