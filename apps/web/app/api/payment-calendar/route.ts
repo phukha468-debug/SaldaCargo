@@ -55,6 +55,8 @@ export type ObligationItem = {
   is_loan?: boolean;
   loan_id?: string;
   is_salary_rule?: boolean;
+  payment_type?: 'fixed' | 'variable';
+  target_period?: string;
 };
 
 export type CalendarStatus = 'paid' | 'due_today' | 'planned' | 'overdue';
@@ -157,6 +159,7 @@ export async function GET(request: Request) {
           amount: parseFloat(l.monthly_payment ?? '0') || 0,
           due_day: dueDay,
           frequency: 'monthly',
+          payment_type: 'fixed',
           preferred_wallet_id: BANK_ID,
           recipient: l.lender_name,
           notes: `Остаток долга: ${parseFloat(l.remaining_amount ?? '0').toLocaleString('ru-RU')} ₽${l.annual_rate ? `, ставка ${l.annual_rate}%` : ''}`,
@@ -208,6 +211,7 @@ export async function GET(request: Request) {
           amount,
           due_day: customDueDay,
           frequency: 'weekly',
+          payment_type: 'fixed',
           preferred_wallet_id: BANK_ID,
           recipient: customRecipient,
           notes:
@@ -219,9 +223,25 @@ export async function GET(request: Request) {
       }
     }
 
+    // Фильтруем сохраненные обязательства:
+    // постоянные (fixed) повторяются каждый месяц,
+    // переменные (variable) отображаются только в их целевом периоде target_period.
+    const filteredStoredObligations: ObligationItem[] = storedObligations
+      .filter((o) => {
+        if (!o.is_active) return false;
+        if (o.payment_type === 'variable' && o.target_period) {
+          return o.target_period === period;
+        }
+        return true;
+      })
+      .map((o) => ({
+        ...o,
+        payment_type: o.payment_type || 'fixed',
+      }));
+
     // Объединяем регулярные обязательства, лизинги и пятничные выплаты ЗП
     const allObligations: ObligationItem[] = [
-      ...storedObligations.filter((o) => o.is_active),
+      ...filteredStoredObligations,
       ...loanObligations,
       ...fridayObligations,
     ];
@@ -273,9 +293,21 @@ export async function GET(request: Request) {
     let totalMonthObligations = 0;
     let paidThisMonth = 0;
     let remainingThisMonth = 0;
+    let fixedTotalMonth = 0;
+    let variableTotalMonth = 0;
+    let fixedRemainingMonth = 0;
+    let variableRemainingMonth = 0;
 
     for (const item of calendarItems) {
       totalMonthObligations += item.amount;
+      if (item.payment_type === 'variable') {
+        variableTotalMonth += item.amount;
+        if (item.status !== 'paid') variableRemainingMonth += item.amount;
+      } else {
+        fixedTotalMonth += item.amount;
+        if (item.status !== 'paid') fixedRemainingMonth += item.amount;
+      }
+
       if (item.status === 'paid') {
         paidThisMonth += item.amount;
       } else {
@@ -303,6 +335,10 @@ export async function GET(request: Request) {
         totalMonthObligations,
         paidThisMonth,
         remainingThisMonth,
+        fixedTotalMonth,
+        variableTotalMonth,
+        fixedRemainingMonth,
+        variableRemainingMonth,
         dueNext7Days,
         cashReserve7Days, // > 0: профицит, < 0: кассовый разрыв
         cashReserveMonth,
@@ -377,11 +413,23 @@ export async function POST(request: Request) {
     }
 
     if (action === 'create_obligation') {
-      const { title, category, amount, due_day, preferred_wallet_id, recipient, notes } = body;
+      const {
+        title,
+        category,
+        amount,
+        due_day,
+        preferred_wallet_id,
+        recipient,
+        notes,
+        payment_type,
+        target_period,
+        period,
+      } = body;
       if (!title?.trim() || !amount) {
         return NextResponse.json({ error: 'Название и сумма обязательны' }, { status: 400 });
       }
 
+      const pType: 'fixed' | 'variable' = payment_type === 'variable' ? 'variable' : 'fixed';
       const stored = readJsonFile<ObligationItem[]>(OBLIGATIONS_FILE, []);
       const newObl: ObligationItem = {
         id: `obl-${Date.now()}`,
@@ -389,7 +437,12 @@ export async function POST(request: Request) {
         category: category || 'other',
         amount: parseFloat(amount),
         due_day: parseInt(due_day) || 1,
-        frequency: body.frequency || 'monthly',
+        frequency: pType === 'variable' ? 'one_time' : body.frequency || 'monthly',
+        payment_type: pType,
+        target_period:
+          pType === 'variable'
+            ? target_period || period || new Date().toISOString().slice(0, 7)
+            : undefined,
         preferred_wallet_id: preferred_wallet_id || BANK_ID,
         recipient: recipient?.trim() || '',
         notes: notes?.trim() || '',
@@ -413,6 +466,8 @@ export async function POST(request: Request) {
         recipient,
         notes,
         period,
+        payment_type,
+        target_period,
       } = body;
       if (!id) {
         return NextResponse.json({ error: 'ID обязательства обязателен' }, { status: 400 });
@@ -436,6 +491,8 @@ export async function POST(request: Request) {
           preferred_wallet_id: preferred_wallet_id || current.preferred_wallet_id,
           recipient: recipient !== undefined ? recipient.trim() : current.recipient,
           notes: notes !== undefined ? notes.trim() : current.notes,
+          payment_type: payment_type !== undefined ? payment_type : current.payment_type || 'fixed',
+          target_period: target_period !== undefined ? target_period : current.target_period,
         };
         stored[idx] = updatedItem;
         writeJsonFile(OBLIGATIONS_FILE, stored);
