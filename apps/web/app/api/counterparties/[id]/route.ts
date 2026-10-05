@@ -31,10 +31,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.is_regular !== undefined) update.is_regular = body.is_regular;
     if ((body as any).is_legal_entity !== undefined)
       update.is_legal_entity = (body as any).is_legal_entity;
-    if (body.payable_amount !== undefined)
-      update.payable_amount = body.payable_amount
-        ? parseFloat(body.payable_amount).toFixed(2)
-        : '0.00';
+    if (body.payable_amount !== undefined) {
+      const parsedPayable = parseFloat(body.payable_amount || '0');
+      update.payable_amount =
+        !isNaN(parsedPayable) && parsedPayable >= 0 ? parsedPayable.toFixed(2) : '0.00';
+
+      // Если долг поставщику обнулен вручную, закрываем старые pending-расходы по нему
+      if (parsedPayable === 0) {
+        await (supabase.from('transactions') as any)
+          .update({ settlement_status: 'completed' })
+          .eq('counterparty_id', id)
+          .eq('direction', 'expense')
+          .eq('settlement_status', 'pending');
+      }
+    }
 
     const { data, error } = await (supabase.from('counterparties') as any)
       .update(update)

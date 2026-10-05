@@ -52,30 +52,38 @@ export async function GET() {
     const supabase = createAdminClient();
     const allIds = SUPPLIERS.map((s) => s.id);
 
-    const [{ data: fuelExpensesAllTime }, { data: txAllTime }] = await Promise.all([
-      (supabase.from('trip_expenses') as any)
-        .select(
-          'amount, created_at, description, trips(trip_number, assets(short_name, reg_number))',
-        )
-        .eq('payment_method', 'fuel_card')
-        .order('created_at', { ascending: false }),
+    const [{ data: fuelExpensesAllTime }, { data: txAllTime }, { data: counterparties }] =
+      await Promise.all([
+        (supabase.from('trip_expenses') as any)
+          .select(
+            'amount, created_at, description, trips(trip_number, assets(short_name, reg_number))',
+          )
+          .eq('payment_method', 'fuel_card')
+          .order('created_at', { ascending: false }),
 
-      (supabase.from('transactions') as any)
-        .select(
-          'id, amount, counterparty_id, settlement_status, description, created_at, direction',
-        )
-        .in('counterparty_id', allIds)
-        .eq('lifecycle_status', 'approved')
-        .order('created_at', { ascending: false }),
-    ]);
+        (supabase.from('transactions') as any)
+          .select(
+            'id, amount, counterparty_id, settlement_status, description, created_at, direction',
+          )
+          .in('counterparty_id', allIds)
+          .eq('lifecycle_status', 'approved')
+          .order('created_at', { ascending: false }),
+
+        (supabase.from('counterparties') as any).select('id, payable_amount').in('id', allIds),
+      ]);
 
     const allTx = (txAllTime ?? []) as any[];
     const allFuel = (fuelExpensesAllTime ?? []) as any[];
+    const cpPayableMap = new Map<string, number>(
+      (counterparties ?? []).map((c: any) => [c.id, parseFloat(c.payable_amount ?? '0')]),
+    );
 
     const result = SUPPLIERS.map((s) => {
       let debt: number;
       let accumulated: number | null = null;
       let discount: number | null = null;
+
+      const manualDebt = cpPayableMap.get(s.id) ?? 0;
 
       const sTxAll = allTx.filter((t) => t.counterparty_id === s.id);
       const pending = sum(
@@ -85,7 +93,9 @@ export async function GET() {
         sTxAll.filter((t) => t.settlement_status === 'completed' && t.direction === 'expense'),
       );
 
-      if (s.id === DERYABIN_ID) {
+      if (manualDebt > 0) {
+        debt = manualDebt;
+      } else if (s.id === DERYABIN_ID) {
         const fuelTotal = sum(allFuel);
         accumulated = fuelTotal + pending;
         discount = accumulated * (DERYABIN_DISCOUNT_PCT / 100);

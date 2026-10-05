@@ -328,7 +328,9 @@ export async function GET(request: Request) {
       // Кредиторская задолженность (наш долг поставщику)
       const manualPayable = parseFloat(cp.payable_amount ?? '0');
       const calcSupplierDebt = isSupplier ? (supplierDebtMap.get(cp.id) ?? 0) : 0;
-      const finalPayableDebt = Math.max(0, calcSupplierDebt + manualPayable);
+      // Если администратор задал manualPayable вручную (> 0), приоритет у ручного значения.
+      // Иначе используется расчетная задолженность по транзакциям/топливу (например, для автоначисления ГСМ).
+      const finalPayableDebt = manualPayable > 0 ? manualPayable : calcSupplierDebt;
 
       // Дебиторская задолженность (клиент должен нам)
       const finalReceivableDebt = isClient ? s.unpaid_amount : 0;

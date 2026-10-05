@@ -20,7 +20,12 @@ export async function GET() {
     const supabase = createAdminClient();
     const allIds = SUPPLIERS.map((s) => s.id);
 
-    const [{ data: fuelExpenses }, { data: txPending }, { data: txCompleted }] = await Promise.all([
+    const [
+      { data: fuelExpenses },
+      { data: txPending },
+      { data: txCompleted },
+      { data: counterparties },
+    ] = await Promise.all([
       (supabase.from('trip_expenses') as any).select('amount').eq('payment_method', 'fuel_card'),
       (supabase.from('transactions') as any)
         .select('amount, counterparty_id')
@@ -34,7 +39,12 @@ export async function GET() {
         .eq('direction', 'expense')
         .eq('settlement_status', 'completed')
         .eq('lifecycle_status', 'approved'),
+      (supabase.from('counterparties') as any).select('id, payable_amount').in('id', allIds),
     ]);
+
+    const cpPayableMap = new Map<string, number>(
+      (counterparties ?? []).map((c: any) => [c.id, parseFloat(c.payable_amount ?? '0')]),
+    );
 
     const opti24FuelTotal = sum(fuelExpenses ?? []);
     const opti24Payments = (txCompleted ?? [])
@@ -43,7 +53,11 @@ export async function GET() {
 
     const result = SUPPLIERS.map((s) => {
       let debt: number;
-      if (s.autoAccrue) {
+      const manualDebt = cpPayableMap.get(s.id) ?? 0;
+
+      if (manualDebt > 0) {
+        debt = manualDebt;
+      } else if (s.autoAccrue) {
         debt = Math.max(0, opti24FuelTotal - opti24Payments);
       } else {
         const pending = (txPending ?? [])
