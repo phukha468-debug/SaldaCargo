@@ -36,30 +36,6 @@
     "is_active": true
   },
   {
-    "id": "obl-salary-adv-04",
-    "title": "Аванс водителям и механикам",
-    "category": "salary",
-    "amount": 180000,
-    "due_day": 25,
-    "frequency": "monthly",
-    "preferred_wallet_id": "10000000-0000-0000-0000-000000000002",
-    "recipient": "Штат водителей и СТО",
-    "notes": "Авансовая часть за первую половину месяца (касса/карта)",
-    "is_active": true
-  },
-  {
-    "id": "obl-salary-final-05",
-    "title": "Официальная ЗП и расчетный фонд",
-    "category": "salary",
-    "amount": 260000,
-    "due_day": 10,
-    "frequency": "monthly",
-    "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
-    "recipient": "Сотрудники ТК501",
-    "notes": "Окончательный расчет по итогам месяца (Р/С Т-Банк)",
-    "is_active": true
-  },
-  {
     "id": "obl-court-06",
     "title": "Алименты и исполнительные листы (ФССП)",
     "category": "court_order",

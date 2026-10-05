@@ -26,6 +26,7 @@ export type CalendarItem = {
   notes?: string;
   is_active: boolean;
   is_loan?: boolean;
+  is_salary_rule?: boolean;
   status: 'paid' | 'due_today' | 'planned' | 'overdue';
   days_left: number;
   paid_amount?: number;
@@ -443,17 +444,30 @@ export function PaymentCalendarPanel() {
 
                     {/* Название и получатель */}
                     <td className="py-3 px-3">
-                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
                         <span>{item.title}</span>
                         {item.is_loan && (
                           <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700">
                             Кредит/Лизинг
                           </span>
                         )}
+                        {item.is_salary_rule && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                            ⚡ Авто-правило (из «Персонал»)
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
                         {item.recipient && <span>Кому: {item.recipient} · </span>}
                         {item.notes}
+                        {item.is_salary_rule && (
+                          <a
+                            href="/staff"
+                            className="ml-2 text-blue-600 hover:text-blue-700 underline font-semibold"
+                          >
+                            Ведомость ЗП →
+                          </a>
+                        )}
                       </div>
                     </td>
 
