@@ -36,7 +36,7 @@
     "preferred_wallet_id": "10000000-0000-0000-0000-000000000001",
     "recipient": "Газпромнефть (Опти24)",
     "notes": "Плановое пополнение баланса карт для рейсов",
-    "is_active": true
+    "is_active": false
   },
   {
     "id": "obl-court-06",

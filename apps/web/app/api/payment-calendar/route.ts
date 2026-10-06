@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { syncTBankBalance } from '@/lib/tbank';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
+const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 function getLocalFilePath(filename: string): string {
@@ -60,6 +62,7 @@ export type ObligationItem = {
   is_loan?: boolean;
   loan_id?: string;
   is_salary_rule?: boolean;
+  is_fuel_rule?: boolean;
   payment_type?: 'fixed' | 'variable';
   target_period?: string;
 };
@@ -70,6 +73,7 @@ export type CalendarResponseItem = ObligationItem & {
   status: CalendarStatus;
   due_date: string; // YYYY-MM-DD
   days_left: number;
+  planned_amount?: number;
   paid_amount?: number;
   paid_at?: string;
   paid_wallet?: string;
@@ -95,15 +99,48 @@ export async function GET(request: Request) {
       '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
     ];
 
-    // 1. Параллельно получаем балансы, кредиты, долг по ЗП, обязательства и переопределения из Supabase
+    // 1. Автоматическая синхронизация остатка Т-Банка с защитой от тайм-аута
+    let apiBalance: number | null = null;
+    try {
+      const syncPromise = syncTBankBalance();
+      const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
+        setTimeout(() => resolve({ success: false, error: 'TBank timeout' }), 2500),
+      );
+      const syncResult = (await Promise.race([syncPromise, timeoutPromise])) as any;
+      if (syncResult?.success && typeof syncResult.balance === 'number') {
+        apiBalance = syncResult.balance;
+      }
+    } catch (e) {
+      console.error('TBank auto-sync in payment-calendar:', e);
+    }
+
+    // 2. Параллельно получаем транзакции счетов, кредиты, долг по ЗП, обязательства и переопределения
     const [
-      { data: walletsRes },
+      { data: bankOrders },
+      { data: collections },
+      { data: txIn },
+      { data: txOut },
       { data: loansRes },
       { data: salaryPendingRes },
       { data: dbObligations, error: dbOblErr },
       { data: dbOverrides, error: dbOvrErr },
     ] = await Promise.all([
-      (supabase.from('wallets') as any).select('id, name, balance'),
+      (supabase.from('trip_orders') as any)
+        .select('amount')
+        .in('payment_method', ['bank_invoice', 'qr'])
+        .eq('settlement_status', 'completed')
+        .eq('lifecycle_status', 'approved'),
+      (supabase.from('cash_collections') as any).select('amount'),
+      (supabase.from('transactions') as any)
+        .select('amount, to_wallet_id, trip_order_id')
+        .in('to_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID])
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount, from_wallet_id')
+        .in('from_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID])
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
       (supabase.from('loans') as any).select('*').eq('is_active', true),
       (supabase.from('transactions') as any)
         .select('amount, description')
@@ -117,16 +154,33 @@ export async function GET(request: Request) {
       (supabase.from('payment_calendar_overrides') as any).select('*').eq('period', period),
     ]);
 
+    const sumRows = (rows: any[]) =>
+      (rows ?? []).reduce((s: number, r: any) => s + (parseFloat(r.amount ?? '0') || 0), 0);
+    const sumWhereRows = (rows: any[], key: string, val: string, excludeTripOrders = false) =>
+      (rows ?? [])
+        .filter((r: any) => r[key] === val && (!excludeTripOrders || !r.trip_order_id))
+        .reduce((s: number, r: any) => s + (parseFloat(r.amount ?? '0') || 0), 0);
+
+    const collectionsTotal = sumRows(collections ?? []);
+    const fallbackBankBalance =
+      sumRows(bankOrders ?? []) +
+      sumWhereRows(txIn ?? [], 'to_wallet_id', BANK_ID, true) -
+      sumWhereRows(txOut ?? [], 'from_wallet_id', BANK_ID);
+
+    const bankBalance = apiBalance !== null ? apiBalance : fallbackBankBalance;
+    const cashBalance =
+      collectionsTotal +
+      sumWhereRows(txIn ?? [], 'to_wallet_id', CASH_ID) -
+      sumWhereRows(txOut ?? [], 'from_wallet_id', CASH_ID);
+    const fuelBalance =
+      sumWhereRows(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
+      sumWhereRows(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
+    const totalCash = bankBalance + cashBalance;
+
     const liveSalaryDebt = (salaryPendingRes ?? []).reduce((sum: number, tx: any) => {
       if (tx.description && tx.description.startsWith('Выплата зарплаты')) return sum;
       return sum + (parseFloat(tx.amount ?? '0') || 0);
     }, 0);
-
-    const bankWallet = (walletsRes ?? []).find((w: any) => w.id === BANK_ID);
-    const cashWallet = (walletsRes ?? []).find((w: any) => w.id === CASH_ID);
-    const bankBalance = parseFloat(bankWallet?.balance ?? '0');
-    const cashBalance = parseFloat(cashWallet?.balance ?? '0');
-    const totalCash = bankBalance + cashBalance;
 
     // Считываем локальные файлы как резервный источник
     const localOblPath = getLocalFilePath('payment_obligations.json');
@@ -270,7 +324,7 @@ export async function GET(request: Request) {
 
     const fridayObligations: ObligationItem[] = [];
     for (const f of monthFridays) {
-      const { day, fridayId, override, isSettled, dueTime } = f;
+      const { day, dateStr, fridayId, override, isSettled, dueTime } = f;
 
       let amount = 0;
       let notes = '';
@@ -318,6 +372,54 @@ export async function GET(request: Request) {
         is_active: true,
         is_salary_rule: true,
       });
+
+      // Топливная карта по пятницам (ГСМ Опти24) — плановое пополнение 50 000 ₽ каждую пятницу
+      const fuelFridayId = `fuel-friday-${dateStr}`;
+      const fuelOverride = monthOverrides[fuelFridayId];
+      if (!fuelOverride?.deleted) {
+        const isFuelSettled = Boolean(
+          fuelOverride &&
+          typeof fuelOverride.paid_amount === 'number' &&
+          fuelOverride.paid_amount > 0,
+        );
+
+        let fuelAmount = 50000;
+        let fuelNotes = 'Плановое пополнение баланса карт для рейсов (50 000 ₽)';
+
+        if (isFuelSettled) {
+          fuelAmount = fuelOverride.paid_amount;
+          fuelNotes = fuelOverride?.custom_notes || 'Пополнение топливной карты произведено';
+        } else if (
+          typeof fuelOverride?.custom_amount === 'number' &&
+          fuelOverride.custom_amount >= 0
+        ) {
+          fuelAmount = fuelOverride.custom_amount;
+          fuelNotes = fuelOverride?.custom_notes || 'Плановое пополнение карт (настроенная сумма)';
+        } else if (dueTime < todayZeroTime) {
+          // Прошедшая дата до создания правила
+          fuelAmount = 0;
+          fuelNotes = fuelOverride?.custom_notes || 'Прошедшая пятница';
+        } else {
+          fuelAmount = 50000;
+          fuelNotes =
+            fuelOverride?.custom_notes || 'Плановое пополнение баланса карт для рейсов (50 000 ₽)';
+        }
+
+        fridayObligations.push({
+          id: fuelFridayId,
+          title: fuelOverride?.custom_title || 'Пополнение топливных карт (ГСМ Опти24)',
+          category: fuelOverride?.custom_category || 'fuel',
+          amount: fuelAmount,
+          due_day: fuelOverride?.custom_due_day || day,
+          frequency: 'weekly',
+          payment_type: fuelOverride?.payment_type || 'fixed',
+          preferred_wallet_id: fuelOverride?.custom_wallet_id || BANK_ID,
+          recipient: fuelOverride?.custom_recipient || 'Газпромнефть (Опти24)',
+          notes: fuelNotes,
+          is_active: true,
+          is_fuel_rule: true,
+        });
+      }
     }
 
     // 5. Фильтруем и дополняем базовые обязательства переопределениями
@@ -352,7 +454,7 @@ export async function GET(request: Request) {
         };
       });
 
-    // Объединяем регулярные обязательства, лизинги и пятничные выплаты ЗП
+    // Объединяем регулярные обязательства, лизинги и пятничные выплаты ЗП / ТК
     const allObligations: ObligationItem[] = [
       ...filteredStoredObligations,
       ...loanObligations,
@@ -367,25 +469,31 @@ export async function GET(request: Request) {
 
       const diffDays = Math.round((dueDateObj.getTime() - todayZeroTime) / (1000 * 60 * 60 * 24));
 
-      // Проверяем, оплачено ли
+      // Проверяем, оплачено ли (любая внесенная сумма > 0 считается оплатой)
       const paidInfo = monthOverrides[obl.id];
       const isPaid = Boolean(
-        paidInfo && typeof paidInfo.paid_amount === 'number' && paidInfo.paid_amount >= obl.amount,
+        paidInfo && typeof paidInfo.paid_amount === 'number' && paidInfo.paid_amount > 0,
       );
 
+      const plannedAmount = obl.amount;
+      const effectiveAmount =
+        isPaid && typeof paidInfo.paid_amount === 'number' ? paidInfo.paid_amount : obl.amount;
+
       let status: CalendarStatus = 'planned';
-      if (isPaid || (obl.amount === 0 && diffDays <= 0)) {
+      if (isPaid || (effectiveAmount === 0 && diffDays <= 0)) {
         status = 'paid';
       } else if (diffDays < 0) {
         status = 'overdue';
       } else if (diffDays === 0) {
-        status = obl.amount > 0 ? 'due_today' : 'planned';
+        status = effectiveAmount > 0 ? 'due_today' : 'planned';
       } else {
         status = 'planned';
       }
 
       return {
         ...obl,
+        amount: effectiveAmount,
+        planned_amount: plannedAmount,
         status,
         due_date: dueDateStr,
         days_left: diffDays,
@@ -439,6 +547,7 @@ export async function GET(request: Request) {
         total: totalCash,
         bank: bankBalance,
         cash: cashBalance,
+        fuel: fuelBalance,
       },
       summary: {
         totalMonthObligations,
@@ -633,7 +742,7 @@ export async function POST(request: Request) {
           updateData.monthly_payment = parsedAmount.toFixed(2);
         }
         await (supabase.from('loans') as any).update(updateData).eq('id', loanId);
-      } else if (!id.startsWith('salary-friday-')) {
+      } else if (!id.startsWith('salary-friday-') && !id.startsWith('fuel-friday-')) {
         // 3. Базовое обязательство (payment_calendar_obligations)
         const updateData: Record<string, any> = {
           updated_at: new Date().toISOString(),
@@ -717,7 +826,7 @@ export async function DELETE(request: Request) {
     if (id.startsWith('loan-')) {
       const loanId = id.replace('loan-', '');
       await (supabase.from('loans') as any).update({ is_active: false }).eq('id', loanId);
-    } else if (!id.startsWith('salary-friday-')) {
+    } else if (!id.startsWith('salary-friday-') && !id.startsWith('fuel-friday-')) {
       await (supabase.from('payment_calendar_obligations') as any)
         .update({ is_active: false })
         .eq('id', id);

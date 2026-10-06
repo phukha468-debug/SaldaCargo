@@ -29,8 +29,10 @@ export type CalendarItem = {
   is_active: boolean;
   is_loan?: boolean;
   is_salary_rule?: boolean;
+  is_fuel_rule?: boolean;
   status: 'paid' | 'due_today' | 'planned' | 'overdue';
   days_left: number;
+  planned_amount?: number;
   paid_amount?: number;
   paid_at?: string;
   paid_wallet?: string;
@@ -42,6 +44,7 @@ export type CalendarData = {
     total: number;
     bank: number;
     cash: number;
+    fuel?: number;
   };
   summary: {
     totalMonthObligations: number;
@@ -162,6 +165,10 @@ export function PaymentCalendarPanel() {
 
   // Period state for looking ahead
   const [selectedPeriod, setSelectedPeriod] = useState<string>(currentPeriod);
+
+  // View mode: 'table' (список/таблица) or 'calendar' (31 день в виде календаря)
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<number | null>(null);
 
   // Filters
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -356,6 +363,15 @@ export function PaymentCalendarPanel() {
 
   const isFutureMonth = selectedPeriod > currentPeriod;
 
+  const [calYearStr, calMonthStr] = selectedPeriod.split('-');
+  const calYear = parseInt(calYearStr || '2026', 10);
+  const calMonth = parseInt(calMonthStr || '10', 10);
+  const daysInSelectedMonth = new Date(calYear, calMonth, 0).getDate();
+  const firstDayWeekday = (new Date(calYear, calMonth - 1, 1).getDay() + 6) % 7;
+  const now = new Date();
+  const isSelectedCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth() + 1;
+  const todayDayNumber = isSelectedCurrentMonth ? now.getDate() : -1;
+
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
       {/* ── Панель Навигации по Месяцам (Смотреть наперёд) ── */}
@@ -412,32 +428,85 @@ export function PaymentCalendarPanel() {
 
       {/* ── Верхний Блок Метрик: Баланс, Постоянные vs Переменные, Разрыв ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        {/* 1. Баланс на счетах компании */}
+        {/* 1. Баланс на счетах компании: Сколько есть vs Сколько нужно */}
         <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
-                Баланс счетов ТК
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span>Баланс счетов ТК</span>
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"
+                  title="Синхронизировано"
+                ></span>
               </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                В наличии
+              </span>
             </div>
-            <div className="text-xl font-black font-mono mt-1">
-              <Money amount={balances.total.toFixed(2)} />
+
+            <div className="mt-1.5 flex items-baseline justify-between gap-2">
+              <div>
+                <div className="text-[10px] text-slate-400 font-medium">Есть сейчас:</div>
+                <div className="text-xl font-black font-mono text-emerald-400 leading-tight">
+                  <Money amount={balances.total.toFixed(2)} />
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] text-slate-400 font-medium">Нужно на месяц:</div>
+                <div className="text-sm font-black font-mono text-amber-300 leading-tight">
+                  <Money amount={summary.remainingThisMonth.toFixed(2)} />
+                </div>
+                <div className="text-[9px] text-slate-400 mt-0.5">
+                  на 7 дн:{' '}
+                  <span className="text-rose-300 font-bold font-mono">
+                    {summary.dueNext7Days.toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="pt-2.5 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between mt-2">
-            <span>
-              Банк:{' '}
-              <strong className="text-white">
-                <Money amount={balances.bank.toFixed(2)} />
-              </strong>
-            </span>
-            <span>
-              Касса:{' '}
-              <strong className="text-white">
-                <Money amount={balances.cash.toFixed(2)} />
-              </strong>
-            </span>
+
+          <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-400 mt-2 space-y-1">
+            <div className="flex justify-between items-center text-[10px] flex-wrap gap-1">
+              <span>
+                Банк:{' '}
+                <strong className="text-white font-mono">
+                  <Money amount={balances.bank.toFixed(2)} />
+                </strong>
+              </span>
+              <span>
+                Касса:{' '}
+                <strong className="text-white font-mono">
+                  <Money amount={balances.cash.toFixed(2)} />
+                </strong>
+              </span>
+              {typeof balances.fuel === 'number' && balances.fuel > 0 && (
+                <span>
+                  ТК:{' '}
+                  <strong className="text-purple-300 font-mono">
+                    <Money amount={balances.fuel.toFixed(2)} />
+                  </strong>
+                </span>
+              )}
+            </div>
+
+            <div className="pt-1 flex items-center justify-between text-[9px] border-t border-slate-800/60">
+              {summary.hasGap7Days ? (
+                <span className="text-rose-400 font-bold flex items-center gap-1">
+                  <span>⚠️</span> Не хватает на 7 дн: −
+                  <Money amount={summary.gapAmount7Days.toFixed(2)} />
+                </span>
+              ) : summary.hasGapMonth ? (
+                <span className="text-amber-400 font-semibold flex items-center gap-1">
+                  <span>🛡️</span> На 7 дн. хватает, на месяц: −
+                  <Money amount={summary.gapAmountMonth.toFixed(2)} />
+                </span>
+              ) : (
+                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                  <span>✓</span> Денег хватает на все платежи
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -541,6 +610,30 @@ export function PaymentCalendarPanel() {
 
       {/* ── Панель Управления и Фильтров Календаря ── */}
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        {/* Переключатель вида: Список (Таблица) / Календарь (31 день) */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+              viewMode === 'table'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📋</span> Таблица
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+              viewMode === 'calendar'
+                ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📅</span> Календарь на 31 день
+          </button>
+        </div>
+
         {/* Фильтр: Тип платежа (Все / Постоянные / Переменные) */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
           <button
@@ -610,32 +703,555 @@ export function PaymentCalendarPanel() {
         </div>
       </div>
 
-      {/* ── Таблица Обязательных Платежей Календаря ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-              <tr>
-                <th className="py-3 px-3.5 w-16 text-center">День</th>
-                <th className="py-3 px-3">Статья расходов / Получатель</th>
-                <th className="py-3 px-3">Тип</th>
-                <th className="py-3 px-3">Категория</th>
-                <th className="py-3 px-3 text-right">Сумма к оплате</th>
-                <th className="py-3 px-3">Срок / Осталось</th>
-                <th className="py-3 px-3">Счёт списания</th>
-                <th className="py-3 px-3 text-center">Статус</th>
-                <th className="py-3 px-3 text-center w-44">Действие</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredItems.length === 0 ? (
+      {/* ── Режим Отображения: Сетка 31 день Календаря ИЛИ Таблица ── */}
+      {viewMode === 'calendar' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-4 sm:p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                <span>📅</span>
+                <span>{formatPeriodTitle(selectedPeriod)}</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  {daysInSelectedMonth} {daysInSelectedMonth === 31 ? 'день' : 'дней'}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Нажмите на любой день, чтобы посмотреть расшифровку сумм и оплатить платежи
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Оплачено
+              </span>
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-rose-500"></span> Просрочка
+              </span>
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Сегодня
+              </span>
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-[11px]">
+                <span>⛽ 👥</span> Пятницы
+              </span>
+            </div>
+          </div>
+
+          {/* Шапка дней недели */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-center text-xs font-black text-slate-400 uppercase tracking-wider py-1">
+            <div>Пн</div>
+            <div>Вт</div>
+            <div>Ср</div>
+            <div>Чт</div>
+            <div className="text-blue-600 font-black">Пт ★</div>
+            <div>Сб</div>
+            <div>Вс</div>
+          </div>
+
+          {/* Сетка дней месяца */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {/* Пустые ячейки смещения до первого числа */}
+            {Array.from({ length: firstDayWeekday }).map((_, i) => (
+              <div
+                key={`empty-${i}`}
+                className="min-h-[85px] sm:min-h-[105px] p-2 rounded-xl bg-slate-50/40 border border-dashed border-slate-100 hidden sm:block opacity-40"
+              />
+            ))}
+
+            {/* Ячейки дней 1..daysInSelectedMonth */}
+            {Array.from({ length: daysInSelectedMonth }).map((_, idx) => {
+              const day = idx + 1;
+              const dayItems = filteredItems.filter((i) => i.due_day === day);
+              const dayTotal = dayItems.reduce((acc, it) => acc + it.amount, 0);
+              const isToday = day === todayDayNumber;
+              const isFriday = (firstDayWeekday + idx) % 7 === 4;
+              const hasOverdue = dayItems.some((i) => i.status === 'overdue');
+              const hasDueToday = dayItems.some((i) => i.status === 'due_today');
+              const allPaid = dayItems.length > 0 && dayItems.every((i) => i.status === 'paid');
+              const isSelected = selectedCalendarDay === day;
+
+              let tileBg = 'bg-white border-slate-200 hover:border-blue-400';
+              if (isSelected) {
+                tileBg = 'bg-blue-50/50 border-blue-500 shadow-sm ring-2 ring-blue-500/20';
+              } else if (isToday) {
+                tileBg = 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-400/30';
+              } else if (allPaid) {
+                tileBg = 'bg-emerald-50/30 border-emerald-200 hover:border-emerald-400';
+              } else if (hasOverdue) {
+                tileBg = 'bg-rose-50/40 border-rose-300 hover:border-rose-400';
+              } else if (hasDueToday) {
+                tileBg = 'bg-blue-50/40 border-blue-300 hover:border-blue-400';
+              } else if (dayItems.length === 0) {
+                tileBg =
+                  'bg-slate-50/40 border-slate-100 text-slate-400 hover:bg-slate-50 hover:border-slate-200';
+              }
+
+              return (
+                <div
+                  key={day}
+                  onClick={() => setSelectedCalendarDay(day)}
+                  className={`min-h-[85px] sm:min-h-[105px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between group ${tileBg}`}
+                >
+                  {/* Верхняя строка ячейки: номер дня и бейджи */}
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
+                        isToday
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : isFriday
+                            ? 'bg-purple-100 text-purple-900'
+                            : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {day}
+                    </span>
+                    {isToday && (
+                      <span className="text-[9px] font-extrabold text-blue-700 uppercase tracking-tighter">
+                        Сегодня
+                      </span>
+                    )}
+                    {!isToday && isFriday && (
+                      <span className="text-[9px] font-bold text-purple-600">Пт</span>
+                    )}
+                  </div>
+
+                  {/* Середина: сумма и количество платежей */}
+                  <div className="my-1">
+                    {dayItems.length > 0 ? (
+                      <>
+                        <div className="font-mono font-black text-slate-900 text-xs sm:text-sm leading-tight truncate">
+                          {dayTotal > 0 ? (
+                            <Money amount={dayTotal.toFixed(2)} />
+                          ) : (
+                            <span className="text-emerald-700 text-xs font-bold">0 ₽</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium mt-0.5 truncate flex items-center gap-1">
+                          <span>
+                            {dayItems.length}{' '}
+                            {dayItems.length === 1
+                              ? 'платёж'
+                              : dayItems.length < 5
+                                ? 'платежа'
+                                : 'платежей'}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[10px] text-slate-300 select-none">—</div>
+                    )}
+                  </div>
+
+                  {/* Нижняя строка: статус или мини-иконки категорий */}
+                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100/60">
+                    {dayItems.length > 0 ? (
+                      allPaid ? (
+                        <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1 py-0.2 rounded">
+                          ✓ Оплачен
+                        </span>
+                      ) : hasOverdue ? (
+                        <span className="text-[9px] font-extrabold text-rose-700 bg-rose-100 px-1 py-0.2 rounded">
+                          Просрочка
+                        </span>
+                      ) : hasDueToday ? (
+                        <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100 px-1 py-0.2 rounded">
+                          Сегодня
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-semibold text-slate-600 bg-slate-100 px-1 py-0.2 rounded">
+                          План
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-[9px] text-slate-300">+</span>
+                    )}
+                    <span className="text-[9px] text-blue-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                      Инфо →
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* ── Таблица Обязательных Платежей Календаря ── */
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    В выбранном периоде ({formatPeriodTitle(selectedPeriod)}) платежи не найдены.
-                  </td>
+                  <th className="py-3 px-3.5 w-16 text-center">День</th>
+                  <th className="py-3 px-3">Статья расходов / Получатель</th>
+                  <th className="py-3 px-3">Тип</th>
+                  <th className="py-3 px-3">Категория</th>
+                  <th className="py-3 px-3 text-right">Сумма к оплате</th>
+                  <th className="py-3 px-3">Срок / Осталось</th>
+                  <th className="py-3 px-3">Счёт списания</th>
+                  <th className="py-3 px-3 text-center">Статус</th>
+                  <th className="py-3 px-3 text-center w-44">Действие</th>
                 </tr>
-              ) : (
-                filteredItems.map((item) => {
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                      В выбранном периоде ({formatPeriodTitle(selectedPeriod)}) платежи не найдены.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((item) => {
+                    const cat = CATEGORY_CONFIG[item.category] ||
+                      CATEGORY_CONFIG.other || {
+                        label: 'Прочее',
+                        icon: '📦',
+                        bg: 'bg-slate-50 border-slate-200',
+                        text: 'text-slate-800',
+                      };
+
+                    const isPaid = item.status === 'paid';
+                    const isDueToday = item.status === 'due_today';
+                    const isOverdue = item.status === 'overdue';
+                    const isVariable = item.payment_type === 'variable';
+
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`hover:bg-slate-50/80 transition-colors ${isPaid ? 'bg-slate-50/40 opacity-75' : isDueToday ? 'bg-blue-50/40' : isOverdue ? 'bg-rose-50/40' : ''}`}
+                      >
+                        {/* День месяца */}
+                        <td className="py-3 px-3.5 text-center">
+                          <div
+                            className={`w-8 h-8 mx-auto rounded-xl flex items-center justify-center font-black text-xs ${isPaid ? 'bg-emerald-100 text-emerald-800' : isDueToday ? 'bg-blue-600 text-white animate-pulse' : isOverdue ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+                          >
+                            {item.due_day}
+                          </div>
+                        </td>
+
+                        {/* Название и получатель */}
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
+                            <span>{item.title}</span>
+                            {item.is_loan && (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700">
+                                Кредит/Лизинг
+                              </span>
+                            )}
+                            {item.is_fuel_rule && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.2 rounded border bg-purple-50 text-purple-700 border-purple-200">
+                                ⛽ Еженедельное пополнение ТК
+                              </span>
+                            )}
+                            {item.is_salary_rule && (
+                              <span
+                                className={`inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
+                                  item.amount > 0
+                                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                {item.amount > 0
+                                  ? '⚡ Ближайшая выплата ЗП'
+                                  : '📅 Плановая пятница'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {item.recipient && <span>Кому: {item.recipient} · </span>}
+                            {item.notes}
+                            {item.is_salary_rule && (
+                              <a
+                                href="/staff"
+                                className="ml-2 text-blue-600 hover:text-blue-700 underline font-semibold"
+                              >
+                                Ведомость ЗП →
+                              </a>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Тип платежа */}
+                        <td className="py-3 px-3">
+                          {isVariable ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
+                              <span>⚡</span> Переменный
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              <span>🔒</span> Постоянный
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Категория */}
+                        <td className="py-3 px-3">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${cat.bg} ${cat.text}`}
+                          >
+                            <span>{cat.icon}</span> {cat.label}
+                          </span>
+                        </td>
+
+                        {/* Сумма */}
+                        <td className="py-3 px-3 text-right">
+                          <div className="font-mono font-black text-slate-900 text-sm">
+                            <Money amount={item.amount.toFixed(2)} />
+                          </div>
+                          {item.planned_amount && item.planned_amount !== item.amount ? (
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              план: {item.planned_amount.toLocaleString('ru-RU')} ₽
+                              {item.amount < item.planned_amount ? (
+                                <span className="text-amber-600 font-bold ml-1">
+                                  (-{(item.planned_amount - item.amount).toLocaleString('ru-RU')} ₽)
+                                </span>
+                              ) : (
+                                <span className="text-blue-600 font-bold ml-1">
+                                  (+{(item.amount - item.planned_amount).toLocaleString('ru-RU')} ₽)
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
+                        </td>
+
+                        {/* Срок */}
+                        <td className="py-3 px-3">
+                          {isPaid ? (
+                            <span className="text-[11px] text-emerald-600 font-medium">
+                              Выплачено
+                            </span>
+                          ) : isDueToday ? (
+                            <span className="text-[11px] text-blue-700 font-extrabold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
+                              Сегодня!
+                            </span>
+                          ) : isOverdue ? (
+                            <span className="text-[11px] text-rose-600 font-bold">
+                              Просрочен на {Math.abs(item.days_left)} дн.
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500">
+                              через {item.days_left} дн. ({item.due_date.slice(8, 10)}.
+                              {item.due_date.slice(5, 7)})
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Счёт */}
+                        <td className="py-3 px-3 text-[11px] text-slate-500">
+                          {item.preferred_wallet_id === '10000000-0000-0000-0000-000000000002'
+                            ? '💵 Касса (нал)'
+                            : '🏦 Р/Счёт (Т-Банк)'}
+                        </td>
+
+                        {/* Статус */}
+                        <td className="py-3 px-3 text-center">
+                          {isPaid ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              ✓ Оплачен
+                            </span>
+                          ) : isDueToday ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                              К оплате
+                            </span>
+                          ) : isOverdue ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                              Просрочка
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                              Запланирован
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Действие */}
+                        <td className="py-3 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {isPaid ? (
+                              <span className="text-[11px] text-slate-400 font-mono">
+                                {item.paid_at
+                                  ? new Date(item.paid_at).toLocaleDateString('ru-RU', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                    })
+                                  : 'Оплачен'}
+                              </span>
+                            ) : item.is_salary_rule && item.amount === 0 ? (
+                              <span className="text-[11px] text-slate-400 font-medium italic">
+                                Копится
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setPayModalItem(item);
+                                  setPayAmount(String(item.amount));
+                                  setPayWallet(
+                                    item.preferred_wallet_id ===
+                                      '10000000-0000-0000-0000-000000000002'
+                                      ? '10000000-0000-0000-0000-000000000002'
+                                      : '10000000-0000-0000-0000-000000000001',
+                                  );
+                                }}
+                                className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1"
+                              >
+                                <span>✓</span> Оплатить
+                              </button>
+                            )}
+
+                            {/* Редактировать */}
+                            <button
+                              onClick={() => handleOpenEdit(item)}
+                              title="Редактировать событие"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                />
+                              </svg>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(`Удалить «${item.title}» из платёжного календаря?`)
+                                ) {
+                                  deleteObligationMutation.mutate(item.id);
+                                }
+                              }}
+                              disabled={deleteObligationMutation.isPending}
+                              title="Удалить из календаря"
+                              className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Модалка Расшифровки Платежей Выбранного Дня Календаря ── */}
+      {selectedCalendarDay !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            {/* Шапка модалки */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                  <span>📅</span>
+                  <span>
+                    {selectedCalendarDay} {MONTH_NAMES[calMonth - 1]} {calYear}
+                  </span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-800">
+                    {
+                      [
+                        'Воскресенье',
+                        'Понедельник',
+                        'Вторник',
+                        'Среда',
+                        'Четверг',
+                        'Пятница',
+                        'Суббота',
+                      ][new Date(calYear, calMonth - 1, selectedCalendarDay).getDay()]
+                    }
+                  </span>
+                </h3>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  Расшифровка всех обязательств и платежей за этот день
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedCalendarDay(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Финансовая сводка за день */}
+            {(() => {
+              const dayItems = items.filter((it) => it.due_day === selectedCalendarDay);
+              const dayTotal = dayItems.reduce((acc, it) => acc + it.amount, 0);
+              const dayPaid = dayItems
+                .filter((it) => it.status === 'paid')
+                .reduce((acc, it) => acc + it.amount, 0);
+              const dayRemaining = dayTotal - dayPaid;
+
+              return (
+                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">
+                      Всего за день
+                    </div>
+                    <div className="text-sm font-black font-mono text-slate-900 mt-0.5">
+                      <Money amount={dayTotal.toFixed(2)} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-emerald-600 font-bold uppercase">Оплачено</div>
+                    <div className="text-sm font-black font-mono text-emerald-700 mt-0.5">
+                      <Money amount={dayPaid.toFixed(2)} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">К оплате</div>
+                    <div className="text-sm font-black font-mono text-slate-800 mt-0.5">
+                      <Money amount={dayRemaining.toFixed(2)} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Список платежей дня */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
+              {(() => {
+                const dayItems = items.filter((it) => it.due_day === selectedCalendarDay);
+                if (dayItems.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-slate-400 space-y-3">
+                      <div>На этот день платежей не запланировано.</div>
+                      <button
+                        onClick={() => {
+                          const d = String(selectedCalendarDay);
+                          setSelectedCalendarDay(null);
+                          setNewDueDay(d);
+                          setShowAddModal(true);
+                        }}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition inline-flex items-center gap-1.5 shadow-xs"
+                      >
+                        + Запланировать платёж на этот день
+                      </button>
+                    </div>
+                  );
+                }
+
+                return dayItems.map((item) => {
                   const cat = CATEGORY_CONFIG[item.category] ||
                     CATEGORY_CONFIG.other || {
                       label: 'Прочее',
@@ -647,154 +1263,123 @@ export function PaymentCalendarPanel() {
                   const isPaid = item.status === 'paid';
                   const isDueToday = item.status === 'due_today';
                   const isOverdue = item.status === 'overdue';
-                  const isVariable = item.payment_type === 'variable';
 
                   return (
-                    <tr
+                    <div
                       key={item.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${isPaid ? 'bg-slate-50/40 opacity-75' : isDueToday ? 'bg-blue-50/40' : isOverdue ? 'bg-rose-50/40' : ''}`}
+                      className={`p-3 rounded-xl border transition-all ${
+                        isPaid
+                          ? 'bg-slate-50/50 border-slate-200 opacity-80'
+                          : isDueToday
+                            ? 'bg-blue-50/30 border-blue-200'
+                            : isOverdue
+                              ? 'bg-rose-50/30 border-rose-200'
+                              : 'bg-white border-slate-200'
+                      }`}
                     >
-                      {/* День месяца */}
-                      <td className="py-3 px-3.5 text-center">
-                        <div
-                          className={`w-8 h-8 mx-auto rounded-xl flex items-center justify-center font-black text-xs ${isPaid ? 'bg-emerald-100 text-emerald-800' : isDueToday ? 'bg-blue-600 text-white animate-pulse' : isOverdue ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700'}`}
-                        >
-                          {item.due_day}
-                        </div>
-                      </td>
-
-                      {/* Название и получатель */}
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
-                          <span>{item.title}</span>
-                          {item.is_loan && (
-                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700">
-                              Кредит/Лизинг
-                            </span>
-                          )}
-                          {item.is_salary_rule && (
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
-                                item.amount > 0
-                                  ? 'bg-amber-100 text-amber-800 border-amber-200'
-                                  : 'bg-slate-100 text-slate-600 border-slate-200'
-                              }`}
+                              className={`inline-flex items-center gap-1 px-2 py-0.2 rounded text-[10px] font-bold border ${cat.bg} ${cat.text}`}
                             >
-                              {item.amount > 0 ? '⚡ Ближайшая выплата ЗП' : '📅 Плановая пятница'}
+                              <span>{cat.icon}</span> {cat.label}
                             </span>
-                          )}
+                            <span className="font-bold text-slate-900 text-xs">{item.title}</span>
+                            {item.is_fuel_rule && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-800">
+                                ⛽ ТК
+                              </span>
+                            )}
+                            {item.is_salary_rule && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                                👥 ЗП
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-[11px] text-slate-500">
+                            {item.recipient && <span>Кому: {item.recipient} · </span>}
+                            <span>{item.notes || 'Без примечаний'}</span>
+                            {item.is_salary_rule && (
+                              <a
+                                href="/staff"
+                                className="ml-2 text-blue-600 hover:text-blue-700 underline font-semibold"
+                              >
+                                Ведомость ЗП →
+                              </a>
+                            )}
+                          </div>
+
+                          <div className="text-[10px] text-slate-400">
+                            Счёт:{' '}
+                            <strong className="text-slate-600 font-medium">
+                              {item.preferred_wallet_id === '10000000-0000-0000-0000-000000000002'
+                                ? '💵 Касса (нал)'
+                                : '🏦 Р/Счёт (Т-Банк)'}
+                            </strong>
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {item.recipient && <span>Кому: {item.recipient} · </span>}
-                          {item.notes}
-                          {item.is_salary_rule && (
-                            <a
-                              href="/staff"
-                              className="ml-2 text-blue-600 hover:text-blue-700 underline font-semibold"
-                            >
-                              Ведомость ЗП →
-                            </a>
+
+                        {/* Сумма и статус */}
+                        <div className="text-right flex flex-col items-end gap-1">
+                          <div className="font-mono font-black text-slate-900 text-sm">
+                            <Money amount={item.amount.toFixed(2)} />
+                          </div>
+                          {item.planned_amount && item.planned_amount !== item.amount && (
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              план: {item.planned_amount.toLocaleString('ru-RU')} ₽
+                              {item.amount < item.planned_amount ? (
+                                <span className="text-amber-600 font-bold ml-1">
+                                  (-{(item.planned_amount - item.amount).toLocaleString('ru-RU')} ₽)
+                                </span>
+                              ) : (
+                                <span className="text-blue-600 font-bold ml-1">
+                                  (+{(item.amount - item.planned_amount).toLocaleString('ru-RU')} ₽)
+                                </span>
+                              )}
+                            </div>
                           )}
-                        </div>
-                      </td>
 
-                      {/* Тип платежа */}
-                      <td className="py-3 px-3">
-                        {isVariable ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
-                            <span>⚡</span> Переменный
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                            <span>🔒</span> Постоянный
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Категория */}
-                      <td className="py-3 px-3">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${cat.bg} ${cat.text}`}
-                        >
-                          <span>{cat.icon}</span> {cat.label}
-                        </span>
-                      </td>
-
-                      {/* Сумма */}
-                      <td className="py-3 px-3 text-right font-mono font-black text-slate-900 text-sm">
-                        <Money amount={item.amount.toFixed(2)} />
-                      </td>
-
-                      {/* Срок */}
-                      <td className="py-3 px-3">
-                        {isPaid ? (
-                          <span className="text-[11px] text-emerald-600 font-medium">
-                            Выплачено
-                          </span>
-                        ) : isDueToday ? (
-                          <span className="text-[11px] text-blue-700 font-extrabold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
-                            Сегодня!
-                          </span>
-                        ) : isOverdue ? (
-                          <span className="text-[11px] text-rose-600 font-bold">
-                            Просрочен на {Math.abs(item.days_left)} дн.
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-slate-500">
-                            через {item.days_left} дн. ({item.due_date.slice(8, 10)}.
-                            {item.due_date.slice(5, 7)})
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Счёт */}
-                      <td className="py-3 px-3 text-[11px] text-slate-500">
-                        {item.preferred_wallet_id === '10000000-0000-0000-0000-000000000002'
-                          ? '💵 Касса (нал)'
-                          : '🏦 Р/Счёт (Т-Банк)'}
-                      </td>
-
-                      {/* Статус */}
-                      <td className="py-3 px-3 text-center">
-                        {isPaid ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            ✓ Оплачен
-                          </span>
-                        ) : isDueToday ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                            К оплате
-                          </span>
-                        ) : isOverdue ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                            Просрочка
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
-                            Запланирован
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Действие */}
-                      <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
                           {isPaid ? (
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {item.paid_at
-                                ? new Date(item.paid_at).toLocaleDateString('ru-RU', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                  })
-                                : 'Оплачен'}
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              ✓ Оплачен
                             </span>
-                          ) : item.is_salary_rule && item.amount === 0 ? (
-                            <span className="text-[11px] text-slate-400 font-medium italic">
-                              Копится
+                          ) : isDueToday ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                              К оплате
+                            </span>
+                          ) : isOverdue ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                              Просрочка
                             </span>
                           ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                              Запланирован
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Кнопки действий */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <div className="text-[10px] text-slate-400">
+                          {isPaid && item.paid_at && (
+                            <span>
+                              Оплачено:{' '}
+                              {new Date(item.paid_at).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short',
+                              })}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {!isPaid && !(item.is_salary_rule && item.amount === 0) && (
                             <button
                               onClick={() => {
+                                setSelectedCalendarDay(null);
                                 setPayModalItem(item);
                                 setPayAmount(String(item.amount));
                                 setPayWallet(
@@ -804,17 +1389,19 @@ export function PaymentCalendarPanel() {
                                     : '10000000-0000-0000-0000-000000000001',
                                 );
                               }}
-                              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1"
+                              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-xl shadow-xs transition flex items-center gap-1"
                             >
                               <span>✓</span> Оплатить
                             </button>
                           )}
 
-                          {/* Редактировать */}
                           <button
-                            onClick={() => handleOpenEdit(item)}
+                            onClick={() => {
+                              setSelectedCalendarDay(null);
+                              handleOpenEdit(item);
+                            }}
                             title="Редактировать событие"
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           >
                             <svg
                               className="w-3.5 h-3.5"
@@ -839,9 +1426,8 @@ export function PaymentCalendarPanel() {
                                 deleteObligationMutation.mutate(item.id);
                               }
                             }}
-                            disabled={deleteObligationMutation.isPending}
                             title="Удалить из календаря"
-                            className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                           >
                             <svg
                               className="w-3.5 h-3.5"
@@ -858,15 +1444,36 @@ export function PaymentCalendarPanel() {
                             </svg>
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                });
+              })()}
+            </div>
+
+            {/* Подвал модалки */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+              <button
+                onClick={() => {
+                  const d = String(selectedCalendarDay);
+                  setSelectedCalendarDay(null);
+                  setNewDueDay(d);
+                  setShowAddModal(true);
+                }}
+                className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-xl transition flex items-center gap-1"
+              >
+                + Запланировать ещё платёж
+              </button>
+              <button
+                onClick={() => setSelectedCalendarDay(null)}
+                className="px-4 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Модалка Отметки об Оплате Обязательства ── */}
       {payModalItem && (
@@ -885,17 +1492,73 @@ export function PaymentCalendarPanel() {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-500 mb-1">Статья обязательства</label>
-                <div className="font-bold text-slate-900 text-sm">{payModalItem.title}</div>
+                <div className="font-bold text-slate-900 text-sm flex items-center justify-between">
+                  <span>{payModalItem.title}</span>
+                  {payModalItem.is_fuel_rule && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">
+                      ⛽ Топливная карта
+                    </span>
+                  )}
+                  {payModalItem.is_salary_rule && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                      👥 Зарплата
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+                  <span>
+                    Плановая сумма:{' '}
+                    <strong className="text-slate-800 font-mono">
+                      {(payModalItem.planned_amount || payModalItem.amount).toLocaleString('ru-RU')}{' '}
+                      ₽
+                    </strong>
+                  </span>
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-500 mb-1">Фактическая сумма оплаты (₽) *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-600 font-semibold">
+                    Фактическая сумма оплаты (₽) *
+                  </label>
+                  {parseFloat(payAmount || '0') !==
+                    (payModalItem.planned_amount || payModalItem.amount) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPayAmount(String(payModalItem.planned_amount || payModalItem.amount))
+                      }
+                      className="text-[11px] text-blue-600 hover:text-blue-700 underline font-semibold"
+                    >
+                      Вернуть плановую (
+                      {(payModalItem.planned_amount || payModalItem.amount).toLocaleString('ru-RU')}{' '}
+                      ₽)
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="Введите сумму..."
                   className="w-full text-base font-bold font-mono px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                 />
+                {parseFloat(payAmount || '0') > 0 &&
+                  parseFloat(payAmount || '0') !==
+                    (payModalItem.planned_amount || payModalItem.amount) && (
+                    <div className="mt-1.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-1.5">
+                      <span className="text-amber-600 font-bold">⚡</span>
+                      <span>
+                        Сумма отличается от плана:{' '}
+                        <strong>{parseFloat(payAmount || '0').toLocaleString('ru-RU')} ₽</strong>{' '}
+                        вместо{' '}
+                        {(payModalItem.planned_amount || payModalItem.amount).toLocaleString(
+                          'ru-RU',
+                        )}{' '}
+                        ₽. Платёж закроется на указанную сумму и отметится как выполненный.
+                      </span>
+                    </div>
+                  )}
               </div>
 
               <div>
