@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { isNoCashCounterparty } from '@saldacargo/shared';
 
 /** PATCH /api/trips/:id/orders/:orderId — отменить или отредактировать заказ */
 export async function PATCH(
@@ -40,7 +41,16 @@ export async function PATCH(
     }
 
     const pendingMethods = ['debt_cash', 'debt', 'debt_bank'];
-    const paymentMethod = body.payment_method === 'card_driver' ? 'qr' : body.payment_method;
+    let paymentMethod = body.payment_method === 'card_driver' ? 'qr' : body.payment_method;
+    if (paymentMethod === 'cash' && body.counterparty_id) {
+      const { data: cp } = await (supabase.from('counterparties') as any)
+        .select('name')
+        .eq('id', body.counterparty_id)
+        .maybeSingle();
+      if (isNoCashCounterparty(cp?.name)) {
+        paymentMethod = 'debt_cash';
+      }
+    }
     const settlementStatus = pendingMethods.includes(paymentMethod) ? 'pending' : 'completed';
 
     const loaders = Array.isArray(body.loaders_data) ? body.loaders_data : [];

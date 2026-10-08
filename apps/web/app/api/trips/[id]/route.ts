@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
+import { isNoCashCounterparty } from '@saldacargo/shared';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -137,7 +138,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           order.counterparty_name,
         );
 
-        const paymentMethod = order.payment_method || 'debt_cash';
+        let paymentMethod = order.payment_method || 'debt_cash';
+        if (paymentMethod === 'cash') {
+          let cpName = order.counterparty_name;
+          if (!cpName && resolvedCounterpartyId) {
+            const { data: cpData } = await (supabase.from('counterparties') as any)
+              .select('name')
+              .eq('id', resolvedCounterpartyId)
+              .maybeSingle();
+            cpName = cpData?.name;
+          }
+          if (isNoCashCounterparty(cpName)) {
+            paymentMethod = 'debt_cash';
+          }
+        }
+
         const isDebt =
           paymentMethod === 'debt_cash' ||
           paymentMethod === 'debt' ||
@@ -179,7 +194,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           if (order.description !== undefined)
             update.description = order.description?.trim() || null;
           if (order.payment_method !== undefined) {
-            update.payment_method = order.payment_method;
+            update.payment_method = paymentMethod;
             update.settlement_status = settlementStatus;
           }
           if (order.counterparty_id !== undefined || order.counterparty_name !== undefined) {

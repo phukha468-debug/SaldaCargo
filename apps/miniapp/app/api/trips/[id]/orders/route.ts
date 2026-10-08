@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { isNoCashCounterparty } from '@saldacargo/shared';
 
 /** POST /api/trips/:id/orders — добавить заказ */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,8 +26,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const supabase = createAdminClient();
 
+  let paymentMethod = body.payment_method;
+  if (paymentMethod === 'cash' && body.counterparty_id) {
+    const { data: cp } = await (supabase.from('counterparties') as any)
+      .select('name')
+      .eq('id', body.counterparty_id)
+      .maybeSingle();
+    if (isNoCashCounterparty(cp?.name)) {
+      paymentMethod = 'debt_cash';
+    }
+  }
+
   // settlement_status: только долг = pending; наличка и QR — деньги получены сразу
-  const settlementStatus = body.payment_method === 'debt_cash' ? 'pending' : 'completed';
+  const settlementStatus =
+    paymentMethod === 'debt_cash' || paymentMethod === 'debt' || paymentMethod === 'debt_bank'
+      ? 'pending'
+      : 'completed';
 
   const loaders = Array.isArray(body.loaders_data) ? body.loaders_data : [];
   const loader1 =
@@ -50,7 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       loader_pay: loader1?.pay ? String(loader1.pay) : '0',
       loader2_id: loader2?.id || null,
       loader2_pay: loader2?.pay ? String(loader2.pay) : '0',
-      payment_method: body.payment_method,
+      payment_method: paymentMethod,
       settlement_status: settlementStatus,
       lifecycle_status: 'draft',
       idempotency_key: body.idempotency_key,

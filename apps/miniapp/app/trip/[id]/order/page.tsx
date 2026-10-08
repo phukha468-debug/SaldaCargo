@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuid } from 'uuid';
 import { Button } from '@saldacargo/ui';
+import { isNoCashCounterparty } from '@saldacargo/shared';
 import {
   calculateOrderPayroll,
   ORDER_DIRECTIONS,
@@ -196,9 +197,13 @@ export default function AddOrderPage() {
     const newType = c.is_legal_entity ? 'legal' : 'individual';
     setClientType(newType);
 
-    const current = watch('payment_method');
-    if (!current) {
-      setValue('payment_method', c.is_legal_entity ? 'debt_cash' : 'cash');
+    if (isNoCashCounterparty(c)) {
+      setValue('payment_method', 'debt_cash');
+    } else {
+      const current = watch('payment_method');
+      if (!current) {
+        setValue('payment_method', c.is_legal_entity ? 'debt_cash' : 'cash');
+      }
     }
   }
 
@@ -219,6 +224,12 @@ export default function AddOrderPage() {
     if (submitting) return;
     if (!data.counterparty_id) {
       setError('Укажите клиента перед добавлением заказа');
+      return;
+    }
+    if (data.payment_method === 'cash' && isNoCashCounterparty(selectedCounterparty)) {
+      setError(
+        `Для клиента «${selectedCounterparty?.name}» оплата наличными запрещена. Заказ оформляется только в долг (дебиторка) или по QR-коду.`,
+      );
       return;
     }
     const isDebt = data.payment_method === 'debt_cash';
@@ -335,6 +346,11 @@ export default function AddOrderPage() {
                 {selectedCounterparty.is_delivery_zone_client && (
                   <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                     Зоны доставки (от 800 ₽)
+                  </span>
+                )}
+                {isNoCashCounterparty(selectedCounterparty) && (
+                  <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                    🚫 Без наличных (только дебиторка)
                   </span>
                 )}
               </div>
@@ -665,28 +681,58 @@ export default function AddOrderPage() {
             Способ оплаты
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {paymentMethods.map((m) => (
-              <label key={m.value} className="cursor-pointer">
-                <input
-                  type="radio"
-                  value={m.value}
-                  {...register('payment_method')}
-                  className="sr-only peer"
-                />
-                <div
-                  className={`flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-2xl p-2.5 h-24 transition-all active:scale-[0.97] ${m.color}`}
+            {paymentMethods.map((m) => {
+              const isNoCash = isNoCashCounterparty(selectedCounterparty);
+              const isCashDisabled = m.value === 'cash' && isNoCash;
+              return (
+                <label
+                  key={m.value}
+                  className={
+                    isCashDisabled ? 'cursor-not-allowed opacity-35 select-none' : 'cursor-pointer'
+                  }
                 >
-                  <span className="text-2xl">{m.icon}</span>
-                  <span className="text-[11px] font-black text-center leading-tight uppercase tracking-tight text-zinc-900">
-                    {m.label}
-                  </span>
-                  <span className="text-[8px] font-bold text-zinc-400 text-center leading-tight">
-                    {m.wallet}
-                  </span>
-                </div>
-              </label>
-            ))}
+                  <input
+                    type="radio"
+                    value={m.value}
+                    disabled={isCashDisabled}
+                    {...register('payment_method')}
+                    className="sr-only peer"
+                  />
+                  <div
+                    className={`flex flex-col items-center justify-center gap-1 border-2 rounded-2xl p-2.5 h-24 transition-all ${
+                      isCashDisabled
+                        ? 'border-zinc-200 bg-zinc-100 cursor-not-allowed'
+                        : `border-zinc-200 active:scale-[0.97] ${m.color}`
+                    }`}
+                  >
+                    <span className="text-2xl">{isCashDisabled ? '🚫' : m.icon}</span>
+                    <span
+                      className={`text-[11px] font-black text-center leading-tight uppercase tracking-tight ${
+                        isCashDisabled ? 'text-zinc-400 line-through' : 'text-zinc-900'
+                      }`}
+                    >
+                      {m.label}
+                    </span>
+                    <span className="text-[8px] font-bold text-zinc-400 text-center leading-tight">
+                      {isCashDisabled ? 'Запрещено' : m.wallet}
+                    </span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
+
+          {/* Баннер запрета наличных для корпоративных клиентов */}
+          {isNoCashCounterparty(selectedCounterparty) && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-900 text-[11px] font-extrabold flex items-start gap-2 mt-2">
+              <span className="text-base leading-none">🚫</span>
+              <span>
+                Клиент «{selectedCounterparty?.name}» обслуживается строго по безналичному расчёту!
+                Оплата наличными отключена — заказ оформляется в долг (дебиторка) под выставление
+                счёта или по QR.
+              </span>
+            </div>
+          )}
 
           {/* Подсказка для QR */}
           {selectedPaymentMethod === 'qr' && (

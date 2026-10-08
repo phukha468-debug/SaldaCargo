@@ -396,3 +396,37 @@ export function getPaymentMethodLabel(method: string): string {
   };
   return labels[method] ?? method;
 }
+
+/**
+ * Паттерны наименований контрагентов, для которых запрещена наличная оплата.
+ * Эти компании работают строго по безналичному расчету или через дебиторскую задолженность (ждут выставления счёта):
+ * - Геостройиндустрия
+ * - ВСМПО
+ * - УВС
+ * - Территория
+ * - Эко-дело
+ * - Теострой
+ */
+export const NO_CASH_COUNTERPARTY_PATTERNS: RegExp[] = [
+  /геострой/i,
+  /всмпо/i,
+  /(?:^|[\s"«»'.,(])увс(?:$|[\s"«»'.,)])/i,
+  /территори/i,
+  /эко[\s-]?дело/i,
+  /теострой/i,
+];
+
+/**
+ * Проверяет, запрещена ли контрагенту оплата наличными.
+ * Принимает объект контрагента (с полем name), либо строку с названием.
+ */
+export function isNoCashCounterparty(
+  cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+): boolean {
+  if (!cp) return false;
+  const name = typeof cp === 'string' ? cp : cp.name || '';
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return NO_CASH_COUNTERPARTY_PATTERNS.some((pattern) => pattern.test(trimmed));
+}

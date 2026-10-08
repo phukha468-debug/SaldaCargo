@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@saldacargo/ui';
+import { isNoCashCounterparty } from '@saldacargo/shared';
 import {
   calculateOrderPayroll,
   ORDER_DIRECTIONS,
@@ -149,7 +150,11 @@ export default function EditOrderPage() {
       setValue('amount', parseFloat(order.amount));
       setValue('driver_pay', parseFloat(order.driver_pay));
       const pm = order.payment_method === 'card_driver' ? 'qr' : order.payment_method;
-      setValue('payment_method', (pm || 'cash') as any);
+      let finalPm = (pm || 'cash') as any;
+      if (finalPm === 'cash' && isNoCashCounterparty(order.counterparty)) {
+        finalPm = 'debt_cash';
+      }
+      setValue('payment_method', finalPm);
       setValue('description', order.description ?? '');
       if (order.counterparty_id) setValue('counterparty_id', order.counterparty_id);
 
@@ -257,10 +262,25 @@ export default function EditOrderPage() {
     setLoaders((prev) => prev.map((l) => (l.id === id ? { ...l, pay } : l)));
   }
 
+  function selectCounterparty(c: any) {
+    setValue('counterparty_id', c.id);
+    setSearchTerm('');
+    setError('');
+    if (isNoCashCounterparty(c)) {
+      setValue('payment_method', 'debt_cash');
+    }
+  }
+
   async function onSubmit(data: FormData) {
     if (submitting) return;
     if (!data.counterparty_id) {
       setError('Укажите клиента перед сохранением');
+      return;
+    }
+    if (data.payment_method === 'cash' && isNoCashCounterparty(selectedCounterparty)) {
+      setError(
+        `Для клиента «${selectedCounterparty?.name}» оплата наличными запрещена. Заказ оформляется только в долг (дебиторка) или по QR-коду.`,
+      );
       return;
     }
     const isDebt = data.payment_method === 'debt_cash';
@@ -398,6 +418,11 @@ export default function EditOrderPage() {
                     Зоны (от 800 ₽)
                   </span>
                 )}
+                {isNoCashCounterparty(selectedCounterparty) && (
+                  <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                    🚫 Без наличных (только дебиторка)
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -412,10 +437,7 @@ export default function EditOrderPage() {
               {genericClient && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setValue('counterparty_id', genericClient.id);
-                    setSearchTerm('');
-                  }}
+                  onClick={() => selectCounterparty(genericClient)}
                   className="w-full p-3.5 rounded-xl border-2 border-orange-500 bg-orange-50 hover:bg-orange-100 flex items-center justify-between text-left transition-all active:scale-[0.99] shadow-sm"
                 >
                   <div className="flex items-center gap-3">
@@ -446,14 +468,16 @@ export default function EditOrderPage() {
                           <button
                             key={c.id}
                             type="button"
-                            onClick={() => {
-                              setValue('counterparty_id', c.id);
-                              setSearchTerm('');
-                            }}
+                            onClick={() => selectCounterparty(c)}
                             className="px-3 py-1.5 rounded-lg border-2 border-zinc-200 bg-white text-xs font-bold text-zinc-700 active:scale-95 flex items-center gap-1.5 shadow-sm hover:border-zinc-300"
                           >
                             <span className="text-sm">{c.is_legal_entity ? '🏢' : '👤'}</span>
                             {c.name}
+                            {isNoCashCounterparty(c) && (
+                              <span className="text-[9px] font-black uppercase px-1 py-0.5 rounded-full bg-rose-100 text-rose-700">
+                                Без нал
+                              </span>
+                            )}
                           </button>
                         ))}
                     </div>
@@ -474,21 +498,25 @@ export default function EditOrderPage() {
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => {
-                          setValue('counterparty_id', c.id);
-                          setSearchTerm('');
-                        }}
+                        onClick={() => selectCounterparty(c)}
                         className="w-full text-left px-4 py-3 font-bold text-zinc-900 hover:bg-orange-50 border-b border-zinc-100 last:border-0 flex items-center justify-between gap-2"
                       >
                         <span className="flex items-center gap-2">
                           <span>{c.is_legal_entity ? '🏢' : '👤'}</span>
                           <span>{c.name}</span>
                         </span>
-                        {c.is_legal_entity && (
-                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600">
-                            ЮЛ
-                          </span>
-                        )}
+                        <span className="flex items-center gap-1">
+                          {isNoCashCounterparty(c) && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">
+                              Без нал
+                            </span>
+                          )}
+                          {c.is_legal_entity && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600">
+                              ЮЛ
+                            </span>
+                          )}
+                        </span>
                       </button>
                     ))}
                     {filteredCounterparties.length === 0 && (
@@ -499,10 +527,7 @@ export default function EditOrderPage() {
                         {genericClient && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setValue('counterparty_id', genericClient.id);
-                              setSearchTerm('');
-                            }}
+                            onClick={() => selectCounterparty(genericClient)}
                             className="w-full py-2.5 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wide shadow-sm"
                           >
                             Выбрать «Частный клиент»
@@ -732,24 +757,53 @@ export default function EditOrderPage() {
           </label>
           <div className="grid grid-cols-3 gap-2">
             {PAYMENT_METHODS.map((m) => {
+              const isNoCash = isNoCashCounterparty(selectedCounterparty);
+              const isCashDisabled = m.value === 'cash' && isNoCash;
               const isSelected = selectedPaymentMethod === m.value;
               return (
                 <button
                   key={m.value}
                   type="button"
-                  onClick={() => setValue('payment_method', m.value as any)}
-                  className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-[0.97] ${
-                    isSelected ? 'border-orange-500 bg-orange-50' : 'border-zinc-200 bg-white'
+                  disabled={isCashDisabled}
+                  onClick={() => {
+                    if (isCashDisabled) return;
+                    setValue('payment_method', m.value as any);
+                  }}
+                  className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                    isCashDisabled
+                      ? 'border-zinc-200 bg-zinc-100 opacity-35 cursor-not-allowed select-none'
+                      : isSelected
+                        ? 'border-orange-500 bg-orange-50 active:scale-[0.97]'
+                        : 'border-zinc-200 bg-white active:scale-[0.97]'
                   }`}
                 >
-                  <span className="text-2xl">{m.icon}</span>
-                  <span className="text-[10px] font-black text-center leading-tight uppercase tracking-tight text-zinc-900">
+                  <span className="text-2xl">{isCashDisabled ? '🚫' : m.icon}</span>
+                  <span
+                    className={`text-[10px] font-black text-center leading-tight uppercase tracking-tight ${
+                      isCashDisabled ? 'text-zinc-400 line-through' : 'text-zinc-900'
+                    }`}
+                  >
                     {m.label}
                   </span>
+                  {isCashDisabled && (
+                    <span className="text-[8px] font-bold text-zinc-400">Запрещено</span>
+                  )}
                 </button>
               );
             })}
           </div>
+
+          {/* Баннер запрета наличных для корпоративных клиентов */}
+          {isNoCashCounterparty(selectedCounterparty) && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-900 text-[11px] font-extrabold flex items-start gap-2 mt-2">
+              <span className="text-base leading-none">🚫</span>
+              <span>
+                Клиент «{selectedCounterparty?.name}» обслуживается строго по безналичному расчёту!
+                Оплата наличными отключена — заказ оформляется в долг (дебиторка) под выставление
+                счёта или по QR.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── Описание / Комментарий / Примечание к заказу ── */}

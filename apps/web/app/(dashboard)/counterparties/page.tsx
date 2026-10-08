@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { Money } from '@saldacargo/ui';
-import { formatPhone } from '@saldacargo/shared';
+import { formatPhone, isNoCashCounterparty } from '@saldacargo/shared';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -782,6 +782,14 @@ export default function CounterpartiesPage() {
                               ФЛ
                             </span>
                           )}
+                          {isNoCashCounterparty(cp) && (
+                            <span
+                              className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200"
+                              title="Наличная оплата запрещена (строго безнал/дебиторка)"
+                            >
+                              БЕЗ НАЛ
+                            </span>
+                          )}
                         </div>
                         {cp.notes && (
                           <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">
@@ -997,6 +1005,11 @@ export default function CounterpartiesPage() {
                                 ? 'ПОСТОЯННЫЙ'
                                 : 'РАЗОВЫЙ'}
                           </span>
+                          {isNoCashCounterparty(selectedCp) && (
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                              🚫 БЕЗ НАЛИЧНЫХ
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                           {selectedCp.phone && (
@@ -1345,6 +1358,14 @@ export default function CounterpartiesPage() {
                               <span className="text-slate-400">Email:</span>{' '}
                               {selectedCp.email || '—'}
                             </div>
+                            {isNoCashCounterparty(selectedCp) && (
+                              <div className="col-span-2 text-rose-700 font-bold text-xs flex items-center gap-1.5 mt-1 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                                <span>🚫</span>
+                                <span>
+                                  Оплата наличными запрещена: только безнал по счёту или дебиторка.
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 

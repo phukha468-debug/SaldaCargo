@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
-import { formatDate } from '@saldacargo/shared';
+import { formatDate, isNoCashCounterparty } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
 interface Counterparty {
@@ -755,7 +755,19 @@ function EditModal({
 
   const updateCounterparty = (orderId: string, cpId: string | null, cpName: string) => {
     setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, _selectedId: cpId, _inputValue: cpName } : o)),
+      prev.map((o) => {
+        if (o.id !== orderId) return o;
+        const cp = counterparties.find((c) => c.id === cpId) || cpName;
+        const isNoCash = isNoCashCounterparty(cp);
+        const newPaymentMethod =
+          isNoCash && o.payment_method === 'cash' ? 'debt_cash' : o.payment_method;
+        return {
+          ...o,
+          _selectedId: cpId,
+          _inputValue: cpName,
+          payment_method: newPaymentMethod,
+        };
+      }),
     );
   };
 
@@ -848,6 +860,14 @@ function EditModal({
       const amt = parseFloat(o.amount);
       if (isNaN(amt) || amt <= 0) {
         setError(`Укажите корректную сумму для заявки ${i + 1}`);
+        return;
+      }
+      const cp = counterparties.find((c) => c.id === o._selectedId) || o._inputValue;
+      if (isNoCashCounterparty(cp) && o.payment_method === 'cash') {
+        const cpTitle = typeof cp === 'object' && cp?.name ? cp.name : o._inputValue || 'Клиент';
+        setError(
+          `Для контрагента «${cpTitle}» (заявка ${i + 1}) оплата наличными запрещена. Выберите «Долг» или «Безнал по счёту».`,
+        );
         return;
       }
     }
@@ -1220,34 +1240,69 @@ function EditModal({
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {PAYMENT_EDIT_OPTIONS.map(({ value, label }) => {
+                        const currentCp =
+                          counterparties.find((c) => c.id === order._selectedId) ||
+                          order._inputValue;
+                        const isNoCash = isNoCashCounterparty(currentCp);
+                        const isCashDisabled = value === 'cash' && isNoCash;
                         const isSelected = order.payment_method === value;
                         return (
                           <button
                             key={value}
                             type="button"
-                            onClick={() => update(order.id, 'payment_method', value)}
+                            disabled={isCashDisabled}
+                            onClick={() => {
+                              if (isCashDisabled) return;
+                              update(order.id, 'payment_method', value);
+                            }}
                             className={cn(
-                              'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
-                              isSelected
-                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+                              'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5',
+                              isCashDisabled
+                                ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200 line-through select-none'
+                                : isSelected
+                                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs cursor-pointer'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50 cursor-pointer',
                             )}
                           >
                             <span
                               className={cn(
                                 'w-2 h-2 rounded-full',
-                                value === 'cash' && 'bg-amber-400',
+                                value === 'cash' &&
+                                  (isCashDisabled ? 'bg-slate-300' : 'bg-amber-400'),
                                 value === 'qr' && 'bg-purple-400',
                                 value === 'card_driver' && 'bg-blue-400',
                                 value === 'debt_cash' && 'bg-rose-400',
                                 value === 'bank_invoice' && 'bg-slate-400',
                               )}
                             />
-                            <span>{label}</span>
+                            <span>
+                              {label}
+                              {isCashDisabled ? ' (Запрещено)' : ''}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
+                    {(() => {
+                      const currentCp =
+                        counterparties.find((c) => c.id === order._selectedId) || order._inputValue;
+                      if (isNoCashCounterparty(currentCp)) {
+                        const cpName =
+                          typeof currentCp === 'object' && currentCp?.name
+                            ? currentCp.name
+                            : order._inputValue;
+                        return (
+                          <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2">
+                            <span className="text-base leading-none">🚫</span>
+                            <span>
+                              Для контрагента «{cpName}» оплата наличными запрещена (только
+                              безналичный расчёт по счёту или дебиторка).
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>
