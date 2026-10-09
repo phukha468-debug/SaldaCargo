@@ -980,7 +980,9 @@ function EditModal({
             </h2>
             <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-1.5 font-medium">
               <span>
-                🚚 {trip.asset.short_name} ({trip.asset.reg_number})
+                {trip.asset?.reg_number === 'БЕЗ АВТО'
+                  ? '👷 Погрузо-разгрузочные работы (без авто)'
+                  : `🚚 ${trip.asset.short_name} (${trip.asset.reg_number})`}
               </span>
               <span>·</span>
               <span>👤 {trip.driver.name}</span>
@@ -1589,10 +1591,10 @@ function TripCard({
           {/* Left: identity — flex-1 so it takes remaining space after fixed metrics */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <span className="font-black text-slate-900 text-sm whitespace-nowrap">
-              🚚 {trip.asset.short_name}
+              {trip.asset?.reg_number === 'БЕЗ АВТО' ? '👷 ПРР' : `🚚 ${trip.asset.short_name}`}
             </span>
             <span className="text-[11px] text-slate-400 font-mono whitespace-nowrap">
-              {trip.asset.reg_number}
+              {trip.asset?.reg_number === 'БЕЗ АВТО' ? '(без авто)' : trip.asset.reg_number}
             </span>
             <span className="text-slate-300 text-xs">·</span>
             <span className="text-sm text-slate-700 font-semibold truncate max-w-[90px]">
@@ -2492,12 +2494,17 @@ export default function ReviewPage() {
 
     // 1. Process Trips
     for (const t of listTrips) {
-      const assetKey = t.asset ? `${t.asset.short_name} (${t.asset.reg_number})` : 'Без машины';
+      const isPrr = t.asset?.reg_number === 'БЕЗ АВТО';
+      const assetKey = isPrr
+        ? '👷 ПРР (без авто)'
+        : t.asset
+          ? `${t.asset.short_name} (${t.asset.reg_number})`
+          : 'Без машины';
       if (!map.has(assetKey)) {
         map.set(assetKey, {
           assetKey,
-          assetName: t.asset?.short_name ?? 'Без машины',
-          regNumber: t.asset?.reg_number ?? '',
+          assetName: isPrr ? '👷 ПРР' : (t.asset?.short_name ?? 'Без машины'),
+          regNumber: isPrr ? 'без авто' : (t.asset?.reg_number ?? ''),
           trips: [],
           serviceOrders: [],
           tripsRevenue: 0,

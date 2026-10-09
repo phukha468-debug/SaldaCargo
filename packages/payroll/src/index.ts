@@ -119,6 +119,14 @@ export const ORDER_DIRECTIONS: readonly OrderDirectionItem[] = [
     icon: '🗺️',
     category: 'intercity',
   },
+  {
+    id: 'loaders_only',
+    label: 'Погрузо-разгрузочные работы (без авто)',
+    desc: 'Только грузчики (70% грузчикам, 30% компании)',
+    icon: '👷',
+    category: 'local',
+    baseMachinePrice: 0,
+  },
 ] as const;
 
 export type OrderDirectionId = (typeof ORDER_DIRECTIONS)[number]['id'];
@@ -138,6 +146,7 @@ export const DIRECTION_LABELS: Record<string, string> = {
   perm: '🌲 Пермь',
   chelyabinsk: '🏭 Челябинск',
   other: '🗺️ Другой город',
+  loaders_only: '👷 ПРР (без авто)',
 };
 
 export function getDirectionLabel(id: string): string {
@@ -233,7 +242,11 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
   let machinePool = 0;
   let loadersPool = 0;
 
-  if (loadingAmount !== undefined && loadingAmount >= 0) {
+  if (direction === 'loaders_only') {
+    // Погрузо-разгрузочные работы без автомобиля: весь пул идёт грузчикам
+    machinePool = 0;
+    loadersPool = amount;
+  } else if (loadingAmount !== undefined && loadingAmount >= 0) {
     // Водитель или диспетчер явно указал сумму за погрузку из общего чека
     loadersPool = Math.min(amount, Math.max(0, loadingAmount));
     machinePool = Math.max(0, amount - loadersPool);

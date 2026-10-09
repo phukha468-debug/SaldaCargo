@@ -237,8 +237,19 @@ export default function TripDetailPage() {
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
           <div className="pl-2 space-y-1">
             <h1 className="font-black text-xl text-zinc-900 leading-tight">
-              {trip.asset.short_name}{' '}
-              <span className="text-zinc-400 font-bold ml-1">{trip.asset.reg_number}</span>
+              {trip.asset?.reg_number === 'БЕЗ АВТО' ? (
+                <>
+                  👷 Погрузо-разгрузочные работы{' '}
+                  <span className="text-amber-600 text-xs font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md ml-1 align-middle">
+                    Без авто
+                  </span>
+                </>
+              ) : (
+                <>
+                  {trip.asset.short_name}{' '}
+                  <span className="text-zinc-400 font-bold ml-1">{trip.asset.reg_number}</span>
+                </>
+              )}
             </h1>
             <p className="font-bold text-sm text-zinc-500 uppercase tracking-wide">
               {trip.driver.name} ·{' '}

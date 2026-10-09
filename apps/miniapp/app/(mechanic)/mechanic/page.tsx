@@ -1,8 +1,10 @@
-﻿'use client';
+'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { cn } from '@saldacargo/ui';
+import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 interface SalarySummary {
   summary: { total_accrued: string; total_paid: string; to_pay: string };
@@ -23,6 +25,7 @@ interface MechanicSummary {
 }
 
 export default function MechanicHomePage() {
+  const [showPrrModal, setShowPrrModal] = useState(false);
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: ['me'],
     queryFn: () => fetch('/api/driver/me').then((r) => r.json()),
@@ -147,7 +150,7 @@ export default function MechanicHomePage() {
         <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
           Быстрые действия
         </h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2.5">
           <ActionButton
             href="/mechanic/warehouse"
             icon="🔍"
@@ -160,8 +163,26 @@ export default function MechanicHomePage() {
             label="Моя ЗП"
             color="bg-green-50 text-green-700"
           />
+          <button
+            type="button"
+            onClick={() => setShowPrrModal(true)}
+            className="p-3 rounded-2xl border border-transparent flex flex-col items-center text-center gap-1.5 active:scale-95 transition-all shadow-sm bg-amber-50 text-amber-800 hover:bg-amber-100"
+          >
+            <span className="text-2xl">👷</span>
+            <span className="text-[10px] font-black uppercase tracking-tight leading-tight">
+              ПРР (без авто)
+            </span>
+          </button>
         </div>
       </section>
+
+      {/* Модалка создания ПРР (без авто) */}
+      <CreatePrrModal
+        isOpen={showPrrModal}
+        onClose={() => setShowPrrModal(false)}
+        defaultCreatorId={me?.id}
+        role="mechanic"
+      />
     </div>
   );
 }

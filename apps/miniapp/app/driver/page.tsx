@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatDuration } from '@saldacargo/shared';
+import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 type TripCard = {
   id: string;
@@ -331,6 +332,7 @@ export default function RootPage() {
   const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
   const [startTripError, setStartTripError] = useState('');
+  const [showPrrModal, setShowPrrModal] = useState(false);
 
   // 1. Проверяем профиль и роли
   const { data: user, isLoading: isUserLoading } = useQuery({
@@ -543,26 +545,37 @@ export default function RootPage() {
       )}
 
       {/* Кнопки действий */}
-      <div className="flex gap-3">
-        {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
-          <button
-            onClick={handleStartTrip}
-            disabled={startingTrip}
-            className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
-          >
-            <span>🚚</span>
-            <span>{startingTrip ? 'Создаём рейс...' : 'Начать рейс'}</span>
-          </button>
-        )}
-        <button
-          onClick={() => setShowRepairForm(true)}
-          className={cn(
-            'flex items-center justify-center gap-2 bg-zinc-800 text-white rounded-lg py-5 font-black shadow-lg active:bg-zinc-700 active:scale-[0.98] transition-all uppercase tracking-wide text-base',
-            data?.activeTrip || (data?.reviewTrips ?? []).length > 0 ? 'flex-1' : 'px-5',
+      <div className="space-y-2.5">
+        <div className="flex gap-3">
+          {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
+            <button
+              onClick={handleStartTrip}
+              disabled={startingTrip}
+              className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
+            >
+              <span>🚚</span>
+              <span>{startingTrip ? 'Создаём рейс...' : 'Начать рейс'}</span>
+            </button>
           )}
+          <button
+            onClick={() => setShowRepairForm(true)}
+            className={cn(
+              'flex items-center justify-center gap-2 bg-zinc-800 text-white rounded-lg py-5 font-black shadow-lg active:bg-zinc-700 active:scale-[0.98] transition-all uppercase tracking-wide text-base',
+              data?.activeTrip || (data?.reviewTrips ?? []).length > 0 ? 'flex-1' : 'px-5',
+            )}
+          >
+            <span>🔧</span>
+            {(data?.activeTrip || (data?.reviewTrips ?? []).length > 0) && <span>Починить</span>}
+          </button>
+        </div>
+
+        {/* Кнопка создания ПРР (без авто) */}
+        <button
+          onClick={() => setShowPrrModal(true)}
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl py-3.5 px-4 font-black shadow-sm active:scale-[0.98] transition-all uppercase tracking-wider text-xs"
         >
-          <span>🔧</span>
-          {(data?.activeTrip || (data?.reviewTrips ?? []).length > 0) && <span>Починить</span>}
+          <span className="text-base">👷</span>
+          <span>Погрузо-разгрузочные работы (без авто)</span>
         </button>
       </div>
       {startTripError && (
@@ -697,6 +710,17 @@ export default function RootPage() {
 
       {/* Заявки на ремонт */}
       <RepairRequestsList />
+
+      {/* Модалка создания ПРР (без авто) */}
+      <CreatePrrModal
+        isOpen={showPrrModal}
+        onClose={() => setShowPrrModal(false)}
+        defaultCreatorId={user?.id}
+        role="driver"
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+        }}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Money } from '@saldacargo/ui';
+import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 type Wallets = {
   bank: { id: string; name: string; balance: string };
@@ -20,6 +21,7 @@ const WALLET_OPTIONS = [
 
 export default function AdminDashboard() {
   const qc = useQueryClient();
+  const [showPrrModal, setShowPrrModal] = useState(false);
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -111,21 +113,29 @@ export default function AdminDashboard() {
         <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
           Быстрые действия
         </h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2.5">
           <Link
             href="/admin/finance?action=income_menu"
-            className="bg-green-600 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            className="bg-green-600 text-white rounded-2xl p-4 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-all shadow-sm text-center"
           >
-            <span className="text-2xl">➕</span>
-            <span className="text-xs font-black uppercase tracking-widest">Доход</span>
+            <span className="text-xl">➕</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">Доход</span>
           </Link>
           <Link
             href="/admin/finance?action=expense_menu"
-            className="bg-zinc-800 text-white rounded-2xl p-5 flex flex-col items-center gap-2 active:scale-[0.97] transition-all shadow-sm"
+            className="bg-zinc-800 text-white rounded-2xl p-4 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-all shadow-sm text-center"
           >
-            <span className="text-2xl">➖</span>
-            <span className="text-xs font-black uppercase tracking-widest">Расход</span>
+            <span className="text-xl">➖</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">Расход</span>
           </Link>
+          <button
+            type="button"
+            onClick={() => setShowPrrModal(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-white rounded-2xl p-4 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-all shadow-sm text-center"
+          >
+            <span className="text-xl">👷</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">ПРР без авто</span>
+          </button>
         </div>
       </section>
 
@@ -150,6 +160,18 @@ export default function AdminDashboard() {
           </Link>
         </section>
       )}
+
+      {/* Модалка создания ПРР (без авто) */}
+      <CreatePrrModal
+        isOpen={showPrrModal}
+        onClose={() => setShowPrrModal(false)}
+        defaultCreatorId={me?.id}
+        role="admin"
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ['admin-summary'] });
+          qc.invalidateQueries({ queryKey: ['wallets'] });
+        }}
+      />
     </div>
   );
 }

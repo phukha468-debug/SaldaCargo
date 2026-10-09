@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Suspense, useState, useEffect } from 'react';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatTime } from '@saldacargo/shared';
+import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 // ── Константы ────────────────────────────────────────────────
 
@@ -652,7 +653,9 @@ function HistoryTripCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-black text-zinc-900 text-sm">
-                    {trip.asset?.short_name ?? '—'}
+                    {trip.asset?.reg_number === 'БЕЗ АВТО'
+                      ? '👷 ПРР (без авто)'
+                      : (trip.asset?.short_name ?? '—')}
                   </span>
                   <span className="text-[9px] font-bold bg-zinc-100 text-zinc-400 px-1.5 py-0.5 rounded">
                     #{trip.trip_number}
@@ -898,7 +901,10 @@ function SimpleTripCard({ trip }: { trip: any }) {
           <div className="flex items-center justify-between mb-2">
             <div>
               <span className="font-black text-zinc-900 text-sm">
-                №{trip.trip_number} · {trip.asset?.short_name ?? '—'}
+                №{trip.trip_number} ·{' '}
+                {trip.asset?.reg_number === 'БЕЗ АВТО'
+                  ? '👷 ПРР (без авто)'
+                  : (trip.asset?.short_name ?? '—')}
               </span>
               <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">
                 {trip.driver?.name ?? '—'} · {formatDate(trip.started_at)}
@@ -949,6 +955,7 @@ function TripsContent() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [editTrip, setEditTrip] = useState<any>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [showPrrModal, setShowPrrModal] = useState(false);
 
   // Запрос для review/active
   const { data: simpleTrips = [], isLoading: simpleLoading } = useQuery<any[]>({
@@ -1053,8 +1060,16 @@ function TripsContent() {
   return (
     <div>
       {/* Шапка */}
-      <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center sticky top-0 z-40">
+      <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center justify-between sticky top-0 z-40">
         <h1 className="font-black text-zinc-900 text-lg uppercase tracking-tight">Рейсы</h1>
+        <button
+          type="button"
+          onClick={() => setShowPrrModal(true)}
+          className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-black px-3.5 py-2 rounded-xl uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all"
+        >
+          <span className="text-sm">👷</span>
+          <span>+ ПРР без авто</span>
+        </button>
       </header>
 
       {/* Фильтры */}
@@ -1134,6 +1149,14 @@ function TripsContent() {
           }}
         />
       )}
+
+      {/* Модалка создания ПРР (без авто) */}
+      <CreatePrrModal
+        isOpen={showPrrModal}
+        onClose={() => setShowPrrModal(false)}
+        role="admin"
+        onSuccess={refresh}
+      />
     </div>
   );
 }
