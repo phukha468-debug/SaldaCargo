@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -96,9 +96,34 @@ export default function AddOrderPage() {
   const [error, setError] = useState('');
   const [idempotencyKey] = useState(() => uuid());
 
+  // Trip data to detect PRR trip
+  const { data: trip } = useQuery<{
+    id: string;
+    trip_type?: string;
+    asset?: { short_name: string; reg_number: string };
+  }>({
+    queryKey: ['trip', tripId],
+    queryFn: () => fetch(`/api/trips/${tripId}`).then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const tripIsPrr =
+    trip?.asset?.reg_number === 'БЕЗ АВТО' ||
+    Boolean(trip?.asset?.short_name?.includes('Без авто')) ||
+    Boolean(trip?.asset?.short_name?.includes('ПРР')) ||
+    trip?.trip_type === 'loaders_only';
+
   // Направление заказа
   const [direction, setDirection] = useState<string>('local');
   const [showDirectionPicker, setShowDirectionPicker] = useState(false);
+
+  useEffect(() => {
+    if (tripIsPrr) {
+      setDirection('loaders_only');
+    }
+  }, [tripIsPrr]);
+
+  const isLoadersOnly = direction === 'loaders_only' || tripIsPrr;
 
   // Водитель-грузчик
   const [isDriverLoader, setIsDriverLoader] = useState(false);
@@ -154,12 +179,12 @@ export default function AddOrderPage() {
   const parsedLoadingAmount = loadingAmount !== '' ? Number(loadingAmount) : undefined;
 
   const payroll = calculateOrderPayroll({
-    direction,
+    direction: isLoadersOnly ? 'loaders_only' : direction,
     amount,
-    isDriverLoader,
+    isDriverLoader: isLoadersOnly ? false : isDriverLoader,
     loadersCount: loaders.length,
     minMachineBase,
-    loadingAmount: parsedLoadingAmount,
+    loadingAmount: isLoadersOnly ? undefined : parsedLoadingAmount,
   });
 
   const isCity = payroll.isAutomatic;
@@ -242,20 +267,28 @@ export default function AddOrderPage() {
     setError('');
 
     // Подготовка данных грузчиков и водителя
-    const driverPayValue = isCity ? String(payroll.driverTotalPay) : String(data.driver_pay ?? 0);
+    const finalDirection = isLoadersOnly ? 'loaders_only' : direction;
+    const finalIsDriverLoader = isLoadersOnly ? false : isDriverLoader;
+    const driverPayValue = isLoadersOnly
+      ? '0'
+      : isCity
+        ? String(payroll.driverTotalPay)
+        : String(data.driver_pay ?? 0);
+
     const loadersData = loaders.map((l) => ({
       id: l.id,
       name: l.name,
-      pay: isCity ? String(payroll.loaderPayEach) : String(parseFloat(l.pay || '0')),
+      pay:
+        isLoadersOnly || isCity ? String(payroll.loaderPayEach) : String(parseFloat(l.pay || '0')),
     }));
 
     const payload = JSON.stringify({
       ...data,
       description: description || null,
-      direction,
-      is_driver_loader: isDriverLoader,
-      driver_car_pay: String(payroll.driverCarPay),
-      driver_loader_pay: String(payroll.driverLoaderPay),
+      direction: finalDirection,
+      is_driver_loader: finalIsDriverLoader,
+      driver_car_pay: isLoadersOnly ? '0' : String(payroll.driverCarPay),
+      driver_loader_pay: isLoadersOnly ? '0' : String(payroll.driverLoaderPay),
       driver_pay: driverPayValue,
       loaders_data: loadersData,
       loader_id: loadersData[0]?.id ?? null,
@@ -488,39 +521,41 @@ export default function AddOrderPage() {
         </div>
 
         {/* ── Роль водителя (Водитель-грузчик) ── */}
-        <div className="bg-orange-50/70 border-2 border-orange-200 rounded-2xl p-4 space-y-2">
-          <label className="flex items-center justify-between cursor-pointer select-none">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={isDriverLoader}
-                onChange={(e) => setIsDriverLoader(e.target.checked)}
-                className="w-6 h-6 rounded-lg text-orange-600 accent-orange-600 cursor-pointer"
-              />
-              <div>
-                <div className="font-black text-zinc-900 text-sm">🚚 Я работал грузчиком</div>
-                <div className="text-xs font-bold text-zinc-500">
-                  Водитель получает оплату за авто + за работу грузчика
+        {!isLoadersOnly && (
+          <div className="bg-orange-50/70 border-2 border-orange-200 rounded-2xl p-4 space-y-2">
+            <label className="flex items-center justify-between cursor-pointer select-none">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={isDriverLoader}
+                  onChange={(e) => setIsDriverLoader(e.target.checked)}
+                  className="w-6 h-6 rounded-lg text-orange-600 accent-orange-600 cursor-pointer"
+                />
+                <div>
+                  <div className="font-black text-zinc-900 text-sm">🚚 Я работал грузчиком</div>
+                  <div className="text-xs font-bold text-zinc-500">
+                    Водитель получает оплату за авто + за работу грузчика
+                  </div>
                 </div>
               </div>
-            </div>
-            <span
-              className={`text-xs font-black px-2.5 py-1 rounded-full uppercase ${
-                isDriverLoader ? 'bg-orange-500 text-white' : 'bg-zinc-200 text-zinc-600'
-              }`}
-            >
-              {isDriverLoader ? 'Да' : 'Нет'}
-            </span>
-          </label>
-        </div>
+              <span
+                className={`text-xs font-black px-2.5 py-1 rounded-full uppercase ${
+                  isDriverLoader ? 'bg-orange-500 text-white' : 'bg-zinc-200 text-zinc-600'
+                }`}
+              >
+                {isDriverLoader ? 'Да' : 'Нет'}
+              </span>
+            </label>
+          </div>
+        )}
 
         {/* ── Грузчики ── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between pl-1">
             <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-              Сторонние грузчики ({loaders.length})
+              {isLoadersOnly ? 'Грузчики' : 'Сторонние грузчики'} ({loaders.length})
             </label>
-            {isCity && loaders.length > 0 && (
+            {(isLoadersOnly || isCity) && loaders.length > 0 && (
               <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
                 ЗП грузчика: {payroll.loaderPayEach} ₽/чел
               </span>
@@ -545,7 +580,7 @@ export default function AddOrderPage() {
                 </button>
               </div>
 
-              {isCity ? (
+              {isLoadersOnly || isCity ? (
                 <div className="bg-white/80 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-500">ЗП грузчика:</span>
                   <span className="text-base font-black text-zinc-900">
@@ -575,37 +610,87 @@ export default function AddOrderPage() {
           </button>
         </div>
 
-        {/* ── Сумма за погрузку ── */}
-        <div className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
-          <label className="block text-xs font-black text-amber-900 uppercase tracking-wide">
-            Введите сумму за погрузку
-          </label>
+        {/* ── Сумма за погрузку (только для рейсов с автомобилем) ── */}
+        {!isLoadersOnly && (
+          <div className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
+            <label className="block text-xs font-black text-amber-900 uppercase tracking-wide">
+              Введите сумму за погрузку
+            </label>
 
-          <input
-            type="number"
-            inputMode="numeric"
-            value={loadingAmount}
-            onChange={(e) => {
-              const val = e.target.value;
-              setLoadingAmount(val);
-              if (val !== '' && Number(val) > 0 && loaders.length === 0 && !isDriverLoader) {
-                setIsDriverLoader(true);
-              }
-            }}
-            placeholder="0 ₽"
-            className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-12 text-xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
-          />
+            <input
+              type="number"
+              inputMode="numeric"
+              value={loadingAmount}
+              onChange={(e) => {
+                const val = e.target.value;
+                setLoadingAmount(val);
+                if (val !== '' && Number(val) > 0 && loaders.length === 0 && !isDriverLoader) {
+                  setIsDriverLoader(true);
+                }
+              }}
+              placeholder="0 ₽"
+              className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-12 text-xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
+            />
 
-          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-amber-200/60 text-amber-900">
-            <span>🚗 На машину остаётся:</span>
-            <span className="font-mono text-sm font-black text-amber-950">
-              {payroll.machinePool.toLocaleString('ru-RU')} ₽
-            </span>
+            <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-amber-200/60 text-amber-900">
+              <span>🚗 На машину остаётся:</span>
+              <span className="font-mono text-sm font-black text-amber-950">
+                {payroll.machinePool.toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* ── ЗП водителя ── */}
-        {isCity ? (
+        {/* ── Расчёт ПРР или ЗП водителя ── */}
+        {isLoadersOnly ? (
+          <div className="bg-zinc-900 text-white rounded-2xl p-4 space-y-3 shadow-md">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-orange-400">
+                ⚡ Расчёт ПРР (без авто)
+              </span>
+              <span className="text-xs font-bold text-zinc-400">70% / 30%</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-zinc-800/80 p-2.5 rounded-xl">
+                <div className="text-zinc-400 font-bold">👥 Грузчикам (70%)</div>
+                <div className="text-base font-black text-blue-400 mt-0.5">
+                  {payroll.totalLoadersPay.toLocaleString('ru-RU')} ₽
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  {loaders.length > 0
+                    ? `по ${payroll.loaderPayEach.toLocaleString('ru-RU')} ₽ на ${loaders.length} чел.`
+                    : 'грузчики не выбраны'}
+                </div>
+              </div>
+
+              <div className="bg-zinc-800/80 p-2.5 rounded-xl">
+                <div className="text-zinc-400 font-bold">🏢 Компании (30%)</div>
+                <div className="text-base font-black text-emerald-400 mt-0.5">
+                  {payroll.companyShare.toLocaleString('ru-RU')} ₽
+                </div>
+                <div className="text-[10px] text-zinc-400">доход компании</div>
+              </div>
+            </div>
+
+            {loaders.length === 0 ? (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-center">
+                <p className="text-xs font-bold text-amber-300">
+                  ⚠️ Добавьте грузчиков кнопкой выше для распределения ЗП
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
+                <span className="text-xs font-bold text-zinc-400">
+                  Каждому грузчику ({loaders.length} чел.):
+                </span>
+                <span className="text-lg font-black text-white">
+                  {payroll.loaderPayEach.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+            )}
+          </div>
+        ) : isCity ? (
           <div className="bg-zinc-900 text-white rounded-2xl p-4 space-y-3 shadow-md">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
               <span className="text-xs font-black uppercase tracking-wider text-orange-400">

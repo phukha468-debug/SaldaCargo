@@ -115,7 +115,9 @@ async function handleOfficialPayrollCron(req: NextRequest) {
     const officialList = (officialUsers as any[]) ?? [];
 
     // ──────────────────────────────────────────────────────────────────────────
-    // ЗАДАЧА 1: 1-е число месяца — Автоматический платёж за налоги в долг сотрудника (10 000 ₽)
+    // ЗАДАЧА 1: 1-е число месяца — Автоматическое начисление долгов сотрудникам:
+    // 1) Налог за официальное трудоустройство ТК РФ (10 000 ₽)
+    // 2) Долги по исполнительным листам (алименты и ФССП) — вместо разделения по дням!
     // ──────────────────────────────────────────────────────────────────────────
     if (currentDay === 1 || searchParams.get('force_accrual') === 'true') {
       const MONTHLY_TAX_AMOUNT = 10000; // Каждый сотрудник с официальной ЗП платит 10 000 ₽ в счёт компании за налоги
@@ -129,65 +131,156 @@ async function handleOfficialPayrollCron(req: NextRequest) {
         .maybeSingle();
       const adminCreatedBy = adminUser?.id ?? officialList[0]?.id;
 
+      const taxAccruedLines: string[] = [];
+      const courtAccruedLines: string[] = [];
+      let totalTaxAccrued = 0;
+      let totalCourtAccrued = 0;
+
+      // 1.1 Начисление налога ТК РФ (10 000 ₽)
       for (const user of officialList) {
         // Проверяем, нет ли уже начисления налога за этот месяц
-        const { data: existing } = await (supabase as any)
+        const { data: existingTax } = await (supabase as any)
           .from('transactions')
           .select('id')
           .eq('category_id', ADVANCE_CATEGORY_ID)
           .eq('related_user_id', user.id)
-          .ilike('description', `%${monthName} ${currentYear}%`)
+          .ilike('description', `%Налог%${monthName} ${currentYear}%`)
           .limit(1);
 
-        if (existing && existing.length > 0) {
+        if (existingTax && existingTax.length > 0) {
           results.details.push(
             `Платёж за налоги для ${user.name} уже был создан ранее за ${monthName} ${currentYear}`,
+          );
+        } else {
+          const description = `Налог за официальное трудоустройство (ТК РФ): ${user.name} — ${monthName} ${currentYear}`;
+          const idempotencyKey = crypto.randomUUID();
+
+          const { error: insErr } = await (supabase as any).from('transactions').insert({
+            direction: 'expense',
+            category_id: ADVANCE_CATEGORY_ID,
+            amount: MONTHLY_TAX_AMOUNT.toFixed(2),
+            description,
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            related_user_id: user.id,
+            from_wallet_id: null, // не списывает из кассы, формирует долг сотрудника перед компанией (вычитается из сдельных рейсов)
+            transaction_date: new Date(currentYear, currentMonth, 1, 0, 1, 0).toISOString(),
+            idempotency_key: idempotencyKey,
+            created_by: adminCreatedBy,
+          });
+
+          if (insErr) {
+            console.error(`Error inserting tax deduction for ${user.name}:`, insErr);
+            results.details.push(`Ошибка начисления налога для ${user.name}: ${insErr.message}`);
+          } else {
+            results.accruals_created++;
+            totalTaxAccrued += MONTHLY_TAX_AMOUNT;
+            taxAccruedLines.push(
+              `• 👤 ${user.name} — ${MONTHLY_TAX_AMOUNT.toLocaleString('ru-RU')} ₽`,
+            );
+            results.details.push(
+              `Начислен налог ${MONTHLY_TAX_AMOUNT} ₽ в долг сотрудника: ${user.name}`,
+            );
+          }
+        }
+      }
+
+      // 1.2 Начисление долга за алименты и долги ФССП (1-го числа каждого месяца всем сотрудникам с исп. листами)
+      const courtList = officialList.filter((u) => u.has_court_orders);
+      for (const user of courtList) {
+        const salary = parseFloat(user.official_salary_amount ?? '22500') || 22500;
+        const pct = Math.min(100, Math.max(0, parseFloat(user.court_order_pct ?? '50') || 50));
+        const courtSum = Math.round(salary * (pct / 100));
+
+        if (courtSum <= 0) continue;
+
+        // Проверяем, не начислен ли уже долг по исполнительному листу / алиментам / ФССП за этот месяц
+        const { data: existingCourt } = await (supabase as any)
+          .from('transactions')
+          .select('id, description')
+          .eq('category_id', ADVANCE_CATEGORY_ID)
+          .eq('related_user_id', user.id)
+          .ilike('description', `%${monthName} ${currentYear}%`)
+          .or(
+            'description.ilike.%ФССП%,description.ilike.%алимент%,description.ilike.%пристав%,description.ilike.%Исполнительный лист%',
+          )
+          .limit(1);
+
+        if (existingCourt && existingCourt.length > 0) {
+          results.details.push(
+            `Долг за алименты/ФССП для ${user.name} уже был начислен ранее за ${monthName} ${currentYear}`,
           );
           continue;
         }
 
-        const description = `Налог за официальное трудоустройство (ТК РФ): ${user.name} — ${monthName} ${currentYear}`;
-
+        const noteSuffix = user.court_order_notes ? ` (${user.court_order_notes})` : '';
+        const courtDescription = `Исполнительный лист (ФССП / алименты ${pct}%): ${user.name} — ${monthName} ${currentYear}${noteSuffix}`;
         const idempotencyKey = crypto.randomUUID();
 
-        const { error: insErr } = await (supabase as any).from('transactions').insert({
+        const { error: insCourtErr } = await (supabase as any).from('transactions').insert({
           direction: 'expense',
           category_id: ADVANCE_CATEGORY_ID,
-          amount: MONTHLY_TAX_AMOUNT.toFixed(2),
-          description,
+          amount: courtSum.toFixed(2),
+          description: courtDescription,
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           related_user_id: user.id,
-          from_wallet_id: null, // не списывает из кассы, формирует долг сотрудника перед компанией (вычитается из сдельных рейсов)
+          from_wallet_id: null,
           transaction_date: new Date(currentYear, currentMonth, 1, 0, 1, 0).toISOString(),
           idempotency_key: idempotencyKey,
           created_by: adminCreatedBy,
         });
 
-        if (insErr) {
-          console.error(`Error inserting tax deduction for ${user.name}:`, insErr);
-          results.details.push(`Ошибка начисления налога для ${user.name}: ${insErr.message}`);
+        if (insCourtErr) {
+          console.error(`Error inserting court order debt for ${user.name}:`, insCourtErr);
+          results.details.push(
+            `Ошибка начисления долга ФССП/алиментов для ${user.name}: ${insCourtErr.message}`,
+          );
         } else {
           results.accruals_created++;
+          totalCourtAccrued += courtSum;
+          courtAccruedLines.push(
+            `• 👤 ${user.name} (${pct}%) — ${courtSum.toLocaleString('ru-RU')} ₽${noteSuffix}`,
+          );
           results.details.push(
-            `Начислен налог ${MONTHLY_TAX_AMOUNT} ₽ в долг сотрудника: ${user.name}`,
+            `Начислен долг за алименты/ФССП ${courtSum} ₽ (${pct}%) в долг сотрудника: ${user.name}`,
           );
         }
       }
 
-      // Если долг был начислен — сразу отправляем отчёт администраторам в МАКС
-      if (results.accruals_created > 0) {
-        const accrualLines = officialList.map(
-          (u) => `• 👤 ${u.name} — ${MONTHLY_TAX_AMOUNT.toLocaleString('ru-RU')} ₽`,
+      // Если был начислен хотя бы один долг — отправляем отчёт администраторам в МАКС
+      if (taxAccruedLines.length > 0 || courtAccruedLines.length > 0) {
+        const messageBlocks: string[] = [
+          `📢 ЕЖЕМЕСЯЧНОЕ НАЧИСЛЕНИЕ ДОЛГОВ ПО СОТРУДНИКАМ (1-е ЧИСЛО)`,
+          `Сегодня 1 ${monthName} — в долг сотрудников перед компанией начислены обязательные платежи:`,
+        ];
+
+        if (taxAccruedLines.length > 0) {
+          messageBlocks.push(
+            `🏛️ НАЛОГ ЗА ОФИЦИАЛЬНОЕ ТРУДОУСТРОЙСТВО (ТК РФ):\n` +
+              taxAccruedLines.join('\n') +
+              `\n📊 Всего налог: ${totalTaxAccrued.toLocaleString('ru-RU')} ₽`,
+          );
+        }
+
+        if (courtAccruedLines.length > 0) {
+          messageBlocks.push(
+            `⚖️ ИСПОЛНИТЕЛЬНЫЕ ЛИСТЫ (АЛИМЕНТЫ / ФССП):\n` +
+              courtAccruedLines.join('\n') +
+              `\n📊 Всего удержания приставов: ${totalCourtAccrued.toLocaleString('ru-RU')} ₽`,
+          );
+        }
+
+        const grandTotal = totalTaxAccrued + totalCourtAccrued;
+        messageBlocks.push(
+          `📈 ИТОГО НАЧИСЛЕНО ДОЛГА: ${grandTotal.toLocaleString('ru-RU')} ₽\n` +
+            `ℹ️ Все суммы зафиксированы в долг с 1-го числа месяца и будут автоматически вычитаться из сдельных выплат за рейсы (вместо разделения по дням).`,
         );
-        const totalTaxAccrued = results.accruals_created * MONTHLY_TAX_AMOUNT;
-        const accrualMsg = [
-          `📢 НАЧИСЛЕНИЕ ДОЛГА ПО ТК РФ (НАЛОГИ ЗА СОТРУДНИКОВ)`,
-          `Сегодня 1 ${monthName} — начислен ежемесячный налог за официальное трудоустройство в долг сотрудникам:\n\n${accrualLines.join('\n')}`,
-          `📊 Всего начислено долга: ${totalTaxAccrued.toLocaleString('ru-RU')} ₽`,
-          `ℹ️ Суммы зафиксированы в долг перед компанией и будут автоматически вычитаться из сдельных выплат за рейсы при расчёте ЗП.`,
+        messageBlocks.push(
           `\n🤖 Сформировано автоматически ботом ТК501 для директора и администратора`,
-        ].join('\n\n');
+        );
+
+        const accrualMsg = messageBlocks.join('\n\n');
 
         const { data: admins } = await (supabase as any)
           .from('users')
@@ -208,7 +301,7 @@ async function handleOfficialPayrollCron(req: NextRequest) {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // ЗАДАЧА 1.5: За 1 день до 1-го числа месяца — Напоминание о начислении долга по налогам
+    // ЗАДАЧА 1.5: За 1 день до 1-го числа месяца — Напоминание о начислении долгов
     // ──────────────────────────────────────────────────────────────────────────
     const tomorrow = new Date(currentYear, currentMonth, currentDay + 1);
     const isDayBeforeAccrual = tomorrow.getDate() === 1;
@@ -219,15 +312,39 @@ async function handleOfficialPayrollCron(req: NextRequest) {
     ) {
       const nextMonthName = MONTH_NAMES_RU[tomorrow.getMonth()] ?? 'месяца';
       const totalTax = officialList.length * 10000;
-      const lines = officialList.map((u) => `• 👤 ${u.name} — 10 000 ₽`);
+      const taxLines = officialList.map((u) => `• 👤 ${u.name} — 10 000 ₽`);
 
-      const preAlertMsg = [
-        `📢 НАПОМИНАНИЕ: ЗАВТРА 1 ${nextMonthName.toUpperCase()} — НАЧИСЛЕНИЕ ДОЛГА ПО ТК РФ`,
-        `Завтра в 09:00 МСК в систему будет автоматически начислено по 10 000 ₽ за официальное трудоустройство (налог) в долг сотрудникам:\n\n${lines.join('\n')}`,
-        `📊 Всего к начислению: ${totalTax.toLocaleString('ru-RU')} ₽`,
-        `ℹ️ Начисление сформирует долг сотрудников перед компанией и будет автоматически вычитаться из сдельной оплаты за рейсы.`,
-        `\n🤖 Сформировано автоматически ботом ТК501 для директора и администратора`,
-      ].join('\n\n');
+      const courtUsers = officialList.filter((u) => u.has_court_orders);
+      let totalCourt = 0;
+      const courtLines = courtUsers.map((u) => {
+        const s = parseFloat(u.official_salary_amount ?? '22500') || 22500;
+        const pct = parseFloat(u.court_order_pct ?? '50') || 50;
+        const cSum = Math.round(s * (pct / 100));
+        totalCourt += cSum;
+        const note = u.court_order_notes ? ` (${u.court_order_notes})` : '';
+        return `• 👤 ${u.name} (${pct}%) — ${cSum.toLocaleString('ru-RU')} ₽${note}`;
+      });
+
+      const preAlertParts: string[] = [
+        `📢 НАПОМИНАНИЕ: ЗАВТРА 1 ${nextMonthName.toUpperCase()} — НАЧИСЛЕНИЕ ДОЛГОВ ПО СОТРУДНИКАМ`,
+        `Завтра в 09:00 МСК в систему будет автоматически начислено в долг сотрудникам:`,
+        `🏛️ НАЛОГ ТК РФ (10 000 ₽):\n${taxLines.join('\n')}\nВсего налог: ${totalTax.toLocaleString('ru-RU')} ₽`,
+      ];
+
+      if (courtLines.length > 0) {
+        preAlertParts.push(
+          `⚖️ АЛИМЕНТЫ И ДОЛГИ ФССП:\n${courtLines.join('\n')}\nВсего по исп. листам: ${totalCourt.toLocaleString('ru-RU')} ₽`,
+        );
+      }
+
+      const grandTotalPreAlert = totalTax + totalCourt;
+      preAlertParts.push(
+        `📊 Всего к начислению: ${grandTotalPreAlert.toLocaleString('ru-RU')} ₽\n` +
+          `ℹ️ Начисление сформирует долг сотрудников перед компанией с 1-го числа месяца и будет автоматически вычитаться из сдельной оплаты за рейсы (вместо разделения по дням).\n` +
+          `\n🤖 Сформировано автоматически ботом ТК501 для директора и администратора`,
+      );
+
+      const preAlertMsg = preAlertParts.join('\n\n');
 
       const { data: admins } = await (supabase as any)
         .from('users')
@@ -315,7 +432,8 @@ async function handleOfficialPayrollCron(req: NextRequest) {
           `📊 СВОДНЫЙ РАСЧЁТ:\n` +
             `• Всего официальная часть: ${totalSalary.toLocaleString('ru-RU')} ₽\n` +
             `• ➜ Водителям на карты: ${totalDriversPay.toLocaleString('ru-RU')} ₽\n` +
-            `• ➜ Приставам (ФССП / Алименты): ${totalCourtPay.toLocaleString('ru-RU')} ₽`,
+            `• ➜ Приставам (ФССП / Алименты): ${totalCourtPay.toLocaleString('ru-RU')} ₽\n\n` +
+            `ℹ️ Долг сотрудников перед компанией (налог 10 000 ₽ + алименты/ФССП) уже начислен 1-го числа в системе и удерживается из сдельной оплаты за рейсы (без разделения по дням).`,
         );
 
         // 1. Компактный красный блок предупреждения ФССП

@@ -505,22 +505,36 @@ function StaffModal({
                     const driverPct = 100 - pct;
 
                     return (
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="p-2 bg-rose-100/80 rounded-lg border border-rose-200 font-bold text-rose-900">
-                          <div className="text-[9px] uppercase text-rose-700">
-                            🏛️ Приставам ({pct}%):
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2 bg-rose-100/80 rounded-lg border border-rose-200 font-bold text-rose-900">
+                            <div className="text-[9px] uppercase text-rose-700">
+                              🏛️ Приставам ({pct}%):
+                            </div>
+                            <div className="text-sm font-black text-rose-950">
+                              {courtSum.toLocaleString('ru-RU')} ₽
+                            </div>
                           </div>
-                          <div className="text-sm font-black text-rose-950">
-                            {courtSum.toLocaleString('ru-RU')} ₽
+                          <div className="p-2 bg-emerald-100/80 rounded-lg border border-emerald-200 font-bold text-emerald-900">
+                            <div className="text-[9px] uppercase text-emerald-700">
+                              💳 Водителю на карту ({driverPct}%):
+                            </div>
+                            <div className="text-sm font-black text-emerald-950">
+                              {driverSum.toLocaleString('ru-RU')} ₽
+                            </div>
                           </div>
                         </div>
-                        <div className="p-2 bg-emerald-100/80 rounded-lg border border-emerald-200 font-bold text-emerald-900">
-                          <div className="text-[9px] uppercase text-emerald-700">
-                            💳 Водителю на карту ({driverPct}%):
+
+                        <div className="p-2 bg-rose-100/60 rounded-lg border border-rose-200/80 text-[11px] text-rose-900 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <span>⚖️ Начисление долга за алименты / ФССП:</span>
+                            <strong className="text-rose-950 font-black">
+                              {courtSum.toLocaleString('ru-RU')} ₽ / мес
+                            </strong>
                           </div>
-                          <div className="text-sm font-black text-emerald-950">
-                            {driverSum.toLocaleString('ru-RU')} ₽
-                          </div>
+                          <span className="text-[10px] text-rose-700 font-semibold">
+                            1-го числа в долг сотрудника (без деления по дням)
+                          </span>
                         </div>
                       </div>
                     );
@@ -5015,9 +5029,9 @@ export default function StaffPage() {
               ТК РФ
             </span>
             <span className="text-emerald-950 font-medium">
-              1-го числа каждого месяца в долг сотрудника начисляется налог за официальное
-              трудоустройство (10 000 ₽), вычитаемый из рейсов. Выплата официальной части (22 500 ₽)
-              производится в назначенный день ЗП за вычетом исполнительных листов (ФССП).
+              1-го числа каждого месяца в долг сотрудников начисляется налог за официальное
+              трудоустройство (10 000 ₽) и удержания по исполнительным листам (алименты / ФССП),
+              вычитаемые из рейсов (вместо разделения по дням).
             </span>
           </div>
           <div className="flex items-center gap-1 bg-emerald-100/70 p-1 rounded-xl shrink-0 self-end sm:self-auto font-bold text-xs">

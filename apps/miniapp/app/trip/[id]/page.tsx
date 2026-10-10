@@ -185,6 +185,11 @@ export default function TripDetailPage() {
 
   const isActive = trip.status === 'in_progress';
   const canEdit = trip.lifecycle_status !== 'approved';
+  const isPrrTrip =
+    trip.asset?.reg_number === 'БЕЗ АВТО' ||
+    Boolean(trip.asset?.short_name?.includes('Без авто')) ||
+    Boolean(trip.asset?.short_name?.includes('ПРР')) ||
+    trip.trip_orders?.some((o) => o.direction === 'loaders_only');
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
 
   const totalExternalLoadersPay = activeOrders.reduce((sum, o) => {
@@ -270,10 +275,33 @@ export default function TripDetailPage() {
             value={<Money amount={totals.revenue.toString()} />}
             highlighted
           />
-          <StatCard label="ЗП Водителя" value={<Money amount={totals.driverPay.toString()} />} />
-          <StatCard label="ГСМ" value={<Money amount={totals.expenses.toString()} />} error />
-          {hasLoaders && (
-            <StatCard label="ЗП Грузчики" value={<Money amount={totals.loadersPay.toString()} />} />
+          {isPrrTrip ? (
+            <>
+              <StatCard
+                label="ЗП Грузчики (70%)"
+                value={<Money amount={totals.loadersPay.toString()} />}
+              />
+              <StatCard
+                label="Компания (30%)"
+                value={
+                  <Money amount={Math.max(0, totals.revenue - totals.loadersPay).toString()} />
+                }
+              />
+            </>
+          ) : (
+            <>
+              <StatCard
+                label="ЗП Водителя"
+                value={<Money amount={totals.driverPay.toString()} />}
+              />
+              <StatCard label="ГСМ" value={<Money amount={totals.expenses.toString()} />} error />
+              {hasLoaders && (
+                <StatCard
+                  label="ЗП Грузчики"
+                  value={<Money amount={totals.loadersPay.toString()} />}
+                />
+              )}
+            </>
           )}
         </section>
 
@@ -362,15 +390,17 @@ export default function TripDetailPage() {
                               </p>
                             )}
 
-                            <p className="text-[11px] font-bold text-green-700 uppercase tracking-wide">
-                              ЗП водителя: <Money amount={order.driver_pay} />
-                              {hasDriverLoaderPay && (
-                                <span className="ml-1 text-[10px] text-zinc-400 lowercase font-medium">
-                                  ({order.driver_car_pay} ₽ авто + {order.driver_loader_pay} ₽
-                                  погрузка)
-                                </span>
-                              )}
-                            </p>
+                            {order.direction !== 'loaders_only' && !isPrrTrip && (
+                              <p className="text-[11px] font-bold text-green-700 uppercase tracking-wide">
+                                ЗП водителя: <Money amount={order.driver_pay} />
+                                {hasDriverLoaderPay && (
+                                  <span className="ml-1 text-[10px] text-zinc-400 lowercase font-medium">
+                                    ({order.driver_car_pay} ₽ авто + {order.driver_loader_pay} ₽
+                                    погрузка)
+                                  </span>
+                                )}
+                              </p>
+                            )}
 
                             {orderLoaders.length > 0 ? (
                               <div className="mt-1 flex flex-wrap gap-1.5">
@@ -431,81 +461,83 @@ export default function TripDetailPage() {
         </section>
 
         {/* Expenses */}
-        <section className="space-y-3">
-          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pb-1 border-b-2 border-zinc-100">
-            Заправки (ГСМ)
-          </h2>
-          {deleteError && (
-            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
-              {deleteError}
-            </div>
-          )}
-          {(trip.trip_expenses ?? []).length === 0 ? (
-            <div className="bg-zinc-100 border-2 border-zinc-200 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center opacity-60">
-              <p className="font-bold text-zinc-400 uppercase tracking-tight text-xs">
-                Заправок пока нет
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {trip.trip_expenses.map((expense) => (
-                <div key={expense.id}>
-                  {confirmDelete === expense.id ? (
-                    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-center justify-between gap-3">
-                      <p className="text-red-700 font-black text-xs uppercase tracking-wide flex-1">
-                        Удалить расход {expense.category.name}?
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setConfirmDelete(null)}
-                          disabled={isMutating}
-                          className="px-3 py-2 bg-white border-2 border-zinc-200 rounded-lg text-xs font-black uppercase text-zinc-600 active:scale-95 transition-all"
-                        >
-                          Нет
-                        </button>
-                        <button
-                          onClick={() => deleteExpense.mutate(expense.id)}
-                          disabled={isMutating}
-                          className="px-3 py-2 bg-red-600 rounded-lg text-xs font-black uppercase text-white active:scale-95 transition-all disabled:opacity-50"
-                        >
-                          {deleteExpense.isPending ? '...' : 'Да'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-white border-2 border-zinc-200 rounded-lg p-4 flex justify-between items-center relative overflow-hidden active:bg-zinc-50 transition-colors">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-400"></div>
-                      <div className="flex-1 pl-2">
-                        <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">
-                          {expense.category.name}
-                        </h3>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                          {expense.description ??
-                            (expense.payment_method === 'fuel_card' ? 'Топливо' : 'Расход')}
+        {(!isPrrTrip || (trip.trip_expenses ?? []).length > 0) && (
+          <section className="space-y-3">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pb-1 border-b-2 border-zinc-100">
+              Заправки (ГСМ)
+            </h2>
+            {deleteError && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
+                {deleteError}
+              </div>
+            )}
+            {(trip.trip_expenses ?? []).length === 0 ? (
+              <div className="bg-zinc-100 border-2 border-zinc-200 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center opacity-60">
+                <p className="font-bold text-zinc-400 uppercase tracking-tight text-xs">
+                  Заправок пока нет
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {trip.trip_expenses.map((expense) => (
+                  <div key={expense.id}>
+                    {confirmDelete === expense.id ? (
+                      <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-center justify-between gap-3">
+                        <p className="text-red-700 font-black text-xs uppercase tracking-wide flex-1">
+                          Удалить расход {expense.category.name}?
                         </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Money
-                          amount={expense.amount}
-                          className="font-black text-lg text-red-600"
-                        />
-                        {canEdit && (
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => setConfirmDelete(expense.id)}
-                            className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1"
-                            aria-label="Удалить расход"
+                            onClick={() => setConfirmDelete(null)}
+                            disabled={isMutating}
+                            className="px-3 py-2 bg-white border-2 border-zinc-200 rounded-lg text-xs font-black uppercase text-zinc-600 active:scale-95 transition-all"
                           >
-                            🗑️
+                            Нет
                           </button>
-                        )}
+                          <button
+                            onClick={() => deleteExpense.mutate(expense.id)}
+                            disabled={isMutating}
+                            className="px-3 py-2 bg-red-600 rounded-lg text-xs font-black uppercase text-white active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            {deleteExpense.isPending ? '...' : 'Да'}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                    ) : (
+                      <div className="bg-white border-2 border-zinc-200 rounded-lg p-4 flex justify-between items-center relative overflow-hidden active:bg-zinc-50 transition-colors">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-400"></div>
+                        <div className="flex-1 pl-2">
+                          <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">
+                            {expense.category.name}
+                          </h3>
+                          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                            {expense.description ??
+                              (expense.payment_method === 'fuel_card' ? 'Топливо' : 'Расход')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Money
+                            amount={expense.amount}
+                            className="font-black text-lg text-red-600"
+                          />
+                          {canEdit && (
+                            <button
+                              onClick={() => setConfirmDelete(expense.id)}
+                              className="text-zinc-300 hover:text-red-400 active:scale-90 transition-all p-1"
+                              aria-label="Удалить расход"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Delete Trip */}
         {canEdit && (
@@ -542,20 +574,31 @@ export default function TripDetailPage() {
               {finishError}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <Link
-              href={`/trip/${id}/order`}
-              className="flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
-            >
-              <span>➕</span> Заказ
-            </Link>
-            <Link
-              href={`/trip/${id}/expense`}
-              className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
-            >
-              <span>⛽</span> ГСМ
-            </Link>
-          </div>
+          {isPrrTrip ? (
+            <div>
+              <Link
+                href={`/trip/${id}/order`}
+                className="flex items-center justify-center gap-2 w-full bg-orange-600 hover:bg-orange-500 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
+              >
+                <span>➕</span> Добавить заказ ПРР
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Link
+                href={`/trip/${id}/order`}
+                className="flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
+              >
+                <span>➕</span> Заказ
+              </Link>
+              <Link
+                href={`/trip/${id}/expense`}
+                className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg h-12 font-black uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md"
+              >
+                <span>⛽</span> ГСМ
+              </Link>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => finishTrip.mutate()}

@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Акт сверки взаимных расчетов — ООО "ГЕОСТРОЙИНДУСТРИЯ" / ИП Нигамедьянов А.С.</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 8mm 8mm 8mm 8mm;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0f172a;
+    background: #f8fafc;
+    font-size: 10px;
+    line-height: 1.35;
+    padding: 20px;
+  }
+  .print-controls {
+    max-width: 900px;
+    margin: 0 auto 16px auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #ffffff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .tab-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tab-btn.active {
+    background: #ea580c;
+    color: #ffffff;
+    border-color: #ea580c;
+  }
+  .print-btn {
+    padding: 8px 18px;
+    background: #0f172a;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sheet {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 20px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border-radius: 8px;
+  }
+  @media print {
+    body {
+      background: #ffffff;
+      padding: 0;
+    }
+    .print-controls {
+      display: none;
+    }
+    .sheet {
+      box-shadow: none;
+      padding: 0;
+      border-radius: 0;
+      max-width: 100%;
+    }
+  }
+
+  .doc-title {
+    font-size: 15px;
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
+    color: #0f172a;
+    margin-bottom: 2px;
+  }
+  .doc-period {
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    color: #475569;
+    margin-bottom: 4px;
+  }
+  .doc-parties {
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    color: #1e293b;
+    margin-bottom: 8px;
+  }
+  .preamble {
+    font-size: 10px;
+    color: #334155;
+    text-align: justify;
+    margin-bottom: 10px;
+    line-height: 1.35;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 9px;
+  }
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 4px 5px;
+    font-weight: 800;
+    border: 1px solid #94a3b8;
+    text-align: center;
+    line-height: 1.2;
+  }
+  td {
+    padding: 3.5px 5px;
+    border: 1px solid #cbd5e1;
+    line-height: 1.25;
+  }
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .center {
+    text-align: center;
+  }
+  .bold {
+    font-weight: 800;
+  }
+  .bg-subtotal {
+    background: #f8fafc;
+    font-weight: 800;
+  }
+  .conclusion {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .signatures {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    font-size: 10px;
+  }
+  .sig-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 80px;
+  }
+  .sig-line {
+    border-bottom: 1px solid #0f172a;
+    display: inline-block;
+    width: 60%;
+  }
+  .text-amber-700 {
+    color: #b45309;
+  }
+</style>
+</head>
+<body>
+
+<div class="print-controls">
+  <div style="display: flex; gap: 8px;">
+    <button id="tab-full" class="tab-btn active" onclick="switchView('full')">
+      📅 Полная сверка (счета 28–46 · Долг 235 000 ₽)
+    </button>
+    <button id="tab-settled" class="tab-btn" onclick="switchView('settled')">
+      ✓ Счета 28–40 (Сентябрь · Закрыто в 0 ₽)
+    </button>
+  </div>
+  <button class="print-btn" onclick="window.print()">
+    <span>🖨️</span>
+    <span>Распечатать / Сохранить PDF</span>
+  </button>
+</div>
+
+<!-- =========================================================================
+     ВАРИАНТ 1: ПО СЧЕТАМ 28–40 (ЗАКРЫТО В НОЛЬ ПО ОПЛАТЕ 30.09.2026)
+     ========================================================================= -->
+<div id="view-settled" class="sheet" style="display: none;">
+  <div class="doc-title">Акт сверки</div>
+  <div class="doc-period">взаимных расчетов за период: 02.09.2026 - 30.09.2026</div>
+  <div class="doc-parties">
+    между <b>ООО "ГЕОСТРОЙИНДУСТРИЯ"</b> (ИНН 7415089601)<br>
+    и <b>ИП Нигамедьянов Александр Сергеевич</b> (ИНН 660704814106)
+  </div>
+
+  <p class="preamble">
+    Мы, нижеподписавшиеся, Директор ООО "ГЕОСТРОЙИНДУСТРИЯ" Ефременко Арсений Викторович, с одной стороны, и ИП Нигамедьянов Александр Сергеевич, с другой стороны, составили настоящий акт сверки в том, что состояние взаимных расчетов по данным учета следующее:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th colspan="4" style="width: 50%; border-right: 2px solid #475569;">
+          По данным ООО "ГЕОСТРОЙИНДУСТРИЯ", руб.
+        </th>
+        <th colspan="4" style="width: 50%;">
+          По данным ИП Нигамедьянов Александр Сергеевич, руб.
+        </th>
+      </tr>
+      <tr>
+        <th style="width: 10%;">Дата</th>
+        <th style="width: 24%;">Документ</th>
+        <th style="width: 8%;">Дебет</th>
+        <th style="width: 8%; border-right: 2px solid #475569;">Кредит</th>
+        <th style="width: 10%;">Дата</th>
+        <th style="width: 24%;">Документ</th>
+        <th style="width: 8%;">Дебет</th>
+        <th style="width: 8%;">Кредит</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="bg-subtotal">
+        <td colspan="2"><b>Сальдо начальное на 02.09.2026</b></td>
+        <td class="num"></td>
+        <td class="num bold" style="border-right: 2px solid #475569;">0,00</td>
+        <td colspan="2"><b>Сальдо начальное на 02.09.2026</b></td>
+        <td class="num bold">0,00</td>
+        <td class="num"></td>
+      </tr>
+
+      <tr>
+        <td class="center">02.09.26</td>
+        <td>Приход (28 от 02.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">02.09.26</td>
+        <td>Акт / Счёт № 28 от 02.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">06.09.26</td>
+        <td>Приход (29 от 06.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">06.09.26</td>
+        <td>Акт / Счёт № 29 от 06.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">07.09.26</td>
+        <td>Приход (30 от 07.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">07.09.26</td>
+        <td>Акт / Счёт № 30 от 07.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">10.09.26</td>
+        <td>Приход (31 от 10.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">10.09.26</td>
+        <td>Акт / Счёт № 31 от 10.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr style="background: #f0fdf4;">
+        <td class="center">11.09.26</td>
+        <td><b>Оплата (930 от 11.09.2026)</b></td>
+        <td class="num bold">130 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">11.09.26</td>
+        <td><b>Оплата (п/п 930 от 11.09.2026)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">130 000,00</td>
+      </tr>
+
+      <tr>
+        <td class="center">12.09.26</td>
+        <td>Приход (32 от 12.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">12.09.26</td>
+        <td>Акт / Счёт № 32 от 12.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">14.09.26</td>
+        <td>Приход (33 от 14.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">14.09.26</td>
+        <td>Акт / Счёт № 33 от 14.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">14.09.26</td>
+        <td>Приход (34 от 14.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">14.09.26</td>
+        <td>Акт / Счёт № 34 от 14.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr style="background: #f0fdf4;">
+        <td class="center">14.09.26</td>
+        <td><b>Оплата (960 от 14.09.2026)</b></td>
+        <td class="num bold">80 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">14.09.26</td>
+        <td><b>Оплата (п/п 960 от 14.09.2026)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">80 000,00</td>
+      </tr>
+
+      <tr>
+        <td class="center">15.09.26</td>
+        <td>Приход (35 от 15.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">15.09.26</td>
+        <td>Акт / Счёт № 35 от 15.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">17.09.26</td>
+        <td>Приход (36 от 17.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">17.09.26</td>
+        <td>Акт / Счёт № 36 от 17.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">18.09.26</td>
+        <td>Приход (37 от 18.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">18.09.26</td>
+        <td>Акт / Счёт № 37 от 18.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">19.09.26</td>
+        <td>Приход (38 от 19.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">19.09.26</td>
+        <td>Акт / Счёт № 38 от 19.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr>
+        <td class="center">21.09.26</td>
+        <td>Приход (39 от 21.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">21.09.26</td>
+        <td>Акт / Счёт № 39 от 21.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr style="background: #f0fdf4;">
+        <td class="center">22.09.26</td>
+        <td><b>Оплата от 22.09.2026</b></td>
+        <td class="num bold">240 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">22.09.26</td>
+        <td><b>Оплата от 22.09.2026 (счета 33–38)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">240 000,00</td>
+      </tr>
+
+      <tr>
+        <td class="center">24.09.26</td>
+        <td>Приход (40 от 24.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">24.09.26</td>
+        <td>Акт / Счёт № 40 от 24.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr style="background: #f0fdf4;">
+        <td class="center">30.09.26</td>
+        <td><b>Оплата от 30.09.2026</b></td>
+        <td class="num bold">80 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">30.09.26</td>
+        <td><b>Оплата от 30.09.2026 (счета 39, 40)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">80 000,00</td>
+      </tr>
+
+      <tr class="bg-subtotal" style="border-top: 2px solid #475569;">
+        <td colspan="2"><b>Обороты за период</b></td>
+        <td class="num bold">530 000,00</td>
+        <td class="num bold" style="border-right: 2px solid #475569;">530 000,00</td>
+        <td colspan="2"><b>Обороты за период</b></td>
+        <td class="num bold">530 000,00</td>
+        <td class="num bold">530 000,00</td>
+      </tr>
+
+      <tr class="bg-subtotal" style="background: #e2e8f0;">
+        <td colspan="2"><b>Сальдо конечное на 30.09.2026</b></td>
+        <td class="num bold">0,00</td>
+        <td class="num bold" style="border-right: 2px solid #475569;">0,00</td>
+        <td colspan="2"><b>Сальдо конечное на 30.09.2026</b></td>
+        <td class="num bold">0,00</td>
+        <td class="num bold">0,00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="conclusion">
+    По данным учета сторон на <b>30 сентября 2026 года</b> взаимная задолженность по счетам № 28 – № 40 <b>отсутствует (0,00 руб)</b>.<br>
+    Оплата от 22.09.2026 на сумму <b>240 000,00 руб</b> полностью закрыла счета № 33, 34, 35, 36, 37, 38.<br>
+    Оплата от 30.09.2026 на сумму <b>80 000,00 руб</b> полностью закрыла счета № 39 и № 40.
+  </div>
+
+  <div class="signatures">
+    <div class="sig-block">
+      <p><b>От ООО "ГЕОСТРОЙИНДУСТРИЯ"</b></p>
+      <p style="margin-top: 24px;">Директор <span class="sig-line"></span> (Ефременко А. В.)</p>
+      <p style="margin-top: 8px; color: #64748b;">М.П.</p>
+    </div>
+    <div class="sig-block">
+      <p><b>От ИП Нигамедьянов Александр Сергеевич</b></p>
+      <p style="margin-top: 24px;">ИП <span class="sig-line"></span> (Нигамедьянов А. С.)</p>
+      <p style="margin-top: 8px; color: #64748b;">М.П.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================================================================
+     ВАРИАНТ 2: ПОЛНАЯ СВЕРКА С УЧЕТОМ СЧЕТОВ 41–46
+     ========================================================================= -->
+<div id="view-full" class="sheet" style="display: block;">
+  <div class="doc-title">Акт сверки</div>
+  <div class="doc-period">взаимных расчетов за период: 02.09.2026 - 09.10.2026</div>
+  <div class="doc-parties">
+    между <b>ООО "ГЕОСТРОЙИНДУСТРИЯ"</b> (ИНН 7415089601)<br>
+    и <b>ИП Нигамедьянов Александр Сергеевич</b> (ИНН 660704814106)
+  </div>
+
+  <p class="preamble">
+    Мы, нижеподписавшиеся, Директор ООО "ГЕОСТРОЙИНДУСТРИЯ" Ефременко Арсений Викторович, с одной стороны, и ИП Нигамедьянов Александр Сергеевич, с другой стороны, составили настоящий акт сверки в том, что состояние взаимных расчетов по данным учета следующее:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th colspan="4" style="width: 50%; border-right: 2px solid #475569;">
+          По данным ООО "ГЕОСТРОЙИНДУСТРИЯ", руб.
+        </th>
+        <th colspan="4" style="width: 50%;">
+          По данным ИП Нигамедьянов Александр Сергеевич, руб.
+        </th>
+      </tr>
+      <tr>
+        <th style="width: 10%;">Дата</th>
+        <th style="width: 24%;">Документ</th>
+        <th style="width: 8%;">Дебет</th>
+        <th style="width: 8%; border-right: 2px solid #475569;">Кредит</th>
+        <th style="width: 10%;">Дата</th>
+        <th style="width: 24%;">Документ</th>
+        <th style="width: 8%;">Дебет</th>
+        <th style="width: 8%;">Кредит</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="bg-subtotal">
+        <td colspan="2"><b>Сальдо начальное на 02.09.2026</b></td>
+        <td class="num"></td>
+        <td class="num bold" style="border-right: 2px solid #475569;">0,00</td>
+        <td colspan="2"><b>Сальдо начальное на 02.09.2026</b></td>
+        <td class="num bold">0,00</td>
+        <td class="num"></td>
+      </tr>
+
+      <tr>
+        <td class="center">02.09.26</td>
+        <td>Приход (28 от 02.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">02.09.26</td>
+        <td>Акт / Счёт № 28 от 02.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">06.09.26</td>
+        <td>Приход (29 от 06.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">06.09.26</td>
+        <td>Акт / Счёт № 29 от 06.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">07.09.26</td>
+        <td>Приход (30 от 07.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">07.09.26</td>
+        <td>Акт / Счёт № 30 от 07.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">10.09.26</td>
+        <td>Приход (31 от 10.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">10.09.26</td>
+        <td>Акт / Счёт № 31 от 10.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #f0fdf4;">
+        <td class="center">11.09.26</td>
+        <td><b>Оплата (930 от 11.09.2026)</b></td>
+        <td class="num bold">130 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">11.09.26</td>
+        <td><b>Оплата (п/п 930 от 11.09.2026)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">130 000,00</td>
+      </tr>
+      <tr>
+        <td class="center">12.09.26</td>
+        <td>Приход (32 от 12.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">12.09.26</td>
+        <td>Акт / Счёт № 32 от 12.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">14.09.26</td>
+        <td>Приход (33 от 14.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">14.09.26</td>
+        <td>Акт / Счёт № 33 от 14.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">14.09.26</td>
+        <td>Приход (34 от 14.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">14.09.26</td>
+        <td>Акт / Счёт № 34 от 14.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #f0fdf4;">
+        <td class="center">14.09.26</td>
+        <td><b>Оплата (960 от 14.09.2026)</b></td>
+        <td class="num bold">80 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">14.09.26</td>
+        <td><b>Оплата (п/п 960 от 14.09.2026)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">80 000,00</td>
+      </tr>
+      <tr>
+        <td class="center">15.09.26</td>
+        <td>Приход (35 от 15.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">15.09.26</td>
+        <td>Акт / Счёт № 35 от 15.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">17.09.26</td>
+        <td>Приход (36 от 17.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">17.09.26</td>
+        <td>Акт / Счёт № 36 от 17.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">18.09.26</td>
+        <td>Приход (37 от 18.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">18.09.26</td>
+        <td>Акт / Счёт № 37 от 18.09.2026</td>
+        <td class="num">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">19.09.26</td>
+        <td>Приход (38 от 19.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">19.09.26</td>
+        <td>Акт / Счёт № 38 от 19.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="center">21.09.26</td>
+        <td>Приход (39 от 21.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">21.09.26</td>
+        <td>Акт / Счёт № 39 от 21.09.2026</td>
+        <td class="num">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #f0fdf4;">
+        <td class="center">22.09.26</td>
+        <td><b>Оплата от 22.09.2026</b></td>
+        <td class="num bold">240 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">22.09.26</td>
+        <td><b>Оплата от 22.09.2026 (счета 33–38)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">240 000,00</td>
+      </tr>
+      <tr>
+        <td class="center">24.09.26</td>
+        <td>Приход (40 от 24.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">24.09.26</td>
+        <td>Акт / Счёт № 40 от 24.09.2026</td>
+        <td class="num">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #f0fdf4;">
+        <td class="center">30.09.26</td>
+        <td><b>Оплата от 30.09.2026</b></td>
+        <td class="num bold">80 000,00</td>
+        <td class="num" style="border-right: 2px solid #475569;">—</td>
+        <td class="center">30.09.26</td>
+        <td><b>Оплата от 30.09.2026 (счета 39, 40)</b></td>
+        <td class="num">—</td>
+        <td class="num bold">80 000,00</td>
+      </tr>
+
+      <!-- Неоплаченные счета -->
+      <tr style="background: #fffbeb;">
+        <td class="center">28.09.26</td>
+        <td>Приход (41 от 28.09.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">28.09.26</td>
+        <td><b>Акт / Счёт № 41 от 28.09.2026</b></td>
+        <td class="num bold text-amber-700">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #fffbeb;">
+        <td class="center">01.10.26</td>
+        <td>Приход (43 от 01.10.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">15 000,00</td>
+        <td class="center">01.10.26</td>
+        <td><b>Акт / Счёт № 43 от 01.10.2026</b></td>
+        <td class="num bold text-amber-700">15 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #fffbeb;">
+        <td class="center">02.10.26</td>
+        <td>Приход (42 от 02.10.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">40 000,00</td>
+        <td class="center">02.10.26</td>
+        <td><b>Акт / Счёт № 42 от 02.10.2026</b></td>
+        <td class="num bold text-amber-700">40 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #fffbeb;">
+        <td class="center">06.10.26</td>
+        <td>Приход (44 от 06.10.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">06.10.26</td>
+        <td><b>Акт / Счёт № 44 от 06.10.2026</b></td>
+        <td class="num bold text-amber-700">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #fffbeb;">
+        <td class="center">07.10.26</td>
+        <td>Приход (45 от 07.10.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">30 000,00</td>
+        <td class="center">07.10.26</td>
+        <td><b>Акт / Счёт № 45 от 07.10.2026</b></td>
+        <td class="num bold text-amber-700">30 000,00</td>
+        <td class="num">—</td>
+      </tr>
+      <tr style="background: #fffbeb;">
+        <td class="center">09.10.26</td>
+        <td>Приход (46 от 09.10.2026)</td>
+        <td class="num">—</td>
+        <td class="num" style="border-right: 2px solid #475569;">50 000,00</td>
+        <td class="center">09.10.26</td>
+        <td><b>Акт / Счёт № 46 от 09.10.2026</b></td>
+        <td class="num bold text-amber-700">50 000,00</td>
+        <td class="num">—</td>
+      </tr>
+
+      <tr class="bg-subtotal" style="border-top: 2px solid #475569;">
+        <td colspan="2"><b>Обороты за период</b></td>
+        <td class="num bold">530 000,00</td>
+        <td class="num bold" style="border-right: 2px solid #475569;">765 000,00</td>
+        <td colspan="2"><b>Обороты за период</b></td>
+        <td class="num bold">765 000,00</td>
+        <td class="num bold">530 000,00</td>
+      </tr>
+
+      <tr class="bg-subtotal" style="background: #fef3c7;">
+        <td colspan="2"><b>Сальдо конечное на 09.10.2026</b></td>
+        <td class="num"></td>
+        <td class="num bold" style="border-right: 2px solid #475569; color: #b45309;">235 000,00</td>
+        <td colspan="2"><b>Сальдо конечное на 09.10.2026</b></td>
+        <td class="num bold" style="color: #b45309;">235 000,00</td>
+        <td class="num"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="conclusion">
+    По данным учета сторон на <b>09 октября 2026 года</b> задолженность в пользу <b>ИП Нигамедьянов Александр Сергеевич</b> составляет <b>235 000,00 руб</b> (Двести тридцать пять тысяч рублей 00 копеек).<br>
+    Неоплаченные счета:
+    <b>№ 41</b> (50 000 ₽), <b>№ 43</b> (15 000 ₽), <b>№ 42</b> (40 000 ₽), <b>№ 44</b> (50 000 ₽), <b>№ 45</b> (30 000 ₽), <b>№ 46</b> (50 000 ₽).
+  </div>
+
+  <div class="signatures">
+    <div class="sig-block">
+      <p><b>От ООО "ГЕОСТРОЙИНДУСТРИЯ"</b></p>
+      <p style="margin-top: 24px;">Директор <span class="sig-line"></span> (Ефременко А. В.)</p>
+      <p style="margin-top: 8px; color: #64748b;">М.П.</p>
+    </div>
+    <div class="sig-block">
+      <p><b>От ИП Нигамедьянов Александр Сергеевич</b></p>
+      <p style="margin-top: 24px;">ИП <span class="sig-line"></span> (Нигамедьянов А. С.)</p>
+      <p style="margin-top: 8px; color: #64748b;">М.П.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchView(view) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.sheet').forEach(sheet => sheet.style.display = 'none');
+    
+    if (view === 'settled') {
+      document.getElementById('tab-settled').classList.add('active');
+      document.getElementById('view-settled').style.display = 'block';
+    } else {
+      document.getElementById('tab-full').classList.add('active');
+      document.getElementById('view-full').style.display = 'block';
+    }
+  }
+</script>
+
+</body>
+</html>
