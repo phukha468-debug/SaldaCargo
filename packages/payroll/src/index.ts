@@ -11,6 +11,7 @@ export interface OrderDirectionItem {
   icon: string;
   category: 'local' | 'intercity';
   baseMachinePrice?: number;
+  isAutomatic?: boolean;
 }
 
 export const ORDER_DIRECTIONS: readonly OrderDirectionItem[] = [
@@ -69,55 +70,63 @@ export const ORDER_DIRECTIONS: readonly OrderDirectionItem[] = [
     icon: '🗺️',
     category: 'local',
     baseMachinePrice: 4000,
-  },
-  {
-    id: 'ekb',
-    label: 'Екатеринбург',
-    desc: 'Прямой рейс',
-    icon: '🏢',
-    category: 'intercity',
+    isAutomatic: true,
   },
   {
     id: 'tagil_vagonka',
     label: 'Тагил · Вагонка',
-    desc: 'Дзержинский район',
+    desc: 'Дзержинский район (авторасчёт)',
     icon: '🏭',
     category: 'intercity',
+    isAutomatic: true,
   },
   {
     id: 'tagil_tagilstroy',
     label: 'Тагил · Тагилстрой',
-    desc: 'Тагилстроевский район',
+    desc: 'Тагилстроевский район (авторасчёт)',
     icon: '🏭',
     category: 'intercity',
+    isAutomatic: true,
   },
   {
     id: 'tagil_galinka',
     label: 'Тагил · Центр / ГГМ',
-    desc: 'Гальянка, Выя, Кр. Камень, Ленинский',
+    desc: 'Гальянка, Выя, Кр. Камень (авторасчёт)',
     icon: '🏭',
     category: 'intercity',
+    isAutomatic: true,
+  },
+  {
+    id: 'ekb',
+    label: 'Екатеринбург',
+    desc: 'Прямой рейс (ручной ввод ЗП)',
+    icon: '🏢',
+    category: 'intercity',
+    isAutomatic: false,
   },
   {
     id: 'perm',
     label: 'Пермь',
-    desc: 'Межгород',
+    desc: 'Межгород (авторасчёт)',
     icon: '🌲',
     category: 'intercity',
+    isAutomatic: true,
   },
   {
     id: 'chelyabinsk',
     label: 'Челябинск',
-    desc: 'Межгород',
+    desc: 'Межгород (авторасчёт)',
     icon: '🏭',
     category: 'intercity',
+    isAutomatic: true,
   },
   {
     id: 'other',
     label: 'Другой город',
-    desc: 'Межгород по км + суточные',
+    desc: 'Межгород по км (авторасчёт)',
     icon: '🗺️',
     category: 'intercity',
+    isAutomatic: true,
   },
   {
     id: 'loaders_only',
@@ -126,6 +135,7 @@ export const ORDER_DIRECTIONS: readonly OrderDirectionItem[] = [
     icon: '👷',
     category: 'local',
     baseMachinePrice: 0,
+    isAutomatic: true,
   },
 ] as const;
 
@@ -139,10 +149,10 @@ export const DIRECTION_LABELS: Record<string, string> = {
   neloba: '🌲 Нелоба',
   basyanovka: '🏭 Басьяновка',
   akinfievo: '🗺️ Акинфьево',
-  ekb: '🏢 Екатеринбург',
   tagil_vagonka: '🏭 Тагил (Вагонка)',
   tagil_tagilstroy: '🏭 Тагил (Тагилстрой)',
   tagil_galinka: '🏭 Тагил (Центр/ГГМ)',
+  ekb: '🏢 Екатеринбург',
   perm: '🌲 Пермь',
   chelyabinsk: '🏭 Челябинск',
   other: '🗺️ Другой город',
@@ -153,9 +163,17 @@ export function getDirectionLabel(id: string): string {
   return DIRECTION_LABELS[id] || '🏙️ По городу';
 }
 
+/**
+ * Определяет, рассчитывается ли направление автоматически.
+ * Екатеринбург ('ekb') — единственный город с ручным вводом ЗП водителя.
+ * Все остальные направления (включая Нижний Тагил) рассчитываются автоматически.
+ */
+export function isAutomaticDirection(id: string): boolean {
+  return id !== 'ekb';
+}
+
 export function isLocalDirection(id: string): boolean {
-  const dir = ORDER_DIRECTIONS.find((d) => d.id === id);
-  return dir ? dir.category === 'local' : id === 'local';
+  return isAutomaticDirection(id);
 }
 
 export function getDirectionBasePrice(id: string, customLocalBase?: number): number {

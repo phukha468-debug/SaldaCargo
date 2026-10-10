@@ -121,7 +121,37 @@ const t12 = calculateOrderPayroll({
   loadersCount: 0,
 });
 console.log('T12 (15000, ekb intercity):', t12);
-assert(t12.isAutomatic === false, 'T12 isAutomatic should be false for intercity');
+assert(t12.isAutomatic === false, 'T12 isAutomatic should be false for intercity ekb');
+
+// 12.1. Тагил (Вагонка): теперь рассчитывается автоматически (30% водителю за авто)
+const t12_1 = calculateOrderPayroll({
+  direction: 'tagil_vagonka',
+  amount: 4500,
+  isDriverLoader: false,
+  loadersCount: 0,
+});
+console.log('T12.1 (4500, tagil_vagonka automatic):', t12_1);
+assert(t12_1.isAutomatic === true, 'T12.1 tagil_vagonka should be automatic');
+assert(t12_1.driverCarPay === 1350, 'T12.1 driverCarPay should be 1350 (30% of 4500)');
+assert(t12_1.driverTotalPay === 1350, 'T12.1 driverTotalPay should be 1350');
+assert(t12_1.companyShare === 3150, 'T12.1 companyShare should be 3150 (70% of 4500)');
+
+// 12.2. Тагил с погрузкой: общая сумма 6000 ₽, погрузка 2000 ₽ (водитель работал грузчиком)
+const t12_2 = calculateOrderPayroll({
+  direction: 'tagil_vagonka',
+  amount: 6000,
+  loadingAmount: 2000,
+  isDriverLoader: true,
+  loadersCount: 0,
+});
+console.log('T12.2 (6000, tagil_vagonka loading 2000):', t12_2);
+assert(t12_2.isAutomatic === true, 'T12.2 tagil_vagonka with loading should be automatic');
+assert(t12_2.machinePool === 4000, 'T12.2 machinePool should be 4000 (6000 - 2000)');
+assert(t12_2.loadersPool === 2000, 'T12.2 loadersPool should be 2000');
+assert(t12_2.driverCarPay === 1200, 'T12.2 driverCarPay should be 1200 (30% of 4000)');
+assert(t12_2.driverLoaderPay === 1400, 'T12.2 driverLoaderPay should be 1400 (70% of 2000)');
+assert(t12_2.driverTotalPay === 2600, 'T12.2 driverTotalPay should be 2600 (1200 + 1400)');
+assert(t12_2.companyShare === 3400, 'T12.2 companyShare should be 3400');
 
 // 13. Кейс пользователя: 4000 ₽ всего, в т.ч. 3000 ₽ погрузка (водитель-грузчик)
 // Машина = 4000 - 3000 = 1000 ₽ -> ЗП авто = 300 ₽, ЗП погрузка = 2100 ₽, всего = 2400 ₽

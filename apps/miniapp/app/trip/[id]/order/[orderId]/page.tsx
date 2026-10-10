@@ -989,9 +989,13 @@ export default function EditOrderPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {dir.baseMachinePrice && (
+                          {dir.baseMachinePrice ? (
                             <span className="text-xs font-black text-zinc-700 bg-zinc-100 px-2.5 py-1 rounded-lg">
                               {dir.baseMachinePrice} ₽
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                              ⚡ Авто
                             </span>
                           )}
                           {isSelected && (
@@ -1006,12 +1010,12 @@ export default function EditOrderPage() {
                 )}
               </div>
 
-              {/* Межгород */}
+              {/* Нижний Тагил */}
               <div className="space-y-2">
-                <div className="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">
-                  🚚 Межгород
+                <div className="text-[10px] font-black uppercase tracking-wider text-blue-600 px-1">
+                  🏭 Нижний Тагил (авторасчёт)
                 </div>
-                {ORDER_DIRECTIONS.filter((d) => d.category === 'intercity').map(
+                {ORDER_DIRECTIONS.filter((d) => d.id.startsWith('tagil_')).map(
                   (dir: OrderDirectionItem) => {
                     const isSelected = direction === dir.id;
                     return (
@@ -1035,15 +1039,72 @@ export default function EditOrderPage() {
                             <div className="text-xs font-bold text-zinc-400">{dir.desc}</div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                            ⚡ Авто (30%)
+                          </span>
+                          {isSelected && (
+                            <span className="text-xs font-black text-orange-600 bg-orange-100 px-2 py-1 rounded-lg uppercase">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+
+              {/* Межгород */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">
+                  🚚 Межгород
+                </div>
+                {ORDER_DIRECTIONS.filter(
+                  (d) => d.category === 'intercity' && !d.id.startsWith('tagil_'),
+                ).map((dir: OrderDirectionItem) => {
+                  const isSelected = direction === dir.id;
+                  const isEkb = dir.id === 'ekb';
+                  return (
+                    <button
+                      key={dir.id}
+                      type="button"
+                      onClick={() => {
+                        setDirection(dir.id);
+                        setShowDirectionPicker(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'border-orange-500 bg-orange-50 shadow-sm'
+                          : 'border-zinc-100 hover:border-orange-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{dir.icon}</span>
+                        <div>
+                          <div className="font-black text-zinc-900 text-sm">{dir.label}</div>
+                          <div className="text-xs font-bold text-zinc-400">{dir.desc}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isEkb ? (
+                          <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                            ✍️ Ручной ввод
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                            ⚡ Авто (30%)
+                          </span>
+                        )}
                         {isSelected && (
                           <span className="text-xs font-black text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
                             Выбрано
                           </span>
                         )}
-                      </button>
-                    );
-                  },
-                )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
