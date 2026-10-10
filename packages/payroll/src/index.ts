@@ -121,8 +121,8 @@ export const ORDER_DIRECTIONS: readonly OrderDirectionItem[] = [
   },
   {
     id: 'loaders_only',
-    label: 'Погрузо-разгрузочные работы (без авто)',
-    desc: 'Только грузчики (70% грузчикам, 30% компании)',
+    label: 'Погрузо-разгрузочные работы',
+    desc: 'Только грузчики (ПРР)',
     icon: '👷',
     category: 'local',
     baseMachinePrice: 0,

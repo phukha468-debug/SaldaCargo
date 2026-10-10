@@ -287,6 +287,10 @@ export default function EditOrderPage() {
       setError('Укажите клиента перед сохранением');
       return;
     }
+    if (isLoadersOnly && loaders.length === 0) {
+      setError('Добавьте хоть 1 грузчика');
+      return;
+    }
     if (data.payment_method === 'cash' && isNoCashCounterparty(selectedCounterparty)) {
       setError(
         `Для клиента «${selectedCounterparty?.name}» оплата наличными запрещена. Заказ оформляется только в долг (дебиторка) или по QR-коду.`,
@@ -399,16 +403,15 @@ export default function EditOrderPage() {
           <button
             type="button"
             onClick={() => setShowDirectionPicker(true)}
-            className="w-full text-left p-3.5 rounded-2xl border-2 border-orange-200 bg-orange-50/50 hover:bg-orange-50 flex items-center justify-between transition-all active:scale-[0.99]"
+            className="w-full text-left px-4 h-14 rounded-xl border-2 border-orange-200 bg-orange-50/50 hover:bg-orange-50 flex items-center justify-between transition-all active:scale-[0.99]"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{currentDirectionObj.icon}</span>
-              <div>
-                <div className="font-black text-zinc-900 text-sm">{currentDirectionObj.label}</div>
-                <div className="text-xs font-bold text-zinc-500">{currentDirectionObj.desc}</div>
-              </div>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-xl shrink-0">{currentDirectionObj.icon}</span>
+              <span className="font-black text-zinc-900 text-sm truncate">
+                {isLoadersOnly ? 'Погрузо-разгрузочные работы' : currentDirectionObj.label}
+              </span>
             </div>
-            <span className="text-xs font-black uppercase text-orange-600 bg-orange-100 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-black uppercase text-orange-600 bg-orange-100 px-2.5 py-1 rounded-lg shrink-0">
               Изменить
             </span>
           </button>
@@ -668,6 +671,13 @@ export default function EditOrderPage() {
             <span className="text-lg">+</span>
             <span>Добавить грузчика из списка</span>
           </button>
+
+          {isLoadersOnly && loaders.length === 0 && (
+            <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-3 text-rose-700 text-xs font-black uppercase tracking-wide flex items-center gap-2">
+              <span className="text-base leading-none">⚠️</span>
+              <span>Добавьте хоть 1 грузчика</span>
+            </div>
+          )}
         </div>
 
         {/* ── Сумма за погрузку (только для рейсов с автомобилем) ── */}
@@ -706,14 +716,13 @@ export default function EditOrderPage() {
           <div className="bg-zinc-900 text-white rounded-2xl p-4 space-y-3 shadow-md">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
               <span className="text-xs font-black uppercase tracking-wider text-orange-400">
-                ⚡ Расчёт ПРР (без авто)
+                ⚡ Расчёт ПРР
               </span>
-              <span className="text-xs font-bold text-zinc-400">70% / 30%</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">👥 Грузчикам (70%)</div>
+                <div className="text-zinc-400 font-bold">👥 Грузчикам</div>
                 <div className="text-base font-black text-blue-400 mt-0.5">
                   {payroll.totalLoadersPay.toLocaleString('ru-RU')} ₽
                 </div>
@@ -725,7 +734,7 @@ export default function EditOrderPage() {
               </div>
 
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">🏢 Компании (30%)</div>
+                <div className="text-zinc-400 font-bold">🏢 Компании</div>
                 <div className="text-base font-black text-emerald-400 mt-0.5">
                   {payroll.companyShare.toLocaleString('ru-RU')} ₽
                 </div>
@@ -735,9 +744,7 @@ export default function EditOrderPage() {
 
             {loaders.length === 0 ? (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-center">
-                <p className="text-xs font-bold text-amber-300">
-                  ⚠️ Добавьте грузчиков кнопкой выше для распределения ЗП
-                </p>
+                <p className="text-xs font-bold text-amber-300">⚠️ Добавьте хоть 1 грузчика</p>
               </div>
             ) : (
               <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
