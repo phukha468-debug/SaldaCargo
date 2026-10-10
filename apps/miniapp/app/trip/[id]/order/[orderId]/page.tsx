@@ -459,18 +459,15 @@ export default function EditOrderPage() {
                 <button
                   type="button"
                   onClick={() => selectCounterparty(genericClient)}
-                  className="w-full p-3.5 rounded-xl border-2 border-orange-500 bg-orange-50 hover:bg-orange-100 flex items-center justify-between text-left transition-all active:scale-[0.99] shadow-sm"
+                  className="w-full px-3.5 h-10 rounded-xl border-2 border-orange-500 bg-orange-50 hover:bg-orange-100 flex items-center justify-between text-left transition-all active:scale-[0.99] shadow-xs"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">👤</span>
-                    <div>
-                      <div className="font-black text-sm text-orange-950">{genericClient.name}</div>
-                      <div className="text-[11px] font-bold text-orange-700">
-                        Обычный разовый заказ (детали укажите в примечании)
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base shrink-0">👤</span>
+                    <span className="font-black text-sm text-orange-950 truncate">
+                      {genericClient.name}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-black uppercase text-white bg-orange-600 px-3 py-1.5 rounded-lg shadow-xs">
+                  <span className="text-[10px] font-black uppercase text-white bg-orange-600 px-2.5 py-1 rounded-md shadow-xs shrink-0">
                     Выбрать
                   </span>
                 </button>

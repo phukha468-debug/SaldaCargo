@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatDuration } from '@saldacargo/shared';
-import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 type TripCard = {
   id: string;
@@ -35,214 +34,6 @@ interface DriverSummary {
   monthPayApproved: string;
   monthPayDraft: string;
   pendingPayrollCount: number;
-}
-
-// ── Форма заявки на ремонт ───────────────────────────────────
-
-interface FaultCatalogItem {
-  id: string;
-  name: string;
-  category: string;
-}
-
-function RepairForm({ onClose, onSubmitted }: { onClose: () => void; onSubmitted: () => void }) {
-  const [assetId, setAssetId] = useState('');
-  const [faultId, setFaultId] = useState('');
-  const [customDescription, setCustomDescription] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-
-  useEffect(() => {
-    const y = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${y}px`;
-    document.body.style.width = '100%';
-    return () => {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, y);
-    };
-  }, []);
-
-  const { data: assets = [] } = useQuery<
-    Array<{ id: string; short_name: string; reg_number: string }>
-  >({
-    queryKey: ['driver-assets'],
-    queryFn: () =>
-      fetch('/api/driver/assets')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 300000,
-  });
-
-  const { data: faultCatalog = [] } = useQuery<FaultCatalogItem[]>({
-    queryKey: ['fault-catalog'],
-    queryFn: () => fetch('/api/driver/fault-catalog').then((r) => r.json()),
-    staleTime: 600000,
-  });
-
-  const faultsByCategory = faultCatalog.reduce<Record<string, FaultCatalogItem[]>>((acc, f) => {
-    (acc[f.category] ??= []).push(f);
-    return acc;
-  }, {});
-
-  const submit = async () => {
-    if (!assetId) {
-      setError('Выберите автомобиль');
-      return;
-    }
-    if (!faultId && !customDescription.trim()) {
-      setError('Выберите неисправность из каталога или опишите проблему');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    const res = await fetch('/api/driver/repair-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        asset_id: assetId,
-        fault_catalog_id: faultId || undefined,
-        custom_description: customDescription.trim() || undefined,
-        idempotency_key: idempotencyKey,
-      }),
-    });
-    const json = await res.json();
-    setSaving(false);
-    if (!res.ok) {
-      setError(json.error ?? 'Ошибка');
-      return;
-    }
-    onSubmitted();
-  };
-
-  const inputCls =
-    'w-full border border-zinc-200 rounded-xl px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-zinc-400 transition-all';
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{
-        background: 'rgba(0,0,0,0.5)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="bg-white rounded-t-3xl shadow-2xl"
-        style={
-          {
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            maxHeight: 'calc(100vh - 80px)',
-          } as React.CSSProperties
-        }
-      >
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-zinc-200 rounded-full" />
-        </div>
-        <div className="px-4 pt-1 pb-3 border-b border-zinc-100 flex items-center justify-between">
-          <div>
-            <h2 className="font-black text-zinc-900 text-base">🔧 Заявка на ремонт</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">Администратор направит механика</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 text-xl font-bold active:bg-zinc-200"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="px-4 pt-4 pb-6 space-y-4">
-          {/* Машина */}
-          <div>
-            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-              Автомобиль
-            </label>
-            <select
-              className={inputCls}
-              value={assetId}
-              onChange={(e) => setAssetId(e.target.value)}
-            >
-              <option value="">— Выбери машину —</option>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.short_name}
-                  {a.reg_number ? ` · ${a.reg_number}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Каталог неисправностей */}
-          <div>
-            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-              Тип неисправности
-            </label>
-            <select
-              className={inputCls}
-              value={faultId}
-              onChange={(e) => setFaultId(e.target.value)}
-            >
-              <option value="">— Не в каталоге / выбрать —</option>
-              {Object.entries(faultsByCategory).map(([cat, items]) => (
-                <optgroup key={cat} label={cat}>
-                  {items.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          {/* Своё описание */}
-          <div>
-            <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
-              {faultId ? 'Уточнение (необязательно)' : 'Что случилось?'}
-            </label>
-            <textarea
-              value={customDescription}
-              onChange={(e) => setCustomDescription(e.target.value)}
-              rows={3}
-              placeholder={
-                faultId
-                  ? 'Подробности, симптомы...'
-                  : 'Опиши проблему: что не работает, когда появилось...'
-              }
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-rose-700 font-medium bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              onClick={submit}
-              disabled={saving}
-              className="flex-1 bg-zinc-900 text-white font-black py-4 rounded-2xl active:bg-zinc-700 disabled:opacity-50 transition-all text-sm"
-            >
-              {saving ? 'Отправка...' : 'Отправить заявку'}
-            </button>
-            <button
-              onClick={onClose}
-              className="px-5 text-sm text-zinc-500 border border-zinc-200 rounded-2xl active:bg-zinc-50 font-bold"
-            >
-              Отмена
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Карточка заявки на ремонт ────────────────────────────────
@@ -326,16 +117,19 @@ function RepairRequestsList() {
 export default function RootPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [showRepairForm, setShowRepairForm] = useState(false);
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
   const [startTripError, setStartTripError] = useState('');
-  const [showPrrModal, setShowPrrModal] = useState(false);
 
   // 1. Проверяем профиль и роли
-  const { data: user, isLoading: isUserLoading } = useQuery({
+  const { data: user, isLoading: isUserLoading } = useQuery<{
+    id: string;
+    name: string;
+    roles?: string[];
+    current_asset_id?: string | null;
+  }>({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await fetch('/api/driver/me');
@@ -355,6 +149,16 @@ export default function RootPage() {
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 300000,
+  });
+
+  const isPrrAdmin =
+    (user?.roles || []).includes('admin') ||
+    (user?.roles || []).includes('owner') ||
+    Boolean(user?.name && /Нигамед|Шахмаев|Роман.*Радик|Радикович/i.test(user.name));
+
+  const availableVehicles = vehicles.filter((v) => {
+    const isPrr = v.reg_number === 'БЕЗ АВТО' || v.short_name?.toLowerCase().includes('без авто');
+    return isPrr ? isPrrAdmin : true;
   });
 
   useEffect(() => {
@@ -397,7 +201,9 @@ export default function RootPage() {
     user?.current_asset_id ||
     (typeof window !== 'undefined' ? localStorage.getItem('active_vehicle_id') : null);
 
-  const activeAsset = vehicles.find((v) => v.id === activeAssetId);
+  const activeAsset =
+    availableVehicles.find((v) => v.id === activeAssetId) ||
+    vehicles.find((v) => v.id === activeAssetId);
 
   useEffect(() => {
     if (showVehiclePicker) {
@@ -544,40 +350,17 @@ export default function RootPage() {
         </div>
       )}
 
-      {/* Кнопки действий */}
-      <div className="space-y-2.5">
-        <div className="flex gap-3">
-          {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
-            <button
-              onClick={handleStartTrip}
-              disabled={startingTrip}
-              className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white rounded-lg py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
-            >
-              <span>🚚</span>
-              <span>{startingTrip ? 'Создаём рейс...' : 'Начать рейс'}</span>
-            </button>
-          )}
-          <button
-            onClick={() => setShowRepairForm(true)}
-            className={cn(
-              'flex items-center justify-center gap-2 bg-zinc-800 text-white rounded-lg py-5 font-black shadow-lg active:bg-zinc-700 active:scale-[0.98] transition-all uppercase tracking-wide text-base',
-              data?.activeTrip || (data?.reviewTrips ?? []).length > 0 ? 'flex-1' : 'px-5',
-            )}
-          >
-            <span>🔧</span>
-            {(data?.activeTrip || (data?.reviewTrips ?? []).length > 0) && <span>Починить</span>}
-          </button>
-        </div>
-
-        {/* Кнопка создания ПРР (без авто) */}
+      {/* Кнопка начала рейса */}
+      {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
         <button
-          onClick={() => setShowPrrModal(true)}
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl py-3.5 px-4 font-black shadow-sm active:scale-[0.98] transition-all uppercase tracking-wider text-xs"
+          onClick={handleStartTrip}
+          disabled={startingTrip}
+          className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
         >
-          <span className="text-base">👷</span>
-          <span>Погрузо-разгрузочные работы (без авто)</span>
+          <span>🚚</span>
+          <span>{startingTrip ? 'Создаём рейс...' : 'Начать рейс'}</span>
         </button>
-      </div>
+      )}
       {startTripError && (
         <div className="bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm font-bold">
           {startTripError}
@@ -611,12 +394,12 @@ export default function RootPage() {
               </button>
             </div>
             <div className="p-4 space-y-2 overflow-y-auto max-h-[50vh]">
-              {vehicles.length === 0 ? (
+              {availableVehicles.length === 0 ? (
                 <p className="text-zinc-400 font-bold text-sm text-center py-4">
                   Загрузка машин...
                 </p>
               ) : (
-                vehicles.map((v) => {
+                availableVehicles.map((v) => {
                   const isSelected = (selectedVehicleId ?? activeAssetId) === v.id;
                   return (
                     <button
@@ -648,7 +431,7 @@ export default function RootPage() {
                 })
               )}
             </div>
-            {vehicles.length > 0 && (
+            {availableVehicles.length > 0 && (
               <div className="p-4 border-t border-zinc-100 bg-white flex-shrink-0">
                 <button
                   type="button"
@@ -665,16 +448,6 @@ export default function RootPage() {
             )}
           </div>
         </div>
-      )}
-
-      {showRepairForm && (
-        <RepairForm
-          onClose={() => setShowRepairForm(false)}
-          onSubmitted={() => {
-            setShowRepairForm(false);
-            queryClient.invalidateQueries({ queryKey: ['driver-repair-requests'] });
-          }}
-        />
       )}
 
       {/* Активный рейс */}
@@ -710,17 +483,6 @@ export default function RootPage() {
 
       {/* Заявки на ремонт */}
       <RepairRequestsList />
-
-      {/* Модалка создания ПРР (без авто) */}
-      <CreatePrrModal
-        isOpen={showPrrModal}
-        onClose={() => setShowPrrModal(false)}
-        defaultCreatorId={user?.id}
-        role="driver"
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
-        }}
-      />
     </div>
   );
 }
