@@ -10,11 +10,6 @@ const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
 const sum = (rows: any[]) =>
   (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
-const sumWhere = (rows: any[], key: string, val: string) =>
-  (rows ?? [])
-    .filter((r: any) => r[key] === val)
-    .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
-
 /**
  * GET /api/finance/reconcile — Полная финансовая ревизия активов, пассивов и капитала
  */
@@ -25,8 +20,14 @@ export async function GET() {
     const [
       { data: bankOrders },
       { data: collections },
-      { data: txIn },
-      { data: txOut },
+      { data: bankIn },
+      { data: bankOut },
+      { data: cashIn },
+      { data: cashOut },
+      { data: fuelIn },
+      { data: fuelOut },
+      { data: garageIn },
+      { data: garageOut },
       { data: loans },
       { data: receivables },
       { data: supplierDebts },
@@ -40,14 +41,50 @@ export async function GET() {
       (supabase.from('cash_collections') as any).select('amount'),
 
       (supabase.from('transactions') as any)
-        .select('amount, to_wallet_id')
-        .in('to_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
+        .select('amount')
+        .eq('to_wallet_id', BANK_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
 
       (supabase.from('transactions') as any)
-        .select('amount, from_wallet_id')
-        .in('from_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
+        .select('amount')
+        .eq('from_wallet_id', BANK_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', CASH_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', CASH_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', FUEL_CARD_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', FUEL_CARD_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', GARAGE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', GARAGE_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
 
@@ -64,23 +101,13 @@ export async function GET() {
 
     const collectionsTotal = sum(collections ?? []);
 
-    const bankBalance =
-      sum(bankOrders ?? []) +
-      sumWhere(txIn ?? [], 'to_wallet_id', BANK_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', BANK_ID);
+    const bankBalance = sum(bankOrders ?? []) + sum(bankIn ?? []) - sum(bankOut ?? []);
 
-    const cashBalance =
-      collectionsTotal +
-      sumWhere(txIn ?? [], 'to_wallet_id', CASH_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', CASH_ID);
+    const cashBalance = collectionsTotal + sum(cashIn ?? []) - sum(cashOut ?? []);
 
-    const fuelBalance =
-      sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
+    const fuelBalance = sum(fuelIn ?? []) - sum(fuelOut ?? []);
 
-    const garageBalance =
-      sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID);
+    const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
     const totalLiquid = bankBalance + cashBalance + fuelBalance + garageBalance;
 

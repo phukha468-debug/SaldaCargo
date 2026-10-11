@@ -15,11 +15,6 @@ const TBANK_FALLBACK_TOKEN =
 const sum = (rows: any[]) =>
   (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
-const sumWhere = (rows: any[], key: string, val: string, excludeOrderTx = false) =>
-  (rows ?? [])
-    .filter((r: any) => r[key] === val && (!excludeOrderTx || !r.trip_order_id))
-    .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
-
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -102,54 +97,92 @@ export async function GET() {
 
     const supabase = createAdminClient();
 
-    const [{ data: bankOrders }, { data: collections }, { data: txIn }, { data: txOut }] =
-      await Promise.all([
-        // Р/С: bank_invoice + qr (оплаченные)
-        (supabase.from('trip_orders') as any)
-          .select('amount')
-          .in('payment_method', ['bank_invoice', 'qr'])
-          .eq('settlement_status', 'completed')
-          .eq('lifecycle_status', 'approved'),
+    const [
+      { data: bankOrders },
+      { data: collections },
+      { data: bankIn },
+      { data: bankOut },
+      { data: cashIn },
+      { data: cashOut },
+      { data: fuelIn },
+      { data: fuelOut },
+      { data: garageIn },
+      { data: garageOut },
+    ] = await Promise.all([
+      // Р/С: bank_invoice + qr (оплаченные)
+      (supabase.from('trip_orders') as any)
+        .select('amount')
+        .in('payment_method', ['bank_invoice', 'qr'])
+        .eq('settlement_status', 'completed')
+        .eq('lifecycle_status', 'approved'),
 
-        // Инкассации → Сейф
-        (supabase.from('cash_collections') as any).select('amount'),
+      // Инкассации → Сейф
+      (supabase.from('cash_collections') as any).select('amount'),
 
-        // Входящие транзакции на кошельки (переводы, прямые доходы)
-        (supabase.from('transactions') as any)
-          .select('amount, to_wallet_id, trip_order_id')
-          .in('to_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount, trip_order_id')
+        .eq('to_wallet_id', BANK_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
 
-        // Исходящие транзакции из кошельков
-        (supabase.from('transactions') as any)
-          .select('amount, from_wallet_id')
-          .in('from_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-      ]);
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', BANK_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', CASH_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', CASH_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', FUEL_CARD_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', FUEL_CARD_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', GARAGE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', GARAGE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+    ]);
 
     const collectionsTotal = sum(collections ?? []);
 
-    const fallbackBankBalance =
-      sum(bankOrders ?? []) +
-      sumWhere(txIn ?? [], 'to_wallet_id', BANK_ID, true) -
-      sumWhere(txOut ?? [], 'from_wallet_id', BANK_ID);
+    const bankInWithoutOrders = (bankIn ?? [])
+      .filter((r: any) => !r.trip_order_id)
+      .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
+
+    const fallbackBankBalance = sum(bankOrders ?? []) + bankInWithoutOrders - sum(bankOut ?? []);
 
     const bankBalance = apiBalance !== null ? apiBalance : fallbackBankBalance;
 
-    const cashBalance =
-      collectionsTotal +
-      sumWhere(txIn ?? [], 'to_wallet_id', CASH_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', CASH_ID);
+    const cashBalance = collectionsTotal + sum(cashIn ?? []) - sum(cashOut ?? []);
 
-    const fuelBalance =
-      sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
+    const fuelBalance = sum(fuelIn ?? []) - sum(fuelOut ?? []);
 
-    const garageBalance =
-      sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
-      sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID);
+    const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
     return NextResponse.json(
       {

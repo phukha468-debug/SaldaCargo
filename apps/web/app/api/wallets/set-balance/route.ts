@@ -11,10 +11,6 @@ const WALLET_IDS: Record<string, string> = {
 
 const sum = (rows: any[]) =>
   (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
-const sumWhere = (rows: any[], key: string, val: string) =>
-  (rows ?? [])
-    .filter((r: any) => r[key] === val)
-    .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
 
 /** POST /api/wallets/set-balance — установить баланс кошелька через корректировочную транзакцию */
 export async function POST(request: Request) {
@@ -48,43 +44,73 @@ export async function POST(request: Request) {
     const FUEL_CARD_ID = WALLET_IDS.fuel_card!;
     const GARAGE_ID = WALLET_IDS.garage!;
 
-    const [{ data: bankOrders }, { data: collections }, { data: txIn }, { data: txOut }] =
-      await Promise.all([
-        (supabase.from('trip_orders') as any)
-          .select('amount')
-          .in('payment_method', ['bank_invoice', 'qr'])
-          .eq('settlement_status', 'completed')
-          .eq('lifecycle_status', 'approved'),
-        (supabase.from('cash_collections') as any).select('amount'),
-        (supabase.from('transactions') as any)
-          .select('amount, to_wallet_id')
-          .in('to_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-        (supabase.from('transactions') as any)
-          .select('amount, from_wallet_id')
-          .in('from_wallet_id', [BANK_ID, CASH_ID, FUEL_CARD_ID, GARAGE_ID])
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-      ]);
+    const [
+      { data: bankOrders },
+      { data: collections },
+      { data: bankIn },
+      { data: bankOut },
+      { data: cashIn },
+      { data: cashOut },
+      { data: fuelIn },
+      { data: fuelOut },
+      { data: garageIn },
+      { data: garageOut },
+    ] = await Promise.all([
+      (supabase.from('trip_orders') as any)
+        .select('amount')
+        .in('payment_method', ['bank_invoice', 'qr'])
+        .eq('settlement_status', 'completed')
+        .eq('lifecycle_status', 'approved'),
+      (supabase.from('cash_collections') as any).select('amount'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', BANK_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', BANK_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', CASH_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', CASH_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', FUEL_CARD_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', FUEL_CARD_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', GARAGE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', GARAGE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+    ]);
 
     const collectionsTotal = sum(collections ?? []);
 
     const currentBalances: Record<string, number> = {
-      bank:
-        sum(bankOrders ?? []) +
-        sumWhere(txIn ?? [], 'to_wallet_id', BANK_ID) -
-        sumWhere(txOut ?? [], 'from_wallet_id', BANK_ID),
-      cash:
-        collectionsTotal +
-        sumWhere(txIn ?? [], 'to_wallet_id', CASH_ID) -
-        sumWhere(txOut ?? [], 'from_wallet_id', CASH_ID),
-      fuel_card:
-        sumWhere(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
-        sumWhere(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID),
-      garage:
-        sumWhere(txIn ?? [], 'to_wallet_id', GARAGE_ID) -
-        sumWhere(txOut ?? [], 'from_wallet_id', GARAGE_ID),
+      bank: sum(bankOrders ?? []) + sum(bankIn ?? []) - sum(bankOut ?? []),
+      cash: collectionsTotal + sum(cashIn ?? []) - sum(cashOut ?? []),
+      fuel_card: sum(fuelIn ?? []) - sum(fuelOut ?? []),
+      garage: sum(garageIn ?? []) - sum(garageOut ?? []),
     };
 
     const current = currentBalances[wallet] ?? 0;
