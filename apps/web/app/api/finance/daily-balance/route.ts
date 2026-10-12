@@ -222,13 +222,41 @@ export async function GET(request: Request) {
     }
 
     const eveningBankCalc = morningBank + bankDayIn - bankDayOut;
-    const eveningCashCalc = morningCash + cashDayIn - cashDayOut;
-    const eveningFuelCalc = morningFuel + fuelDayIn - fuelDayOut;
-
     const actualEveningBank = isToday && apiBalance !== null ? apiBalance : eveningBankCalc;
     // Для сегодняшнего дня при известном текущем балансе из API утро = вечер - приход + расход
     const actualMorningBank =
       isToday && apiBalance !== null ? actualEveningBank - bankDayIn + bankDayOut : morningBank;
+
+    // Фактические остатки сейфа (27 500 ₽) и топливной карты (6 642,05 ₽),
+    // зафиксированные директором, отсекающие старые виртуальные накопления из прошлых периодов
+    const BASE_ACTUAL_CASH = 27500.0;
+    const BASE_ACTUAL_FUEL = 6642.05;
+
+    let actualEveningCash = morningCash + cashDayIn - cashDayOut;
+    let actualMorningCash = morningCash;
+
+    if (auditRow && auditRow.safe_cash_actual !== undefined && auditRow.safe_cash_actual !== null) {
+      actualEveningCash = Number(auditRow.safe_cash_actual);
+      actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
+    } else if (isToday) {
+      actualEveningCash = BASE_ACTUAL_CASH;
+      actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
+    }
+
+    let actualEveningFuel = morningFuel + fuelDayIn - fuelDayOut;
+    let actualMorningFuel = morningFuel;
+
+    if (
+      auditRow &&
+      auditRow.fuel_card_balance !== undefined &&
+      auditRow.fuel_card_balance !== null
+    ) {
+      actualEveningFuel = Number(auditRow.fuel_card_balance);
+      actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
+    } else if (isToday) {
+      actualEveningFuel = BASE_ACTUAL_FUEL;
+      actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
+    }
 
     return NextResponse.json({
       date,
@@ -247,18 +275,18 @@ export async function GET(request: Request) {
         cash: {
           id: CASH_ID,
           name: 'Сейф (Наличные)',
-          morning: morningCash,
+          morning: actualMorningCash,
           inflow: cashDayIn,
           outflow: cashDayOut,
-          evening: eveningCashCalc,
+          evening: actualEveningCash,
         },
         fuel_card: {
           id: FUEL_CARD_ID,
           name: 'Топливная карта',
-          morning: morningFuel,
+          morning: actualMorningFuel,
           inflow: fuelDayIn,
           outflow: fuelDayOut,
-          evening: eveningFuelCalc,
+          evening: actualEveningFuel,
         },
       },
       audit: auditRow || null,
