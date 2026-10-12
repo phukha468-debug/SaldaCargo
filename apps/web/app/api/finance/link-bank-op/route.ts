@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     const supabase = createAdminClient();
-    const idempotencyKey = `tbank:${operationId}`;
+    const idempotencyKey = operationId;
 
     // 1. Действие: ОТВЯЗАТЬ
     if (action === 'unlink') {

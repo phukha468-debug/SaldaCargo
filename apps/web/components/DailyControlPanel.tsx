@@ -351,7 +351,7 @@ export function DailyControlPanel() {
 
         // Ищем существующую связь с рейсом в transactions
         const linkedTx = (data?.transactions ?? []).find(
-          (t) => t.idempotency_key === `tbank:${op.operationId}`,
+          (t) => t.idempotency_key === op.operationId,
         );
 
         let title = op.description || op.payPurpose || 'Входящий перевод на Р/С';
