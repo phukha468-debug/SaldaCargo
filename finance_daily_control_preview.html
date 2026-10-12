@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ТК 510 — Ежедневный контроль финансов: Р/С, Сейф, Топливная карта</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,500..700,0..1,-50..200" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+            display: ['"Space Grotesk"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Компактный скроллбар */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f8fafc; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Декоративные круги SumCard уменьшенные */
+    .sum-card-decor-1 {
+      position: absolute; right: -8px; top: -8px; width: 42px; height: 42px;
+      border-radius: 50%; background: rgba(255,255,255,0.12); pointer-events: none;
+    }
+    .sum-card-decor-2 {
+      position: absolute; right: 8px; bottom: -12px; width: 32px; height: 32px;
+      border-radius: 50%; background: rgba(255,255,255,0.08); pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col select-none">
+
+  <!-- =========================================================================
+       ШАПКА: КОМПАКТНЫЙ ВЕРХНИЙ БАР ТК510
+       ========================================================================= -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2.5">
+      
+      <!-- Лого и Название -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-lg bg-slate-900 text-amber-400 font-black flex items-center justify-center font-display text-xs shadow-xs">
+          510
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xs font-black uppercase tracking-wide text-slate-900">Суточный финансовый баланс</h1>
+            <span class="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
+              100% сверка
+            </span>
+          </div>
+          <p class="text-[10px] text-slate-500 hidden sm:block">
+            Раздельный и сводный контроль: Расчётный счёт · Сейф · Топливная карта
+          </p>
+        </div>
+      </div>
+
+      <!-- Кнопка Telegram 19:30 + кнопка утверждения -->
+      <div class="flex items-center gap-2">
+        <button onclick="openTelegramPreview()" class="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs transition-colors flex items-center gap-1 shadow-xs cursor-pointer">
+          <span class="material-symbols-outlined text-[15px]">send</span>
+          <span>Телеграм в 19:30</span>
+        </button>
+
+        <button onclick="approveDailyBook()" id="btn-top-approve" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors flex items-center gap-1 shadow-xs cursor-pointer">
+          <span class="material-symbols-outlined text-[15px]">verified</span>
+          <span>Утвердить кассу</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       ОСНОВНОЙ КОНТЕЙНЕР
+       ========================================================================= -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-3.5 flex flex-col gap-3.5 flex-1">
+
+    <!-- =======================================================================
+         1. КОМПОНЕНТ DATENAV: В ТОЧНОСТИ ПО РЕФЕРЕНСУ ИЗ СКРИНШОТА, УМЕНЬШЕН В 2 РАЗА
+         ======================================================================= -->
+    <div id="date-nav-widget" class="bg-slate-900 text-white rounded-xl shadow-xs overflow-hidden flex flex-col transition-all">
+      
+      <!-- Верхний ярус (микро): [ ДЕНЬ | НЕДЕЛЯ | МЕСЯЦ ] -->
+      <div class="flex items-center justify-center py-1.5 px-3 bg-slate-900 border-b border-slate-800">
+        <div class="flex bg-slate-800 p-0.5 rounded-lg max-w-xs w-full border border-slate-700/60 shadow-inner">
+          <button onclick="setTimeScale('day')" id="scale-btn-day" class="flex-1 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors">
+            ДЕНЬ
+          </button>
+          <button onclick="setTimeScale('week')" id="scale-btn-week" class="flex-1 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors">
+            НЕДЕЛЯ
+          </button>
+          <button onclick="setTimeScale('month')" id="scale-btn-month" class="flex-1 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-sky-500 text-white shadow-xs transition-colors">
+            МЕСЯЦ
+          </button>
+        </div>
+      </div>
+
+      <!-- Средний ярус (уменьшен в 2 раза: высота всего h-8 / 34px вместо 56px) -->
+      <div class="flex items-stretch h-8 bg-slate-900">
+        <!-- Кнопка назад ← -->
+        <button onclick="shiftDate(-1)" class="w-16 sm:w-24 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors flex items-center justify-center text-white shrink-0 cursor-pointer group" title="Предыдущий период">
+          <span class="text-base font-black group-hover:-translate-x-0.5 transition-transform">←</span>
+        </button>
+
+        <!-- Центр: Календарь и текущая дата -->
+        <div class="flex-1 flex items-center justify-center gap-1.5 px-3 cursor-pointer hover:bg-slate-800/60 transition-colors" onclick="quickToday()">
+          <span class="material-symbols-outlined text-sky-400 text-[16px]">calendar_today</span>
+          <span id="nav-date-label" class="text-xs font-black text-white tracking-wide">
+            октябрь 2026 г.
+          </span>
+          <span id="nav-day-sublabel" class="text-[10px] text-slate-400 hidden sm:inline font-medium">
+            (Понедельник, 12.10.2026)
+          </span>
+        </div>
+
+        <!-- Кнопка вперед → -->
+        <button onclick="shiftDate(1)" id="btn-forward" class="w-16 sm:w-24 bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors flex items-center justify-center shrink-0 cursor-pointer group" title="Следующий период">
+          <span class="text-base font-black group-hover:translate-x-0.5 transition-transform">→</span>
+        </button>
+      </div>
+
+      <!-- Нижний ярус (микро): [ ИЮНЬ | ИЮЛЬ | АВГ. | СЕНТ. | ОКТ. ] -->
+      <div class="grid grid-cols-5 border-t border-slate-800 text-[10px] font-black uppercase tracking-wider text-center">
+        <button onclick="selectMonth(5)" id="m-btn-0" class="py-1 text-slate-400 hover:text-white hover:bg-slate-800/50 border-r border-slate-800 transition-colors cursor-pointer">
+          ИЮНЬ
+        </button>
+        <button onclick="selectMonth(6)" id="m-btn-1" class="py-1 text-slate-400 hover:text-white hover:bg-slate-800/50 border-r border-slate-800 transition-colors cursor-pointer">
+          ИЮЛЬ
+        </button>
+        <button onclick="selectMonth(7)" id="m-btn-2" class="py-1 text-slate-400 hover:text-white hover:bg-slate-800/50 border-r border-slate-800 transition-colors cursor-pointer">
+          АВГ.
+        </button>
+        <button onclick="selectMonth(8)" id="m-btn-3" class="py-1 text-slate-400 hover:text-white hover:bg-slate-800/50 border-r border-slate-800 transition-colors cursor-pointer">
+          СЕНТ.
+        </button>
+        <button onclick="selectMonth(9)" id="m-btn-4" class="py-1 bg-sky-500 text-white font-extrabold transition-colors cursor-pointer shadow-xs">
+          ОКТ.
+        </button>
+      </div>
+
+    </div>
+
+
+    <!-- =======================================================================
+         2. ПЛАШКИ С ИНФОРМАЦИЕЙ (КОМПАКТНЫЕ, УМЕНЬШЕНЫ В 2 РАЗА ПО ВЫСОТЕ)
+         ======================================================================= -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      
+      <!-- 1. Входящий остаток (00:00) -->
+      <div class="rounded-xl p-2.5 text-white relative overflow-hidden shadow-xs" style="background: linear-gradient(135deg, #0f172a, #1e293b);">
+        <div class="sum-card-decor-1"></div>
+        <div class="sum-card-decor-2"></div>
+        <div class="text-[8px] font-black uppercase tracking-wider text-slate-300">САЛЬДО НА УТРО (00:00)</div>
+        <div class="text-base sm:text-lg font-black mt-0.5 font-mono tracking-tight leading-tight">842 500 ₽</div>
+        <div class="text-[9px] text-slate-300 mt-0.5 truncate">Р/С: 620к · ТК: 42к · Сейф: 180к</div>
+      </div>
+
+      <!-- 2. Расходы сегодня -->
+      <div class="rounded-xl p-2.5 text-white relative overflow-hidden shadow-xs" style="background: linear-gradient(135deg, #f43f5e, #e11d48);">
+        <div class="sum-card-decor-1"></div>
+        <div class="sum-card-decor-2"></div>
+        <div class="text-[8px] font-black uppercase tracking-wider text-rose-100">РАСХОД СЕГОДНЯ</div>
+        <div class="text-base sm:text-lg font-black mt-0.5 font-mono tracking-tight leading-tight">-145 800 ₽</div>
+        <div class="text-[9px] text-rose-100 mt-0.5 flex items-center justify-between">
+          <span>ЗП: 92к · ГСМ: 26.5к</span>
+          <span class="font-bold opacity-80">6 опер.</span>
+        </div>
+      </div>
+
+      <!-- 3. Доходы сегодня -->
+      <div class="rounded-xl p-2.5 text-white relative overflow-hidden shadow-xs" style="background: linear-gradient(135deg, #10b981, #059669);">
+        <div class="sum-card-decor-1"></div>
+        <div class="sum-card-decor-2"></div>
+        <div class="text-[8px] font-black uppercase tracking-wider text-emerald-100">ДОХОД СЕГОДНЯ</div>
+        <div class="text-base sm:text-lg font-black mt-0.5 font-mono tracking-tight leading-tight">+218 400 ₽</div>
+        <div class="text-[9px] text-emerald-100 mt-0.5 flex items-center justify-between">
+          <span>ВСМПО: 95к · Геострой: 68к</span>
+          <span class="font-bold opacity-80">5 плат.</span>
+        </div>
+      </div>
+
+      <!-- 4. Дельта суток и факт на вечер -->
+      <div class="rounded-xl p-2.5 text-white relative overflow-hidden shadow-xs" style="background: linear-gradient(135deg, #0284c7, #2563eb);">
+        <div class="sum-card-decor-1"></div>
+        <div class="sum-card-decor-2"></div>
+        <div class="text-[8px] font-black uppercase tracking-wider text-sky-100">ДЕЛЬТА СУТОК / ОСТАТОК</div>
+        <div class="text-base sm:text-lg font-black mt-0.5 font-mono tracking-tight leading-tight">+72 600 ₽</div>
+        <div class="text-[9px] text-sky-100 mt-0.5 flex items-center justify-between">
+          <span>Касса: <strong>915 100 ₽</strong></span>
+          <span class="bg-white/25 px-1 py-0.1 rounded text-[8px] font-bold">+8.6%</span>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- =======================================================================
+         3. ТРЕХЗОННЫЙ КОНТРОЛЬ ПО 3 СТАТЬЯМ: Р/С БАНК, СЕЙФ, ТОПЛИВНАЯ КАРТА
+         (Сразу видно цифры по каждому источнику + быстрый фильтр в 1 клик)
+         ======================================================================= -->
+    <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-xs flex flex-col gap-2.5">
+      
+      <!-- Верхний переключатель фильтра кошельков -->
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+          <span class="material-symbols-outlined text-[17px] text-slate-500">account_balance_wallet</span>
+          <span>Движение по кошелькам (выберите для фильтрации):</span>
+        </div>
+
+        <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-bold">
+          <button onclick="filterWallet('all')" id="w-filter-all" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition-all cursor-pointer">
+            Все кошельки (Сводка)
+          </button>
+          <button onclick="filterWallet('bank')" id="w-filter-bank" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer flex items-center gap-1">
+            <span>🏦 Р/С Банк</span>
+          </button>
+          <button onclick="filterWallet('safe')" id="w-filter-safe" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer flex items-center gap-1">
+            <span>🔒 Сейф (нал)</span>
+          </button>
+          <button onclick="filterWallet('fuel')" id="w-filter-fuel" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer flex items-center gap-1">
+            <span>⛽ Топливная карта</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3 Информационные полосы: видно СРАЗУ остатки и оборот каждого кошелька -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+        
+        <!-- 1. Р/С БАНК (ТОЧКА API) -->
+        <div id="card-wallet-bank" onclick="filterWallet('bank')" class="p-2.5 rounded-lg border border-sky-200 bg-sky-50/50 hover:bg-sky-50 transition-all cursor-pointer group">
+          <div class="flex items-center justify-between">
+            <span class="font-extrabold text-sky-900 flex items-center gap-1 text-[11px]">
+              <span>🏦 Р/С БАНК (ТОЧКА)</span>
+              <span class="bg-sky-200 text-sky-900 text-[9px] font-black px-1 py-0.2 rounded">API 100%</span>
+            </span>
+            <div class="flex items-center gap-1.5">
+              <span id="badge-selected-bank" class="hidden bg-sky-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs uppercase tracking-wide">ВЫБРАНО 🔥</span>
+              <span class="text-[10px] text-sky-600 font-bold group-hover:underline">только банк →</span>
+            </div>
+          </div>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-xs text-slate-500 font-medium">Утро: 620 300 ₽</span>
+            <span class="font-mono font-black text-slate-900 text-sm">Итог: 692 800 ₽</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] mt-1 pt-1 border-t border-sky-100 font-mono">
+            <span class="text-emerald-700 font-bold">+163 400 ₽ приход</span>
+            <span class="text-rose-600 font-bold">-90 900 ₽ расход</span>
+            <span class="text-sky-800 font-extrabold">+72 500 ₽ дельта</span>
+          </div>
+        </div>
+
+        <!-- 2. СЕЙФ (НАЛИЧНЫЕ В ОФИСЕ) -->
+        <div id="card-wallet-safe" onclick="filterWallet('safe')" class="p-2.5 rounded-lg border border-emerald-300 bg-emerald-50/60 hover:bg-emerald-50 transition-all cursor-pointer group shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="font-extrabold text-emerald-950 flex items-center gap-1 text-[11px]">
+              <span>🔒 СЕЙФ (НАЛИЧНЫЕ)</span>
+              <span class="bg-emerald-200 text-emerald-900 text-[9px] font-black px-1 py-0.2 rounded">ПРОВЕРЕНО</span>
+            </span>
+            <div class="flex items-center gap-1.5">
+              <span id="badge-selected-safe" class="hidden bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs uppercase tracking-wide">ВЫБРАНО 🔥</span>
+              <span class="text-[10px] text-emerald-700 font-bold group-hover:underline">только сейф →</span>
+            </div>
+          </div>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-xs text-slate-500 font-medium">Утро: 180 000 ₽</span>
+            <span class="font-mono font-black text-emerald-800 text-sm">Итог: 188 600 ₽</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] mt-1 pt-1 border-t border-emerald-100 font-mono">
+            <span class="text-emerald-700 font-bold">+55 000 ₽ приход</span>
+            <span class="text-rose-600 font-bold">-46 400 ₽ расход</span>
+            <span class="text-emerald-900 font-extrabold">+8 600 ₽ дельта</span>
+          </div>
+        </div>
+
+        <!-- 3. ТОПЛИВНАЯ КАРТА (ГАЗПРОМНЕФТЬ / ОПТИ / ДЕРЯБИН) -->
+        <div id="card-wallet-fuel" onclick="filterWallet('fuel')" class="p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-50 transition-all cursor-pointer group">
+          <div class="flex items-center justify-between">
+            <span class="font-extrabold text-amber-950 flex items-center gap-1 text-[11px]">
+              <span>⛽ ТОПЛИВНАЯ КАРТА</span>
+              <span class="bg-amber-200 text-amber-900 text-[9px] font-black px-1 py-0.2 rounded">ЧЕКИ ✅</span>
+            </span>
+            <div class="flex items-center gap-1.5">
+              <span id="badge-selected-fuel" class="hidden bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs uppercase tracking-wide">ВЫБРАНО 🔥</span>
+              <span class="text-[10px] text-amber-700 font-bold group-hover:underline">только ТК →</span>
+            </div>
+          </div>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-xs text-slate-500 font-medium">Утро: 42 200 ₽</span>
+            <span class="font-mono font-black text-slate-900 text-sm">Итог: 33 700 ₽</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] mt-1 pt-1 border-t border-amber-100 font-mono">
+            <span class="text-slate-400 font-medium">0 ₽ приход</span>
+            <span class="text-rose-600 font-bold">-8 500 ₽ списано</span>
+            <span class="text-amber-900 font-extrabold">-8 500 ₽ дельта</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ЯРКАЯ ПОЛОСА АКТИВНОГО ВЫБОРА КОШЕЛЬКА (ПОДСВЕТКА) -->
+    <div id="active-wallet-banner" class="hidden rounded-xl p-2.5 px-4 flex items-center justify-between text-xs font-bold transition-all shadow-sm">
+      <div class="flex items-center gap-2">
+        <span id="active-wallet-icon" class="text-base"></span>
+        <span id="active-wallet-text" class="font-black text-xs sm:text-sm"></span>
+      </div>
+      <button onclick="filterWallet('all')" class="px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white font-extrabold text-[10px] transition-colors cursor-pointer flex items-center gap-1">
+        <span>Показать все кошельки</span>
+        <span class="text-xs">✕</span>
+      </button>
+    </div>
+
+    <!-- =======================================================================
+         4. ОСНОВНАЯ ТАБЛИЦА: 2 КОЛОНКИ (РАСХОДЫ И ДОХОДЫ) С МАРКИРОВКОЙ 3 КОШЕЛЬКОВ
+         ======================================================================= -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+      
+      <!-- ==================== ЛЕВЫЙ СТОЛБЕЦ: РАСХОДЫ ==================== -->
+      <div id="col-container-exp" class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col transition-all">
+        
+        <!-- Шапка колонки Расходы -->
+        <div id="header-exp-col" class="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between transition-colors">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            <span class="text-xs font-black uppercase tracking-wider text-slate-700">РАСХОДЫ ЗА СЕГОДНЯ</span>
+            <span id="label-filter-exp" class="text-[10px] font-bold text-slate-400">(Все кошельки)</span>
+          </div>
+          <div id="total-exp-display" class="font-mono font-black text-rose-600 text-xs sm:text-sm">
+            -145 800 ₽
+          </div>
+        </div>
+
+        <!-- Список расходов -->
+        <div class="divide-y divide-slate-100 flex-1 text-xs" id="exp-rows-container">
+          
+          <!-- 1. Зарплата (Сейф + Р/С) -->
+          <div data-wallet="safe,bank" class="tx-row hover:bg-slate-50 transition-colors">
+            <div onclick="toggleAccordion('acc-salary')" class="p-3 flex items-center justify-between cursor-pointer">
+              <div class="flex items-start gap-2.5">
+                <div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">badge</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-extrabold text-slate-900">Зарплата и авансы сотрудникам</span>
+                    <span class="bg-blue-100 text-blue-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full">4 чел.</span>
+                    <span class="text-[9px] text-slate-400">▼ список</span>
+                  </div>
+                  <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                    <span>Списано: <strong class="text-emerald-700">🔒 Сейф (58к)</strong> + <strong class="text-sky-700">🏦 Р/С (34к)</strong></span>
+                    <span>·</span>
+                    <span>Кто: <strong class="text-slate-700">Бухгалтер Светлана</strong></span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <div class="font-mono font-black text-rose-600">-92 000 ₽</div>
+                <span class="text-[9px] text-slate-400">ФОТ</span>
+              </div>
+            </div>
+
+            <!-- Раскрывающийся список выплат -->
+            <div id="acc-salary" class="hidden bg-slate-50/90 border-t border-dashed border-slate-200 px-3.5 py-2 space-y-1.5 text-[11px]">
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Колесников В. (Водитель Газель А501)</span>
+                  <span class="block text-[10px] text-slate-500">Аванс за рейс Екатеринбург · <strong class="text-emerald-700">🔒 Сейф</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-28 000 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Смирнов Д. (Водитель Газель В502)</span>
+                  <span class="block text-[10px] text-slate-500">Зарплата 2-я часть · <strong class="text-emerald-700">🔒 Сейф</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-24 000 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Сергеев И. (Грузчик ПРР Салда)</span>
+                  <span class="block text-[10px] text-slate-500">Оплата за 5 заявок ПРР · <strong class="text-emerald-700">🔒 Сейф</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-6 000 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1">
+                <div>
+                  <span class="font-bold text-slate-800">Попов К. (Главный механик СТО)</span>
+                  <span class="block text-[10px] text-slate-500">Окладная часть · <strong class="text-sky-700">🏦 Р/С Банк</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-34 000 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. ГСМ (Топливная карта ТК + Сейф) -->
+          <div data-wallet="fuel,safe" class="tx-row hover:bg-slate-50 transition-colors">
+            <div onclick="toggleAccordion('acc-fuel')" class="p-3 flex items-center justify-between cursor-pointer">
+              <div class="flex items-start gap-2.5">
+                <div class="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">local_gas_station</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-extrabold text-slate-900">ГСМ и заправка автоколонны</span>
+                    <span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full">3 чека</span>
+                    <span class="text-[9px] text-slate-400">▼ список</span>
+                  </div>
+                  <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                    <span>Списано: <strong class="text-amber-800">⛽ ТК Карта (19.3к)</strong> + <strong class="text-emerald-700">🔒 Сейф (7.2к)</strong></span>
+                    <span>·</span>
+                    <span>Кто: <strong class="text-slate-700">Водители колонны</strong></span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <div class="font-mono font-black text-rose-600">-26 500 ₽</div>
+                <span class="text-[9px] text-slate-400">Топливо</span>
+              </div>
+            </div>
+
+            <!-- Вложенные чеки ГСМ -->
+            <div id="acc-fuel" class="hidden bg-slate-50/90 border-t border-dashed border-slate-200 px-3.5 py-2 space-y-1.5 text-[11px]">
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Газель NEXT А501ТК (ДТ 130 л)</span>
+                  <span class="block text-[10px] text-slate-500">АЗС Газпромнефть Тагил · <strong class="text-amber-800">⛽ ТК Опти</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-9 200 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Газель NEXT В502ТК (ДТ 142 л)</span>
+                  <span class="block text-[10px] text-slate-500">АЗС Газпромнефть Екат · <strong class="text-amber-800">⛽ ТК Опти</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-10 100 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1">
+                <div>
+                  <span class="font-bold text-slate-800">Заправка базы / канистры в гараж</span>
+                  <span class="block text-[10px] text-slate-500">Наличные водителю · <strong class="text-emerald-700">🔒 Сейф</strong></span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-7 200 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. ОДНОТИПНЫЕ КОМИССИИ БАНКА (Р/С) -->
+          <div data-wallet="bank" class="tx-row hover:bg-slate-50 transition-colors">
+            <div onclick="toggleAccordion('acc-comms')" class="p-3 flex items-center justify-between cursor-pointer">
+              <div class="flex items-start gap-2.5">
+                <div class="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-extrabold text-slate-900">Комиссия за входящие переводы и банк</span>
+                    <span class="bg-slate-200 text-slate-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full">3 комиссии</span>
+                    <span class="text-[9px] text-slate-400">▼ список</span>
+                  </div>
+                  <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                    <span>Списано: <strong class="text-sky-800">🏦 Р/С Банк</strong></span>
+                    <span>·</span>
+                    <span>Авто-списание Точка API</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <div class="font-mono font-black text-rose-600">-4 500 ₽</div>
+                <span class="text-[9px] text-slate-400">Банк</span>
+              </div>
+            </div>
+
+            <!-- Вложенные комиссии банка -->
+            <div id="acc-comms" class="hidden bg-slate-50/90 border-t border-dashed border-slate-200 px-3.5 py-2 space-y-1.5 text-[11px]">
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Комиссия СБП за входящий платёж (клиент 142)</span>
+                  <span class="block text-[10px] text-slate-500">11:15 · 🏦 Р/С Банк</span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-1 500 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <span class="font-bold text-slate-800">Комиссия за перевод поставщику «Деталь-Авто»</span>
+                  <span class="block text-[10px] text-slate-500">14:40 · 🏦 Р/С Банк</span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-2 000 ₽</span>
+              </div>
+              <div class="flex items-center justify-between py-1">
+                <div>
+                  <span class="font-bold text-slate-800">Ежемесячное смс-информирование и выписка</span>
+                  <span class="block text-[10px] text-slate-500">08:00 · 🏦 Р/С Банк</span>
+                </div>
+                <span class="font-mono font-bold text-rose-600">-1 000 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Запчасти (Р/С Банк) -->
+          <div data-wallet="bank" class="tx-row p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-[16px]">build</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-extrabold text-slate-900">Запчасти: карданный вал в сборе + крестовина</span>
+                  <button onclick="editTransaction('tx-parts', 'Запчасти: карданный вал в сборе', '18300', 'bank', 'Снабжение Ромашин')" class="opacity-0 group-hover:opacity-100 text-sky-600 hover:text-sky-800 text-[10px] font-bold transition-opacity cursor-pointer flex items-center gap-0.5">
+                    <span class="material-symbols-outlined text-[12px]">edit</span> Изм.
+                  </button>
+                </div>
+                <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                  <span>Списано: <strong class="text-sky-800">🏦 Р/С Банк</strong></span>
+                  <span>·</span>
+                  <span>Ответственный: <strong class="text-slate-700">Снабжение Ромашин</strong></span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <div class="font-mono font-black text-rose-600">-18 300 ₽</div>
+              <span class="text-[9px] text-slate-400">Ремонт</span>
+            </div>
+          </div>
+
+          <!-- 5. Хозтовары (Сейф) -->
+          <div data-wallet="safe" class="tx-row p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-[16px]">shopping_cart</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-extrabold text-slate-900">Канцелярия, бумага и вода для базы</span>
+                  <button onclick="editTransaction('tx-office', 'Канцелярия и хозтовары офиса', '4500', 'safe', 'Диспетчер Ольга')" class="opacity-0 group-hover:opacity-100 text-sky-600 hover:text-sky-800 text-[10px] font-bold transition-opacity cursor-pointer flex items-center gap-0.5">
+                    <span class="material-symbols-outlined text-[12px]">edit</span> Изм.
+                  </button>
+                </div>
+                <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                  <span>Списано: <strong class="text-emerald-800">🔒 Сейф (нал)</strong></span>
+                  <span>·</span>
+                  <span>Ответственный: <strong class="text-slate-700">Диспетчер Ольга</strong></span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <div class="font-mono font-black text-rose-600">-4 500 ₽</div>
+              <span class="text-[9px] text-slate-400">Офис</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ==================== ПРАВЫЙ СТОЛБЕЦ: ДОХОДЫ ==================== -->
+      <div id="col-container-inc" class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col transition-all">
+        
+        <!-- Шапка колонки Доходы -->
+        <div id="header-inc-col" class="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between transition-colors">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="text-xs font-black uppercase tracking-wider text-slate-700">ДОХОДЫ ЗА СЕГОДНЯ</span>
+            <span id="label-filter-inc" class="text-[10px] font-bold text-slate-400">(Все кошельки)</span>
+          </div>
+          <div id="total-inc-display" class="font-mono font-black text-emerald-600 text-xs sm:text-sm">
+            +218 400 ₽
+          </div>
+        </div>
+
+        <!-- Список доходов -->
+        <div class="divide-y divide-slate-100 flex-1 text-xs" id="inc-rows-container">
+          
+          <!-- 1. ВСМПО (Р/С Банк) -->
+          <div data-wallet="bank" class="tx-row p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-[16px]">domain</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-extrabold text-slate-900">ПАО «Корпорация ВСМПО-АВИСМА»</span>
+                  <span class="bg-blue-50 text-blue-700 text-[9px] font-bold px-1.5 py-0.2 rounded border border-blue-200">Рейс #1420</span>
+                </div>
+                <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                  <span>Поступило: <strong class="text-sky-800">🏦 Р/С Банк</strong></span>
+                  <span>·</span>
+                  <span>Екатеринбург — Верхняя Салда</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <div class="font-mono font-black text-emerald-600">+95 000 ₽</div>
+              <span class="text-[9px] text-slate-400">Безнал</span>
+            </div>
+          </div>
+
+          <!-- 2. Геострой (Р/С Банк) -->
+          <div data-wallet="bank" class="tx-row p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-[16px]">precision_manufacturing</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-extrabold text-slate-900">ООО «Геострой-Урал» (Акт сверки #89)</span>
+                </div>
+                <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                  <span>Поступило: <strong class="text-sky-800">🏦 Р/С Банк</strong></span>
+                  <span>·</span>
+                  <span>Услуги спецтехники и автовышки</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <div class="font-mono font-black text-emerald-600">+68 400 ₽</div>
+              <span class="text-[9px] text-slate-400">Безнал</span>
+            </div>
+          </div>
+
+          <!-- 3. ВОЗМЕЩЕНИЕ ПО ЭКВАЙРИНГУ (Р/С Банк, ОДНОТИПНЫЕ + РЕДАКТИРОВАНИЕ) -->
+          <div data-wallet="bank" class="tx-row hover:bg-slate-50 transition-colors border-l-3 border-amber-400 bg-amber-50/20">
+            <div onclick="toggleAccordion('acc-acq')" class="p-3 flex items-center justify-between cursor-pointer">
+              <div class="flex items-start gap-2.5">
+                <div class="w-7 h-7 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">point_of_sale</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-extrabold text-slate-900">Возмещение по эквайрингу (Терминалы кассы)</span>
+                    <span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full">3 чека</span>
+                    <span id="badge-acq-unassigned" class="bg-amber-200 text-amber-900 text-[9px] font-black px-1.5 py-0.2 rounded">1 требует подписи</span>
+                  </div>
+                  <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                    <span>Поступило: <strong class="text-sky-800">🏦 Р/С Банк</strong></span>
+                    <span>·</span>
+                    <span>Терминалы базы / шиномонтажа</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <div class="font-mono font-black text-emerald-600">+24 000 ₽</div>
+                <span class="text-[9px] text-slate-400">Эквайринг</span>
+              </div>
+            </div>
+
+            <!-- Вложенные чеки эквайринга с редактированием -->
+            <div id="acc-acq" class="bg-slate-50/90 border-t border-dashed border-slate-200 px-3.5 py-2 space-y-1.5 text-[11px]">
+              
+              <!-- Неподписанная транзакция из банка -->
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50 bg-amber-50/60 p-2 rounded-lg">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span id="tx-acq-1-title" class="font-bold text-slate-900">Возмещение по эквайрингу Сбер №49102</span>
+                    <span id="tx-acq-1-badge" class="bg-rose-100 text-rose-700 text-[9px] font-extrabold px-1.5 py-0.2 rounded">НЕ РАЗМЕЧЕНО</span>
+                  </div>
+                  <span class="block text-[10px] text-slate-500 mt-0.5">
+                    Банк передал: «Возмещение по реестру №882» · Назначьте имя
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold text-emerald-600">+11 500 ₽</span>
+                  <button onclick="editTransaction('tx-acq-1', 'Возмещение по эквайрингу Сбер №49102', '11500', 'bank', 'Клиент базы')" class="px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] rounded transition-colors flex items-center gap-0.5 shadow-xs cursor-pointer">
+                    <span class="material-symbols-outlined text-[12px]">edit</span> Подписать
+                  </button>
+                </div>
+              </div>
+
+              <!-- Чек 2 -->
+              <div class="flex items-center justify-between py-1 border-b border-slate-200/50">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-slate-800">Оплата через терминал: Доставка стройматериалов</span>
+                    <span class="bg-emerald-100 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">Подписано: Макарова О.</span>
+                  </div>
+                  <span class="block text-[10px] text-slate-500">Терминал кассы СТО · 12:40</span>
+                </div>
+                <span class="font-mono font-bold text-emerald-600">+8 500 ₽</span>
+              </div>
+
+              <!-- Чек 3 -->
+              <div class="flex items-center justify-between py-1">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-slate-800">Оплата картой: Шиномонтаж и балансировка</span>
+                    <span class="bg-emerald-100 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">Подписано: Мастер Попов</span>
+                  </div>
+                  <span class="block text-[10px] text-slate-500">Терминал кассы СТО · 15:10</span>
+                </div>
+                <span class="font-mono font-bold text-emerald-600">+4 000 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Услуги СТО (Сейф) -->
+          <div data-wallet="safe" class="tx-row p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-[16px]">car_repair</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-extrabold text-slate-900">Услуги СТО: сход-развал + замена масла</span>
+                  <button onclick="editTransaction('tx-sto', 'Услуги СТО частный клиент', '16000', 'safe', 'Мастер Попов К.')" class="opacity-0 group-hover:opacity-100 text-sky-600 hover:text-sky-800 text-[10px] font-bold transition-opacity cursor-pointer flex items-center gap-0.5">
+                    <span class="material-symbols-outlined text-[12px]">edit</span> Изм.
+                  </button>
+                </div>
+                <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                  <span>Поступило: <strong class="text-emerald-800">🔒 Сейф (нал)</strong></span>
+                  <span>·</span>
+                  <span>Мастер-приёмщик: <strong class="text-slate-700">Попов К.</strong></span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <div class="font-mono font-black text-emerald-600">+16 000 ₽</div>
+              <span class="text-[9px] text-slate-400">СТО Нал</span>
+            </div>
+          </div>
+
+          <!-- 5. ПРР (Сейф) -->
+          <div data-wallet="safe" class="tx-row p-3 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-[16px]">front_loader</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-extrabold text-slate-900">ПРР: бригада грузчиков (разгрузка фуры)</span>
+                  <button onclick="editTransaction('tx-prr', 'ПРР Магазин Магнит', '15000', 'safe', 'Бригада ПРР')" class="opacity-0 group-hover:opacity-100 text-sky-600 hover:text-sky-800 text-[10px] font-bold transition-opacity cursor-pointer flex items-center gap-0.5">
+                    <span class="material-symbols-outlined text-[12px]">edit</span> Изм.
+                  </button>
+                </div>
+                <div class="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                  <span>Поступило: <strong class="text-emerald-800">🔒 Сейф (нал)</strong></span>
+                  <span>·</span>
+                  <span>Заказчик: <strong class="text-slate-700">Супермаркет «Магнит»</strong></span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <div class="font-mono font-black text-emerald-600">+15 000 ₽</div>
+              <span class="text-[9px] text-slate-400">ПРР Нал</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <!-- =========================================================================
+       МОДАЛЬНОЕ ОКНО: РЕДАКТИРОВАНИЕ ТРАНЗАКЦИИ (ПРИСВОЕНИЕ ИМЕНИ)
+       ========================================================================= -->
+  <div id="edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-amber-400 text-[18px]">edit_note</span>
+          <h3 class="text-xs font-black uppercase">Разметка банковской выписки</h3>
+        </div>
+        <button onclick="closeEditModal()" class="w-6 h-6 rounded-md bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="saveTransaction(event)" class="p-4 space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Понятное имя / назначение операции</label>
+          <input type="text" id="edit-title" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none" placeholder="Например: Возмещение эквайринга за шиномонтаж">
+          <p class="text-[10px] text-slate-400 mt-0.5">Сырой текст банка: «Возмещение по реестру операций №882»</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Сумма операции</label>
+            <input type="text" id="edit-amount" readonly class="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Кошелёк / Счёт</label>
+            <select id="edit-wallet" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <option value="bank">🏦 Р/С Банк (Точка)</option>
+              <option value="safe">🔒 Сейф (Наличные)</option>
+              <option value="fuel">⛽ Топливная карта</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Статья</label>
+            <select id="edit-category" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <option value="acq">Эквайринг (выручка базы)</option>
+              <option value="delivery">Доставка грузов</option>
+              <option value="sto">Услуги СТО / Сервис</option>
+              <option value="parts">Запчасти и детали</option>
+              <option value="comm">Комиссия банка</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Ответственный / Контрагент</label>
+            <input type="text" id="edit-person" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none" placeholder="ФИО или заказчик">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+          <button type="button" onclick="closeEditModal()" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer">Отмена</button>
+          <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs cursor-pointer">Сохранить</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+
+  <!-- =========================================================================
+       МОДАЛЬНОЕ ОКНО: ТЕЛЕГРАМ ДИРЕКТОРУ В 19:30
+       ========================================================================= -->
+  <div id="telegram-preview-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-300 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <div class="bg-sky-500 text-white px-3.5 py-2.5 flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[17px]">notifications_active</span>
+          <span class="font-extrabold text-xs">Телеграм директору в 19:30</span>
+        </div>
+        <button onclick="closeTelegramPreview()" class="w-5 h-5 rounded bg-sky-600 hover:bg-sky-700 flex items-center justify-center text-white cursor-pointer text-xs">✕</button>
+      </div>
+
+      <div class="p-3.5 space-y-3 text-xs text-slate-800">
+        <div class="bg-slate-100 p-3 rounded-xl border border-slate-200 font-mono text-[11px] leading-relaxed shadow-inner">
+          <div class="font-bold text-sky-700">🔔 ТК 510 · Ежедневный отчёт кассы (19:30)</div>
+          <div class="text-slate-400">-----------------------------------------</div>
+          <div>Сальдо на утро: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>842 500 ₽</strong></div>
+          <div class="text-emerald-700 font-bold">Поступления (+): &nbsp;&nbsp;&nbsp;+218 400 ₽</div>
+          <div class="text-rose-600 font-bold">Списания (-): &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-145 800 ₽</div>
+          <div>Дельта дня: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>+72 600 ₽</strong></div>
+          <div class="text-slate-400">-----------------------------------------</div>
+          <div class="font-bold text-slate-900">Контрольный остаток на вечер:</div>
+          <div>🏦 Банк (р/с): &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>692 800 ₽</strong> (API ✅)</div>
+          <div>⛽ Топливо (ТК): &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>33 700 ₽</strong> (сверено ✅)</div>
+          <div class="bg-amber-100 text-amber-900 font-bold px-1 py-0.5 rounded mt-0.5">
+            🔒 СЕЙФ (нал): &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;188 600 ₽ ❓ СВЕРЬТЕ КУПЮРЫ
+          </div>
+          <div class="text-slate-400">-----------------------------------------</div>
+          <div class="text-[10px] text-slate-500">Банк синхронизирован по API (ошибок нет). Пожалуйста, проверьте купюры в сейфе перед закрытием дня.</div>
+        </div>
+
+        <button onclick="approveDailyBook(); closeTelegramPreview();" class="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs cursor-pointer">
+          Подтвердить: В сейфе ровно 188 600 ₽
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- =========================================================================
+       JS ЛОГИКА: ФИЛЬТРАЦИЯ 3-х КОШЕЛЬКОВ, АККОРДЕОНЫ, РЕДАКТИРОВАНИЕ, DATENAV
+       ========================================================================= -->
+  <script>
+    let activeScale = 'month'; // 'day' | 'week' | 'month'
+    let currentMonthIndex = 4; // 0..4 (Июнь..Октябрь)
+    const MONTH_NAMES = ['Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь'];
+
+    // 1. Фильтрация по 3-м статьям / кошелькам (Р/С, Сейф, Топливная карта)
+    let currentWalletFilter = 'all';
+
+    function filterWallet(wallet) {
+      currentWalletFilter = wallet;
+
+      // 1. Яркое выделение кнопок-фильтров в верхнем меню
+      const wallets = ['all', 'bank', 'safe', 'fuel'];
+      wallets.forEach(w => {
+        const btn = document.getElementById(`w-filter-${w}`);
+        if (!btn) return;
+        if (w === wallet) {
+          if (w === 'bank') {
+            btn.className = 'px-3 py-1 rounded-md bg-sky-500 text-white shadow-md ring-2 ring-sky-300 font-black scale-105 transition-all cursor-pointer flex items-center gap-1';
+          } else if (w === 'safe') {
+            btn.className = 'px-3 py-1 rounded-md bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300 font-black scale-105 transition-all cursor-pointer flex items-center gap-1';
+          } else if (w === 'fuel') {
+            btn.className = 'px-3 py-1 rounded-md bg-amber-500 text-white shadow-md ring-2 ring-amber-300 font-black scale-105 transition-all cursor-pointer flex items-center gap-1';
+          } else {
+            btn.className = 'px-3 py-1 rounded-md bg-slate-900 text-white shadow-md ring-2 ring-slate-400 font-black scale-105 transition-all cursor-pointer';
+          }
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer font-bold opacity-75 hover:opacity-100 flex items-center gap-1';
+        }
+      });
+
+      // 2. Яркая подсветка 3-х карточек кошельков
+      const cardBank = document.getElementById('card-wallet-bank');
+      const cardSafe = document.getElementById('card-wallet-safe');
+      const cardFuel = document.getElementById('card-wallet-fuel');
+
+      const badgeBank = document.getElementById('badge-selected-bank');
+      const badgeSafe = document.getElementById('badge-selected-safe');
+      const badgeFuel = document.getElementById('badge-selected-fuel');
+
+      const banner = document.getElementById('active-wallet-banner');
+      const bannerIcon = document.getElementById('active-wallet-icon');
+      const bannerText = document.getElementById('active-wallet-text');
+
+      const colExp = document.getElementById('col-container-exp');
+      const colInc = document.getElementById('col-container-inc');
+      const headerExp = document.getElementById('header-exp-col');
+      const headerInc = document.getElementById('header-inc-col');
+
+      // Сброс базовых стилей
+      cardBank.className = 'p-2.5 rounded-lg border border-sky-200 bg-sky-50/50 hover:bg-sky-50 transition-all cursor-pointer group';
+      cardSafe.className = 'p-2.5 rounded-lg border border-emerald-300 bg-emerald-50/60 hover:bg-emerald-50 transition-all cursor-pointer group shadow-xs';
+      cardFuel.className = 'p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-50 transition-all cursor-pointer group';
+
+      badgeBank.classList.add('hidden');
+      badgeSafe.classList.add('hidden');
+      badgeFuel.classList.add('hidden');
+
+      colExp.className = 'bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col transition-all';
+      colInc.className = 'bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col transition-all';
+      headerExp.className = 'px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between transition-colors';
+      headerInc.className = 'px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between transition-colors';
+
+      const labelExp = document.getElementById('label-filter-exp');
+      const labelInc = document.getElementById('label-filter-inc');
+      const totalExpDisplay = document.getElementById('total-exp-display');
+      const totalIncDisplay = document.getElementById('total-inc-display');
+
+      if (wallet === 'all') {
+        banner.classList.add('hidden');
+        labelExp.textContent = '(Все кошельки)';
+        labelInc.textContent = '(Все кошельки)';
+        totalExpDisplay.textContent = '-145 800 ₽';
+        totalIncDisplay.textContent = '+218 400 ₽';
+      } else if (wallet === 'bank') {
+        // 🔥 ЯРКАЯ ПОДСВЕТКА БАНКА
+        cardBank.className = 'p-2.5 rounded-xl border-2 border-sky-500 bg-sky-100 ring-4 ring-sky-300 shadow-xl scale-[1.02] transition-all cursor-pointer';
+        badgeBank.classList.remove('hidden');
+        cardSafe.className += ' opacity-35 grayscale-50 scale-[0.98]';
+        cardFuel.className += ' opacity-35 grayscale-50 scale-[0.98]';
+
+        banner.classList.remove('hidden');
+        banner.className = 'rounded-xl p-2.5 px-4 flex items-center justify-between text-xs font-bold transition-all shadow-md bg-sky-600 text-white ring-2 ring-sky-300 mb-1';
+        bannerIcon.textContent = '🏦';
+        bannerText.textContent = 'ВЫБРАН РАСЧЁТНЫЙ СЧЁТ (ТОЧКА БАНК API) · Показаны операции безналичных расчетов';
+
+        colExp.className = 'bg-white border-2 border-sky-400 rounded-xl overflow-hidden shadow-md flex flex-col transition-all ring-1 ring-sky-200';
+        colInc.className = 'bg-white border-2 border-sky-400 rounded-xl overflow-hidden shadow-md flex flex-col transition-all ring-1 ring-sky-200';
+        headerExp.className = 'px-3.5 py-2.5 bg-sky-50 border-b border-sky-200 flex items-center justify-between transition-colors';
+        headerInc.className = 'px-3.5 py-2.5 bg-sky-50 border-b border-sky-200 flex items-center justify-between transition-colors';
+
+        labelExp.textContent = '(Только 🏦 Р/С Банк)';
+        labelInc.textContent = '(Только 🏦 Р/С Банк)';
+        totalExpDisplay.textContent = '-90 900 ₽';
+        totalIncDisplay.textContent = '+163 400 ₽';
+      } else if (wallet === 'safe') {
+        // 🔥 ЯРКАЯ ПОДСВЕТКА СЕЙФА
+        cardSafe.className = 'p-2.5 rounded-xl border-2 border-emerald-600 bg-emerald-100 ring-4 ring-emerald-300 shadow-xl scale-[1.02] transition-all cursor-pointer';
+        badgeSafe.classList.remove('hidden');
+        cardBank.className += ' opacity-35 grayscale-50 scale-[0.98]';
+        cardFuel.className += ' opacity-35 grayscale-50 scale-[0.98]';
+
+        banner.classList.remove('hidden');
+        banner.className = 'rounded-xl p-2.5 px-4 flex items-center justify-between text-xs font-bold transition-all shadow-md bg-emerald-700 text-white ring-2 ring-emerald-300 mb-1';
+        bannerIcon.textContent = '🔒';
+        bannerText.textContent = 'ВЫБРАН СЕЙФ (НАЛИЧНЫЕ) · Показаны операции с наличными деньгами кассы';
+
+        colExp.className = 'bg-white border-2 border-emerald-500 rounded-xl overflow-hidden shadow-md flex flex-col transition-all ring-1 ring-emerald-200';
+        colInc.className = 'bg-white border-2 border-emerald-500 rounded-xl overflow-hidden shadow-md flex flex-col transition-all ring-1 ring-emerald-200';
+        headerExp.className = 'px-3.5 py-2.5 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between transition-colors';
+        headerInc.className = 'px-3.5 py-2.5 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between transition-colors';
+
+        labelExp.textContent = '(Только 🔒 Сейф нал)';
+        labelInc.textContent = '(Только 🔒 Сейф нал)';
+        totalExpDisplay.textContent = '-46 400 ₽';
+        totalIncDisplay.textContent = '+55 000 ₽';
+      } else if (wallet === 'fuel') {
+        // 🔥 ЯРКАЯ ПОДСВЕТКА ТОПЛИВНОЙ КАРТЫ
+        cardFuel.className = 'p-2.5 rounded-xl border-2 border-amber-500 bg-amber-100 ring-4 ring-amber-300 shadow-xl scale-[1.02] transition-all cursor-pointer';
+        badgeFuel.classList.remove('hidden');
+        cardBank.className += ' opacity-35 grayscale-50 scale-[0.98]';
+        cardSafe.className += ' opacity-35 grayscale-50 scale-[0.98]';
+
+        banner.classList.remove('hidden');
+        banner.className = 'rounded-xl p-2.5 px-4 flex items-center justify-between text-xs font-bold transition-all shadow-md bg-amber-600 text-white ring-2 ring-amber-300 mb-1';
+        bannerIcon.textContent = '⛽';
+        bannerText.textContent = 'ВЫБРАНА ТОПЛИВНАЯ КАРТА · Показаны чеки заправок по ТК автоколонны';
+
+        colExp.className = 'bg-white border-2 border-amber-400 rounded-xl overflow-hidden shadow-md flex flex-col transition-all ring-1 ring-amber-200';
+        colInc.className = 'bg-white border-2 border-amber-400 rounded-xl overflow-hidden shadow-md flex flex-col transition-all ring-1 ring-amber-200';
+        headerExp.className = 'px-3.5 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between transition-colors';
+        headerInc.className = 'px-3.5 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between transition-colors';
+
+        labelExp.textContent = '(Только ⛽ Топливная карта)';
+        labelInc.textContent = '(Только ⛽ Топливная карта)';
+        totalExpDisplay.textContent = '-8 500 ₽';
+        totalIncDisplay.textContent = '0 ₽';
+      }
+
+      // 3. Фильтрация строк и подсветка строк таблицы
+      document.querySelectorAll('.tx-row').forEach(row => {
+        const rowWallets = (row.getAttribute('data-wallet') || '').split(',');
+        if (wallet === 'all' || rowWallets.includes(wallet)) {
+          row.classList.remove('hidden');
+          if (wallet === 'bank') {
+            row.classList.add('bg-sky-50/50');
+            row.classList.remove('bg-emerald-50/50', 'bg-amber-50/50');
+          } else if (wallet === 'safe') {
+            row.classList.add('bg-emerald-50/50');
+            row.classList.remove('bg-sky-50/50', 'bg-amber-50/50');
+          } else if (wallet === 'fuel') {
+            row.classList.add('bg-amber-50/50');
+            row.classList.remove('bg-sky-50/50', 'bg-emerald-50/50');
+          } else {
+            row.classList.remove('bg-sky-50/50', 'bg-emerald-50/50', 'bg-amber-50/50');
+          }
+        } else {
+          row.classList.add('hidden');
+        }
+      });
+    }
+
+    // 2. Логика переключателя дат DateNav (компактный)
+    function setTimeScale(scale) {
+      activeScale = scale;
+      ['day', 'week', 'month'].forEach(s => {
+        const btn = document.getElementById(`scale-btn-${s}`);
+        if (s === scale) {
+          btn.className = 'flex-1 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-sky-500 text-white shadow-xs transition-colors';
+        } else {
+          btn.className = 'flex-1 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors';
+        }
+      });
+      updateNavLabels();
+    }
+
+    function selectMonth(idx) {
+      currentMonthIndex = idx - 5;
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById(`m-btn-${i}`);
+        if (i === currentMonthIndex) {
+          btn.className = 'py-1 bg-sky-500 text-white font-extrabold transition-colors cursor-pointer shadow-xs';
+        } else {
+          btn.className = 'py-1 text-slate-400 hover:text-white hover:bg-slate-800/50 border-r border-slate-800 transition-colors cursor-pointer';
+        }
+      }
+      updateNavLabels();
+    }
+
+    function shiftDate(dir) {
+      if (activeScale === 'month') {
+        let newIdx = currentMonthIndex + dir;
+        if (newIdx >= 0 && newIdx < 5) {
+          selectMonth(newIdx + 5);
+        }
+      } else {
+        alert(dir < 0 ? 'Переход на предыдущий день (11 октября)' : 'Переход на следующий день (13 октября)');
+      }
+    }
+
+    function quickToday() {
+      selectMonth(9);
+    }
+
+    function updateNavLabels() {
+      const monthName = MONTH_NAMES[currentMonthIndex];
+      const navLabel = document.getElementById('nav-date-label');
+      const subLabel = document.getElementById('nav-day-sublabel');
+
+      if (activeScale === 'month') {
+        navLabel.textContent = `${monthName.toLowerCase()} 2026 г.`;
+        subLabel.textContent = `(Сводка за полный месяц)`;
+      } else if (activeScale === 'week') {
+        navLabel.textContent = `12 — 18 октября 2026 г.`;
+        subLabel.textContent = `(Текущая 42-я неделя)`;
+      } else {
+        navLabel.textContent = `12 октября 2026 г.`;
+        subLabel.textContent = `(Понедельник · рабочий день)`;
+      }
+    }
+
+    // 3. Аккордеоны групп
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('hidden');
+    }
+
+    // 4. Редактирование неподписанной транзакции
+    let currentEditTxId = null;
+
+    function editTransaction(id, defaultTitle, defaultAmount, defaultWallet, defaultPerson) {
+      currentEditTxId = id;
+      document.getElementById('edit-title').value = defaultTitle;
+      document.getElementById('edit-amount').value = `${defaultAmount} ₽`;
+      document.getElementById('edit-wallet').value = defaultWallet;
+      document.getElementById('edit-person').value = defaultPerson || '';
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function saveTransaction(e) {
+      e.preventDefault();
+      const newTitle = document.getElementById('edit-title').value;
+      const person = document.getElementById('edit-person').value;
+
+      if (currentEditTxId === 'tx-acq-1') {
+        const titleEl = document.getElementById('tx-acq-1-title');
+        const badgeEl = document.getElementById('tx-acq-1-badge');
+        const unassignedBadge = document.getElementById('badge-acq-unassigned');
+
+        if (titleEl) titleEl.textContent = `${newTitle} (${person || 'Подписано'})`;
+        if (badgeEl) {
+          badgeEl.textContent = 'ПОДПИСАНО ✅';
+          badgeEl.className = 'bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.2 rounded';
+        }
+        if (unassignedBadge) {
+          unassignedBadge.textContent = 'Все 3 чека подписаны';
+          unassignedBadge.className = 'bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full';
+        }
+      }
+
+      closeEditModal();
+      alert(`✅ Транзакция успешно сохранена!\nНазвание: ${newTitle}\nОтветственный: ${person}\nСтатус: Подписано.`);
+    }
+
+    // 5. Утверждение кассы
+    function approveDailyBook() {
+      const btn = document.getElementById('btn-top-approve');
+      if (btn) {
+        btn.innerHTML = '<span class="material-symbols-outlined text-[15px]">check_circle</span><span>Касса утверждена директором</span>';
+        btn.className = 'px-2.5 py-1 rounded-lg bg-slate-900 text-emerald-400 font-black text-xs transition-colors flex items-center gap-1 shadow-xs cursor-default';
+      }
+      alert('✅ Суточный баланс за 12.10.2026 утверждён директором!\n\n• 🏦 Р/С Банк: 692 800 ₽ (100% совпадение с API)\n• 🔒 Сейф (нал): 188 600 ₽ (пересчитано, без расхождений)\n• ⛽ Топливная карта: 33 700 ₽ (сверено с чеками)');
+    }
+
+    // 6. Телеграм превью
+    function openTelegramPreview() {
+      document.getElementById('telegram-preview-modal').classList.remove('hidden');
+    }
+
+    function closeTelegramPreview() {
+      document.getElementById('telegram-preview-modal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

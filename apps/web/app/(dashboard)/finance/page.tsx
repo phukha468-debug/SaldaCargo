@@ -5,10 +5,11 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ReceivablesPage from '../receivables/page';
 import { PaymentCalendarPanel } from '@/components/PaymentCalendarPanel';
+import { DailyControlPanel } from '@/components/DailyControlPanel';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'expenses' | 'income' | 'recv' | 'calendar';
+type Tab = 'daily' | 'expenses' | 'income' | 'recv' | 'calendar';
 
 type ExpenseTx = {
   id: string;
@@ -2059,6 +2060,7 @@ function TabAmount({ children }: { children: React.ReactNode }) {
 // ── Main page ──────────────────────────────────────────────────────────────
 
 const TAB_GRADIENTS: Record<Tab, string> = {
+  daily: 'linear-gradient(135deg,#0f172a,#1e293b)',
   expenses: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
   income: 'linear-gradient(135deg,#10b981,#0891b2)',
   recv: 'linear-gradient(135deg,#f59e0b,#f97316)',
@@ -2068,9 +2070,9 @@ const TAB_GRADIENTS: Record<Tab, string> = {
 export default function FinancePage() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab') as Tab | null;
-  const VALID_TABS: Tab[] = ['expenses', 'income', 'recv', 'calendar'];
+  const VALID_TABS: Tab[] = ['daily', 'expenses', 'income', 'recv', 'calendar'];
   const [activeTab, setActiveTab] = useState<Tab>(
-    tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'expenses',
+    tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'daily',
   );
   const currentMonth = todayMonth();
 
@@ -2099,6 +2101,13 @@ export default function FinancePage() {
     n(expSummary?.revenue);
 
   const tabs: { id: Tab; icon: string; label: string; sub: string; amount: string }[] = [
+    {
+      id: 'daily',
+      icon: '⚡',
+      label: 'Суточный контроль',
+      sub: 'баланс и касса дня',
+      amount: '100% контроль',
+    },
     {
       id: 'expenses',
       icon: '📊',
@@ -2185,6 +2194,7 @@ export default function FinancePage() {
 
       {/* Active panel */}
       <div key={activeTab}>
+        {activeTab === 'daily' && <DailyControlPanel />}
         {activeTab === 'expenses' && <ExpensesPanel />}
         {activeTab === 'income' && <IncomePanel />}
         {activeTab === 'recv' && <ReceivablesPanel />}

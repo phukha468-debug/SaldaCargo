@@ -2,6 +2,37 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+/** PATCH /api/transactions/[id] — обновить описание, категорию или контрагента */
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await request.json().catch(() => ({}));
+  if (!id) return NextResponse.json({ error: 'ID обязателен' }, { status: 400 });
+
+  const supabase = createAdminClient();
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (typeof body.description === 'string') {
+    updateData.description = body.description.trim();
+  }
+  if (body.category_id !== undefined) {
+    updateData.category_id = body.category_id;
+  }
+  if (body.counterparty_id !== undefined) {
+    updateData.counterparty_id = body.counterparty_id;
+  }
+
+  const { data, error } = await (supabase.from('transactions') as any)
+    .update(updateData)
+    .eq('id', id)
+    .select('id, description, category_id, counterparty_id, updated_at')
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, transaction: data });
+}
+
 /** DELETE /api/transactions/[id] — аннулировать транзакцию (soft-delete) */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
