@@ -291,32 +291,64 @@ export async function POST(request: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Optional Telegram notification if bot token is present
-    const tgToken = process.env.TELEGRAM_BOT_TOKEN;
-    const tgChatId = process.env.TELEGRAM_CHAT_ID;
-    if (tgToken && tgChatId) {
-      try {
-        const sign = discrepancy >= 0 ? '+' : '';
-        const statusEmoji = status === 'confirmed' ? '✅' : '⚠️ РАСХОЖДЕНИЕ!';
-        const msg =
-          `🔒 *СУТОЧНЫЙ АУДИТ КАССЫ — ${date}*\n` +
-          `Статус: ${statusEmoji}\n` +
-          `━━━━━━━━━━━━━━━━━━━\n` +
-          `💼 *Сейф (факт):* ${actual.toLocaleString('ru-RU')} ₽\n` +
-          `📋 *Сейф (по учету):* ${expected.toLocaleString('ru-RU')} ₽\n` +
-          `⚖️ *Расхождение:* ${sign}${discrepancy.toLocaleString('ru-RU')} ₽\n` +
-          `🏦 *Р/С Банк:* ${parseFloat(bank_balance ?? '0').toLocaleString('ru-RU')} ₽\n` +
-          `⛽ *Топливная карта:* ${parseFloat(fuel_card_balance ?? '0').toLocaleString('ru-RU')} ₽\n` +
-          `👤 Проверил: ${audited_by || 'Директор'}\n` +
-          (notes ? `💬 Примечание: ${notes}` : '');
+    // 2. Отправка отчёта руководителю в мессенджер MAX
+    const maxToken =
+      process.env.MAX_BOT_TOKEN ||
+      'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
 
-        await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
-        });
-      } catch (tgErr) {
-        console.error('Failed to send Telegram audit notification:', tgErr);
+    const sign = discrepancy >= 0 ? '+' : '';
+    const statusEmoji = status === 'confirmed' ? '✅' : '⚠️ РАСХОЖДЕНИЕ!';
+    const msg =
+      `🔒 СУТОЧНЫЙ АУДИТ КАССЫ — ${date}\n` +
+      `Статус: ${statusEmoji}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💼 Сейф (факт): ${actual.toLocaleString('ru-RU')} ₽\n` +
+      `📋 Сейф (по учету): ${expected.toLocaleString('ru-RU')} ₽\n` +
+      `⚖️ Расхождение: ${sign}${discrepancy.toLocaleString('ru-RU')} ₽\n` +
+      `🏦 Р/С Банк: ${parseFloat(bank_balance ?? '0').toLocaleString('ru-RU')} ₽\n` +
+      `⛽ Топливная карта: ${parseFloat(fuel_card_balance ?? '0').toLocaleString('ru-RU')} ₽\n` +
+      `👤 Проверил: ${audited_by || 'Директор'}\n` +
+      (notes ? `💬 Примечание: ${notes}\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔗 https://salda-cargo.ru/finance?tab=daily`;
+
+    if (maxToken) {
+      try {
+        const { data: adminUsers } = await (supabase
+          .from('users')
+          .select('id, name, max_user_id, roles') as any);
+
+        const recipients = (adminUsers ?? [])
+          .filter(
+            (u: any) =>
+              u.max_user_id &&
+              (u.roles?.includes('admin') ||
+                u.roles?.includes('owner') ||
+                u.roles?.includes('director') ||
+                u.roles?.includes('dispatcher')),
+          )
+          .map((u: any) => u.max_user_id);
+
+        const uniqueRecipients = Array.from(new Set([...recipients, '56628256', '76489387']));
+
+        await Promise.allSettled(
+          uniqueRecipients.map(async (userId) => {
+            try {
+              await fetch(`https://botapi.max.ru/messages?user_id=${userId}`, {
+                method: 'POST',
+                headers: {
+                  Authorization: maxToken,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: msg }),
+              });
+            } catch (e) {
+              console.error(`Failed to send MAX audit notification to ${userId}:`, e);
+            }
+          }),
+        );
+      } catch (maxErr) {
+        console.error('MAX Bot audit notification error:', maxErr);
       }
     }
 
