@@ -2074,19 +2074,11 @@ export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<Tab>(
     tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'daily',
   );
-  const currentMonth = todayMonth();
 
   const { data: recvSummary } = useQuery<{ total: string }>({
     queryKey: ['recv-summary'],
     queryFn: () => fetch('/api/receivables/summary').then((r) => r.json()),
     staleTime: 60 * 1000,
-  });
-
-  const { data: expSummary } = useQuery<ExpenseMonthData>({
-    queryKey: ['finance-month', currentMonth],
-    queryFn: () => fetch(`/api/finance?month=${currentMonth}`).then((r) => r.json()),
-    staleTime: 60 * 1000,
-    refetchInterval: 30 * 1000,
   });
 
   const { data: calData } = useQuery<{ summary: { remainingThisMonth: number } }>({
@@ -2095,32 +2087,13 @@ export default function FinancePage() {
     staleTime: 60 * 1000,
   });
 
-  const expTotal = (expSummary?.transactions ?? []).reduce((s, t) => s + n(t.amount), 0);
-  const incTotal =
-    (expSummary?.income_transactions ?? []).reduce((s, t) => s + n(t.amount), 0) +
-    n(expSummary?.revenue);
-
   const tabs: { id: Tab; icon: string; label: string; sub: string; amount: string }[] = [
     {
       id: 'daily',
       icon: '⚡',
       label: 'Суточный контроль',
-      sub: 'баланс и касса дня',
+      sub: 'доходы, расходы и касса дня',
       amount: '100% контроль',
-    },
-    {
-      id: 'expenses',
-      icon: '📊',
-      label: 'Расходы',
-      sub: 'структура и аналитика',
-      amount: rub(expTotal),
-    },
-    {
-      id: 'income',
-      icon: '📈',
-      label: 'Доходы',
-      sub: 'поступления за месяц',
-      amount: rub(incTotal),
     },
     {
       id: 'recv',

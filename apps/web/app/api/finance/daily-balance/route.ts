@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { syncTBankBalance } from '@/lib/tbank';
+import { syncTBankBalance, fetchTBankStatement, TBankOperation } from '@/lib/tbank';
 import { NextResponse } from 'next/server';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
@@ -19,27 +19,37 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
 
-    // 1. Fetch live T-Bank balance if today
+    // 1. Fetch live T-Bank balance and bank statement operations
     let apiBalance: number | null = null;
     let isApiSynced = false;
     let tbankAccountNum = '';
+    let bankStatementOps: TBankOperation[] = [];
     const isToday = date === new Date().toISOString().slice(0, 10);
 
-    if (isToday) {
-      try {
-        const syncPromise = syncTBankBalance();
-        const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
-          setTimeout(() => resolve({ success: false, error: 'TBank timeout' }), 2500),
-        );
-        const syncResult = (await Promise.race([syncPromise, timeoutPromise])) as any;
-        if (syncResult?.success && typeof syncResult.balance === 'number') {
-          apiBalance = syncResult.balance;
-          isApiSynced = true;
-          tbankAccountNum = syncResult.accountNumber || '';
-        }
-      } catch (e) {
-        console.error('TBank auto-sync error in daily-balance:', e);
+    const fromIso = `${date}T00:00:00Z`;
+    const toIso = `${date}T23:59:59Z`;
+
+    try {
+      const syncPromise = isToday ? syncTBankBalance() : Promise.resolve(null);
+      const statementPromise = fetchTBankStatement(fromIso, toIso);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+
+      const [syncResult, statementResult] = await Promise.all([
+        Promise.race([syncPromise, timeoutPromise]) as any,
+        Promise.race([statementPromise, timeoutPromise]) as any,
+      ]);
+
+      if (syncResult?.success && typeof syncResult.balance === 'number') {
+        apiBalance = syncResult.balance;
+        isApiSynced = true;
+        tbankAccountNum = syncResult.accountNumber || '';
       }
+
+      if (Array.isArray(statementResult)) {
+        bankStatementOps = statementResult;
+      }
+    } catch (e) {
+      console.error('TBank auto-sync/statement error in daily-balance:', e);
     }
 
     // 2. Fetch all transactions for this day
@@ -199,11 +209,27 @@ export async function GET(request: Request) {
       }
     }
 
+    // Если подключена и получена живая выписка Т-Банка через API — это 100% точный источник правды по Р/С
+    if (bankStatementOps && bankStatementOps.length > 0) {
+      const apiOpIn = bankStatementOps
+        .filter((op: any) => op.typeOfOperation === 'Credit')
+        .reduce((s: number, op: any) => s + (op.operationAmount || op.rubleAmount || 0), 0);
+      const apiOpOut = bankStatementOps
+        .filter((op: any) => op.typeOfOperation === 'Debit')
+        .reduce((s: number, op: any) => s + (op.operationAmount || op.rubleAmount || 0), 0);
+
+      bankDayIn = apiOpIn;
+      bankDayOut = apiOpOut;
+    }
+
     const eveningBankCalc = morningBank + bankDayIn - bankDayOut;
     const eveningCashCalc = morningCash + cashDayIn - cashDayOut;
     const eveningFuelCalc = morningFuel + fuelDayIn - fuelDayOut;
 
     const actualEveningBank = isToday && apiBalance !== null ? apiBalance : eveningBankCalc;
+    // Для сегодняшнего дня при известном текущем балансе из API утро = вечер - приход + расход
+    const actualMorningBank =
+      isToday && apiBalance !== null ? actualEveningBank - bankDayIn + bankDayOut : morningBank;
 
     return NextResponse.json({
       date,
@@ -214,7 +240,7 @@ export async function GET(request: Request) {
           name: 'Р/С Банк',
           account_number: tbankAccountNum,
           api_synced: isApiSynced,
-          morning: morningBank,
+          morning: actualMorningBank,
           inflow: bankDayIn,
           outflow: bankDayOut,
           evening: actualEveningBank,
@@ -240,6 +266,7 @@ export async function GET(request: Request) {
       transactions: dayTxs ?? [],
       trip_orders: dayTripOrders ?? [],
       cash_collections: dayCollections ?? [],
+      bank_operations: bankStatementOps,
       categories: categoriesList ?? [],
     });
   } catch (err: any) {

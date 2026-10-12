@@ -64,6 +64,22 @@ interface CashCollectionTx {
   driver: { name: string } | null;
 }
 
+interface TBankOp {
+  operationId: string;
+  operationDate: string;
+  operationTime?: string;
+  typeOfOperation: 'Credit' | 'Debit' | string;
+  operationAmount: number;
+  rubleAmount?: number;
+  description: string;
+  payPurpose?: string;
+  category?: string;
+  documentNumber?: string;
+  payer?: { name?: string; inn?: string; acct?: string };
+  receiver?: { name?: string; inn?: string; acct?: string };
+  counterParty?: { name?: string; inn?: string; account?: string };
+}
+
 interface DailyBalanceData {
   date: string;
   is_today: boolean;
@@ -111,6 +127,7 @@ interface DailyBalanceData {
   transactions: RawTx[];
   trip_orders: TripOrderTx[];
   cash_collections: CashCollectionTx[];
+  bank_operations?: TBankOp[];
   categories: CategoryItem[];
 }
 
@@ -262,30 +279,51 @@ export function DailyControlPanel() {
 
   const incomeItems: IncomeItem[] = [];
 
-  // Add settled trip orders (Bank income)
+  // 1. Поступления на Р/С БАНК:
+  // Если пришли прямые операции по API Т-Банка, отображаем их в Р/С (Credit)
+  const bankOps = data?.bank_operations ?? [];
+  const creditBankOps = bankOps.filter((op) => op.typeOfOperation === 'Credit');
+
   if (activeWallet === 'all' || activeWallet === 'bank') {
-    (data?.trip_orders ?? []).forEach((order) => {
-      const client = order.counterparty?.name || order.description || 'Оплата рейса';
-      const driver = order.trip?.driver?.name ? `вод. ${order.trip.driver.name}` : 'Рейс';
-      incomeItems.push({
-        id: `trip-${order.id}`,
-        title: `Выручка с рейса · ${client}`,
-        category: 'Выручка логистики',
-        wallet: 'bank',
-        walletName: 'Р/С Банк',
-        author: driver,
-        amount: parseFloat(order.amount) || 0,
+    if (creditBankOps.length > 0) {
+      creditBankOps.forEach((op) => {
+        const payerName = op.payer?.name || op.counterParty?.name || 'Поступление на Р/С';
+        incomeItems.push({
+          id: `tbank-${op.operationId}`,
+          title: op.description || op.payPurpose || 'Входящий перевод на Р/С',
+          category: op.category === 'acquiring' ? 'Эквайринг / СБП' : 'Поступления на Р/С',
+          wallet: 'bank',
+          walletName: 'Р/С Банк (API)',
+          author: payerName,
+          amount: op.operationAmount || op.rubleAmount || 0,
+        });
       });
-    });
+    } else {
+      // Резервный источник по заказам, если API выписки пуст
+      (data?.trip_orders ?? []).forEach((order) => {
+        const client = order.counterparty?.name || order.description || 'Оплата счёта / QR';
+        const driver = order.trip?.driver?.name ? `вод. ${order.trip.driver.name}` : 'Рейс';
+        incomeItems.push({
+          id: `trip-${order.id}`,
+          title: `Оплата рейса · ${client}`,
+          category: 'Оплата по счёту / QR',
+          wallet: 'bank',
+          walletName: 'Р/С Банк',
+          author: driver,
+          amount: parseFloat(order.amount) || 0,
+        });
+      });
+    }
   }
 
-  // Add cash collections (Safe income)
+  // 2. Поступления в СЕЙФ (НАЛИЧНЫЕ):
+  // Только факт сдачи наличных: инкассация водителей за смену либо погашение долга клиентом наличными
   if (activeWallet === 'all' || activeWallet === 'cash') {
     (data?.cash_collections ?? []).forEach((col) => {
       incomeItems.push({
         id: `cash-${col.id}`,
-        title: `Инкассация наличных${col.note ? ` (${col.note})` : ''}`,
-        category: 'Инкассация',
+        title: `Инкассация с рейса${col.note ? ` (${col.note})` : ''}`,
+        category: 'Наличные со смены',
         wallet: 'cash',
         walletName: 'Сейф (нал)',
         author: col.driver?.name || 'Водитель',
@@ -294,16 +332,21 @@ export function DailyControlPanel() {
     });
   }
 
-  // Add explicit income transactions
+  // 3. Ручные транзакции поступлений (погашение дебиторки наличными в сейф)
   const rawIncomeTxs = (data?.transactions ?? []).filter(
     (t) => t.direction === 'income' && txMatchesWallet(t),
   );
 
-  // Group acquiring reimbursements if multiple
+  // Group acquiring reimbursements if multiple (только если не подтянуты из API банка)
   const acquiringTxs: RawTx[] = [];
   rawIncomeTxs.forEach((tx) => {
     const desc = (tx.description || '').toLowerCase();
     const cat = (tx.category?.name || '').toLowerCase();
+    if (creditBankOps.length > 0 && tx.to_wallet_id === BANK_ID) {
+      // Если есть банковская выписка, не дублируем банковские поступления
+      return;
+    }
+
     if (desc.includes('эквайринг') || cat.includes('эквайринг')) {
       acquiringTxs.push(tx);
     } else {
@@ -318,11 +361,11 @@ export function DailyControlPanel() {
       }
       incomeItems.push({
         id: tx.id,
-        title: tx.description || 'Входящее поступление',
-        category: tx.category?.name || 'Поступления',
+        title: tx.description || 'Погашение задолженности (нал)',
+        category: tx.category?.name || 'Поступление в сейф',
         wallet: w,
         walletName: wName,
-        author: tx.counterparty?.name || tx.related_user?.name || 'Бухгалтерия',
+        author: tx.counterparty?.name || tx.related_user?.name || 'Администратор',
         amount: parseFloat(tx.amount) || 0,
         rawTx: tx,
       });
@@ -572,6 +615,88 @@ export function DailyControlPanel() {
         })),
       });
     }
+  }
+
+  // Live Bank Debit operations (Commissions, Outgoing payments) from T-Bank API
+  if (data?.bank_operations && data.bank_operations.length > 0) {
+    const debitBankOps = data.bank_operations.filter(
+      (op) => op.typeOfOperation === 'Debit' && (activeWallet === 'all' || activeWallet === 'bank'),
+    );
+
+    const apiBankCommissions: TBankOp[] = [];
+    const apiBankOtherDebits: TBankOp[] = [];
+
+    debitBankOps.forEach((op) => {
+      const desc = (op.description || op.payPurpose || '').toLowerCase();
+      if (
+        desc.includes('комисси') ||
+        desc.includes('плата за') ||
+        desc.includes('тариф') ||
+        op.category === 'commission'
+      ) {
+        apiBankCommissions.push(op);
+      } else {
+        apiBankOtherDebits.push(op);
+      }
+    });
+
+    if (apiBankCommissions.length > 0) {
+      if (apiBankCommissions.length === 1 && apiBankCommissions[0]) {
+        const op = apiBankCommissions[0];
+        expenseItems.push({
+          id: `tbank-deb-${op.operationId}`,
+          title: op.description || op.payPurpose || 'Комиссия банка',
+          category: 'Банковские услуги (API)',
+          wallet: 'bank',
+          walletName: 'Р/С Банк',
+          author: 'Т-Банк (Авто)',
+          amount: op.operationAmount || op.rubleAmount || 0,
+        });
+      } else {
+        const totalComm = apiBankCommissions.reduce(
+          (s, op) => s + (op.operationAmount || op.rubleAmount || 0),
+          0,
+        );
+        expenseItems.push({
+          id: 'group-api-bank-commission',
+          title: `Комиссии банка за операции (${apiBankCommissions.length} списаний)`,
+          category: 'Банковские услуги (API)',
+          wallet: 'bank',
+          walletName: 'Р/С Банк',
+          author: 'Т-Банк (Авто)',
+          amount: totalComm,
+          isGroup: true,
+          subItems: apiBankCommissions.map((op) => {
+            const dateVal = op.operationDate || op.operationTime;
+            return {
+              id: `tbank-deb-${op.operationId}`,
+              title: op.description || op.payPurpose || 'Комиссия за операцию',
+              author: 'Т-Банк',
+              amount: op.operationAmount || op.rubleAmount || 0,
+              time: dateVal
+                ? new Date(dateVal).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '—',
+            };
+          }),
+        });
+      }
+    }
+
+    apiBankOtherDebits.forEach((op) => {
+      const receiverName = op.receiver?.name || op.counterParty?.name || 'Контрагент';
+      expenseItems.push({
+        id: `tbank-deb-${op.operationId}`,
+        title: op.description || op.payPurpose || `Списание с Р/С · ${receiverName}`,
+        category: 'Списание с Р/С (API)',
+        wallet: 'bank',
+        walletName: 'Р/С Банк',
+        author: receiverName,
+        amount: op.operationAmount || op.rubleAmount || 0,
+      });
+    });
   }
 
   // Totals calculations
@@ -827,197 +952,7 @@ export function DailyControlPanel() {
         </div>
       )}
 
-      {/* ── 4. THREE WALLET CONTROL CARDS (WITH VIBRANT SELECTION HIGHLIGHTING) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-        {/* BANK CARD */}
-        <div
-          onClick={() => setActiveWallet(activeWallet === 'bank' ? 'all' : 'bank')}
-          className={`p-2.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
-            activeWallet === 'bank'
-              ? 'bg-sky-50 border-2 border-sky-500 ring-4 ring-sky-200/80 shadow-md scale-[1.01]'
-              : activeWallet !== 'all'
-                ? 'bg-white border-slate-200 opacity-40 grayscale-40'
-                : 'bg-white border-slate-200 hover:border-sky-300 shadow-xs'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="text-base">🏦</span>
-              <div>
-                <div className="text-[11px] font-black uppercase text-slate-800 flex items-center gap-1">
-                  Р/С Банк
-                  {bankWallet?.api_synced && (
-                    <span className="text-[9px] bg-sky-100 text-sky-700 font-mono font-bold px-1 rounded">
-                      API 100%
-                    </span>
-                  )}
-                </div>
-                <div className="text-[9px] text-slate-400 font-mono">
-                  {bankWallet?.account_number
-                    ? `№ ...${bankWallet.account_number.slice(-4)}`
-                    : 'Т-Банк Бизнес'}
-                </div>
-              </div>
-            </div>
-            {activeWallet === 'bank' && (
-              <span className="text-[9px] font-black uppercase bg-sky-500 text-white px-1.5 py-0.5 rounded shadow-xs">
-                ВЫБРАНО 🔥
-              </span>
-            )}
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-100 text-center font-mono">
-            <div>
-              <div className="text-[8px] uppercase text-slate-400 font-sans font-bold">
-                Утро (00:00)
-              </div>
-              <div className="text-[11px] font-extrabold text-slate-600">
-                {rub(bankWallet?.morning ?? 0)}
-              </div>
-            </div>
-            <div>
-              <div className="text-[8px] uppercase text-slate-400 font-sans font-bold">
-                Оборот дня
-              </div>
-              <div className="text-[11px] font-extrabold">
-                <span className="text-emerald-600">+{rub(bankWallet?.inflow ?? 0)}</span>
-                <span className="text-slate-300 mx-0.5">/</span>
-                <span className="text-rose-600">-{rub(bankWallet?.outflow ?? 0)}</span>
-              </div>
-            </div>
-            <div className="bg-sky-50/60 rounded p-0.5">
-              <div className="text-[8px] uppercase text-sky-800 font-sans font-black">
-                Вечер (Итог)
-              </div>
-              <div className="text-xs font-black text-sky-700">{rub(bankWallet?.evening ?? 0)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* CASH SAFE CARD */}
-        <div
-          onClick={() => setActiveWallet(activeWallet === 'cash' ? 'all' : 'cash')}
-          className={`p-2.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
-            activeWallet === 'cash'
-              ? 'bg-emerald-50 border-2 border-emerald-600 ring-4 ring-emerald-200/80 shadow-md scale-[1.01]'
-              : activeWallet !== 'all'
-                ? 'bg-white border-slate-200 opacity-40 grayscale-40'
-                : 'bg-white border-slate-200 hover:border-emerald-300 shadow-xs'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="text-base">🔒</span>
-              <div>
-                <div className="text-[11px] font-black uppercase text-slate-800 flex items-center gap-1">
-                  Сейф (Наличные)
-                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">
-                    Аудит 19:30
-                  </span>
-                </div>
-                <div className="text-[9px] text-slate-400">Пересчёт купюр директором</div>
-              </div>
-            </div>
-            {activeWallet === 'cash' && (
-              <span className="text-[9px] font-black uppercase bg-emerald-600 text-white px-1.5 py-0.5 rounded shadow-xs">
-                ВЫБРАНО 🔥
-              </span>
-            )}
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-100 text-center font-mono">
-            <div>
-              <div className="text-[8px] uppercase text-slate-400 font-sans font-bold">
-                Утро (00:00)
-              </div>
-              <div className="text-[11px] font-extrabold text-slate-600">
-                {rub(cashWallet?.morning ?? 0)}
-              </div>
-            </div>
-            <div>
-              <div className="text-[8px] uppercase text-slate-400 font-sans font-bold">
-                Оборот дня
-              </div>
-              <div className="text-[11px] font-extrabold">
-                <span className="text-emerald-600">+{rub(cashWallet?.inflow ?? 0)}</span>
-                <span className="text-slate-300 mx-0.5">/</span>
-                <span className="text-rose-600">-{rub(cashWallet?.outflow ?? 0)}</span>
-              </div>
-            </div>
-            <div className="bg-emerald-50/60 rounded p-0.5">
-              <div className="text-[8px] uppercase text-emerald-800 font-sans font-black">
-                Вечер (Итог)
-              </div>
-              <div className="text-xs font-black text-emerald-700">
-                {rub(cashWallet?.evening ?? 0)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* FUEL CARD */}
-        <div
-          onClick={() => setActiveWallet(activeWallet === 'fuel_card' ? 'all' : 'fuel_card')}
-          className={`p-2.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
-            activeWallet === 'fuel_card'
-              ? 'bg-amber-50 border-2 border-amber-500 ring-4 ring-amber-200/80 shadow-md scale-[1.01]'
-              : activeWallet !== 'all'
-                ? 'bg-white border-slate-200 opacity-40 grayscale-40'
-                : 'bg-white border-slate-200 hover:border-amber-300 shadow-xs'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="text-base">⛽</span>
-              <div>
-                <div className="text-[11px] font-black uppercase text-slate-800 flex items-center gap-1">
-                  Топливная карта
-                  <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1 rounded">
-                    ГСМ Автопарк
-                  </span>
-                </div>
-                <div className="text-[9px] text-slate-400">Баланс по чекам / кабинету</div>
-              </div>
-            </div>
-            {activeWallet === 'fuel_card' && (
-              <span className="text-[9px] font-black uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded shadow-xs">
-                ВЫБРАНО 🔥
-              </span>
-            )}
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-100 text-center font-mono">
-            <div>
-              <div className="text-[8px] uppercase text-slate-400 font-sans font-bold">
-                Утро (00:00)
-              </div>
-              <div className="text-[11px] font-extrabold text-slate-600">
-                {rub(fuelWallet?.morning ?? 0)}
-              </div>
-            </div>
-            <div>
-              <div className="text-[8px] uppercase text-slate-400 font-sans font-bold">
-                Оборот дня
-              </div>
-              <div className="text-[11px] font-extrabold">
-                <span className="text-emerald-600">+{rub(fuelWallet?.inflow ?? 0)}</span>
-                <span className="text-slate-300 mx-0.5">/</span>
-                <span className="text-rose-600">-{rub(fuelWallet?.outflow ?? 0)}</span>
-              </div>
-            </div>
-            <div className="bg-amber-50/60 rounded p-0.5">
-              <div className="text-[8px] uppercase text-amber-800 font-sans font-black">
-                Вечер (Итог)
-              </div>
-              <div className="text-xs font-black text-amber-700">
-                {rub(fuelWallet?.evening ?? 0)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 5. TOP SUMMARY CARDS (Proportionally 2x smaller) ── */}
+      {/* ── 4. TOP SUMMARY CARDS (Proportionally 2x smaller) ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {/* Morning Total */}
         <div className="bg-gradient-to-br from-slate-700 to-slate-800 text-white rounded-xl p-2.5 relative overflow-hidden shadow-xs">

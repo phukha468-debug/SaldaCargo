@@ -3,7 +3,7 @@ import https from 'https';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const BANK_WALLET_ID = '10000000-0000-0000-0000-000000000001';
-const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
+export const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
 
 export interface TBankAccount {
   accountNumber: string;
@@ -98,8 +98,68 @@ export async function fetchTBankAccounts(apiToken: string): Promise<TBankAccount
   throw new Error('Не удалось подключиться к Т-Банк API');
 }
 
-const TBANK_FALLBACK_TOKEN =
+export const TBANK_FALLBACK_TOKEN =
   't.mOBb0LuZQvgaz2LNItGsy45aAjBmikPwHaVqTTpHOGHE-YAh2rNox5C2ZD8kLZJQIstHqyg6G8rQNzVUyQ60JA';
+
+export interface TBankOperation {
+  operationId: string;
+  operationDate: string;
+  typeOfOperation: 'Credit' | 'Debit' | string;
+  operationAmount: number;
+  rubleAmount?: number;
+  description: string;
+  payPurpose?: string;
+  category?: string;
+  documentNumber?: string;
+  payer?: {
+    name?: string;
+    inn?: string;
+    acct?: string;
+  };
+  receiver?: {
+    name?: string;
+    inn?: string;
+    acct?: string;
+  };
+  counterParty?: {
+    name?: string;
+    inn?: string;
+    account?: string;
+  };
+}
+
+/**
+ * Получить выписку операций по счёту из Open API Т-Банка
+ */
+export async function fetchTBankStatement(
+  fromDate: string, // YYYY-MM-DDTHH:mm:ssZ
+  toDate?: string,
+  apiToken?: string,
+  accountNumber?: string,
+): Promise<TBankOperation[]> {
+  const token = apiToken || process.env.TBANK_API_TOKEN || TBANK_FALLBACK_TOKEN;
+  const acc = accountNumber || TARGET_ACCOUNT_NUMBER;
+  let path = `/openapi/api/v1/statement?accountNumber=${encodeURIComponent(acc)}&from=${encodeURIComponent(fromDate)}`;
+  if (toDate) {
+    path += `&to=${encodeURIComponent(toDate)}`;
+  }
+
+  try {
+    const data = await requestTBankApi('business.tbank.ru', path, token);
+    return Array.isArray(data?.operations) ? data.operations : [];
+  } catch (err: any) {
+    if (!err?.message?.includes('Таймаут')) {
+      try {
+        const data2 = await requestTBankApi('business.tinkoff.ru', path, token);
+        return Array.isArray(data2?.operations) ? data2.operations : [];
+      } catch {
+        // ignore
+      }
+    }
+    console.error('TBank statement fetch error:', err);
+    return [];
+  }
+}
 
 /**
  * Синхронизировать баланс Р/С с реальными данными из Т-Банка
