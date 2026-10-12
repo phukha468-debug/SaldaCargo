@@ -273,8 +273,8 @@ export function CreatePrrModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200">
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 mb-0">
         {/* Шапка */}
         <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -607,23 +607,27 @@ export function CreatePrrModal({
               </span>
             </label>
           )}
-
-          {/* Кнопка отправки */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={submitting || amount <= 0 || selectedLoaders.length === 0}
-              className={cn(
-                'w-full py-4 rounded-xl text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all active:scale-[0.98]',
-                submitting || amount <= 0 || selectedLoaders.length === 0
-                  ? 'bg-zinc-300 cursor-not-allowed text-zinc-500'
-                  : 'bg-orange-600 hover:bg-orange-700 shadow-orange-200',
-              )}
-            >
-              {submitting ? 'Создаём заявку...' : '🚀 Создать заказ ПРР'}
-            </button>
-          </div>
         </form>
+
+        {/* Фиксированный подвал с кнопкой создания заказа (всегда на виду, не перекрывается меню) */}
+        <div
+          className="p-4 border-t border-zinc-200 bg-white shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
+          style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}
+        >
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e)}
+            disabled={submitting || amount <= 0 || selectedLoaders.length === 0}
+            className={cn(
+              'w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all active:scale-[0.98]',
+              submitting || amount <= 0 || selectedLoaders.length === 0
+                ? 'bg-zinc-300 cursor-not-allowed text-zinc-500'
+                : 'bg-orange-600 hover:bg-orange-700 shadow-orange-200',
+            )}
+          >
+            {submitting ? 'Создаём заявку...' : '🚀 Создать заказ ПРР'}
+          </button>
+        </div>
       </div>
     </div>
   );
