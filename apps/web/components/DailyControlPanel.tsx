@@ -343,6 +343,12 @@ export function DailyControlPanel() {
   rawIncomeTxs.forEach((tx) => {
     const desc = (tx.description || '').toLowerCase();
     const cat = (tx.category?.name || '').toLowerCase();
+
+    // Исключаем технические фиктивные корректировки остатка
+    if (desc.includes('корректировка остатка') || desc.includes('корректировка баланса')) {
+      return;
+    }
+
     if (creditBankOps.length > 0 && tx.to_wallet_id === BANK_ID) {
       // Если есть банковская выписка, не дублируем банковские поступления
       return;
@@ -445,6 +451,11 @@ export function DailyControlPanel() {
   rawExpenseTxs.forEach((tx) => {
     const desc = (tx.description || '').toLowerCase();
     const cat = (tx.category?.name || '').toLowerCase();
+
+    // Исключаем технические фиктивные корректировки остатка
+    if (desc.includes('корректировка остатка') || desc.includes('корректировка баланса')) {
+      return;
+    }
 
     if (
       desc.includes('комисси') ||

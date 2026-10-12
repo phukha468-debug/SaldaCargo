@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import https from 'https';
-import { createAdminClient } from '@/lib/supabase/admin';
 
-const BANK_WALLET_ID = '10000000-0000-0000-0000-000000000001';
 export const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
 
 export interface TBankAccount {
@@ -202,63 +200,7 @@ export async function syncTBankBalance(): Promise<{
         : Number(targetAccount.balance) || 0;
 
     // Автоматическая корректировка баланса кошелька в системе при расхождении
-    const supabase = createAdminClient();
-    const { data: adminUser } = await (supabase.from('users') as any)
-      .select('id')
-      .or('roles.cs.{admin},roles.cs.{owner}')
-      .limit(1)
-      .single();
-
-    let adjustmentString = '0.00';
-
-    if (adminUser) {
-      const [{ data: bankOrders }, { data: txIn }, { data: txOut }] = await Promise.all([
-        (supabase.from('trip_orders') as any)
-          .select('amount')
-          .in('payment_method', ['bank_invoice', 'qr'])
-          .eq('settlement_status', 'completed')
-          .eq('lifecycle_status', 'approved'),
-        (supabase.from('transactions') as any)
-          .select('amount, trip_order_id')
-          .eq('to_wallet_id', BANK_WALLET_ID)
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-        (supabase.from('transactions') as any)
-          .select('amount')
-          .eq('from_wallet_id', BANK_WALLET_ID)
-          .eq('lifecycle_status', 'approved')
-          .eq('settlement_status', 'completed'),
-      ]);
-
-      const sum = (rows: any[]) =>
-        (rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
-
-      // Исключаем транзакции с trip_order_id, так как эти заказы уже учтены в bankOrders
-      const txInFiltered = (txIn ?? []).filter((r: any) => !r.trip_order_id);
-      const currentBalance = sum(bankOrders ?? []) + sum(txInFiltered) - sum(txOut ?? []);
-      const delta = realBalance - currentBalance;
-
-      if (Math.abs(delta) >= 0.01) {
-        const isIncome = delta > 0;
-        const amount = Math.abs(delta).toFixed(2);
-        adjustmentString = (isIncome ? '+' : '-') + amount;
-
-        const CAT_OTHER_INCOME = '68225ea2-d7de-4442-8ed8-ce2366b5d369';
-        const CAT_OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
-
-        await (supabase.from('transactions') as any).insert({
-          direction: isIncome ? 'income' : 'expense',
-          amount,
-          category_id: isIncome ? CAT_OTHER_INCOME : CAT_OTHER_EXPENSE,
-          ...(isIncome ? { to_wallet_id: BANK_WALLET_ID } : { from_wallet_id: BANK_WALLET_ID }),
-          lifecycle_status: 'approved',
-          settlement_status: 'completed',
-          description: 'Корректировка остатка (Т-Банк API)',
-          created_by: adminUser.id,
-          idempotency_key: crypto.randomUUID(),
-        });
-      }
-    }
+    const adjustmentString = '0.00';
 
     return {
       success: true,
