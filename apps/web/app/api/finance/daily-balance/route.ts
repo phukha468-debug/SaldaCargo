@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
     // 2. Fetch all transactions for this day
     const txSelect =
-      'id, amount, direction, description, created_at, from_wallet_id, to_wallet_id, category_id, counterparty_id, related_user_id, ' +
+      'id, amount, direction, description, created_at, from_wallet_id, to_wallet_id, category_id, counterparty_id, related_user_id, trip_order_id, trip_id, idempotency_key, ' +
       'category:transaction_categories(id, name, code), ' +
       'counterparty:counterparties(id, name), ' +
       'related_user:users!transactions_related_user_id_fkey(id, name)';
@@ -77,16 +77,15 @@ export async function GET(request: Request) {
         .lte('created_at', dayEnd)
         .order('created_at', { ascending: false }),
 
-      // Trip orders settled on this day (Bank income)
+      // All Trip orders of this day with Bank/QR payment
       (supabase.from('trip_orders') as any)
         .select(
-          'id, amount, created_at, payment_method, description, counterparty:counterparties(id, name), trip:trips!inner(trip_number, driver:users!trips_driver_id_fkey(name))',
+          'id, amount, created_at, payment_method, description, settlement_status, lifecycle_status, counterparty:counterparties(id, name), trip:trips!inner(id, trip_number, driver_id, driver:users!trips_driver_id_fkey(id, name))',
         )
         .in('payment_method', ['bank_invoice', 'qr'])
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
         .gte('created_at', dayStart)
-        .lte('created_at', dayEnd),
+        .lte('created_at', dayEnd)
+        .order('created_at', { ascending: false }),
 
       // Cash collections settled on this day (Safe income)
       (supabase.from('cash_collections') as any)
