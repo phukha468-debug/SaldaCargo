@@ -159,10 +159,11 @@ export function DailyControlPanel() {
   });
 
   // Fetch daily balance data
-  const { data } = useQuery<DailyBalanceData>({
+  const { data, isFetching, refetch } = useQuery<DailyBalanceData>({
     queryKey: ['daily-balance', selectedDate],
     queryFn: () => fetch(`/api/finance/daily-balance?date=${selectedDate}`).then((r) => r.json()),
     staleTime: 30 * 1000,
+    refetchInterval: selectedDate === todayStr ? 60 * 1000 : false,
   });
 
   // Mutations
@@ -768,6 +769,17 @@ export function DailyControlPanel() {
                 🔒 ПРОВЕРИТЬ СЕЙФ (19:30)
               </button>
             )}
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="inline-flex items-center gap-1 text-[10px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded transition cursor-pointer border border-slate-700/80 disabled:opacity-50"
+              title="Запросить свежую выписку из Т-Банка прямо сейчас"
+            >
+              <span className={`text-[9px] ${isFetching ? 'animate-spin inline-block' : ''}`}>
+                🔄
+              </span>
+              <span>{isFetching ? 'Синхронизация...' : 'Обновить'}</span>
+            </button>
             <span className="text-[10px] text-slate-400 font-mono">
               API Т-Банк: {bankWallet?.api_synced ? '🟢 Live' : '⚪ DB'}
             </span>
