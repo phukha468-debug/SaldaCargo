@@ -34,6 +34,7 @@ import { useEffect } from 'react';
 declare global {
   interface Window {
     WebApp?: {
+      ready?: () => void;
       BackButton?: {
         isVisible: boolean;
         show: () => void;
@@ -64,6 +65,13 @@ export function MinimizeOnBack() {
 
     try {
       const WebApp = window.WebApp;
+
+      // ── Уведомляем MAX о готовности приложения (скрывает нативный спиннер MAX) ─
+      try {
+        WebApp?.ready?.();
+      } catch {
+        // Not supported — silently skip
+      }
 
       // ── Closing confirmation (handles the ✕ button in MAX header) ──────────
       try {

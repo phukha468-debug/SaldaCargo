@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import { Providers } from './providers';
 import { ScrollOnFocus } from '@/components/scroll-on-focus';
@@ -25,6 +26,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <Script src="https://st.max.ru/js/max-web-app.js" strategy="beforeInteractive" />
+      </head>
       <body className="font-sans antialiased bg-zinc-50" suppressHydrationWarning>
         <Providers>
           <MinimizeOnBack />
