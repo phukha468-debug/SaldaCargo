@@ -40,7 +40,7 @@ function clearClientCookie(name: string) {
 }
 
 export default function RootDispatcher() {
-  const [step, setStep] = useState<Step>('restoring');
+  const [step, setStep] = useState<Step>('role');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -93,38 +93,52 @@ export default function RootDispatcher() {
           typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
         const userId = cookieId || localId;
 
-        // Если сессия не сохранена — мгновенно открываем выбор роли без ожидания
+        // Если сессия не сохранена — остаёмся на экране выбора роли
         if (!userId || !savedRole) {
           if (!cancelled) setStep('role');
           return;
         }
+
+        // Если сессия есть, показываем восстановление только пока проверяем
+        if (!cancelled) setStep('restoring');
 
         // Синхронизируем куку, если она была только в localStorage
         if (!cookieId && localId) {
           setClientCookie('salda_user_id', localId);
         }
 
-        // Проверяем валидность сессии через API
-        const res = await fetch('/api/driver/me', { cache: 'no-store' });
-        if (cancelled) return;
+        // Проверяем валидность сессии через API с коротким таймаутом
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-        if (res.ok) {
-          const user = await res.json();
-          if (user && user.id) {
-            const targetPath =
-              savedRole === 'driver'
-                ? '/driver'
-                : savedRole === 'admin' || savedRole === 'owner'
-                  ? '/admin'
-                  : savedRole === 'mechanic'
-                    ? '/mechanic'
-                    : null;
+        try {
+          const res = await fetch('/api/driver/me', {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (cancelled) return;
 
-            if (targetPath) {
-              window.location.replace(targetPath);
-              return;
+          if (res.ok) {
+            const user = await res.json();
+            if (user && user.id) {
+              const targetPath =
+                savedRole === 'driver'
+                  ? '/driver'
+                  : savedRole === 'admin' || savedRole === 'owner'
+                    ? '/admin'
+                    : savedRole === 'mechanic'
+                      ? '/mechanic'
+                      : null;
+
+              if (targetPath) {
+                window.location.replace(targetPath);
+                return;
+              }
             }
           }
+        } catch {
+          // ignore network timeout
         }
 
         // Если сессия недействительна (пользователь удалён или 401) — сбрасываем и даём выбрать роль
@@ -138,16 +152,8 @@ export default function RootDispatcher() {
 
     restoreSession();
 
-    // Страховочный таймаут: не более 1.5 сек на проверку, затем принудительно открываем выбор роли
-    const timer = setTimeout(() => {
-      if (!cancelled) {
-        setStep((current) => (current === 'restoring' ? 'role' : current));
-      }
-    }, 1500);
-
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
   }, []);
 
