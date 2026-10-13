@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Money } from '@saldacargo/ui';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
+import { performLogout } from '@/lib/auth/logout';
 
 type Wallets = {
   bank: { id: string; name: string; balance: string };
@@ -50,9 +51,7 @@ export default function AdminDashboard() {
   });
 
   const handleLogout = () => {
-    document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    localStorage.clear();
-    window.location.href = '/';
+    performLogout();
   };
 
   return (

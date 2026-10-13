@@ -33,8 +33,10 @@ function setClientCookie(name: string, value: string, maxAgeDays = 30) {
 
 function clearClientCookie(name: string) {
   if (typeof document === 'undefined') return;
-  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=None; Secure;`;
-  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+  const expire = '=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+  document.cookie = `${name}${expire} SameSite=None; Secure;`;
+  document.cookie = `${name}${expire} SameSite=Lax;`;
+  document.cookie = `${name}${expire}`;
 }
 
 export default function RootDispatcher() {
@@ -52,8 +54,16 @@ export default function RootDispatcher() {
   const handleResetAll = () => {
     try {
       clearClientCookie('salda_user_id');
-      localStorage.clear();
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+        } catch {
+          // ignore
+        }
+      }
       fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     } catch (e) {
       console.error('Reset error:', e);
     }
@@ -66,6 +76,16 @@ export default function RootDispatcher() {
 
     async function restoreSession() {
       try {
+        // Если перешли с явным запросом выхода или выбора роли — сбрасываем и не восстанавливаем
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.get('logout') === 'true' || urlParams.get('step') === 'role') {
+            handleResetAll();
+            if (!cancelled) setStep('role');
+            return;
+          }
+        }
+
         const cookieId = getCookieValue('salda_user_id');
         const localId =
           typeof window !== 'undefined' ? localStorage.getItem('salda_user_id') : null;

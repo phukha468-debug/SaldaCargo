@@ -11,11 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing user_id' }, { status: 400 });
     }
 
+    const isProd = process.env.NODE_ENV === 'production';
     const cookieStore = await cookies();
     cookieStore.set('salda_user_id', user_id, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 60 * 60 * 24 * 30, // 30 дней
       path: '/',
     });
@@ -30,8 +31,16 @@ export async function POST(request: Request) {
 /** DELETE /api/auth/session — удаляет куку сессии */
 export async function DELETE() {
   try {
+    const isProd = process.env.NODE_ENV === 'production';
     const cookieStore = await cookies();
     cookieStore.delete('salda_user_id');
+    cookieStore.set('salda_user_id', '', {
+      path: '/',
+      expires: new Date(0),
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    });
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     console.error('[API /auth/session] Error:', err);

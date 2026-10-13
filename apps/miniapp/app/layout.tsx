@@ -24,8 +24,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={inter.variable}>
-      <body className="font-sans antialiased bg-zinc-50">
+    <html lang="ru" className={inter.variable} suppressHydrationWarning>
+      <body className="font-sans antialiased bg-zinc-50" suppressHydrationWarning>
         <Providers>
           <MinimizeOnBack />
           <ScrollOnFocus />

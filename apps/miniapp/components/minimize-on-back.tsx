@@ -60,97 +60,115 @@ function isRootPath(pathname: string): boolean {
 
 export function MinimizeOnBack() {
   useEffect(() => {
-    const WebApp = window.WebApp;
+    if (typeof window === 'undefined') return;
 
-    // ── Closing confirmation (handles the ✕ button in MAX header) ──────────
     try {
-      WebApp?.enableClosingConfirmation?.();
-    } catch {
-      // Not supported — silently skip
-    }
+      const WebApp = window.WebApp;
 
-    // ── History API barrier (hardware back / environments without BackButton) ─
-    try {
-      history.replaceState({ [BARRIER_KEY]: true }, '');
-    } catch {
-      return; // SSR guard or restricted environment
-    }
-
-    // Push a clean entry for the app to live on; barrier is below it
-    history.pushState({ [BARRIER_KEY]: false }, '');
-
-    function onPopState(e: PopStateEvent) {
-      if (e.state?.[BARRIER_KEY] === true) {
-        // User hit the barrier — re-push a clean entry so the app stays alive
-        // (there is no SDK minimize in MAX, so we just keep the app open at root)
-        history.pushState({ [BARRIER_KEY]: false }, '');
-      }
-    }
-
-    window.addEventListener('popstate', onPopState);
-
-    // ── MAX BackButton: intercept header back button on root pages ────────────
-    const backButton = WebApp?.BackButton;
-
-    function handleBackButtonClick() {
-      if (isRootPath(window.location.pathname)) {
-        // On root — do nothing; app stays open (no SDK minimize available)
-        // The History API barrier also ensures hardware back doesn't close the app
-      } else {
-        // On inner pages — navigate back within the app
-        history.back();
-      }
-    }
-
-    if (backButton) {
-      backButton.onClick(handleBackButtonClick);
-
-      // Show BackButton on root pages (routes the hardware back button through MAX SDK)
-      // Visibility will be updated on each navigation via the route-aware hook below
-      if (isRootPath(window.location.pathname)) {
-        backButton.show();
-      }
-    }
-
-    // Watch for URL changes (Next.js App Router navigation) to toggle BackButton
-    let lastPathname = window.location.pathname;
-
-    function onLocationChange() {
-      const current = window.location.pathname;
-      if (current === lastPathname) return;
-      lastPathname = current;
-
-      if (!backButton) return;
-
-      if (isRootPath(current)) {
-        // On root pages: show BackButton so MAX routes hardware back through our handler
-        if (!backButton.isVisible) backButton.show();
-      } else {
-        // On inner pages: hide BackButton so Next.js router handles navigation
-        if (backButton.isVisible) backButton.hide();
-      }
-    }
-
-    // Next.js App Router doesn't fire popstate on push — observe via MutationObserver
-    // on the URL, or use the popstate event (fires on back/forward, not push).
-    // We combine popstate + a periodic check as the simplest cross-version approach.
-    window.addEventListener('popstate', onLocationChange);
-
-    // Poll for pushState-based navigation (Next.js link clicks)
-    const pollInterval = setInterval(onLocationChange, 300);
-
-    return () => {
-      window.removeEventListener('popstate', onPopState);
-      window.removeEventListener('popstate', onLocationChange);
-      clearInterval(pollInterval);
-      backButton?.offClick(handleBackButtonClick);
-      // Restore closing without confirmation on unmount (component teardown)
+      // ── Closing confirmation (handles the ✕ button in MAX header) ──────────
       try {
-        WebApp?.disableClosingConfirmation?.();
+        WebApp?.enableClosingConfirmation?.();
       } catch {
-        // ignore
+        // Not supported — silently skip
       }
-    };
+
+      // ── History API barrier (hardware back / environments without BackButton) ─
+      try {
+        if (window.history && window.history.replaceState && window.history.pushState) {
+          window.history.replaceState({ [BARRIER_KEY]: true }, '', window.location.href);
+          window.history.pushState({ [BARRIER_KEY]: false }, '', window.location.href);
+        }
+      } catch {
+        // Silently skip if restricted environment (e.g. Samsung WebView strict sandbox)
+      }
+
+      function onPopState(e: PopStateEvent) {
+        try {
+          if (e.state?.[BARRIER_KEY] === true && window.history?.pushState) {
+            window.history.pushState({ [BARRIER_KEY]: false }, '', window.location.href);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      window.addEventListener('popstate', onPopState);
+
+      // ── MAX BackButton: intercept header back button on root pages ────────────
+      let backButton:
+        | {
+            isVisible: boolean;
+            show: () => void;
+            hide: () => void;
+            onClick: (callback: () => void) => void;
+            offClick: (callback: () => void) => void;
+          }
+        | undefined = undefined;
+      try {
+        backButton = WebApp?.BackButton;
+      } catch {
+        backButton = undefined;
+      }
+
+      function handleBackButtonClick() {
+        try {
+          if (!isRootPath(window.location.pathname)) {
+            window.history.back();
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (backButton) {
+        try {
+          backButton.onClick?.(handleBackButtonClick);
+          if (isRootPath(window.location.pathname)) {
+            backButton.show?.();
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Watch for URL changes (Next.js App Router navigation) to toggle BackButton
+      let lastPathname = window.location.pathname;
+
+      function onLocationChange() {
+        try {
+          const current = window.location.pathname;
+          if (current === lastPathname) return;
+          lastPathname = current;
+
+          if (!backButton) return;
+
+          if (isRootPath(current)) {
+            if (!backButton.isVisible) backButton.show?.();
+          } else {
+            if (backButton.isVisible) backButton.hide?.();
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      window.addEventListener('popstate', onLocationChange);
+      const pollInterval = setInterval(onLocationChange, 300);
+
+      return () => {
+        try {
+          window.removeEventListener('popstate', onPopState);
+          window.removeEventListener('popstate', onLocationChange);
+          clearInterval(pollInterval);
+          backButton?.offClick?.(handleBackButtonClick);
+          WebApp?.disableClosingConfirmation?.();
+        } catch {
+          // ignore
+        }
+      };
+    } catch (rootErr) {
+      console.warn('MinimizeOnBack initialization safely ignored:', rootErr);
+    }
   }, []);
 
   return null;

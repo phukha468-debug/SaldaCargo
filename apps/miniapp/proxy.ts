@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
-  const userId = request.cookies.get('salda_user_id')?.value;
+  const userId =
+    request.cookies.get('salda_user_id')?.value ||
+    request.headers.get('x-salda-user-id') ||
+    request.nextUrl.searchParams.get('user_id');
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname === '/login';
-  const isAuthApi = pathname.startsWith('/api/auth/');
+  const isAuthApi = pathname.startsWith('/api/auth/') || pathname === '/api/driver/me';
   const isPublicApi =
     pathname.startsWith('/api/users/public') ||
     pathname === '/api/vehicles/public' ||

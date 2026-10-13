@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
+import { performLogout } from '@/lib/auth/logout';
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
@@ -49,9 +50,7 @@ export default function ProfilePage() {
   });
 
   const handleLogout = () => {
-    document.cookie = 'salda_user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    localStorage.clear();
-    window.location.href = '/';
+    performLogout();
   };
 
   if (isLoading) {
