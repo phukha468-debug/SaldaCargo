@@ -31,9 +31,10 @@ interface CategoryItem {
 interface RawTx {
   id: string;
   amount: string;
-  direction: 'income' | 'expense';
+  direction: 'income' | 'expense' | 'transfer' | string;
   description: string | null;
   created_at: string;
+  transaction_date?: string | null;
   from_wallet_id: string | null;
   to_wallet_id: string | null;
   category_id?: string | null;
@@ -259,11 +260,15 @@ export function DailyControlPanel() {
       tripOrderId,
       amount,
       action,
+      operationDate,
+      date,
     }: {
       operationId: string;
       tripOrderId?: string;
       amount?: number;
       action?: 'link' | 'unlink';
+      operationDate?: string;
+      date?: string;
     }) => {
       const res = await fetch('/api/finance/link-bank-op', {
         method: 'POST',
@@ -273,6 +278,8 @@ export function DailyControlPanel() {
           tripOrderId,
           amount,
           action,
+          operationDate,
+          date,
         }),
       });
       if (!res.ok) {
@@ -367,7 +374,9 @@ export function DailyControlPanel() {
 
         // Ищем существующую связь с рейсом в transactions
         const linkedTx = (data?.transactions ?? []).find(
-          (t) => t.idempotency_key === op.operationId,
+          (t) =>
+            t.idempotency_key === op.operationId ||
+            (op.operationId && t.idempotency_key?.includes(op.operationId)),
         );
 
         let title = op.description || op.payPurpose || 'Входящий перевод на Р/С';
@@ -378,9 +387,16 @@ export function DailyControlPanel() {
 
         if (linkedTx) {
           isLinked = true;
-          linkedDriverName = linkedTx.related_user?.name;
+          const linkedOrder = (data?.trip_orders ?? []).find(
+            (o) => o.id === linkedTx.trip_order_id,
+          );
           const matchNum = linkedTx.description?.match(/Рейс №(\d+)/);
-          linkedTripNumber = matchNum ? matchNum[1] : undefined;
+          linkedTripNumber = linkedOrder?.trip?.trip_number || (matchNum ? matchNum[1] : undefined);
+          const matchDriver = linkedTx.description?.match(/\((.+?)\)/);
+          linkedDriverName =
+            linkedTx.related_user?.name ||
+            linkedOrder?.trip?.driver?.name ||
+            (matchDriver ? matchDriver[1] : undefined);
           author = linkedDriverName ? `вод. ${linkedDriverName}` : payerName;
           title = linkedTx.description || title;
         }
@@ -842,6 +858,11 @@ export function DailyControlPanel() {
 
   const groupedByTitle = new Map<string, ExpenseItem[]>();
   for (const it of individualExpenses) {
+    // Неклассифицированные банковские списания выводим отдельно, чтобы директор сразу видел каждое и мог назначить статью
+    if (it.bankOp && (!it.categoryId || it.category === 'Списание с Р/С (API)')) {
+      expenseItems.push(it);
+      continue;
+    }
     const k = normKey(it.title);
     const list = groupedByTitle.get(k) || [];
     list.push(it);
@@ -849,9 +870,9 @@ export function DailyControlPanel() {
   }
 
   for (const [, list] of groupedByTitle.entries()) {
-    if (list.length === 1) {
+    if (list.length === 1 && list[0]) {
       expenseItems.push(list[0]);
-    } else {
+    } else if (list.length > 1 && list[0]) {
       const first = list[0];
       const sumAmt = list.reduce((s, it) => s + it.amount, 0);
       const groupId = `group-custom-${normKey(first.title).slice(0, 30)}-${list.length}`;
@@ -1268,10 +1289,19 @@ export function DailyControlPanel() {
                                   (op ? op.operationDate || op.operationTime : selectedDate),
                               });
                             }}
-                            className="text-[9px] text-slate-400 hover:text-sky-600 p-0.5 rounded hover:bg-sky-50 transition cursor-pointer"
-                            title="Редактировать название / категорию"
+                            className={
+                              item.category === 'Списание с Р/С (API)' || !item.categoryId
+                                ? 'inline-flex items-center gap-1 bg-sky-500 hover:bg-sky-400 text-white font-black text-[10px] px-2 py-0.5 rounded shadow-xs transition cursor-pointer'
+                                : 'text-[9px] text-slate-400 hover:text-sky-600 p-0.5 rounded hover:bg-sky-50 transition cursor-pointer font-bold'
+                            }
+                            title="Выбрать статью расходов и написать точное назначение"
                           >
-                            ✎ изменить
+                            <span>✏️</span>
+                            <span>
+                              {item.category === 'Списание с Р/С (API)' || !item.categoryId
+                                ? 'Выбрать статью расходов'
+                                : 'изменить'}
+                            </span>
                           </button>
                         )}
                         {item.isGroup && (
@@ -1579,6 +1609,8 @@ export function DailyControlPanel() {
                                       operationId: item.bankOp!.operationId,
                                       tripOrderId: item.suggestedOrder!.id,
                                       amount: item.amount,
+                                      operationDate: item.bankOp?.operationDate,
+                                      date: selectedDate,
                                       action: 'link',
                                     })
                                   }
@@ -2206,6 +2238,8 @@ export function DailyControlPanel() {
                       operationId: linkingBankOp.operationId,
                       tripOrderId: selectedOrderIdToLink,
                       amount: linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0,
+                      operationDate: linkingBankOp.operationDate,
+                      date: selectedDate,
                       action: 'link',
                     })
                   }

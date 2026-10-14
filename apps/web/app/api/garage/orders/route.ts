@@ -143,6 +143,7 @@ export async function POST(request: Request) {
       work_description?: string;
       parts_description?: string;
       is_completed?: boolean;
+      payment_wallet_id?: string;
     };
 
     if (!body.problem_description?.trim()) {

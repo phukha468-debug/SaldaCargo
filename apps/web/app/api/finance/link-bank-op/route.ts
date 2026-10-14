@@ -82,6 +82,12 @@ export async function POST(req: Request) {
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle();
 
+    const opDate =
+      body.operationDate ||
+      (body.date ? `${body.date}T12:00:00.000Z` : null) ||
+      order.created_at ||
+      new Date().toISOString();
+
     const txPayload = {
       direction: 'income',
       amount: amountVal,
@@ -96,6 +102,8 @@ export async function POST(req: Request) {
       settlement_status: 'completed',
       description: `Оплата по СБП · ${tripNumber} (${driverName})`,
       idempotency_key: idempotencyKey,
+      transaction_date: opDate,
+      created_at: existingTx?.created_at || opDate,
       created_by: adminUser?.id || null,
     };
 
