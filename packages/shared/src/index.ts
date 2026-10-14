@@ -430,3 +430,64 @@ export function isNoCashCounterparty(
   if (!trimmed) return false;
   return NO_CASH_COUNTERPARTY_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
+
+/**
+ * Проверяет, является ли контрагент «Территорией».
+ * Для «Территории» действует специальное строгое правило:
+ * обязательно указывается Адрес (улица + дом) и Описание работы для выставления счетов.
+ */
+export function isTerritoryCounterparty(
+  cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+): boolean {
+  if (!cp) return false;
+  const name = typeof cp === 'string' ? cp : cp.name || '';
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return /территори/i.test(trimmed);
+}
+
+/**
+ * Форматирует строку описания для заказов контрагента «Территория»:
+ * «{улица + дом} — {описание работы}»
+ */
+export function formatTerritoryDescription(address: string, work: string): string {
+  const cleanAddr = address.trim();
+  const cleanWork = work.trim();
+  if (cleanAddr && cleanWork) {
+    return `${cleanAddr} — ${cleanWork}`;
+  }
+  return cleanAddr || cleanWork || '';
+}
+
+/**
+ * Разбирает сохранённое описание заказа «Территории» обратно на адрес и работу.
+ */
+export function parseTerritoryDescription(desc: string | null | undefined): {
+  address: string;
+  work: string;
+} {
+  if (!desc) return { address: '', work: '' };
+  const str = desc.trim();
+  // Формат: "ул. Ленина, д. 45 — Вывоз мусора"
+  const dashParts = str.split(' — ');
+  if (dashParts.length >= 2 && dashParts[0] !== undefined) {
+    return {
+      address: dashParts[0].trim(),
+      work: dashParts.slice(1).join(' — ').trim(),
+    };
+  }
+  // Формат с разделителем "|"
+  const pipeParts = str.split('|');
+  if (pipeParts.length >= 2 && pipeParts[0] !== undefined) {
+    return {
+      address: pipeParts[0].replace(/^(?:адрес:?\s*)/i, '').trim(),
+      work: pipeParts
+        .slice(1)
+        .join('|')
+        .replace(/^(?:работа:?\s*)/i, '')
+        .trim(),
+    };
+  }
+  return { address: '', work: str };
+}

@@ -5,7 +5,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
-import { formatDate, isNoCashCounterparty } from '@saldacargo/shared';
+import {
+  formatDate,
+  isNoCashCounterparty,
+  isTerritoryCounterparty,
+  formatTerritoryDescription,
+  parseTerritoryDescription,
+} from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
 interface Counterparty {
@@ -28,6 +34,7 @@ interface TripOrder {
   lifecycle_status: string;
   counterparty_id: string | null;
   counterparty: { name: string } | null;
+  description?: string | null;
   direction?: string;
   is_driver_loader?: boolean;
   driver_car_pay?: string | number;
@@ -562,6 +569,7 @@ type EditableOrder = {
   lifecycle_status?: string;
   counterparty_id?: string | null;
   counterparty?: { name: string } | null;
+  description?: string | null;
   _selectedId: string | null;
   _inputValue: string;
   _deleted?: boolean;
@@ -721,6 +729,7 @@ function EditModal({
   const [orders, setOrders] = useState<EditableOrder[]>(() =>
     activeOrders.map((o) => ({
       ...o,
+      description: o.description ?? '',
       _selectedId: o.counterparty_id,
       _inputValue: o.counterparty?.name ?? '',
       _deleted: false,
@@ -825,6 +834,7 @@ function EditModal({
       lifecycle_status: trip.lifecycle_status === 'approved' ? 'approved' : 'draft',
       counterparty_id: null,
       counterparty: null,
+      description: '',
       _selectedId: null,
       _inputValue: '',
       _deleted: false,
@@ -870,6 +880,15 @@ function EditModal({
         );
         return;
       }
+      if (isTerritoryCounterparty(cp)) {
+        const parsed = parseTerritoryDescription(o.description);
+        if (!parsed.address.trim() || !parsed.work.trim()) {
+          setError(
+            `Для контрагента «Территория» (заявка ${i + 1}) обязательно укажите Адрес (улица + дом) и Описание работы для счёта!`,
+          );
+          return;
+        }
+      }
     }
 
     const nonDeletedExpenses = expenses.filter((e) => !e._deleted);
@@ -897,6 +916,7 @@ function EditModal({
       loader2_id: o.loader2_id ?? null,
       payment_method: o.payment_method,
       counterparty_id: o._selectedId,
+      description: o.description?.trim() || null,
       ...(o._selectedId === null && o._inputValue.trim()
         ? { counterparty_name: o._inputValue.trim() }
         : {}),
@@ -1140,6 +1160,80 @@ function EditModal({
                     counterparties={counterparties}
                     onChange={(id, name) => updateCounterparty(order.id, id, name)}
                   />
+
+                  {/* Обязательное правило для контрагента «Территория» (Адрес + Работа) */}
+                  {(() => {
+                    const currentCp =
+                      counterparties.find((c) => c.id === order._selectedId) || order._inputValue;
+                    if (isTerritoryCounterparty(currentCp)) {
+                      const parsed = parseTerritoryDescription(order.description);
+                      return (
+                        <div className="p-3 bg-blue-50/90 border-2 border-blue-300 rounded-xl space-y-2 mt-2 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-blue-950 uppercase tracking-wide">
+                            <span>🏢</span>
+                            <span>
+                              Правило для контрагента «Территория» (для выставления счетов):
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="text-[10px] font-black text-blue-950 uppercase block mb-1">
+                                📍 Адрес (улица + дом){' '}
+                                <span className="text-rose-600 font-black">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Например: ул. Ленина, д. 45"
+                                className={inputCls}
+                                value={parsed.address}
+                                onChange={(e) => {
+                                  const currentWork = parseTerritoryDescription(
+                                    order.description,
+                                  ).work;
+                                  update(
+                                    order.id,
+                                    'description',
+                                    formatTerritoryDescription(e.target.value, currentWork),
+                                  );
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-blue-950 uppercase block mb-1">
+                                🛠️ Описание работы{' '}
+                                <span className="text-rose-600 font-black">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Например: Вывоз мусора / ПРР"
+                                className={inputCls}
+                                value={parsed.work}
+                                onChange={(e) => {
+                                  const currentAddr = parseTerritoryDescription(
+                                    order.description,
+                                  ).address;
+                                  update(
+                                    order.id,
+                                    'description',
+                                    formatTerritoryDescription(currentAddr, e.target.value),
+                                  );
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {order.description && (
+                            <div className="text-[11px] text-blue-900 bg-white/90 p-2 rounded-lg border border-blue-200">
+                              <span className="font-bold text-blue-950">В счёт пойдёт:</span>{' '}
+                              <span className="font-semibold text-slate-800">
+                                {order.description}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Financial Grid */}

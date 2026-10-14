@@ -9,7 +9,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuid } from 'uuid';
 import { Button } from '@saldacargo/ui';
-import { isNoCashCounterparty } from '@saldacargo/shared';
+import {
+  isNoCashCounterparty,
+  isTerritoryCounterparty,
+  formatTerritoryDescription,
+} from '@saldacargo/shared';
 import {
   calculateOrderPayroll,
   ORDER_DIRECTIONS,
@@ -202,6 +206,10 @@ export default function AddOrderPage() {
   const isDebt = selectedPaymentMethod === 'debt_cash';
   const paymentMethods = PAYMENT_METHODS;
 
+  const isTerritory = isTerritoryCounterparty(selectedCounterparty);
+  const [territoryAddress, setTerritoryAddress] = useState('');
+  const [territoryWork, setTerritoryWork] = useState('');
+
   const DEFAULT_DIRECTION: OrderDirectionItem = {
     id: 'local',
     label: 'По городу',
@@ -261,10 +269,24 @@ export default function AddOrderPage() {
       );
       return;
     }
-    const isDebt = data.payment_method === 'debt_cash';
-    let description = data.description?.trim() || '';
-    if (isDebt && !description) {
-      description = `Долг: ${selectedCounterparty?.name || 'Клиент'}`;
+
+    let description = '';
+    if (isTerritory) {
+      if (!territoryAddress.trim()) {
+        setError('Для контрагента «Территория» обязательно укажите адрес (улица + дом)!');
+        return;
+      }
+      if (!territoryWork.trim()) {
+        setError('Для контрагента «Территория» обязательно укажите описание работы!');
+        return;
+      }
+      description = formatTerritoryDescription(territoryAddress, territoryWork);
+    } else {
+      const isDebt = data.payment_method === 'debt_cash';
+      description = data.description?.trim() || '';
+      if (isDebt && !description) {
+        description = `Долг: ${selectedCounterparty?.name || 'Клиент'}`;
+      }
     }
 
     setSubmitting(true);
@@ -855,38 +877,101 @@ export default function AddOrderPage() {
         </div>
 
         {/* ── Описание / Комментарий / Примечание к заказу ── */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
-            {isDebt
-              ? '⏳ Комментарий к долгу (опционально)'
-              : selectedCounterparty?.name === 'Частный клиент'
-                ? '📝 Примечание к заказу (холодильник, диван, адрес...)'
-                : 'Примечание / Описание (опционально)'}
-          </label>
-          <input
-            type="text"
-            {...register('description')}
-            placeholder={
-              isDebt
-                ? 'Обещал заплатить в пятницу...'
+        {isTerritory ? (
+          <div className="bg-blue-50/90 border-2 border-blue-400 rounded-2xl p-4 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-blue-200 pb-2">
+              <span className="text-xl">🏢</span>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wide text-blue-950">
+                  Правило для контрагента «Территория»
+                </h3>
+                <p className="text-[10px] text-blue-800 font-medium">
+                  Обязательно укажите адрес и работу для автоматического выставления счетов
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black uppercase tracking-wider text-blue-950 flex items-center justify-between">
+                <span>
+                  📍 Адрес (улица + дом) <span className="text-rose-600">*</span>
+                </span>
+                <span className="text-[9px] font-bold text-blue-700 normal-case">Обязательно</span>
+              </label>
+              <input
+                type="text"
+                value={territoryAddress}
+                onChange={(e) => {
+                  setTerritoryAddress(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder="Например: ул. Ленина, д. 45 (или Строителей 12)"
+                className="w-full rounded-xl border-2 border-blue-300 bg-white px-4 h-12 text-sm font-bold text-zinc-900 focus:border-blue-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black uppercase tracking-wider text-blue-950 flex items-center justify-between">
+                <span>
+                  🛠️ Описание работы <span className="text-rose-600">*</span>
+                </span>
+                <span className="text-[9px] font-bold text-blue-700 normal-case">Обязательно</span>
+              </label>
+              <input
+                type="text"
+                value={territoryWork}
+                onChange={(e) => {
+                  setTerritoryWork(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder="Например: Вывоз мусора / Доставка стройматериалов / ПРР"
+                className="w-full rounded-xl border-2 border-blue-300 bg-white px-4 h-12 text-sm font-bold text-zinc-900 focus:border-blue-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            {territoryAddress.trim() && territoryWork.trim() && (
+              <div className="p-2.5 bg-white/90 rounded-xl border border-blue-200 text-[11px] text-blue-900">
+                <span className="font-bold text-blue-950">В счёт пойдёт:</span>{' '}
+                <span className="font-semibold text-zinc-900">
+                  {territoryAddress.trim()} — {territoryWork.trim()}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold uppercase tracking-widest pl-1 text-zinc-500">
+              {isDebt
+                ? '⏳ Комментарий к долгу (опционально)'
                 : selectedCounterparty?.name === 'Частный клиент'
-                  ? 'Детали заказа: холодильник, этаж, адрес...'
-                  : 'Переезд, доставка плитки, детали...'
-            }
-            className={`w-full rounded-xl border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
-              isDebt
-                ? 'border-rose-400 bg-rose-50/50 focus:border-rose-600'
-                : selectedCounterparty?.name === 'Частный клиент'
-                  ? 'border-orange-300 bg-orange-50/20 focus:border-orange-500'
-                  : 'border-zinc-200 focus:border-orange-500'
-            }`}
-          />
-          {selectedCounterparty?.name === 'Частный клиент' && (
-            <p className="text-[10px] font-medium text-zinc-400 pl-1">
-              Укажите детали груза, чтобы легко отличать заказы частных клиентов
-            </p>
-          )}
-        </div>
+                  ? '📝 Примечание к заказу (холодильник, диван, адрес...)'
+                  : 'Примечание / Описание (опционально)'}
+            </label>
+            <input
+              type="text"
+              {...register('description')}
+              placeholder={
+                isDebt
+                  ? 'Обещал заплатить в пятницу...'
+                  : selectedCounterparty?.name === 'Частный клиент'
+                    ? 'Детали заказа: холодильник, этаж, адрес...'
+                    : 'Переезд, доставка плитки, детали...'
+              }
+              className={`w-full rounded-xl border-2 px-4 h-14 text-sm font-bold text-zinc-900 focus:outline-none transition-colors ${
+                isDebt
+                  ? 'border-rose-400 bg-rose-50/50 focus:border-rose-600'
+                  : selectedCounterparty?.name === 'Частный клиент'
+                    ? 'border-orange-300 bg-orange-50/20 focus:border-orange-500'
+                    : 'border-zinc-200 focus:border-orange-500'
+              }`}
+            />
+            {selectedCounterparty?.name === 'Частный клиент' && (
+              <p className="text-[10px] font-medium text-zinc-400 pl-1">
+                Укажите детали груза, чтобы легко отличать заказы частных клиентов
+              </p>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3 text-red-700 text-xs font-bold uppercase tracking-wide">

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
-import { isNoCashCounterparty } from '@saldacargo/shared';
+import { isNoCashCounterparty, isTerritoryCounterparty } from '@saldacargo/shared';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -138,19 +138,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           order.counterparty_name,
         );
 
+        let cpName = order.counterparty_name;
+        if (!cpName && resolvedCounterpartyId) {
+          const { data: cpData } = await (supabase.from('counterparties') as any)
+            .select('name')
+            .eq('id', resolvedCounterpartyId)
+            .maybeSingle();
+          cpName = cpData?.name;
+        }
+
+        if (isTerritoryCounterparty(cpName) && !order.description?.trim()) {
+          return NextResponse.json(
+            {
+              error:
+                'Для контрагента «Территория» обязательно укажите адрес (улица + дом) и описание работы',
+            },
+            { status: 400 },
+          );
+        }
+
         let paymentMethod = order.payment_method || 'debt_cash';
-        if (paymentMethod === 'cash') {
-          let cpName = order.counterparty_name;
-          if (!cpName && resolvedCounterpartyId) {
-            const { data: cpData } = await (supabase.from('counterparties') as any)
-              .select('name')
-              .eq('id', resolvedCounterpartyId)
-              .maybeSingle();
-            cpName = cpData?.name;
-          }
-          if (isNoCashCounterparty(cpName)) {
-            paymentMethod = 'debt_cash';
-          }
+        if (paymentMethod === 'cash' && isNoCashCounterparty(cpName)) {
+          paymentMethod = 'debt_cash';
         }
 
         const isDebt =

@@ -4,7 +4,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn, Money } from '@saldacargo/ui';
-import { isNoCashCounterparty } from '@saldacargo/shared';
+import {
+  isNoCashCounterparty,
+  isTerritoryCounterparty,
+  formatTerritoryDescription,
+} from '@saldacargo/shared';
 import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
 
 interface Loader {
@@ -70,6 +74,8 @@ export function CreatePrrModal({
     Array<{ id: string; name: string; customPay?: string }>
   >([]);
   const [description, setDescription] = useState('');
+  const [territoryAddress, setTerritoryAddress] = useState('');
+  const [territoryWork, setTerritoryWork] = useState('');
   const [autoApprove, setAutoApprove] = useState(role === 'admin');
 
   const [submitting, setSubmitting] = useState(false);
@@ -216,6 +222,22 @@ export function CreatePrrModal({
 
     setSubmitting(true);
 
+    const isTerritory = isTerritoryCounterparty(selectedCounterparty?.name);
+    let finalDescription = description.trim();
+    if (isTerritory) {
+      if (!territoryAddress.trim()) {
+        setError('Для контрагента «Территория» обязательно укажите адрес (улица + дом)!');
+        setSubmitting(false);
+        return;
+      }
+      if (!territoryWork.trim()) {
+        setError('Для контрагента «Территория» обязательно укажите описание работы!');
+        setSubmitting(false);
+        return;
+      }
+      finalDescription = formatTerritoryDescription(territoryAddress, territoryWork);
+    }
+
     try {
       const loadersPayload = selectedLoaders.map((l) => ({
         id: l.id,
@@ -234,7 +256,7 @@ export function CreatePrrModal({
           amount,
           payment_method: paymentMethod,
           loaders: loadersPayload,
-          description: description || 'Погрузо-разгрузочные работы (без авто)',
+          description: finalDescription || 'Погрузо-разгрузочные работы (без авто)',
           user_id: defaultCreatorId,
           auto_approve: autoApprove,
         }),
@@ -580,18 +602,85 @@ export function CreatePrrModal({
           )}
 
           {/* 6. Описание / адрес */}
-          <div>
-            <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
-              Адрес / Заметка к заказу (опционально)
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Например: ул. Ленина 45, 4 этаж, погрузка дивана"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-            />
-          </div>
+          {isTerritoryCounterparty(selectedCounterparty?.name) ? (
+            <div className="bg-blue-50/90 border-2 border-blue-400 rounded-2xl p-3.5 space-y-3">
+              <div className="flex items-center gap-2 border-b border-blue-200 pb-1.5">
+                <span className="text-base">🏢</span>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wide text-blue-950">
+                    Правило для контрагента «Территория»
+                  </h4>
+                  <p className="text-[10px] text-blue-800">
+                    Обязательно укажите адрес и работу для счёта
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-blue-950 mb-1 flex items-center justify-between">
+                  <span>
+                    📍 Адрес: Улица + Дом <span className="text-rose-600">*</span>
+                  </span>
+                  <span className="text-[9px] font-bold text-blue-700 normal-case">
+                    Обязательно
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={territoryAddress}
+                  onChange={(e) => {
+                    setTerritoryAddress(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder="Например: ул. Ленина, д. 45"
+                  className="w-full px-3 py-2 rounded-xl border border-blue-300 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-blue-950 mb-1 flex items-center justify-between">
+                  <span>
+                    🛠️ Описание работы <span className="text-rose-600">*</span>
+                  </span>
+                  <span className="text-[9px] font-bold text-blue-700 normal-case">
+                    Обязательно
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={territoryWork}
+                  onChange={(e) => {
+                    setTerritoryWork(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder="Например: Погрузочно-разгрузочные работы"
+                  className="w-full px-3 py-2 rounded-xl border border-blue-300 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+
+              {territoryAddress.trim() && territoryWork.trim() && (
+                <div className="p-2 bg-white/90 rounded-xl border border-blue-200 text-[10px] text-blue-900">
+                  <span className="font-bold text-blue-950">В счёт пойдёт:</span>{' '}
+                  <span className="font-semibold text-zinc-900">
+                    {territoryAddress.trim()} — {territoryWork.trim()}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
+                Адрес / Заметка к заказу (опционально)
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Например: ул. Ленина 45, 4 этаж, погрузка дивана"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+              />
+            </div>
+          )}
 
           {/* Опция авто-утверждения для админа */}
           {role === 'admin' && (

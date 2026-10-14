@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
-import { isNoCashCounterparty } from '@saldacargo/shared';
+import { isNoCashCounterparty, isTerritoryCounterparty } from '@saldacargo/shared';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 
 /**
@@ -94,15 +94,26 @@ export async function POST(request: Request) {
           : String(payroll.loaderPayEach),
     }));
 
-    // Проверка запрета наличных для корпоративных клиентов
+    // Проверка запрета наличных и обязательного адреса для корпоративных клиентов
     let paymentMethod = body.payment_method || 'cash';
-    if (paymentMethod === 'cash' && body.counterparty_id) {
+    if (body.counterparty_id) {
       const { data: cp } = await (supabase.from('counterparties') as any)
         .select('name')
         .eq('id', body.counterparty_id)
         .maybeSingle();
-      if (isNoCashCounterparty(cp?.name)) {
+      if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
         paymentMethod = 'debt_cash';
+      }
+      if (isTerritoryCounterparty(cp?.name)) {
+        if (!body.description?.trim()) {
+          return NextResponse.json(
+            {
+              error:
+                'Для контрагента «Территория» обязательно укажите адрес (улица + дом) и описание работы',
+            },
+            { status: 400 },
+          );
+        }
       }
     }
 
