@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
@@ -6,6 +6,14 @@ import { ScrollOnFocus } from '@/components/scroll-on-focus';
 import { MinimizeOnBack } from '@/components/minimize-on-back';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-inter' });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'TK501',
@@ -48,7 +56,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="font-sans antialiased bg-zinc-50" suppressHydrationWarning>
+      <body
+        className="font-sans antialiased bg-zinc-50"
+        suppressHydrationWarning
+        onTouchStart={() => {}}
+      >
         <Providers>
           <MinimizeOnBack />
           <ScrollOnFocus />

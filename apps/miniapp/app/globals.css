@@ -32,6 +32,30 @@
 }
 
 @layer base {
+  html,
+  body {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role='button'] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   body {
     background-color: var(--color-zinc-50);
     color: var(--color-zinc-900);
