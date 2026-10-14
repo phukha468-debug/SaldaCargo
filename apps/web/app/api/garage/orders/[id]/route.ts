@@ -328,6 +328,79 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
       }
 
+      // Расход с наряда — для своих машин (сторонний ремонт или покупка запчастей)
+      if (order.machine_type === 'own') {
+        const isExt = Boolean(
+          (order.admin_note && order.admin_note.includes('[Сторонний сервис')) ||
+          (order.problem_description && order.problem_description.includes('[Сторонний сервис')),
+        );
+        if (isExt) {
+          const { data: existingTx } = await (supabase as any)
+            .from('transactions')
+            .select('id')
+            .eq('service_order_id', id)
+            .limit(1)
+            .maybeSingle();
+
+          if (!existingTx) {
+            const { data: worksForCost } = await (supabase as any)
+              .from('service_order_works')
+              .select('price_client, status')
+              .eq('service_order_id', id)
+              .neq('status', 'cancelled');
+            const { data: partsForCost } = await (supabase as any)
+              .from('service_order_parts')
+              .select('client_price, unit_price, quantity')
+              .eq('service_order_id', id);
+
+            const worksTotal = ((worksForCost ?? []) as any[]).reduce(
+              (s: number, w: any) => s + parseFloat(w.price_client ?? '0'),
+              0,
+            );
+            const partsTotal = ((partsForCost ?? []) as any[]).reduce(
+              (s: number, p: any) =>
+                s +
+                (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) *
+                  (parseFloat(p.quantity ?? '1') || 1),
+              0,
+            );
+            const costTotal = worksTotal + partsTotal;
+
+            const paymentWallet =
+              body.payment_wallet_id === 'none'
+                ? null
+                : body.payment_wallet_id || '10000000-0000-0000-0000-000000000002';
+
+            if (costTotal > 0 && paymentWallet) {
+              const REPAIR_EXTERNAL_CAT = '8c5f3080-d0a8-49ea-b759-3286f2084940';
+              const { data: adminUser } = await (supabase as any)
+                .from('users')
+                .select('id')
+                .filter('roles', 'cs', '{"admin"}')
+                .limit(1)
+                .maybeSingle();
+
+              await (supabase as any).from('transactions').insert({
+                direction: 'expense',
+                amount: costTotal.toFixed(2),
+                category_id: REPAIR_EXTERNAL_CAT,
+                from_wallet_id: paymentWallet,
+                to_wallet_id: null,
+                asset_id: order.asset_id || null,
+                service_order_id: id,
+                lifecycle_status: 'approved',
+                settlement_status: 'completed',
+                transaction_date: order.created_at || new Date().toISOString(),
+                created_at: order.created_at || new Date().toISOString(),
+                description: `Наряд ТО #${order.order_number}: ${order.problem_description || 'Сторонний ремонт'}`,
+                idempotency_key: crypto.randomUUID(),
+                created_by: adminUser?.id ?? null,
+              });
+            }
+          }
+        }
+      }
+
       // Начисляем ЗП механикам
       const unpaidWorks = (order.works ?? []).filter(
         (w: any) => w.status !== 'cancelled' && !w.salary_paid,

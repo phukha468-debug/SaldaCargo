@@ -372,6 +372,7 @@ const emptyForm = {
   works_cost: '',
   parts_cost: '',
   is_completed: true,
+  payment_wallet_id: '10000000-0000-0000-0000-000000000002',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -3545,6 +3546,33 @@ function CreateOrderModal({
                   Ремонт завершён и оплачен (сразу в архив и P&L)
                 </label>
               </div>
+
+              {form.is_completed && form.machine_type === 'own' && totalExternalCost > 0 && (
+                <div className="bg-white p-3 rounded-xl border border-purple-200 space-y-1.5 shadow-2xs">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>💵</span> Источник списания оплаты (Кошелёк)
+                  </label>
+                  <select
+                    value={form.payment_wallet_id}
+                    onChange={(e) => set('payment_wallet_id', e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="10000000-0000-0000-0000-000000000002">
+                      💵 Сейф (Наличные ТК) — списать из кассы
+                    </option>
+                    <option value="10000000-0000-0000-0000-000000000001">
+                      🏦 Расчётный счёт (Т-Банк) — безналичный расчёт
+                    </option>
+                    <option value="none">
+                      🚫 Без списания (уже учтено в выписке / личные средства)
+                    </option>
+                  </select>
+                  <p className="text-[10px] text-slate-500">
+                    Сумма {totalExternalCost.toLocaleString('ru-RU')} ₽ сразу отобразится в Дневном
+                    контроле и уменьшит остаток выбранного счёта.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             /* Standard In-House Repair Fields */

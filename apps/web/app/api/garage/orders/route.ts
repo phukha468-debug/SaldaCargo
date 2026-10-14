@@ -271,6 +271,46 @@ export async function POST(request: Request) {
           console.error('Error creating external service part:', partErr);
         }
       }
+
+      // Если ремонт своей машины завершён и оплачен, создаём расходную транзакцию
+      const totalCost = worksCost + partsCost;
+      const paymentWallet =
+        body.payment_wallet_id === 'none'
+          ? null
+          : body.payment_wallet_id || '10000000-0000-0000-0000-000000000002'; // по умолчанию Сейф (нал)
+
+      if (isCompleted && body.machine_type === 'own' && totalCost > 0 && paymentWallet) {
+        const REPAIR_EXTERNAL_CAT = '8c5f3080-d0a8-49ea-b759-3286f2084940';
+        let carDesc = '';
+        if (data.asset_id) {
+          const { data: assetData } = await (supabase as any)
+            .from('assets')
+            .select('short_name, reg_number')
+            .eq('id', data.asset_id)
+            .maybeSingle();
+          if (assetData) {
+            carDesc = ` (${assetData.short_name || ''} ${assetData.reg_number || ''})`.trim();
+          }
+        }
+        const contractorDesc = body.contractor_name ? ` · ${body.contractor_name.trim()}` : '';
+
+        await (supabase as any).from('transactions').insert({
+          direction: 'expense',
+          amount: totalCost,
+          category_id: REPAIR_EXTERNAL_CAT,
+          from_wallet_id: paymentWallet,
+          to_wallet_id: null,
+          asset_id: data.asset_id || null,
+          service_order_id: data.id,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          transaction_date: orderCreatedAt,
+          created_at: orderCreatedAt,
+          description: `Наряд ТО #${data.order_number}${contractorDesc}: ${body.problem_description?.trim() || 'Ремонт'}${carDesc ? ` ${carDesc}` : ''}`,
+          idempotency_key: crypto.randomUUID(),
+          created_by: adminUsers?.id ?? null,
+        });
+      }
     }
 
     return NextResponse.json(data, { status: 201 });
