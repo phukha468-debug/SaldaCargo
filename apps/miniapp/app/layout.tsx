@@ -26,16 +26,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" className={inter.variable} suppressHydrationWarning>
       <head>
-        {/* MAX Messenger official SDK — load synchronously before anything else */}
-        <script src="https://st.max.ru/js/max-web-app.js" />
+        {/* MAX Messenger official SDK — non-blocking parallel loading */}
+        <script src="https://st.max.ru/js/max-web-app.js" defer />
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                if (window.WebApp && typeof window.WebApp.ready === 'function') {
-                  window.WebApp.ready();
-                }
-              } catch (e) {}
+              function initMaxSdk() {
+                try {
+                  if (window.WebApp && typeof window.WebApp.ready === 'function') {
+                    window.WebApp.ready();
+                  }
+                } catch (e) {}
+              }
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initMaxSdk);
+              } else {
+                initMaxSdk();
+              }
+              window.addEventListener('load', initMaxSdk);
             `,
           }}
         />

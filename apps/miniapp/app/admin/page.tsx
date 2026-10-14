@@ -45,9 +45,9 @@ export default function AdminDashboard() {
   } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: () => fetch('/api/wallets').then((r) => r.json()),
-    staleTime: 5000,
-    refetchInterval: 15000,
-    refetchOnWindowFocus: true,
+    staleTime: 30000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: false,
   });
 
   const handleLogout = () => {
@@ -83,7 +83,11 @@ export default function AdminDashboard() {
         wallets={wallets}
         isLoading={walletsLoading}
         isFetching={walletsFetching}
-        onRefresh={() => refetchWallets()}
+        onRefresh={() => {
+          fetch('/api/wallets?fresh=true')
+            .then(() => refetchWallets())
+            .catch(() => refetchWallets());
+        }}
         onTransferred={() => qc.invalidateQueries({ queryKey: ['wallets'] })}
       />
 

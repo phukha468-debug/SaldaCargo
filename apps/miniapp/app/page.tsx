@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Step = 'restoring' | 'role' | 'user' | 'vehicle' | 'pin';
 
@@ -40,6 +41,7 @@ function clearClientCookie(name: string) {
 }
 
 export default function RootDispatcher() {
+  const router = useRouter();
   const [step, setStep] = useState<Step>('role');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -132,7 +134,7 @@ export default function RootDispatcher() {
                       : null;
 
               if (targetPath) {
-                window.location.replace(targetPath);
+                router.replace(targetPath);
                 return;
               }
             }
@@ -220,7 +222,7 @@ export default function RootDispatcher() {
         return;
       }
       await finishLogin(pendingUser);
-      window.location.replace('/admin');
+      router.replace('/admin');
     } catch {
       setPinError('Ошибка соединения');
       setPinValue('');
@@ -243,7 +245,7 @@ export default function RootDispatcher() {
       // Если машина уже закреплена — пропускаем выбор
       if (user.current_asset_id) {
         localStorage.setItem('active_vehicle_id', user.current_asset_id);
-        window.location.replace('/driver');
+        router.replace('/driver');
         return;
       }
       setLoading(true);
@@ -260,7 +262,7 @@ export default function RootDispatcher() {
     } else {
       const path =
         selectedRole === 'admin' || selectedRole === 'owner' ? '/admin' : `/${selectedRole}`;
-      window.location.replace(path);
+      router.replace(path);
     }
   };
 
@@ -275,7 +277,7 @@ export default function RootDispatcher() {
     } catch (err) {
       console.error('Failed to sync active vehicle to DB:', err);
     }
-    window.location.replace('/driver');
+    router.replace('/driver');
   };
 
   const renderStep = () => {
@@ -433,7 +435,7 @@ export default function RootDispatcher() {
               </button>
               <button
                 type="button"
-                onClick={() => window.location.replace('/driver')}
+                onClick={() => router.replace('/driver')}
                 className="w-full p-4 bg-zinc-50 border border-dashed border-zinc-200 rounded-3xl text-center text-zinc-400 font-bold uppercase tracking-widest hover:border-orange-200 text-xs"
               >
                 Пропустить выбор машины

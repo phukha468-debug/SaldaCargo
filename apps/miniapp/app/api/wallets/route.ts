@@ -18,6 +18,9 @@ const sum = (rows: any[]) =>
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+let cachedWallets: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 25000; // 25 seconds TTL
+
 function requestTBankApi(host: string, path: string, token: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -72,8 +75,20 @@ async function fetchTBankAccounts(token: string): Promise<any[] | null> {
   return null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const forceFresh = url.searchParams.get('fresh') === 'true';
+
+    if (!forceFresh && cachedWallets && Date.now() - cachedWallets.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json(cachedWallets.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
     let apiBalance: number | null = null;
     let isApiSynced = false;
     const token = process.env.TBANK_API_TOKEN || TBANK_FALLBACK_TOKEN;
@@ -202,34 +217,39 @@ export async function GET() {
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
-    return NextResponse.json(
-      {
-        bank: {
-          id: BANK_ID,
-          name: 'Расчётный счёт',
-          balance: bankBalance.toFixed(2),
-          api_synced: isApiSynced,
-          synced_at: new Date().toISOString(),
-          account_number: TARGET_ACCOUNT_NUMBER,
-        },
-        cash: { id: CASH_ID, name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
-        fuel_card: {
-          id: FUEL_CARD_ID,
-          name: 'Топливные карты (ГСМ)',
-          balance: fuelBalance.toFixed(2),
-        },
-        garage: {
-          id: GARAGE_ID,
-          name: 'Касса Гаража (СТО)',
-          balance: garageBalance.toFixed(2),
-        },
+    const responseData = {
+      bank: {
+        id: BANK_ID,
+        name: 'Расчётный счёт',
+        balance: bankBalance.toFixed(2),
+        api_synced: isApiSynced,
+        synced_at: new Date().toISOString(),
+        account_number: TARGET_ACCOUNT_NUMBER,
       },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        },
+      cash: { id: CASH_ID, name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
+      fuel_card: {
+        id: FUEL_CARD_ID,
+        name: 'Топливные карты (ГСМ)',
+        balance: fuelBalance.toFixed(2),
       },
-    );
+      garage: {
+        id: GARAGE_ID,
+        name: 'Касса Гаража (СТО)',
+        balance: garageBalance.toFixed(2),
+      },
+    };
+
+    cachedWallets = {
+      data: responseData,
+      timestamp: Date.now(),
+    };
+
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+        'X-Cache': 'MISS',
+      },
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
