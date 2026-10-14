@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
     // 2. Fetch all transactions for this day
     const txSelect =
-      'id, amount, direction, description, created_at, from_wallet_id, to_wallet_id, category_id, counterparty_id, related_user_id, trip_order_id, trip_id, idempotency_key, ' +
+      'id, amount, direction, description, created_at, transaction_date, from_wallet_id, to_wallet_id, category_id, counterparty_id, related_user_id, trip_order_id, trip_id, idempotency_key, ' +
       'category:transaction_categories(id, name, code), ' +
       'counterparty:counterparties(id, name), ' +
       'related_user:users!transactions_related_user_id_fkey(id, name)';
@@ -66,15 +66,16 @@ export async function GET(request: Request) {
       { data: auditRow },
       { data: categoriesList },
     ] = await Promise.all([
-      // Transactions of the day
+      // Transactions of the day (по transaction_date, либо по created_at если transaction_date не задан)
       (supabase.from('transactions') as any)
         .select(txSelect)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
         .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
         .or('description.is.null,description.neq.Корректировка остатка')
-        .gte('created_at', dayStart)
-        .lte('created_at', dayEnd)
+        .or(
+          `and(transaction_date.gte.${dayStart},transaction_date.lte.${dayEnd}),and(transaction_date.is.null,created_at.gte.${dayStart},created_at.lte.${dayEnd})`,
+        )
         .order('created_at', { ascending: false }),
 
       // All Trip orders of this day with Bank/QR payment
@@ -205,6 +206,14 @@ export async function GET(request: Request) {
         if (tx.from_wallet_id === BANK_ID) bankDayOut += amt;
         else if (tx.from_wallet_id === CASH_ID) cashDayOut += amt;
         else if (tx.from_wallet_id === FUEL_CARD_ID) fuelDayOut += amt;
+      } else if (tx.direction === 'transfer') {
+        if (tx.from_wallet_id === BANK_ID) bankDayOut += amt;
+        else if (tx.from_wallet_id === CASH_ID) cashDayOut += amt;
+        else if (tx.from_wallet_id === FUEL_CARD_ID) fuelDayOut += amt;
+
+        if (tx.to_wallet_id === BANK_ID) bankDayIn += amt;
+        else if (tx.to_wallet_id === CASH_ID) cashDayIn += amt;
+        else if (tx.to_wallet_id === FUEL_CARD_ID) fuelDayIn += amt;
       }
     }
 
@@ -227,9 +236,9 @@ export async function GET(request: Request) {
     const actualMorningBank =
       isToday && apiBalance !== null ? actualEveningBank - bankDayIn + bankDayOut : morningBank;
 
-    // Фактические остатки сейфа (27 500 ₽) и топливной карты (6 642,05 ₽),
+    // Фактические остатки сейфа (29 000 ₽) и топливной карты (6 642,05 ₽),
     // зафиксированные директором, отсекающие старые виртуальные накопления из прошлых периодов
-    const BASE_ACTUAL_CASH = 27500.0;
+    const BASE_ACTUAL_CASH = 29000.0;
     const BASE_ACTUAL_FUEL = 6642.05;
 
     let actualEveningCash = morningCash + cashDayIn - cashDayOut;

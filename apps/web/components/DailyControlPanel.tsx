@@ -148,6 +148,16 @@ export function DailyControlPanel() {
   // Accordion state for grouped rows (key -> boolean)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
+  // Query Payment Calendar obligations for auto-linking
+  const selectedPeriod = selectedDate.slice(0, 7);
+  const { data: calendarData } = useQuery<{
+    items?: Array<{ id: string; title: string; amount: number; due_day: number; status: string }>;
+  }>({
+    queryKey: ['payment-calendar-items', selectedPeriod],
+    queryFn: () => fetch(`/api/payment-calendar?period=${selectedPeriod}`).then((r) => r.json()),
+    staleTime: 60 * 1000,
+  });
+
   // Edit transaction modal state
   const [editingTx, setEditingTx] = useState<{
     id: string;
@@ -155,7 +165,11 @@ export function DailyControlPanel() {
     amount: number;
     categoryId?: string | null;
     categoryName?: string;
-    direction: 'income' | 'expense';
+    direction: 'income' | 'expense' | 'transfer';
+    toWalletId?: string | null;
+    fromWalletId?: string | null;
+    obligationId?: string | null;
+    transactionDate?: string;
   } | null>(null);
 
   // Director Audit Modal state
@@ -175,23 +189,22 @@ export function DailyControlPanel() {
   });
 
   // Mutations
-  const updateTxMutation = useMutation({
-    mutationFn: async ({
-      id,
-      description,
-      categoryId,
-    }: {
+  const categorizeMutation = useMutation({
+    mutationFn: async (payload: {
       id: string;
       description: string;
-      categoryId?: string | null;
+      category_id?: string | null;
+      amount?: number;
+      direction?: string;
+      to_wallet_id?: string | null;
+      from_wallet_id?: string | null;
+      transaction_date?: string;
+      obligation_id?: string | null;
     }) => {
-      const res = await fetch(`/api/transactions/${id}`, {
-        method: 'PATCH',
+      const res = await fetch('/api/finance/categorize-op', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description,
-          category_id: categoryId,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -202,6 +215,9 @@ export function DailyControlPanel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-balance', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
       setEditingTx(null);
     },
   });
@@ -521,11 +537,14 @@ export function DailyControlPanel() {
     id: string;
     title: string;
     category: string;
+    categoryId?: string | null;
     wallet: 'bank' | 'cash' | 'fuel_card';
     walletName: string;
     author: string;
     amount: number;
+    time?: string;
     rawTx?: RawTx;
+    bankOp?: TBankOp;
     isGroup?: boolean;
     subItems?: Array<{
       id: string;
@@ -533,18 +552,26 @@ export function DailyControlPanel() {
       author: string;
       amount: number;
       time: string;
+      category?: string;
+      categoryId?: string | null;
+      wallet?: 'bank' | 'cash' | 'fuel_card';
+      walletName?: string;
       rawTx?: RawTx;
+      bankOp?: TBankOp;
     }>;
   }
 
+  // 1. Все расходы и перемещения из transactions
   const rawExpenseTxs = (data?.transactions ?? []).filter(
-    (t) => t.direction === 'expense' && txMatchesWallet(t),
+    (t) =>
+      (t.direction === 'expense' || (t.direction === 'transfer' && t.from_wallet_id)) &&
+      txMatchesWallet(t),
   );
 
   const bankCommissions: RawTx[] = [];
   const payrollTxs: RawTx[] = [];
   const fuelTxs: RawTx[] = [];
-  const normalExpenseItems: ExpenseItem[] = [];
+  const individualExpenses: ExpenseItem[] = [];
 
   rawExpenseTxs.forEach((tx) => {
     const desc = (tx.description || '').toLowerCase();
@@ -571,8 +598,8 @@ export function DailyControlPanel() {
     ) {
       payrollTxs.push(tx);
     } else if (
-      (tx.from_wallet_id === FUEL_CARD_ID || desc.includes('гсм') || cat.includes('гсм')) &&
-      tx.from_wallet_id === FUEL_CARD_ID
+      tx.from_wallet_id === FUEL_CARD_ID &&
+      (desc.includes('гсм') || cat.includes('гсм') || desc.includes('заправ'))
     ) {
       fuelTxs.push(tx);
     } else {
@@ -586,22 +613,86 @@ export function DailyControlPanel() {
         wName = 'Топливная карта';
       }
 
-      normalExpenseItems.push({
+      const txTime = new Date(tx.transaction_date || tx.created_at).toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      individualExpenses.push({
         id: tx.id,
         title: tx.description || 'Расход',
         category: tx.category?.name || 'Прочие расходы',
+        categoryId: tx.category_id,
         wallet: w,
         walletName: wName,
         author: tx.related_user?.name || tx.counterparty?.name || 'Администратор',
         amount: parseFloat(tx.amount) || 0,
+        time: txTime,
         rawTx: tx,
       });
     }
   });
 
-  const expenseItems: ExpenseItem[] = [...normalExpenseItems];
+  // 2. Банковские списания напрямую из API Т-Банка (если ещё не заведены в transactions)
+  if (data?.bank_operations && data.bank_operations.length > 0) {
+    const debitBankOps = data.bank_operations.filter(
+      (op) =>
+        op.typeOfOperation === 'Debit' &&
+        (activeWallet === 'all' || activeWallet === 'bank') &&
+        !(data?.transactions ?? []).some((t) => t.idempotency_key === op.operationId),
+    );
 
-  // Grouped: Bank Commissions
+    debitBankOps.forEach((op) => {
+      const desc = (op.description || op.payPurpose || '').toLowerCase();
+      const opAmt = op.operationAmount || op.rubleAmount || 0;
+      const dateVal = op.operationDate || op.operationTime;
+      const opTime = dateVal
+        ? new Date(dateVal).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—';
+
+      if (
+        desc.includes('комисси') ||
+        desc.includes('плата за') ||
+        desc.includes('тариф') ||
+        op.category === 'commission'
+      ) {
+        individualExpenses.push({
+          id: `tbank-deb-${op.operationId}`,
+          title: op.description || op.payPurpose || 'Комиссия банка',
+          category: 'Банковские услуги (API)',
+          categoryId: null,
+          wallet: 'bank',
+          walletName: 'Р/С Банк',
+          author: 'Т-Банк (Авто)',
+          amount: opAmt,
+          time: opTime,
+          bankOp: op,
+        });
+      } else {
+        const receiverName = op.receiver?.name || op.counterParty?.name || 'Контрагент';
+        individualExpenses.push({
+          id: `tbank-deb-${op.operationId}`,
+          title: op.description || op.payPurpose || `Списание с Р/С · ${receiverName}`,
+          category: 'Списание с Р/С (API)',
+          categoryId: null,
+          wallet: 'bank',
+          walletName: 'Р/С Банк',
+          author: receiverName,
+          amount: opAmt,
+          time: opTime,
+          bankOp: op,
+        });
+      }
+    });
+  }
+
+  // 3. УНИВЕРСАЛЬНАЯ ГРУППИРОВКА ОДНОТИПНЫХ ТРАНЗАКЦИЙ:
+  const expenseItems: ExpenseItem[] = [];
+
+  // А) Сгруппированные банковские комиссии
   if (bankCommissions.length > 0) {
     if (bankCommissions.length === 1 && bankCommissions[0]) {
       const tx = bankCommissions[0];
@@ -609,6 +700,7 @@ export function DailyControlPanel() {
         id: tx.id,
         title: tx.description || 'Комиссия банка',
         category: 'Банковские услуги',
+        categoryId: tx.category_id,
         wallet: 'bank',
         walletName: 'Р/С Банк',
         author: 'Т-Банк (Авто)',
@@ -631,17 +723,21 @@ export function DailyControlPanel() {
           title: t.description || 'Комиссия за операцию',
           author: 'Т-Банк',
           amount: parseFloat(t.amount) || 0,
-          time: new Date(t.created_at).toLocaleTimeString('ru-RU', {
+          time: new Date(t.transaction_date || t.created_at).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit',
           }),
+          category: 'Банковские услуги',
+          categoryId: t.category_id,
+          wallet: 'bank',
+          walletName: 'Р/С Банк',
           rawTx: t,
         })),
       });
     }
   }
 
-  // Grouped: Payroll (Зарплата)
+  // Б) Сгруппированные зарплаты
   if (payrollTxs.length > 0) {
     if (payrollTxs.length === 1 && payrollTxs[0]) {
       const tx = payrollTxs[0];
@@ -655,6 +751,7 @@ export function DailyControlPanel() {
         id: tx.id,
         title: tx.description || 'Выплата зарплаты',
         category: 'ФОТ / Зарплата',
+        categoryId: tx.category_id,
         wallet: w,
         walletName: wName,
         author: tx.related_user?.name || 'Водитель/Сотрудник',
@@ -677,17 +774,21 @@ export function DailyControlPanel() {
           title: t.description || 'Зарплата / Аванс',
           author: t.related_user?.name || 'Сотрудник',
           amount: parseFloat(t.amount) || 0,
-          time: new Date(t.created_at).toLocaleTimeString('ru-RU', {
+          time: new Date(t.transaction_date || t.created_at).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit',
           }),
+          category: 'ФОТ / Зарплата',
+          categoryId: t.category_id,
+          wallet: t.from_wallet_id === CASH_ID ? 'cash' : 'bank',
+          walletName: t.from_wallet_id === CASH_ID ? 'Сейф (нал)' : 'Р/С Банк',
           rawTx: t,
         })),
       });
     }
   }
 
-  // Grouped: Fuel Card transactions
+  // В) Сгруппированные заправки автопарка
   if (fuelTxs.length > 0) {
     if (fuelTxs.length === 1 && fuelTxs[0]) {
       const tx = fuelTxs[0];
@@ -695,6 +796,7 @@ export function DailyControlPanel() {
         id: tx.id,
         title: tx.description || 'Заправка ГСМ',
         category: 'ГСМ',
+        categoryId: tx.category_id,
         wallet: 'fuel_card',
         walletName: 'Топливная карта',
         author: tx.related_user?.name || 'Водитель',
@@ -717,96 +819,67 @@ export function DailyControlPanel() {
           title: t.description || 'Заправка ТС',
           author: t.related_user?.name || 'Водитель',
           amount: parseFloat(t.amount) || 0,
-          time: new Date(t.created_at).toLocaleTimeString('ru-RU', {
+          time: new Date(t.transaction_date || t.created_at).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit',
           }),
+          category: 'ГСМ',
+          categoryId: t.category_id,
+          wallet: 'fuel_card',
+          walletName: 'Топливная карта',
           rawTx: t,
         })),
       });
     }
   }
 
-  // Live Bank Debit operations (Commissions, Outgoing payments) from T-Bank API
-  if (data?.bank_operations && data.bank_operations.length > 0) {
-    const debitBankOps = data.bank_operations.filter(
-      (op) => op.typeOfOperation === 'Debit' && (activeWallet === 'all' || activeWallet === 'bank'),
-    );
+  // Г) Однотипные расходы, сгруппированные по названию/назначению
+  const normKey = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[.\s,]+/g, ' ');
 
-    const apiBankCommissions: TBankOp[] = [];
-    const apiBankOtherDebits: TBankOp[] = [];
+  const groupedByTitle = new Map<string, ExpenseItem[]>();
+  for (const it of individualExpenses) {
+    const k = normKey(it.title);
+    const list = groupedByTitle.get(k) || [];
+    list.push(it);
+    groupedByTitle.set(k, list);
+  }
 
-    debitBankOps.forEach((op) => {
-      const desc = (op.description || op.payPurpose || '').toLowerCase();
-      if (
-        desc.includes('комисси') ||
-        desc.includes('плата за') ||
-        desc.includes('тариф') ||
-        op.category === 'commission'
-      ) {
-        apiBankCommissions.push(op);
-      } else {
-        apiBankOtherDebits.push(op);
-      }
-    });
-
-    if (apiBankCommissions.length > 0) {
-      if (apiBankCommissions.length === 1 && apiBankCommissions[0]) {
-        const op = apiBankCommissions[0];
-        expenseItems.push({
-          id: `tbank-deb-${op.operationId}`,
-          title: op.description || op.payPurpose || 'Комиссия банка',
-          category: 'Банковские услуги (API)',
-          wallet: 'bank',
-          walletName: 'Р/С Банк',
-          author: 'Т-Банк (Авто)',
-          amount: op.operationAmount || op.rubleAmount || 0,
-        });
-      } else {
-        const totalComm = apiBankCommissions.reduce(
-          (s, op) => s + (op.operationAmount || op.rubleAmount || 0),
-          0,
-        );
-        expenseItems.push({
-          id: 'group-api-bank-commission',
-          title: `Комиссии банка за операции (${apiBankCommissions.length} списаний)`,
-          category: 'Банковские услуги (API)',
-          wallet: 'bank',
-          walletName: 'Р/С Банк',
-          author: 'Т-Банк (Авто)',
-          amount: totalComm,
-          isGroup: true,
-          subItems: apiBankCommissions.map((op) => {
-            const dateVal = op.operationDate || op.operationTime;
-            return {
-              id: `tbank-deb-${op.operationId}`,
-              title: op.description || op.payPurpose || 'Комиссия за операцию',
-              author: 'Т-Банк',
-              amount: op.operationAmount || op.rubleAmount || 0,
-              time: dateVal
-                ? new Date(dateVal).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '—',
-            };
-          }),
-        });
-      }
-    }
-
-    apiBankOtherDebits.forEach((op) => {
-      const receiverName = op.receiver?.name || op.counterParty?.name || 'Контрагент';
+  for (const [, list] of groupedByTitle.entries()) {
+    if (list.length === 1) {
+      expenseItems.push(list[0]);
+    } else {
+      const first = list[0];
+      const sumAmt = list.reduce((s, it) => s + it.amount, 0);
+      const groupId = `group-custom-${normKey(first.title).slice(0, 30)}-${list.length}`;
       expenseItems.push({
-        id: `tbank-deb-${op.operationId}`,
-        title: op.description || op.payPurpose || `Списание с Р/С · ${receiverName}`,
-        category: 'Списание с Р/С (API)',
-        wallet: 'bank',
-        walletName: 'Р/С Банк',
-        author: receiverName,
-        amount: op.operationAmount || op.rubleAmount || 0,
+        id: groupId,
+        title: `${first.title} (${list.length} операции)`,
+        category: first.category,
+        categoryId: first.categoryId,
+        wallet: first.wallet,
+        walletName: first.walletName,
+        author: first.author,
+        amount: sumAmt,
+        isGroup: true,
+        subItems: list.map((it) => ({
+          id: it.id,
+          title: it.title,
+          author: it.author,
+          amount: it.amount,
+          time: it.time || '—',
+          category: it.category,
+          categoryId: it.categoryId,
+          wallet: it.wallet,
+          walletName: it.walletName,
+          rawTx: it.rawTx,
+          bankOp: it.bankOp,
+        })),
       });
-    });
+    }
   }
 
   // Totals calculations
@@ -1159,30 +1232,59 @@ export function DailyControlPanel() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-black text-slate-800">{item.title}</span>
-                        {item.rawTx && (
+                        {!item.isGroup && (
                           <button
-                            onClick={() =>
+                            onClick={() => {
+                              const raw = item.rawTx;
+                              const op = item.bankOp;
                               setEditingTx({
-                                id: item.rawTx!.id,
-                                description: item.rawTx!.description || '',
-                                amount: parseFloat(item.rawTx!.amount) || 0,
-                                categoryId: item.rawTx!.category_id,
-                                categoryName: item.rawTx!.category?.name,
-                                direction: 'expense',
-                              })
-                            }
+                                id: raw ? raw.id : op ? op.operationId : item.id,
+                                description: raw
+                                  ? raw.description || ''
+                                  : op
+                                    ? op.description || op.payPurpose || ''
+                                    : item.title,
+                                amount: item.amount,
+                                categoryId: raw?.category_id || item.categoryId || null,
+                                categoryName: raw?.category?.name || item.category,
+                                direction:
+                                  (raw?.direction === 'income' || raw?.direction === 'transfer'
+                                    ? raw.direction
+                                    : 'expense') ||
+                                  (item.wallet === 'fuel_card' ? 'transfer' : 'expense'),
+                                fromWalletId:
+                                  raw?.from_wallet_id ||
+                                  (item.wallet === 'cash'
+                                    ? CASH_ID
+                                    : item.wallet === 'fuel_card'
+                                      ? FUEL_CARD_ID
+                                      : BANK_ID),
+                                toWalletId:
+                                  raw?.to_wallet_id ||
+                                  (item.wallet === 'fuel_card' ? FUEL_CARD_ID : null),
+                                transactionDate:
+                                  raw?.transaction_date ||
+                                  raw?.created_at ||
+                                  (op ? op.operationDate || op.operationTime : selectedDate),
+                              });
+                            }}
                             className="text-[9px] text-slate-400 hover:text-sky-600 p-0.5 rounded hover:bg-sky-50 transition cursor-pointer"
                             title="Редактировать название / категорию"
                           >
-                            ✎ переименовать
+                            ✎ изменить
                           </button>
                         )}
                         {item.isGroup && (
                           <button
                             onClick={() => toggleGroup(item.id)}
-                            className="text-[9px] font-extrabold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded hover:bg-rose-200 transition cursor-pointer"
+                            className="text-[9px] font-extrabold bg-rose-100 text-rose-800 px-2 py-0.5 rounded hover:bg-rose-200 transition cursor-pointer flex items-center gap-1"
                           >
-                            {expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть список'}
+                            <span>
+                              {expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть список'}
+                            </span>
+                            <span className="bg-rose-200/80 px-1 rounded-sm text-[8px]">
+                              {item.subItems?.length}
+                            </span>
                           </button>
                         )}
                       </div>
@@ -1223,31 +1325,59 @@ export function DailyControlPanel() {
                       {item.subItems.map((sub) => (
                         <div
                           key={sub.id}
-                          className="flex items-center justify-between text-xs py-1 border-b border-slate-200/40 last:border-0"
+                          className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/40 last:border-0 hover:bg-slate-100/60 px-2 rounded-lg"
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[10px] font-mono text-slate-400">{sub.time}</span>
-                            <span className="font-semibold text-slate-700">{sub.title}</span>
+                            <span className="font-semibold text-slate-800">{sub.title}</span>
                             <span className="text-[10px] text-slate-400">({sub.author})</span>
-                            {sub.rawTx && (
-                              <button
-                                onClick={() =>
-                                  setEditingTx({
-                                    id: sub.rawTx!.id,
-                                    description: sub.rawTx!.description || '',
-                                    amount: parseFloat(sub.rawTx!.amount) || 0,
-                                    categoryId: sub.rawTx!.category_id,
-                                    categoryName: sub.rawTx!.category?.name,
-                                    direction: 'expense',
-                                  })
-                                }
-                                className="text-[8px] text-slate-400 hover:text-sky-600 cursor-pointer ml-1"
-                              >
-                                ✎
-                              </button>
+                            {sub.category && (
+                              <span className="text-[9px] bg-slate-200/70 text-slate-700 px-1 rounded font-medium">
+                                {sub.category}
+                              </span>
                             )}
+                            <button
+                              onClick={() => {
+                                const raw = sub.rawTx;
+                                const op = sub.bankOp;
+                                setEditingTx({
+                                  id: raw ? raw.id : op ? op.operationId : sub.id,
+                                  description: raw
+                                    ? raw.description || ''
+                                    : op
+                                      ? op.description || op.payPurpose || ''
+                                      : sub.title,
+                                  amount: sub.amount,
+                                  categoryId: raw?.category_id || sub.categoryId || null,
+                                  categoryName: raw?.category?.name || sub.category,
+                                  direction:
+                                    (raw?.direction === 'income' || raw?.direction === 'transfer'
+                                      ? raw.direction
+                                      : 'expense') ||
+                                    (sub.wallet === 'fuel_card' ? 'transfer' : 'expense'),
+                                  fromWalletId:
+                                    raw?.from_wallet_id ||
+                                    (sub.wallet === 'cash'
+                                      ? CASH_ID
+                                      : sub.wallet === 'fuel_card'
+                                        ? FUEL_CARD_ID
+                                        : BANK_ID),
+                                  toWalletId:
+                                    raw?.to_wallet_id ||
+                                    (sub.wallet === 'fuel_card' ? FUEL_CARD_ID : null),
+                                  transactionDate:
+                                    raw?.transaction_date ||
+                                    raw?.created_at ||
+                                    (op ? op.operationDate || op.operationTime : selectedDate),
+                                });
+                              }}
+                              className="text-[9px] text-sky-600 hover:text-sky-800 cursor-pointer ml-1 font-bold underline"
+                              title="Классифицировать / изменить"
+                            >
+                              ✎ изменить статью / имя
+                            </button>
                           </div>
-                          <div className="font-mono font-bold text-rose-600">
+                          <div className="font-mono font-bold text-rose-600 ml-2 flex-shrink-0">
                             -{rub(sub.amount)}
                           </div>
                         </div>
@@ -1606,15 +1736,15 @@ export function DailyControlPanel() {
         </div>
       </div>
 
-      {/* ── 8. MODAL: EDIT TRANSACTION TITLE & CATEGORY ── */}
+      {/* ── 8. MODAL: EDIT & CATEGORIZE EXPENSE / AUTO-LINK CALENDAR ── */}
       {editingTx && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="text-base">✎</span>
                 <span className="text-sm font-black uppercase text-slate-800">
-                  Редактирование операции
+                  Классификация и редактирование расхода
                 </span>
               </div>
               <button
@@ -1625,47 +1755,125 @@ export function DailyControlPanel() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Сумма операции
-                </label>
-                <div className="text-base font-black font-mono text-slate-900 mt-0.5">
-                  {rub(editingTx.amount)}
+            <div className="mt-4 space-y-3.5">
+              <div className="bg-rose-50/60 border border-rose-200/80 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-black uppercase text-rose-800 tracking-wider">
+                    Сумма списания
+                  </div>
+                  <div className="text-lg font-black font-mono text-rose-600 mt-0.5">
+                    -{rub(editingTx.amount)}
+                  </div>
+                </div>
+                <div className="text-right text-[10px] text-slate-500">
+                  <div>Дата операции:</div>
+                  <div className="font-mono font-bold text-slate-700">
+                    {editingTx.transactionDate
+                      ? new Date(editingTx.transactionDate).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : selectedDate}
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Название транзакции (как отображать в таблице)
+                <label className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
+                  Название / точное назначение (куда ушли деньги) *
                 </label>
                 <input
                   type="text"
                   value={editingTx.description}
                   onChange={(e) => setEditingTx({ ...editingTx, description: e.target.value })}
-                  placeholder="Например: Возмещение эквайринга за 12.10"
-                  className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Например: Пополнение топливной карты, Запчасти на Газель, Кредит Тинькофф"
+                  className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Категория
+                <label className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
+                  Статья расходов (Группа расходов) *
                 </label>
                 <select
                   value={editingTx.categoryId || ''}
-                  onChange={(e) =>
-                    setEditingTx({ ...editingTx, categoryId: e.target.value || null })
-                  }
-                  className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
+                  onChange={(e) => {
+                    const newCatId = e.target.value || null;
+                    const catObj = (data?.categories ?? []).find((c) => c.id === newCatId);
+                    let toW = editingTx.toWalletId;
+                    if (catObj?.code === 'FUEL' || catObj?.code === 'WALLET_TRANSFER') {
+                      toW = FUEL_CARD_ID;
+                    }
+                    setEditingTx({
+                      ...editingTx,
+                      categoryId: newCatId,
+                      categoryName: catObj?.name,
+                      toWalletId: toW,
+                    });
+                  }}
+                  className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white font-medium"
                 >
-                  <option value="">(Без категории)</option>
+                  <option value="">(Выберите статью расходов)</option>
                   {(data?.categories ?? []).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Destination wallet (for Fuel Card / Inter-wallet transfer) */}
+              {(editingTx.categoryId === '62cebf3f-9982-4cc6-904b-48c6169cf5e4' ||
+                editingTx.categoryId === 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93' ||
+                (editingTx.description || '').toLowerCase().includes('топливн') ||
+                (editingTx.description || '').toLowerCase().includes('пополнение тк') ||
+                (editingTx.description || '').toLowerCase().includes('гсм')) && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-amber-900 tracking-wider">
+                    ⛽ Зачислить на кошелек / карту:
+                  </label>
+                  <select
+                    value={editingTx.toWalletId || ''}
+                    onChange={(e) =>
+                      setEditingTx({ ...editingTx, toWalletId: e.target.value || null })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-amber-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value={FUEL_CARD_ID}>⛽ Топливная карта (ГСМ)</option>
+                    <option value={CASH_ID}>🔒 Сейф (Наличные)</option>
+                    <option value="">(Не переводить, оставить прямым списанием)</option>
+                  </select>
+                  <div className="text-[10px] text-amber-800">
+                    💡 При выборе Топливной карты баланс ГСМ автоматически пополнится на эту сумму
+                    (+{rub(editingTx.amount)}).
+                  </div>
+                </div>
+              )}
+
+              {/* Link with Payment Calendar */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                  <span>📅</span> Связать с Календарём платежей (отметить как оплаченный):
+                </label>
+                <select
+                  value={editingTx.obligationId || ''}
+                  onChange={(e) =>
+                    setEditingTx({ ...editingTx, obligationId: e.target.value || null })
+                  }
+                  className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white font-medium"
+                >
+                  <option value="">(Автоматический подбор по названию/сумме)</option>
+                  {(calendarData?.items ?? []).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.title} — {rub(o.amount)} (до {o.due_day}-го числа)
+                      {o.status === 'paid' ? ' [✓ Оплачен]' : ''}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-[10px] text-slate-500 mt-1">
+                  Платёж автоматически отметится как оплаченный в Платёжном календаре за этот месяц.
+                </div>
               </div>
             </div>
 
@@ -1677,17 +1885,23 @@ export function DailyControlPanel() {
                 Отмена
               </button>
               <button
-                disabled={updateTxMutation.isPending}
+                disabled={categorizeMutation.isPending || !editingTx.description?.trim()}
                 onClick={() =>
-                  updateTxMutation.mutate({
+                  categorizeMutation.mutate({
                     id: editingTx.id,
                     description: editingTx.description,
-                    categoryId: editingTx.categoryId,
+                    category_id: editingTx.categoryId,
+                    amount: editingTx.amount,
+                    to_wallet_id: editingTx.toWalletId,
+                    from_wallet_id: editingTx.fromWalletId,
+                    direction: editingTx.direction,
+                    obligation_id: editingTx.obligationId,
+                    transaction_date: editingTx.transactionDate,
                   })
                 }
-                className="px-4 py-1.5 text-xs font-black bg-sky-500 hover:bg-sky-600 text-white rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"
               >
-                {updateTxMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
+                {categorizeMutation.isPending ? 'Сохранение...' : '✓ Сохранить и распределить'}
               </button>
             </div>
           </div>

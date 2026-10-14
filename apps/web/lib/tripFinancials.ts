@@ -101,6 +101,7 @@ export async function syncTripFinancials(
     .maybeSingle();
 
   if (cashTotal > 0) {
+    const tripDate = trip.started_at || trip.created_at;
     if (existingCashTx) {
       await (supabase.from('transactions') as any)
         .update({
@@ -108,6 +109,8 @@ export async function syncTripFinancials(
           description: buildOrderDescription(cashOrders, 'Нал'),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
+          transaction_date: tripDate,
+          created_at: tripDate,
         })
         .eq('id', existingCashTx.id);
     } else {
@@ -120,6 +123,8 @@ export async function syncTripFinancials(
         description: buildOrderDescription(cashOrders, 'Нал'),
         lifecycle_status: 'approved',
         settlement_status: 'completed',
+        transaction_date: tripDate,
+        created_at: tripDate,
         created_by: adminId,
         idempotency_key: cashIdempotency,
       });
@@ -143,6 +148,7 @@ export async function syncTripFinancials(
     .maybeSingle();
 
   if (qrTotal > 0) {
+    const tripDate = trip.started_at || trip.created_at;
     if (existingQrTx) {
       await (supabase.from('transactions') as any)
         .update({
@@ -150,6 +156,8 @@ export async function syncTripFinancials(
           description: buildOrderDescription(qrOrders, 'QR/Безнал'),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
+          transaction_date: tripDate,
+          created_at: tripDate,
         })
         .eq('id', existingQrTx.id);
     } else {
@@ -162,6 +170,8 @@ export async function syncTripFinancials(
         description: buildOrderDescription(qrOrders, 'QR/Безнал'),
         lifecycle_status: 'approved',
         settlement_status: 'completed',
+        transaction_date: tripDate,
+        created_at: tripDate,
         created_by: adminId,
         idempotency_key: qrIdempotency,
       });

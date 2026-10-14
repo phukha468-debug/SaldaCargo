@@ -43,15 +43,27 @@ export async function GET() {
 
     const supabase = createAdminClient();
 
+    // Получаем последний подтвержденный вечерний аудит (базовая точка отсчета)
+    const { data: latestAudit } = await (supabase.from('daily_finance_audits') as any)
+      .select('*')
+      .eq('status', 'confirmed')
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const baseCash = Number(latestAudit?.safe_cash_actual ?? 29000);
+    const baseFuel = Number(latestAudit?.fuel_card_balance ?? 6642.05);
+    const auditCutoff = latestAudit?.audited_at || `${latestAudit?.date ?? '2026-10-12'}T13:04:34Z`;
+
     const [
       { data: bankOrders },
-      { data: collections },
       { data: bankIn },
       { data: bankOut },
-      { data: cashIn },
-      { data: cashOut },
-      { data: fuelIn },
-      { data: fuelOut },
+      { data: collectionsAfterAudit },
+      { data: cashInAfterAudit },
+      { data: cashOutAfterAudit },
+      { data: fuelInAfterAudit },
+      { data: fuelOutAfterAudit },
       { data: garageIn },
       { data: garageOut },
     ] = await Promise.all([
@@ -60,8 +72,6 @@ export async function GET() {
         .in('payment_method', ['bank_invoice', 'qr'])
         .eq('settlement_status', 'completed')
         .eq('lifecycle_status', 'approved'),
-
-      (supabase.from('cash_collections') as any).select('amount'),
 
       (supabase.from('transactions') as any)
         .select('amount, trip_order_id')
@@ -75,29 +85,35 @@ export async function GET() {
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
 
+      (supabase.from('cash_collections') as any).select('amount').gt('created_at', auditCutoff),
+
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('to_wallet_id', CASH_ID)
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
+        .eq('settlement_status', 'completed')
+        .gt('created_at', auditCutoff),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('from_wallet_id', CASH_ID)
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
+        .eq('settlement_status', 'completed')
+        .gt('created_at', auditCutoff),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('to_wallet_id', FUEL_CARD_ID)
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
+        .eq('settlement_status', 'completed')
+        .gt('created_at', auditCutoff),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('from_wallet_id', FUEL_CARD_ID)
         .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed'),
+        .eq('settlement_status', 'completed')
+        .gt('created_at', auditCutoff),
 
       (supabase.from('transactions') as any)
         .select('amount')
@@ -112,8 +128,6 @@ export async function GET() {
         .eq('settlement_status', 'completed'),
     ]);
 
-    const collectionsTotal = sum(collections ?? []);
-
     const bankInWithoutOrders = (bankIn ?? [])
       .filter((r: any) => !r.trip_order_id)
       .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
@@ -125,9 +139,13 @@ export async function GET() {
     // Если API вернул баланс, показываем строго его. Никакие отметки оплаченных счетов не завышают остаток.
     const bankBalance = apiBalance !== null ? apiBalance : fallbackBankBalance;
 
-    const cashBalance = collectionsTotal + sum(cashIn ?? []) - sum(cashOut ?? []);
+    const cashBalance =
+      baseCash +
+      sum(collectionsAfterAudit ?? []) +
+      sum(cashInAfterAudit ?? []) -
+      sum(cashOutAfterAudit ?? []);
 
-    const fuelBalance = sum(fuelIn ?? []) - sum(fuelOut ?? []);
+    const fuelBalance = baseFuel + sum(fuelInAfterAudit ?? []) - sum(fuelOutAfterAudit ?? []);
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
