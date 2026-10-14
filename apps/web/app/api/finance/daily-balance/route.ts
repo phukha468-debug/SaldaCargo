@@ -236,10 +236,10 @@ export async function GET(request: Request) {
     const actualMorningBank =
       isToday && apiBalance !== null ? actualEveningBank - bankDayIn + bankDayOut : morningBank;
 
-    // Фактические остатки сейфа (29 000 ₽) и топливной карты (6 642,05 ₽),
+    // Фактические остатки сейфа (29 000 ₽) и топливной карты (926,13 ₽),
     // зафиксированные директором, отсекающие старые виртуальные накопления из прошлых периодов
     const BASE_ACTUAL_CASH = 29000.0;
-    const BASE_ACTUAL_FUEL = 6642.05;
+    const BASE_ACTUAL_FUEL = 926.13;
 
     let actualEveningCash = morningCash + cashDayIn - cashDayOut;
     let actualMorningCash = morningCash;

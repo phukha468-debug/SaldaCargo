@@ -52,8 +52,8 @@ export async function GET() {
       .maybeSingle();
 
     const baseCash = Number(latestAudit?.safe_cash_actual ?? 29000);
-    const baseFuel = Number(latestAudit?.fuel_card_balance ?? 6642.05);
-    const auditCutoff = latestAudit?.audited_at || `${latestAudit?.date ?? '2026-10-12'}T13:04:34Z`;
+    const baseFuel = Number(latestAudit?.fuel_card_balance ?? 926.13);
+    const auditCutoff = latestAudit?.audited_at || `${latestAudit?.date ?? '2026-10-14'}T09:57:13Z`;
 
     const [
       { data: bankOrders },

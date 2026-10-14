@@ -178,6 +178,7 @@ export function DailyControlPanel() {
   const [auditForm, setAuditForm] = useState({
     audited_by: 'Директор',
     actualCash: '',
+    actualFuel: '',
     notes: '',
   });
 
@@ -963,6 +964,7 @@ export function DailyControlPanel() {
                   setAuditForm({
                     audited_by: 'Директор',
                     actualCash: String(cashWallet?.evening ?? ''),
+                    actualFuel: String(fuelWallet?.evening ?? ''),
                     notes: '',
                   });
                   setIsAuditModalOpen(true);
@@ -2012,18 +2014,30 @@ export function DailyControlPanel() {
                 </div>
               )}
 
+              {/* Fuel Card balance input */}
+              <div>
+                <label className="text-[9px] font-black uppercase text-slate-500 flex items-center justify-between">
+                  <span>Фактически на Топливной карте (рубли)</span>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    по учёту: {rub(fuelWallet?.evening ?? 0)}
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={auditForm.actualFuel}
+                  onChange={(e) => setAuditForm({ ...auditForm, actualFuel: e.target.value })}
+                  placeholder="Например: 926.13"
+                  className="w-full mt-1 px-3 py-2 text-sm font-bold font-mono border-2 border-amber-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-300"
+                />
+              </div>
+
               {/* Balances to record */}
               <div className="text-[10px] text-slate-500 space-y-1 pt-1">
                 <div className="flex justify-between">
                   <span>Фиксация Р/С Банк:</span>
                   <span className="font-mono font-bold text-slate-800">
                     {rub(bankWallet?.evening ?? 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Фиксация Топливной карты:</span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {rub(fuelWallet?.evening ?? 0)}
                   </span>
                 </div>
               </div>
@@ -2069,7 +2083,10 @@ export function DailyControlPanel() {
                     safe_cash_actual: parseFloat(auditForm.actualCash) || 0,
                     safe_cash_expected: cashWallet?.evening ?? 0,
                     bank_balance: bankWallet?.evening ?? 0,
-                    fuel_card_balance: fuelWallet?.evening ?? 0,
+                    fuel_card_balance:
+                      auditForm.actualFuel !== ''
+                        ? parseFloat(auditForm.actualFuel)
+                        : (fuelWallet?.evening ?? 0),
                     audited_by: auditForm.audited_by,
                     notes: auditForm.notes,
                   })
