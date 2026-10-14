@@ -65,6 +65,7 @@ export async function GET(request: Request) {
       { data: dayCollections },
       { data: auditRow },
       { data: categoriesList },
+      { data: calendarOverrides },
     ] = await Promise.all([
       // Transactions of the day (по transaction_date, либо по created_at если transaction_date не задан)
       (supabase.from('transactions') as any)
@@ -101,6 +102,11 @@ export async function GET(request: Request) {
       (supabase.from('transaction_categories') as any)
         .select('id, name, code')
         .order('name', { ascending: true }),
+
+      // Payment calendar overrides for the month to match paid obligations
+      (supabase.from('payment_calendar_overrides') as any)
+        .select('*')
+        .eq('period', date.slice(0, 7)),
     ]);
 
     // 3. Historical totals up to dayStart (to compute morning opening balance)
@@ -304,6 +310,7 @@ export async function GET(request: Request) {
       cash_collections: dayCollections ?? [],
       bank_operations: bankStatementOps,
       categories: categoriesList ?? [],
+      calendar_overrides: calendarOverrides ?? [],
     });
   } catch (err: any) {
     console.error('Error in daily-balance route:', err);

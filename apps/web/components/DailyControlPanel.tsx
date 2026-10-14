@@ -138,6 +138,15 @@ interface DailyBalanceData {
   cash_collections: CashCollectionTx[];
   bank_operations?: TBankOp[];
   categories: CategoryItem[];
+  calendar_overrides?: Array<{
+    id: string;
+    period: string;
+    obligation_id: string;
+    paid_amount: number | null;
+    paid_at: string | null;
+    custom_title?: string | null;
+    custom_notes?: string | null;
+  }>;
 }
 
 export function DailyControlPanel() {
@@ -562,6 +571,8 @@ export function DailyControlPanel() {
     time?: string;
     rawTx?: RawTx;
     bankOp?: TBankOp;
+    linkedObligationId?: string | null;
+    linkedObligationTitle?: string | null;
     isGroup?: boolean;
     subItems?: Array<{
       id: string;
@@ -575,6 +586,8 @@ export function DailyControlPanel() {
       walletName?: string;
       rawTx?: RawTx;
       bankOp?: TBankOp;
+      linkedObligationId?: string | null;
+      linkedObligationTitle?: string | null;
     }>;
   }
 
@@ -635,6 +648,25 @@ export function DailyControlPanel() {
         minute: '2-digit',
       });
 
+      const txAmt = parseFloat(tx.amount) || 0;
+      const calendarOverrides = data?.calendar_overrides ?? [];
+      const matchedOv = calendarOverrides.find(
+        (ov) =>
+          (ov.custom_notes && ov.custom_notes.includes(tx.id)) ||
+          (ov.paid_amount &&
+            Math.abs(Number(ov.paid_amount) - txAmt) < 1 &&
+            (tx.category_id === '00000000-0000-0000-0000-000000000020' ||
+              (tx.description || '').toLowerCase().includes('кредит'))),
+      );
+
+      let oblTitle: string | null = null;
+      let oblId: string | null = null;
+      if (matchedOv) {
+        oblId = matchedOv.obligation_id;
+        const calItem = calendarData?.items?.find((i) => i.id === matchedOv.obligation_id);
+        oblTitle = calItem?.title || matchedOv.custom_title || 'План платежей';
+      }
+
       individualExpenses.push({
         id: tx.id,
         title: tx.description || 'Расход',
@@ -643,9 +675,11 @@ export function DailyControlPanel() {
         wallet: w,
         walletName: wName,
         author: tx.related_user?.name || tx.counterparty?.name || 'Администратор',
-        amount: parseFloat(tx.amount) || 0,
+        amount: txAmt,
         time: txTime,
         rawTx: tx,
+        linkedObligationId: oblId,
+        linkedObligationTitle: oblTitle,
       });
     }
   });
@@ -899,6 +933,8 @@ export function DailyControlPanel() {
           walletName: it.walletName,
           rawTx: it.rawTx,
           bankOp: it.bankOp,
+          linkedObligationId: it.linkedObligationId,
+          linkedObligationTitle: it.linkedObligationTitle,
         })),
       });
     }
@@ -1289,6 +1325,7 @@ export function DailyControlPanel() {
                                   raw?.transaction_date ||
                                   raw?.created_at ||
                                   (op ? op.operationDate || op.operationTime : selectedDate),
+                                obligationId: item.linkedObligationId || null,
                               });
                             }}
                             className={
@@ -1338,6 +1375,13 @@ export function DailyControlPanel() {
                           {item.walletName}
                         </span>
                         <span>👤 {item.author}</span>
+                        {item.linkedObligationTitle && (
+                          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 border border-blue-300 font-extrabold text-[10px] px-2 py-0.5 rounded shadow-xs">
+                            <span>📅</span>
+                            <span>План: {item.linkedObligationTitle}</span>
+                            <span className="text-emerald-700 font-black">✓ Оплачен</span>
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1366,6 +1410,13 @@ export function DailyControlPanel() {
                             {sub.category && (
                               <span className="text-[9px] bg-slate-200/70 text-slate-700 px-1 rounded font-medium">
                                 {sub.category}
+                              </span>
+                            )}
+                            {sub.linkedObligationTitle && (
+                              <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 border border-blue-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded shadow-xs">
+                                <span>📅</span>
+                                <span>{sub.linkedObligationTitle}</span>
+                                <span className="text-emerald-700 font-black">✓</span>
                               </span>
                             )}
                             <button
@@ -1401,6 +1452,7 @@ export function DailyControlPanel() {
                                     raw?.transaction_date ||
                                     raw?.created_at ||
                                     (op ? op.operationDate || op.operationTime : selectedDate),
+                                  obligationId: sub.linkedObligationId || null,
                                 });
                               }}
                               className="text-[9px] text-sky-600 hover:text-sky-800 cursor-pointer ml-1 font-bold underline"
@@ -1898,6 +1950,7 @@ export function DailyControlPanel() {
                   className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white font-medium"
                 >
                   <option value="">(Автоматический подбор по названию/сумме)</option>
+                  <option value="none">❌ Не связывать / отвязать от плана платежей</option>
                   {(calendarData?.items ?? []).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.title} — {rub(o.amount)} (до {o.due_day}-го числа)

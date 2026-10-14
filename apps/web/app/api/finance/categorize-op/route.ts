@@ -151,23 +151,48 @@ export async function POST(req: Request) {
     }
 
     // 2. АВТОМАТИЧЕСКАЯ СИНХРОНИЗАЦИЯ С КАЛЕНДАРЁМ ПЛАТЕЖЕЙ
-    // Если явно передан obligation_id, либо если статья расхода — кредит/займ
     let matchedOblId = obligation_id;
 
-    if (!matchedOblId && category_id === LOAN_REPAYMENT_CAT) {
+    if (matchedOblId === 'none') {
+      matchedOblId = null;
+    } else if (!matchedOblId && category_id === LOAN_REPAYMENT_CAT) {
       // Автоподбор активного кредита из таблицы loans
       const { data: loans } = await (supabase.from('loans') as any)
-        .select('id, lender_name, monthly_payment')
+        .select('id, lender_name, monthly_payment, purpose')
         .eq('is_active', true);
 
       if (Array.isArray(loans) && loans.length > 0) {
         const descLower = (description || '').toLowerCase();
-        // Ищем по совпадению названия банка/кредитора или совпадению суммы
+        // 1. Поиск по сумме или по номеру/назначению кредита
         const match =
-          loans.find((l: any) => descLower.includes((l.lender_name || '').toLowerCase())) ||
           loans.find(
-            (l: any) => Math.abs(parseFloat(l.monthly_payment || '0') - numAmount) < 100,
+            (l: any) =>
+              (descLower.includes('19к') ||
+                descLower.includes('19000') ||
+                descLower.includes('19 000')) &&
+              Math.abs(parseFloat(l.monthly_payment || '0') - 19310) < 1000,
           ) ||
+          loans.find(
+            (l: any) =>
+              (descLower.includes('32к') ||
+                descLower.includes('32000') ||
+                descLower.includes('32 000')) &&
+              Math.abs(parseFloat(l.monthly_payment || '0') - 32300) < 1000,
+          ) ||
+          loans.find(
+            (l: any) =>
+              (descLower.includes('55к') ||
+                descLower.includes('55000') ||
+                descLower.includes('55 000')) &&
+              Math.abs(parseFloat(l.monthly_payment || '0') - 55000) < 1000,
+          ) ||
+          loans.find(
+            (l: any) => l.purpose && descLower.includes(String(l.purpose).toLowerCase()),
+          ) ||
+          loans.find(
+            (l: any) => Math.abs(parseFloat(l.monthly_payment || '0') - numAmount) <= 1000,
+          ) ||
+          loans.find((l: any) => descLower.includes((l.lender_name || '').toLowerCase())) ||
           loans[0];
 
         if (match) {
@@ -180,6 +205,7 @@ export async function POST(req: Request) {
       const period = txDate.slice(0, 7); // YYYY-MM
       const overrideId = `${period}:${matchedOblId}`;
       const payAmount = numAmount > 0 ? numAmount : parseFloat(savedTx?.amount || '0');
+      const txIdRef = savedTx?.id || cleanId;
 
       // Сохраняем отметку об оплате в payment_calendar_overrides
       await (supabase.from('payment_calendar_overrides') as any).upsert({
@@ -189,6 +215,7 @@ export async function POST(req: Request) {
         paid_amount: payAmount,
         paid_at: txDate,
         wallet_id: fromWallet,
+        custom_notes: `Оплачено через Р/С [tx:${txIdRef}]`,
         updated_at: new Date().toISOString(),
       });
 
