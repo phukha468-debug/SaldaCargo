@@ -20,6 +20,10 @@ function formatDayHeader(dateStr: string): string {
   return `${dow.toUpperCase()}, ${dayMonth}`;
 }
 
+const BANK_ID = '10000000-0000-0000-0000-000000000001';
+const CASH_ID = '10000000-0000-0000-0000-000000000002';
+const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
+
 type WalletFilter = 'all' | 'bank' | 'cash' | 'fuel_card';
 
 interface CategoryItem {
@@ -260,6 +264,78 @@ export function DailyControlPanel() {
     },
   });
 
+  // Manual Operation Modal state
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualType, setManualType] = useState<'expense' | 'income'>('expense');
+  const [manualAmount, setManualAmount] = useState('');
+  const [manualWallet, setManualWallet] = useState<'safe' | 'bank' | 'fuel'>('safe');
+  const [manualCategoryId, setManualCategoryId] = useState('');
+  const [manualDescription, setManualDescription] = useState('');
+  const [manualObligationId, setManualObligationId] = useState('');
+  const [manualTripOrderId, setManualTripOrderId] = useState('');
+
+  function openManualModal(type: 'expense' | 'income') {
+    setManualType(type);
+    setManualAmount('');
+    setManualDescription('');
+    setManualCategoryId('');
+    setManualWallet(type === 'expense' ? 'safe' : 'bank');
+    setManualObligationId('');
+    setManualTripOrderId('');
+    setIsManualModalOpen(true);
+  }
+
+  const createManualMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(manualAmount);
+      if (isNaN(amt) || amt <= 0) throw new Error('Укажите корректную сумму');
+      if (!manualDescription.trim()) throw new Error('Укажите описание операции');
+
+      let fromW: string | null = null;
+      let toW: string | null = null;
+
+      if (manualType === 'expense') {
+        fromW =
+          manualWallet === 'safe' ? CASH_ID : manualWallet === 'fuel' ? FUEL_CARD_ID : BANK_ID;
+      } else {
+        toW = manualWallet === 'safe' ? CASH_ID : BANK_ID;
+      }
+
+      const payload = {
+        id: crypto.randomUUID(),
+        direction: manualType,
+        amount: amt,
+        description: manualDescription.trim(),
+        category_id: manualCategoryId || null,
+        from_wallet_id: fromW,
+        to_wallet_id: toW,
+        transaction_date: `${selectedDate}T12:00:00.000Z`,
+        obligation_id: manualObligationId || null,
+        trip_order_id: manualTripOrderId || null,
+      };
+
+      const res = await fetch('/api/finance/categorize-op', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Ошибка при сохранении операции');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-balance', selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      setIsManualModalOpen(false);
+    },
+  });
+
   // Link Bank Op to Trip Order Mutation
   const [linkingBankOp, setLinkingBankOp] = useState<TBankOp | null>(null);
   const [selectedOrderIdToLink, setSelectedOrderIdToLink] = useState<string>('');
@@ -320,11 +396,6 @@ export function DailyControlPanel() {
   const bankWallet = data?.wallets?.bank;
   const cashWallet = data?.wallets?.cash;
   const fuelWallet = data?.wallets?.fuel_card;
-
-  // Active wallet filter helper
-  const BANK_ID = '10000000-0000-0000-0000-000000000001';
-  const CASH_ID = '10000000-0000-0000-0000-000000000002';
-  const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 
   function txMatchesWallet(tx: RawTx): boolean {
     if (activeWallet === 'all') return true;
@@ -986,6 +1057,23 @@ export function DailyControlPanel() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Quick manual operation buttons in top bar */}
+            <button
+              onClick={() => openManualModal('expense')}
+              className="inline-flex items-center gap-1 text-[10px] font-black bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-0.5 rounded-md transition shadow-2xs cursor-pointer"
+              title="Внести расход / списание вручную"
+            >
+              <span>−</span>
+              <span>Списание</span>
+            </button>
+            <button
+              onClick={() => openManualModal('income')}
+              className="inline-flex items-center gap-1 text-[10px] font-black bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-0.5 rounded-md transition shadow-2xs cursor-pointer"
+              title="Внести доход / пополнение вручную"
+            >
+              <span>+</span>
+              <span>Пополнение</span>
+            </button>
             {data?.audit?.status === 'confirmed' ? (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded-full">
                 ✓ СЕЙФ ПОДТВЕРЖДЁН (19:30)
@@ -1263,34 +1351,125 @@ export function DailyControlPanel() {
       {/* ── 6. MAIN TWO-COLUMN TABLE: LEFT = EXPENSES, RIGHT = INCOMES ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         {/* LEFT COLUMN: EXPENSES (РАСХОДЫ) */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="flex items-center justify-between px-3.5 py-2.5 bg-rose-50/70 border-b border-rose-100">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-              <span className="text-xs font-black uppercase tracking-wide text-rose-900">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-white rounded-2xl border-2 border-rose-200 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-full bg-rose-500 flex items-center justify-center text-white text-[9px] font-black">
+                −
+              </span>
+              <span className="text-xs font-black uppercase tracking-tight text-slate-900">
                 РАСХОДЫ ЗА СЕГОДНЯ
               </span>
-              <span className="text-[10px] font-mono font-bold bg-white text-rose-700 px-1.5 py-0.2 rounded border border-rose-200">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-mono">
                 {expenseItems.length}
               </span>
             </div>
-            <div className="text-xs font-black font-mono text-rose-600">
-              -{rub(totalDayExpenses)}
+            <div className="flex items-center gap-3">
+              <div className="text-xs font-black font-mono text-rose-600">
+                -{rub(totalDayExpenses)}
+              </div>
+              <button
+                onClick={() => openManualModal('expense')}
+                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-black shadow-xs flex items-center gap-1 cursor-pointer transition"
+              >
+                <span>+</span> <span>Списание</span>
+              </button>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-2.5">
             {expenseItems.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
+              <div className="py-8 text-center text-xs text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200">
                 Нет расходов за выбранный день
               </div>
             ) : (
               expenseItems.map((item) => (
-                <div key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                  <div className="p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-800">{item.title}</span>
+                <div
+                  key={item.id}
+                  className="bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm flex flex-col overflow-hidden group transition"
+                >
+                  <div className="flex items-stretch flex-1">
+                    {/* Accent strip 6px */}
+                    <div
+                      className={`w-1.5 flex-shrink-0 group-hover:w-2 transition-all ${
+                        item.wallet === 'fuel_card'
+                          ? 'bg-amber-500'
+                          : item.wallet === 'cash'
+                            ? 'bg-emerald-500'
+                            : 'bg-rose-500'
+                      }`}
+                    />
+
+                    {/* Card Content (3 zones) */}
+                    <div className="p-3 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+                      {/* Zone 1: Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-slate-900 truncate">
+                            {item.title}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
+                            {item.category}
+                          </span>
+                          {item.isGroup && (
+                            <button
+                              onClick={() => toggleGroup(item.id)}
+                              className="text-[9px] font-extrabold bg-rose-100 text-rose-800 px-2 py-0.5 rounded hover:bg-rose-200 transition cursor-pointer flex items-center gap-1"
+                            >
+                              <span>{expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть'}</span>
+                              <span className="bg-rose-200/80 px-1 rounded-sm text-[8px]">
+                                {item.subItems?.length}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1 flex-wrap">
+                          <span
+                            className={`px-1.5 py-0.2 rounded font-bold border text-[10px] ${
+                              item.wallet === 'bank'
+                                ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                : item.wallet === 'cash'
+                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-900 border-amber-200'
+                            }`}
+                          >
+                            {item.wallet === 'bank' ? '🏦' : item.wallet === 'cash' ? '🔒' : '⛽'}{' '}
+                            {item.walletName}
+                          </span>
+                          {item.time && (
+                            <>
+                              <span>·</span>
+                              <span className="font-mono text-slate-400">{item.time}</span>
+                            </>
+                          )}
+                          <span>·</span>
+                          <span className="text-slate-500">{item.author}</span>
+                        </div>
+                      </div>
+
+                      {/* Zone 2: Plan Link */}
+                      <div className="flex-shrink-0 self-start sm:self-center">
+                        {item.linkedObligationTitle ? (
+                          <div className="inline-flex items-center gap-1.5 bg-blue-50/90 text-blue-950 border-2 border-blue-200 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
+                            <span>📅</span>
+                            <span>{item.linkedObligationTitle}</span>
+                            <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded text-[10px]">
+                              ✓ Закрыт
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            Без привязки
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Zone 3: Amount + Edit Button */}
+                      <div className="text-right flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        <div className="text-sm font-black font-mono text-rose-600">
+                          -{rub(item.amount)}
+                        </div>
                         {!item.isGroup && (
                           <button
                             onClick={() => {
@@ -1328,80 +1507,26 @@ export function DailyControlPanel() {
                                 obligationId: item.linkedObligationId || null,
                               });
                             }}
-                            className={
-                              item.category === 'Списание с Р/С (API)' || !item.categoryId
-                                ? 'inline-flex items-center gap-1 bg-sky-500 hover:bg-sky-400 text-white font-black text-[10px] px-2 py-0.5 rounded shadow-xs transition cursor-pointer'
-                                : 'text-[9px] text-slate-400 hover:text-sky-600 p-0.5 rounded hover:bg-sky-50 transition cursor-pointer font-bold'
-                            }
-                            title="Выбрать статью расходов и написать точное назначение"
+                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center text-xs font-black cursor-pointer shadow-2xs transition"
+                            title="Редактировать / изменить статью"
                           >
-                            <span>✏️</span>
-                            <span>
-                              {item.category === 'Списание с Р/С (API)' || !item.categoryId
-                                ? 'Выбрать статью расходов'
-                                : 'изменить'}
-                            </span>
+                            ✏️
                           </button>
                         )}
-                        {item.isGroup && (
-                          <button
-                            onClick={() => toggleGroup(item.id)}
-                            className="text-[9px] font-extrabold bg-rose-100 text-rose-800 px-2 py-0.5 rounded hover:bg-rose-200 transition cursor-pointer flex items-center gap-1"
-                          >
-                            <span>
-                              {expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть список'}
-                            </span>
-                            <span className="bg-rose-200/80 px-1 rounded-sm text-[8px]">
-                              {item.subItems?.length}
-                            </span>
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500 flex-wrap">
-                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-semibold">
-                          📂 {item.category}
-                        </span>
-                        <span
-                          className={`px-1.5 py-0.2 rounded font-semibold ${
-                            item.wallet === 'bank'
-                              ? 'bg-sky-100 text-sky-800'
-                              : item.wallet === 'cash'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {item.wallet === 'bank' ? '🏦' : item.wallet === 'cash' ? '🔒' : '⛽'}{' '}
-                          {item.walletName}
-                        </span>
-                        <span>👤 {item.author}</span>
-                        {item.linkedObligationTitle && (
-                          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 border border-blue-300 font-extrabold text-[10px] px-2 py-0.5 rounded shadow-xs">
-                            <span>📅</span>
-                            <span>План: {item.linkedObligationTitle}</span>
-                            <span className="text-emerald-700 font-black">✓ Оплачен</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-black font-mono text-rose-600">
-                        -{rub(item.amount)}
                       </div>
                     </div>
                   </div>
 
-                  {/* Accordion Sub-items */}
+                  {/* Group details */}
                   {item.isGroup && expandedGroups[item.id] && item.subItems && (
-                    <div className="bg-slate-50/90 border-t border-slate-200/60 p-2.5 space-y-1.5 pl-6">
+                    <div className="w-full bg-slate-50/90 border-t-2 border-slate-200 p-2.5 space-y-1.5 pl-6">
                       <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
                         ДЕТАЛИЗАЦИЯ СГРУППИРОВАННЫХ ОПЕРАЦИЙ:
                       </div>
                       {item.subItems.map((sub) => (
                         <div
                           key={sub.id}
-                          className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/40 last:border-0 hover:bg-slate-100/60 px-2 rounded-lg"
+                          className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60 last:border-0 hover:bg-slate-100/60 px-2 rounded-lg"
                         >
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[10px] font-mono text-slate-400">{sub.time}</span>
@@ -1472,22 +1597,43 @@ export function DailyControlPanel() {
               ))
             )}
           </div>
+
+          {/* Bottom manual add button for left column */}
+          <button
+            onClick={() => openManualModal('expense')}
+            className="w-full py-3 bg-white hover:bg-rose-50/50 border-2 border-dashed border-rose-300 hover:border-rose-400 rounded-2xl text-xs font-black text-rose-700 hover:text-rose-800 flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition"
+          >
+            <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-xs font-black border border-rose-300">
+              +
+            </span>
+            <span>Внести списание вручную (ГСМ, запчасти, ЗП, кредит)</span>
+          </button>
         </div>
 
         {/* RIGHT COLUMN: INCOMES (ДОХОДЫ) */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="flex items-center justify-between px-3.5 py-2.5 bg-emerald-50/70 border-b border-emerald-100">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span className="text-xs font-black uppercase tracking-wide text-emerald-900">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-white rounded-2xl border-2 border-emerald-200 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[9px] font-black">
+                +
+              </span>
+              <span className="text-xs font-black uppercase tracking-tight text-slate-900">
                 ДОХОДЫ ЗА СЕГОДНЯ
               </span>
-              <span className="text-[10px] font-mono font-bold bg-white text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono">
                 {incomeItems.length}
               </span>
             </div>
-            <div className="text-xs font-black font-mono text-emerald-600">
-              +{rub(totalDayIncomes)}
+            <div className="flex items-center gap-3">
+              <div className="text-xs font-black font-mono text-emerald-600">
+                +{rub(totalDayIncomes)}
+              </div>
+              <button
+                onClick={() => openManualModal('income')}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black shadow-xs flex items-center gap-1 cursor-pointer transition"
+              >
+                <span>+</span> <span>Пополнение</span>
+              </button>
             </div>
           </div>
 
@@ -1506,7 +1652,7 @@ export function DailyControlPanel() {
             const pendingAmt = qrPending.reduce((s, o) => s + parseFloat(o.amount || '0'), 0);
 
             return (
-              <div className="p-2.5 bg-slate-900 text-slate-200 border-b border-slate-800 text-xs flex flex-col gap-1.5">
+              <div className="p-2.5 bg-slate-900 text-slate-200 rounded-2xl border-2 border-slate-800 text-xs flex flex-col gap-1.5 shadow-sm">
                 <div className="flex items-center justify-between flex-wrap gap-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm">📱</span>
@@ -1536,7 +1682,7 @@ export function DailyControlPanel() {
                 </div>
 
                 {qrPending.length > 0 && (
-                  <div className="bg-rose-950/70 border border-rose-800/80 rounded-lg p-2 text-[10px] space-y-1">
+                  <div className="bg-rose-950/70 border border-rose-800/80 rounded-xl p-2 text-[10px] space-y-1">
                     <div className="text-[9px] font-black uppercase tracking-wider text-rose-300 flex items-center justify-between">
                       <span>Заказы с QR, по которым оплата ещё НЕ поступила:</span>
                       <span className="text-rose-400">Требуется проверка водителей</span>
@@ -1571,59 +1717,91 @@ export function DailyControlPanel() {
             );
           })()}
 
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-2.5">
             {incomeItems.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
+              <div className="py-8 text-center text-xs text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200">
                 Нет поступлений за выбранный день
               </div>
             ) : (
               incomeItems.map((item) => (
-                <div key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                  <div className="p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-800">{item.title}</span>
-                        {item.rawTx && (
-                          <button
-                            onClick={() =>
-                              setEditingTx({
-                                id: item.rawTx!.id,
-                                description: item.rawTx!.description || '',
-                                amount: parseFloat(item.rawTx!.amount) || 0,
-                                categoryId: item.rawTx!.category_id,
-                                categoryName: item.rawTx!.category?.name,
-                                direction: 'income',
-                              })
-                            }
-                            className="text-[9px] text-slate-400 hover:text-sky-600 p-0.5 rounded hover:bg-sky-50 transition cursor-pointer"
-                            title="Редактировать название / категорию"
-                          >
-                            ✎ переименовать
-                          </button>
-                        )}
-                        {item.isGroup && (
-                          <button
-                            onClick={() => toggleGroup(item.id)}
-                            className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded hover:bg-emerald-200 transition cursor-pointer"
-                          >
-                            {expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть список'}
-                          </button>
-                        )}
+                <div
+                  key={item.id}
+                  className={`bg-white rounded-2xl border-2 shadow-sm flex flex-col overflow-hidden group transition ${
+                    !item.isLinked && item.canLinkToTrip
+                      ? 'border-amber-400 hover:border-amber-500 bg-amber-50/20'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <div className="flex items-stretch flex-1">
+                    {/* Accent strip 6px */}
+                    <div
+                      className={`w-1.5 flex-shrink-0 group-hover:w-2 transition-all ${
+                        item.wallet === 'cash'
+                          ? 'bg-emerald-500'
+                          : item.category.toLowerCase().includes('безнал')
+                            ? 'bg-sky-500'
+                            : !item.isLinked && item.canLinkToTrip
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                      }`}
+                    />
 
-                        {/* Связка с рейсом для банковских операций СБП */}
-                        {item.bankOp &&
-                          item.canLinkToTrip &&
-                          (item.isLinked ? (
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded border border-emerald-300">
+                    {/* Card Content (3 zones) */}
+                    <div className="p-3 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+                      {/* Zone 1: Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-slate-900 truncate">
+                            {item.title}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                            {item.category}
+                          </span>
+                          {item.isGroup && (
+                            <button
+                              onClick={() => toggleGroup(item.id)}
+                              className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded hover:bg-emerald-200 transition cursor-pointer flex items-center gap-1"
+                            >
+                              <span>{expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть'}</span>
+                              <span className="bg-emerald-200/80 px-1 rounded-sm text-[8px]">
+                                {item.subItems?.length}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1 flex-wrap">
+                          <span
+                            className={`px-1.5 py-0.2 rounded font-bold border text-[10px] ${
+                              item.wallet === 'bank'
+                                ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                            }`}
+                          >
+                            {item.wallet === 'bank' ? '🏦' : '🔒'} {item.walletName}
+                          </span>
+                          <span>·</span>
+                          <span className="text-slate-500">{item.author}</span>
+                        </div>
+                      </div>
+
+                      {/* Zone 2: Link / Match status */}
+                      <div className="flex-shrink-0 self-start sm:self-center">
+                        {item.bankOp && item.canLinkToTrip ? (
+                          item.isLinked ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-950 border-2 border-emerald-200 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
+                                <span>🚚</span>
                                 <span>
-                                  ✓{' '}
                                   {item.linkedTripNumber
                                     ? `Рейс №${item.linkedTripNumber}`
                                     : 'Рейс'}
                                 </span>
                                 {item.linkedDriverName && <span>({item.linkedDriverName})</span>}
-                              </span>
+                                <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded text-[10px]">
+                                  ✓
+                                </span>
+                              </div>
                               <button
                                 onClick={() =>
                                   linkBankOpMutation.mutate({
@@ -1632,30 +1810,14 @@ export function DailyControlPanel() {
                                   })
                                 }
                                 disabled={linkBankOpMutation.isPending}
-                                className="text-[9px] text-slate-400 hover:text-rose-600 underline cursor-pointer"
-                                title="Отвязать операцию от рейса"
+                                className="text-[10px] text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
+                                title="Отвязать операцию"
                               >
-                                отвязать ✕
+                                ✕
                               </button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <button
-                                onClick={() => {
-                                  setLinkingBankOp(item.bankOp!);
-                                  if (item.suggestedOrder) {
-                                    setSelectedOrderIdToLink(item.suggestedOrder.id);
-                                  } else {
-                                    setSelectedOrderIdToLink('');
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded shadow-xs transition cursor-pointer animate-pulse"
-                                title="Связать платёж с водителем и рейсом"
-                              >
-                                <span>🔗</span>
-                                <span>Привязать к рейсу</span>
-                              </button>
-
                               {item.suggestedOrder && (
                                 <button
                                   onClick={() =>
@@ -1669,54 +1831,75 @@ export function DailyControlPanel() {
                                     })
                                   }
                                   disabled={linkBankOpMutation.isPending}
-                                  className="text-[9px] text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-1.5 py-0.5 rounded font-black cursor-pointer transition"
+                                  className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs border-2 border-amber-500/40 flex items-center gap-1 cursor-pointer transition"
                                   title="Быстро связать с совпадающим заказом"
                                 >
-                                  ⚡ Совпадает: Рейс №{item.suggestedOrder.trip?.trip_number} (
-                                  {item.suggestedOrder.trip?.driver?.name})
+                                  <span>⚡</span>
+                                  <span>
+                                    Совпадает: Рейс №{item.suggestedOrder.trip?.trip_number} (
+                                    {item.suggestedOrder.trip?.driver?.name})
+                                  </span>
                                 </button>
                               )}
+                              <button
+                                onClick={() => {
+                                  setLinkingBankOp(item.bankOp!);
+                                  if (item.suggestedOrder) {
+                                    setSelectedOrderIdToLink(item.suggestedOrder.id);
+                                  } else {
+                                    setSelectedOrderIdToLink('');
+                                  }
+                                }}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] rounded-xl border border-slate-300 cursor-pointer transition"
+                              >
+                                🔗 Привязать к рейсу
+                              </button>
                             </div>
-                          ))}
+                          )
+                        ) : (
+                          <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-lg">
+                            <span>✓ Зачислено</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500 flex-wrap">
-                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-semibold">
-                          📂 {item.category}
-                        </span>
-                        <span
-                          className={`px-1.5 py-0.2 rounded font-semibold ${
-                            item.wallet === 'bank'
-                              ? 'bg-sky-100 text-sky-800'
-                              : item.wallet === 'cash'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {item.wallet === 'bank' ? '🏦' : item.wallet === 'cash' ? '🔒' : '⛽'}{' '}
-                          {item.walletName}
-                        </span>
-                        <span>👤 {item.author}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-black font-mono text-emerald-600">
-                        +{rub(item.amount)}
+                      {/* Zone 3: Amount + Action button */}
+                      <div className="text-right flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        <div className="text-sm font-black font-mono text-emerald-600">
+                          +{rub(item.amount)}
+                        </div>
+                        {item.rawTx && (
+                          <button
+                            onClick={() =>
+                              setEditingTx({
+                                id: item.rawTx!.id,
+                                description: item.rawTx!.description || '',
+                                amount: parseFloat(item.rawTx!.amount) || 0,
+                                categoryId: item.rawTx!.category_id,
+                                categoryName: item.rawTx!.category?.name,
+                                direction: 'income',
+                              })
+                            }
+                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center text-xs font-black cursor-pointer shadow-2xs transition"
+                            title="Редактировать название / категорию"
+                          >
+                            ✏️
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Accordion Sub-items */}
+                  {/* Group details */}
                   {item.isGroup && expandedGroups[item.id] && item.subItems && (
-                    <div className="bg-slate-50/90 border-t border-slate-200/60 p-2.5 space-y-1.5 pl-6">
+                    <div className="w-full bg-slate-50/90 border-t-2 border-slate-200 p-2.5 space-y-1.5 pl-6">
                       <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
                         ДЕТАЛИЗАЦИЯ ПОСТУПЛЕНИЙ:
                       </div>
                       {item.subItems.map((sub) => (
                         <div
                           key={sub.id}
-                          className="flex items-center justify-between text-xs py-1 border-b border-slate-200/40 last:border-0"
+                          className="flex items-center justify-between text-xs py-1 border-b border-slate-200/60 last:border-0 hover:bg-slate-100/60 px-2 rounded-lg"
                         >
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] font-mono text-slate-400">{sub.time}</span>
@@ -1734,7 +1917,7 @@ export function DailyControlPanel() {
                                     direction: 'income',
                                   })
                                 }
-                                className="text-[8px] text-slate-400 hover:text-sky-600 cursor-pointer ml-1"
+                                className="text-[9px] text-slate-400 hover:text-sky-600 cursor-pointer ml-1 font-bold underline"
                               >
                                 ✎
                               </button>
@@ -1751,6 +1934,17 @@ export function DailyControlPanel() {
               ))
             )}
           </div>
+
+          {/* Bottom manual add button for right column */}
+          <button
+            onClick={() => openManualModal('income')}
+            className="w-full py-3 bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300 hover:border-emerald-400 rounded-2xl text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition"
+          >
+            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black border border-emerald-300">
+              +
+            </span>
+            <span>Внести пополнение вручную (Выручка нал/безнал, возврат, прочее)</span>
+          </button>
         </div>
       </div>
 
@@ -2319,6 +2513,240 @@ export function DailyControlPanel() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: MANUAL EXPENSE / INCOME OPERATION ── */}
+      {isManualModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-lg w-full overflow-hidden">
+            {/* Header */}
+            <div
+              className={`px-5 py-4 text-white flex items-center justify-between transition-colors ${
+                manualType === 'expense'
+                  ? 'bg-gradient-to-r from-rose-500 to-rose-600'
+                  : 'bg-gradient-to-r from-emerald-500 to-emerald-600'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">{manualType === 'expense' ? '💸' : '💰'}</span>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight">
+                    {manualType === 'expense'
+                      ? 'Внести списание вручную'
+                      : 'Внести пополнение вручную'}
+                  </h3>
+                  <p className="text-[11px] text-white/80">
+                    {manualType === 'expense'
+                      ? 'Расход по кассе сейфа, банку или топливной карте'
+                      : 'Поступление выручки нал/безнал или возврат'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsManualModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-sm font-black cursor-pointer transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                createManualMutation.mutate();
+              }}
+              className="p-5 space-y-4 text-xs"
+            >
+              {/* Type Switcher */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Тип операции
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border-2 border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualType('expense');
+                      if (manualWallet === 'safe') setManualWallet('safe');
+                    }}
+                    className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      manualType === 'expense'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    − Списание (Расход)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualType('income');
+                      if (manualWallet === 'fuel') setManualWallet('safe');
+                    }}
+                    className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      manualType === 'income'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    + Пополнение (Доход)
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Сумма операции (₽) *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={manualAmount}
+                    onChange={(e) => setManualAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-4 pr-12 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black font-mono text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono font-black text-slate-400">
+                    ₽
+                  </span>
+                </div>
+              </div>
+
+              {/* Wallet */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Кошелёк / Счёт *
+                </label>
+                <select
+                  value={manualWallet}
+                  onChange={(e) => setManualWallet(e.target.value as 'safe' | 'bank' | 'fuel')}
+                  className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
+                >
+                  <option value="safe">🔒 Сейф кассы (Наличные)</option>
+                  <option value="bank">🏦 Р/С Т-Банк (Безналичные)</option>
+                  {manualType === 'expense' && (
+                    <option value="fuel">⛽ Топливная карта Газпромнефть</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Статья / Категория
+                </label>
+                <select
+                  value={manualCategoryId}
+                  onChange={(e) => setManualCategoryId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
+                >
+                  <option value="">(Выберите категорию)</option>
+                  {(data?.categories ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Описание / Контрагент / Примечание *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={manualDescription}
+                  onChange={(e) => setManualDescription(e.target.value)}
+                  placeholder="Например: Заправка Газель А777АА или Сдача наличных водителем"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                />
+              </div>
+
+              {/* Optional Link */}
+              {manualType === 'expense' ? (
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <span>📅</span> Связать с Планом платежей (отметить оплаченным)
+                  </label>
+                  <select
+                    value={manualObligationId}
+                    onChange={(e) => setManualObligationId(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
+                  >
+                    <option value="">Без привязки к плану</option>
+                    {(calendarData?.items ?? []).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.title} — {rub(o.amount)} (до {o.due_day}-го числа)
+                        {o.status === 'paid' ? ' [✓ Оплачен]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <span>🚚</span> Привязать к заказу рейса за сегодня
+                  </label>
+                  <select
+                    value={manualTripOrderId}
+                    onChange={(e) => setManualTripOrderId(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
+                  >
+                    <option value="">Без привязки к рейсу</option>
+                    {(data?.trip_orders ?? []).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.trip?.trip_number ? `Рейс №${o.trip.trip_number}` : 'Рейс'} (
+                        {o.trip?.driver?.name || 'Водитель'}) — {rub(o.amount)}
+                        {o.counterparty?.name ? ` · ${o.counterparty.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Error message */}
+              {createManualMutation.isError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-700 text-xs font-bold">
+                  {(createManualMutation.error as Error)?.message || 'Ошибка сохранения'}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsManualModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black cursor-pointer transition"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    createManualMutation.isPending || !manualAmount || !manualDescription.trim()
+                  }
+                  className={`px-5 py-2.5 text-white rounded-xl text-xs font-black shadow-xs cursor-pointer transition disabled:opacity-50 ${
+                    manualType === 'expense'
+                      ? 'bg-rose-600 hover:bg-rose-500'
+                      : 'bg-emerald-600 hover:bg-emerald-500'
+                  }`}
+                >
+                  {createManualMutation.isPending
+                    ? 'Сохранение...'
+                    : manualType === 'expense'
+                      ? 'Сохранить списание'
+                      : 'Сохранить пополнение'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -90,10 +90,16 @@ export async function POST(req: Request) {
 
     // Определение направления и кошельков
     let direction = body.direction || 'expense';
-    let fromWallet = from_wallet_id || existingTx?.from_wallet_id || BANK_ID;
-    let toWallet = to_wallet_id !== undefined ? to_wallet_id : existingTx?.to_wallet_id || null;
+    let fromWallet =
+      from_wallet_id !== undefined
+        ? from_wallet_id
+        : existingTx?.from_wallet_id || (direction === 'expense' ? BANK_ID : null);
+    let toWallet =
+      to_wallet_id !== undefined
+        ? to_wallet_id
+        : existingTx?.to_wallet_id || (direction === 'income' ? BANK_ID : null);
 
-    if (toWallet || category_id === WALLET_TRANSFER_CAT) {
+    if (direction !== 'income' && (toWallet || category_id === WALLET_TRANSFER_CAT)) {
       direction = 'transfer';
       if (!toWallet) toWallet = FUEL_CARD_ID;
       if (!fromWallet) fromWallet = BANK_ID;
@@ -111,6 +117,7 @@ export async function POST(req: Request) {
       if (toWallet !== undefined) updateData.to_wallet_id = toWallet;
       if (fromWallet !== undefined) updateData.from_wallet_id = fromWallet;
       if (direction !== undefined) updateData.direction = direction;
+      if (body.trip_order_id !== undefined) updateData.trip_order_id = body.trip_order_id;
 
       const { data: updated, error: updErr } = await (supabase.from('transactions') as any)
         .update(updateData)
@@ -123,20 +130,25 @@ export async function POST(req: Request) {
       }
       savedTx = updated;
     } else {
-      // Создаем новую запись транзакции для банковской операции
+      // Создаем новую запись транзакции для банковской операции или ручного ввода
       const insertData: Record<string, any> = {
         direction,
         amount: numAmount > 0 ? numAmount : 0,
         category_id: category_id || null,
         from_wallet_id: fromWallet,
         to_wallet_id: toWallet,
-        description: description ? String(description).trim() : 'Расход по Р/С',
+        description: description
+          ? String(description).trim()
+          : direction === 'income'
+            ? 'Поступление'
+            : 'Расход',
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         transaction_date: txDate,
         created_at: txDate,
         idempotency_key: cleanId,
         created_by: adminUser?.id || null,
+        trip_order_id: body.trip_order_id || null,
       };
 
       const { data: inserted, error: insErr } = await (supabase.from('transactions') as any)
