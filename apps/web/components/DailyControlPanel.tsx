@@ -198,6 +198,7 @@ interface DailyBalanceData {
 export function DailyControlPanel() {
   const queryClient = useQueryClient();
   const todayStr = new Date().toISOString().slice(0, 10);
+  const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [activeWallet, setActiveWallet] = useState<WalletFilter>('all');
 
@@ -397,6 +398,95 @@ export function DailyControlPanel() {
   const [dispatcherDetails, setDispatcherDetails] = useState('');
   const [dispatcherClientName, setDispatcherClientName] = useState('');
 
+  // Trip link modal search and filters
+  const [linkOrderSearch, setLinkOrderSearch] = useState('');
+  const [linkOrderPeriod, setLinkOrderPeriod] = useState<
+    'smart' | 'today' | 'yesterday' | '7days' | 'custom'
+  >('smart');
+  const [linkOrderCustomDate, setLinkOrderCustomDate] = useState('');
+
+  // Query linkable trip orders across dates and with smart scoring
+  const { data: linkableOrdersData, isLoading: isLoadingLinkableOrders } = useQuery<{
+    extractedDate?: string | null;
+    orders: Array<{
+      id: string;
+      trip_id: string;
+      amount: string | number;
+      payment_method: string;
+      settlement_status: string;
+      lifecycle_status: string;
+      description?: string | null;
+      created_at: string;
+      trip_date?: string;
+      order_amount?: number;
+      is_match_amount?: boolean;
+      is_match_date?: boolean;
+      is_match_client?: boolean;
+      is_already_linked?: boolean;
+      score?: number;
+      counterparty?: { id: string; name: string; inn?: string; contact_person?: string } | null;
+      trip?: {
+        id: string;
+        trip_number: number;
+        started_at: string;
+        created_at: string;
+        driver?: { id: string; name: string } | null;
+      } | null;
+    }>;
+  }>({
+    queryKey: [
+      'linkable-orders',
+      linkingBankOp?.operationId,
+      linkOrderSearch,
+      linkOrderPeriod,
+      linkOrderCustomDate,
+    ],
+    queryFn: async () => {
+      if (!linkingBankOp) return { orders: [] };
+      const amt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
+      const desc = linkingBankOp.description || linkingBankOp.payPurpose || '';
+      const opDate = linkingBankOp.operationDate || '';
+
+      const params = new URLSearchParams();
+      params.set('targetAmount', String(amt));
+      params.set('targetDesc', desc);
+      params.set('operationDate', opDate);
+      if (linkOrderSearch) params.set('search', linkOrderSearch);
+
+      if (linkOrderPeriod === 'custom' && linkOrderCustomDate) {
+        params.set('date', linkOrderCustomDate);
+      } else if (linkOrderPeriod === 'today') {
+        params.set('date', todayStr);
+      } else if (linkOrderPeriod === 'yesterday') {
+        params.set('date', yesterdayStr);
+      } else if (linkOrderPeriod === '7days') {
+        params.set('days', '7');
+      } else {
+        // 'smart' (default): checks last 14 days and scores matches
+        params.set('days', '14');
+      }
+
+      const res = await fetch(`/api/finance/linkable-orders?${params.toString()}`);
+      if (!res.ok) throw new Error('Ошибка загрузки рейсов');
+      return res.json();
+    },
+    enabled: !!linkingBankOp && linkMode === 'trip',
+  });
+
+  // Auto-select the best matching order when linkableOrdersData loads
+  React.useEffect(() => {
+    if (!linkingBankOp || linkMode !== 'trip') return;
+    const orders = linkableOrdersData?.orders ?? [];
+    if (orders.length > 0 && !selectedOrderIdToLink) {
+      const best =
+        orders.find((o) => !o.is_already_linked && (o.is_match_amount || o.is_match_date)) ||
+        orders[0];
+      if (best) {
+        setSelectedOrderIdToLink(best.id);
+      }
+    }
+  }, [linkableOrdersData, linkingBankOp, linkMode, selectedOrderIdToLink]);
+
   const linkBankOpMutation = useMutation({
     mutationFn: async ({
       operationId,
@@ -445,8 +535,12 @@ export function DailyControlPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-balance', selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['linkable-orders'] });
       setLinkingBankOp(null);
       setSelectedOrderIdToLink('');
+      setLinkOrderSearch('');
+      setLinkOrderPeriod('smart');
+      setLinkOrderCustomDate('');
       setStoOrderNumber('');
       setStoClientName('');
       setDispatcherDetails('');
@@ -1932,6 +2026,9 @@ export function DailyControlPanel() {
                                 onClick={() => {
                                   setLinkingBankOp(item.bankOp!);
                                   setLinkMode('trip');
+                                  setLinkOrderSearch('');
+                                  setLinkOrderPeriod('smart');
+                                  setLinkOrderCustomDate('');
                                   if (item.suggestedOrder) {
                                     setSelectedOrderIdToLink(item.suggestedOrder.id);
                                   } else {
@@ -2565,28 +2662,157 @@ export function DailyControlPanel() {
 
               {/* Tab 1: Trip Selection */}
               {linkMode === 'trip' && (
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1.5">
-                    Выберите рейс автопарка за сегодня:
-                  </label>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-black uppercase text-slate-700">
+                      Выберите рейс автопарка для привязки:
+                    </label>
+                    {linkableOrdersData?.extractedDate && (
+                      <span className="text-[10px] font-bold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full border border-sky-200">
+                        🎯 Дата из платежа:{' '}
+                        {linkableOrdersData.extractedDate.split('-').reverse().join('.')}
+                      </span>
+                    )}
+                  </div>
 
+                  {/* Filter chips: Smart / Yesterday / Today / 7 days / Date picker */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkOrderPeriod('smart');
+                        setLinkOrderCustomDate('');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-black rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                        linkOrderPeriod === 'smart'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>⚡</span>
+                      <span>Умный подбор</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkOrderPeriod('yesterday');
+                        setLinkOrderCustomDate('');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-black rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                        linkOrderPeriod === 'yesterday'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>📅</span>
+                      <span>Вчера ({yesterdayStr.split('-').reverse().slice(0, 2).join('.')})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkOrderPeriod('today');
+                        setLinkOrderCustomDate('');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-black rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                        linkOrderPeriod === 'today'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>📅</span>
+                      <span>Сегодня ({todayStr.split('-').reverse().slice(0, 2).join('.')})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkOrderPeriod('7days');
+                        setLinkOrderCustomDate('');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-black rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                        linkOrderPeriod === '7days'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>🗓️</span>
+                      <span>За 7 дней</span>
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={linkOrderCustomDate}
+                        onChange={(e) => {
+                          setLinkOrderCustomDate(e.target.value);
+                          if (e.target.value) setLinkOrderPeriod('custom');
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-bold border border-slate-300 rounded-lg bg-white text-slate-800"
+                        title="Выбрать другую дату рейса"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Search input */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={linkOrderSearch}
+                      onChange={(e) => setLinkOrderSearch(e.target.value)}
+                      placeholder="🔍 Поиск по номеру рейса (напр. 827), клиенту (Оля), сумме (2500)..."
+                      className="w-full pl-3 pr-8 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                    {linkOrderSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setLinkOrderSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Orders List */}
                   {(() => {
-                    const todayOrders = data?.trip_orders ?? [];
+                    const orders = linkableOrdersData?.orders ?? [];
                     const opAmt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
 
-                    if (todayOrders.length === 0) {
+                    if (isLoadingLinkableOrders) {
                       return (
-                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center text-slate-500">
-                          Сегодня ещё не создано рейсов водителей.
+                        <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center text-slate-500 text-xs">
+                          <span className="inline-block animate-spin mr-2">⏳</span>
+                          Загрузка рейсов автопарка...
+                        </div>
+                      );
+                    }
+
+                    if (orders.length === 0) {
+                      return (
+                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-2">
+                          <div className="text-slate-500 text-xs">
+                            Рейсы не найдены по выбранным критериям.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLinkOrderPeriod('7days');
+                              setLinkOrderSearch('');
+                              setLinkOrderCustomDate('');
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-white border border-slate-300 rounded-lg text-sky-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            Показать рейсы за последние 7 дней
+                          </button>
                         </div>
                       );
                     }
 
                     return (
-                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                        {todayOrders.map((order) => {
-                          const isMatchAmt = parseFloat(order.amount) === opAmt;
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {orders.map((order) => {
+                          const isMatchAmt =
+                            order.is_match_amount ?? parseFloat(String(order.amount)) === opAmt;
                           const isSelected = selectedOrderIdToLink === order.id;
+                          const isTopRecommendation = order.score && order.score >= 100;
 
                           return (
                             <div
@@ -2595,9 +2821,11 @@ export function DailyControlPanel() {
                               className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
                                 isSelected
                                   ? 'bg-sky-50 border-2 border-sky-500 ring-2 ring-sky-200'
-                                  : isMatchAmt
-                                    ? 'bg-amber-50/70 border-amber-300 hover:border-amber-400'
-                                    : 'bg-white border-slate-200 hover:border-slate-300'
+                                  : isTopRecommendation
+                                    ? 'bg-amber-50/80 border-2 border-amber-400 hover:border-amber-500 shadow-2xs'
+                                    : isMatchAmt
+                                      ? 'bg-amber-50/50 border-amber-300 hover:border-amber-400'
+                                      : 'bg-white border-slate-200 hover:border-slate-300'
                               }`}
                             >
                               <div className="flex items-center gap-2">
@@ -2608,7 +2836,7 @@ export function DailyControlPanel() {
                                   className="cursor-pointer"
                                 />
                                 <div>
-                                  <div className="font-black text-slate-900 flex items-center gap-1.5">
+                                  <div className="font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
                                     <span>
                                       {order.trip?.trip_number
                                         ? `Рейс №${order.trip.trip_number}`
@@ -2617,36 +2845,62 @@ export function DailyControlPanel() {
                                     <span className="text-slate-500 font-normal">
                                       · {order.trip?.driver?.name || 'Водитель'}
                                     </span>
+                                    {order.trip_date && (
+                                      <span className="text-[10px] font-mono font-medium text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                        📅{' '}
+                                        {order.trip_date.split('-').reverse().slice(0, 2).join('.')}
+                                      </span>
+                                    )}
+                                    {order.is_match_date && (
+                                      <span className="text-[9px] font-black bg-sky-200 text-sky-900 px-1.5 py-0.2 rounded">
+                                        🎯 Дата совпадает
+                                      </span>
+                                    )}
                                     {isMatchAmt && (
                                       <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded shadow-2xs">
                                         ⭐ Совпадает сумма
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                  <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
                                     <span>
                                       Тип:{' '}
                                       {order.payment_method === 'qr'
                                         ? '📱 QR-код'
                                         : order.payment_method === 'cash'
                                           ? '💵 Наличные'
-                                          : order.payment_method}
+                                          : order.payment_method === 'bank_invoice'
+                                            ? '💳 Безнал'
+                                            : order.payment_method}
                                     </span>
                                     {order.counterparty?.name && (
-                                      <span>Клиент: {order.counterparty.name}</span>
+                                      <span className="font-semibold text-slate-700">
+                                        Клиент: {order.counterparty.name}
+                                      </span>
+                                    )}
+                                    {order.description && (
+                                      <span className="text-slate-400 italic">
+                                        ({order.description})
+                                      </span>
                                     )}
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="text-right">
+                              <div className="text-right flex-shrink-0 ml-2">
                                 <div className="font-mono font-black text-slate-900 text-xs">
-                                  {rub(parseFloat(order.amount))}
+                                  {rub(parseFloat(String(order.amount)))}
                                 </div>
                                 <div className="text-[9px] text-slate-400">
-                                  {order.settlement_status === 'completed'
-                                    ? '✓ Оплачен'
-                                    : '⏳ Ожидает'}
+                                  {order.is_already_linked ? (
+                                    <span className="text-emerald-700 font-bold">
+                                      ✓ Привязан к Р/С
+                                    </span>
+                                  ) : order.settlement_status === 'completed' ? (
+                                    '✓ Отмечен'
+                                  ) : (
+                                    '⏳ Ожидает'
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2768,7 +3022,14 @@ export function DailyControlPanel() {
                       ? '✓ Связать с заказ-нарядом СТО'
                       : linkMode === 'dispatcher'
                         ? '✓ Связать с рейсом диспетчера'
-                        : '✓ Связать с рейсом автопарка'}
+                        : (() => {
+                            const selOrder = (linkableOrdersData?.orders ?? []).find(
+                              (o) => o.id === selectedOrderIdToLink,
+                            );
+                            return selOrder?.trip?.trip_number
+                              ? `✓ Связать с рейсом №${selOrder.trip.trip_number}`
+                              : '✓ Связать с рейсом автопарка';
+                          })()}
                 </button>
               </div>
             </div>

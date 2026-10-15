@@ -12,7 +12,7 @@ interface NetworkIndicatorProps {
  */
 export function NetworkIndicator({ className }: NetworkIndicatorProps) {
   const [isOnline, setIsOnline] = React.useState(true);
-  const [pendingCount, setPendingCount] = React.useState(0);
+  const [pendingCount] = React.useState(0);
 
   React.useEffect(() => {
     const handleOnline = () => setIsOnline(true);
