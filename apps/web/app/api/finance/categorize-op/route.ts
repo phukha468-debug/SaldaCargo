@@ -8,6 +8,7 @@ const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const WALLET_TRANSFER_CAT = 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93';
 const LOAN_REPAYMENT_CAT = '00000000-0000-0000-0000-000000000020';
+const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
 function getLocalFilePath(filename: string): string {
   const inAppsWeb = path.join(process.cwd(), 'apps', 'web', 'data', filename);
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
       from_wallet_id,
       transaction_date,
       obligation_id,
+      related_user_id,
     } = body;
 
     if (!id) {
@@ -105,6 +107,33 @@ export async function POST(req: Request) {
       if (!fromWallet) fromWallet = BANK_ID;
     }
 
+    // Разрешение сотрудника (водителя): если передан явно или автопоиск по имени в описании
+    let finalRelatedUserId: string | null =
+      related_user_id !== undefined ? related_user_id || null : existingTx?.related_user_id || null;
+
+    if (
+      !finalRelatedUserId &&
+      (category_id === ADVANCE_CATEGORY_ID || /аванс|суточн/i.test(description || ''))
+    ) {
+      const descLower = (description || '').toLowerCase();
+      const { data: usersList } = await (supabase.from('users') as any)
+        .select('id, name')
+        .eq('is_active', true);
+      if (Array.isArray(usersList)) {
+        const matched = usersList.find((u: any) => {
+          if (!u.name) return false;
+          const words = u.name
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w: string) => w.length >= 3);
+          return words.some((w: string) => descLower.includes(w));
+        });
+        if (matched) {
+          finalRelatedUserId = matched.id;
+        }
+      }
+    }
+
     let savedTx: any = null;
 
     if (existingTx) {
@@ -118,6 +147,7 @@ export async function POST(req: Request) {
       if (fromWallet !== undefined) updateData.from_wallet_id = fromWallet;
       if (direction !== undefined) updateData.direction = direction;
       if (body.trip_order_id !== undefined) updateData.trip_order_id = body.trip_order_id;
+      if (finalRelatedUserId !== undefined) updateData.related_user_id = finalRelatedUserId;
 
       const { data: updated, error: updErr } = await (supabase.from('transactions') as any)
         .update(updateData)
@@ -149,6 +179,7 @@ export async function POST(req: Request) {
         idempotency_key: cleanId,
         created_by: adminUser?.id || null,
         trip_order_id: body.trip_order_id || null,
+        related_user_id: finalRelatedUserId || null,
       };
 
       const { data: inserted, error: insErr } = await (supabase.from('transactions') as any)

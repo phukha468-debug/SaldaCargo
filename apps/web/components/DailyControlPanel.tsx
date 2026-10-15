@@ -84,6 +84,7 @@ interface RawTx {
   to_wallet_id: string | null;
   category_id?: string | null;
   counterparty_id?: string | null;
+  related_user_id?: string | null;
   trip_order_id?: string | null;
   trip_id?: string | null;
   idempotency_key?: string | null;
@@ -225,6 +226,7 @@ export function DailyControlPanel() {
     fromWalletId?: string | null;
     obligationId?: string | null;
     transactionDate?: string;
+    relatedUserId?: string | null;
   } | null>(null);
 
   // Director Audit Modal state
@@ -244,6 +246,13 @@ export function DailyControlPanel() {
     refetchInterval: selectedDate === todayStr ? 60 * 1000 : false,
   });
 
+  // Fetch active users / staff for linking advances and debt without duplicating
+  const { data: usersData } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['users-list'],
+    queryFn: () => fetch('/api/users').then((r) => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Mutations
   const categorizeMutation = useMutation({
     mutationFn: async (payload: {
@@ -256,6 +265,7 @@ export function DailyControlPanel() {
       from_wallet_id?: string | null;
       transaction_date?: string;
       obligation_id?: string | null;
+      related_user_id?: string | null;
     }) => {
       const res = await fetch('/api/finance/categorize-op', {
         method: 'POST',
@@ -274,6 +284,7 @@ export function DailyControlPanel() {
       queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'] });
       queryClient.invalidateQueries({ queryKey: ['payment-calendar'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-payroll'] });
       setEditingTx(null);
     },
   });
@@ -1582,6 +1593,8 @@ export function DailyControlPanel() {
                                   raw?.created_at ||
                                   (op ? op.operationDate || op.operationTime : selectedDate),
                                 obligationId: item.linkedObligationId || null,
+                                relatedUserId:
+                                  raw?.related_user_id || raw?.related_user?.id || null,
                               });
                             }}
                             className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center text-xs font-black cursor-pointer shadow-2xs transition"
@@ -1655,6 +1668,8 @@ export function DailyControlPanel() {
                                     raw?.created_at ||
                                     (op ? op.operationDate || op.operationTime : selectedDate),
                                   obligationId: sub.linkedObligationId || null,
+                                  relatedUserId:
+                                    raw?.related_user_id || raw?.related_user?.id || null,
                                 });
                               }}
                               className="text-[9px] text-sky-600 hover:text-sky-800 cursor-pointer ml-1 font-bold underline"
@@ -2236,6 +2251,41 @@ export function DailyControlPanel() {
                   Платёж автоматически отметится как оплаченный в Платёжном календаре за этот месяц.
                 </div>
               </div>
+
+              {/* Link with Staff (Driver / Employee advance or salary) */}
+              {(editingTx.categoryId === 'a0000000-0000-0000-0000-000000000001' ||
+                (editingTx.categoryName || '').toLowerCase().includes('аванс') ||
+                (editingTx.categoryName || '').toLowerCase().includes('фот') ||
+                (editingTx.categoryName || '').toLowerCase().includes('зарплат') ||
+                (editingTx.description || '').toLowerCase().includes('суточн') ||
+                editingTx.relatedUserId) && (
+                <div className="p-3 bg-violet-50 border border-violet-200 rounded-xl space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-violet-900 tracking-wider flex items-center justify-between">
+                    <span>👤 Сотрудник / Водитель (учёт аванса/долга):</span>
+                    {editingTx.relatedUserId && (
+                      <span className="text-emerald-700 font-bold">✓ Привязан к сотруднику</span>
+                    )}
+                  </label>
+                  <select
+                    value={editingTx.relatedUserId || ''}
+                    onChange={(e) =>
+                      setEditingTx({ ...editingTx, relatedUserId: e.target.value || null })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-violet-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="">(Не привязывать к долгам сотрудника)</option>
+                    {(usersData ?? []).map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-[10px] text-violet-800">
+                    💡 При выборе сотрудника расход ({rub(editingTx.amount)}) автоматически
+                    запишется в его карточку как выданный аванс без создания дублирующих записей.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -2258,6 +2308,7 @@ export function DailyControlPanel() {
                     direction: editingTx.direction,
                     obligation_id: editingTx.obligationId,
                     transaction_date: editingTx.transactionDate,
+                    related_user_id: editingTx.relatedUserId,
                   })
                 }
                 className="px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"

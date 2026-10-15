@@ -4737,9 +4737,20 @@ function AddStaffDebtModal({
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
               >
                 <option value="10000000-0000-0000-0000-000000000002">💵 Касса (Наличные)</option>
-                <option value="10000000-0000-0000-0000-000000000001">🏦 Расчётный счёт</option>
-                <option value="none">🚫 Без списания с кошелька (внутренний долг)</option>
+                <option value="10000000-0000-0000-0000-000000000001">
+                  🏦 Расчётный счёт (автосвязка с операцией банка)
+                </option>
+                <option value="none">
+                  🚫 Без списания с кошелька (уже списано / внутренний долг)
+                </option>
               </select>
+              {walletId === '10000000-0000-0000-0000-000000000001' && (
+                <p className="text-[11px] text-sky-700 bg-sky-50 border border-sky-200 rounded-lg p-2 mt-1.5 leading-snug">
+                  ℹ️ Если перевод уже сделан с расчетного счета, система автоматически найдет
+                  списание банка на эту сумму и свяжет его с водителем во избежание задвоения
+                  расходов.
+                </p>
+              )}
             </div>
           )}
 

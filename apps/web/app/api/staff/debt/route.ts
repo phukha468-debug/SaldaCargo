@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
+const BANK_ID = '10000000-0000-0000-0000-000000000001';
 
 async function resolveUserId(supabase: any): Promise<string> {
   const cookieStore = await cookies();
@@ -145,6 +146,41 @@ export async function POST(request: Request) {
     } else {
       if (body.from_wallet_id && body.from_wallet_id !== 'none') {
         payload.from_wallet_id = body.from_wallet_id;
+      }
+
+      // Защита от задвоения расходов: если списание происходит с Р/С (Банк),
+      // проверяем, нет ли уже нераспределенной банковской операции на эту сумму за последние 3 дня.
+      if (body.from_wallet_id === BANK_ID) {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: matchedBankTx } = await (supabase.from('transactions') as any)
+          .select('*')
+          .eq('from_wallet_id', BANK_ID)
+          .eq('direction', 'expense')
+          .or(`amount.eq.${amount},amount.eq.${amount.toFixed(2)}`)
+          .is('related_user_id', null)
+          .gte('transaction_date', threeDaysAgo)
+          .order('transaction_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedBankTx) {
+          // Вместо создания второй записи связываем существующую банковскую транзакцию с сотрудником
+          const { data: updated, error: updErr } = await (supabase.from('transactions') as any)
+            .update({
+              related_user_id: body.user_id,
+              category_id: ADVANCE_CATEGORY_ID,
+              description: body.note?.trim()
+                ? `${body.note.trim()} (аванс водителю)`
+                : `Аванс водителю: ${user.name}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', matchedBankTx.id)
+            .select()
+            .single();
+
+          if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+          return NextResponse.json({ ...updated, deduplicated: true }, { status: 200 });
+        }
       }
     }
 
