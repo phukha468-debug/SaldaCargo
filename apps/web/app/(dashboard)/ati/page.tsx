@@ -238,7 +238,9 @@ export default function AtiPage() {
   const [cancelMode, setCancelMode] = useState<'claim' | 'simple'>('claim');
   const [cancelReason, setCancelReason] = useState<string>('Отказ заказчика по обоюдному согласию');
   const [showCancelledList, setShowCancelledList] = useState(false);
-  const [cancelledListTab, setCancelledListTab] = useState<'claims' | 'simple'>('claims');
+  const [cancelledListTab, setCancelledListTab] = useState<'claims' | 'claims_archive' | 'simple'>(
+    'claims',
+  );
   const [viewingClaimOrder, setViewingClaimOrder] = useState<AtiOrder | null>(null);
 
   // Параметры претензии
@@ -386,13 +388,16 @@ export default function AtiPage() {
   // Разделение на активные, претензии и простые срывы
   const cancelledOrders = orders.filter((o) => o.is_cancelled || o.stage === 0);
   const claimOrders = cancelledOrders.filter((o) => o.has_claim);
+  const activeClaimOrders = claimOrders.filter((o) => o.claim_status !== 'paid');
+  const paidClaimOrders = claimOrders.filter((o) => o.claim_status === 'paid');
   const simpleCancelledOrders = cancelledOrders.filter((o) => !o.has_claim);
   const activeOrders = orders.filter((o) => !o.is_cancelled && o.stage > 0);
 
-  const activeClaimsCount = claimOrders.filter((o) => o.claim_status !== 'paid').length;
-  const activeClaimsSum = claimOrders
-    .filter((o) => o.claim_status !== 'paid')
-    .reduce((sum, o) => sum + (Number(o.claim_amount) || 0), 0);
+  const activeClaimsSum = activeClaimOrders.reduce(
+    (sum, o) => sum + (Number(o.claim_amount) || 0),
+    0,
+  );
+  const paidClaimsSum = paidClaimOrders.reduce((sum, o) => sum + (Number(o.claim_amount) || 0), 0);
 
   // Фильтрация активных по типу документов
   const filteredOrders = activeOrders.filter((o) => {
@@ -519,23 +524,37 @@ export default function AtiPage() {
             </button>
           </div>
 
-          {/* Кнопка претензий */}
+          {/* Кнопка претензий и архива */}
           {claimOrders.length > 0 && (
             <button
               onClick={() => {
-                setCancelledListTab('claims');
+                setCancelledListTab(activeClaimOrders.length > 0 ? 'claims' : 'claims_archive');
                 setShowCancelledList(true);
               }}
-              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
-              title="Претензии к заказчикам за срыв погрузки"
+              className={`px-2.5 py-1.5 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs ${
+                activeClaimOrders.length > 0
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'
+              }`}
+              title="Претензии к заказчикам за срыв погрузки (активные и архив)"
             >
-              <span>⚖️ Претензии:</span>
-              <span className="font-black bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded-full font-mono text-[11px]">
-                {claimOrders.length}
+              <span>{activeClaimOrders.length > 0 ? '⚖️ Претензии:' : '📁 Архив претензий:'}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full font-mono text-[11px] font-black ${
+                  activeClaimOrders.length > 0
+                    ? 'bg-amber-200 text-amber-950'
+                    : 'bg-emerald-200 text-emerald-950'
+                }`}
+              >
+                {activeClaimOrders.length > 0 ? activeClaimOrders.length : paidClaimOrders.length}
               </span>
-              {activeClaimsSum > 0 && (
+              {activeClaimsSum > 0 ? (
                 <span className="text-[10px] font-mono font-black text-amber-800">
                   ({activeClaimsSum.toLocaleString('ru-RU')} ₽)
+                </span>
+              ) : (
+                <span className="text-[10px] text-emerald-700 font-bold">
+                  (оплачено {paidClaimsSum.toLocaleString('ru-RU')} ₽ ✓)
                 </span>
               )}
             </button>
@@ -569,16 +588,15 @@ export default function AtiPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-           БАННЕР АКТИВНОЙ ПРЕТЕНЗИОННОЙ РАБОТЫ (ЕСЛИ ЕСТЬ ПРЕТЕНЗИИ)
+           БАННЕР АКТИВНОЙ ПРЕТЕНЗИОННОЙ РАБОТЫ (ТОЛЬКО НЕОПЛАЧЕННЫЕ ПРЕТЕНЗИИ)
            ══════════════════════════════════════════════════════════════════════ */}
-      {claimOrders.length > 0 && (
+      {activeClaimOrders.length > 0 && (
         <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50/50 border-2 border-amber-300 rounded-2xl p-3 shadow-2xs space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-lg">⚖️</span>
               <span className="text-xs font-black uppercase text-amber-950 tracking-wide">
-                Претензионная работа по срывам (
-                {activeClaimsCount > 0 ? `${activeClaimsCount} в работе` : `${claimOrders.length}`})
+                Претензионная работа по срывам ({activeClaimOrders.length} в работе)
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
                 ст. 35 УАТ РФ · Штраф 20%
@@ -587,18 +605,14 @@ export default function AtiPage() {
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-600 font-medium">Сумма требований:</span>
               <span className="font-mono font-black text-amber-950 text-sm">
-                {(activeClaimsSum > 0
-                  ? activeClaimsSum
-                  : claimOrders.reduce((sum, o) => sum + (Number(o.claim_amount) || 0), 0)
-                ).toLocaleString('ru-RU')}{' '}
-                ₽
+                {activeClaimsSum.toLocaleString('ru-RU')} ₽
               </span>
             </div>
           </div>
 
           {/* Список претензий в работе */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-            {claimOrders.map((ord) => {
+            {activeClaimOrders.map((ord) => {
               const status = ord.claim_status || 'issued';
               return (
                 <div
@@ -1855,7 +1869,7 @@ export default function AtiPage() {
               </button>
             </div>
 
-            {/* Вкладки: Претензии vs Простые срывы */}
+            {/* Вкладки: В работе vs Архив оплаченных vs Простые срывы */}
             <div className="px-5 pt-2.5 border-b border-slate-200 flex gap-2 bg-slate-50 shrink-0">
               <button
                 type="button"
@@ -1866,11 +1880,27 @@ export default function AtiPage() {
                     : 'border-transparent text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <span>⚖️ Претензии к заказчикам</span>
+                <span>⚖️ Претензии в работе</span>
                 <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
-                  {claimOrders.length}
+                  {activeClaimOrders.length}
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setCancelledListTab('claims_archive')}
+                className={`pb-2 px-3 text-xs font-black border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  cancelledListTab === 'claims_archive'
+                    ? 'border-emerald-600 text-emerald-900 bg-white rounded-t-lg border-t border-x border-b-white -mb-px'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>📁 Архив оплаченных</span>
+                <span className="bg-emerald-100 text-emerald-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                  {paidClaimOrders.length}
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setCancelledListTab('simple')}
@@ -1914,12 +1944,29 @@ export default function AtiPage() {
                     </div>
                   </div>
 
-                  {claimOrders.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 font-bold">
-                      Нет активных претензий к заказчикам.
+                  {activeClaimOrders.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 font-bold space-y-2">
+                      <div className="text-3xl">🎉</div>
+                      <div className="text-sm text-slate-700 font-bold">
+                        Нет активных претензий в работе
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Все претензии согласованы и оплачены заказчиками.
+                      </div>
+                      {paidClaimOrders.length > 0 && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setCancelledListTab('claims_archive')}
+                            className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl cursor-pointer transition"
+                          >
+                            📁 Перейти в Архив оплаченных ({paidClaimOrders.length})
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    claimOrders.map((ord) => {
+                    activeClaimOrders.map((ord) => {
                       const status = ord.claim_status || 'issued';
                       return (
                         <div
@@ -2078,6 +2125,118 @@ export default function AtiPage() {
                         </div>
                       );
                     })
+                  )}
+                </>
+              ) : cancelledListTab === 'claims_archive' ? (
+                /* Вкладка: Архив оплаченных претензий */
+                <>
+                  <div className="p-3 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-emerald-950">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl shrink-0">📁</span>
+                      <div className="space-y-0.5">
+                        <div className="font-black text-[11px]">
+                          Архив успешно оплаченных претензий по срывам
+                        </div>
+                        <div className="text-[10px] text-emerald-900 leading-tight">
+                          Здесь хранятся закрытые претензии, по которым заказчики перечислили штраф
+                          на расчётный счёт. Они не занимают место на доске и закрыты в дебиторке.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] text-emerald-700 font-bold block">
+                        Всего взыскано:
+                      </span>
+                      <span className="font-mono font-black text-emerald-950 text-sm">
+                        {paidClaimsSum.toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                  </div>
+
+                  {paidClaimOrders.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 font-bold">
+                      В архиве пока нет оплаченных претензий.
+                    </div>
+                  ) : (
+                    paidClaimOrders.map((ord) => (
+                      <div
+                        key={ord.id}
+                        className="p-3.5 bg-white rounded-2xl border-2 border-emerald-300 shadow-2xs space-y-3 hover:border-emerald-400 transition"
+                      >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-slate-900 text-sm">
+                                Претензия № {ord.claim_number || '01-ПР'}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold">
+                                к заявке {ord.order_number}
+                              </span>
+                              <span className="text-slate-400 font-mono text-[10px]">
+                                от {ord.claim_date || new Date().toLocaleDateString('ru-RU')}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                ✓ Оплачено на Р/С
+                              </span>
+                            </div>
+                            <div className="font-bold text-slate-900 text-xs mt-0.5">
+                              Заказчик: {ord.counterparty_name}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] text-slate-500 block">
+                              Оплаченная сумма:
+                            </span>
+                            <span className="font-mono font-black text-emerald-700 text-base">
+                              + {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Инфо-полоса */}
+                        <div className="flex items-center justify-between text-[11px] bg-emerald-50/60 p-2 rounded-xl border border-emerald-200 text-emerald-950">
+                          <div className="flex items-center gap-1.5">
+                            <span>✅</span>
+                            <span className="font-semibold">
+                              Штраф поступил на расчетный счёт. Задолженность в Дебиторке закрыта.
+                            </span>
+                          </div>
+                          {ord.claim_paid_at && (
+                            <span className="text-[10px] text-emerald-700 font-mono">
+                              Дата оплаты: {new Date(ord.claim_paid_at).toLocaleDateString('ru-RU')}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Кнопки */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setViewingClaimOrder(ord)}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 cursor-pointer transition"
+                          >
+                            <span>📄</span>
+                            <span>Печать бланка претензии</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={updateClaimStatusMutation.isPending}
+                            onClick={() =>
+                              updateClaimStatusMutation.mutate({
+                                id: ord.id,
+                                claim_status: 'waiting_payment',
+                              })
+                            }
+                            className="px-2.5 py-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg text-[10px] font-semibold cursor-pointer transition"
+                            title="Вернуть претензию из архива в статус ожидания оплаты"
+                          >
+                            ↶ Вернуть в работу
+                          </button>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </>
               ) : (

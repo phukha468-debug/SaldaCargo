@@ -36,6 +36,18 @@ export type Counterparty = {
   payment_breakdown: Record<string, number>;
   monthly: string[];
   month_labels: string[];
+  // Реквизиты
+  inn?: string | null;
+  kpp?: string | null;
+  ogrn?: string | null;
+  legal_address?: string | null;
+  actual_address?: string | null;
+  contact_person?: string | null;
+  ati_code?: string | null;
+  bank_name?: string | null;
+  bik?: string | null;
+  bank_account?: string | null;
+  corr_account?: string | null;
 };
 
 export type TripRecord = {
@@ -75,6 +87,17 @@ const emptyForm = {
   notes: '',
   is_legal_entity: false,
   is_regular: false,
+  inn: '',
+  kpp: '',
+  ogrn: '',
+  legal_address: '',
+  actual_address: '',
+  contact_person: '',
+  ati_code: '',
+  bank_name: '',
+  bik: '',
+  bank_account: '',
+  corr_account: '',
 };
 
 function daysAgo(dateStr: string | null): number | null {
@@ -118,6 +141,14 @@ export default function CounterpartiesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopy = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   // Quick Pay Modal (Погашение долга поставщику)
   const [showPayModal, setShowPayModal] = useState(false);
@@ -238,7 +269,23 @@ export default function CounterpartiesPage() {
         const matchesPhone = (cp.phone ?? '').includes(q);
         const matchesEmail = (cp.email ?? '').toLowerCase().includes(q);
         const matchesNotes = (cp.notes ?? '').toLowerCase().includes(q);
-        if (!matchesName && !matchesPhone && !matchesEmail && !matchesNotes) return false;
+        const matchesInn = (cp.inn ?? '').toLowerCase().includes(q);
+        const matchesAti = (cp.ati_code ?? '').toLowerCase().includes(q);
+        const matchesContact = (cp.contact_person ?? '').toLowerCase().includes(q);
+        const matchesAddress =
+          (cp.legal_address ?? '').toLowerCase().includes(q) ||
+          (cp.actual_address ?? '').toLowerCase().includes(q);
+        if (
+          !matchesName &&
+          !matchesPhone &&
+          !matchesEmail &&
+          !matchesNotes &&
+          !matchesInn &&
+          !matchesAti &&
+          !matchesContact &&
+          !matchesAddress
+        )
+          return false;
       }
 
       // Legal filter
@@ -494,6 +541,17 @@ export default function CounterpartiesPage() {
       notes: cp.notes ?? '',
       is_legal_entity: cp.is_legal_entity,
       is_regular: cp.is_regular,
+      inn: cp.inn ?? '',
+      kpp: cp.kpp ?? '',
+      ogrn: cp.ogrn ?? '',
+      legal_address: cp.legal_address ?? '',
+      actual_address: cp.actual_address ?? '',
+      contact_person: cp.contact_person ?? '',
+      ati_code: cp.ati_code ?? '',
+      bank_name: cp.bank_name ?? '',
+      bik: cp.bik ?? '',
+      bank_account: cp.bank_account ?? '',
+      corr_account: cp.corr_account ?? '',
     });
     setFormError('');
     setShowModal(true);
@@ -829,11 +887,31 @@ export default function CounterpartiesPage() {
                             </span>
                           )}
                         </div>
-                        {cp.notes && (
-                          <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">
-                            {cp.notes}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-500 mt-0.5">
+                          {cp.inn && (
+                            <span className="font-mono bg-slate-100 text-slate-700 px-1 py-0.2 rounded text-[9px] font-semibold">
+                              ИНН {cp.inn}
+                            </span>
+                          )}
+                          {cp.ati_code && (
+                            <span className="bg-sky-50 text-sky-700 px-1 py-0.2 rounded text-[9px] font-semibold">
+                              АТИ {cp.ati_code}
+                            </span>
+                          )}
+                          {cp.contact_person && (
+                            <span
+                              className="text-slate-500 truncate max-w-[140px]"
+                              title={cp.contact_person}
+                            >
+                              👤 {cp.contact_person}
+                            </span>
+                          )}
+                          {!cp.inn && !cp.ati_code && cp.notes && (
+                            <span className="text-slate-400 truncate max-w-[220px]">
+                              {cp.notes}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Тип / Роль */}
@@ -1422,8 +1500,203 @@ export default function CounterpartiesPage() {
                     {/* Таб 3: Реквизиты и Договор */}
                     {drawerTab === 'requisites' && (
                       <div className="space-y-4 text-xs">
+                        {/* Кнопки быстрых действий */}
+                        <div className="flex items-center justify-between gap-2 p-3 bg-blue-50/70 border border-blue-200 rounded-2xl">
+                          <div>
+                            <span className="font-bold text-blue-950 text-xs">
+                              Досье контрагента
+                            </span>
+                            <div className="text-[10px] text-blue-700">
+                              Реквизиты из Договор-заявок и карточки
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const text = [
+                                  selectedCp.name,
+                                  selectedCp.inn ? `ИНН: ${selectedCp.inn}` : '',
+                                  selectedCp.kpp ? `КПП: ${selectedCp.kpp}` : '',
+                                  selectedCp.ogrn ? `ОГРН: ${selectedCp.ogrn}` : '',
+                                  selectedCp.legal_address
+                                    ? `Юр. адрес: ${selectedCp.legal_address}`
+                                    : '',
+                                  selectedCp.actual_address
+                                    ? `Факт. адрес: ${selectedCp.actual_address}`
+                                    : '',
+                                  selectedCp.contact_person
+                                    ? `Контакт: ${selectedCp.contact_person}`
+                                    : '',
+                                  selectedCp.phone ? `Тел: ${selectedCp.phone}` : '',
+                                  selectedCp.email ? `Email: ${selectedCp.email}` : '',
+                                  selectedCp.ati_code ? `Код АТИ: ${selectedCp.ati_code}` : '',
+                                  selectedCp.bank_name ? `Банк: ${selectedCp.bank_name}` : '',
+                                  selectedCp.bik ? `БИК: ${selectedCp.bik}` : '',
+                                  selectedCp.bank_account ? `Р/с: ${selectedCp.bank_account}` : '',
+                                  selectedCp.corr_account ? `К/с: ${selectedCp.corr_account}` : '',
+                                ]
+                                  .filter(Boolean)
+                                  .join('\n');
+                                handleCopy(text, 'all');
+                              }}
+                              className="px-2.5 py-1.5 bg-white hover:bg-blue-100 text-blue-900 font-bold rounded-xl border border-blue-200 transition text-[11px] shadow-2xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>
+                                {copiedField === 'all' ? '✓ Скопировано' : '📋 Копировать всё'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => handleEdit(selectedCp)}
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition text-[11px] shadow-2xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>✏️ Изменить</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Основные реквизиты */}
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                          <h4 className="font-bold text-slate-800">Юридический статус</h4>
+                          <h4 className="font-bold text-slate-800 flex items-center justify-between">
+                            <span>Основные реквизиты</span>
+                            {selectedCp.ati_code && (
+                              <span
+                                onClick={() => handleCopy(selectedCp.ati_code!, 'ati')}
+                                className="cursor-pointer bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full text-[10px] font-bold hover:bg-sky-200 transition"
+                                title="Кликните для копирования кода АТИ"
+                              >
+                                {copiedField === 'ati'
+                                  ? '✓ Скопировано'
+                                  : `АТИ: ${selectedCp.ati_code}`}
+                              </span>
+                            )}
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 text-slate-600">
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">ИНН:</span>
+                              {selectedCp.inn ? (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="font-mono font-bold text-slate-900 text-xs">
+                                    {selectedCp.inn}
+                                  </span>
+                                  <button
+                                    onClick={() => handleCopy(selectedCp.inn!, 'inn')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                                  >
+                                    {copiedField === 'inn' ? '✓' : 'Коп.'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">Не указан</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">КПП:</span>
+                              <span className="font-mono font-medium text-slate-800 mt-0.5 block">
+                                {selectedCp.kpp || '—'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">ОГРН:</span>
+                              <span className="font-mono font-medium text-slate-800 mt-0.5 block">
+                                {selectedCp.ogrn || '—'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">
+                                Контактное лицо:
+                              </span>
+                              <span className="font-semibold text-slate-900 mt-0.5 block">
+                                {selectedCp.contact_person || '—'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Телефон:</span>
+                              <span className="font-medium text-slate-800 mt-0.5 block">
+                                {selectedCp.phone ? formatPhone(selectedCp.phone) : '—'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Email:</span>
+                              <span className="font-medium text-slate-800 mt-0.5 block">
+                                {selectedCp.email || '—'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Адреса */}
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                          <h4 className="font-bold text-slate-800">Адреса компании</h4>
+                          <div className="space-y-2 text-slate-700">
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">
+                                Юридический адрес:
+                              </span>
+                              <p className="mt-0.5 font-medium leading-relaxed">
+                                {selectedCp.legal_address || '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">
+                                Фактический / Почтовый адрес:
+                              </span>
+                              <p className="mt-0.5 font-medium leading-relaxed">
+                                {selectedCp.actual_address || selectedCp.legal_address || '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Банковские реквизиты */}
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                          <h4 className="font-bold text-slate-800">Банковские реквизиты</h4>
+                          <div className="space-y-1.5 text-slate-700">
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Банк:</span>
+                              <span className="font-medium text-slate-900">
+                                {selectedCp.bank_name || '—'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">БИК:</span>
+                                <span className="font-mono text-slate-800">
+                                  {selectedCp.bik || '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">
+                                  Корр. счёт:
+                                </span>
+                                <span className="font-mono text-slate-800">
+                                  {selectedCp.corr_account || '—'}
+                                </span>
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">
+                                Расчётный счёт:
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-slate-900 text-xs">
+                                  {selectedCp.bank_account || '—'}
+                                </span>
+                                {selectedCp.bank_account && (
+                                  <button
+                                    onClick={() => handleCopy(selectedCp.bank_account!, 'account')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 cursor-pointer"
+                                  >
+                                    {copiedField === 'account' ? '✓' : 'Коп.'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Условия сотрудничества */}
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                          <h4 className="font-bold text-slate-800">Условия и статус</h4>
                           <div className="grid grid-cols-2 gap-2 text-slate-600">
                             <div>
                               <span className="text-slate-400">Форма:</span>{' '}
@@ -1448,37 +1721,15 @@ export default function CounterpartiesPage() {
                               {selectedCp.is_regular ? 'Постоянный' : 'Разовый'}
                             </div>
                             <div>
-                              <span className="text-slate-400">Телефон:</span>{' '}
-                              {selectedCp.phone || '—'}
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-slate-400">Email:</span>{' '}
-                              {selectedCp.email || '—'}
-                            </div>
-                            {isNoCashCounterparty(selectedCp) && (
-                              <div className="col-span-2 text-rose-700 font-bold text-xs flex items-center gap-1.5 mt-1 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                                <span>🚫</span>
-                                <span>
-                                  Оплата наличными запрещена: только безнал по счёту или дебиторка.
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                          <h4 className="font-bold text-slate-800">Условия сотрудничества</h4>
-                          <div className="text-slate-600 space-y-1">
-                            <div>
-                              Кредитный лимит:{' '}
+                              <span className="text-slate-400">Лимит:</span>{' '}
                               <strong>
                                 {selectedCp.credit_limit
                                   ? `${parseFloat(selectedCp.credit_limit).toLocaleString('ru-RU')} ₽`
                                   : 'Без лимита'}
                               </strong>
                             </div>
-                            <div>
-                              Основной способ оплаты:{' '}
+                            <div className="col-span-2">
+                              <span className="text-slate-400">Способ оплаты:</span>{' '}
                               <strong>
                                 {PAYMENT_LABEL[selectedCp.preferred_payment || ''] || 'Не указан'}
                               </strong>
@@ -1593,7 +1844,7 @@ export default function CounterpartiesPage() {
       {/* ── Модалка Создания / Редактирования Контрагента ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900">
                 {editId ? 'Редактировать контрагента' : 'Новый контрагент'}
@@ -1730,6 +1981,144 @@ export default function CounterpartiesPage() {
                 </label>
               </div>
 
+              {/* Секция: Реквизиты и Коды */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
+                <span className="font-bold text-slate-800 block text-[11px]">
+                  Реквизиты компании и контакты
+                </span>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-500 mb-1">ИНН</label>
+                    <input
+                      type="text"
+                      value={form.inn}
+                      onChange={(e) => setForm({ ...form, inn: e.target.value })}
+                      placeholder="10 или 12 цифр"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">Код в АТИ</label>
+                    <input
+                      type="text"
+                      value={form.ati_code}
+                      onChange={(e) => setForm({ ...form, ati_code: e.target.value })}
+                      placeholder="Например: 923131"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-500 mb-1">КПП</label>
+                    <input
+                      type="text"
+                      value={form.kpp}
+                      onChange={(e) => setForm({ ...form, kpp: e.target.value })}
+                      placeholder="9 цифр"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">ОГРН / ОГРНИП</label>
+                    <input
+                      type="text"
+                      value={form.ogrn}
+                      onChange={(e) => setForm({ ...form, ogrn: e.target.value })}
+                      placeholder="ОГРН"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-500 mb-1">Контактное лицо / Логист</label>
+                  <input
+                    type="text"
+                    value={form.contact_person}
+                    onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
+                    placeholder="Радик, (343) 286-73-65 (доб. 447)"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-500 mb-1">Юридический адрес</label>
+                  <input
+                    type="text"
+                    value={form.legal_address}
+                    onChange={(e) => setForm({ ...form, legal_address: e.target.value })}
+                    placeholder="Индекс, город, улица, дом, офис..."
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-500 mb-1">Фактический / Почтовый адрес</label>
+                  <input
+                    type="text"
+                    value={form.actual_address}
+                    onChange={(e) => setForm({ ...form, actual_address: e.target.value })}
+                    placeholder="Для отправки оригиналов документов..."
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Секция: Банковские реквизиты */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
+                <span className="font-bold text-slate-800 block text-[11px]">
+                  Банковские реквизиты
+                </span>
+
+                <div>
+                  <label className="block text-slate-500 mb-1">Банк</label>
+                  <input
+                    type="text"
+                    value={form.bank_name}
+                    onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
+                    placeholder="ПАО Сбербанк, АО ТБанк..."
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-500 mb-1">БИК</label>
+                    <input
+                      type="text"
+                      value={form.bik}
+                      onChange={(e) => setForm({ ...form, bik: e.target.value })}
+                      placeholder="044525974"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">Корр. счёт</label>
+                    <input
+                      type="text"
+                      value={form.corr_account}
+                      onChange={(e) => setForm({ ...form, corr_account: e.target.value })}
+                      placeholder="30101810..."
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-500 mb-1">Расчётный счёт (Р/с)</label>
+                  <input
+                    type="text"
+                    value={form.bank_account}
+                    onChange={(e) => setForm({ ...form, bank_account: e.target.value })}
+                    placeholder="40702810..."
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none font-mono"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-slate-600 font-semibold mb-1">
                   Заметки и особенности
@@ -1738,7 +2127,7 @@ export default function CounterpartiesPage() {
                   rows={3}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Контактные лица, логист, отсрочка платежа, требования..."
+                  placeholder="Особенности работы, отсрочка платежа, требования..."
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none resize-none"
                 />
               </div>

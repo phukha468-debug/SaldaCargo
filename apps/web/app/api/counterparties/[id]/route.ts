@@ -17,6 +17,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       is_active?: boolean;
       is_regular?: boolean;
       payable_amount?: string | null;
+      inn?: string | null;
+      kpp?: string | null;
+      ogrn?: string | null;
+      legal_address?: string | null;
+      actual_address?: string | null;
+      contact_person?: string | null;
+      ati_code?: string | null;
+      bank_name?: string | null;
+      bik?: string | null;
+      bank_account?: string | null;
+      corr_account?: string | null;
     };
 
     const supabase = createAdminClient();
@@ -33,6 +44,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.is_regular !== undefined) update.is_regular = body.is_regular;
     if ((body as any).is_legal_entity !== undefined)
       update.is_legal_entity = (body as any).is_legal_entity;
+    if (body.inn !== undefined) update.inn = body.inn?.trim() || null;
+    if (body.kpp !== undefined) update.kpp = body.kpp?.trim() || null;
+    if (body.ogrn !== undefined) update.ogrn = body.ogrn?.trim() || null;
+    if (body.legal_address !== undefined) update.legal_address = body.legal_address?.trim() || null;
+    if (body.actual_address !== undefined)
+      update.actual_address = body.actual_address?.trim() || null;
+    if (body.contact_person !== undefined)
+      update.contact_person = body.contact_person?.trim() || null;
+    if (body.ati_code !== undefined) update.ati_code = body.ati_code?.trim() || null;
+    if (body.bank_name !== undefined) update.bank_name = body.bank_name?.trim() || null;
+    if (body.bik !== undefined) update.bik = body.bik?.trim() || null;
+    if (body.bank_account !== undefined) update.bank_account = body.bank_account?.trim() || null;
+    if (body.corr_account !== undefined) update.corr_account = body.corr_account?.trim() || null;
     if (body.payable_amount !== undefined) {
       const parsedPayable = parseFloat(body.payable_amount || '0');
       update.payable_amount =

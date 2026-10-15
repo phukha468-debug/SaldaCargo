@@ -413,6 +413,17 @@ export type Database = {
           phone: string | null;
           type: Database['public']['Enums']['counterparty_type'];
           updated_at: string | null;
+          inn: string | null;
+          kpp: string | null;
+          ogrn: string | null;
+          legal_address: string | null;
+          actual_address: string | null;
+          contact_person: string | null;
+          ati_code: string | null;
+          bank_name: string | null;
+          bik: string | null;
+          bank_account: string | null;
+          corr_account: string | null;
         };
         Insert: {
           client_role?: 'owner' | 'forwarder';
@@ -431,6 +442,17 @@ export type Database = {
           phone?: string | null;
           type?: Database['public']['Enums']['counterparty_type'];
           updated_at?: string | null;
+          inn?: string | null;
+          kpp?: string | null;
+          ogrn?: string | null;
+          legal_address?: string | null;
+          actual_address?: string | null;
+          contact_person?: string | null;
+          ati_code?: string | null;
+          bank_name?: string | null;
+          bik?: string | null;
+          bank_account?: string | null;
+          corr_account?: string | null;
         };
         Update: {
           client_role?: 'owner' | 'forwarder';
@@ -449,6 +471,17 @@ export type Database = {
           phone?: string | null;
           type?: Database['public']['Enums']['counterparty_type'];
           updated_at?: string | null;
+          inn?: string | null;
+          kpp?: string | null;
+          ogrn?: string | null;
+          legal_address?: string | null;
+          actual_address?: string | null;
+          contact_person?: string | null;
+          ati_code?: string | null;
+          bank_name?: string | null;
+          bik?: string | null;
+          bank_account?: string | null;
+          corr_account?: string | null;
         };
         Relationships: [];
       };

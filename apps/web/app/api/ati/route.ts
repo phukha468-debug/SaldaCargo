@@ -227,15 +227,30 @@ export async function POST(request: Request) {
           is_legal_entity: true,
           is_active: true,
           type: 'client',
-          notes: body.counterparty_inn
-            ? `ИНН ${body.counterparty_inn}${body.ati_code ? `, ${body.ati_code}` : ''}`
-            : 'Создан из АТИ Заявки',
+          client_role: 'forwarder',
+          inn: body.counterparty_inn?.trim() || null,
+          contact_person: body.counterparty_contact?.trim() || null,
+          ati_code: body.ati_code?.trim() || null,
+          legal_address: body.postal_address?.trim() || null,
+          notes: body.notes?.trim() || null,
         })
         .select('id')
         .single();
 
       if (!cpErr && newCp) {
         counterpartyId = newCp.id;
+      }
+    } else if (counterpartyId) {
+      // Авто-обогащение существующего контрагента реквизитами из заявки
+      const cpUpdate: Record<string, any> = {};
+      if (body.counterparty_inn) cpUpdate.inn = body.counterparty_inn.trim();
+      if (body.counterparty_contact) cpUpdate.contact_person = body.counterparty_contact.trim();
+      if (body.ati_code) cpUpdate.ati_code = body.ati_code.trim();
+      if (body.counterparty_phone) cpUpdate.phone = body.counterparty_phone.trim();
+      if (body.counterparty_email) cpUpdate.email = body.counterparty_email.trim();
+      if (body.postal_address) cpUpdate.legal_address = body.postal_address.trim();
+      if (Object.keys(cpUpdate).length > 0) {
+        await (supabase.from('counterparties') as any).update(cpUpdate).eq('id', counterpartyId);
       }
     }
 

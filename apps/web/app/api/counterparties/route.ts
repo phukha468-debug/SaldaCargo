@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     let q = (supabase as any)
       .from('counterparties')
       .select(
-        'id, name, phone, email, type, credit_limit, payable_amount, notes, is_active, is_regular, is_legal_entity, client_role',
+        'id, name, phone, email, type, credit_limit, payable_amount, notes, is_active, is_regular, is_legal_entity, client_role, inn, kpp, ogrn, legal_address, actual_address, contact_person, ati_code, bank_name, bik, bank_account, corr_account',
       )
       .order('name');
 
@@ -78,64 +78,78 @@ export async function GET(request: Request) {
 
     const overheadCatIds = (overheadCategories ?? []).map((c: any) => c.id);
 
-    // Параллельная загрузка базовых данных
-    const [overheadTxList, overheadTripExpList, allCompanyOrders, orders, supplierTransactions] =
-      await Promise.all([
-        overheadCatIds.length > 0
-          ? fetchAllRows((from, to) =>
-              (supabase as any)
-                .from('transactions')
-                .select('amount')
-                .in('category_id', overheadCatIds)
-                .eq('direction', 'expense')
-                .eq('lifecycle_status', 'approved')
-                .eq('settlement_status', 'completed')
-                .range(from, to),
-            )
-          : Promise.resolve([]),
-        overheadCatIds.length > 0
-          ? fetchAllRows((from, to) =>
-              (supabase as any)
-                .from('trip_expenses')
-                .select('amount')
-                .in('category_id', overheadCatIds)
-                .range(from, to),
-            )
-          : Promise.resolve([]),
-        fetchAllRows((from, to) =>
-          (supabase as any)
-            .from('trip_orders')
-            .select('amount, trips!inner(lifecycle_status)')
-            .eq('lifecycle_status', 'approved')
-            .eq('trips.lifecycle_status', 'approved')
-            .range(from, to),
-        ),
-        // Заказы клиентов
-        fetchAllRows((from, to) =>
-          (supabase as any)
-            .from('trip_orders')
-            .select(
-              'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
-            )
-            .in('counterparty_id', cpIds)
-            .eq('lifecycle_status', 'approved')
-            .eq('trips.lifecycle_status', 'approved')
-            .range(from, to),
-        ),
-        // Транзакции по поставщикам
-        supplierIds.length > 0
-          ? fetchAllRows((from, to) =>
-              (supabase as any)
-                .from('transactions')
-                .select(
-                  'id, amount, counterparty_id, settlement_status, description, created_at, direction',
-                )
-                .in('counterparty_id', supplierIds)
-                .eq('lifecycle_status', 'approved')
-                .range(from, to),
-            )
-          : Promise.resolve([]),
-      ]);
+    // Параллельная загрузка базовых данных (включая ручную дебиторку и претензии по срывам)
+    const [
+      overheadTxList,
+      overheadTripExpList,
+      allCompanyOrders,
+      orders,
+      supplierTransactions,
+      manualReceivables,
+    ] = await Promise.all([
+      overheadCatIds.length > 0
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('transactions')
+              .select('amount')
+              .in('category_id', overheadCatIds)
+              .eq('direction', 'expense')
+              .eq('lifecycle_status', 'approved')
+              .eq('settlement_status', 'completed')
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+      overheadCatIds.length > 0
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('trip_expenses')
+              .select('amount')
+              .in('category_id', overheadCatIds)
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+      fetchAllRows((from, to) =>
+        (supabase as any)
+          .from('trip_orders')
+          .select('amount, trips!inner(lifecycle_status)')
+          .eq('lifecycle_status', 'approved')
+          .eq('trips.lifecycle_status', 'approved')
+          .range(from, to),
+      ),
+      // Заказы клиентов
+      fetchAllRows((from, to) =>
+        (supabase as any)
+          .from('trip_orders')
+          .select(
+            'counterparty_id, trip_id, amount, driver_pay, loader_pay, payment_method, lifecycle_status, settlement_status, trip:trips!inner(started_at, lifecycle_status)',
+          )
+          .in('counterparty_id', cpIds)
+          .eq('lifecycle_status', 'approved')
+          .eq('trips.lifecycle_status', 'approved')
+          .range(from, to),
+      ),
+      // Транзакции по поставщикам
+      supplierIds.length > 0
+        ? fetchAllRows((from, to) =>
+            (supabase as any)
+              .from('transactions')
+              .select(
+                'id, amount, counterparty_id, settlement_status, description, created_at, direction',
+              )
+              .in('counterparty_id', supplierIds)
+              .eq('lifecycle_status', 'approved')
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+      // Ручная дебиторка (в т.ч. штрафы/претензии по срывам)
+      fetchAllRows((from, to) =>
+        (supabase as any)
+          .from('manual_receivables')
+          .select('counterparty_id, amount')
+          .eq('settled', false)
+          .range(from, to),
+      ),
+    ]);
 
     const totalOverhead = [...overheadTxList, ...overheadTripExpList].reduce(
       (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
@@ -207,6 +221,17 @@ export async function GET(request: Request) {
       );
 
       supplierDebtMap.set(sId, Math.max(0, pending - payments));
+    }
+
+    // Ручная дебиторка и претензии по срывам
+    const manualDebtMap = new Map<string, number>();
+    for (const mr of (manualReceivables ?? []) as any[]) {
+      if (mr.counterparty_id) {
+        manualDebtMap.set(
+          mr.counterparty_id,
+          (manualDebtMap.get(mr.counterparty_id) ?? 0) + parseFloat(mr.amount ?? '0'),
+        );
+      }
     }
 
     // Статистика по каждому контрагенту
@@ -309,8 +334,9 @@ export async function GET(request: Request) {
       // Иначе используется расчетная задолженность по транзакциям/топливу (например, для автоначисления ГСМ).
       const finalPayableDebt = manualPayable > 0 ? manualPayable : calcSupplierDebt;
 
-      // Дебиторская задолженность (клиент должен нам)
-      const finalReceivableDebt = isClient ? s.unpaid_amount : 0;
+      // Дебиторская задолженность (клиент должен нам): неоплаченные рейсы + активные претензии/ручные долги
+      const clientManualDebt = manualDebtMap.get(cp.id) ?? 0;
+      const finalReceivableDebt = (isClient ? s.unpaid_amount : 0) + clientManualDebt;
 
       // Сальдо: положительное = нам должны, отрицательное = мы должны
       const netBalance = finalReceivableDebt - finalPayableDebt;
@@ -347,6 +373,18 @@ export async function GET(request: Request) {
         is_regular: cp.is_regular ?? false,
         is_legal_entity: cp.is_legal_entity ?? false,
         client_role: cp.client_role || 'owner',
+        // Реквизиты:
+        inn: cp.inn ?? null,
+        kpp: cp.kpp ?? null,
+        ogrn: cp.ogrn ?? null,
+        legal_address: cp.legal_address ?? null,
+        actual_address: cp.actual_address ?? null,
+        contact_person: cp.contact_person ?? null,
+        ati_code: cp.ati_code ?? null,
+        bank_name: cp.bank_name ?? null,
+        bik: cp.bik ?? null,
+        bank_account: cp.bank_account ?? null,
+        corr_account: cp.corr_account ?? null,
         // Взаиморасчеты:
         payable_amount: finalPayableDebt.toFixed(2), // Мы должны
         receivable_amount: finalReceivableDebt.toFixed(2), // Нам должны
@@ -401,6 +439,17 @@ export async function POST(request: Request) {
       notes?: string;
       is_legal_entity?: boolean;
       is_regular?: boolean;
+      inn?: string;
+      kpp?: string;
+      ogrn?: string;
+      legal_address?: string;
+      actual_address?: string;
+      contact_person?: string;
+      ati_code?: string;
+      bank_name?: string;
+      bik?: string;
+      bank_account?: string;
+      corr_account?: string;
     };
 
     if (!body.name?.trim()) {
@@ -422,6 +471,17 @@ export async function POST(request: Request) {
         is_active: true,
         is_regular: body.is_regular !== undefined ? body.is_regular : false,
         is_legal_entity: Boolean(body.is_legal_entity),
+        inn: body.inn?.trim() || null,
+        kpp: body.kpp?.trim() || null,
+        ogrn: body.ogrn?.trim() || null,
+        legal_address: body.legal_address?.trim() || null,
+        actual_address: body.actual_address?.trim() || null,
+        contact_person: body.contact_person?.trim() || null,
+        ati_code: body.ati_code?.trim() || null,
+        bank_name: body.bank_name?.trim() || null,
+        bik: body.bik?.trim() || null,
+        bank_account: body.bank_account?.trim() || null,
+        corr_account: body.corr_account?.trim() || null,
       })
       .select()
       .single();
