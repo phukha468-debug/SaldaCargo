@@ -9,6 +9,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = (await request.json()) as {
       name?: string;
       type?: string;
+      client_role?: 'owner' | 'forwarder';
       phone?: string | null;
       email?: string | null;
       credit_limit?: string | null;
@@ -23,6 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const update: Record<string, any> = {};
     if (body.name !== undefined) update.name = body.name.trim();
     if (body.type !== undefined) update.type = body.type;
+    if (body.client_role !== undefined) update.client_role = body.client_role;
     if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
     if (body.email !== undefined) update.email = body.email?.trim() || null;
     if (body.credit_limit !== undefined) update.credit_limit = body.credit_limit || null;

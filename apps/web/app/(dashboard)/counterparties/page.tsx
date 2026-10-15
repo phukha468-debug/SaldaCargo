@@ -11,6 +11,7 @@ export type Counterparty = {
   id: string;
   name: string;
   type: 'client' | 'supplier' | 'both';
+  client_role?: 'owner' | 'forwarder';
   phone: string | null;
   email: string | null;
   notes: string | null;
@@ -66,6 +67,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 const emptyForm = {
   name: '',
   type: 'client' as 'client' | 'supplier' | 'both',
+  client_role: 'owner' as 'owner' | 'forwarder',
   phone: '',
   email: '',
   credit_limit: '',
@@ -101,6 +103,7 @@ export default function CounterpartiesPage() {
     'all' | 'client' | 'supplier' | 'debtors' | 'creditors' | 'sleeping'
   >('all');
   const [legalFilter, setLegalFilter] = useState<'all' | 'legal' | 'individual'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'owner' | 'forwarder'>('all');
   const [showInactive, setShowInactive] = useState(false);
 
   // Selection & Drawer
@@ -162,6 +165,8 @@ export default function CounterpartiesPage() {
     let suppliersCount = 0;
     let legalCount = 0;
     let indCount = 0;
+    let ownersCount = 0;
+    let forwardersCount = 0;
     let rev30d = 0;
     let netProfit30d = 0;
     let totalClientDebt = 0; // дебиторка
@@ -177,6 +182,11 @@ export default function CounterpartiesPage() {
       else {
         clientsCount++;
         suppliersCount++;
+      }
+
+      if (cp.type !== 'supplier') {
+        if (cp.client_role === 'forwarder') forwardersCount++;
+        else ownersCount++;
       }
 
       if (cp.is_legal_entity) legalCount++;
@@ -204,6 +214,8 @@ export default function CounterpartiesPage() {
       suppliersCount,
       legalCount,
       indCount,
+      ownersCount,
+      forwardersCount,
       rev30d,
       netProfit30d,
       totalClientDebt,
@@ -232,6 +244,10 @@ export default function CounterpartiesPage() {
       // Legal filter
       if (legalFilter === 'legal' && !cp.is_legal_entity) return false;
       if (legalFilter === 'individual' && cp.is_legal_entity) return false;
+
+      // Role filter (Собственник / Экспедитор)
+      if (roleFilter === 'owner' && cp.client_role === 'forwarder') return false;
+      if (roleFilter === 'forwarder' && cp.client_role !== 'forwarder') return false;
 
       // Segment filter
       if (segment === 'client' && cp.type === 'supplier') return false;
@@ -276,7 +292,7 @@ export default function CounterpartiesPage() {
     });
 
     return list;
-  }, [counterparties, search, segment, legalFilter, showInactive, sortCol, sortAsc]);
+  }, [counterparties, search, segment, legalFilter, roleFilter, showInactive, sortCol, sortAsc]);
 
   // Детектор дублей (поиск схожих контрагентов по названиям и телефонам)
   const detectedDuplicates = useMemo(() => {
@@ -422,6 +438,15 @@ export default function CounterpartiesPage() {
     }).then(() => qc.invalidateQueries({ queryKey: ['counterparties'] }));
   };
 
+  const toggleRole = (cp: Counterparty) => {
+    const nextRole = cp.client_role === 'forwarder' ? 'owner' : 'forwarder';
+    fetch(`/api/counterparties/${cp.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_role: nextRole }),
+    }).then(() => qc.invalidateQueries({ queryKey: ['counterparties'] }));
+  };
+
   const handlePaySupplier = async () => {
     if (!selectedCp || !payAmount || parseFloat(payAmount) <= 0) return;
     setPayPending(true);
@@ -461,6 +486,7 @@ export default function CounterpartiesPage() {
     setForm({
       name: cp.name,
       type: cp.type,
+      client_role: cp.client_role || 'owner',
       phone: cp.phone ?? '',
       email: cp.email ?? '',
       credit_limit: cp.credit_limit ?? '',
@@ -489,7 +515,8 @@ export default function CounterpartiesPage() {
           <div className="text-[11px] text-slate-400 font-medium">Всего в реестре</div>
           <div className="text-xl font-black text-slate-900 mt-0.5">{metrics.total}</div>
           <div className="text-[10px] text-slate-500 mt-1">
-            {metrics.clientsCount} кл. · {metrics.suppliersCount} пост. · {metrics.legalCount} ЮЛ
+            {metrics.clientsCount} кл. ({metrics.ownersCount} прям. · {metrics.forwardersCount}{' '}
+            экспед.) · {metrics.suppliersCount} пост.
           </div>
         </div>
 
@@ -633,6 +660,17 @@ export default function CounterpartiesPage() {
             <option value="all">Форма: Все</option>
             <option value="legal">Юрлица (ООО / АО)</option>
             <option value="individual">Физлица / ИП</option>
+          </select>
+
+          {/* Роль: Собственник / Экспедитор */}
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as 'all' | 'owner' | 'forwarder')}
+            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none font-semibold text-slate-700"
+          >
+            <option value="all">Роль: Все</option>
+            <option value="owner">🏢 Собственники ({metrics.ownersCount})</option>
+            <option value="forwarder">🔄 Экспедиторы ({metrics.forwardersCount})</option>
           </select>
 
           <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer ml-1 select-none">
@@ -800,37 +838,69 @@ export default function CounterpartiesPage() {
 
                       {/* Тип / Роль */}
                       <td className="py-2.5 px-3">
-                        {isSupplier ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                            <span>⛽</span> {cp.supplier_category || 'Поставщик'}
-                          </span>
-                        ) : isBoth ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                            Клиент + Пост.
-                          </span>
-                        ) : cp.is_regular ? (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleRegular(cp);
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer"
-                            title="Постоянный клиент"
-                          >
-                            ★ Постоянный
-                          </span>
-                        ) : (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleRegular(cp);
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer"
-                            title="Разовый клиент"
-                          >
-                            Разовый
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-1 items-start">
+                          {isSupplier ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                              <span>⛽</span> {cp.supplier_category || 'Поставщик'}
+                            </span>
+                          ) : isBoth ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                              Клиент + Пост.
+                            </span>
+                          ) : null}
+
+                          {!isSupplier && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {cp.client_role === 'forwarder' ? (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleRole(cp);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 cursor-pointer transition shadow-2xs"
+                                  title="Экспедитор (перекуп). Кликните для смены на Собственника"
+                                >
+                                  🔄 Экспедитор
+                                </span>
+                              ) : (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleRole(cp);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-200 hover:bg-blue-200 cursor-pointer transition shadow-2xs"
+                                  title="Собственник груза (прямой клиент). Кликните для смены на Экспедитора"
+                                >
+                                  🏢 Собственник
+                                </span>
+                              )}
+
+                              {cp.is_regular ? (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleRegular(cp);
+                                  }}
+                                  className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer"
+                                  title="Постоянный клиент"
+                                >
+                                  ★ Пост.
+                                </span>
+                              ) : (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleRegular(cp);
+                                  }}
+                                  className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer"
+                                  title="Разовый клиент"
+                                >
+                                  Разовый
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* Контакты */}
@@ -996,6 +1066,19 @@ export default function CounterpartiesPage() {
                           >
                             {selectedCp.is_legal_entity ? 'ЮРЛИЦО' : 'ФИЗЛИЦО'}
                           </span>
+                          {selectedCp.type !== 'supplier' && (
+                            <span
+                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                                selectedCp.client_role === 'forwarder'
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  : 'bg-blue-100 text-blue-900 border border-blue-200'
+                              }`}
+                            >
+                              {selectedCp.client_role === 'forwarder'
+                                ? '🔄 ЭКСПЕДИТОР (ПЕРЕКУП)'
+                                : '🏢 СОБСТВЕННИК (ПРЯМОЙ)'}
+                            </span>
+                          )}
                           <span
                             className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${selectedCp.type === 'supplier' ? 'bg-purple-100 text-purple-800' : selectedCp.is_regular ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}
                           >
@@ -1347,14 +1430,28 @@ export default function CounterpartiesPage() {
                               {selectedCp.is_legal_entity ? 'Юрлицо (ООО/АО)' : 'Физлицо / ИП'}
                             </div>
                             <div>
-                              <span className="text-slate-400">Статус клиента:</span>{' '}
+                              <span className="text-slate-400">Роль:</span>{' '}
+                              <strong
+                                className={
+                                  selectedCp.client_role === 'forwarder'
+                                    ? 'text-amber-900'
+                                    : 'text-blue-900'
+                                }
+                              >
+                                {selectedCp.client_role === 'forwarder'
+                                  ? '🔄 Экспедитор (перекуп)'
+                                  : '🏢 Собственник (прямой)'}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Статус:</span>{' '}
                               {selectedCp.is_regular ? 'Постоянный' : 'Разовый'}
                             </div>
                             <div>
                               <span className="text-slate-400">Телефон:</span>{' '}
                               {selectedCp.phone || '—'}
                             </div>
-                            <div>
+                            <div className="col-span-2">
                               <span className="text-slate-400">Email:</span>{' '}
                               {selectedCp.email || '—'}
                             </div>
@@ -1521,7 +1618,7 @@ export default function CounterpartiesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-600 font-semibold mb-1">Тип контрагента</label>
                   <select
@@ -1534,6 +1631,22 @@ export default function CounterpartiesPage() {
                     <option value="client">Клиент (заказчик)</option>
                     <option value="supplier">Поставщик (ГСМ/запчасти/услуги)</option>
                     <option value="both">Клиент + Поставщик</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">
+                    Роль (Собственник / Экспедитор)
+                  </label>
+                  <select
+                    value={form.client_role}
+                    onChange={(e) =>
+                      setForm({ ...form, client_role: e.target.value as 'owner' | 'forwarder' })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none font-semibold text-slate-800"
+                  >
+                    <option value="owner">🏢 Собственник (прямой)</option>
+                    <option value="forwarder">🔄 Экспедитор (перекуп)</option>
                   </select>
                 </div>
 

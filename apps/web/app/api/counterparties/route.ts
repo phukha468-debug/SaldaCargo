@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     let q = (supabase as any)
       .from('counterparties')
       .select(
-        'id, name, phone, email, type, credit_limit, payable_amount, notes, is_active, is_regular, is_legal_entity',
+        'id, name, phone, email, type, credit_limit, payable_amount, notes, is_active, is_regular, is_legal_entity, client_role',
       )
       .order('name');
 
@@ -346,6 +346,7 @@ export async function GET(request: Request) {
         is_active: cp.is_active,
         is_regular: cp.is_regular ?? false,
         is_legal_entity: cp.is_legal_entity ?? false,
+        client_role: cp.client_role || 'owner',
         // Взаиморасчеты:
         payable_amount: finalPayableDebt.toFixed(2), // Мы должны
         receivable_amount: finalReceivableDebt.toFixed(2), // Нам должны
@@ -392,6 +393,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name: string;
       type?: 'client' | 'supplier' | 'both';
+      client_role?: 'owner' | 'forwarder';
       phone?: string;
       email?: string;
       credit_limit?: string;
@@ -411,6 +413,7 @@ export async function POST(request: Request) {
       .insert({
         name: body.name.trim(),
         type: body.type || 'client',
+        client_role: body.client_role || 'owner',
         phone: body.phone?.trim() || null,
         email: body.email?.trim() || null,
         credit_limit: body.credit_limit || null,

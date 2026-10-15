@@ -397,6 +397,7 @@ export type Database = {
       };
       counterparties: {
         Row: {
+          client_role: 'owner' | 'forwarder';
           created_at: string | null;
           credit_limit: number | null;
           email: string | null;
@@ -414,6 +415,7 @@ export type Database = {
           updated_at: string | null;
         };
         Insert: {
+          client_role?: 'owner' | 'forwarder';
           created_at?: string | null;
           credit_limit?: number | null;
           email?: string | null;
@@ -431,6 +433,7 @@ export type Database = {
           updated_at?: string | null;
         };
         Update: {
+          client_role?: 'owner' | 'forwarder';
           created_at?: string | null;
           credit_limit?: number | null;
           email?: string | null;
