@@ -46,6 +46,24 @@ export type AtiOrder = {
   payment_terms: string;
   postal_address?: string;
   postal_tracking_number?: string;
+  // Отмена и срыв
+  is_cancelled?: boolean;
+  cancel_reason?: string;
+  cancelled_at?: string;
+  // Претензионная работа
+  has_claim?: boolean;
+  claim_status?: 'none' | 'issued' | 'agreed' | 'waiting_payment' | 'paid' | 'rejected';
+  claim_number?: string;
+  claim_date?: string;
+  claim_amount?: number;
+  claim_penalty_amount?: number;
+  claim_empty_run_amount?: number;
+  claim_idle_amount?: number;
+  claim_due_days?: number;
+  claim_due_date?: string;
+  claim_agreed_at?: string;
+  claim_paid_at?: string;
+  claim_notes?: string;
   // Дополнительно
   notes?: string;
   created_at: string;

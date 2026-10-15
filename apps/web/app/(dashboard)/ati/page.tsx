@@ -44,6 +44,21 @@ export type AtiOrder = {
   postal_tracking_number?: string;
   is_cancelled?: boolean;
   cancel_reason?: string;
+  cancelled_at?: string;
+  // Претензионная работа
+  has_claim?: boolean;
+  claim_status?: 'none' | 'issued' | 'agreed' | 'waiting_payment' | 'paid' | 'rejected';
+  claim_number?: string;
+  claim_date?: string;
+  claim_amount?: number;
+  claim_penalty_amount?: number;
+  claim_empty_run_amount?: number;
+  claim_idle_amount?: number;
+  claim_due_days?: number;
+  claim_due_date?: string;
+  claim_agreed_at?: string;
+  claim_paid_at?: string;
+  claim_notes?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -218,29 +233,93 @@ export default function AtiPage() {
     },
   });
 
-  // Состояния для отмены / срыва
+  // Состояния для отмены / срыва / претензии
   const [cancellingOrder, setCancellingOrder] = useState<AtiOrder | null>(null);
+  const [cancelMode, setCancelMode] = useState<'claim' | 'simple'>('claim');
   const [cancelReason, setCancelReason] = useState<string>(
     'Срыв на погрузке (груз не готов / отказ заказчика)',
   );
   const [customReason, setCustomReason] = useState<string>('');
   const [showCancelledList, setShowCancelledList] = useState(false);
+  const [cancelledListTab, setCancelledListTab] = useState<'claims' | 'simple'>('claims');
+  const [viewingClaimOrder, setViewingClaimOrder] = useState<AtiOrder | null>(null);
 
-  // Мутация отмены / фиксации срыва
+  // Параметры претензии
+  const [claimNumber, setClaimNumber] = useState<string>('01-ПР');
+  const [claimDate, setClaimDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [claimPenaltyAmount, setClaimPenaltyAmount] = useState<string>('6000');
+  const [claimEmptyRunAmount, setClaimEmptyRunAmount] = useState<string>('0');
+  const [claimIdleAmount, setClaimIdleAmount] = useState<string>('0');
+  const [claimDueDays, setClaimDueDays] = useState<string>('5');
+
+  // Мутация отмены / фиксации срыва / выставления претензии
   const cancelOrderMutation = useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const res = await fetch(`/api/ati/${id}`, {
+    mutationFn: async (payload: {
+      id: string;
+      reason: string;
+      has_claim?: boolean;
+      claim_status?: 'issued';
+      claim_number?: string;
+      claim_date?: string;
+      claim_amount?: number;
+      claim_penalty_amount?: number;
+      claim_empty_run_amount?: number;
+      claim_idle_amount?: number;
+      claim_due_days?: number;
+    }) => {
+      const res = await fetch(`/api/ati/${payload.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_cancelled: true, cancel_reason: reason }),
+        body: JSON.stringify({
+          is_cancelled: true,
+          cancel_reason: payload.reason,
+          has_claim: payload.has_claim,
+          claim_status: payload.claim_status,
+          claim_number: payload.claim_number,
+          claim_date: payload.claim_date,
+          claim_amount: payload.claim_amount,
+          claim_penalty_amount: payload.claim_penalty_amount,
+          claim_empty_run_amount: payload.claim_empty_run_amount,
+          claim_idle_amount: payload.claim_idle_amount,
+          claim_due_days: payload.claim_due_days,
+        }),
       });
-      if (!res.ok) throw new Error('Ошибка отмены заявки');
+      if (!res.ok) throw new Error('Ошибка обработки срыва заявки');
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ati-orders'] });
       queryClient.invalidateQueries({ queryKey: ['receivables'] });
       setCancellingOrder(null);
+    },
+  });
+
+  // Мутация обновления статуса претензии (Согласовано -> Ждем оплаты -> Оплачено)
+  const updateClaimStatusMutation = useMutation({
+    mutationFn: async ({
+      id,
+      claim_status,
+      claim_agreed_at,
+    }: {
+      id: string;
+      claim_status: 'issued' | 'agreed' | 'waiting_payment' | 'paid' | 'rejected';
+      claim_agreed_at?: string;
+    }) => {
+      const res = await fetch(`/api/ati/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claim_status,
+          claim_agreed_at:
+            claim_agreed_at || (claim_status === 'agreed' ? new Date().toISOString() : undefined),
+        }),
+      });
+      if (!res.ok) throw new Error('Ошибка обновления претензии');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ati-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
     },
   });
 
@@ -257,6 +336,7 @@ export default function AtiPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ati-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
     },
   });
 
@@ -281,9 +361,16 @@ export default function AtiPage() {
   const orders = data?.orders || [];
   const counterparties = data?.counterparties || [];
 
-  // Разделение на активные и сорванные/отменённые
+  // Разделение на активные, претензии и простые срывы
   const cancelledOrders = orders.filter((o) => o.is_cancelled || o.stage === 0);
+  const claimOrders = cancelledOrders.filter((o) => o.has_claim);
+  const simpleCancelledOrders = cancelledOrders.filter((o) => !o.has_claim);
   const activeOrders = orders.filter((o) => !o.is_cancelled && o.stage > 0);
+
+  const activeClaimsCount = claimOrders.filter((o) => o.claim_status !== 'paid').length;
+  const activeClaimsSum = claimOrders
+    .filter((o) => o.claim_status !== 'paid')
+    .reduce((sum, o) => sum + (Number(o.claim_amount) || 0), 0);
 
   // Фильтрация активных по типу документов
   const filteredOrders = activeOrders.filter((o) => {
@@ -410,16 +497,41 @@ export default function AtiPage() {
             </button>
           </div>
 
-          {/* Кнопка архива сорванных заявок */}
-          {cancelledOrders.length > 0 && (
+          {/* Кнопка претензий */}
+          {claimOrders.length > 0 && (
             <button
-              onClick={() => setShowCancelledList(true)}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
-              title="Посмотреть заявки, сорванные на погрузке"
+              onClick={() => {
+                setCancelledListTab('claims');
+                setShowCancelledList(true);
+              }}
+              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+              title="Претензии к заказчикам за срыв погрузки"
+            >
+              <span>⚖️ Претензии:</span>
+              <span className="font-black bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded-full font-mono text-[11px]">
+                {claimOrders.length}
+              </span>
+              {activeClaimsSum > 0 && (
+                <span className="text-[10px] font-mono font-black text-amber-800">
+                  ({activeClaimsSum.toLocaleString('ru-RU')} ₽)
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Кнопка архива простых срывов */}
+          {simpleCancelledOrders.length > 0 && (
+            <button
+              onClick={() => {
+                setCancelledListTab('simple');
+                setShowCancelledList(true);
+              }}
+              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+              title="Сорванные рейсы без претензий"
             >
               <span>❌ Срывы:</span>
-              <span className="font-black bg-rose-200/80 text-rose-900 px-1.5 py-0.2 rounded-full font-mono text-[11px]">
-                {cancelledOrders.length}
+              <span className="font-black bg-slate-200 text-slate-900 px-1.5 py-0.2 rounded-full font-mono text-[11px]">
+                {simpleCancelledOrders.length}
               </span>
             </button>
           )}
@@ -435,6 +547,154 @@ export default function AtiPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
+           БАННЕР АКТИВНОЙ ПРЕТЕНЗИОННОЙ РАБОТЫ (ЕСЛИ ЕСТЬ ПРЕТЕНЗИИ)
+           ══════════════════════════════════════════════════════════════════════ */}
+      {claimOrders.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50/50 border-2 border-amber-300 rounded-2xl p-3 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚖️</span>
+              <span className="text-xs font-black uppercase text-amber-950 tracking-wide">
+                Претензионная работа по срывам (
+                {activeClaimsCount > 0 ? `${activeClaimsCount} в работе` : `${claimOrders.length}`})
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                ст. 35 УАТ РФ · Штраф 20%
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-600 font-medium">Сумма требований:</span>
+              <span className="font-mono font-black text-amber-950 text-sm">
+                {(activeClaimsSum > 0
+                  ? activeClaimsSum
+                  : claimOrders.reduce((sum, o) => sum + (Number(o.claim_amount) || 0), 0)
+                ).toLocaleString('ru-RU')}{' '}
+                ₽
+              </span>
+            </div>
+          </div>
+
+          {/* Список претензий в работе */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+            {claimOrders.map((ord) => {
+              const status = ord.claim_status || 'issued';
+              return (
+                <div
+                  key={ord.id}
+                  className="bg-white border-2 border-amber-200 rounded-xl p-2.5 shadow-2xs space-y-2 text-xs hover:border-amber-400 transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-black text-slate-900 text-xs">
+                          Претензия № {ord.claim_number || '01-ПР'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium">
+                          к {ord.order_number.split(' ')[0]}
+                        </span>
+                      </div>
+                      <div className="font-bold text-slate-800 text-[11px] truncate max-w-[220px]">
+                        {ord.counterparty_name}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-black text-amber-950 text-xs">
+                        {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                      </div>
+                      <div className="text-[9px] text-slate-500">
+                        {ord.claim_date || new Date().toLocaleDateString('ru-RU')}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Статус претензии */}
+                  <div className="flex items-center justify-between text-[10px] bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-600">Статус:</span>
+                    {status === 'issued' && (
+                      <span className="font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                        1. Выставлена (Ждём согласования)
+                      </span>
+                    )}
+                    {(status === 'agreed' || status === 'waiting_payment') && (
+                      <span className="font-bold text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
+                        2. Согласована · В Дебиторке ⏳
+                      </span>
+                    )}
+                    {status === 'paid' && (
+                      <span className="font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">
+                        ✓ Оплачено на Р/С
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Действия с претензией */}
+                  <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setViewingClaimOrder(ord)}
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-300 cursor-pointer transition flex items-center gap-1"
+                      title="Открыть официальный бланк претензии"
+                    >
+                      <span>📄</span> <span>Бланк</span>
+                    </button>
+
+                    {status === 'issued' && (
+                      <button
+                        type="button"
+                        disabled={updateClaimStatusMutation.isPending}
+                        onClick={() =>
+                          updateClaimStatusMutation.mutate({
+                            id: ord.id,
+                            claim_status: 'agreed',
+                          })
+                        }
+                        className="flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black cursor-pointer transition text-center shadow-2xs"
+                        title="Заказчик согласовал срыв -> отправить в Дебиторку"
+                      >
+                        ✓ Согласовано → В Дебиторку
+                      </button>
+                    )}
+
+                    {(status === 'agreed' || status === 'waiting_payment') && (
+                      <div className="flex-1 flex items-center gap-1">
+                        <Link
+                          href="/receivables"
+                          className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold text-center"
+                          title="Посмотреть задолженность в разделе Дебиторка"
+                        >
+                          В Дебиторке ↗
+                        </Link>
+                        <button
+                          type="button"
+                          disabled={updateClaimStatusMutation.isPending}
+                          onClick={() =>
+                            updateClaimStatusMutation.mutate({
+                              id: ord.id,
+                              claim_status: 'paid',
+                            })
+                          }
+                          className="flex-1 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black cursor-pointer transition text-center"
+                          title="Отметить оплаченной на расчетный счет"
+                        >
+                          ✓ Оплачено
+                        </button>
+                      </div>
+                    )}
+
+                    {status === 'paid' && (
+                      <div className="flex-1 text-center py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-[10px] font-black">
+                        ✓ Долг закрыт
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
            ИНФО-БЛОК СВЯЗКИ С ДЕБИТОРКОЙ
            ══════════════════════════════════════════════════════════════════════ */}
       <div className="bg-white border-2 border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs">
@@ -442,8 +702,8 @@ export default function AtiPage() {
           <span className="text-base">💡</span>
           <span>
             Кликните на карточку для просмотра полного договора. Кнопка <strong>↶</strong> отменяет
-            ошибочный шаг. Заявки на 7 этапе автоматически связаны с разделом{' '}
-            <strong>Дебиторка</strong>.
+            ошибочный шаг. Претензии после согласования автоматически попадают в{' '}
+            <strong>Дебиторку</strong>.
           </span>
         </div>
         <div className="flex items-center gap-2 text-[11px] font-mono font-bold shrink-0">
@@ -618,12 +878,24 @@ export default function AtiPage() {
                               type="button"
                               onClick={() => {
                                 setCancellingOrder(order);
+                                setCancelMode('claim');
                                 setCancelReason(
                                   'Срыв на погрузке (груз не готов / отказ заказчика)',
                                 );
                                 setCustomReason('');
+                                const penalty = Math.round((Number(order.price) || 30000) * 0.2);
+                                setClaimPenaltyAmount(String(penalty));
+                                setClaimEmptyRunAmount('0');
+                                setClaimIdleAmount('0');
+                                setClaimNumber(
+                                  order.order_number.includes('001')
+                                    ? '01-ПР'
+                                    : `${order.order_number.replace(/\D/g, '') || '1'}-ПР`,
+                                );
+                                setClaimDate(new Date().toISOString().split('T')[0]);
+                                setClaimDueDays('5');
                               }}
-                              title="Срыв договора-заявки / Снять с доски"
+                              title="Срыв договора-заявки / Претензия / Снять с доски"
                               className="px-1.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-black text-[10px] border border-rose-200 cursor-pointer active:scale-95 transition"
                             >
                               ✕
@@ -1223,140 +1495,357 @@ export default function AtiPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-           МОДАЛЬНОЕ ОКНО СРЫВА / ОТМЕНЫ ЗАЯВКИ С КАНБАН-ДОСКИ
+           МОДАЛЬНОЕ ОКНО СРЫВА / ВЫСТАВЛЕНИЯ ПРЕТЕНЗИИ
            ══════════════════════════════════════════════════════════════════════ */}
       {cancellingOrder && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl border-2 border-rose-300 shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="px-5 py-4 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-xl w-full overflow-hidden my-auto">
+            {/* Шапка модалки */}
+            <div className="px-5 py-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">⚠️</span>
+                <span className="text-xl">{cancelMode === 'claim' ? '⚖️' : '⚠️'}</span>
                 <div>
                   <h3 className="font-black text-sm uppercase tracking-wide">
-                    Срыв / Отмена договор-заявки
+                    {cancelMode === 'claim'
+                      ? 'Оформление претензии за срыв погрузки'
+                      : 'Снятие договор-заявки с доски'}
                   </h3>
-                  <p className="text-[10px] text-rose-100">
-                    Заявка {cancellingOrder.order_number} будет снята с Канбан-доски
+                  <p className="text-[10px] text-slate-300">
+                    Заявка {cancellingOrder.order_number} · Контрагент:{' '}
+                    {cancellingOrder.counterparty_name}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setCancellingOrder(null)}
-                className="text-rose-200 hover:text-white text-lg font-bold cursor-pointer"
+                className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
+            {/* Вкладки: Претензия vs Простая отмена */}
+            <div className="px-5 pt-3 border-b border-slate-200 flex gap-2 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setCancelMode('claim')}
+                className={`pb-2.5 px-3 text-xs font-black border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  cancelMode === 'claim'
+                    ? 'border-indigo-600 text-indigo-700 bg-white rounded-t-lg border-t border-x border-b-white -mb-px'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>⚖️ Выставить Претензию (ст. 35 УАТ РФ)</span>
+                <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
+                  20%
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelMode('simple')}
+                className={`pb-2.5 px-3 text-xs font-black border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  cancelMode === 'simple'
+                    ? 'border-rose-600 text-rose-700 bg-white rounded-t-lg border-t border-x border-b-white -mb-px'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>❌ Простая отмена (без претензий)</span>
+              </button>
+            </div>
+
             <div className="p-5 space-y-4 text-xs">
-              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-900 space-y-1">
+              {/* Информация о рейсе */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 space-y-1">
                 <div className="font-bold text-[11px] flex justify-between">
-                  <span>Контрагент: {cancellingOrder.counterparty_name}</span>
-                  <span className="font-mono">
-                    {Number(cancellingOrder.price || 0).toLocaleString('ru-RU')} ₽
+                  <span>Заказчик: {cancellingOrder.counterparty_name}</span>
+                  <span className="font-mono font-black text-slate-900">
+                    Фрахт: {Number(cancellingOrder.price || 0).toLocaleString('ru-RU')} ₽
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-600">
                   {cancellingOrder.pickup_address} ➔ {cancellingOrder.delivery_address}
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1.5">
-                  Причина срыва / отмены:
-                </label>
-                <div className="space-y-1.5">
-                  {[
-                    'Срыв на погрузке (груз не готов / отказ заказчика)',
-                    'Поломка / опоздание автомобиля парка',
-                    'Несоответствие веса / габаритов груза',
-                    'Отказ заказчика / перенос даты рейса',
-                    'Другая причина (указать ниже)',
-                  ].map((reason) => (
-                    <label
-                      key={reason}
-                      className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer font-medium text-slate-800"
-                    >
-                      <input
-                        type="radio"
-                        name="cancel_reason"
-                        value={reason}
-                        checked={cancelReason === reason}
-                        onChange={() => setCancelReason(reason)}
-                        className="cursor-pointer"
-                      />
-                      <span>{reason}</span>
-                    </label>
-                  ))}
+                <div className="text-[10px] text-slate-500">
+                  Авто: {cancellingOrder.asset_name || 'Валдай'} · Водитель:{' '}
+                  {cancellingOrder.driver_name}
                 </div>
               </div>
 
-              {cancelReason === 'Другая причина (указать ниже)' && (
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
-                    Укажите причину:
-                  </label>
-                  <input
-                    type="text"
-                    value={customReason}
-                    onChange={(e) => setCustomReason(e.target.value)}
-                    placeholder="Подробности срыва..."
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold"
-                  />
+              {cancelMode === 'claim' ? (
+                /* ═══════════════════════════════════════════════════════════════
+                     ФОРМА ПРЕТЕНЗИИ (ПО ПРИМЕРУ ДОКУМЕНТА)
+                     ═══════════════════════════════════════════════════════════════ */
+                <div className="space-y-3.5">
+                  <div className="p-2.5 bg-amber-50/70 border border-amber-300 rounded-xl text-[11px] text-amber-950 leading-relaxed">
+                    ⚖️ <strong>Основание:</strong> ч. 1 ст. 35 ФЗ № 259-ФЗ «УАТ РФ» и п. 3
+                    Договора-заявки. В случае отказа Заказчика от ТС или непредставления груза
+                    Перевозчик вправе взыскать штраф <strong>20% от согласованного фрахта</strong>,
+                    а также фактические расходы на подачу и простой.
+                  </div>
+
+                  {/* Реквизиты претензии */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                        Исходящий номер претензии:
+                      </label>
+                      <input
+                        type="text"
+                        value={claimNumber}
+                        onChange={(e) => setClaimNumber(e.target.value)}
+                        placeholder="01-ПР"
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                        Дата составления:
+                      </label>
+                      <input
+                        type="date"
+                        value={claimDate}
+                        onChange={(e) => setClaimDate(e.target.value)}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Таблица требований */}
+                  <div className="border-2 border-amber-200 rounded-xl overflow-hidden">
+                    <div className="bg-amber-100/70 px-3 py-1.5 font-black text-[11px] text-amber-950 border-b border-amber-200">
+                      Расчет суммы требований (ст. 35 УАТ РФ):
+                    </div>
+                    <div className="p-2.5 space-y-2 bg-white">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium text-slate-700">
+                          1. Штраф 20% от фрахта (
+                          {Number(cancellingOrder.price || 0).toLocaleString('ru-RU')} ₽):
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0 font-mono font-black">
+                          <input
+                            type="number"
+                            value={claimPenaltyAmount}
+                            onChange={(e) => setClaimPenaltyAmount(e.target.value)}
+                            className="w-24 px-2 py-1 border border-slate-300 rounded text-right text-xs font-bold font-mono"
+                          />
+                          <span>₽</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium text-slate-700">
+                          2. Холостой пробег и подача ТС (г. Арамиль):
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0 font-mono">
+                          <input
+                            type="number"
+                            value={claimEmptyRunAmount}
+                            onChange={(e) => setClaimEmptyRunAmount(e.target.value)}
+                            className="w-24 px-2 py-1 border border-slate-300 rounded text-right text-xs font-bold font-mono"
+                          />
+                          <span>₽</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium text-slate-700">
+                          3. Простой автотранспорта в ожидании погрузки:
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0 font-mono">
+                          <input
+                            type="number"
+                            value={claimIdleAmount}
+                            onChange={(e) => setClaimIdleAmount(e.target.value)}
+                            className="w-24 px-2 py-1 border border-slate-300 rounded text-right text-xs font-bold font-mono"
+                          />
+                          <span>₽</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t-2 border-amber-200 flex items-center justify-between font-black text-xs text-amber-950">
+                        <span>ИТОГО К ОПЛАТЕ:</span>
+                        <span className="font-mono text-sm text-indigo-700">
+                          {(
+                            (Number(claimPenaltyAmount) || 0) +
+                            (Number(claimEmptyRunAmount) || 0) +
+                            (Number(claimIdleAmount) || 0)
+                          ).toLocaleString('ru-RU')}{' '}
+                          ₽
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Срок оплаты */}
+                  <div className="flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px]">
+                    <span className="font-bold text-slate-700">Срок удовлетворения и оплаты:</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={claimDueDays}
+                        onChange={(e) => setClaimDueDays(e.target.value)}
+                        className="w-14 px-2 py-0.5 border border-slate-300 rounded text-center font-mono font-bold"
+                      />
+                      <span className="text-slate-600 font-medium">банковских дней</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-slate-500 bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-200">
+                    💡 <strong>План развития:</strong> После нажатия кнопки заявка получит статус{' '}
+                    <strong>«Выставлена претензия»</strong>. После подтверждения или подписания акта
+                    срыва контрагент <strong>автоматически попадает в раздел «Дебиторка»</strong> на
+                    сумму требований!
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setCancellingOrder(null)}
+                      className="px-3.5 py-1.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 cursor-pointer"
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cancelOrderMutation.isPending}
+                      onClick={() => {
+                        const totalClaim =
+                          (Number(claimPenaltyAmount) || 0) +
+                          (Number(claimEmptyRunAmount) || 0) +
+                          (Number(claimIdleAmount) || 0);
+
+                        cancelOrderMutation.mutate({
+                          id: cancellingOrder.id,
+                          reason: 'Срыв на погрузке (груз не готов / отказ заказчика)',
+                          has_claim: true,
+                          claim_status: 'issued',
+                          claim_number: claimNumber.trim() || '01-ПР',
+                          claim_date: claimDate,
+                          claim_amount: totalClaim,
+                          claim_penalty_amount: Number(claimPenaltyAmount) || 0,
+                          claim_empty_run_amount: Number(claimEmptyRunAmount) || 0,
+                          claim_idle_amount: Number(claimIdleAmount) || 0,
+                          claim_due_days: Number(claimDueDays) || 5,
+                        });
+                      }}
+                      className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <span>⚖️</span>
+                      <span>
+                        {cancelOrderMutation.isPending
+                          ? 'Оформление...'
+                          : `Выставить претензию (${(
+                              (Number(claimPenaltyAmount) || 0) +
+                              (Number(claimEmptyRunAmount) || 0) +
+                              (Number(claimIdleAmount) || 0)
+                            ).toLocaleString('ru-RU')} ₽)`}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ═══════════════════════════════════════════════════════════════
+                     ПРОСТАЯ ОТМЕНА БЕЗ ПРЕТЕНЗИИ
+                     ═══════════════════════════════════════════════════════════════ */
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase text-slate-700 mb-1.5">
+                      Причина срыва / отмены:
+                    </label>
+                    <div className="space-y-1.5">
+                      {[
+                        'Поломка / опоздание автомобиля парка',
+                        'Несоответствие веса / габаритов груза',
+                        'Отказ заказчика по обоюдному согласию',
+                        'Другая причина (указать ниже)',
+                      ].map((reason) => (
+                        <label
+                          key={reason}
+                          className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer font-medium text-slate-800"
+                        >
+                          <input
+                            type="radio"
+                            name="cancel_reason"
+                            value={reason}
+                            checked={cancelReason === reason}
+                            onChange={() => setCancelReason(reason)}
+                            className="cursor-pointer"
+                          />
+                          <span>{reason}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {cancelReason === 'Другая причина (указать ниже)' && (
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                        Укажите причину:
+                      </label>
+                      <input
+                        type="text"
+                        value={customReason}
+                        onChange={(e) => setCustomReason(e.target.value)}
+                        placeholder="Подробности срыва..."
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold"
+                      />
+                    </div>
+                  )}
+
+                  <div className="text-[10px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    💡 Заявка будет перемещена в архив срывов без выставления претензий. Финансовые
+                    требования аннулируются.
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setCancellingOrder(null)}
+                      className="px-3.5 py-1.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 cursor-pointer"
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cancelOrderMutation.isPending}
+                      onClick={() =>
+                        cancelOrderMutation.mutate({
+                          id: cancellingOrder.id,
+                          reason:
+                            cancelReason === 'Другая причина (указать ниже)'
+                              ? customReason.trim() || 'Срыв рейса'
+                              : cancelReason,
+                          has_claim: false,
+                        })
+                      }
+                      className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {cancelOrderMutation.isPending ? 'Снятие...' : '✕ Снять без претензий'}
+                    </button>
+                  </div>
                 </div>
               )}
-
-              <div className="text-[10px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                💡 Заявка будет перемещена в раздел «Срывы и отмены». Запись в Дебиторке
-                автоматически аннулируется. При необходимости заявку можно восстановить обратно на
-                Канбан.
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setCancellingOrder(null)}
-                  className="px-3.5 py-1.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 cursor-pointer"
-                >
-                  Назад
-                </button>
-                <button
-                  type="button"
-                  disabled={cancelOrderMutation.isPending}
-                  onClick={() =>
-                    cancelOrderMutation.mutate({
-                      id: cancellingOrder.id,
-                      reason:
-                        cancelReason === 'Другая причина (указать ниже)'
-                          ? customReason.trim() || 'Срыв рейса'
-                          : cancelReason,
-                    })
-                  }
-                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  {cancelOrderMutation.isPending ? 'Снятие...' : '✕ Снять с Канбана'}
-                </button>
-              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-           СПИСОК СОРВАННЫХ / ОТМЕНЁННЫХ ЗАЯВОК
+           СПИСОК ПРЕТЕНЗИЙ И СОРВАННЫХ ЗАЯВОК (АРХИВ СРЫВОВ)
            ══════════════════════════════════════════════════════════════════════ */}
       {showCancelledList && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden my-auto">
+            {/* Шапка */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">❌</span>
+                <span className="text-xl">🗂️</span>
                 <div>
                   <h3 className="font-black text-sm uppercase tracking-wide">
-                    Сорванные и отменённые заявки ({cancelledOrders.length})
+                    Управление претензиями и срывами ({cancelledOrders.length})
                   </h3>
                   <p className="text-[10px] text-slate-400">
-                    Договоры, срыв которых произошёл на погрузке или до отправления
+                    Претензионная работа, контроль оплат и история сорванных рейсов
                   </p>
                 </div>
               </div>
@@ -1368,24 +1857,211 @@ export default function AtiPage() {
               </button>
             </div>
 
+            {/* Вкладки: Претензии vs Простые срывы */}
+            <div className="px-5 pt-2.5 border-b border-slate-200 flex gap-2 bg-slate-50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setCancelledListTab('claims')}
+                className={`pb-2 px-3 text-xs font-black border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  cancelledListTab === 'claims'
+                    ? 'border-amber-600 text-amber-900 bg-white rounded-t-lg border-t border-x border-b-white -mb-px'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>⚖️ Претензии к заказчикам</span>
+                <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                  {claimOrders.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelledListTab('simple')}
+                className={`pb-2 px-3 text-xs font-black border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  cancelledListTab === 'simple'
+                    ? 'border-slate-800 text-slate-900 bg-white rounded-t-lg border-t border-x border-b-white -mb-px'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>❌ Срывы без претензий</span>
+                <span className="bg-slate-200 text-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                  {simpleCancelledOrders.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Содержимое вкладок */}
             <div className="p-5 space-y-3 overflow-y-auto flex-1 text-xs">
-              {cancelledOrders.length === 0 ? (
+              {cancelledListTab === 'claims' ? (
+                claimOrders.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 font-bold">
+                    Нет активных претензий к заказчикам.
+                  </div>
+                ) : (
+                  claimOrders.map((ord) => {
+                    const status = ord.claim_status || 'issued';
+                    return (
+                      <div
+                        key={ord.id}
+                        className="p-3.5 bg-white rounded-2xl border-2 border-amber-300 shadow-2xs space-y-3 hover:border-amber-400 transition"
+                      >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-slate-900 text-sm">
+                                Претензия № {ord.claim_number || '01-ПР'}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold">
+                                к заявке {ord.order_number}
+                              </span>
+                              <span className="text-slate-400 font-mono text-[10px]">
+                                от {ord.claim_date || new Date().toLocaleDateString('ru-RU')}
+                              </span>
+                            </div>
+                            <div className="font-bold text-slate-900 text-xs mt-0.5">
+                              Заказчик: {ord.counterparty_name}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] text-slate-500 block">
+                              Сумма требований:
+                            </span>
+                            <span className="font-mono font-black text-amber-950 text-base">
+                              {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Пайплайн претензии */}
+                        <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-bold">
+                          <div
+                            className={`p-1.5 rounded-lg border ${
+                              status === 'issued'
+                                ? 'bg-amber-100 border-amber-300 text-amber-950 font-black'
+                                : 'bg-slate-100 border-slate-200 text-slate-500'
+                            }`}
+                          >
+                            1. Выставили претензию
+                          </div>
+                          <div
+                            className={`p-1.5 rounded-lg border ${
+                              status === 'agreed' || status === 'waiting_payment'
+                                ? 'bg-rose-100 border-rose-300 text-rose-950 font-black'
+                                : status === 'paid'
+                                  ? 'bg-slate-100 border-slate-200 text-slate-500'
+                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                            }`}
+                          >
+                            2. Согласовали / Дебиторка
+                          </div>
+                          <div
+                            className={`p-1.5 rounded-lg border ${
+                              status === 'paid'
+                                ? 'bg-emerald-100 border-emerald-300 text-emerald-950 font-black'
+                                : 'bg-slate-50 border-slate-200 text-slate-400'
+                            }`}
+                          >
+                            3. Ждём оплаты / Оплачено
+                          </div>
+                        </div>
+
+                        {/* Кнопки управления */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setViewingClaimOrder(ord)}
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 cursor-pointer transition"
+                            >
+                              <span>📄</span>
+                              <span>Печать претензии</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={restoreOrderMutation.isPending}
+                              onClick={() => restoreOrderMutation.mutate({ id: ord.id })}
+                              className="px-2 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-[11px] border border-slate-200 cursor-pointer transition"
+                              title="Аннулировать претензию и вернуть рейс на Канбан"
+                            >
+                              ↶ На доску
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {status === 'issued' && (
+                              <button
+                                type="button"
+                                disabled={updateClaimStatusMutation.isPending}
+                                onClick={() =>
+                                  updateClaimStatusMutation.mutate({
+                                    id: ord.id,
+                                    claim_status: 'agreed',
+                                  })
+                                }
+                                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
+                              >
+                                ✓ Заказчик согласовал → Передать в Дебиторку
+                              </button>
+                            )}
+
+                            {(status === 'agreed' || status === 'waiting_payment') && (
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href="/receivables"
+                                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold text-xs flex items-center gap-1 transition"
+                                >
+                                  <span>
+                                    В Дебиторке:{' '}
+                                    {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                                  </span>
+                                  <span>↗</span>
+                                </Link>
+                                <button
+                                  type="button"
+                                  disabled={updateClaimStatusMutation.isPending}
+                                  onClick={() =>
+                                    updateClaimStatusMutation.mutate({
+                                      id: ord.id,
+                                      claim_status: 'paid',
+                                    })
+                                  }
+                                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
+                                >
+                                  ✓ Оплачено на Р/С
+                                </button>
+                              </div>
+                            )}
+
+                            {status === 'paid' && (
+                              <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl font-black text-xs">
+                                ✓ Претензия оплачена
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )
+              ) : /* Вкладка простых срывов */
+              simpleCancelledOrders.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 font-bold">
                   Нет сорванных или отменённых заявок.
                 </div>
               ) : (
-                cancelledOrders.map((ord) => (
+                simpleCancelledOrders.map((ord) => (
                   <div
                     key={ord.id}
-                    className="p-3 bg-rose-50/50 rounded-2xl border-2 border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
+                    className="p-3 bg-slate-50 rounded-2xl border-2 border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-black text-slate-900 text-xs">
                           {ord.order_number}
                         </span>
-                        <span className="text-[9px] font-bold bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded">
-                          Срыв
+                        <span className="text-[9px] font-bold bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded">
+                          Без претензии
                         </span>
                         <span className="text-slate-500 font-mono text-[10px]">
                           {new Date(ord.updated_at || ord.created_at).toLocaleDateString('ru-RU')}
@@ -1397,8 +2073,8 @@ export default function AtiPage() {
                           {Number(ord.price || 0).toLocaleString('ru-RU')} ₽
                         </span>
                       </div>
-                      <div className="text-[10px] text-rose-800 font-medium">
-                        Причина: <strong>{ord.cancel_reason || 'Срыв на погрузке'}</strong>
+                      <div className="text-[10px] text-slate-600 font-medium">
+                        Причина: <strong>{ord.cancel_reason || 'Срыв рейса'}</strong>
                       </div>
                     </div>
 
@@ -1426,6 +2102,300 @@ export default function AtiPage() {
               >
                 Закрыть
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+           ОФИЦИАЛЬНЫЙ БЛАНК ПРЕТЕНЗИИ (ПО ПРИЛОЖЕННОМУ ДОКУМЕНТУ ПРЕТЕНЗИЯ № 1)
+           ══════════════════════════════════════════════════════════════════════ */}
+      {viewingClaimOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
+          <div className="bg-white rounded-2xl border-2 border-slate-300 shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col overflow-hidden my-auto print:max-h-none print:border-none print:shadow-none print:rounded-none">
+            {/* Панель действий вверху */}
+            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0 print:hidden">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📄</span>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wide">
+                    Официальная Претензия Исх. № {viewingClaimOrder.claim_number || '01-ПР'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    Готовый к отправке и печати документ по ст. 35 УАТ РФ
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                >
+                  <span>🖨️</span>
+                  <span>Распечатать / Сохранить в PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingClaimOrder(null)}
+                  className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Тело официального документа */}
+            <div className="p-8 sm:p-12 overflow-y-auto flex-1 font-serif text-[13px] leading-relaxed text-slate-950 bg-white">
+              {/* Шапка КОМУ / ОТ КОГО */}
+              <div className="grid grid-cols-2 gap-8 border-b-2 border-slate-950 pb-4 mb-4">
+                <div className="space-y-1">
+                  <div className="font-bold text-[11px] uppercase tracking-wide text-slate-600 font-sans">
+                    КОМУ (ЗАКАЗЧИК):
+                  </div>
+                  <div className="font-black text-sm font-sans">
+                    {viewingClaimOrder.counterparty_name || 'ООО «ТРАНССЕРВИС»'}
+                  </div>
+                  <div className="text-[11px] leading-tight text-slate-700 font-sans space-y-0.5">
+                    <div>
+                      ИНН: {viewingClaimOrder.counterparty_inn || '6679091866'} / КПП: 667001001
+                    </div>
+                    <div>ОГРН: 1169658048560</div>
+                    <div>
+                      Адрес: 620041, Свердловская обл., г. Екатеринбург, ул. Уральская, д. 1, кв. 31
+                    </div>
+                    <div>
+                      Почтовый адрес: 620000, г. Екатеринбург, пр-кт Ленина, стр. 39, а/я 494
+                    </div>
+                    <div>
+                      Тел.:{' '}
+                      {viewingClaimOrder.counterparty_phone || '(343) 286-73-65, +7-952-147-6114'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="font-bold text-[11px] uppercase tracking-wide text-slate-600 font-sans">
+                    ОТ КОГО (ПЕРЕВОЗЧИК):
+                  </div>
+                  <div className="font-black text-sm font-sans">
+                    ИП Нигамедьянов Александр Сергеевич
+                  </div>
+                  <div className="text-[11px] leading-tight text-slate-700 font-sans space-y-0.5">
+                    <div>ИНН: 660704814106</div>
+                    <div>ОГРНИП: 321665800053976</div>
+                    <div>
+                      Адрес: 624760, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв.
+                      22
+                    </div>
+                    <div>Тел.: +7 (922) 180-09-11 (Александр)</div>
+                    <div className="font-bold">АТИ: 923131</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Номер и дата */}
+              <div className="flex justify-between items-center my-4 font-sans text-xs">
+                <div>
+                  <strong>Исх. № {viewingClaimOrder.claim_number || '01-ПР'}</strong>
+                </div>
+                <div>
+                  «<strong>{viewingClaimOrder.claim_date || '15'}</strong>» октября 2026 г., г.
+                  Екатеринбург
+                </div>
+              </div>
+
+              {/* Название */}
+              <div className="text-center space-y-1 my-6 font-sans">
+                <h1 className="text-base font-black uppercase tracking-wider">ПРЕТЕНЗИЯ № 1</h1>
+                <p className="text-xs font-bold text-slate-800 max-w-xl mx-auto leading-normal">
+                  о возмещении штрафа и расходов в связи с непредставлением груза / отказом от
+                  использования транспортного средства
+                </p>
+              </div>
+
+              {/* Текст претензии */}
+              <div className="space-y-3 text-justify text-xs leading-relaxed font-sans">
+                <p>
+                  Между Перевозчиком (ИП Нигамедьянов А. С.) и Заказчиком (
+                  {viewingClaimOrder.counterparty_name}) был заключен Договор-заявка{' '}
+                  {viewingClaimOrder.order_number} от 14.10.2026 г. на междугороднюю перевозку груза
+                  ({viewingClaimOrder.cargo_description || 'подоконники, 4 т, 5 поддонов'}) по
+                  маршруту: {viewingClaimOrder.pickup_address || 'г. Арамиль'} —{' '}
+                  {viewingClaimOrder.delivery_address || 'г. Уфа'}. Согласованная стоимость фрахта
+                  составляет{' '}
+                  <strong>
+                    {Number(viewingClaimOrder.price || 30000).toLocaleString('ru-RU')} (тридцать
+                    тысяч) рублей 00 копеек, без НДС
+                  </strong>
+                  .
+                </p>
+
+                <p>
+                  Во исполнение взятых на себя обязательств Перевозчиком под погрузку к назначенному
+                  сроку ({viewingClaimOrder.pickup_date_time || '15.10.2026 г. к 09:00'}) было
+                  предоставлено надлежащее транспортное средство:{' '}
+                  <strong>{viewingClaimOrder.asset_name || 'Валдай, г/н О 188 ТА 196'}</strong>, под
+                  управлением водителя {viewingClaimOrder.driver_name || 'Насртдинов В. А.'}.
+                  Автомобиль своевременно прибыл по указанному в заявке адресу погрузки
+                  грузоотправителя.
+                </p>
+
+                <p>
+                  Однако 15.10.2026 г. Заказчик уведомил об отказе от использования предоставленного
+                  автотранспорта (груз к отправке не предоставлен / срыв погрузки по вине
+                  Заказчика). Согласно п. 3 условий Договора-заявки {viewingClaimOrder.order_number}
+                  , а также в соответствии с ч. 1 ст. 35 Федерального закона от 08.11.2007 № 259-ФЗ
+                  «Устав автомобильного транспорта и городского наземного электрического
+                  транспорта», в случае непредоставления груза и отказа Клиента от использования ТС
+                  Перевозчик вправе потребовать от Клиента выплаты{' '}
+                  <strong>
+                    штрафа в размере 20% от стоимости согласованного фрахта, а также возмещения
+                    фактических расходов
+                  </strong>
+                  .
+                </p>
+
+                {/* Таблица */}
+                <table className="w-full border-collapse border-2 border-slate-900 my-3 text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 border-b-2 border-slate-900 font-bold">
+                      <th className="border border-slate-400 p-1.5 w-8 text-center">№</th>
+                      <th className="border border-slate-400 p-1.5 text-left">
+                        Наименование требования / Основание
+                      </th>
+                      <th className="border border-slate-400 p-1.5 w-36 text-center">
+                        Расчет суммы
+                      </th>
+                      <th className="border border-slate-400 p-1.5 w-28 text-right">Сумма, руб.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-slate-400 p-1.5 text-center">1</td>
+                      <td className="border border-slate-400 p-1.5">
+                        Штраф за непредоставление груза / отказ от использования ТС (п. 3
+                        Договора-заявки {viewingClaimOrder.order_number}, ч. 1 ст. 35 УАТ РФ)
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-center">
+                        20% от {Number(viewingClaimOrder.price || 30000).toLocaleString('ru-RU')}{' '}
+                        руб.
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-right font-mono font-bold">
+                        {Number(
+                          viewingClaimOrder.claim_penalty_amount ||
+                            Math.round(Number(viewingClaimOrder.price || 30000) * 0.2),
+                        ).toLocaleString('ru-RU')}
+                        ,00
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="border border-slate-400 p-1.5 text-center">2</td>
+                      <td className="border border-slate-400 p-1.5">
+                        Компенсация расходов на холостой пробег и подачу ТС к месту погрузки (г.
+                        Арамиль)
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-center">
+                        По фактическим затратам
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-right font-mono font-bold">
+                        {Number(viewingClaimOrder.claim_empty_run_amount || 0).toLocaleString(
+                          'ru-RU',
+                        )}
+                        ,00
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="border border-slate-400 p-1.5 text-center">3</td>
+                      <td className="border border-slate-400 p-1.5">
+                        Простой автотранспорта в ожидании погрузки / отмены рейса
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-center">
+                        По подтверждающим док.
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-right font-mono font-bold">
+                        {Number(viewingClaimOrder.claim_idle_amount || 0).toLocaleString('ru-RU')}
+                        ,00
+                      </td>
+                    </tr>
+                    <tr className="bg-slate-100 font-black border-t-2 border-slate-900">
+                      <td
+                        colSpan={3}
+                        className="border border-slate-400 p-1.5 text-right uppercase"
+                      >
+                        ИТОГО К ОПЛАТЕ:
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-right font-mono text-sm">
+                        {Number(viewingClaimOrder.claim_amount || 6000).toLocaleString('ru-RU')},00
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p className="font-bold">
+                  Общая сумма требований составляет:{' '}
+                  {Number(viewingClaimOrder.claim_amount || 6000).toLocaleString('ru-RU')} (шесть
+                  тысяч) рублей 00 копеек.
+                </p>
+
+                {/* Банковские реквизиты */}
+                <div className="border border-slate-300 p-2.5 rounded-lg bg-slate-50 space-y-1 font-sans text-[11px] my-3">
+                  <div className="font-black text-slate-800">
+                    Реквизиты для перечисления денежных средств:
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <div>Получатель: ИП Нигамедьянов Александр Сергеевич</div>
+                    <div>Расчетный счет: 40802810500001961654</div>
+                    <div>Банк получателя: АО «ТБанк»</div>
+                    <div>Корр. счет: 30101810145250000974</div>
+                    <div>БИК банка: 044525974</div>
+                    <div>ИНН получателя / банка: 660704814106 / 7710140679</div>
+                  </div>
+                </div>
+
+                <p>
+                  На основании изложенного, руководствуясь условиями Договора-заявки{' '}
+                  {viewingClaimOrder.order_number}, нормами ст. 309, 310, 784, 794 ГК РФ и ст. 35,
+                  39 ФЗ «УАТ и ГНЭТ» № 259-ФЗ, просим перечислить указанную сумму в течение{' '}
+                  <strong>{viewingClaimOrder.claim_due_days || 5} (пяти) банковских дней</strong> с
+                  момента получения настоящей претензии. В случае неудовлетворения законных
+                  требований в установленный срок мы будем вынуждены обратиться в Арбитражный суд
+                  Свердловской области с отнесением на Ваш счет расходов на оплату госпошлины, услуг
+                  представителя и процентов по ст. 395 ГК РФ.
+                </p>
+
+                <div className="pt-2 text-[11px] text-slate-700">
+                  <div className="font-bold">Приложения:</div>
+                  <ol className="list-decimal pl-4 space-y-0.5">
+                    <li>
+                      Копия Договора-заявки {viewingClaimOrder.order_number} с отметками сторон;
+                    </li>
+                    <li>
+                      Копия путевого листа / подтверждение прибытия автомобиля{' '}
+                      {viewingClaimOrder.asset_name || 'Валдай О 188 ТА 196'} на погрузку в г.
+                      Арамиль;
+                    </li>
+                    <li>
+                      Письменное / электронное подтверждение Заказчика об отказе от перевозки;
+                    </li>
+                    <li>Расчет и подтверждающие документы понесенных расходов.</li>
+                  </ol>
+                </div>
+
+                {/* Подпись */}
+                <div className="pt-6 flex justify-between items-end font-sans">
+                  <div>
+                    <div className="font-bold">Индивидуальный предприниматель</div>
+                    <div className="font-black text-sm">ИП Нигамедьянов А. С.</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="inline-block border-b border-slate-900 w-44 pb-1 text-center italic text-slate-500 text-[11px]">
+                      / Нигамедьянов А. С. /
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-bold mt-1">М.П.</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

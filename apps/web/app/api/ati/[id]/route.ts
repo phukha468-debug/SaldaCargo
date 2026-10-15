@@ -36,15 +36,37 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       updatedValues.cancelled_at = new Date().toISOString();
       updatedValues.stage = 0; // Снимается с активных этапов 1..8
 
-      // Если была создана запись в дебиторке — закрываем её
+      // Если выставлена претензия
+      if (body.has_claim) {
+        updatedValues.has_claim = true;
+        updatedValues.claim_status = body.claim_status || 'issued';
+        updatedValues.claim_number = body.claim_number || '01-ПР';
+        updatedValues.claim_date = body.claim_date || new Date().toISOString().split('T')[0];
+        updatedValues.claim_penalty_amount =
+          body.claim_penalty_amount !== undefined
+            ? Number(body.claim_penalty_amount)
+            : Math.round(Number(updatedValues.price || 0) * 0.2);
+        updatedValues.claim_empty_run_amount = Number(body.claim_empty_run_amount || 0);
+        updatedValues.claim_idle_amount = Number(body.claim_idle_amount || 0);
+        updatedValues.claim_amount =
+          body.claim_amount !== undefined
+            ? Number(body.claim_amount)
+            : updatedValues.claim_penalty_amount +
+              updatedValues.claim_empty_run_amount +
+              updatedValues.claim_idle_amount;
+        updatedValues.claim_due_days = Number(body.claim_due_days || 5);
+        updatedValues.claim_notes = body.claim_notes || '';
+      }
+
+      // Если ранее была создана запись в дебиторке по самому фрахту — закрываем её (рейс не состоялся)
       if (currentValues.counterparty_id) {
         try {
           await (supabase.from('manual_receivables') as any)
             .update({ settled: true })
             .eq('counterparty_id', currentValues.counterparty_id)
-            .ilike('description', `%${updatedValues.order_number}%`);
+            .ilike('description', `АТИ Заявка ${updatedValues.order_number}%`);
         } catch (cErr) {
-          console.warn('Could not close manual_receivables on cancel:', cErr);
+          console.warn('Could not close freight manual_receivables on cancel:', cErr);
         }
       }
     } else if (body.restore) {
@@ -52,7 +74,75 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       updatedValues.is_cancelled = false;
       updatedValues.cancel_reason = null;
       updatedValues.cancelled_at = null;
+      updatedValues.has_claim = false;
+      updatedValues.claim_status = 'none';
       updatedValues.stage = body.stage || 1;
+
+      // Если была претензия в дебиторке — аннулируем долг по претензии
+      if (currentValues.counterparty_id) {
+        try {
+          await (supabase.from('manual_receivables') as any)
+            .update({ settled: true })
+            .eq('counterparty_id', currentValues.counterparty_id)
+            .ilike('description', `%Претензия%${updatedValues.order_number}%`);
+        } catch (rErr) {
+          console.warn('Could not close claim manual_receivables on restore:', rErr);
+        }
+      }
+    }
+
+    // Обработка перехода этапов претензии:
+    if (body.claim_status) {
+      updatedValues.claim_status = body.claim_status;
+
+      // При согласовании претензии ('agreed' или 'waiting_payment') — КОНТРАГЕНТ АВТОМАТИЧЕСКИ ПОПАДАЕТ В ДЕБИТОРКУ
+      if (
+        (body.claim_status === 'agreed' || body.claim_status === 'waiting_payment') &&
+        currentValues.counterparty_id
+      ) {
+        updatedValues.claim_agreed_at = body.claim_agreed_at || new Date().toISOString();
+        const claimAmt = Number(updatedValues.claim_amount || 6000);
+        const claimNum = updatedValues.claim_number || '01-ПР';
+        const claimDesc = `Претензия Исх. № ${claimNum} по срыву заявки ${updatedValues.order_number} (штраф 20%)`;
+
+        try {
+          const { data: existingClaimRec } = await (supabase.from('manual_receivables') as any)
+            .select('id')
+            .eq('counterparty_id', currentValues.counterparty_id)
+            .ilike('description', `%${claimNum}%`)
+            .limit(1);
+
+          if (!existingClaimRec || existingClaimRec.length === 0) {
+            await (supabase.from('manual_receivables') as any).insert({
+              counterparty_id: currentValues.counterparty_id,
+              amount: claimAmt,
+              date: new Date().toISOString().split('T')[0],
+              description: claimDesc,
+              settled: false,
+            });
+          } else {
+            await (supabase.from('manual_receivables') as any)
+              .update({ amount: claimAmt, settled: false })
+              .eq('id', existingClaimRec[0].id);
+          }
+        } catch (cRecErr) {
+          console.warn('Error syncing claim with manual_receivables:', cRecErr);
+        }
+      }
+
+      // При оплате претензии ('paid') — закрываем запись в дебиторке
+      if (body.claim_status === 'paid' && currentValues.counterparty_id) {
+        updatedValues.claim_paid_at = new Date().toISOString();
+        const claimNum = updatedValues.claim_number || '01-ПР';
+        try {
+          await (supabase.from('manual_receivables') as any)
+            .update({ settled: true, settled_at: new Date().toISOString() })
+            .eq('counterparty_id', currentValues.counterparty_id)
+            .ilike('description', `%${claimNum}%`);
+        } catch (cPaidErr) {
+          console.warn('Error settling claim manual_receivables:', cPaidErr);
+        }
+      }
     }
 
     // 2. Интеграция с Дебиторкой:
