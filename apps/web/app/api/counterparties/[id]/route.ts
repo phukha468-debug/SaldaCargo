@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { invalidateCounterpartiesCache } from '../route';
 
 /** PATCH /api/counterparties/[id] — обновить контрагента */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    invalidateCounterpartiesCache();
     const { id } = await params;
     const body = (await request.json()) as {
       name?: string;
@@ -88,6 +90,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 /** DELETE /api/counterparties/[id] — удалить контрагента (только если нет заказов) */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    invalidateCounterpartiesCache();
     const { id } = await params;
     const supabase = createAdminClient();
 

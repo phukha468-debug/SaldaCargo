@@ -62,7 +62,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const { data: summary } = useQuery<Summary>({
     queryKey: ['dashboard-summary'],
     queryFn: () => fetch('/api/dashboard/summary').then((r) => r.json()),
-    staleTime: 30000,
+    staleTime: 60000,
   });
 
   const {
@@ -72,15 +72,15 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   } = useQuery<Wallets>({
     queryKey: ['wallets'],
     queryFn: async () => {
-      const res = await fetch('/api/wallets', { cache: 'no-store' });
+      const res = await fetch('/api/wallets');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    staleTime: 5000,
-    refetchInterval: 15000,
-    refetchOnWindowFocus: true,
+    staleTime: 30000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });
 
@@ -288,7 +288,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
               <button
-                onClick={() => refetchWallets()}
+                onClick={() => {
+                  fetch('/api/wallets?force=1').finally(() => refetchWallets());
+                }}
                 disabled={walletsFetching}
                 title="Синхронизировать баланс с Т-Банком сейчас"
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"

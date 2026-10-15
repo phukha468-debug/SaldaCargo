@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { invalidateAtiCache } from '../route';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    invalidateAtiCache();
     const { id } = await params;
     const supabase = createAdminClient();
     const body = await request.json();
@@ -250,6 +252,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    invalidateAtiCache();
     const { id } = await params;
     const supabase = createAdminClient();
 

@@ -191,7 +191,8 @@ export default function AtiPage() {
       if (!res.ok) throw new Error('Ошибка загрузки заявок АТИ');
       return res.json();
     },
-    refetchInterval: 15000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 
   // Мутация смены этапа

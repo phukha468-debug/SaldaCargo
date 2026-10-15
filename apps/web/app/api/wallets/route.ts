@@ -15,8 +15,33 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const maxDuration = 15;
 
-export async function GET() {
+let walletsCache: { data: any; timestamp: number } | null = null;
+let inFlightWalletsPromise: Promise<any> | null = null;
+const WALLETS_CACHE_TTL = 25000; // 25 секунд
+
+export function invalidateWalletsCache() {
+  walletsCache = null;
+}
+
+export async function GET(request?: Request) {
   try {
+    const url = request ? new URL(request.url) : null;
+    const forceRefresh = url?.searchParams.get('force') === '1';
+
+    if (!forceRefresh && walletsCache && Date.now() - walletsCache.timestamp < WALLETS_CACHE_TTL) {
+      return NextResponse.json(walletsCache.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
+    if (inFlightWalletsPromise) {
+      const data = await inFlightWalletsPromise;
+      return NextResponse.json(data);
+    }
+
     let apiBalance: number | null = null;
     let isApiSynced = false;
     let tbankAccountNum = '';
@@ -25,7 +50,7 @@ export async function GET() {
 
     // Автоматическая синхронизация с Т-Банком с защитой от зависания (макс 2.5 сек)
     try {
-      const syncPromise = syncTBankBalance();
+      const syncPromise = syncTBankBalance(forceRefresh);
       const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
         setTimeout(() => resolve({ success: false, error: 'TBank timeout' }), 2500),
       );
@@ -149,31 +174,33 @@ export async function GET() {
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
-    return NextResponse.json(
-      {
-        bank: {
-          name: 'Расчётный счёт',
-          balance: bankBalance.toFixed(2),
-          available: (apiBalance !== null ? apiOtb : bankBalance).toFixed(2),
-          authorized: apiAuthorized.toFixed(2),
-          api_synced: isApiSynced,
-          synced_at: new Date().toISOString(),
-          account_number: tbankAccountNum,
-        },
-        cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
-        fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
-        garage: {
-          id: GARAGE_ID,
-          name: 'Касса Гаража (СТО)',
-          balance: garageBalance.toFixed(2),
-        },
+    const result = {
+      bank: {
+        name: 'Расчётный счёт',
+        balance: bankBalance.toFixed(2),
+        available: (apiBalance !== null ? apiOtb : bankBalance).toFixed(2),
+        authorized: apiAuthorized.toFixed(2),
+        api_synced: isApiSynced,
+        synced_at: new Date().toISOString(),
+        account_number: tbankAccountNum,
       },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        },
+      cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
+      fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
+      garage: {
+        id: GARAGE_ID,
+        name: 'Касса Гаража (СТО)',
+        balance: garageBalance.toFixed(2),
       },
-    );
+    };
+
+    walletsCache = { data: result, timestamp: Date.now() };
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+        'X-Cache': 'MISS',
+      },
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

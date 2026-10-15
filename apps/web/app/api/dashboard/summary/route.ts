@@ -2,8 +2,27 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+let summaryCache: { data: any; timestamp: number } | null = null;
+const SUMMARY_CACHE_TTL = 30000; // 30 секунд
+
+export function invalidateSummaryCache() {
+  summaryCache = null;
+}
+
+export async function GET(request?: Request) {
   try {
+    const url = request ? new URL(request.url) : null;
+    const forceRefresh = url?.searchParams.get('force') === '1';
+
+    if (!forceRefresh && summaryCache && Date.now() - summaryCache.timestamp < SUMMARY_CACHE_TTL) {
+      return NextResponse.json(summaryCache.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
     const supabase = createAdminClient();
 
     const now = new Date();
@@ -148,7 +167,7 @@ export async function GET() {
     // Итог: transactions + trip_expenses + driver_pay (без двойного счёта)
     const totalExpenses = expenses + tripExpensesTotal + payrollFromOrders;
 
-    return NextResponse.json({
+    const result = {
       month: {
         revenue: revenue.toFixed(2),
         expenses: totalExpenses.toFixed(2),
@@ -164,6 +183,15 @@ export async function GET() {
         tripsForReview: reviewTripsCount ?? 0,
       },
       recentTransactions: recentTransactions ?? [],
+    };
+
+    summaryCache = { data: result, timestamp: Date.now() };
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

@@ -112,8 +112,27 @@ const SEED_ORDER_001: Omit<AtiOrder, 'id'> = {
   updated_at: new Date().toISOString(),
 };
 
-export async function GET() {
+let atiCache: { data: any; timestamp: number } | null = null;
+const ATI_CACHE_TTL = 15000; // 15 секунд
+
+export function invalidateAtiCache() {
+  atiCache = null;
+}
+
+export async function GET(request?: Request) {
   try {
+    const url = request ? new URL(request.url) : null;
+    const forceRefresh = url?.searchParams.get('force') === '1';
+
+    if (!forceRefresh && atiCache && Date.now() - atiCache.timestamp < ATI_CACHE_TTL) {
+      return NextResponse.json(atiCache.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=10, stale-while-revalidate=20',
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
     const supabase = createAdminClient();
 
     // 1. Получаем заявки АТИ из audit_log
@@ -197,12 +216,21 @@ export async function GET() {
       .eq('is_active', true)
       .order('name');
 
-    return NextResponse.json({
+    const result = {
       success: true,
       orders,
       counterparties: counterparties || [],
       assets: assets || [],
       drivers: drivers || [],
+    };
+
+    atiCache = { data: result, timestamp: Date.now() };
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=10, stale-while-revalidate=20',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (err: any) {
     console.error('Fatal GET /api/ati error:', err);
@@ -212,6 +240,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    invalidateAtiCache();
     const supabase = createAdminClient();
     const body = await request.json();
 

@@ -5,8 +5,27 @@ import { NextResponse } from 'next/server';
 const RECEIVABLES_OVERDUE_DAYS = 14;
 const DOCS_WARN_DAYS = 30;
 
-export async function GET() {
+let alertsCache: { data: any; timestamp: number } | null = null;
+const ALERTS_CACHE_TTL = 60000; // 60 секунд
+
+export function invalidateAlertsCache() {
+  alertsCache = null;
+}
+
+export async function GET(request?: Request) {
   try {
+    const url = request ? new URL(request.url) : null;
+    const forceRefresh = url?.searchParams.get('force') === '1';
+
+    if (!forceRefresh && alertsCache && Date.now() - alertsCache.timestamp < ALERTS_CACHE_TTL) {
+      return NextResponse.json(alertsCache.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
     const supabase = createAdminClient();
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
@@ -164,13 +183,22 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({
+    const result = {
       fleet: fleetAlerts,
       receivables: receivableAlerts,
       loans: loanAlerts,
       service: serviceAlerts,
       total:
         fleetAlerts.length + receivableAlerts.length + loanAlerts.length + serviceAlerts.length,
+    };
+
+    alertsCache = { data: result, timestamp: Date.now() };
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (err: any) {
     return NextResponse.json(

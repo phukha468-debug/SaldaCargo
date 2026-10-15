@@ -38,12 +38,33 @@ async function fetchAllRows<T = any>(
   return all;
 }
 
+const cpCache = new Map<string, { data: any; timestamp: number }>();
+const CP_CACHE_TTL = 30000; // 30 секунд
+
+export function invalidateCounterpartiesCache() {
+  cpCache.clear();
+}
+
 /** GET /api/counterparties — единый список контрагентов (клиенты + поставщики) с аналитикой и взаимными долгами */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const onlyActive = searchParams.get('active') === '1';
-    const filterType = searchParams.get('type'); // 'client' | 'supplier' | 'all'
+    const filterType = searchParams.get('type') || 'all'; // 'client' | 'supplier' | 'all'
+    const forceRefresh = searchParams.get('force') === '1';
+    const cacheKey = `${onlyActive}:${filterType}`;
+
+    if (!forceRefresh) {
+      const cached = cpCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CP_CACHE_TTL) {
+        return NextResponse.json(cached.data, {
+          headers: {
+            'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+            'X-Cache': 'HIT',
+          },
+        });
+      }
+    }
 
     const supabase = createAdminClient();
     const monthKeys = last6MonthKeys();
@@ -419,7 +440,14 @@ export async function GET(request: Request) {
       return debtB - debtA || parseFloat(b.total_revenue) - parseFloat(a.total_revenue);
     });
 
-    return NextResponse.json(result);
+    cpCache.set(cacheKey, { data: result, timestamp: Date.now() });
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
+        'X-Cache': 'MISS',
+      },
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
@@ -428,6 +456,7 @@ export async function GET(request: Request) {
 /** POST /api/counterparties — создать контрагента (клиента или поставщика) */
 export async function POST(request: Request) {
   try {
+    invalidateCounterpartiesCache();
     const body = (await request.json()) as {
       name: string;
       type?: 'client' | 'supplier' | 'both';

@@ -10,10 +10,32 @@ const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const dailyBalanceCache = new Map<string, { data: any; timestamp: number }>();
+const DAILY_BALANCE_CACHE_TTL = 20000; // 20 секунд
+
+export function invalidateDailyBalanceCache(date?: string) {
+  if (date) dailyBalanceCache.delete(date);
+  else dailyBalanceCache.clear();
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const forceRefresh = searchParams.get('force') === '1';
+
+    if (!forceRefresh) {
+      const cached = dailyBalanceCache.get(date);
+      if (cached && Date.now() - cached.timestamp < DAILY_BALANCE_CACHE_TTL) {
+        return NextResponse.json(cached.data, {
+          headers: {
+            'Cache-Control': 'public, max-age=10, stale-while-revalidate=20',
+            'X-Cache': 'HIT',
+          },
+        });
+      }
+    }
+
     const dayStart = `${date}T00:00:00.000Z`;
     const dayEnd = `${date}T23:59:59.999Z`;
 
@@ -273,7 +295,7 @@ export async function GET(request: Request) {
       actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
     }
 
-    return NextResponse.json({
+    const result = {
       date,
       is_today: isToday,
       wallets: {
@@ -311,6 +333,15 @@ export async function GET(request: Request) {
       bank_operations: bankStatementOps,
       categories: categoriesList ?? [],
       calendar_overrides: calendarOverrides ?? [],
+    };
+
+    dailyBalanceCache.set(date, { data: result, timestamp: Date.now() });
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=10, stale-while-revalidate=20',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (err: any) {
     console.error('Error in daily-balance route:', err);

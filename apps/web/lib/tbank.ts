@@ -126,6 +126,44 @@ export interface TBankOperation {
   };
 }
 
+// In-memory cache for T-Bank balance and statements
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+let balanceCache: CacheEntry<{
+  success: boolean;
+  balance?: number;
+  otb?: number;
+  authorized?: number;
+  accountNumber?: string;
+  adjustment?: string;
+  error?: string;
+}> | null = null;
+
+const statementCache = new Map<string, CacheEntry<TBankOperation[]>>();
+
+let inFlightBalancePromise: Promise<{
+  success: boolean;
+  balance?: number;
+  otb?: number;
+  authorized?: number;
+  accountNumber?: string;
+  adjustment?: string;
+  error?: string;
+}> | null = null;
+
+const inFlightStatementPromises = new Map<string, Promise<TBankOperation[]>>();
+
+const BALANCE_CACHE_TTL = 45000; // 45 секунд
+const STATEMENT_CACHE_TTL = 30000; // 30 секунд
+
+export function invalidateTBankCache() {
+  balanceCache = null;
+  statementCache.clear();
+}
+
 /**
  * Получить выписку операций по счёту из Open API Т-Банка
  */
@@ -134,35 +172,64 @@ export async function fetchTBankStatement(
   toDate?: string,
   apiToken?: string,
   accountNumber?: string,
+  forceRefresh = false,
 ): Promise<TBankOperation[]> {
   const token = apiToken || process.env.TBANK_API_TOKEN || TBANK_FALLBACK_TOKEN;
   const acc = accountNumber || TARGET_ACCOUNT_NUMBER;
+  const cacheKey = `${acc}:${fromDate}:${toDate || ''}`;
+
+  if (!forceRefresh) {
+    const cached = statementCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < STATEMENT_CACHE_TTL) {
+      return cached.data;
+    }
+  }
+
+  const existingInFlight = inFlightStatementPromises.get(cacheKey);
+  if (existingInFlight) {
+    return existingInFlight;
+  }
+
   let path = `/openapi/api/v1/statement?accountNumber=${encodeURIComponent(acc)}&from=${encodeURIComponent(fromDate)}`;
   if (toDate) {
     path += `&to=${encodeURIComponent(toDate)}`;
   }
 
-  try {
-    const data = await requestTBankApi('business.tbank.ru', path, token);
-    return Array.isArray(data?.operations) ? data.operations : [];
-  } catch (err: any) {
-    if (!err?.message?.includes('Таймаут')) {
-      try {
-        const data2 = await requestTBankApi('business.tinkoff.ru', path, token);
-        return Array.isArray(data2?.operations) ? data2.operations : [];
-      } catch {
-        // ignore
+  const promise = (async () => {
+    try {
+      const data = await requestTBankApi('business.tbank.ru', path, token);
+      const ops = Array.isArray(data?.operations) ? data.operations : [];
+      statementCache.set(cacheKey, { data: ops, timestamp: Date.now() });
+      return ops;
+    } catch (err: any) {
+      if (!err?.message?.includes('Таймаут')) {
+        try {
+          const data2 = await requestTBankApi('business.tinkoff.ru', path, token);
+          const ops2 = Array.isArray(data2?.operations) ? data2.operations : [];
+          statementCache.set(cacheKey, { data: ops2, timestamp: Date.now() });
+          return ops2;
+        } catch {
+          // ignore
+        }
       }
+      console.error('TBank statement fetch error:', err);
+      // Если есть старый кэш, отдаем его даже при ошибке/таймауте
+      const fallbackCached = statementCache.get(cacheKey);
+      if (fallbackCached) return fallbackCached.data;
+      return [];
     }
-    console.error('TBank statement fetch error:', err);
-    return [];
-  }
+  })().finally(() => {
+    inFlightStatementPromises.delete(cacheKey);
+  });
+
+  inFlightStatementPromises.set(cacheKey, promise);
+  return promise;
 }
 
 /**
  * Синхронизировать баланс Р/С с реальными данными из Т-Банка
  */
-export async function syncTBankBalance(): Promise<{
+export async function syncTBankBalance(forceRefresh = false): Promise<{
   success: boolean;
   balance?: number;
   otb?: number;
@@ -171,6 +238,14 @@ export async function syncTBankBalance(): Promise<{
   adjustment?: string;
   error?: string;
 }> {
+  if (!forceRefresh && balanceCache && Date.now() - balanceCache.timestamp < BALANCE_CACHE_TTL) {
+    return balanceCache.data;
+  }
+
+  if (inFlightBalancePromise) {
+    return inFlightBalancePromise;
+  }
+
   const token = process.env.TBANK_API_TOKEN || TBANK_FALLBACK_TOKEN;
 
   if (!token) {
@@ -181,36 +256,50 @@ export async function syncTBankBalance(): Promise<{
     };
   }
 
-  try {
-    const accounts = await fetchTBankAccounts(token);
-    const targetAccount =
-      accounts.find((a) => a.accountNumber === TARGET_ACCOUNT_NUMBER) || accounts[0];
+  inFlightBalancePromise = (async () => {
+    try {
+      const accounts = await fetchTBankAccounts(token);
+      const targetAccount =
+        accounts.find((a) => a.accountNumber === TARGET_ACCOUNT_NUMBER) || accounts[0];
 
-    if (!targetAccount) {
-      return { success: false, error: 'Счёт 40802810500001961654 не найден в ответе Т-Банка' };
+      if (!targetAccount) {
+        return { success: false, error: 'Счёт 40802810500001961654 не найден в ответе Т-Банка' };
+      }
+
+      const otb = typeof targetAccount.balance?.otb === 'number' ? targetAccount.balance.otb : 0;
+      const authorized =
+        typeof targetAccount.balance?.authorized === 'number'
+          ? targetAccount.balance.authorized
+          : 0;
+      // Полный баланс расчётного счёта в Т-Банке (включая авторизованные суммы/холды по картам)
+      const realBalance =
+        typeof targetAccount.balance?.otb === 'number'
+          ? otb + authorized
+          : Number(targetAccount.balance) || 0;
+
+      const adjustmentString = '0.00';
+
+      const result = {
+        success: true,
+        balance: realBalance,
+        otb,
+        authorized,
+        accountNumber: targetAccount.accountNumber,
+        adjustment: adjustmentString,
+      };
+
+      balanceCache = { data: result, timestamp: Date.now() };
+      return result;
+    } catch (err: any) {
+      // При таймауте или временном сбое отдаем кэшированный баланс
+      if (balanceCache) {
+        return balanceCache.data;
+      }
+      return { success: false, error: err.message };
     }
+  })().finally(() => {
+    inFlightBalancePromise = null;
+  });
 
-    const otb = typeof targetAccount.balance?.otb === 'number' ? targetAccount.balance.otb : 0;
-    const authorized =
-      typeof targetAccount.balance?.authorized === 'number' ? targetAccount.balance.authorized : 0;
-    // Полный баланс расчётного счёта в Т-Банке (включая авторизованные суммы/холды по картам)
-    const realBalance =
-      typeof targetAccount.balance?.otb === 'number'
-        ? otb + authorized
-        : Number(targetAccount.balance) || 0;
-
-    // Автоматическая корректировка баланса кошелька в системе при расхождении
-    const adjustmentString = '0.00';
-
-    return {
-      success: true,
-      balance: realBalance,
-      otb,
-      authorized,
-      accountNumber: targetAccount.accountNumber,
-      adjustment: adjustmentString,
-    };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
+  return inFlightBalancePromise;
 }
