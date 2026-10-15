@@ -4,12 +4,12 @@ import Link from 'next/link';
 
 const navigationCards = [
   {
-    href: '/deliveries',
-    title: 'Заявки с сайта',
-    subtitle: 'Доставки tk501.ru, калькулятор и ПРР',
+    href: '/ati',
+    title: 'АТИ Перевозки',
+    subtitle: 'Канбан договоров-заявок, 8 этапов, ЭТрН, Почта РФ и дебиторка',
     icon: '🚚',
-    badge: 'Сайт',
-    badgeColor: 'bg-emerald-300 text-slate-900 border-slate-900',
+    badge: 'АТИ',
+    badgeColor: 'bg-amber-400 text-slate-900 border-slate-900',
     cardBg: 'bg-white',
   },
   {

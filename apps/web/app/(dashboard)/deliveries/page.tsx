@@ -1,44 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-type DeliveryOrder = {
-  id: string;
-  createdAt: string;
-  order_number?: string;
-  orderNumber?: string;
-  store_name?: string;
-  storeName?: string;
-  pickup_address?: string;
-  delivery_address?: string;
-  has_extra_point?: boolean;
-  extra_point_address?: string;
-  extra_point_price?: number;
-  extra_disposal_carry?: boolean;
-  distance_km?: number;
-  distance_km_leg1?: number;
-  distance_km_leg2?: number;
-  has_loaders?: boolean;
-  loaders_count?: number;
-  cargo_name?: string;
-  total_price?: number;
-  totalPrice?: number;
-  client_name?: string;
-  client_phone?: string;
-  notes?: string;
-};
-
-type ApiResponse = {
-  success: boolean;
-  orders: DeliveryOrder[];
-  storeStats: Record<string, { count: number; totalSum: number }>;
-  totalCount: number;
-  grandTotal: number;
-};
-
 export default function DeliveriesPage() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/ati');
+  }, [router]);
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('all');
 

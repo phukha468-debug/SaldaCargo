@@ -8,7 +8,7 @@ import { cn } from '@saldacargo/ui';
 
 const navItems = [
   { href: '/', label: 'Главная', icon: 'dashboard' },
-  { href: '/deliveries', label: 'Заявки с сайта', icon: 'local_shipping' },
+  { href: '/ati', label: 'АТИ Перевозки', icon: 'local_shipping' },
   { href: '/review', label: 'Ревью рейсов', icon: 'rate_review' },
   { href: '/finance', label: 'Финансы / P&L', icon: 'account_balance_wallet' },
   { href: '/fleet', label: 'Автопарк', icon: 'directions_car' },

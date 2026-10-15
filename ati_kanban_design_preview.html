@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>АТИ Перевозки — Канбан 8 этапов (Компактный финтех, полный цикл заявки)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', 'system-ui', 'sans-serif'],
+            display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          boxShadow: {
+            '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+            'xs': '0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+            'card': '0 2px 5px -1px rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.03)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html, body {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .btn-tactile {
+      transition: all 0.1s ease;
+    }
+    .btn-tactile:active {
+      transform: scale(0.96);
+    }
+
+    .card-2x {
+      border-width: 2px;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-2x:hover {
+      box-shadow: 0 6px 14px -2px rgba(0,0,0,0.08);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body class="min-h-full font-sans text-slate-800 antialiased flex flex-col bg-[#F3F5F9]">
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ВЕРХНЯЯ ШАПКА: АТИ ПЕРЕВОЗКИ (Вместо "Заявки с сайта")
+       ══════════════════════════════════════════════════════════════════════ -->
+  <header class="sticky top-0 z-40 bg-white border-b-2 border-slate-200 shadow-2xs px-3 py-2">
+    <div class="w-full mx-auto flex flex-col xl:flex-row items-center justify-between gap-2">
+      
+      <!-- Лого + Заголовок -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-xs">
+          🚚
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm font-black text-slate-900 tracking-tight font-display">
+              АТИ ПЕРЕВОЗКИ
+            </h1>
+            <span class="text-[10px] font-bold px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+              Вместо «Заявки с сайта»
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.2 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300">
+              Стиль: Компактный Финтех
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 font-medium">
+            8 этапов без скролла • Динамические кнопки перехода • Кнопка возврата ↶ • Полная карточка Договор-Заявки
+          </p>
+        </div>
+      </div>
+
+      <!-- Быстрый поиск и фильтрация -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-300 text-[11px] font-bold">
+          <button onclick="filterType('all')" id="f-all" class="px-2 py-0.5 rounded-md bg-white text-slate-900 shadow-2xs font-black">Все (5)</button>
+          <button onclick="filterType('etrn')" id="f-etrn" class="px-2 py-0.5 rounded-md text-emerald-800 font-bold hover:bg-white/60">⚡ ЭТрН (3)</button>
+          <button onclick="filterType('paper')" id="f-paper" class="px-2 py-0.5 rounded-md text-amber-900 font-bold hover:bg-white/60">📮 Почта РФ (2)</button>
+        </div>
+
+        <button onclick="openNewOrderModal()" class="btn-tactile px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1 cursor-pointer">
+          <span>+</span>
+          <span>Новая заявка АТИ</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ИНФО-СТРОКА: ПОДСКАЗКА О ВОЗМОЖНОСТЯХ
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="w-full px-2.5 pt-2">
+    <div class="bg-white border-2 border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2 text-[11px]">
+        <span class="text-base">💡</span>
+        <span class="text-slate-600">
+          <strong>Кликните на карточку</strong> — откроется вся информация из Договор-Заявки (груз, адреса, контакты, реквизиты). Кнопка <strong>↶</strong> отменяет ошибочный шаг.
+        </span>
+      </div>
+      <div class="flex items-center gap-2 text-[11px] font-mono font-bold">
+        <span class="text-slate-500">В работе: 5 заявок</span>
+        <span class="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">Фрахт: 370 000 ₽</span>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       КАНБАН-ДОСКА: 8 КОЛОНОК БЕЗ СИСТЕМА СКРОЛЛА (FIT-TO-SCREEN)
+       ══════════════════════════════════════════════════════════════════════ -->
+  <main class="flex-1 w-full p-2.5">
+    
+    <div class="grid grid-cols-8 gap-1.5 w-full items-start">
+
+      <!-- ==============================================================
+           1. ДОГОВОР НА ПОЧТЕ
+           ============================================================== -->
+      <div class="bg-slate-200/70 rounded-xl border-2 border-slate-300 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-slate-300">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-slate-500 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-slate-800 truncate" title="1. Договор на почте">1. Договор</span>
+          </div>
+          <span id="cnt-1" class="text-[10px] font-mono font-black bg-white px-1 rounded border border-slate-300">1</span>
+        </div>
+
+        <div id="col-1" class="flex flex-col gap-1.5">
+          <!-- Карточка из реального документа пользователя № 001 -->
+          <div id="card-001" data-type="etrn" class="card-2x bg-white rounded-xl border-2 border-slate-300 hover:border-indigo-400 p-2 space-y-1.5 text-xs shadow-2xs cursor-pointer" onclick="openOrderDetails('order_001')">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-mono font-black text-slate-900 text-[11px]">№ 001 • АТИ</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded">⚡ ЭТрН</span>
+            </div>
+
+            <div class="bg-slate-50 rounded p-1 border border-slate-200">
+              <div class="font-bold text-slate-900 truncate text-[11px]">ООО «ТРАНССЕРВИС»</div>
+              <div class="text-[9px] text-emerald-700 font-semibold">✓ В контрагентах (АТИ 923131)</div>
+            </div>
+
+            <div>
+              <div class="text-[11px] font-bold text-slate-800 truncate">Арамиль ➔ Уфа</div>
+              <div class="text-[9px] text-slate-500">Подоконники • 4т (Валдай)</div>
+            </div>
+
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="text-slate-500">Фрахт:</span>
+              <span class="font-mono font-black text-slate-900">30 000 ₽</span>
+            </div>
+
+            <!-- Блок кнопок управления этапом (с защитой от клика на карточку) -->
+            <div class="pt-1 border-t border-slate-100 flex items-center gap-1" onclick="event.stopPropagation()">
+              <button onclick="stepForward('card-001', 1)" class="btn-tactile flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-black text-[10px] cursor-pointer">
+                Согласовать →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           2. СОГЛАСОВАНИЕ ЗАЯВКИ-ЭТрН
+           ============================================================== -->
+      <div class="bg-sky-50/80 rounded-xl border-2 border-sky-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-sky-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-sky-900 truncate" title="2. Согласование Заявки-ЭТрН">2. ЭТрН Заявка</span>
+          </div>
+          <span id="cnt-2" class="text-[10px] font-mono font-black bg-white text-sky-900 px-1 rounded border border-sky-300">1</span>
+        </div>
+
+        <div id="col-2" class="flex flex-col gap-1.5">
+          <!-- Карточка № 4889 -->
+          <div id="card-4889" data-type="etrn" class="card-2x bg-white rounded-xl border-2 border-sky-300 hover:border-sky-400 p-2 space-y-1.5 text-xs shadow-2xs cursor-pointer" onclick="openOrderDetails('order_4889')">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-mono font-black text-slate-900 text-[11px]">№ 4889</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded">⚡ ЭТрН</span>
+            </div>
+
+            <div class="bg-slate-50 rounded p-1 border border-slate-200">
+              <div class="font-bold text-slate-900 truncate text-[11px]">ООО «УралСпецСталь»</div>
+              <div class="text-[9px] text-sky-700 font-semibold">Ждём титул заказчика</div>
+            </div>
+
+            <div>
+              <div class="text-[11px] font-bold text-slate-800 truncate">Первоуральск ➔ Пермь</div>
+              <div class="text-[9px] text-slate-500">Трубы профильные • 10т</div>
+            </div>
+
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="text-slate-500">Фрахт:</span>
+              <span class="font-mono font-black text-slate-900">85 000 ₽</span>
+            </div>
+
+            <div class="pt-1 border-t border-slate-100 flex items-center gap-1" onclick="event.stopPropagation()">
+              <button onclick="stepBack('card-4889', 2)" title="Вернуть на предыдущий этап" class="btn-tactile px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer">
+                ↶
+              </button>
+              <button onclick="stepForward('card-4889', 2)" class="btn-tactile flex-1 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded font-black text-[10px] cursor-pointer">
+                На погрузку →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           3. ПОГРУЗКА & ПОДПИСЬ
+           ============================================================== -->
+      <div class="bg-amber-50/80 rounded-xl border-2 border-amber-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-amber-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-amber-900 truncate" title="3. Погрузка и подписи">3. Погрузка</span>
+          </div>
+          <span id="cnt-3" class="text-[10px] font-mono font-black bg-white text-amber-900 px-1 rounded border border-amber-300">1</span>
+        </div>
+
+        <div id="col-3" class="flex flex-col gap-1.5">
+          <!-- Карточка № 4880 (Бумага) -->
+          <div id="card-4880" data-type="paper" class="card-2x bg-white rounded-xl border-2 border-amber-300 hover:border-amber-400 p-2 space-y-1.5 text-xs shadow-2xs cursor-pointer" onclick="openOrderDetails('order_4880')">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-mono font-black text-slate-900 text-[11px]">№ 4880</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded">📮 Почта</span>
+            </div>
+
+            <div class="bg-slate-50 rounded p-1 border border-slate-200">
+              <div class="font-bold text-slate-900 truncate text-[11px]">АО «СибирьСнаб»</div>
+              <div class="text-[9px] text-amber-800 font-semibold">Водитель: Петров С.</div>
+            </div>
+
+            <div class="bg-amber-50/60 p-1 rounded border border-amber-200 text-[9px] space-y-0.5">
+              <div class="text-emerald-700 font-bold">✓ Склад подписал</div>
+              <div class="text-slate-600 font-medium">⏳ Водитель расписался</div>
+            </div>
+
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="text-slate-500">Фрахт:</span>
+              <span class="font-mono font-black text-slate-900">140 000 ₽</span>
+            </div>
+
+            <div class="pt-1 border-t border-slate-100 flex items-center gap-1" onclick="event.stopPropagation()">
+              <button onclick="stepBack('card-4880', 3)" title="Вернуть на предыдущий этап" class="btn-tactile px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer">
+                ↶
+              </button>
+              <button onclick="stepForward('card-4880', 3)" class="btn-tactile flex-1 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded font-black text-[10px] cursor-pointer">
+                В путь →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           4. В ПУТИ НА ВЫГРУЗКУ
+           ============================================================== -->
+      <div class="bg-blue-50/80 rounded-xl border-2 border-blue-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-blue-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-blue-900 truncate" title="4. В пути">4. В пути</span>
+          </div>
+          <span id="cnt-4" class="text-[10px] font-mono font-black bg-white text-blue-900 px-1 rounded border border-blue-300">0</span>
+        </div>
+
+        <div id="col-4" class="flex flex-col gap-1.5">
+          <!-- Сюда переходят карточки -->
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           5. ВЫГРУЗКА & СДАЧА РЕЙСА
+           ============================================================== -->
+      <div class="bg-indigo-50/80 rounded-xl border-2 border-indigo-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-indigo-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-indigo-600 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-indigo-900 truncate" title="5. Выгрузка & Сдача рейса">5. Выгрузка</span>
+          </div>
+          <span id="cnt-5" class="text-[10px] font-mono font-black bg-white text-indigo-900 px-1 rounded border border-indigo-300">1</span>
+        </div>
+
+        <div id="col-5" class="flex flex-col gap-1.5">
+          <!-- Карточка № 4871 -->
+          <div id="card-4871" data-type="paper" class="card-2x bg-white rounded-xl border-2 border-indigo-300 hover:border-indigo-400 p-2 space-y-1.5 text-xs shadow-2xs cursor-pointer" onclick="openOrderDetails('order_4871')">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-mono font-black text-slate-900 text-[11px]">№ 4871</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded">📮 Почта</span>
+            </div>
+
+            <div class="bg-indigo-50 rounded p-1 border border-indigo-200 text-[10px] space-y-0.5">
+              <div class="font-bold text-slate-900 truncate">ООО «ПромАльянс»</div>
+              <div class="text-indigo-800 font-bold">🚛 Водитель сдал рейс</div>
+              <div class="text-emerald-700 font-bold">✓ Выбрал контрагента</div>
+            </div>
+
+            <div>
+              <div class="text-[11px] font-bold text-slate-800 truncate">ЕКБ ➔ Тюмень</div>
+              <div class="text-[9px] text-slate-500">Кабель в барабанах</div>
+            </div>
+
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="text-slate-500">Фрахт:</span>
+              <span class="font-mono font-black text-slate-900">65 000 ₽</span>
+            </div>
+
+            <div class="pt-1 border-t border-slate-100 flex items-center gap-1" onclick="event.stopPropagation()">
+              <button onclick="stepBack('card-4871', 5)" title="Вернуть на предыдущий этап" class="btn-tactile px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer">
+                ↶
+              </button>
+              <button onclick="stepForward('card-4871', 5)" class="btn-tactile flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-black text-[10px] cursor-pointer">
+                В документы →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           6. ДОКУМЕНТООБОРОТ (ЭДО / ПОЧТА РФ)
+           ============================================================== -->
+      <div class="bg-purple-50/80 rounded-xl border-2 border-purple-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-purple-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-purple-600 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-purple-900 truncate" title="6. Документооборот">6. Документы</span>
+          </div>
+          <span id="cnt-6" class="text-[10px] font-mono font-black bg-white text-purple-900 px-1 rounded border border-purple-300">0</span>
+        </div>
+
+        <div id="col-6" class="flex flex-col gap-1.5">
+          <!-- Сюда переходят карточки -->
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           7. ДЕБИТОРКА (ОЖИДАНИЕ ОПЛАТЫ)
+           ============================================================== -->
+      <div class="bg-rose-50/80 rounded-xl border-2 border-rose-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-rose-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-rose-600 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-rose-900 truncate" title="7. Дебиторка (Ожидание оплаты)">7. Дебиторка</span>
+          </div>
+          <span id="cnt-7" class="text-[10px] font-mono font-black bg-white text-rose-900 px-1 rounded border border-rose-300">1</span>
+        </div>
+
+        <div id="col-7" class="flex flex-col gap-1.5">
+          <!-- Карточка № 4845 -->
+          <div id="card-4845" data-type="etrn" class="card-2x bg-white rounded-xl border-2 border-rose-300 hover:border-rose-400 p-2 space-y-1.5 text-xs shadow-2xs cursor-pointer" onclick="openOrderDetails('order_4845')">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-mono font-black text-slate-900 text-[11px]">№ 4845</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded">⚡ ЭТрН</span>
+            </div>
+
+            <!-- Блок Дебиторки -->
+            <div class="bg-rose-50 rounded p-1.5 border border-rose-200 space-y-0.5">
+              <div class="font-bold text-slate-900 truncate text-[11px]">ООО «ТехноЛогистик»</div>
+              <div class="text-[9px] text-rose-700 font-bold flex items-center justify-between">
+                <span>⏱ В дебиторке:</span>
+                <span class="font-mono font-black">50 000 ₽</span>
+              </div>
+              <div class="text-[9px] text-slate-500">Срок: до 20.10.2026</div>
+            </div>
+
+            <div class="flex items-center justify-between pt-0.5">
+              <a href="/receivables" target="_blank" onclick="event.stopPropagation()" class="text-[9px] text-rose-700 hover:underline font-bold">
+                В Дебиторку ↗
+              </a>
+              <span class="text-[9px] bg-amber-100 text-amber-800 px-1 rounded font-bold">Ожидаем</span>
+            </div>
+
+            <div class="pt-1 border-t border-slate-100 flex items-center gap-1" onclick="event.stopPropagation()">
+              <button onclick="stepBack('card-4845', 7)" title="Вернуть на предыдущий этап" class="btn-tactile px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer">
+                ↶
+              </button>
+              <button onclick="stepForward('card-4845', 7)" class="btn-tactile flex-1 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-black text-[10px] cursor-pointer">
+                ✓ Оплачено на Р/С
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           8. ОПЛАЧЕНО (ЗАКРЫТО)
+           ============================================================== -->
+      <div class="bg-emerald-50/80 rounded-xl border-2 border-emerald-200 p-1.5 flex flex-col gap-1.5 min-w-0">
+        <div class="flex items-center justify-between px-1 pb-1 border-b border-emerald-200">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
+            <span class="text-[11px] font-black uppercase text-emerald-900 truncate" title="8. Оплачено">8. Оплачено</span>
+          </div>
+          <span id="cnt-8" class="text-[10px] font-mono font-black bg-white text-emerald-900 px-1 rounded border border-emerald-300">0</span>
+        </div>
+
+        <div id="col-8" class="flex flex-col gap-1.5">
+          <!-- Сюда переходят оплаченные карточки -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       МОДАЛЬНОЕ ОКНО ДЕТАЛЬНОЙ ИНФОРМАЦИИ О ДОГОВОР-ЗАЯВКЕ
+       (Точно по реальному документу № 001)
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="orderDetailModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      
+      <!-- Шапка модалки -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">📋</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 id="modal-title" class="text-base font-black font-display tracking-tight">Договор-Заявка № 001 от 14.10.2026</h2>
+              <span id="modal-type-badge" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400 text-[10px] font-bold">⚡ ЭТрН</span>
+            </div>
+            <p id="modal-subtitle" class="text-xs text-slate-400">Междугородняя перевозка: Арамиль (Свердловская обл.) ➔ Уфа</p>
+          </div>
+        </div>
+        <button onclick="closeOrderDetails()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-black cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <!-- Содержимое с прокруткой -->
+      <div class="p-5 overflow-y-auto space-y-4 text-xs text-slate-700">
+        
+        <!-- Блок статуса и этапа в канбане -->
+        <div class="bg-slate-50 rounded-2xl border-2 border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span class="text-[10px] font-bold text-slate-400 uppercase block">Текущий этап заявки</span>
+            <span id="modal-current-stage" class="text-xs font-black text-indigo-700">1. Договор отправлен на почту грузоотправителю</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] text-slate-500">Статус в Дебиторке:</span>
+            <span id="modal-receivable-status" class="px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300">
+              Ожидает завершения рейса
+            </span>
+          </div>
+        </div>
+
+        <!-- Сетка 2 колонки: Заказчик & Перевозчик -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          
+          <!-- Заказчик -->
+          <div class="bg-indigo-50/40 rounded-2xl border border-indigo-200 p-3 space-y-1.5">
+            <div class="text-[11px] font-black uppercase text-indigo-950 flex items-center justify-between">
+              <span>🏢 ЗАКАЗЧИК</span>
+              <span class="text-[10px] font-mono text-indigo-700">АТИ: 923131</span>
+            </div>
+            <div class="font-bold text-slate-900 text-sm">ООО «ТРАНССЕРВИС»</div>
+            <div class="text-slate-600">ИНН: <span class="font-mono font-bold">6679091866</span> | КПП: 667001001</div>
+            <div class="text-slate-600">Менеджер: <strong>Радик</strong></div>
+            <div class="text-slate-600">Тел: <strong>(343) 286-73-65 (доб. 447)</strong>, моб: <strong>+7-952-147-6114</strong></div>
+            <div class="text-slate-600">Email: <a href="mailto:bautdinov@tr-tech.ru" class="text-indigo-600 underline">bautdinov@tr-tech.ru</a></div>
+            <div class="pt-1 text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+              <span>✓</span> <span>Контрагент занесён в базу системы</span>
+            </div>
+          </div>
+
+          <!-- Перевозчик -->
+          <div class="bg-slate-50 rounded-2xl border border-slate-200 p-3 space-y-1.5">
+            <div class="text-[11px] font-black uppercase text-slate-800 flex items-center justify-between">
+              <span>🚚 ПЕРЕВОЗЧИК</span>
+              <span class="text-[10px] font-mono text-slate-500">ИП</span>
+            </div>
+            <div class="font-bold text-slate-900 text-sm">ИП НИГАМЕДЬЯНОВ АЛЕКСАНДР СЕРГЕЕВИЧ</div>
+            <div class="text-slate-600">ИНН: <span class="font-mono font-bold">660704814106</span> | ОГРНИП: 321665800053976</div>
+            <div class="text-slate-600">Контактное лицо: <strong>Александр (7 922 180-09-11)</strong></div>
+            <div class="text-slate-600">Р/С: <span class="font-mono font-semibold">40802810500001961654</span> в АО «ТБанк»</div>
+            <div class="text-slate-600">БИК: 044525974, К/С: 30101810145250000974</div>
+          </div>
+
+        </div>
+
+        <!-- Данные по автотранспорту и водителю -->
+        <div class="bg-amber-50/40 rounded-2xl border border-amber-200 p-3 space-y-2">
+          <div class="text-[11px] font-black uppercase text-amber-950 flex items-center justify-between">
+            <span>🚛 АВТОТРАНСПОРТ И ВОДИТЕЛЬ</span>
+            <span class="text-[10px] font-bold text-amber-800">4 тонник, тент</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+            <div>
+              <span class="text-slate-500 block text-[10px]">Автомобиль:</span>
+              <span class="font-bold text-slate-900 text-xs">Валдай О188ТА 196</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Водитель:</span>
+              <span class="font-bold text-slate-900 text-xs">Насртдинов Вячеслав Аксанович</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Телефон водителя:</span>
+              <span class="font-bold font-mono text-slate-900">+7 995 661-06-85</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Паспорт и ВУ:</span>
+              <span class="font-mono text-slate-700">Паспорт 6521 № 342609 • ВУ 9931 051064</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Погрузка и Разгрузка (Маршрут) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          
+          <!-- Погрузка -->
+          <div class="bg-emerald-50/40 rounded-2xl border border-emerald-200 p-3 space-y-1.5">
+            <div class="text-[11px] font-black uppercase text-emerald-950 flex items-center justify-between">
+              <span>📦 2.3. ПОГРУЗКА</span>
+              <span class="font-mono text-emerald-800 font-bold">15.10.2026, 09:00</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Грузоотправитель:</span>
+              <span class="font-bold text-slate-900">ООО СП Торговый Дом «МАГЕЛЛАН»</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Адрес:</span>
+              <span class="font-semibold text-slate-800">Свердловская обл., г. Арамиль, пер. Речной д. 2А/1</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Контакт на складе:</span>
+              <span class="font-mono font-bold text-slate-900">8-999-285-30-10 (Склад)</span>
+            </div>
+            <div class="text-[10px] text-slate-600 bg-white p-1 rounded border border-emerald-100">
+              Груз: <strong>Подоконники</strong>, 4т, 6*2*1 (5 поддонов), боковая погрузка, ремни
+            </div>
+          </div>
+
+          <!-- Разгрузка -->
+          <div class="bg-blue-50/40 rounded-2xl border border-blue-200 p-3 space-y-1.5">
+            <div class="text-[11px] font-black uppercase text-blue-950 flex items-center justify-between">
+              <span>🏁 2.4. РАЗГРУЗКА</span>
+              <span class="font-mono text-blue-800 font-bold">16.10.2026</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Грузополучатель:</span>
+              <span class="font-bold text-slate-900">ООО «Створ» (г. Уфа)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Адрес:</span>
+              <span class="font-semibold text-slate-800">г. Уфа, ул. Губкина, 10/1</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Контакт приёмки:</span>
+              <span class="font-mono font-bold text-slate-900">8-919-151-77-80 (Эльмира)</span>
+            </div>
+            <div class="text-[10px] text-slate-600 bg-white p-1 rounded border border-blue-100">
+              Нормативное время выгрузки: 24 часа с момента прибытия
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Финансы и условия оплаты -->
+        <div class="bg-white rounded-2xl border-2 border-slate-200 p-3 space-y-2">
+          <div class="text-[11px] font-black uppercase text-slate-900 flex items-center justify-between">
+            <span>💰 2.5. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ</span>
+            <span class="text-sm font-mono font-black text-emerald-600">30 000 ₽ без НДС</span>
+          </div>
+          <div class="text-xs text-slate-700">
+            <strong>Форма и срок:</strong> 10 банковских дней по ЭТрН и бухгалтерским документам.
+          </div>
+          <div class="p-2 bg-slate-50 rounded-xl border border-slate-200 text-[11px] space-y-1">
+            <div class="font-bold text-slate-800">Почтовый адрес для оригиналов документов (при необходимости):</div>
+            <div class="text-slate-600">620000, Свердловская область, г. Екатеринбург, пр-кт Ленина, стр. 39, а/я 494 на имя ООО «Транссервис» заказным письмом с уведомлением.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Подвал модалки с действиями -->
+      <div class="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <span class="text-[11px] text-slate-500">Договор подписан: Лихоманов М.И. (дов. № 05/26-ТС)</span>
+        <div class="flex items-center gap-2">
+          <button onclick="closeOrderDetails()" class="px-4 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50">
+            Закрыть
+          </button>
+          <a href="/receivables" target="_blank" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black shadow-xs">
+            Открыть в Дебиторке ↗
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       МОДАЛЬНОЕ ОКНО СОЗДАНИЯ НОВОЙ ЗАЯВКИ
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="newOrderModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🚚</span>
+          <div>
+            <h3 class="text-sm font-black font-display">Новый Договор-Заявка АТИ</h3>
+            <p class="text-[11px] text-slate-400">Менеджер заносит контрагента для связки с рейсом и дебиторкой</p>
+          </div>
+        </div>
+        <button onclick="closeNewOrderModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-black cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <form onsubmit="handleNewOrder(event)" class="p-5 space-y-2.5 text-xs">
+        <div>
+          <label class="block text-[11px] font-black text-slate-700 uppercase mb-1">Номер Договор-Заявки *</label>
+          <input type="text" required value="№ 002 от 15.10.2026" class="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl font-mono font-bold text-slate-900">
+        </div>
+
+        <div class="p-2.5 bg-indigo-50/70 border-2 border-indigo-200 rounded-xl space-y-1">
+          <label class="block text-[11px] font-black text-indigo-950 uppercase">Контрагент (Заказчик) *</label>
+          <select class="w-full px-3 py-1.5 border-2 border-indigo-300 rounded-xl font-bold bg-white text-slate-900">
+            <option>ООО «ТРАНССЕРВИС» (ИНН 6679091866, АТИ 923131)</option>
+            <option>ООО «УралСпецСталь» (ИНН 6684001928)</option>
+            <option>АО «СибирьСнаб» (ИНН 5408192837)</option>
+            <option>+ Создать нового контрагента...</option>
+          </select>
+          <span class="text-[10px] text-indigo-700 block">Будет доступен водителю при завершении рейса</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-black text-slate-700 uppercase mb-1">Откуда *</label>
+            <input type="text" required placeholder="г. Арамиль" class="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl font-bold">
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-700 uppercase mb-1">Куда *</label>
+            <input type="text" required placeholder="г. Уфа" class="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl font-bold">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-black text-slate-700 uppercase mb-1">Фрахт (₽) *</label>
+            <input type="number" required value="30000" class="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl font-mono font-bold">
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-700 uppercase mb-1">Тип документов *</label>
+            <select class="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl font-bold">
+              <option value="etrn">⚡ ЭТрН + ЭДО</option>
+              <option value="paper">📮 Бумажная ТрН + Почта РФ</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="p-2 bg-amber-50 rounded-xl border border-amber-200 text-[10px] text-amber-900">
+          ⚠️ <strong>Правило:</strong> Работа начинается после отправки подписанного скана на почту заказчику.
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="closeNewOrderModal()" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl font-bold">Отмена</button>
+          <button type="submit" class="px-4 py-1.5 bg-indigo-600 text-white rounded-xl font-black shadow-xs">Создать заявку</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ИНТЕРАКТИВНЫЙ JAVASCRIPT: ДИНАМИЧЕСКИЕ КНОПКИ + КНОПКА ВОЗВРАТА ↶
+       ══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    // Конфигурация 8 этапов: названия и текст кнопок перехода
+    const STAGE_CONFIG = {
+      1: {
+        name: "1. Договор на почте",
+        btnForward: "Согласовать →",
+        btnClass: "bg-indigo-600 hover:bg-indigo-500 text-white",
+      },
+      2: {
+        name: "2. Согласование Заявки-ЭТрН",
+        btnForward: "На погрузку →",
+        btnClass: "bg-sky-600 hover:bg-sky-500 text-white",
+      },
+      3: {
+        name: "3. Погрузка & Подпись",
+        btnForward: "В путь →",
+        btnClass: "bg-amber-500 hover:bg-amber-400 text-slate-950 font-black",
+      },
+      4: {
+        name: "4. В пути на выгрузку",
+        btnForward: "На выгрузку →",
+        btnClass: "bg-blue-600 hover:bg-blue-500 text-white",
+      },
+      5: {
+        name: "5. Выгрузка & Сдача рейса",
+        btnForward: "В документы →",
+        btnClass: "bg-indigo-600 hover:bg-indigo-500 text-white",
+      },
+      6: {
+        name: "6. Документооборот (ЭДО / Почта)",
+        btnForward: "В Дебиторку →",
+        btnClass: "bg-purple-600 hover:bg-purple-500 text-white",
+      },
+      7: {
+        name: "7. Дебиторка (Ожидание оплаты)",
+        btnForward: "✓ Оплачено на Р/С",
+        btnClass: "bg-emerald-600 hover:bg-emerald-500 text-white",
+      },
+      8: {
+        name: "8. Оплачено и закрыто",
+        btnForward: "✓ Закрыто",
+        btnClass: "bg-slate-300 text-slate-700 cursor-default",
+      }
+    };
+
+    // Перемещение карточки ВПЕРЕД
+    function stepForward(cardId, currentStage) {
+      if (currentStage >= 8) return;
+      const nextStage = currentStage + 1;
+      moveCardToStage(cardId, nextStage);
+    }
+
+    // Перемещение карточки НАЗАД (Возврат при ошибке)
+    function stepBack(cardId, currentStage) {
+      if (currentStage <= 1) return;
+      const prevStage = currentStage - 1;
+      moveCardToStage(cardId, prevStage);
+    }
+
+    // Универсальная функция переноса карточки в нужный столбец и обновления её кнопок
+    function moveCardToStage(cardId, stage) {
+      const card = document.getElementById(cardId);
+      const targetCol = document.getElementById('col-' + stage);
+      if (!card || !targetCol) return;
+
+      targetCol.appendChild(card);
+      updateCardControls(card, cardId, stage);
+      updateColumnCounters();
+    }
+
+    // Обновление кнопок внутри карточки под текущий этап
+    function updateCardControls(card, cardId, stage) {
+      const btnContainer = card.querySelector('[onclick*="event.stopPropagation()"]');
+      if (!btnContainer) return;
+
+      const cfg = STAGE_CONFIG[stage];
+
+      if (stage === 1) {
+        // На 1-м этапе кнопки «Назад» нет, только вперед
+        btnContainer.innerHTML = `
+          <button onclick="stepForward('${cardId}', 1)" class="btn-tactile flex-1 py-1 ${cfg.btnClass} rounded font-black text-[10px] cursor-pointer">
+            ${cfg.btnForward}
+          </button>
+        `;
+      } else if (stage === 8) {
+        // На 8-м этапе — только откат назад и статус "Закрыто"
+        btnContainer.innerHTML = `
+          <button onclick="stepBack('${cardId}', 8)" title="Вернуть в Дебиторку" class="btn-tactile px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer">
+            ↶
+          </button>
+          <div class="flex-1 text-center py-1 bg-emerald-100 text-emerald-900 rounded font-black text-[10px]">
+            ✓ Закрыто (Оплачено)
+          </div>
+        `;
+      } else {
+        // На этапах 2..7 — кнопка «Назад ↶» + кнопка «Вперед» с новым названием!
+        btnContainer.innerHTML = `
+          <button onclick="stepBack('${cardId}', ${stage})" title="Вернуть на предыдущий этап" class="btn-tactile px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer">
+            ↶
+          </button>
+          <button onclick="stepForward('${cardId}', ${stage})" class="btn-tactile flex-1 py-1 ${cfg.btnClass} rounded font-black text-[10px] cursor-pointer">
+            ${cfg.btnForward}
+          </button>
+        `;
+      }
+    }
+
+    // Подсчет счетчиков в колонках
+    function updateColumnCounters() {
+      for (let i = 1; i <= 8; i++) {
+        const col = document.getElementById('col-' + i);
+        const cntBadge = document.getElementById('cnt-' + i);
+        if (col && cntBadge) {
+          const count = col.querySelectorAll('.card-2x:not(.hidden)').length;
+          cntBadge.textContent = count;
+        }
+      }
+    }
+
+    // Открытие модалки деталей Договор-Заявки
+    function openOrderDetails(orderId) {
+      const modal = document.getElementById('orderDetailModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeOrderDetails() {
+      const modal = document.getElementById('orderDetailModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // Создание новой заявки
+    function openNewOrderModal() {
+      document.getElementById('newOrderModal').classList.remove('hidden');
+    }
+
+    function closeNewOrderModal() {
+      document.getElementById('newOrderModal').classList.add('hidden');
+    }
+
+    function handleNewOrder(e) {
+      e.preventDefault();
+      alert('Заявка № 002 создана! Контрагент ООО «ТРАНССЕРВИС» зафиксирован. Заявка помещена в столбец 1: «Договор на почте»');
+      closeNewOrderModal();
+    }
+
+    // Фильтр ЭТрН / Почта
+    function filterType(type) {
+      ['all', 'etrn', 'paper'].forEach(t => {
+        const btn = document.getElementById('f-' + t);
+        if (btn) {
+          if (t === type) {
+            btn.className = "px-2 py-0.5 rounded-md bg-white text-slate-900 shadow-2xs font-black";
+          } else {
+            btn.className = "px-2 py-0.5 rounded-md text-slate-600 font-bold hover:bg-white/60";
+          }
+        }
+      });
+
+      document.querySelectorAll('.card-2x').forEach(card => {
+        const ctype = card.getAttribute('data-type');
+        if (type === 'all' || ctype === type) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      updateColumnCounters();
+    }
+
+    // Инициализация при загрузке
+    document.addEventListener('DOMContentLoaded', () => {
+      updateColumnCounters();
+    });
+  </script>
+
+</body>
+</html>
