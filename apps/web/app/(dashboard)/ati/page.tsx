@@ -42,6 +42,8 @@ export type AtiOrder = {
   payment_terms: string;
   postal_address?: string;
   postal_tracking_number?: string;
+  is_cancelled?: boolean;
+  cancel_reason?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -216,6 +218,48 @@ export default function AtiPage() {
     },
   });
 
+  // Состояния для отмены / срыва
+  const [cancellingOrder, setCancellingOrder] = useState<AtiOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>(
+    'Срыв на погрузке (груз не готов / отказ заказчика)',
+  );
+  const [customReason, setCustomReason] = useState<string>('');
+  const [showCancelledList, setShowCancelledList] = useState(false);
+
+  // Мутация отмены / фиксации срыва
+  const cancelOrderMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const res = await fetch(`/api/ati/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_cancelled: true, cancel_reason: reason }),
+      });
+      if (!res.ok) throw new Error('Ошибка отмены заявки');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ati-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      setCancellingOrder(null);
+    },
+  });
+
+  // Мутация восстановления сорванной заявки на доску
+  const restoreOrderMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await fetch(`/api/ati/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restore: true }),
+      });
+      if (!res.ok) throw new Error('Ошибка восстановления заявки');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ati-orders'] });
+    },
+  });
+
   // Мутация создания новой заявки
   const createOrderMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
@@ -237,8 +281,12 @@ export default function AtiPage() {
   const orders = data?.orders || [];
   const counterparties = data?.counterparties || [];
 
-  // Фильтрация
-  const filteredOrders = orders.filter((o) => {
+  // Разделение на активные и сорванные/отменённые
+  const cancelledOrders = orders.filter((o) => o.is_cancelled || o.stage === 0);
+  const activeOrders = orders.filter((o) => !o.is_cancelled && o.stage > 0);
+
+  // Фильтрация активных по типу документов
+  const filteredOrders = activeOrders.filter((o) => {
     if (filterDoc === 'all') return true;
     return o.doc_type === filterDoc;
   });
@@ -261,8 +309,8 @@ export default function AtiPage() {
   }
 
   // Общая сумма активных
-  const totalFreight = orders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
-  const inReceivables = orders
+  const totalFreight = activeOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+  const inReceivables = activeOrders
     .filter((o) => o.stage === 7)
     .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
 
@@ -338,7 +386,7 @@ export default function AtiPage() {
                   : 'text-slate-600 hover:bg-white/50'
               }`}
             >
-              Все ({orders.length})
+              Все ({activeOrders.length})
             </button>
             <button
               onClick={() => setFilterDoc('etrn')}
@@ -348,7 +396,7 @@ export default function AtiPage() {
                   : 'text-emerald-700 hover:bg-white/50'
               }`}
             >
-              ⚡ ЭТрН ({orders.filter((o) => o.doc_type === 'etrn').length})
+              ⚡ ЭТрН ({activeOrders.filter((o) => o.doc_type === 'etrn').length})
             </button>
             <button
               onClick={() => setFilterDoc('paper')}
@@ -358,9 +406,23 @@ export default function AtiPage() {
                   : 'text-amber-800 hover:bg-white/50'
               }`}
             >
-              📮 Почта РФ ({orders.filter((o) => o.doc_type === 'paper').length})
+              📮 Почта РФ ({activeOrders.filter((o) => o.doc_type === 'paper').length})
             </button>
           </div>
+
+          {/* Кнопка архива сорванных заявок */}
+          {cancelledOrders.length > 0 && (
+            <button
+              onClick={() => setShowCancelledList(true)}
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+              title="Посмотреть заявки, сорванные на погрузке"
+            >
+              <span>❌ Срывы:</span>
+              <span className="font-black bg-rose-200/80 text-rose-900 px-1.5 py-0.2 rounded-full font-mono text-[11px]">
+                {cancelledOrders.length}
+              </span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsNewModalOpen(true)}
@@ -550,6 +612,24 @@ export default function AtiPage() {
                           className="pt-1 border-t border-slate-100 flex items-center gap-1"
                           onClick={(e) => e.stopPropagation()}
                         >
+                          {/* Кнопка срыва / отмены с Канбана (доступна на этапах 1..6) */}
+                          {stageNum <= 6 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCancellingOrder(order);
+                                setCancelReason(
+                                  'Срыв на погрузке (груз не готов / отказ заказчика)',
+                                );
+                                setCustomReason('');
+                              }}
+                              title="Срыв договора-заявки / Снять с доски"
+                              className="px-1.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-black text-[10px] border border-rose-200 cursor-pointer active:scale-95 transition"
+                            >
+                              ✕
+                            </button>
+                          )}
+
                           {/* Кнопка возврата ↶ (доступна со 2 этапа) */}
                           {stageNum > 1 && (
                             <button
@@ -1138,6 +1218,215 @@ export default function AtiPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+           МОДАЛЬНОЕ ОКНО СРЫВА / ОТМЕНЫ ЗАЯВКИ С КАНБАН-ДОСКИ
+           ══════════════════════════════════════════════════════════════════════ */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl border-2 border-rose-300 shadow-2xl max-w-lg w-full overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wide">
+                    Срыв / Отмена договор-заявки
+                  </h3>
+                  <p className="text-[10px] text-rose-100">
+                    Заявка {cancellingOrder.order_number} будет снята с Канбан-доски
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCancellingOrder(null)}
+                className="text-rose-200 hover:text-white text-lg font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-900 space-y-1">
+                <div className="font-bold text-[11px] flex justify-between">
+                  <span>Контрагент: {cancellingOrder.counterparty_name}</span>
+                  <span className="font-mono">
+                    {Number(cancellingOrder.price || 0).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-600">
+                  {cancellingOrder.pickup_address} ➔ {cancellingOrder.delivery_address}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1.5">
+                  Причина срыва / отмены:
+                </label>
+                <div className="space-y-1.5">
+                  {[
+                    'Срыв на погрузке (груз не готов / отказ заказчика)',
+                    'Поломка / опоздание автомобиля парка',
+                    'Несоответствие веса / габаритов груза',
+                    'Отказ заказчика / перенос даты рейса',
+                    'Другая причина (указать ниже)',
+                  ].map((reason) => (
+                    <label
+                      key={reason}
+                      className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer font-medium text-slate-800"
+                    >
+                      <input
+                        type="radio"
+                        name="cancel_reason"
+                        value={reason}
+                        checked={cancelReason === reason}
+                        onChange={() => setCancelReason(reason)}
+                        className="cursor-pointer"
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {cancelReason === 'Другая причина (указать ниже)' && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                    Укажите причину:
+                  </label>
+                  <input
+                    type="text"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Подробности срыва..."
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold"
+                  />
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                💡 Заявка будет перемещена в раздел «Срывы и отмены». Запись в Дебиторке
+                автоматически аннулируется. При необходимости заявку можно восстановить обратно на
+                Канбан.
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setCancellingOrder(null)}
+                  className="px-3.5 py-1.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 cursor-pointer"
+                >
+                  Назад
+                </button>
+                <button
+                  type="button"
+                  disabled={cancelOrderMutation.isPending}
+                  onClick={() =>
+                    cancelOrderMutation.mutate({
+                      id: cancellingOrder.id,
+                      reason:
+                        cancelReason === 'Другая причина (указать ниже)'
+                          ? customReason.trim() || 'Срыв рейса'
+                          : cancelReason,
+                    })
+                  }
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {cancelOrderMutation.isPending ? 'Снятие...' : '✕ Снять с Канбана'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+           СПИСОК СОРВАННЫХ / ОТМЕНЁННЫХ ЗАЯВОК
+           ══════════════════════════════════════════════════════════════════════ */}
+      {showCancelledList && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">❌</span>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wide">
+                    Сорванные и отменённые заявки ({cancelledOrders.length})
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    Договоры, срыв которых произошёл на погрузке или до отправления
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCancelledList(false)}
+                className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 overflow-y-auto flex-1 text-xs">
+              {cancelledOrders.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 font-bold">
+                  Нет сорванных или отменённых заявок.
+                </div>
+              ) : (
+                cancelledOrders.map((ord) => (
+                  <div
+                    key={ord.id}
+                    className="p-3 bg-rose-50/50 rounded-2xl border-2 border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-slate-900 text-xs">
+                          {ord.order_number}
+                        </span>
+                        <span className="text-[9px] font-bold bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded">
+                          Срыв
+                        </span>
+                        <span className="text-slate-500 font-mono text-[10px]">
+                          {new Date(ord.updated_at || ord.created_at).toLocaleDateString('ru-RU')}
+                        </span>
+                      </div>
+                      <div className="font-bold text-slate-800 text-[11px]">
+                        {ord.counterparty_name} ·{' '}
+                        <span className="font-mono text-slate-900">
+                          {Number(ord.price || 0).toLocaleString('ru-RU')} ₽
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-rose-800 font-medium">
+                        Причина: <strong>{ord.cancel_reason || 'Срыв на погрузке'}</strong>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      <button
+                        type="button"
+                        disabled={restoreOrderMutation.isPending}
+                        onClick={() => restoreOrderMutation.mutate({ id: ord.id })}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                      >
+                        <span>↶</span>
+                        <span>Восстановить на Канбан</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCancelledList(false)}
+                className="px-4 py-1.5 bg-slate-800 text-white rounded-xl font-bold text-xs hover:bg-slate-700 cursor-pointer"
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>
       )}

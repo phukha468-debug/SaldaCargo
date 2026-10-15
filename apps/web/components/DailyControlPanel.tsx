@@ -20,6 +20,47 @@ function formatDayHeader(dateStr: string): string {
   return `${dow.toUpperCase()}, ${dayMonth}`;
 }
 
+function cleanExpenseDescription(rawText: string | null | undefined): string {
+  if (!rawText) return 'Расход';
+  let t = rawText.trim();
+  t = t.replace(/[,.]?\s*НДС\s*(не\s*облагается|исчислен|включен)?/gi, '');
+  t = t.replace(/[,.]?\s*В\s*том\s*числе\s*НДС[^\n.,]*/gi, '');
+  t = t.replace(/[,.]?\s*без\s*налога\s*\(?НДС\)?/gi, '');
+  if (/перевод\s+собственных\s+средств/i.test(t)) {
+    return 'Перевод собственных средств';
+  }
+  if (/комиссия\s+банка|плата\s+за\s+обслуживание|за\s+входящий\s+перевод/i.test(t)) {
+    return 'Комиссия банка';
+  }
+  t = t.replace(/\s*р\/с\s*\d+/gi, '');
+  t = t.replace(/\s*счет\s*№?\s*\d+/gi, '');
+  t = t.replace(/\s*ИНН\s*\d+/gi, '');
+  t = t.replace(/\s*БИК\s*\d+/gi, '');
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  return t || 'Расход';
+}
+
+function resolveExpenseCategory(title: string, rawCatName?: string | null): string {
+  if (
+    rawCatName &&
+    rawCatName !== 'Прочие расходы' &&
+    rawCatName !== 'Списание с Р/С (API)' &&
+    rawCatName !== 'Расход'
+  ) {
+    return rawCatName;
+  }
+  const s = (title || '').toLowerCase();
+  if (/гсм|топлив|бензин|газ|азс|лукойл|газпром/i.test(s)) return 'ГСМ / Топливо';
+  if (/комисси|плата\s*за|тариф|обслуживан/i.test(s)) return 'Комиссия банка';
+  if (/перевод\s*собственн|между\s*счетами/i.test(s)) return 'Перевод между кошельками';
+  if (/зарплат|фот|аванс|оплат.*труд|подотчет/i.test(s)) return 'ФОТ / Зарплата';
+  if (/кредит|лизинг|процент|заем/i.test(s)) return 'Кредит / Лизинг';
+  if (/запчаст|ремонт|сервис|сто|шино|масло|фильтр/i.test(s)) return 'Запчасти / ТО';
+  if (/налог|енс|фнс|страхов.*взнос/i.test(s)) return 'Налоги';
+  if (/аренда|офис|связь|интернет/i.test(s)) return 'Аренда и связь';
+  return 'Прочий расход';
+}
+
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
@@ -336,9 +377,14 @@ export function DailyControlPanel() {
     },
   });
 
-  // Link Bank Op to Trip Order Mutation
+  // Link Bank Op (Trip / STO / Dispatcher) Mutation
   const [linkingBankOp, setLinkingBankOp] = useState<TBankOp | null>(null);
   const [selectedOrderIdToLink, setSelectedOrderIdToLink] = useState<string>('');
+  const [linkMode, setLinkMode] = useState<'trip' | 'sto' | 'dispatcher'>('trip');
+  const [stoOrderNumber, setStoOrderNumber] = useState('');
+  const [stoClientName, setStoClientName] = useState('');
+  const [dispatcherDetails, setDispatcherDetails] = useState('');
+  const [dispatcherClientName, setDispatcherClientName] = useState('');
 
   const linkBankOpMutation = useMutation({
     mutationFn: async ({
@@ -348,6 +394,10 @@ export function DailyControlPanel() {
       action,
       operationDate,
       date,
+      linkType = 'trip',
+      serviceOrderId,
+      dispatcherDetails: dispDetails,
+      clientName,
     }: {
       operationId: string;
       tripOrderId?: string;
@@ -355,6 +405,10 @@ export function DailyControlPanel() {
       action?: 'link' | 'unlink';
       operationDate?: string;
       date?: string;
+      linkType?: 'trip' | 'service_order' | 'dispatcher';
+      serviceOrderId?: string;
+      dispatcherDetails?: string;
+      clientName?: string;
     }) => {
       const res = await fetch('/api/finance/link-bank-op', {
         method: 'POST',
@@ -366,6 +420,10 @@ export function DailyControlPanel() {
           action,
           operationDate,
           date,
+          linkType,
+          serviceOrderId,
+          dispatcherDetails: dispDetails,
+          clientName,
         }),
       });
       if (!res.ok) {
@@ -378,6 +436,10 @@ export function DailyControlPanel() {
       queryClient.invalidateQueries({ queryKey: ['daily-balance', selectedDate] });
       setLinkingBankOp(null);
       setSelectedOrderIdToLink('');
+      setStoOrderNumber('');
+      setStoClientName('');
+      setDispatcherDetails('');
+      setDispatcherClientName('');
     },
   });
 
@@ -420,6 +482,7 @@ export function DailyControlPanel() {
     rawTx?: RawTx;
     bankOp?: TBankOp;
     isLinked?: boolean;
+    linkTypeLabel?: string;
     linkedTripNumber?: string | number;
     linkedDriverName?: string;
     canLinkToTrip?: boolean;
@@ -463,50 +526,61 @@ export function DailyControlPanel() {
         let title = op.description || op.payPurpose || 'Входящий перевод на Р/С';
         let author = payerName;
         let isLinked = false;
+        let linkTypeLabel = '';
         let linkedTripNumber: string | number | undefined;
         let linkedDriverName: string | undefined;
 
         if (linkedTx) {
           isLinked = true;
-          const linkedOrder = (data?.trip_orders ?? []).find(
-            (o) => o.id === linkedTx.trip_order_id,
-          );
-          const matchNum = linkedTx.description?.match(/Рейс №(\d+)/);
-          linkedTripNumber = linkedOrder?.trip?.trip_number || (matchNum ? matchNum[1] : undefined);
-          const matchDriver = linkedTx.description?.match(/\((.+?)\)/);
-          linkedDriverName =
-            linkedTx.related_user?.name ||
-            linkedOrder?.trip?.driver?.name ||
-            (matchDriver ? matchDriver[1] : undefined);
+          const desc = linkedTx.description || '';
+          if (desc.includes('Заказ-наряд')) {
+            linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
+          } else if (desc.includes('Диспетчерский')) {
+            linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
+          } else {
+            const linkedOrder = (data?.trip_orders ?? []).find(
+              (o) => o.id === linkedTx.trip_order_id,
+            );
+            const matchNum = linkedTx.description?.match(/Рейс №(\d+)/);
+            linkedTripNumber =
+              linkedOrder?.trip?.trip_number || (matchNum ? matchNum[1] : undefined);
+            const matchDriver = linkedTx.description?.match(/\((.+?)\)/);
+            linkedDriverName =
+              linkedTx.related_user?.name ||
+              linkedOrder?.trip?.driver?.name ||
+              (matchDriver ? matchDriver[1] : undefined);
+            linkTypeLabel = linkedTripNumber
+              ? `Рейс №${linkedTripNumber}${linkedDriverName ? ` (${linkedDriverName})` : ''}`
+              : 'Рейс автопарка';
+          }
           author = linkedDriverName ? `вод. ${linkedDriverName}` : payerName;
           title = linkedTx.description || title;
         }
 
         // Подбор подходящего сегодняшнего заказа с совпадающей суммой
         const opAmt = op.operationAmount || op.rubleAmount || 0;
-        const matchingOrder =
-          !isLinked && isSbpOrQr
-            ? (data?.trip_orders ?? []).find(
-                (o) =>
-                  parseFloat(o.amount) === opAmt &&
-                  o.payment_method === 'qr' &&
-                  !(data?.transactions ?? []).some((t) => t.trip_order_id === o.id),
-              )
-            : undefined;
+        const matchingOrder = !isLinked
+          ? (data?.trip_orders ?? []).find(
+              (o) =>
+                parseFloat(o.amount) === opAmt &&
+                !(data?.transactions ?? []).some((t) => t.trip_order_id === o.id),
+            )
+          : undefined;
 
         incomeItems.push({
           id: `tbank-${op.operationId}`,
           title,
-          category: isSbpOrQr ? 'Эквайринг / СБП' : 'Поступления на Р/С',
+          category: isSbpOrQr ? 'Эквайринг / СБП' : 'Поступление на Р/С',
           wallet: 'bank',
           walletName: 'Р/С Банк (API)',
           author,
           amount: opAmt,
           bankOp: op,
           isLinked,
+          linkTypeLabel,
           linkedTripNumber,
           linkedDriverName,
-          canLinkToTrip: isSbpOrQr,
+          canLinkToTrip: true, // Доступно для всех приходов на Р/С!
           suggestedOrder: matchingOrder,
         });
       });
@@ -955,40 +1029,40 @@ export function DailyControlPanel() {
     }
   }
 
-  // Г) Однотипные расходы, сгруппированные по названию/назначению
-  const normKey = (s: string) =>
-    (s || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[.\s,]+/g, ' ');
-
-  const groupedByTitle = new Map<string, ExpenseItem[]>();
+  // Г) Однотипные расходы, сгруппированные по статье расходов или назначению
+  const groupedByCategoryOrTitle = new Map<string, ExpenseItem[]>();
   for (const it of individualExpenses) {
-    // Неклассифицированные банковские списания выводим отдельно, чтобы директор сразу видел каждое и мог назначить статью
-    if (it.bankOp && (!it.categoryId || it.category === 'Списание с Р/С (API)')) {
-      expenseItems.push(it);
-      continue;
-    }
-    const k = normKey(it.title);
-    const list = groupedByTitle.get(k) || [];
+    const cleanedTitle = cleanExpenseDescription(it.title);
+    const assignedCategory = resolveExpenseCategory(cleanedTitle, it.category);
+
+    // Обновляем поля расхода
+    it.title = cleanedTitle;
+    it.category = assignedCategory;
+
+    // Ключ группировки: если категория "Комиссия банка", "ГСМ", "Перевод между кошельками" или повторяющийся получатель
+    const groupKey = assignedCategory.toLowerCase();
+    const list = groupedByCategoryOrTitle.get(groupKey) || [];
     list.push(it);
-    groupedByTitle.set(k, list);
+    groupedByCategoryOrTitle.set(groupKey, list);
   }
 
-  for (const [, list] of groupedByTitle.entries()) {
+  for (const [catKey, list] of groupedByCategoryOrTitle.entries()) {
     if (list.length === 1 && list[0]) {
       expenseItems.push(list[0]);
     } else if (list.length > 1 && list[0]) {
       const first = list[0];
       const sumAmt = list.reduce((s, it) => s + it.amount, 0);
-      const groupId = `group-custom-${normKey(first.title).slice(0, 30)}-${list.length}`;
+      const groupTitle = `${first.category} (${list.length} операций)`;
+      const groupId = `group-cat-${catKey.slice(0, 30)}-${list.length}`;
       expenseItems.push({
         id: groupId,
-        title: `${first.title} (${list.length} операции)`,
+        title: groupTitle,
         category: first.category,
         categoryId: first.categoryId,
         wallet: first.wallet,
-        walletName: first.walletName,
+        walletName: list.every((it) => it.wallet === first.wallet)
+          ? first.walletName
+          : 'Разные счета',
         author: first.author,
         amount: sumAmt,
         isGroup: true,
@@ -1405,7 +1479,10 @@ export function DailyControlPanel() {
                       {/* Zone 1: Info */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-black text-slate-900 truncate">
+                          <span
+                            className="text-xs font-black text-slate-900 line-clamp-2 leading-tight break-words max-w-[420px]"
+                            title={item.title}
+                          >
                             {item.title}
                           </span>
                           <span className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
@@ -1597,17 +1674,6 @@ export function DailyControlPanel() {
               ))
             )}
           </div>
-
-          {/* Bottom manual add button for left column */}
-          <button
-            onClick={() => openManualModal('expense')}
-            className="w-full py-3 bg-white hover:bg-rose-50/50 border-2 border-dashed border-rose-300 hover:border-rose-400 rounded-2xl text-xs font-black text-rose-700 hover:text-rose-800 flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition"
-          >
-            <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-xs font-black border border-rose-300">
-              +
-            </span>
-            <span>Внести списание вручную (ГСМ, запчасти, ЗП, кредит)</span>
-          </button>
         </div>
 
         {/* RIGHT COLUMN: INCOMES (ДОХОДЫ) */}
@@ -1652,26 +1718,26 @@ export function DailyControlPanel() {
             const pendingAmt = qrPending.reduce((s, o) => s + parseFloat(o.amount || '0'), 0);
 
             return (
-              <div className="p-2.5 bg-slate-900 text-slate-200 rounded-2xl border-2 border-slate-800 text-xs flex flex-col gap-1.5 shadow-sm">
+              <div className="p-3 bg-white text-slate-850 rounded-2xl border-2 border-slate-200 text-xs flex flex-col gap-2 shadow-2xs">
                 <div className="flex items-center justify-between flex-wrap gap-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm">📱</span>
-                    <span className="font-black text-slate-100 uppercase tracking-wide text-[10px]">
+                    <span className="font-black text-slate-900 uppercase tracking-wide text-[10px]">
                       Сверка QR-кодов от водителей
                     </span>
-                    <span className="text-[9px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded">
+                    <span className="text-[10px] font-mono bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-bold">
                       Всего: {qrOrders.length} ({rub(totalQrAmt)})
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] font-mono">
-                    <span className="text-emerald-400 font-bold">
+                    <span className="text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
                       ✓ В банке: {qrCompleted.length}
                     </span>
                     <span
-                      className={`px-1.5 py-0.2 rounded font-black ${
+                      className={`px-2 py-0.5 rounded-md font-black ${
                         qrPending.length > 0
-                          ? 'bg-rose-500 text-white animate-pulse'
-                          : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       }`}
                     >
                       {qrPending.length > 0
@@ -1682,31 +1748,31 @@ export function DailyControlPanel() {
                 </div>
 
                 {qrPending.length > 0 && (
-                  <div className="bg-rose-950/70 border border-rose-800/80 rounded-xl p-2 text-[10px] space-y-1">
-                    <div className="text-[9px] font-black uppercase tracking-wider text-rose-300 flex items-center justify-between">
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-[11px] space-y-1.5">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-rose-900 flex items-center justify-between">
                       <span>Заказы с QR, по которым оплата ещё НЕ поступила:</span>
-                      <span className="text-rose-400">Требуется проверка водителей</span>
+                      <span className="text-rose-700 font-bold">Требуется проверка водителей</span>
                     </div>
                     {qrPending.map((o) => (
                       <div
                         key={o.id}
-                        className="flex items-center justify-between text-rose-200 py-0.5 border-b border-rose-900/40 last:border-0"
+                        className="flex items-center justify-between text-slate-700 py-0.5 border-b border-rose-100 last:border-0"
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                          <span className="font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                          <span className="font-bold text-slate-900">
                             {o.trip?.trip_number ? `Рейс №${o.trip.trip_number}` : 'Рейс'}
                           </span>
-                          <span className="text-rose-300 font-medium">
+                          <span className="text-slate-600 font-medium">
                             ({o.trip?.driver?.name || 'Водитель'})
                           </span>
                           {o.counterparty?.name && (
-                            <span className="text-[9px] text-rose-400">
+                            <span className="text-[10px] text-slate-500">
                               · {o.counterparty.name}
                             </span>
                           )}
                         </div>
-                        <span className="font-mono font-black text-rose-200">
+                        <span className="font-mono font-black text-rose-700">
                           {rub(parseFloat(o.amount || '0'))}
                         </span>
                       </div>
@@ -1791,13 +1857,19 @@ export function DailyControlPanel() {
                           item.isLinked ? (
                             <div className="flex items-center gap-1.5">
                               <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-950 border-2 border-emerald-200 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
-                                <span>🚚</span>
                                 <span>
-                                  {item.linkedTripNumber
-                                    ? `Рейс №${item.linkedTripNumber}`
-                                    : 'Рейс'}
+                                  {item.linkTypeLabel?.includes('Заказ-наряд')
+                                    ? '🔧'
+                                    : item.linkTypeLabel?.includes('Диспетчер')
+                                      ? '🤝'
+                                      : '🚚'}
                                 </span>
-                                {item.linkedDriverName && <span>({item.linkedDriverName})</span>}
+                                <span>
+                                  {item.linkTypeLabel ||
+                                    (item.linkedTripNumber
+                                      ? `Рейс №${item.linkedTripNumber}`
+                                      : 'Связано')}
+                                </span>
                                 <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded text-[10px]">
                                   ✓
                                 </span>
@@ -1832,11 +1904,11 @@ export function DailyControlPanel() {
                                   }
                                   disabled={linkBankOpMutation.isPending}
                                   className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs border-2 border-amber-500/40 flex items-center gap-1 cursor-pointer transition"
-                                  title="Быстро связать с совпадающим заказом"
+                                  title="Быстро связать с совпадающим заказом рейса"
                                 >
                                   <span>⚡</span>
                                   <span>
-                                    Совпадает: Рейс №{item.suggestedOrder.trip?.trip_number} (
+                                    Рейс №{item.suggestedOrder.trip?.trip_number} (
                                     {item.suggestedOrder.trip?.driver?.name})
                                   </span>
                                 </button>
@@ -1844,6 +1916,7 @@ export function DailyControlPanel() {
                               <button
                                 onClick={() => {
                                   setLinkingBankOp(item.bankOp!);
+                                  setLinkMode('trip');
                                   if (item.suggestedOrder) {
                                     setSelectedOrderIdToLink(item.suggestedOrder.id);
                                   } else {
@@ -1852,7 +1925,7 @@ export function DailyControlPanel() {
                                 }}
                                 className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] rounded-xl border border-slate-300 cursor-pointer transition"
                               >
-                                🔗 Привязать к рейсу
+                                🔗 Связать (Рейс / Гараж / Диспетчер)
                               </button>
                             </div>
                           )
@@ -1934,46 +2007,41 @@ export function DailyControlPanel() {
               ))
             )}
           </div>
-
-          {/* Bottom manual add button for right column */}
-          <button
-            onClick={() => openManualModal('income')}
-            className="w-full py-3 bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300 hover:border-emerald-400 rounded-2xl text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition"
-          >
-            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black border border-emerald-300">
-              +
-            </span>
-            <span>Внести пополнение вручную (Выручка нал/безнал, возврат, прочее)</span>
-          </button>
         </div>
       </div>
 
       {/* ── 7. BOTTOM EXACT WALLET SUMMARY (100% ФИНАНСОВЫЙ КОНТРОЛЬ) ── */}
-      <div className="bg-slate-900 text-white rounded-xl p-3.5 border border-slate-800 shadow-md">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+      <div className="bg-white text-slate-900 rounded-2xl p-4 border-2 border-slate-200 shadow-card">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <span className="text-sm">🎯</span>
-            <span className="text-xs font-black uppercase tracking-wider text-slate-200">
+            <span className="text-base">🎯</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
               ИТОГОВЫЙ СУТОЧНЫЙ БАЛАНС ПО КОШЕЛЬКАМ (ИТОГО ЗА ДЕНЬ)
             </span>
           </div>
-          <div className="text-xs font-mono font-black text-sky-400">
+          <div className="text-sm font-mono font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
             ВСЕГО: {rub(eveningTotal)}
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="mt-3.5 grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Bank */}
-          <div className="bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/60">
+          <div className="bg-sky-50/60 rounded-xl p-3 border-2 border-sky-100">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-300">🏦 Р/С Банк (АПИ):</span>
-              <span className="text-xs font-black font-mono text-sky-400">
+              <span className="text-xs font-bold text-sky-950">🏦 Р/С Банк (АПИ):</span>
+              <span className="text-sm font-black font-mono text-sky-700">
                 {rub(bankWallet?.evening ?? 0)}
               </span>
             </div>
-            <div className="text-[9px] text-slate-400 mt-1 flex justify-between">
+            <div className="text-[10px] text-slate-500 mt-1 flex justify-between font-mono">
               <span>С утра: {rub(bankWallet?.morning ?? 0)}</span>
-              <span>
+              <span
+                className={
+                  (bankWallet?.evening ?? 0) - (bankWallet?.morning ?? 0) >= 0
+                    ? 'text-emerald-600 font-bold'
+                    : 'text-rose-600 font-bold'
+                }
+              >
                 {(bankWallet?.evening ?? 0) - (bankWallet?.morning ?? 0) >= 0 ? '+' : ''}
                 {rub((bankWallet?.evening ?? 0) - (bankWallet?.morning ?? 0))}
               </span>
@@ -1981,16 +2049,22 @@ export function DailyControlPanel() {
           </div>
 
           {/* Cash Safe */}
-          <div className="bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/60">
+          <div className="bg-emerald-50/60 rounded-xl p-3 border-2 border-emerald-100">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-300">🔒 Сейф (Факт директор):</span>
-              <span className="text-xs font-black font-mono text-emerald-400">
+              <span className="text-xs font-bold text-emerald-950">🔒 Сейф (Факт директор):</span>
+              <span className="text-sm font-black font-mono text-emerald-700">
                 {rub(cashWallet?.evening ?? 0)}
               </span>
             </div>
-            <div className="text-[9px] text-slate-400 mt-1 flex justify-between">
+            <div className="text-[10px] text-slate-500 mt-1 flex justify-between font-mono">
               <span>С утра: {rub(cashWallet?.morning ?? 0)}</span>
-              <span>
+              <span
+                className={
+                  (cashWallet?.evening ?? 0) - (cashWallet?.morning ?? 0) >= 0
+                    ? 'text-emerald-600 font-bold'
+                    : 'text-rose-600 font-bold'
+                }
+              >
                 {(cashWallet?.evening ?? 0) - (cashWallet?.morning ?? 0) >= 0 ? '+' : ''}
                 {rub((cashWallet?.evening ?? 0) - (cashWallet?.morning ?? 0))}
               </span>
@@ -1998,16 +2072,22 @@ export function DailyControlPanel() {
           </div>
 
           {/* Fuel Card */}
-          <div className="bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/60">
+          <div className="bg-amber-50/60 rounded-xl p-3 border-2 border-amber-100">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-300">⛽ Топливная карта:</span>
-              <span className="text-xs font-black font-mono text-amber-400">
+              <span className="text-xs font-bold text-amber-950">⛽ Топливная карта:</span>
+              <span className="text-sm font-black font-mono text-amber-700">
                 {rub(fuelWallet?.evening ?? 0)}
               </span>
             </div>
-            <div className="text-[9px] text-slate-400 mt-1 flex justify-between">
+            <div className="text-[10px] text-slate-500 mt-1 flex justify-between font-mono">
               <span>С утра: {rub(fuelWallet?.morning ?? 0)}</span>
-              <span>
+              <span
+                className={
+                  (fuelWallet?.evening ?? 0) - (fuelWallet?.morning ?? 0) >= 0
+                    ? 'text-emerald-600 font-bold'
+                    : 'text-rose-600 font-bold'
+                }
+              >
                 {(fuelWallet?.evening ?? 0) - (fuelWallet?.morning ?? 0) >= 0 ? '+' : ''}
                 {rub((fuelWallet?.evening ?? 0) - (fuelWallet?.morning ?? 0))}
               </span>
@@ -2354,10 +2434,10 @@ export function DailyControlPanel() {
             <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-black text-sm uppercase tracking-wide flex items-center gap-1.5">
-                  <span>🔗</span> Привязка оплаты СБП / QR к рейсу
+                  <span>🔗</span> Привязка поступления денежных средств
                 </h3>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Выберите рейс и водителя, который выполнил этот заказ
+                  Свяжите приход с рейсом автопарка, заказ-нарядом СТО или диспетчерским договором
                 </p>
               </div>
               <button
@@ -2392,98 +2472,208 @@ export function DailyControlPanel() {
                 </div>
               </div>
 
-              {/* Trip Selection */}
-              <div>
-                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1.5">
-                  Выберите заказ рейса водителя за сегодня:
-                </label>
+              {/* Mode Switcher Tabs */}
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('trip')}
+                  className={`py-1.5 text-[11px] font-black rounded-lg transition cursor-pointer flex items-center justify-center gap-1 ${
+                    linkMode === 'trip'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🚚</span>
+                  <span>Рейс парка</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('sto')}
+                  className={`py-1.5 text-[11px] font-black rounded-lg transition cursor-pointer flex items-center justify-center gap-1 ${
+                    linkMode === 'sto'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🔧</span>
+                  <span>Гараж / СТО</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('dispatcher')}
+                  className={`py-1.5 text-[11px] font-black rounded-lg transition cursor-pointer flex items-center justify-center gap-1 ${
+                    linkMode === 'dispatcher'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🤝</span>
+                  <span>Диспетчер (АТИ)</span>
+                </button>
+              </div>
 
-                {(() => {
-                  const todayOrders = data?.trip_orders ?? [];
-                  const opAmt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
+              {/* Tab 1: Trip Selection */}
+              {linkMode === 'trip' && (
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1.5">
+                    Выберите рейс автопарка за сегодня:
+                  </label>
 
-                  if (todayOrders.length === 0) {
+                  {(() => {
+                    const todayOrders = data?.trip_orders ?? [];
+                    const opAmt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
+
+                    if (todayOrders.length === 0) {
+                      return (
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center text-slate-500">
+                          Сегодня ещё не создано рейсов водителей.
+                        </div>
+                      );
+                    }
+
                     return (
-                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center text-slate-500">
-                        Сегодня ещё не создано заказов рейсов.
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {todayOrders.map((order) => {
+                          const isMatchAmt = parseFloat(order.amount) === opAmt;
+                          const isSelected = selectedOrderIdToLink === order.id;
+
+                          return (
+                            <div
+                              key={order.id}
+                              onClick={() => setSelectedOrderIdToLink(order.id)}
+                              className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
+                                isSelected
+                                  ? 'bg-sky-50 border-2 border-sky-500 ring-2 ring-sky-200'
+                                  : isMatchAmt
+                                    ? 'bg-amber-50/70 border-amber-300 hover:border-amber-400'
+                                    : 'bg-white border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="radio"
+                                  checked={isSelected}
+                                  onChange={() => setSelectedOrderIdToLink(order.id)}
+                                  className="cursor-pointer"
+                                />
+                                <div>
+                                  <div className="font-black text-slate-900 flex items-center gap-1.5">
+                                    <span>
+                                      {order.trip?.trip_number
+                                        ? `Рейс №${order.trip.trip_number}`
+                                        : 'Рейс'}
+                                    </span>
+                                    <span className="text-slate-500 font-normal">
+                                      · {order.trip?.driver?.name || 'Водитель'}
+                                    </span>
+                                    {isMatchAmt && (
+                                      <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded shadow-2xs">
+                                        ⭐ Совпадает сумма
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                    <span>
+                                      Тип:{' '}
+                                      {order.payment_method === 'qr'
+                                        ? '📱 QR-код'
+                                        : order.payment_method === 'cash'
+                                          ? '💵 Наличные'
+                                          : order.payment_method}
+                                    </span>
+                                    {order.counterparty?.name && (
+                                      <span>Клиент: {order.counterparty.name}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <div className="font-mono font-black text-slate-900 text-xs">
+                                  {rub(parseFloat(order.amount))}
+                                </div>
+                                <div className="text-[9px] text-slate-400">
+                                  {order.settlement_status === 'completed'
+                                    ? '✓ Оплачен'
+                                    : '⏳ Ожидает'}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
-                  }
+                  })()}
+                </div>
+              )}
 
-                  return (
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                      {todayOrders.map((order) => {
-                        const isMatchAmt = parseFloat(order.amount) === opAmt;
-                        const isSelected = selectedOrderIdToLink === order.id;
+              {/* Tab 2: STO / Garage Work Order */}
+              {linkMode === 'sto' && (
+                <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                      Номер заказ-наряда / чека автосервиса:
+                    </label>
+                    <input
+                      type="text"
+                      value={stoOrderNumber}
+                      onChange={(e) => setStoOrderNumber(e.target.value)}
+                      placeholder="Например: ЗН-104 или 482"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                      Клиент / Автомобиль (необязательно):
+                    </label>
+                    <input
+                      type="text"
+                      value={stoClientName}
+                      onChange={(e) => setStoClientName(e.target.value)}
+                      placeholder="Например: Газель В672ТТ / ООО Вектор"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    💡 Привяжет данный платёж к услугам гаража/СТО и зафиксирует выручку
+                    автосервиса.
+                  </div>
+                </div>
+              )}
 
-                        return (
-                          <div
-                            key={order.id}
-                            onClick={() => setSelectedOrderIdToLink(order.id)}
-                            className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-sky-50 border-2 border-sky-500 ring-2 ring-sky-200'
-                                : isMatchAmt
-                                  ? 'bg-amber-50/70 border-amber-300 hover:border-amber-400'
-                                  : 'bg-white border-slate-200 hover:border-slate-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                checked={isSelected}
-                                onChange={() => setSelectedOrderIdToLink(order.id)}
-                                className="cursor-pointer"
-                              />
-                              <div>
-                                <div className="font-black text-slate-900 flex items-center gap-1.5">
-                                  <span>
-                                    {order.trip?.trip_number
-                                      ? `Рейс №${order.trip.trip_number}`
-                                      : 'Рейс'}
-                                  </span>
-                                  <span className="text-slate-500 font-normal">
-                                    · {order.trip?.driver?.name || 'Водитель'}
-                                  </span>
-                                  {isMatchAmt && (
-                                    <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded shadow-2xs">
-                                      ⭐ Совпадает сумма
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
-                                  <span>
-                                    Тип:{' '}
-                                    {order.payment_method === 'qr'
-                                      ? '📱 QR-код'
-                                      : order.payment_method === 'cash'
-                                        ? '💵 Наличные'
-                                        : order.payment_method}
-                                  </span>
-                                  {order.counterparty?.name && (
-                                    <span>Клиент: {order.counterparty.name}</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="text-right">
-                              <div className="font-mono font-black text-slate-900 text-xs">
-                                {rub(parseFloat(order.amount))}
-                              </div>
-                              <div className="text-[9px] text-slate-400">
-                                {order.settlement_status === 'completed'
-                                  ? '✓ Оплачен'
-                                  : '⏳ Ожидает'}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
+              {/* Tab 3: Dispatcher Trip */}
+              {linkMode === 'dispatcher' && (
+                <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                      Номер заявки / маршрут чужого авто:
+                    </label>
+                    <input
+                      type="text"
+                      value={dispatcherDetails}
+                      onChange={(e) => setDispatcherDetails(e.target.value)}
+                      placeholder="Например: АТИ №1405 Салда — Москва"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-700 mb-1">
+                      Заказчик перевозки / экспедирование:
+                    </label>
+                    <input
+                      type="text"
+                      value={dispatcherClientName}
+                      onChange={(e) => setDispatcherClientName(e.target.value)}
+                      placeholder="Например: ООО Логистик Групп"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    💡 Привяжет платёж к экспедиторскому рейсу на привлечённом транспорте
+                    (диспетчерская комиссия).
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -2496,11 +2686,23 @@ export function DailyControlPanel() {
                 </button>
                 <button
                   type="button"
-                  disabled={!selectedOrderIdToLink || linkBankOpMutation.isPending}
+                  disabled={
+                    linkBankOpMutation.isPending ||
+                    (linkMode === 'trip' && !selectedOrderIdToLink) ||
+                    (linkMode === 'sto' && !stoOrderNumber.trim()) ||
+                    (linkMode === 'dispatcher' && !dispatcherDetails.trim())
+                  }
                   onClick={() =>
                     linkBankOpMutation.mutate({
                       operationId: linkingBankOp.operationId,
-                      tripOrderId: selectedOrderIdToLink,
+                      linkType: linkMode,
+                      tripOrderId: linkMode === 'trip' ? selectedOrderIdToLink : undefined,
+                      stoOrderNumber: linkMode === 'sto' ? stoOrderNumber.trim() : undefined,
+                      stoClientName: linkMode === 'sto' ? stoClientName.trim() : undefined,
+                      dispatcherDetails:
+                        linkMode === 'dispatcher' ? dispatcherDetails.trim() : undefined,
+                      dispatcherClientName:
+                        linkMode === 'dispatcher' ? dispatcherClientName.trim() : undefined,
                       amount: linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0,
                       operationDate: linkingBankOp.operationDate,
                       date: selectedDate,
@@ -2509,7 +2711,13 @@ export function DailyControlPanel() {
                   }
                   className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
-                  {linkBankOpMutation.isPending ? 'Связывание...' : '✓ Связать платёж с рейсом'}
+                  {linkBankOpMutation.isPending
+                    ? 'Связывание...'
+                    : linkMode === 'sto'
+                      ? '✓ Связать с заказ-нарядом СТО'
+                      : linkMode === 'dispatcher'
+                        ? '✓ Связать с рейсом диспетчера'
+                        : '✓ Связать с рейсом автопарка'}
                 </button>
               </div>
             </div>

@@ -29,12 +29,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       updated_at: new Date().toISOString(),
     };
 
+    // Если заявка сорвана / отменена
+    if (body.is_cancelled) {
+      updatedValues.is_cancelled = true;
+      updatedValues.cancel_reason = body.cancel_reason || 'Срыв погрузки';
+      updatedValues.cancelled_at = new Date().toISOString();
+      updatedValues.stage = 0; // Снимается с активных этапов 1..8
+
+      // Если была создана запись в дебиторке — закрываем её
+      if (currentValues.counterparty_id) {
+        try {
+          await (supabase.from('manual_receivables') as any)
+            .update({ settled: true })
+            .eq('counterparty_id', currentValues.counterparty_id)
+            .ilike('description', `%${updatedValues.order_number}%`);
+        } catch (cErr) {
+          console.warn('Could not close manual_receivables on cancel:', cErr);
+        }
+      }
+    } else if (body.restore) {
+      // Восстановление сорванной заявки обратно на доску
+      updatedValues.is_cancelled = false;
+      updatedValues.cancel_reason = null;
+      updatedValues.cancelled_at = null;
+      updatedValues.stage = body.stage || 1;
+    }
+
     // 2. Интеграция с Дебиторкой:
-    // Если заявка переведена на этап 7 (Ожидание оплаты / Дебиторка)
-    // и у нее есть контрагент и сумма — гарантируем наличие записи в дебиторке!
-    if (newStage === 7 && currentValues.counterparty_id && updatedValues.price > 0) {
+    if (
+      newStage === 7 &&
+      currentValues.counterparty_id &&
+      updatedValues.price > 0 &&
+      !updatedValues.is_cancelled
+    ) {
       try {
-        // Проверяем, создана ли уже запись в manual_receivables для этой заявки АТИ
         const atiRefDesc = `АТИ Заявка ${updatedValues.order_number}`;
         const { data: existingRec } = await (supabase.from('manual_receivables') as any)
           .select('id')
