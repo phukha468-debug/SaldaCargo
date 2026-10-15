@@ -391,7 +391,12 @@ export function DailyControlPanel() {
 
   // Link Bank Op (Trip / STO / Dispatcher) Mutation
   const [linkingBankOp, setLinkingBankOp] = useState<TBankOp | null>(null);
-  const [selectedOrderIdToLink, setSelectedOrderIdToLink] = useState<string>('');
+  const [selectedOrderIdsToLink, setSelectedOrderIdsToLink] = useState<string[]>([]);
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrderIdsToLink((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId],
+    );
+  };
   const [linkMode, setLinkMode] = useState<'trip' | 'sto' | 'dispatcher'>('trip');
   const [stoOrderNumber, setStoOrderNumber] = useState('');
   const [stoClientName, setStoClientName] = useState('');
@@ -473,24 +478,67 @@ export function DailyControlPanel() {
     enabled: !!linkingBankOp && linkMode === 'trip',
   });
 
-  // Auto-select the best matching order when linkableOrdersData loads
+  // Auto-select the best matching order(s) when linkableOrdersData loads
   React.useEffect(() => {
     if (!linkingBankOp || linkMode !== 'trip') return;
     const orders = linkableOrdersData?.orders ?? [];
-    if (orders.length > 0 && !selectedOrderIdToLink) {
+    if (orders.length > 0 && selectedOrderIdsToLink.length === 0) {
+      const opAmt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
+
+      // 1. Сначала ищем одиночный рейс с точным совпадением суммы
+      const exactSingle = orders.find(
+        (o) => !o.is_already_linked && Math.abs(parseFloat(String(o.amount || '0')) - opAmt) < 0.01,
+      );
+      if (exactSingle) {
+        setSelectedOrderIdsToLink([exactSingle.id]);
+        return;
+      }
+
+      // 2. Ищем комбинацию из двух рейсов, сумма которых равна платежу (напр. долг за 2 рейса: 1000 + 1000 = 2000)
+      const available = orders.filter((o) => !o.is_already_linked);
+      let foundPair: string[] | null = null;
+      for (let i = 0; i < available.length; i++) {
+        for (let j = i + 1; j < available.length; j++) {
+          const sumAmt =
+            parseFloat(String(available[i].amount || '0')) +
+            parseFloat(String(available[j].amount || '0'));
+          if (Math.abs(sumAmt - opAmt) < 0.01) {
+            // Если одинаковый контрагент — высший приоритет
+            if (
+              available[i].counterparty?.name &&
+              available[i].counterparty?.name === available[j].counterparty?.name
+            ) {
+              foundPair = [available[i].id, available[j].id];
+              break;
+            }
+            if (!foundPair) {
+              foundPair = [available[i].id, available[j].id];
+            }
+          }
+        }
+        if (foundPair) break;
+      }
+
+      if (foundPair) {
+        setSelectedOrderIdsToLink(foundPair);
+        return;
+      }
+
+      // 3. Fallback: рейс по дате или первый в списке
       const best =
         orders.find((o) => !o.is_already_linked && (o.is_match_amount || o.is_match_date)) ||
         orders[0];
       if (best) {
-        setSelectedOrderIdToLink(best.id);
+        setSelectedOrderIdsToLink([best.id]);
       }
     }
-  }, [linkableOrdersData, linkingBankOp, linkMode, selectedOrderIdToLink]);
+  }, [linkableOrdersData, linkingBankOp, linkMode, selectedOrderIdsToLink.length]);
 
   const linkBankOpMutation = useMutation({
     mutationFn: async ({
       operationId,
       tripOrderId,
+      tripOrderIds,
       amount,
       action,
       operationDate,
@@ -502,6 +550,7 @@ export function DailyControlPanel() {
     }: {
       operationId: string;
       tripOrderId?: string;
+      tripOrderIds?: string[];
       amount?: number;
       action?: 'link' | 'unlink';
       operationDate?: string;
@@ -517,6 +566,7 @@ export function DailyControlPanel() {
         body: JSON.stringify({
           operationId,
           tripOrderId,
+          tripOrderIds,
           amount,
           action,
           operationDate,
@@ -537,7 +587,7 @@ export function DailyControlPanel() {
       queryClient.invalidateQueries({ queryKey: ['daily-balance', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['linkable-orders'] });
       setLinkingBankOp(null);
-      setSelectedOrderIdToLink('');
+      setSelectedOrderIdsToLink([]);
       setLinkOrderSearch('');
       setLinkOrderPeriod('smart');
       setLinkOrderCustomDate('');
@@ -621,11 +671,11 @@ export function DailyControlPanel() {
           descLower.includes('qr') ||
           op.category === 'acquiring';
 
-        // Ищем существующую связь с рейсом в transactions
-        const linkedTx = (data?.transactions ?? []).find(
+        // Ищем существующую связь с рейсами в transactions
+        const linkedTxs = (data?.transactions ?? []).filter(
           (t) =>
             t.idempotency_key === op.operationId ||
-            (op.operationId && t.idempotency_key?.includes(op.operationId)),
+            (op.operationId && t.idempotency_key?.startsWith(`${op.operationId}_`)),
         );
 
         let title = op.description || op.payPurpose || 'Входящий перевод на Р/С';
@@ -635,31 +685,56 @@ export function DailyControlPanel() {
         let linkedTripNumber: string | number | undefined;
         let linkedDriverName: string | undefined;
 
-        if (linkedTx) {
+        if (linkedTxs.length > 0) {
           isLinked = true;
-          const desc = linkedTx.description || '';
-          if (desc.includes('Заказ-наряд')) {
-            linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
-          } else if (desc.includes('Диспетчерский')) {
-            linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
+          if (linkedTxs.length === 1) {
+            const linkedTx = linkedTxs[0];
+            const desc = linkedTx.description || '';
+            if (desc.includes('Заказ-наряд')) {
+              linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
+            } else if (desc.includes('Диспетчерский')) {
+              linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
+            } else {
+              const linkedOrder = (data?.trip_orders ?? []).find(
+                (o) => o.id === linkedTx.trip_order_id,
+              );
+              const matchNum = linkedTx.description?.match(/Рейс №(\d+)/);
+              linkedTripNumber =
+                linkedOrder?.trip?.trip_number || (matchNum ? matchNum[1] : undefined);
+              const matchDriver = linkedTx.description?.match(/\((.+?)\)/);
+              linkedDriverName =
+                linkedTx.related_user?.name ||
+                linkedOrder?.trip?.driver?.name ||
+                (matchDriver ? matchDriver[1] : undefined);
+              linkTypeLabel = linkedTripNumber
+                ? `Рейс №${linkedTripNumber}${linkedDriverName ? ` (${linkedDriverName})` : ''}`
+                : 'Рейс автопарка';
+            }
+            author = linkedDriverName ? `вод. ${linkedDriverName}` : payerName;
+            title = linkedTx.description || title;
           } else {
-            const linkedOrder = (data?.trip_orders ?? []).find(
-              (o) => o.id === linkedTx.trip_order_id,
-            );
-            const matchNum = linkedTx.description?.match(/Рейс №(\d+)/);
-            linkedTripNumber =
-              linkedOrder?.trip?.trip_number || (matchNum ? matchNum[1] : undefined);
-            const matchDriver = linkedTx.description?.match(/\((.+?)\)/);
-            linkedDriverName =
-              linkedTx.related_user?.name ||
-              linkedOrder?.trip?.driver?.name ||
-              (matchDriver ? matchDriver[1] : undefined);
-            linkTypeLabel = linkedTripNumber
-              ? `Рейс №${linkedTripNumber}${linkedDriverName ? ` (${linkedDriverName})` : ''}`
-              : 'Рейс автопарка';
+            // Связано несколько рейсов автопарка
+            const tripNumbers: string[] = [];
+            const driverNames: string[] = [];
+            for (const tx of linkedTxs) {
+              const matchNum = tx.description?.match(/Рейс №(\d+)/);
+              if (matchNum && !tripNumbers.includes(`№${matchNum[1]}`)) {
+                tripNumbers.push(`№${matchNum[1]}`);
+              }
+              const matchDriver = tx.description?.match(/\((.+?)\)/);
+              if (matchDriver && !driverNames.includes(matchDriver[1])) {
+                driverNames.push(matchDriver[1]);
+              }
+            }
+            linkTypeLabel =
+              tripNumbers.length > 0
+                ? `Рейсы: ${tripNumbers.join(', ')}`
+                : `${linkedTxs.length} рейса`;
+            if (driverNames.length > 0) {
+              author = `вод. ${driverNames.join(', ')}`;
+            }
+            title = `Оплата долга за ${linkedTxs.length} рейса (${tripNumbers.join(', ')})`;
           }
-          author = linkedDriverName ? `вод. ${linkedDriverName}` : payerName;
-          title = linkedTx.description || title;
         }
 
         // Подбор подходящего сегодняшнего заказа с совпадающей суммой
@@ -2030,9 +2105,9 @@ export function DailyControlPanel() {
                                   setLinkOrderPeriod('smart');
                                   setLinkOrderCustomDate('');
                                   if (item.suggestedOrder) {
-                                    setSelectedOrderIdToLink(item.suggestedOrder.id);
+                                    setSelectedOrderIdsToLink([item.suggestedOrder.id]);
                                   } else {
-                                    setSelectedOrderIdToLink('');
+                                    setSelectedOrderIdsToLink([]);
                                   }
                                 }}
                                 className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] rounded-xl border border-slate-300 cursor-pointer transition"
@@ -2664,9 +2739,14 @@ export function DailyControlPanel() {
               {linkMode === 'trip' && (
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-black uppercase text-slate-700">
-                      Выберите рейс автопарка для привязки:
-                    </label>
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-700">
+                        Выберите рейс(ы) автопарка для привязки:
+                      </label>
+                      <div className="text-[10px] text-slate-500">
+                        💡 Можно выбрать сразу несколько рейсов (оплата долга за 2 и более рейса)
+                      </div>
+                    </div>
                     {linkableOrdersData?.extractedDate && (
                       <span className="text-[10px] font-bold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full border border-sky-200">
                         🎯 Дата из платежа:{' '}
@@ -2775,6 +2855,20 @@ export function DailyControlPanel() {
                   {(() => {
                     const orders = linkableOrdersData?.orders ?? [];
                     const opAmt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
+                    const selectedOrders = orders.filter((o) =>
+                      selectedOrderIdsToLink.includes(o.id),
+                    );
+                    const selectedTotalAmount = selectedOrders.reduce(
+                      (sum, o) => sum + parseFloat(String(o.amount || '0')),
+                      0,
+                    );
+                    const isSumExactMatch =
+                      selectedOrderIdsToLink.length > 0 &&
+                      Math.abs(selectedTotalAmount - opAmt) < 0.01;
+                    const isSumUnder =
+                      selectedOrderIdsToLink.length > 0 && selectedTotalAmount < opAmt;
+                    const isSumOver =
+                      selectedOrderIdsToLink.length > 0 && selectedTotalAmount > opAmt;
 
                     if (isLoadingLinkableOrders) {
                       return (
@@ -2807,105 +2901,168 @@ export function DailyControlPanel() {
                     }
 
                     return (
-                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                        {orders.map((order) => {
-                          const isMatchAmt =
-                            order.is_match_amount ?? parseFloat(String(order.amount)) === opAmt;
-                          const isSelected = selectedOrderIdToLink === order.id;
-                          const isTopRecommendation = order.score && order.score >= 100;
-
-                          return (
-                            <div
-                              key={order.id}
-                              onClick={() => setSelectedOrderIdToLink(order.id)}
-                              className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
-                                isSelected
-                                  ? 'bg-sky-50 border-2 border-sky-500 ring-2 ring-sky-200'
-                                  : isTopRecommendation
-                                    ? 'bg-amber-50/80 border-2 border-amber-400 hover:border-amber-500 shadow-2xs'
-                                    : isMatchAmt
-                                      ? 'bg-amber-50/50 border-amber-300 hover:border-amber-400'
-                                      : 'bg-white border-slate-200 hover:border-slate-300'
-                              }`}
+                      <div className="space-y-2">
+                        {/* Status bar of selected orders */}
+                        <div
+                          className={`p-2.5 rounded-xl border text-xs flex items-center justify-between transition ${
+                            selectedOrderIdsToLink.length === 0
+                              ? 'bg-slate-50 border-slate-200 text-slate-500'
+                              : isSumExactMatch
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-medium'
+                                : isSumUnder
+                                  ? 'bg-amber-50 border-amber-300 text-amber-950'
+                                  : 'bg-purple-50 border-purple-300 text-purple-950'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>
+                              {selectedOrderIdsToLink.length === 0 ? (
+                                '💡 Отметьте один или сразу несколько рейсов'
+                              ) : (
+                                <>
+                                  Выбрано: <b>{selectedOrderIdsToLink.length}</b> рейса на сумму{' '}
+                                  <b className="font-mono text-slate-900">
+                                    {rub(selectedTotalAmount)}
+                                  </b>{' '}
+                                  из <b className="font-mono text-slate-900">{rub(opAmt)}</b>
+                                </>
+                              )}
+                            </span>
+                            {isSumExactMatch && (
+                              <span className="bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded shadow-2xs">
+                                ✓ Сумма совпадает (100%)
+                              </span>
+                            )}
+                            {isSumUnder && (
+                              <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded">
+                                Остаток: {rub(opAmt - selectedTotalAmount)}
+                              </span>
+                            )}
+                            {isSumOver && (
+                              <span className="text-[10px] text-purple-800 font-bold bg-purple-100 px-1.5 py-0.2 rounded">
+                                Превышение: +{rub(selectedTotalAmount - opAmt)}
+                              </span>
+                            )}
+                          </div>
+                          {selectedOrderIdsToLink.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOrderIdsToLink([])}
+                              className="text-[10px] text-slate-500 hover:text-slate-800 underline cursor-pointer ml-2 flex-shrink-0"
                             >
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="radio"
-                                  checked={isSelected}
-                                  onChange={() => setSelectedOrderIdToLink(order.id)}
-                                  className="cursor-pointer"
-                                />
-                                <div>
-                                  <div className="font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
-                                    <span>
-                                      {order.trip?.trip_number
-                                        ? `Рейс №${order.trip.trip_number}`
-                                        : 'Рейс'}
-                                    </span>
-                                    <span className="text-slate-500 font-normal">
-                                      · {order.trip?.driver?.name || 'Водитель'}
-                                    </span>
-                                    {order.trip_date && (
-                                      <span className="text-[10px] font-mono font-medium text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-                                        📅{' '}
-                                        {order.trip_date.split('-').reverse().slice(0, 2).join('.')}
-                                      </span>
-                                    )}
-                                    {order.is_match_date && (
-                                      <span className="text-[9px] font-black bg-sky-200 text-sky-900 px-1.5 py-0.2 rounded">
-                                        🎯 Дата совпадает
-                                      </span>
-                                    )}
-                                    {isMatchAmt && (
-                                      <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded shadow-2xs">
-                                        ⭐ Совпадает сумма
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
-                                    <span>
-                                      Тип:{' '}
-                                      {order.payment_method === 'qr'
-                                        ? '📱 QR-код'
-                                        : order.payment_method === 'cash'
-                                          ? '💵 Наличные'
-                                          : order.payment_method === 'bank_invoice'
-                                            ? '💳 Безнал'
-                                            : order.payment_method}
-                                    </span>
-                                    {order.counterparty?.name && (
-                                      <span className="font-semibold text-slate-700">
-                                        Клиент: {order.counterparty.name}
-                                      </span>
-                                    )}
-                                    {order.description && (
-                                      <span className="text-slate-400 italic">
-                                        ({order.description})
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
+                              Сбросить выбор
+                            </button>
+                          )}
+                        </div>
 
-                              <div className="text-right flex-shrink-0 ml-2">
-                                <div className="font-mono font-black text-slate-900 text-xs">
-                                  {rub(parseFloat(String(order.amount)))}
+                        {/* List */}
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {orders.map((order) => {
+                            const isMatchAmt =
+                              order.is_match_amount ?? parseFloat(String(order.amount)) === opAmt;
+                            const isSelected = selectedOrderIdsToLink.includes(order.id);
+                            const isTopRecommendation = order.score && order.score >= 100;
+
+                            return (
+                              <div
+                                key={order.id}
+                                onClick={() => toggleOrderSelection(order.id)}
+                                className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
+                                  isSelected
+                                    ? 'bg-sky-50 border-2 border-sky-500 ring-2 ring-sky-200'
+                                    : isTopRecommendation
+                                      ? 'bg-amber-50/80 border-2 border-amber-400 hover:border-amber-500 shadow-2xs'
+                                      : isMatchAmt
+                                        ? 'bg-amber-50/50 border-amber-300 hover:border-amber-400'
+                                        : 'bg-white border-slate-200 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      toggleOrderSelection(order.id);
+                                    }}
+                                    className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer"
+                                  />
+                                  <div>
+                                    <div className="font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
+                                      <span>
+                                        {order.trip?.trip_number
+                                          ? `Рейс №${order.trip.trip_number}`
+                                          : 'Рейс'}
+                                      </span>
+                                      <span className="text-slate-500 font-normal">
+                                        · {order.trip?.driver?.name || 'Водитель'}
+                                      </span>
+                                      {order.trip_date && (
+                                        <span className="text-[10px] font-mono font-medium text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                          📅{' '}
+                                          {order.trip_date
+                                            .split('-')
+                                            .reverse()
+                                            .slice(0, 2)
+                                            .join('.')}
+                                        </span>
+                                      )}
+                                      {order.is_match_date && (
+                                        <span className="text-[9px] font-black bg-sky-200 text-sky-900 px-1.5 py-0.2 rounded">
+                                          🎯 Дата совпадает
+                                        </span>
+                                      )}
+                                      {isMatchAmt && (
+                                        <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded shadow-2xs">
+                                          ⭐ Совпадает сумма
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                                      <span>
+                                        Тип:{' '}
+                                        {order.payment_method === 'qr'
+                                          ? '📱 QR-код'
+                                          : order.payment_method === 'cash'
+                                            ? '💵 Наличные'
+                                            : order.payment_method === 'bank_invoice'
+                                              ? '💳 Безнал'
+                                              : order.payment_method}
+                                      </span>
+                                      {order.counterparty?.name && (
+                                        <span className="font-semibold text-slate-700">
+                                          Клиент: {order.counterparty.name}
+                                        </span>
+                                      )}
+                                      {order.description && (
+                                        <span className="text-slate-400 italic">
+                                          ({order.description})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-[9px] text-slate-400">
-                                  {order.is_already_linked ? (
-                                    <span className="text-emerald-700 font-bold">
-                                      ✓ Привязан к Р/С
-                                    </span>
-                                  ) : order.settlement_status === 'completed' ? (
-                                    '✓ Отмечен'
-                                  ) : (
-                                    '⏳ Ожидает'
-                                  )}
+
+                                <div className="text-right flex-shrink-0 ml-2">
+                                  <div className="font-mono font-black text-slate-900 text-xs">
+                                    {rub(parseFloat(String(order.amount)))}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400">
+                                    {order.is_already_linked ? (
+                                      <span className="text-emerald-700 font-bold">
+                                        ✓ Привязан к Р/С
+                                      </span>
+                                    ) : order.settlement_status === 'completed' ? (
+                                      '✓ Отмечен'
+                                    ) : (
+                                      '⏳ Ожидает'
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })()}
@@ -2993,7 +3150,7 @@ export function DailyControlPanel() {
                   type="button"
                   disabled={
                     linkBankOpMutation.isPending ||
-                    (linkMode === 'trip' && !selectedOrderIdToLink) ||
+                    (linkMode === 'trip' && selectedOrderIdsToLink.length === 0) ||
                     (linkMode === 'sto' && !stoOrderNumber.trim()) ||
                     (linkMode === 'dispatcher' && !dispatcherDetails.trim())
                   }
@@ -3001,7 +3158,11 @@ export function DailyControlPanel() {
                     linkBankOpMutation.mutate({
                       operationId: linkingBankOp.operationId,
                       linkType: linkMode,
-                      tripOrderId: linkMode === 'trip' ? selectedOrderIdToLink : undefined,
+                      tripOrderIds: linkMode === 'trip' ? selectedOrderIdsToLink : undefined,
+                      tripOrderId:
+                        linkMode === 'trip' && selectedOrderIdsToLink.length === 1
+                          ? selectedOrderIdsToLink[0]
+                          : undefined,
                       stoOrderNumber: linkMode === 'sto' ? stoOrderNumber.trim() : undefined,
                       stoClientName: linkMode === 'sto' ? stoClientName.trim() : undefined,
                       dispatcherDetails:
@@ -3023,12 +3184,31 @@ export function DailyControlPanel() {
                       : linkMode === 'dispatcher'
                         ? '✓ Связать с рейсом диспетчера'
                         : (() => {
-                            const selOrder = (linkableOrdersData?.orders ?? []).find(
-                              (o) => o.id === selectedOrderIdToLink,
+                            if (selectedOrderIdsToLink.length === 0) {
+                              return 'Выберите рейс для привязки';
+                            }
+                            if (selectedOrderIdsToLink.length === 1) {
+                              const selOrder = (linkableOrdersData?.orders ?? []).find(
+                                (o) => o.id === selectedOrderIdsToLink[0],
+                              );
+                              return selOrder?.trip?.trip_number
+                                ? `✓ Связать с рейсом №${selOrder.trip.trip_number}`
+                                : '✓ Связать с рейсом автопарка';
+                            }
+                            const selOrders = (linkableOrdersData?.orders ?? []).filter((o) =>
+                              selectedOrderIdsToLink.includes(o.id),
                             );
-                            return selOrder?.trip?.trip_number
-                              ? `✓ Связать с рейсом №${selOrder.trip.trip_number}`
-                              : '✓ Связать с рейсом автопарка';
+                            const tripNums = selOrders
+                              .map((o) => o.trip?.trip_number)
+                              .filter(Boolean)
+                              .map((n) => `№${n}`);
+                            const sumSel = selOrders.reduce(
+                              (s, o) => s + parseFloat(String(o.amount || '0')),
+                              0,
+                            );
+                            return tripNums.length > 0
+                              ? `✓ Связать сразу с ${selectedOrderIdsToLink.length} рейсами (${tripNums.join(', ')}) · ${rub(sumSel)}`
+                              : `✓ Связать сразу с ${selectedOrderIdsToLink.length} рейсами (${rub(sumSel)})`;
                           })()}
                 </button>
               </div>

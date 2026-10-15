@@ -35,21 +35,23 @@ export async function POST(req: Request) {
 
     // 1. Действие: ОТВЯЗАТЬ
     if (action === 'unlink') {
-      const { data: existingTx } = await (supabase.from('transactions') as any)
+      const { data: existingTxs } = await (supabase.from('transactions') as any)
         .select('id, trip_order_id')
-        .eq('idempotency_key', idempotencyKey)
-        .maybeSingle();
+        .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.like.${idempotencyKey}_%`);
 
-      if (existingTx) {
-        await (supabase.from('transactions') as any).delete().eq('id', existingTx.id);
+      if (existingTxs && existingTxs.length > 0) {
+        const txIds = existingTxs.map((t: any) => t.id);
+        const orderIds = existingTxs.map((t: any) => t.trip_order_id).filter(Boolean);
 
-        if (existingTx.trip_order_id) {
+        await (supabase.from('transactions') as any).delete().in('id', txIds);
+
+        if (orderIds.length > 0) {
           await (supabase.from('trip_orders') as any)
             .update({
               settlement_status: 'pending',
               invoice_paid_at: null,
             })
-            .eq('id', existingTx.trip_order_id);
+            .in('id', orderIds);
         }
       }
 
@@ -63,12 +65,6 @@ export async function POST(req: Request) {
       .limit(1)
       .single();
 
-    // Проверяем, существует ли уже транзакция
-    const { data: existingTx } = await (supabase.from('transactions') as any)
-      .select('id')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
     const opDate =
       body.operationDate ||
       (body.date ? `${body.date}T12:00:00.000Z` : null) ||
@@ -76,50 +72,89 @@ export async function POST(req: Request) {
 
     const amountVal = parseFloat(body.amount || '0');
 
-    // 2. ВАРИАНТ А: СВЯЗКА С РЕЙСОМ АВТОПАРКА
+    // 2. ВАРИАНТ А: СВЯЗКА С РЕЙСАМИ АВТОПАРКА (Один или сразу несколько рейсов)
     if (linkType === 'trip') {
-      if (!tripOrderId) {
-        return NextResponse.json({ error: 'Не указан tripOrderId для привязки' }, { status: 400 });
+      const targetOrderIds: string[] =
+        Array.isArray(body.tripOrderIds) && body.tripOrderIds.length > 0
+          ? body.tripOrderIds
+          : tripOrderId
+            ? [tripOrderId]
+            : [];
+
+      if (targetOrderIds.length === 0) {
+        return NextResponse.json(
+          { error: 'Не указаны рейсы автопарка для привязки' },
+          { status: 400 },
+        );
       }
 
-      const { data: order, error: orderErr } = await (supabase.from('trip_orders') as any)
+      // Очищаем старые транзакции для этой банковской операции (если была предыдущая привязка)
+      const { data: prevTxs } = await (supabase.from('transactions') as any)
+        .select('id, trip_order_id')
+        .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.like.${idempotencyKey}_%`);
+
+      if (prevTxs && prevTxs.length > 0) {
+        const prevTxIds = prevTxs.map((t: any) => t.id);
+        const prevOrderIds = prevTxs
+          .map((t: any) => t.trip_order_id)
+          .filter((id: string) => Boolean(id) && !targetOrderIds.includes(id));
+
+        await (supabase.from('transactions') as any).delete().in('id', prevTxIds);
+
+        if (prevOrderIds.length > 0) {
+          await (supabase.from('trip_orders') as any)
+            .update({
+              settlement_status: 'pending',
+              invoice_paid_at: null,
+            })
+            .in('id', prevOrderIds);
+        }
+      }
+
+      // Получаем выбранные заказы
+      const { data: orders, error: ordersErr } = await (supabase.from('trip_orders') as any)
         .select(
           'id, amount, trip_id, counterparty_id, payment_method, trip:trips(id, trip_number, driver_id, driver:users!trips_driver_id_fkey(id, name))',
         )
-        .eq('id', tripOrderId)
-        .single();
+        .in('id', targetOrderIds);
 
-      if (orderErr || !order) {
-        return NextResponse.json({ error: 'Заказ рейса не найден' }, { status: 404 });
+      if (ordersErr || !orders || orders.length === 0) {
+        return NextResponse.json({ error: 'Заказы рейсов не найдены' }, { status: 404 });
       }
 
-      const tripNumber = order.trip?.trip_number ? `Рейс №${order.trip.trip_number}` : 'Рейс';
-      const driverName = order.trip?.driver?.name || 'Водитель';
+      const isSingle = orders.length === 1;
+      const newTxs: any[] = [];
 
-      const txPayload = {
-        direction: 'income',
-        amount: amountVal || parseFloat(order.amount || '0'),
-        category_id: TRIP_REVENUE_CAT_ID,
-        to_wallet_id: BANK_WALLET_ID,
-        from_wallet_id: null,
-        counterparty_id: order.counterparty_id || null,
-        trip_order_id: order.id,
-        trip_id: order.trip_id,
-        related_user_id: order.trip?.driver_id || null,
-        lifecycle_status: 'approved',
-        settlement_status: 'completed',
-        description: `Оплата по СБП / Р/С · ${tripNumber} (${driverName})`,
-        idempotency_key: idempotencyKey,
-        transaction_date: opDate,
-        created_at: existingTx?.created_at || opDate,
-        created_by: adminUser?.id || null,
-      };
+      for (const order of orders) {
+        const tripNumber = order.trip?.trip_number ? `Рейс №${order.trip.trip_number}` : 'Рейс';
+        const driverName = order.trip?.driver?.name || 'Водитель';
+        const orderAmt = parseFloat(order.amount || '0');
 
-      if (existingTx) {
-        await (supabase.from('transactions') as any).update(txPayload).eq('id', existingTx.id);
-      } else {
-        await (supabase.from('transactions') as any).insert(txPayload);
+        // Если 1 рейс — берём сумму операции или сумму заказа; если несколько — сумму конкретного заказа
+        const txAmount = isSingle ? amountVal || orderAmt : orderAmt;
+        const txKey = isSingle ? idempotencyKey : `${idempotencyKey}_${order.id}`;
+
+        newTxs.push({
+          direction: 'income',
+          amount: txAmount,
+          category_id: TRIP_REVENUE_CAT_ID,
+          to_wallet_id: BANK_WALLET_ID,
+          from_wallet_id: null,
+          counterparty_id: order.counterparty_id || null,
+          trip_order_id: order.id,
+          trip_id: order.trip_id,
+          related_user_id: order.trip?.driver_id || null,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          description: `Оплата по СБП / Р/С · ${tripNumber} (${driverName})`,
+          idempotency_key: txKey,
+          transaction_date: opDate,
+          created_at: opDate,
+          created_by: adminUser?.id || null,
+        });
       }
+
+      await (supabase.from('transactions') as any).insert(newTxs);
 
       await (supabase.from('trip_orders') as any)
         .update({
@@ -127,15 +162,37 @@ export async function POST(req: Request) {
           lifecycle_status: 'approved',
           invoice_paid_at: new Date().toISOString(),
         })
-        .eq('id', order.id);
+        .in('id', targetOrderIds);
 
       return NextResponse.json({
         success: true,
         linked: true,
         type: 'trip',
-        trip_number: order.trip?.trip_number,
-        driver_name: driverName,
+        count: orders.length,
+        trip_numbers: orders.map((o: any) => o.trip?.trip_number).filter(Boolean),
+        driver_name: isSingle ? orders[0].trip?.driver?.name || 'Водитель' : undefined,
       });
+    }
+
+    // Очищаем старые транзакции для этой банковской операции перед записью СТО / Диспетчера
+    const { data: prevTxs } = await (supabase.from('transactions') as any)
+      .select('id, trip_order_id')
+      .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.like.${idempotencyKey}_%`);
+
+    if (prevTxs && prevTxs.length > 0) {
+      const prevTxIds = prevTxs.map((t: any) => t.id);
+      const prevOrderIds = prevTxs.map((t: any) => t.trip_order_id).filter(Boolean);
+
+      await (supabase.from('transactions') as any).delete().in('id', prevTxIds);
+
+      if (prevOrderIds.length > 0) {
+        await (supabase.from('trip_orders') as any)
+          .update({
+            settlement_status: 'pending',
+            invoice_paid_at: null,
+          })
+          .in('id', prevOrderIds);
+      }
     }
 
     // 3. ВАРИАНТ Б: СВЯЗКА С ЗАКАЗ-НАРЯДОМ ГАРАЖА / СТО
@@ -155,15 +212,11 @@ export async function POST(req: Request) {
         description: `Оплата заказ-наряда · ${orderLabel} (${clientName})`,
         idempotency_key: idempotencyKey,
         transaction_date: opDate,
-        created_at: existingTx?.created_at || opDate,
+        created_at: opDate,
         created_by: adminUser?.id || null,
       };
 
-      if (existingTx) {
-        await (supabase.from('transactions') as any).update(txPayload).eq('id', existingTx.id);
-      } else {
-        await (supabase.from('transactions') as any).insert(txPayload);
-      }
+      await (supabase.from('transactions') as any).insert(txPayload);
 
       return NextResponse.json({
         success: true,
@@ -190,15 +243,11 @@ export async function POST(req: Request) {
         description: `Диспетчерский рейс · ${details} (${clientName})`,
         idempotency_key: idempotencyKey,
         transaction_date: opDate,
-        created_at: existingTx?.created_at || opDate,
+        created_at: opDate,
         created_by: adminUser?.id || null,
       };
 
-      if (existingTx) {
-        await (supabase.from('transactions') as any).update(txPayload).eq('id', existingTx.id);
-      } else {
-        await (supabase.from('transactions') as any).insert(txPayload);
-      }
+      await (supabase.from('transactions') as any).insert(txPayload);
 
       return NextResponse.json({
         success: true,
