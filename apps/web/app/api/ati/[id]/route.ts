@@ -98,57 +98,85 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
+    // 1.1 Обновление параметров претензии (суммы, штраф, примечания)
+    if (body.claim_amount !== undefined) {
+      updatedValues.claim_amount = Number(body.claim_amount);
+      if (body.claim_penalty_amount === undefined) {
+        updatedValues.claim_penalty_amount = Number(body.claim_amount);
+      }
+    }
+    if (body.claim_penalty_amount !== undefined) {
+      updatedValues.claim_penalty_amount = Number(body.claim_penalty_amount);
+    }
+    if (body.claim_notes !== undefined) {
+      updatedValues.claim_notes = body.claim_notes;
+    }
+
     // Обработка перехода этапов претензии:
     if (body.claim_status) {
       updatedValues.claim_status = body.claim_status;
+    }
 
-      // При согласовании претензии ('agreed' или 'waiting_payment') — КОНТРАГЕНТ АВТОМАТИЧЕСКИ ПОПАДАЕТ В ДЕБИТОРКУ
-      if (
-        (body.claim_status === 'agreed' || body.claim_status === 'waiting_payment') &&
-        currentValues.counterparty_id
-      ) {
-        updatedValues.claim_agreed_at = body.claim_agreed_at || new Date().toISOString();
-        const claimAmt = Number(updatedValues.claim_amount || 6000);
-        const claimNum = updatedValues.claim_number || '01-ПР';
-        const claimDesc = `Претензия Исх. № ${claimNum} по срыву заявки ${updatedValues.order_number} (штраф 20%)`;
+    // При согласовании претензии ('agreed' или 'waiting_payment') или при изменении суммы согласованной претензии — КОНТРАГЕНТ АВТОМАТИЧЕСКИ ПОПАДАЕТ / ОБНОВЛЯЕТСЯ В ДЕБИТОРКЕ
+    const effectiveClaimStatus = updatedValues.claim_status || currentValues.claim_status;
+    const isAgreedOrWaiting =
+      effectiveClaimStatus === 'agreed' || effectiveClaimStatus === 'waiting_payment';
 
-        try {
-          const { data: existingClaimRec } = await (supabase.from('manual_receivables') as any)
-            .select('id')
-            .eq('counterparty_id', currentValues.counterparty_id)
-            .ilike('description', `%${claimNum}%`)
-            .limit(1);
-
-          if (!existingClaimRec || existingClaimRec.length === 0) {
-            await (supabase.from('manual_receivables') as any).insert({
-              counterparty_id: currentValues.counterparty_id,
-              amount: claimAmt,
-              date: new Date().toISOString().split('T')[0],
-              description: claimDesc,
-              settled: false,
-            });
-          } else {
-            await (supabase.from('manual_receivables') as any)
-              .update({ amount: claimAmt, settled: false })
-              .eq('id', existingClaimRec[0].id);
-          }
-        } catch (cRecErr) {
-          console.warn('Error syncing claim with manual_receivables:', cRecErr);
-        }
+    if (
+      (body.claim_status === 'agreed' ||
+        body.claim_status === 'waiting_payment' ||
+        (isAgreedOrWaiting && body.claim_amount !== undefined)) &&
+      currentValues.counterparty_id
+    ) {
+      if (body.claim_status === 'agreed' || body.claim_status === 'waiting_payment') {
+        updatedValues.claim_agreed_at =
+          body.claim_agreed_at || currentValues.claim_agreed_at || new Date().toISOString();
       }
+      const claimAmt = Number(updatedValues.claim_amount ?? currentValues.claim_amount ?? 6000);
+      const claimNum = updatedValues.claim_number || currentValues.claim_number || '01-ПР';
+      const orderNum = updatedValues.order_number || currentValues.order_number;
+      const freightPrice = Number(updatedValues.price || currentValues.price || 0);
+      const percentStr =
+        freightPrice > 0 ? ` (${Math.round((claimAmt / freightPrice) * 100)}%)` : '';
+      const notesSuffix = updatedValues.claim_notes ? ` [${updatedValues.claim_notes}]` : '';
+      const claimDesc = `Претензия Исх. № ${claimNum} по срыву заявки ${orderNum}${percentStr}${notesSuffix}`;
 
-      // При оплате претензии ('paid') — закрываем запись в дебиторке
-      if (body.claim_status === 'paid' && currentValues.counterparty_id) {
-        updatedValues.claim_paid_at = new Date().toISOString();
-        const claimNum = updatedValues.claim_number || '01-ПР';
-        try {
+      try {
+        const { data: existingClaimRec } = await (supabase.from('manual_receivables') as any)
+          .select('id')
+          .eq('counterparty_id', currentValues.counterparty_id)
+          .ilike('description', `%${claimNum}%`)
+          .limit(1);
+
+        if (!existingClaimRec || existingClaimRec.length === 0) {
+          await (supabase.from('manual_receivables') as any).insert({
+            counterparty_id: currentValues.counterparty_id,
+            amount: claimAmt,
+            date: new Date().toISOString().split('T')[0],
+            description: claimDesc,
+            settled: false,
+          });
+        } else {
           await (supabase.from('manual_receivables') as any)
-            .update({ settled: true, settled_at: new Date().toISOString() })
-            .eq('counterparty_id', currentValues.counterparty_id)
-            .ilike('description', `%${claimNum}%`);
-        } catch (cPaidErr) {
-          console.warn('Error settling claim manual_receivables:', cPaidErr);
+            .update({ amount: claimAmt, description: claimDesc, settled: false })
+            .eq('id', existingClaimRec[0].id);
         }
+      } catch (cRecErr) {
+        console.warn('Error syncing claim with manual_receivables:', cRecErr);
+      }
+    }
+
+    // При оплате претензии ('paid') — закрываем запись в дебиторке
+    if (body.claim_status === 'paid' && currentValues.counterparty_id) {
+      updatedValues.claim_paid_at = new Date().toISOString();
+      const claimNum = updatedValues.claim_number || currentValues.claim_number || '01-ПР';
+      try {
+        await (supabase.from('manual_receivables') as any)
+          .update({ settled: true, settled_at: new Date().toISOString() })
+          .eq('counterparty_id', currentValues.counterparty_id)
+          .ilike('description', `%${claimNum}%`);
+      } catch (cPaidErr) {
+        console.warn('Error settling claim manual_receivables:', cPaidErr);
       }
     }
 

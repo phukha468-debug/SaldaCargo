@@ -250,6 +250,24 @@ export default function AtiPage() {
   const [claimDueDays, setClaimDueDays] = useState<string>('5');
   const [showDetailedClaim, setShowDetailedClaim] = useState<boolean>(false);
 
+  // Состояние согласования / редактирования суммы претензии
+  const [agreeingClaim, setAgreeingClaim] = useState<{
+    order: AtiOrder;
+    amount: string;
+    notes: string;
+  } | null>(null);
+
+  const openAgreeClaimModal = (ord: AtiOrder) => {
+    const freight = Number(ord.price || 30000);
+    const tenPercent = Math.round(freight * 0.1);
+    const defaultAmt = ord.claim_amount !== undefined ? ord.claim_amount : tenPercent;
+    setAgreeingClaim({
+      order: ord,
+      amount: String(defaultAmt),
+      notes: ord.claim_notes || 'Согласовано 10% от фрахта без бюрократических проволочек',
+    });
+  };
+
   // Мутация отмены / фиксации срыва / выставления претензии
   const cancelOrderMutation = useMutation({
     mutationFn: async (payload: {
@@ -292,16 +310,20 @@ export default function AtiPage() {
     },
   });
 
-  // Мутация обновления статуса претензии (Согласовано -> Ждем оплаты -> Оплачено)
+  // Мутация обновления статуса и суммы претензии (Согласовано -> Ждем оплаты -> Оплачено)
   const updateClaimStatusMutation = useMutation({
     mutationFn: async ({
       id,
       claim_status,
       claim_agreed_at,
+      claim_amount,
+      claim_notes,
     }: {
       id: string;
-      claim_status: 'issued' | 'agreed' | 'waiting_payment' | 'paid' | 'rejected';
+      claim_status?: 'issued' | 'agreed' | 'waiting_payment' | 'paid' | 'rejected';
       claim_agreed_at?: string;
+      claim_amount?: number;
+      claim_notes?: string;
     }) => {
       const res = await fetch(`/api/ati/${id}`, {
         method: 'PATCH',
@@ -310,6 +332,8 @@ export default function AtiPage() {
           claim_status,
           claim_agreed_at:
             claim_agreed_at || (claim_status === 'agreed' ? new Date().toISOString() : undefined),
+          claim_amount,
+          claim_notes,
         }),
       });
       if (!res.ok) throw new Error('Ошибка обновления претензии');
@@ -596,8 +620,18 @@ export default function AtiPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-mono font-black text-amber-950 text-xs">
-                        {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                      <div className="flex items-center justify-end gap-1">
+                        <div className="font-mono font-black text-amber-950 text-xs">
+                          {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openAgreeClaimModal(ord)}
+                          className="px-1 py-0.5 hover:bg-amber-100 rounded text-amber-800 text-[10px] font-bold cursor-pointer"
+                          title="Изменить согласованную сумму претензии"
+                        >
+                          ✏️
+                        </button>
                       </div>
                       <div className="text-[9px] text-slate-500">
                         {ord.claim_date || new Date().toLocaleDateString('ru-RU')}
@@ -639,15 +673,9 @@ export default function AtiPage() {
                     {status === 'issued' && (
                       <button
                         type="button"
-                        disabled={updateClaimStatusMutation.isPending}
-                        onClick={() =>
-                          updateClaimStatusMutation.mutate({
-                            id: ord.id,
-                            claim_status: 'agreed',
-                          })
-                        }
+                        onClick={() => openAgreeClaimModal(ord)}
                         className="flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black cursor-pointer transition text-center shadow-2xs"
-                        title="Заказчик согласовал срыв -> отправить в Дебиторку"
+                        title="Заказчик согласовал срыв -> выбрать согласованную сумму (10%, 20%) и отправить в Дебиторку"
                       >
                         ✓ Согласовано → В Дебиторку
                       </button>
@@ -655,6 +683,14 @@ export default function AtiPage() {
 
                     {(status === 'agreed' || status === 'waiting_payment') && (
                       <div className="flex-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openAgreeClaimModal(ord)}
+                          className="px-1.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold text-center cursor-pointer"
+                          title="Изменить согласованную сумму претензии в Дебиторке"
+                        >
+                          ✏️ Сумма
+                        </button>
                         <Link
                           href="/receivables"
                           className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold text-center"
@@ -1912,9 +1948,19 @@ export default function AtiPage() {
                               <span className="text-[10px] text-slate-500 block">
                                 Сумма требований:
                               </span>
-                              <span className="font-mono font-black text-amber-950 text-base">
-                                {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
-                              </span>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span className="font-mono font-black text-amber-950 text-base">
+                                  {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => openAgreeClaimModal(ord)}
+                                  className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-[10px] font-bold cursor-pointer transition"
+                                  title="Изменить согласованную сумму претензии"
+                                >
+                                  ✏️ Изменить
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -1978,14 +2024,9 @@ export default function AtiPage() {
                               {status === 'issued' && (
                                 <button
                                   type="button"
-                                  disabled={updateClaimStatusMutation.isPending}
-                                  onClick={() =>
-                                    updateClaimStatusMutation.mutate({
-                                      id: ord.id,
-                                      claim_status: 'agreed',
-                                    })
-                                  }
+                                  onClick={() => openAgreeClaimModal(ord)}
                                   className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
+                                  title="Выбрать согласованную сумму (10%, 20%) и передать в Дебиторку"
                                 >
                                   ✓ Заказчик согласовал → Передать в Дебиторку
                                 </button>
@@ -1993,6 +2034,14 @@ export default function AtiPage() {
 
                               {(status === 'agreed' || status === 'waiting_payment') && (
                                 <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => openAgreeClaimModal(ord)}
+                                    className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs cursor-pointer transition"
+                                    title="Изменить согласованную сумму претензии в Дебиторке"
+                                  >
+                                    ✏️ Изменить сумму
+                                  </button>
                                   <Link
                                     href="/receivables"
                                     className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold text-xs flex items-center gap-1 transition"
@@ -2314,12 +2363,21 @@ export default function AtiPage() {
                         Договора-заявки {viewingClaimOrder.order_number}, ч. 1 ст. 35 УАТ РФ)
                       </td>
                       <td className="border border-slate-400 p-1.5 text-center">
-                        20% от {Number(viewingClaimOrder.price || 30000).toLocaleString('ru-RU')}{' '}
-                        руб.
+                        {Math.round(
+                          (Number(
+                            viewingClaimOrder.claim_penalty_amount ||
+                              viewingClaimOrder.claim_amount ||
+                              6000,
+                          ) /
+                            Number(viewingClaimOrder.price || 30000)) *
+                            100,
+                        )}
+                        % от {Number(viewingClaimOrder.price || 30000).toLocaleString('ru-RU')} руб.
                       </td>
                       <td className="border border-slate-400 p-1.5 text-right font-mono font-bold">
                         {Number(
                           viewingClaimOrder.claim_penalty_amount ||
+                            viewingClaimOrder.claim_amount ||
                             Math.round(Number(viewingClaimOrder.price || 30000) * 0.2),
                         ).toLocaleString('ru-RU')}
                         ,00
@@ -2370,8 +2428,13 @@ export default function AtiPage() {
 
                 <p className="font-bold">
                   Общая сумма требований составляет:{' '}
-                  {Number(viewingClaimOrder.claim_amount || 6000).toLocaleString('ru-RU')} (шесть
-                  тысяч) рублей 00 копеек.
+                  {Number(viewingClaimOrder.claim_amount || 6000).toLocaleString('ru-RU')} рублей 00
+                  копеек.
+                  {viewingClaimOrder.claim_notes && (
+                    <span className="block font-normal text-slate-600 text-[11px] mt-0.5">
+                      Условия согласования: {viewingClaimOrder.claim_notes}
+                    </span>
+                  )}
                 </p>
 
                 {/* Банковские реквизиты */}
@@ -2431,6 +2494,299 @@ export default function AtiPage() {
                     <div className="text-[10px] text-slate-500 font-bold mt-1">М.П.</div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+           МОДАЛКА СОГЛАСОВАНИЯ / ИЗМЕНЕНИЯ СУММЫ ПРЕТЕНЗИИ
+           ══════════════════════════════════════════════════════════════════════ */}
+      {agreeingClaim && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 overflow-y-auto">
+          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-lg w-full overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+            {/* Шапка */}
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚖️</span>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wide">
+                    {agreeingClaim.order.claim_status === 'issued'
+                      ? 'Согласование претензии'
+                      : 'Изменение суммы претензии'}
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Претензия № {agreeingClaim.order.claim_number || '01-ПР'} ·{' '}
+                    {agreeingClaim.order.order_number}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAgreeingClaim(null)}
+                className="text-slate-400 hover:text-white text-xl font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              {/* Информация о контрагенте и рейсе */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Контрагент (Заказчик):</span>
+                  <strong className="text-slate-900 text-right">
+                    {agreeingClaim.order.counterparty_name}
+                  </strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Стоимость фрахта по заявке:</span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {Number(agreeingClaim.order.price || 30000).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600 border-t border-slate-200/80 pt-1">
+                  <span>Текущая сумма претензии:</span>
+                  <span className="font-mono font-bold text-amber-900">
+                    {Number(agreeingClaim.order.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              </div>
+
+              {/* Быстрые пресеты */}
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1.5">
+                  Быстрый выбор согласованной суммы:
+                </label>
+                {(() => {
+                  const freight = Number(agreeingClaim.order.price || 30000);
+                  const tenP = Math.round(freight * 0.1);
+                  const fifteenP = Math.round(freight * 0.15);
+                  const twentyP = Math.round(freight * 0.2);
+                  const currentNum = Number(agreeingClaim.amount) || 0;
+
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAgreeingClaim({
+                            ...agreeingClaim,
+                            amount: String(tenP),
+                            notes: 'Согласовано 10% от фрахта без бюрократических проволочек',
+                          })
+                        }
+                        className={`p-2.5 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                          currentNum === tenP
+                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 shadow-xs'
+                            : 'border-slate-200 hover:border-indigo-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-xs text-indigo-700">
+                            ⭐ 10% (Рекомендовано)
+                          </span>
+                          <span className="font-mono font-bold text-xs">
+                            {tenP.toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 leading-tight">
+                          Без бюрократических проволочек
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAgreeingClaim({
+                            ...agreeingClaim,
+                            amount: String(fifteenP),
+                            notes: 'Согласовано 15% от фрахта по обоюдному согласию',
+                          })
+                        }
+                        className={`p-2.5 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                          currentNum === fifteenP
+                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 shadow-xs'
+                            : 'border-slate-200 hover:border-indigo-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-xs text-slate-800">15%</span>
+                          <span className="font-mono font-bold text-xs">
+                            {fifteenP.toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 leading-tight">
+                          Компромиссная сумма
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAgreeingClaim({
+                            ...agreeingClaim,
+                            amount: String(twentyP),
+                            notes: 'Стандартный штраф 20% по УАТ РФ',
+                          })
+                        }
+                        className={`p-2.5 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                          currentNum === twentyP
+                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 shadow-xs'
+                            : 'border-slate-200 hover:border-indigo-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-xs text-slate-800">20% (УАТ РФ)</span>
+                          <span className="font-mono font-bold text-xs">
+                            {twentyP.toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 leading-tight">
+                          Полный законный штраф
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAgreeingClaim({
+                            ...agreeingClaim,
+                            amount: String(freight),
+                            notes: '100% компенсация полной стоимости фрахта',
+                          })
+                        }
+                        className={`p-2.5 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                          currentNum === freight
+                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 shadow-xs'
+                            : 'border-slate-200 hover:border-indigo-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-xs text-slate-800">100% Фрахт</span>
+                          <span className="font-mono font-bold text-xs">
+                            {freight.toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 leading-tight">
+                          Полная оплата рейса
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Поле ввода суммы */}
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">
+                  Итоговая согласованная сумма к взысканию (₽):
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={agreeingClaim.amount}
+                    onChange={(e) =>
+                      setAgreeingClaim({
+                        ...agreeingClaim,
+                        amount: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2.5 bg-white border-2 border-slate-300 focus:border-indigo-600 rounded-xl font-mono font-black text-base text-slate-900 outline-none"
+                    placeholder="3000"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+                    ₽
+                  </span>
+                </div>
+                {(() => {
+                  const freight = Number(agreeingClaim.order.price || 30000);
+                  const currentNum = Number(agreeingClaim.amount) || 0;
+                  const pct = freight > 0 ? Math.round((currentNum / freight) * 100) : 0;
+                  return (
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                      <span>
+                        Составляет <strong>{pct}%</strong> от стоимости рейса (
+                        {freight.toLocaleString('ru-RU')} ₽)
+                      </span>
+                      {pct === 10 && (
+                        <span className="text-emerald-700 font-bold">✓ Согласованные 10%</span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Примечание */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Примечание к соглашению (необязательно):
+                </label>
+                <input
+                  type="text"
+                  value={agreeingClaim.notes}
+                  onChange={(e) =>
+                    setAgreeingClaim({
+                      ...agreeingClaim,
+                      notes: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 focus:border-indigo-600 rounded-xl text-xs text-slate-800"
+                  placeholder="например: Согласовано 10% от фрахта без бюрократических проволочек"
+                />
+              </div>
+
+              {/* Пояснение про Дебиторку */}
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2 text-emerald-950">
+                <span className="text-base shrink-0">💡</span>
+                <p className="text-[11px] leading-relaxed">
+                  Сумма{' '}
+                  <strong>{Number(agreeingClaim.amount || 0).toLocaleString('ru-RU')} ₽</strong>{' '}
+                  будет зафиксирована в заявке и автоматически отразится в{' '}
+                  <strong>Дебиторке</strong> заказчика «{agreeingClaim.order.counterparty_name}».
+                </p>
+              </div>
+
+              {/* Кнопки действий */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAgreeingClaim(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs cursor-pointer"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  disabled={updateClaimStatusMutation.isPending || !agreeingClaim.amount}
+                  onClick={() => {
+                    const finalAmount = Number(agreeingClaim.amount) || 0;
+                    updateClaimStatusMutation.mutate(
+                      {
+                        id: agreeingClaim.order.id,
+                        claim_status: 'agreed',
+                        claim_amount: finalAmount,
+                        claim_notes: agreeingClaim.notes,
+                      },
+                      {
+                        onSuccess: () => {
+                          setAgreeingClaim(null);
+                        },
+                      },
+                    );
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <span>✓</span>
+                  <span>
+                    {agreeingClaim.order.claim_status === 'issued'
+                      ? `Согласовать и отправить ${Number(agreeingClaim.amount || 0).toLocaleString('ru-RU')} ₽ в Дебиторку`
+                      : `Сохранить ${Number(agreeingClaim.amount || 0).toLocaleString('ru-RU')} ₽ в Дебиторке`}
+                  </span>
+                </button>
               </div>
             </div>
           </div>
