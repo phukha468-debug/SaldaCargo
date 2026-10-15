@@ -36,8 +36,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       updatedValues.cancelled_at = new Date().toISOString();
       updatedValues.stage = 0; // Снимается с активных этапов 1..8
 
-      // Если выставлена претензия
-      if (body.has_claim) {
+      // Если выставлена претензия (или выбрана причина срыва на погрузке / отказ заказчика из старого меню)
+      const isClaimDisruption =
+        Boolean(body.has_claim) ||
+        (body.cancel_reason &&
+          (body.cancel_reason.toLowerCase().includes('груз не готов') ||
+            body.cancel_reason.toLowerCase().includes('срыв на погрузке') ||
+            body.cancel_reason.toLowerCase().includes('претензи')));
+
+      if (isClaimDisruption) {
         updatedValues.has_claim = true;
         updatedValues.claim_status = body.claim_status || 'issued';
         updatedValues.claim_number = body.claim_number || '01-ПР';
