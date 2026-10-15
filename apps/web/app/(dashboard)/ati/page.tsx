@@ -1892,205 +1892,281 @@ export default function AtiPage() {
             {/* Содержимое вкладок */}
             <div className="p-5 space-y-3 overflow-y-auto flex-1 text-xs">
               {cancelledListTab === 'claims' ? (
-                claimOrders.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 font-bold">
-                    Нет активных претензий к заказчикам.
+                <>
+                  {/* Памятка по этапам претензии */}
+                  <div className="p-3 bg-indigo-50 border-2 border-indigo-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-indigo-950">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl shrink-0">🚀</span>
+                      <div className="space-y-0.5">
+                        <div className="font-black text-[11px]">
+                          Как перемещать претензию дальше (попадание в Дебиторку):
+                        </div>
+                        <div className="text-[10px] text-indigo-900 leading-tight">
+                          <strong>1. Выставили:</strong> претензия сформирована и отправлена
+                          заказчику. <br />
+                          <strong>2. Согласовали:</strong> когда заказчик подтвердил срыв, нажмите{' '}
+                          <span className="font-bold underline">
+                            «✓ Заказчик согласовал → В Дебиторку»
+                          </span>{' '}
+                          (контрагент сразу появится в разделе <strong>Дебиторка</strong>!). <br />
+                          <strong>3. Оплата:</strong> после поступления денег на р/с нажмите{' '}
+                          <span className="font-bold underline">«✓ Оплачено на Р/С»</span>.
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  claimOrders.map((ord) => {
-                    const status = ord.claim_status || 'issued';
-                    return (
-                      <div
-                        key={ord.id}
-                        className="p-3.5 bg-white rounded-2xl border-2 border-amber-300 shadow-2xs space-y-3 hover:border-amber-400 transition"
-                      >
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-slate-900 text-sm">
-                                Претензия № {ord.claim_number || '01-ПР'}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-bold">
-                                к заявке {ord.order_number}
-                              </span>
-                              <span className="text-slate-400 font-mono text-[10px]">
-                                от {ord.claim_date || new Date().toLocaleDateString('ru-RU')}
-                              </span>
+
+                  {claimOrders.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 font-bold">
+                      Нет активных претензий к заказчикам.
+                    </div>
+                  ) : (
+                    claimOrders.map((ord) => {
+                      const status = ord.claim_status || 'issued';
+                      return (
+                        <div
+                          key={ord.id}
+                          className="p-3.5 bg-white rounded-2xl border-2 border-amber-300 shadow-2xs space-y-3 hover:border-amber-400 transition"
+                        >
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-black text-slate-900 text-sm">
+                                  Претензия № {ord.claim_number || '01-ПР'}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-bold">
+                                  к заявке {ord.order_number}
+                                </span>
+                                <span className="text-slate-400 font-mono text-[10px]">
+                                  от {ord.claim_date || new Date().toLocaleDateString('ru-RU')}
+                                </span>
+                              </div>
+                              <div className="font-bold text-slate-900 text-xs mt-0.5">
+                                Заказчик: {ord.counterparty_name}
+                              </div>
                             </div>
-                            <div className="font-bold text-slate-900 text-xs mt-0.5">
-                              Заказчик: {ord.counterparty_name}
+
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-500 block">
+                                Сумма требований:
+                              </span>
+                              <span className="font-mono font-black text-amber-950 text-base">
+                                {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                              </span>
                             </div>
                           </div>
 
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-500 block">
-                              Сумма требований:
-                            </span>
-                            <span className="font-mono font-black text-amber-950 text-base">
-                              {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Пайплайн претензии */}
-                        <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-bold">
-                          <div
-                            className={`p-1.5 rounded-lg border ${
-                              status === 'issued'
-                                ? 'bg-amber-100 border-amber-300 text-amber-950 font-black'
-                                : 'bg-slate-100 border-slate-200 text-slate-500'
-                            }`}
-                          >
-                            1. Выставили претензию
-                          </div>
-                          <div
-                            className={`p-1.5 rounded-lg border ${
-                              status === 'agreed' || status === 'waiting_payment'
-                                ? 'bg-rose-100 border-rose-300 text-rose-950 font-black'
-                                : status === 'paid'
-                                  ? 'bg-slate-100 border-slate-200 text-slate-500'
+                          {/* Пайплайн претензии */}
+                          <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-bold">
+                            <div
+                              className={`p-1.5 rounded-lg border ${
+                                status === 'issued'
+                                  ? 'bg-amber-100 border-amber-300 text-amber-950 font-black'
+                                  : 'bg-slate-100 border-slate-200 text-slate-500'
+                              }`}
+                            >
+                              1. Выставили претензию
+                            </div>
+                            <div
+                              className={`p-1.5 rounded-lg border ${
+                                status === 'agreed' || status === 'waiting_payment'
+                                  ? 'bg-rose-100 border-rose-300 text-rose-950 font-black'
+                                  : status === 'paid'
+                                    ? 'bg-slate-100 border-slate-200 text-slate-500'
+                                    : 'bg-slate-50 border-slate-200 text-slate-400'
+                              }`}
+                            >
+                              2. Согласовали / Дебиторка
+                            </div>
+                            <div
+                              className={`p-1.5 rounded-lg border ${
+                                status === 'paid'
+                                  ? 'bg-emerald-100 border-emerald-300 text-emerald-950 font-black'
                                   : 'bg-slate-50 border-slate-200 text-slate-400'
-                            }`}
-                          >
-                            2. Согласовали / Дебиторка
-                          </div>
-                          <div
-                            className={`p-1.5 rounded-lg border ${
-                              status === 'paid'
-                                ? 'bg-emerald-100 border-emerald-300 text-emerald-950 font-black'
-                                : 'bg-slate-50 border-slate-200 text-slate-400'
-                            }`}
-                          >
-                            3. Ждём оплаты / Оплачено
-                          </div>
-                        </div>
-
-                        {/* Кнопки управления */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setViewingClaimOrder(ord)}
-                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 cursor-pointer transition"
+                              }`}
                             >
-                              <span>📄</span>
-                              <span>Печать претензии</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={restoreOrderMutation.isPending}
-                              onClick={() => restoreOrderMutation.mutate({ id: ord.id })}
-                              className="px-2 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-[11px] border border-slate-200 cursor-pointer transition"
-                              title="Аннулировать претензию и вернуть рейс на Канбан"
-                            >
-                              ↶ На доску
-                            </button>
+                              3. Ждём оплаты / Оплачено
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {status === 'issued' && (
+                          {/* Кнопки управления */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                            <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                disabled={updateClaimStatusMutation.isPending}
-                                onClick={() =>
-                                  updateClaimStatusMutation.mutate({
-                                    id: ord.id,
-                                    claim_status: 'agreed',
-                                  })
-                                }
-                                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
+                                onClick={() => setViewingClaimOrder(ord)}
+                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 cursor-pointer transition"
                               >
-                                ✓ Заказчик согласовал → Передать в Дебиторку
+                                <span>📄</span>
+                                <span>Печать претензии</span>
                               </button>
-                            )}
 
-                            {(status === 'agreed' || status === 'waiting_payment') && (
-                              <div className="flex items-center gap-2">
-                                <Link
-                                  href="/receivables"
-                                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold text-xs flex items-center gap-1 transition"
-                                >
-                                  <span>
-                                    В Дебиторке:{' '}
-                                    {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
-                                  </span>
-                                  <span>↗</span>
-                                </Link>
+                              <button
+                                type="button"
+                                disabled={restoreOrderMutation.isPending}
+                                onClick={() => restoreOrderMutation.mutate({ id: ord.id })}
+                                className="px-2 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-[11px] border border-slate-200 cursor-pointer transition"
+                                title="Аннулировать претензию и вернуть рейс на Канбан"
+                              >
+                                ↶ На доску
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {status === 'issued' && (
                                 <button
                                   type="button"
                                   disabled={updateClaimStatusMutation.isPending}
                                   onClick={() =>
                                     updateClaimStatusMutation.mutate({
                                       id: ord.id,
-                                      claim_status: 'paid',
+                                      claim_status: 'agreed',
                                     })
                                   }
-                                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
+                                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
                                 >
-                                  ✓ Оплачено на Р/С
+                                  ✓ Заказчик согласовал → Передать в Дебиторку
                                 </button>
-                              </div>
-                            )}
+                              )}
 
-                            {status === 'paid' && (
-                              <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl font-black text-xs">
-                                ✓ Претензия оплачена
-                              </span>
-                            )}
+                              {(status === 'agreed' || status === 'waiting_payment') && (
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href="/receivables"
+                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold text-xs flex items-center gap-1 transition"
+                                  >
+                                    <span>
+                                      В Дебиторке:{' '}
+                                      {Number(ord.claim_amount || 6000).toLocaleString('ru-RU')} ₽
+                                    </span>
+                                    <span>↗</span>
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    disabled={updateClaimStatusMutation.isPending}
+                                    onClick={() =>
+                                      updateClaimStatusMutation.mutate({
+                                        id: ord.id,
+                                        claim_status: 'paid',
+                                      })
+                                    }
+                                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-xs transition"
+                                  >
+                                    ✓ Оплачено на Р/С
+                                  </button>
+                                </div>
+                              )}
+
+                              {status === 'paid' && (
+                                <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl font-black text-xs">
+                                  ✓ Претензия оплачена
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )
-              ) : /* Вкладка простых срывов */
-              simpleCancelledOrders.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 font-bold">
-                  Нет сорванных или отменённых заявок.
-                </div>
+                      );
+                    })
+                  )}
+                </>
               ) : (
-                simpleCancelledOrders.map((ord) => (
-                  <div
-                    key={ord.id}
-                    className="p-3 bg-slate-50 rounded-2xl border-2 border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-slate-900 text-xs">
-                          {ord.order_number}
-                        </span>
-                        <span className="text-[9px] font-bold bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded">
-                          Без претензии
-                        </span>
-                        <span className="text-slate-500 font-mono text-[10px]">
-                          {new Date(ord.updated_at || ord.created_at).toLocaleDateString('ru-RU')}
-                        </span>
+                /* Вкладка простых срывов */
+                <>
+                  <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-950">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl shrink-0">⚖️</span>
+                      <div>
+                        <div className="font-black text-[11px]">
+                          Срыв по вине заказчика? Переведите заявку в Претензию!
+                        </div>
+                        <div className="text-[10px] text-amber-900 leading-tight">
+                          Нажмите кнопку <strong>«⚖️ Оформить Претензию (20%)»</strong> на карточке
+                          ниже. Система рассчитает штраф 20% (ст. 35 УАТ РФ) и после согласования{' '}
+                          <strong>автоматически перенесёт долг в Дебиторку</strong>.
+                        </div>
                       </div>
-                      <div className="font-bold text-slate-800 text-[11px]">
-                        {ord.counterparty_name} ·{' '}
-                        <span className="font-mono text-slate-900">
-                          {Number(ord.price || 0).toLocaleString('ru-RU')} ₽
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-slate-600 font-medium">
-                        Причина: <strong>{ord.cancel_reason || 'Срыв рейса'}</strong>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0">
-                      <button
-                        type="button"
-                        disabled={restoreOrderMutation.isPending}
-                        onClick={() => restoreOrderMutation.mutate({ id: ord.id })}
-                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
-                      >
-                        <span>↶</span>
-                        <span>Восстановить на Канбан</span>
-                      </button>
                     </div>
                   </div>
-                ))
+
+                  {simpleCancelledOrders.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 font-bold">
+                      Нет сорванных или отменённых заявок.
+                    </div>
+                  ) : (
+                    simpleCancelledOrders.map((ord) => (
+                      <div
+                        key={ord.id}
+                        className="p-3 bg-slate-50 rounded-2xl border-2 border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-slate-900 text-xs">
+                              {ord.order_number}
+                            </span>
+                            <span className="text-[9px] font-bold bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded">
+                              В архиве срывов
+                            </span>
+                            <span className="text-slate-500 font-mono text-[10px]">
+                              {new Date(ord.updated_at || ord.created_at).toLocaleDateString(
+                                'ru-RU',
+                              )}
+                            </span>
+                          </div>
+                          <div className="font-bold text-slate-800 text-[11px]">
+                            {ord.counterparty_name} ·{' '}
+                            <span className="font-mono text-slate-900">
+                              {Number(ord.price || 0).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-600 font-medium">
+                            Причина: <strong>{ord.cancel_reason || 'Срыв рейса'}</strong>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCancelledList(false);
+                              setCancellingOrder(ord);
+                              setCancelMode('claim');
+                              setCancelReason(
+                                ord.cancel_reason ||
+                                  'Срыв на погрузке (груз не готов / отказ заказчика)',
+                              );
+                              setCustomReason('');
+                              const penalty = Math.round((Number(ord.price) || 30000) * 0.2);
+                              setClaimPenaltyAmount(String(penalty));
+                              setClaimEmptyRunAmount('0');
+                              setClaimIdleAmount('0');
+                              setClaimNumber(
+                                ord.order_number.includes('001')
+                                  ? '01-ПР'
+                                  : `${ord.order_number.replace(/\D/g, '') || '1'}-ПР`,
+                              );
+                              setClaimDate(new Date().toISOString().split('T')[0]);
+                              setClaimDueDays('5');
+                            }}
+                            className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-xs"
+                            title="Оформить официальную претензию за срыв по ст. 35 УАТ РФ (20% штрафа)"
+                          >
+                            <span>⚖️</span>
+                            <span>Оформить Претензию (20%)</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={restoreOrderMutation.isPending}
+                            onClick={() => restoreOrderMutation.mutate({ id: ord.id })}
+                            className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                          >
+                            <span>↶</span>
+                            <span>На Канбан</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
               )}
             </div>
 
