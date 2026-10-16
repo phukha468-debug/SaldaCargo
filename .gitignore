@@ -54,3 +54,7 @@ coverage/
 scratch/
 *.apk
 *.jfif
+
+# Python
+__pycache__/
+*.py[cod]
