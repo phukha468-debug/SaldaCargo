@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     let q = (supabase.from('service_orders') as any)
       .select(selectStr)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(300);
 
     if (filter === 'review') {
       // draft orders that mechanic completed (status=completed) and admin hasn't closed yet
