@@ -314,10 +314,11 @@ export default function AtiPage() {
     'claims',
   );
   const [viewingClaimOrder, setViewingClaimOrder] = useState<AtiOrder | null>(null);
+  const [viewingPowerOfAttorney, setViewingPowerOfAttorney] = useState<AtiOrder | null>(null);
 
   // Параметры претензии
   const [claimNumber, setClaimNumber] = useState<string>('01-ПР');
-  const [claimDate, setClaimDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [claimDate, setClaimDate] = useState<string>(new Date().toISOString().split('T')[0] ?? '');
   const [claimPenaltyAmount, setClaimPenaltyAmount] = useState<string>('6000');
   const [claimEmptyRunAmount, setClaimEmptyRunAmount] = useState<string>('0');
   const [claimIdleAmount, setClaimIdleAmount] = useState<string>('0');
@@ -491,7 +492,7 @@ export default function AtiPage() {
 
   for (const ord of filteredOrders) {
     const st = ord.stage >= 1 && ord.stage <= 8 ? ord.stage : 1;
-    ordersByStage[st].push(ord);
+    ordersByStage[st]?.push(ord);
   }
 
   // Общая сумма активных
@@ -851,6 +852,7 @@ export default function AtiPage() {
         <div className="grid grid-cols-8 gap-1.5 w-full items-start">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((stageNum) => {
             const cfg = STAGE_CONFIG[stageNum];
+            if (!cfg) return null;
             const colOrders = ordersByStage[stageNum] || [];
 
             return (
@@ -1009,7 +1011,7 @@ export default function AtiPage() {
                                     ? '01-ПР'
                                     : `${order.order_number.replace(/\D/g, '') || '1'}-ПР`,
                                 );
-                                setClaimDate(new Date().toISOString().split('T')[0]);
+                                setClaimDate(new Date().toISOString().split('T')[0] ?? '');
                                 setClaimDueDays('5');
                               }}
                               title="Срыв договора-заявки / Претензия / Снять с доски"
@@ -1333,6 +1335,17 @@ export default function AtiPage() {
                     </span>
                   </div>
                 )}
+                {selectedOrder.notes && (
+                  <div className="p-2.5 bg-amber-50/90 rounded-xl border-2 border-amber-300 text-[11px] space-y-1">
+                    <div className="font-black text-amber-950 flex items-center gap-1.5">
+                      <span>📌</span>
+                      <span>Требования к оплате и документам:</span>
+                    </div>
+                    <div className="text-slate-800 leading-snug font-medium">
+                      {selectedOrder.notes}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1342,6 +1355,15 @@ export default function AtiPage() {
                 Создана: {new Date(selectedOrder.created_at).toLocaleDateString('ru-RU')}
               </span>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingPowerOfAttorney(selectedOrder)}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition active:scale-95"
+                  title="Сформировать и распечатать доверенность от ИП на водителя"
+                >
+                  <span>📄</span>
+                  <span>Доверенность на водителя</span>
+                </button>
                 <button
                   onClick={() => setSelectedOrder(null)}
                   className="px-4 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 cursor-pointer"
@@ -2426,7 +2448,7 @@ export default function AtiPage() {
                                   ? '01-ПР'
                                   : `${ord.order_number.replace(/\D/g, '') || '1'}-ПР`,
                               );
-                              setClaimDate(new Date().toISOString().split('T')[0]);
+                              setClaimDate(new Date().toISOString().split('T')[0] ?? '');
                               setClaimDueDays('5');
                             }}
                             className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-xs"
@@ -2765,6 +2787,176 @@ export default function AtiPage() {
                       / Нигамедьянов А. С. /
                     </div>
                     <div className="text-[10px] text-slate-500 font-bold mt-1">М.П.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+           ОФИЦИАЛЬНЫЙ БЛАНК ДОВЕРЕННОСТИ ОТ ИП НА ВОДИТЕЛЯ
+           ══════════════════════════════════════════════════════════════════════ */}
+      {viewingPowerOfAttorney && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
+          <div className="bg-white rounded-2xl border-2 border-slate-300 shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col overflow-hidden my-auto print:max-h-none print:border-none print:shadow-none print:rounded-none">
+            {/* Панель действий вверху (скрыта при печати) */}
+            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0 print:hidden">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📄</span>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wide">
+                    Доверенность от ИП на водителя
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    Для сдачи оригиналов документов в {viewingPowerOfAttorney.counterparty_name}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/Doverennost_Voditel_Bayt_Tranzit.docx"
+                  download
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-xl font-bold text-xs flex items-center gap-1.5 transition"
+                >
+                  <span>📥</span>
+                  <span>Скачать Word (.docx)</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                >
+                  <span>🖨️</span>
+                  <span>Распечатать / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingPowerOfAttorney(null)}
+                  className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Официальный бланк А4 */}
+            <div className="p-8 sm:p-12 overflow-y-auto flex-1 font-serif text-[13px] leading-relaxed text-slate-950 bg-white">
+              {/* Реквизиты ИП */}
+              <div className="border-b-2 border-slate-950 pb-3 mb-4 font-sans text-xs space-y-0.5 text-slate-800">
+                <div className="font-black text-sm text-slate-950">
+                  {viewingPowerOfAttorney.carrier_name ||
+                    'Индивидуальный предприниматель Нигамедьянов Александр Сергеевич'}
+                </div>
+                <div>
+                  <strong>Юридический адрес:</strong> 624760, Россия, Свердловская обл., г. Верхняя
+                  Салда, ул. 25 Октября, д. 11, кв. 22
+                </div>
+                <div>
+                  <strong>ИНН:</strong> {viewingPowerOfAttorney.carrier_inn || '660704814106'}{' '}
+                  &nbsp;|&nbsp; <strong>ОГРНИП:</strong> 321665800053976
+                </div>
+                <div>
+                  <strong>Банк:</strong>{' '}
+                  {viewingPowerOfAttorney.carrier_bank || 'АО «ТБанк» г. Москва'} &nbsp;|&nbsp;{' '}
+                  <strong>БИК:</strong> {viewingPowerOfAttorney.carrier_bik || '044525974'}
+                </div>
+                <div>
+                  <strong>Р/С:</strong>{' '}
+                  {viewingPowerOfAttorney.carrier_account || '40802810500001961654'} &nbsp;|&nbsp;{' '}
+                  <strong>К/С:</strong> 30101810145250000974
+                </div>
+                <div>
+                  <strong>Контакты:</strong>{' '}
+                  {viewingPowerOfAttorney.carrier_contact || '7 922 180-09-11 Александр'}{' '}
+                  &nbsp;|&nbsp; uralavto707@mail.ru
+                </div>
+              </div>
+
+              {/* Заголовок */}
+              <div className="text-center my-6">
+                <h1 className="text-xl font-bold tracking-widest uppercase">ДОВЕРЕННОСТЬ</h1>
+              </div>
+
+              {/* Город и дата */}
+              <div className="flex justify-between items-center mb-6 text-sm font-sans">
+                <div>г. Верхняя Салда / г. Екатеринбург</div>
+                <div className="font-bold">«15» октября 2026 г.</div>
+              </div>
+
+              {/* Текст поручения */}
+              <div className="text-justify indent-8 space-y-3 mb-6 text-sm leading-relaxed">
+                <p>
+                  Индивидуальный предприниматель <strong>Нигамедьянов Александр Сергеевич</strong>{' '}
+                  (ОГРНИП 321665800053976, ИНН 660704814106), настоящей доверенностью уполномочивает
+                  гражданина РФ{' '}
+                  <strong>
+                    {viewingPowerOfAttorney.driver_name || 'Насртдинова Вячеслава Аксановича'}
+                  </strong>
+                  ,{' '}
+                  {viewingPowerOfAttorney.driver_passport ||
+                    'паспорт серия 6521 номер 342609, выдан 27.07.2021 г. ГУ МВД России по Свердловской области'}
+                  , водительское удостоверение{' '}
+                  <strong>{viewingPowerOfAttorney.driver_license || '99 31 051064'}</strong>,
+                  управляющего грузовым автомобилем{' '}
+                  <strong>
+                    {viewingPowerOfAttorney.asset_name || 'Валдай'} (
+                    {viewingPowerOfAttorney.asset_reg_number || 'О 188 ТА 196'})
+                  </strong>
+                  , производить в{' '}
+                  <strong>
+                    {viewingPowerOfAttorney.counterparty_name ||
+                      'ООО «Байт Транзит Континент» (ООО «БТК»)'}
+                  </strong>{' '}
+                  следующие операции:
+                </p>
+
+                <ol className="list-decimal pl-8 space-y-2 mt-3 font-normal">
+                  <li>Сдавать и получать грузы для транспортировки;</li>
+                  <li>
+                    Подписывать заявки на транспортировку груза, транспортные накладные (ТрН / ТТН),
+                    акты выполненных работ (оказанных услуг), акты сдачи-приемки, экспедиторские
+                    расписки, а также совершать все иные фактические и юридические действия и
+                    формальности, связанные с выполнением настоящего поручения.
+                  </li>
+                </ol>
+
+                <p className="pt-2">
+                  Настоящая доверенность выдана сроком с <strong>15.10.2026 г.</strong> и
+                  действительна по <strong>31.12.2026 г.</strong> включительно без права
+                  передоверия.
+                </p>
+              </div>
+
+              {/* Образец подписи */}
+              <div className="my-6 text-sm">
+                Образец подписи доверенного лица:{' '}
+                <span className="inline-block border-b border-slate-900 w-44 pb-0.5"></span> /{' '}
+                <strong>
+                  {viewingPowerOfAttorney.driver_name
+                    ? viewingPowerOfAttorney.driver_name.split(' ')[0] +
+                      ' ' +
+                      (viewingPowerOfAttorney.driver_name.split(' ')[1]?.[0] || '') +
+                      '.' +
+                      (viewingPowerOfAttorney.driver_name.split(' ')[2]?.[0] || '') +
+                      '.'
+                    : 'Насртдинов В. А.'}
+                </strong>{' '}
+                / подтверждаю.
+              </div>
+
+              {/* Подпись доверителя и М.П. */}
+              <div className="mt-8 pt-4 flex justify-between items-end font-sans">
+                <div>
+                  <div className="font-bold text-xs uppercase text-slate-600">Доверитель:</div>
+                  <div className="font-bold text-sm">Индивидуальный предприниматель</div>
+                  <div className="font-black text-base">ИП Нигамедьянов А. С.</div>
+                  <div className="font-bold text-xs mt-3 text-slate-500">М. П.</div>
+                </div>
+                <div className="text-right">
+                  <div className="inline-block border-b border-slate-900 w-48 pb-1 text-center italic text-slate-500 text-xs">
+                    / Нигамедьянов А. С. /
                   </div>
                 </div>
               </div>

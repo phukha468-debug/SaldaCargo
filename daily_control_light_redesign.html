@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Суточный контроль — Crisp Pro (Linear + Навигация Ревью + Акценты)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
+            display: ['"Plus Jakarta Sans"', '"Inter"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          boxShadow: {
+            '2xs': '0 1px 2px 0 rgba(15, 23, 42, 0.05)',
+            'subtle': '0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px 0 rgba(15, 23, 42, 0.04)',
+            'card': '0 3px 8px -1px rgba(15, 23, 42, 0.08), 0 1px 4px -1px rgba(15, 23, 42, 0.04)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom sleek scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .btn-tactile {
+      transition: all 0.12s ease;
+    }
+    .btn-tactile:active {
+      transform: scale(0.975);
+    }
+
+    /* Accented line transitions */
+    .row-accent {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .row-accent:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -1px rgba(15, 23, 42, 0.04);
+    }
+
+    /* Sub-items accordion */
+    .group-subitems {
+      transition: max-height 0.25s ease-out, opacity 0.2s ease-out;
+    }
+  </style>
+</head>
+<body class="min-h-full font-sans text-slate-800 antialiased bg-[#F8FAFC] flex flex-col selection:bg-sky-100 selection:text-sky-900">
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ВЕРХНИЙ СТАТУС-БАР РЕДИЗАЙНА
+       ══════════════════════════════════════════════════════════════════════ -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-300 shadow-2xs px-3 sm:px-6 py-2">
+    <div class="max-w-[1680px] mx-auto flex flex-col md:flex-row items-center justify-between gap-2.5">
+      
+      <!-- Заголовок задачи и бейджи доработок -->
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-black text-sm shadow-2xs">
+          ⚡
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-xs sm:text-sm font-black text-slate-900 tracking-tight font-display">
+              СУТОЧНЫЙ КОНТРОЛЬ: CRISP PRO (LINEAR + НАВИГАЦИЯ РЕВЬЮ)
+            </h1>
+            <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-300">
+              5 доработок внедрено
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 font-medium">
+            Светлый дизайн • Большие кнопки дней • Навигация День/Неделя/Месяц • Чёткие акцентные строки • Группировка комиссий
+          </p>
+        </div>
+      </div>
+
+      <!-- Действия -->
+      <div class="flex items-center gap-2">
+        <button onclick="openFeedbackModal()" class="btn-tactile px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-black shadow-2xs flex items-center gap-1.5 cursor-pointer">
+          <span>✓</span>
+          <span>Утвердить дизайн для DailyControlPanel</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ПУНКТ 5: ВЕРХНИЕ КНОПКИ В ОДНУ СТРОЧКУ (КАК В МАКЕТЕ)
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="bg-white border-b border-slate-300 px-3 sm:px-6 py-1.5 space-y-1.5">
+    
+    <!-- 1. Главные разделы приложения (Маленькие, в одну строчку) -->
+    <div class="max-w-[1680px] mx-auto flex items-center gap-1.5 overflow-x-auto text-xs font-bold text-slate-600 scrollbar-none">
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>⊞</span> <span>Главная</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>🚚</span> <span>АТИ Перевозки</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>📋</span> <span>Ревью рейсов</span>
+      </div>
+      
+      <!-- Активный раздел «Финансы» — лаконичный светлый вид с бейджем -->
+      <div class="flex items-center gap-1.5 px-3 py-1 rounded-md border-2 border-sky-600 bg-sky-50 text-sky-900 font-black shadow-2xs cursor-pointer whitespace-nowrap">
+        <span>💳</span> <span>Финансы</span>
+        <span class="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">25</span>
+      </div>
+
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>🚗</span> <span>Автопарк</span>
+        <span class="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">15</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>🔧</span> <span>Гараж / СТО</span>
+        <span class="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center">9</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>🏢</span> <span>Контрагенты</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>👥</span> <span>Персонал</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-white text-slate-700 cursor-pointer whitespace-nowrap">
+        <span>⏱️</span> <span>Ретро-ввод</span>
+      </div>
+    </div>
+
+    <!-- 2. Подразделы «Финансов» (Маленькие, плотные, в одну аккуратную строчку) -->
+    <div class="max-w-[1680px] mx-auto flex items-center gap-1.5 overflow-x-auto text-xs font-bold scrollbar-none pt-0.5">
+      <!-- Активная кнопка "Суточный контроль": Чёткая, светлая, 0% чёрного -->
+      <button class="px-3 py-1.5 bg-white text-slate-900 font-black rounded-lg shadow-2xs border-2 border-slate-900 flex items-center gap-2 cursor-pointer whitespace-nowrap">
+        <span class="text-sky-600">⚡</span>
+        <span>Суточный контроль</span>
+        <span class="bg-sky-100 text-sky-800 text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border border-sky-200">100%</span>
+      </button>
+
+      <!-- Дебиторка -->
+      <button class="px-3 py-1.5 bg-slate-100/90 hover:bg-white text-slate-700 hover:text-slate-900 rounded-lg border border-slate-300 flex items-center gap-2 cursor-pointer transition whitespace-nowrap">
+        <span>📋</span>
+        <span>Дебиторка:</span>
+        <span class="font-mono font-black text-slate-900">443 800 ₽</span>
+      </button>
+
+      <!-- Платёжный календарь -->
+      <button class="px-3 py-1.5 bg-slate-100/90 hover:bg-white text-slate-700 hover:text-slate-900 rounded-lg border border-slate-300 flex items-center gap-2 cursor-pointer transition whitespace-nowrap">
+        <span>📅</span>
+        <span>Платёжный календарь:</span>
+        <span class="font-mono font-black text-slate-900">564 077 ₽</span>
+      </button>
+
+      <span class="text-[10px] text-slate-400 pl-2 hidden lg:inline">
+        ← Компактные кнопки разделов в одну строчку
+      </span>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ГЛАВНЫЙ КОНТЕЙНЕР
+       ══════════════════════════════════════════════════════════════════════ -->
+  <main class="flex-1 max-w-[1680px] w-full mx-auto p-3 sm:p-5 space-y-3.5">
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         ПУНКТЫ 1 И 2: НАВИГАЦИЯ ДЕНЬ / НЕДЕЛЯ / МЕСЯЦ КАК В РАЗДЕЛЕ РЕВЬЮ
+         + БОЛЬШИЕ КНОПКИ ПЕРЕКЛЮЧЕНИЯ ДНЕЙ (← / →)
+         ════════════════════════════════════════════════════════════════════ -->
+    <section class="bg-white border-2 border-slate-300 rounded-2xl shadow-subtle overflow-hidden">
+      
+      <!-- 1. Верхний переключатель периодов: [ ДЕНЬ ] [ НЕДЕЛЯ ] [ МЕСЯЦ ] (как в Ревью) -->
+      <div class="flex items-center justify-between px-3 py-2 bg-slate-100/80 border-b border-slate-300">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-xs font-black uppercase tracking-wider text-slate-800">
+            ПЕРИОД КОНТРОЛЯ КАССЫ
+          </span>
+        </div>
+
+        <!-- Переключатель ДЕНЬ / НЕДЕЛЯ / МЕСЯЦ -->
+        <div class="flex bg-slate-200/80 p-0.5 rounded-xl border border-slate-300 max-w-xs w-full sm:w-auto">
+          <button onclick="setPeriod('day')" id="period-btn-day" class="flex-1 sm:px-4 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition cursor-pointer bg-white text-slate-900 shadow-2xs border border-slate-300/80">
+            День
+          </button>
+          <button onclick="setPeriod('week')" id="period-btn-week" class="flex-1 sm:px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer text-slate-600 hover:text-slate-900">
+            Неделя
+          </button>
+          <button onclick="setPeriod('month')" id="period-btn-month" class="flex-1 sm:px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer text-slate-600 hover:text-slate-900">
+            Месяц
+          </button>
+        </div>
+
+        <div class="hidden md:flex items-center gap-2 text-xs">
+          <button onclick="openModalAudit()" class="btn-tactile px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-400 rounded-lg font-black flex items-center gap-1 cursor-pointer">
+            <span>🔒</span> <span>Сейф 19:30</span>
+          </button>
+          <span class="font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-300 text-[11px]">
+            API Т-Банк: <strong class="text-emerald-700">● Live</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- 2. БОЛЬШАЯ ЦЕНТРАЛЬНАЯ СТРОКА: БОЛЬШИЕ КНОПКИ ПЕРЕКЛЮЧЕНИЯ ДНЕЙ (ВЫСОТА 56px, ШИРИНА 140px) -->
+      <div class="flex items-stretch h-14 bg-white border-b border-slate-300">
+        
+        <!-- БОЛЬШАЯ КНОПКА «НАЗАД» (Широкая, тактильная, удобная для клика) -->
+        <button onclick="shiftDate(-1)" class="w-28 sm:w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-600 flex items-center justify-center gap-1 cursor-pointer" aria-label="Предыдущий период">
+          <span class="text-3xl font-black group-hover:-translate-x-1.5 transition-transform select-none">
+            ←
+          </span>
+          <span class="text-xs font-black uppercase tracking-tight hidden sm:inline">
+            Назад
+          </span>
+        </button>
+
+        <!-- ЦЕНТРАЛЬНЫЙ БЛОК ДАТЫ (Крупный, с кликабельным календарем и бейджем) -->
+        <div class="flex-1 flex items-center justify-center gap-3 px-3 cursor-pointer hover:bg-slate-50 transition" onclick="resetDateToday()" title="Нажмите, чтобы вернуться к сегодняшнему дню">
+          <span class="text-sky-600 text-xl font-bold">📅</span>
+          <div class="flex items-center gap-2.5 flex-wrap justify-center">
+            <span class="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight font-display uppercase" id="current-date-title">
+              ЧТ, 15 ОКТЯБРЯ 2026 Г.
+            </span>
+            <span id="today-badge" class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-300 font-mono">
+              СЕГОДНЯ
+            </span>
+            <span id="period-sub-label" class="text-xs text-slate-400 font-medium hidden md:inline">
+              (Суточный баланс кассы и выписок)
+            </span>
+          </div>
+        </div>
+
+        <!-- БОЛЬШАЯ КНОПКА «ВПЕРЕД» -->
+        <button onclick="shiftDate(1)" class="w-28 sm:w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-l border-sky-600 flex items-center justify-center gap-1 cursor-pointer" aria-label="Следующий период">
+          <span class="text-xs font-black uppercase tracking-tight hidden sm:inline">
+            Вперёд
+          </span>
+          <span class="text-3xl font-black group-hover:translate-x-1.5 transition-transform select-none">
+            →
+          </span>
+        </button>
+
+      </div>
+
+      <!-- 3. НИЖНЯЯ ПОЛОСА БЫСТРОГО ПЕРЕКЛЮЧЕНИЯ (МЕСЯЦЫ ИЛИ НЕДЕЛИ) -->
+      
+      <!-- Полоса месяцев (для режима «День» и «Месяц») -->
+      <div id="strip-months" class="grid grid-cols-5 text-center text-xs font-bold divide-x divide-slate-300 bg-slate-100/70">
+        <button onclick="goMonth('2026-06')" class="py-2 text-slate-600 hover:bg-white hover:text-slate-900 transition cursor-pointer">
+          ИЮНЬ 2026
+        </button>
+        <button onclick="goMonth('2026-07')" class="py-2 text-slate-600 hover:bg-white hover:text-slate-900 transition cursor-pointer">
+          ИЮЛЬ 2026
+        </button>
+        <button onclick="goMonth('2026-08')" class="py-2 text-slate-600 hover:bg-white hover:text-slate-900 transition cursor-pointer">
+          АВГ. 2026
+        </button>
+        <button onclick="goMonth('2026-09')" class="py-2 text-slate-600 hover:bg-white hover:text-slate-900 transition cursor-pointer">
+          СЕНТ. 2026
+        </button>
+        <!-- Активный месяц: Чёткая белая кнопка с синей границей -->
+        <button onclick="goMonth('2026-10')" class="py-2 bg-white text-sky-800 font-black border-b-2 border-sky-600 shadow-2xs transition cursor-pointer">
+          ОКТЯБРЬ 2026 (ТЕКУЩИЙ)
+        </button>
+      </div>
+
+      <!-- Полоса недель (для режима «Неделя» — как в Ревью) -->
+      <div id="strip-weeks" class="hidden flex overflow-x-auto text-xs font-bold divide-x divide-slate-300 bg-slate-100/70 scrollbar-none">
+        <button onclick="goWeek('22 сен — 28 сен')" class="flex-1 py-2 px-3 min-w-[130px] text-slate-600 hover:bg-white hover:text-slate-900 transition whitespace-nowrap text-center cursor-pointer">
+          22 сен — 28 сен
+        </button>
+        <button onclick="goWeek('29 сен — 5 окт')" class="flex-1 py-2 px-3 min-w-[130px] text-slate-600 hover:bg-white hover:text-slate-900 transition whitespace-nowrap text-center cursor-pointer">
+          29 сен — 5 окт
+        </button>
+        <button onclick="goWeek('6 окт — 12 окт')" class="flex-1 py-2 px-3 min-w-[130px] text-slate-600 hover:bg-white hover:text-slate-900 transition whitespace-nowrap text-center cursor-pointer">
+          6 окт — 12 окт
+        </button>
+        <button onclick="goWeek('13 окт — 19 окт')" class="flex-1 py-2 px-3 min-w-[130px] bg-white text-sky-800 font-black border-b-2 border-sky-600 shadow-2xs whitespace-nowrap text-center cursor-pointer">
+          13 окт — 19 окт (ТЕКУЩАЯ)
+        </button>
+        <button onclick="goWeek('20 окт — 26 окт')" class="flex-1 py-2 px-3 min-w-[130px] text-slate-400 hover:bg-white hover:text-slate-900 transition whitespace-nowrap text-center cursor-pointer">
+          20 окт — 26 окт
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         СВЕТЛЫЙ СЕЛЕКТОР КОШЕЛЬКОВ + БЫСТРЫЕ ДЕЙСТВИЯ
+         ════════════════════════════════════════════════════════════════════ -->
+    <div class="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2 rounded-xl border border-slate-300 shadow-2xs">
+      
+      <!-- Фильтр кошельков (Без черной таблетки) -->
+      <div class="flex items-center gap-1.5 overflow-x-auto text-xs">
+        <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider pl-1 pr-1">
+          КОШЕЛЁК:
+        </span>
+
+        <button onclick="filterWallet('all')" id="w-all" class="px-3 py-1.5 rounded-lg text-xs font-black bg-slate-900 text-white shadow-2xs cursor-pointer">
+          🌐 Все 3 кошелька
+        </button>
+
+        <button onclick="filterWallet('bank')" id="w-bank" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-900 border border-slate-300 flex items-center gap-1.5 transition cursor-pointer">
+          <span>🏦</span>
+          <span>Р/С БАНК:</span>
+          <span class="font-mono font-black text-sky-700">208 386,51 ₽</span>
+        </button>
+
+        <button onclick="filterWallet('cash')" id="w-cash" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-900 border border-slate-300 flex items-center gap-1.5 transition cursor-pointer">
+          <span>🔒</span>
+          <span>СЕЙФ:</span>
+          <span class="font-mono font-black text-emerald-700">2 056 106,67 ₽</span>
+        </button>
+
+        <button onclick="filterWallet('fuel')" id="w-fuel" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-slate-300 flex items-center gap-1.5 transition cursor-pointer">
+          <span>⛽</span>
+          <span>ТОПЛИВНАЯ:</span>
+          <span class="font-mono font-black text-amber-700">-73 976 ₽</span>
+        </button>
+      </div>
+
+      <!-- Быстрые действия -->
+      <div class="flex items-center gap-2">
+        <button onclick="openModalQuick('expense')" class="btn-tactile px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-black flex items-center gap-1 cursor-pointer">
+          <span>−</span> <span>Списание</span>
+        </button>
+        <button onclick="openModalQuick('income')" class="btn-tactile px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-black flex items-center gap-1 cursor-pointer">
+          <span>+</span> <span>Пополнение</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         КОМПАКТНАЯ ГОРИЗОНТАЛЬНАЯ ЛЕНТА KPI (SPLIT BAR)
+         ════════════════════════════════════════════════════════════════════ -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 bg-white border-2 border-slate-300 rounded-xl divide-y lg:divide-y-0 lg:divide-x divide-slate-300 shadow-2xs overflow-hidden">
+      
+      <div class="p-3">
+        <div class="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+          Остаток на начало (00:00)
+        </div>
+        <div class="text-base sm:text-lg font-black font-mono text-slate-900 mt-0.5">
+          2 103 464,68 ₽
+        </div>
+        <div class="text-[10px] text-slate-500 font-medium">Банк + Сейф + Топливо</div>
+      </div>
+
+      <div class="p-3 bg-rose-50/40">
+        <div class="text-[9px] font-black text-rose-700 uppercase tracking-wider flex items-center justify-between">
+          <span>Расходы за период</span>
+          <span class="text-[10px] font-mono bg-rose-100 text-rose-800 px-1 rounded">5 списаний</span>
+        </div>
+        <div class="text-base sm:text-lg font-black font-mono text-rose-600 mt-0.5">
+          -23 947,50 ₽
+        </div>
+        <div class="text-[10px] text-rose-700/80 font-medium">Списания и комиссии</div>
+      </div>
+
+      <div class="p-3 bg-emerald-50/40">
+        <div class="text-[9px] font-black text-emerald-800 uppercase tracking-wider flex items-center justify-between">
+          <span>Доходы за период</span>
+          <span class="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-1 rounded">10 поступлений</span>
+        </div>
+        <div class="text-base sm:text-lg font-black font-mono text-emerald-700 mt-0.5">
+          +111 000,00 ₽
+        </div>
+        <div class="text-[10px] text-emerald-700/80 font-medium">Выручка и безнал</div>
+      </div>
+
+      <div class="p-3 bg-sky-50/40">
+        <div class="text-[9px] font-black text-sky-800 uppercase tracking-wider flex items-center justify-between">
+          <span>Итого в кассе (Дельта)</span>
+          <span class="text-[10px] font-mono font-black text-emerald-700 bg-white px-1.5 py-0.2 rounded border border-emerald-200">+87 052 ₽</span>
+        </div>
+        <div class="text-base sm:text-lg font-black font-mono text-slate-900 mt-0.5">
+          2 190 517,18 ₽
+        </div>
+        <div class="text-[10px] text-sky-700 font-bold font-mono">Вечерний баланс 19:30</div>
+      </div>
+
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         ПУНКТЫ 3 И 4: ДВУХКОЛОНОЧНЫЙ СПИСОК С АКЦЕНТНЫМИ СТРОКАМИ
+         И АВТОМАТИЧЕСКОЙ ГРУППИРОВКОЙ ОДНОТИПНЫХ РАСХОДОВ/ДОХОДОВ
+         ════════════════════════════════════════════════════════════════════ -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      
+      <!-- ════════════ ЛЕВАЯ КОЛОНКА: РАСХОДЫ ════════════ -->
+      <div class="space-y-2.5">
+        
+        <!-- Заголовок колонки расходов -->
+        <div class="flex items-center justify-between px-3.5 py-2 bg-white rounded-xl border-2 border-rose-300 shadow-2xs">
+          <div class="flex items-center gap-2">
+            <span class="w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">
+              −
+            </span>
+            <h2 class="text-xs font-black uppercase tracking-tight text-slate-900">
+              РАСХОДЫ ЗА СЕГОДНЯ
+            </h2>
+            <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800">
+              5 операций • 2 группы
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black font-mono text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+              -23 947,50 ₽
+            </span>
+            <button onclick="openModalQuick('expense')" class="btn-tactile px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-black shadow-2xs cursor-pointer">
+              + Списание
+            </button>
+          </div>
+        </div>
+
+        <!-- СПИСОК РАСХОДОВ: КАЖДАЯ СТРОКА ЧЁТКО РАЗДЕЛЕНА И АКЦЕНТИРОВАНА БОКОВОЙ ПОЛОСОЙ -->
+        <div class="space-y-2">
+
+          <!-- ════ ГРУППА 1: БАНКОВСКИЕ КОМИССИИ (ПУНКТ 4) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs overflow-hidden border-l-4 border-l-rose-500">
+            <!-- Главная компактная строка группы -->
+            <div onclick="toggleGroupDetails('group-commissions')" class="p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 transition select-none">
+              <div class="flex items-center gap-2 min-w-0">
+                <span id="group-commissions-chevron" class="text-xs font-black text-rose-600 transition-transform">
+                  ▼
+                </span>
+                <span class="text-base">🏦</span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-black text-slate-900">Банковские комиссии Т-Банк</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200">
+                      3 списания
+                    </span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      Комиссия банка
+                    </span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                    <span class="text-sky-700 font-bold bg-sky-50 px-1 py-0.2 rounded border border-sky-100">Р/С Банк (API)</span>
+                    <span>•</span>
+                    <span>Сводная группа • Нажмите для просмотра</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-right flex-shrink-0">
+                <div class="text-sm font-black font-mono text-rose-600">-2 450,00 ₽</div>
+                <span class="text-[10px] text-slate-400 font-bold">Раскрыть детали</span>
+              </div>
+            </div>
+
+            <!-- Раскрывающиеся детальные строки группы -->
+            <div id="group-commissions-sub" class="border-t border-slate-200 bg-slate-50/80 p-2.5 space-y-1.5 text-xs">
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">10:05</span>
+                  <span class="font-bold text-slate-800">Комиссия за перевод физлицам по СБП (Иванов)</span>
+                </div>
+                <span class="font-mono font-black text-rose-600">-1 200,00 ₽</span>
+              </div>
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">12:40</span>
+                  <span class="font-bold text-slate-800">Плата за ведение расчетного счета (тариф Простой)</span>
+                </div>
+                <span class="font-mono font-black text-rose-600">-750,00 ₽</span>
+              </div>
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">16:15</span>
+                  <span class="font-bold text-slate-800">СМС и Push-информирование за октябрь</span>
+                </div>
+                <span class="font-mono font-black text-rose-600">-500,00 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ ГРУППА 2: ВЫПЛАТА ЗАРПЛАТЫ (ПУНКТ 4) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs overflow-hidden border-l-4 border-l-rose-500">
+            <div onclick="toggleGroupDetails('group-salary')" class="p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 transition select-none">
+              <div class="flex items-center gap-2 min-w-0">
+                <span id="group-salary-chevron" class="text-xs font-black text-rose-600 transition-transform">
+                  ▼
+                </span>
+                <span class="text-base">👥</span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-black text-slate-900">Выплата зарплаты сотрудникам</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200">
+                      2 выплаты
+                    </span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      ФОТ / Зарплата
+                    </span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                    <span class="text-emerald-800 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100">🔒 Сейф (Нал)</span>
+                    <span>•</span>
+                    <span>Бухгалтерия / Директор</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-right flex-shrink-0">
+                <div class="text-sm font-black font-mono text-rose-600">-4 895,00 ₽</div>
+                <span class="text-[10px] text-slate-400 font-bold">Раскрыть детали</span>
+              </div>
+            </div>
+
+            <!-- Детали зарплаты -->
+            <div id="group-salary-sub" class="hidden border-t border-slate-200 bg-slate-50/80 p-2.5 space-y-1.5 text-xs">
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">11:00</span>
+                  <span class="font-bold text-slate-800">1. Аванесов М. (Водитель Газель 866) — аванс за рейс №821</span>
+                </div>
+                <span class="font-mono font-black text-rose-600">-3 000,00 ₽</span>
+              </div>
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">11:20</span>
+                  <span class="font-bold text-slate-800">2. Ковалев Д. (Слесарь СТО) — остаток за смену</span>
+                </div>
+                <span class="font-mono font-black text-rose-600">-1 895,00 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: СТРАХОВКА ГАЗЕЛЬ 866 (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-rose-500">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-black text-slate-900">Страховка Газель 866 (ОСАГО)</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                  Страховка
+                </span>
+              </div>
+              <div class="flex items-center gap-2 text-[11px] text-slate-500">
+                <span class="text-sky-700 font-bold bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">🏦 Р/С Банк</span>
+                <span class="font-mono">19:12</span>
+                <span>•</span>
+                <span>Администратор</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="text-sm font-black font-mono text-rose-600">-9 000,00 ₽</div>
+                <span class="text-[10px] text-slate-400">Без привязки</span>
+              </div>
+              <button onclick="editItemDemo('Страховка Газель 866', '9000')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: ЗАПРАВКА ГАЗПРОМНЕФТЬ (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-rose-500">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-black text-slate-900">Заправка ДТ (Газпромнефть №42) Газель 866</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                  ГСМ / Топливо
+                </span>
+              </div>
+              <div class="flex items-center gap-2 text-[11px] text-slate-500">
+                <span class="text-amber-800 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-100">⛽ Топливная карта</span>
+                <span class="font-mono">14:20</span>
+                <span>•</span>
+                <span class="text-emerald-700 font-bold">✓ Сверка ОК</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="text-sm font-black font-mono text-rose-600">-4 552,50 ₽</div>
+                <span class="text-[10px] text-slate-400">Автозагрузка</span>
+              </div>
+              <button onclick="editItemDemo('Заправка Газпромнефть', '4552.5')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: ЗАПЧАСТИ ГАЗЕЛЬ 412 (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-rose-500">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-black text-slate-900">Запчасти Газель 412 (Колодки тормозные)</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                  Запчасти / ТО
+                </span>
+              </div>
+              <div class="flex items-center gap-2 text-[11px] text-slate-500">
+                <span class="text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">🔒 Сейф (Нал)</span>
+                <span class="font-mono">11:30</span>
+                <span>•</span>
+                <span>Механик СТО</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="text-sm font-black font-mono text-rose-600">-3 500,00 ₽</div>
+                <span class="text-[10px] text-slate-400">Товарный чек</span>
+              </div>
+              <button onclick="editItemDemo('Запчасти Газель 412', '3500')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ════════════ ПРАВАЯ КОЛОНКА: ДОХОДЫ ════════════ -->
+      <div class="space-y-2.5">
+        
+        <!-- Заголовок колонки доходов -->
+        <div class="flex items-center justify-between px-3.5 py-2 bg-white rounded-xl border-2 border-emerald-300 shadow-2xs">
+          <div class="flex items-center gap-2">
+            <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center">
+              +
+            </span>
+            <h2 class="text-xs font-black uppercase tracking-tight text-slate-900">
+              ДОХОДЫ ЗА СЕГОДНЯ
+            </h2>
+            <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+              10 операций • 2 группы
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              +111 000,00 ₽
+            </span>
+            <button onclick="openModalQuick('income')" class="btn-tactile px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black shadow-2xs cursor-pointer">
+              + Пополнение
+            </button>
+          </div>
+        </div>
+
+        <!-- СПИСОК ДОХОДОВ: КАЖДАЯ СТРОКА АКЦЕНТИРОВАНА ЗЕЛЕНОЙ ПОЛОСОЙ BORDER-L-4 -->
+        <div class="space-y-2">
+
+          <!-- ════ ГРУППА 1: СВЕРКА QR-КОДОВ (ПУНКТ 4) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs overflow-hidden border-l-4 border-l-emerald-500">
+            <div onclick="toggleGroupDetails('group-qrcodes')" class="p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 transition select-none">
+              <div class="flex items-center gap-2 min-w-0">
+                <span id="group-qrcodes-chevron" class="text-xs font-black text-emerald-600 transition-transform">
+                  ▼
+                </span>
+                <span class="text-base">📱</span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-black text-slate-900">Сверка QR-кодов от водителей</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      3 оплаты
+                    </span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      СБП / Р/С
+                    </span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                    <span class="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100">✓ Все в банке: 3</span>
+                    <span>•</span>
+                    <span class="text-emerald-700 font-bold">Все оплачены ✓</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-right flex-shrink-0">
+                <div class="text-sm font-black font-mono text-emerald-700">+7 500,00 ₽</div>
+                <span class="text-[10px] text-slate-400 font-bold">Раскрыть детали</span>
+              </div>
+            </div>
+
+            <!-- Детали QR кодов -->
+            <div id="group-qrcodes-sub" class="hidden border-t border-slate-200 bg-slate-50/80 p-2.5 space-y-1.5 text-xs">
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">10:15</span>
+                  <span class="font-bold text-slate-800">1. Водитель Фирсов И. — Рейс №825 (СБП перевод заказчика)</span>
+                </div>
+                <span class="font-mono font-black text-emerald-700">+2 500,00 ₽</span>
+              </div>
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">12:30</span>
+                  <span class="font-bold text-slate-800">2. Водитель Смирнов А. — Рейс №826 (СБП перевод заказчика)</span>
+                </div>
+                <span class="font-mono font-black text-emerald-700">+3 000,00 ₽</span>
+              </div>
+              <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400 font-mono text-[11px]">15:45</span>
+                  <span class="font-bold text-slate-800">3. Водитель Козлов Д. — Рейс №828 (СБП перевод заказчика)</span>
+                </div>
+                <span class="font-mono font-black text-emerald-700">+2 000,00 ₽</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: РЕЙС 827 (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-emerald-500">
+            <div class="space-y-1 min-w-0">
+              <div class="text-xs font-black text-slate-900">
+                Оплата по СБП / Р/С — Рейс №827 (Иван Фирсов)
+              </div>
+              <div class="flex items-center gap-2 flex-wrap text-[11px]">
+                <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[10px]">
+                  Поступление на Р/С
+                </span>
+                <span class="text-sky-700 font-bold bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
+                  🏦 Р/С Банк (API)
+                </span>
+                <span class="text-slate-500">вод. Иван Фирсов</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-950 border border-emerald-300 text-[11px] font-black px-2 py-0.5 rounded-lg shadow-2xs">
+                  <span>🚚 Рейс №827 (Иван Фирсов)</span>
+                  <span class="text-emerald-700">✓</span>
+                </div>
+                <div class="text-sm font-black font-mono text-emerald-700 mt-0.5">+2 500,00 ₽</div>
+              </div>
+              <button onclick="editItemDemo('Рейс №827', '2500')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: СЕВЕРТРАНС (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-emerald-500">
+            <div class="space-y-1 min-w-0">
+              <div class="text-xs font-black text-slate-900">
+                Оплата по счету №402 (ООО «СеверТранс») Заказ №1042
+              </div>
+              <div class="flex items-center gap-2 flex-wrap text-[11px]">
+                <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 font-bold border border-sky-200 text-[10px]">
+                  Оплата от контрагента
+                </span>
+                <span class="text-sky-700 font-bold bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
+                  🏦 Р/С Банк (API)
+                </span>
+                <span class="text-slate-500">ООО «СеверТранс»</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="inline-flex items-center gap-1.5 bg-sky-50 text-sky-950 border border-sky-300 text-[11px] font-black px-2 py-0.5 rounded-lg shadow-2xs">
+                  <span>📄 Заказ №1042</span>
+                  <span class="text-sky-700">✓</span>
+                </div>
+                <div class="text-sm font-black font-mono text-emerald-700 mt-0.5">+65 000,00 ₽</div>
+              </div>
+              <button onclick="editItemDemo('СеверТранс', '65000')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: СДАЧА ВЫРУЧКИ В СЕЙФ (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-emerald-500">
+            <div class="space-y-1 min-w-0">
+              <div class="text-xs font-black text-slate-900">
+                Сдача наличной выручки за рейс (Алексей Смирнов)
+              </div>
+              <div class="flex items-center gap-2 flex-wrap text-[11px]">
+                <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[10px]">
+                  Выручка наличными
+                </span>
+                <span class="text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
+                  🔒 Сейф (Нал)
+                </span>
+                <span class="text-slate-500">вод. Алексей Смирнов</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-950 border border-emerald-300 text-[11px] font-black px-2 py-0.5 rounded-lg shadow-2xs">
+                  <span>🔒 В сейф</span>
+                  <span class="text-emerald-700">✓</span>
+                </div>
+                <div class="text-sm font-black font-mono text-emerald-700 mt-0.5">+21 000,00 ₽</div>
+              </div>
+              <button onclick="editItemDemo('Выручка Смирнов', '21000')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+          <!-- ════ ОДИНОЧНАЯ СТРОКА: РЕЙС 829 (ПУНКТ 3) ════ -->
+          <div class="row-accent bg-white rounded-xl border border-slate-300 shadow-2xs p-3 flex items-start justify-between gap-2 border-l-4 border-l-emerald-500">
+            <div class="space-y-1 min-w-0">
+              <div class="text-xs font-black text-slate-900">
+                Оплата по СБП — Рейс №829 (Дмитрий Козлов)
+              </div>
+              <div class="flex items-center gap-2 flex-wrap text-[11px]">
+                <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[10px]">
+                  Поступление на Р/С
+                </span>
+                <span class="text-sky-700 font-bold bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
+                  🏦 Р/С Банк (API)
+                </span>
+                <span class="text-slate-500">вод. Дмитрий Козлов</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right">
+                <div class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-950 border border-emerald-300 text-[11px] font-black px-2 py-0.5 rounded-lg shadow-2xs">
+                  <span>🚚 Рейс №829</span>
+                  <span class="text-emerald-700">✓</span>
+                </div>
+                <div class="text-sm font-black font-mono text-emerald-700 mt-0.5">+15 000,00 ₽</div>
+              </div>
+              <button onclick="editItemDemo('Рейс №829', '15000')" class="btn-tactile w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-300 flex items-center justify-center text-xs cursor-pointer">
+                ✏️
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ ДЛЯ ПЕРЕНОСА В DAILYCONTROLPANEL
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="feedbackModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-300 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div>
+          <h3 class="text-sm font-black text-slate-900">Утверждение дизайна Crisp Pro v2.0</h3>
+          <p class="text-xs text-slate-500">Все 5 доработок реализованы и готовы к переносу в код</p>
+        </div>
+        <button onclick="closeFeedbackModal()" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-xl space-y-2 text-xs">
+        <div class="font-black text-emerald-900 flex items-center gap-1.5">
+          <span>✓</span> <span>Все требования учтены:</span>
+        </div>
+        <ul class="text-slate-700 space-y-1 list-disc list-inside">
+          <li>Навигация День / Неделя / Месяц с переключателем и полосами выбора как в Ревью.</li>
+          <li>Большие кнопки переключения периода (← и →) шириной 140px.</li>
+          <li>Строчки расходов и доходов чётко отделены с цветными акцентами <code class="bg-emerald-100 px-1 rounded">border-l-4</code>.</li>
+          <li>Группировка комиссий банка и зарплат в минималистичные раскрывающиеся строки.</li>
+          <li>Маленькие кнопки разделов в одну строку строго как в макете.</li>
+        </ul>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeFeedbackModal()" class="px-3.5 py-2 rounded-lg border border-slate-300 text-xs font-bold text-slate-600">
+          Продолжить осмотр
+        </button>
+        <button onclick="confirmApply()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-black shadow-2xs">
+          Применить в DailyControlPanel.tsx
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       ИНТЕРАКТИВНЫЕ СКРИПТЫ НАВИГАЦИИ И ГРУПП
+       ══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    // Текущий режим периода: 'day' | 'week' | 'month'
+    let currentPeriod = 'day';
+    let currentDateOffset = 0;
+
+    const baseDate = new Date(2026, 9, 15); // Чт, 15 октября 2026
+
+    function setPeriod(p) {
+      currentPeriod = p;
+
+      // Обновляем кнопки табов периода
+      ['day', 'week', 'month'].forEach(id => {
+        const btn = document.getElementById('period-btn-' + id);
+        if (id === p) {
+          btn.className = 'flex-1 sm:px-4 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition cursor-pointer bg-white text-slate-900 shadow-2xs border border-slate-300/80';
+        } else {
+          btn.className = 'flex-1 sm:px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer text-slate-600 hover:text-slate-900';
+        }
+      });
+
+      // Переключаем нижнюю полосу: Месяцы или Недели
+      const stripMonths = document.getElementById('strip-months');
+      const stripWeeks = document.getElementById('strip-weeks');
+
+      if (p === 'week') {
+        stripMonths.classList.add('hidden');
+        stripWeeks.classList.remove('hidden');
+      } else {
+        stripMonths.classList.remove('hidden');
+        stripWeeks.classList.add('hidden');
+      }
+
+      updateDateHeader();
+    }
+
+    function shiftDate(delta) {
+      currentDateOffset += delta;
+      updateDateHeader();
+    }
+
+    function resetDateToday() {
+      currentDateOffset = 0;
+      updateDateHeader();
+    }
+
+    function updateDateHeader() {
+      const d = new Date(baseDate);
+
+      const titleEl = document.getElementById('current-date-title');
+      const badgeEl = document.getElementById('today-badge');
+      const subLabelEl = document.getElementById('period-sub-label');
+
+      if (currentPeriod === 'day') {
+        d.setDate(d.getDate() + currentDateOffset);
+        const days = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+        const months = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
+        
+        titleEl.innerText = `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} Г.`;
+        badgeEl.style.display = currentDateOffset === 0 ? 'inline-block' : 'none';
+        subLabelEl.innerText = '(Суточный баланс кассы и выписок)';
+      } else if (currentPeriod === 'week') {
+        d.setDate(d.getDate() + (currentDateOffset * 7));
+        const day = d.getDay();
+        const diffToMon = day === 0 ? -6 : 1 - day;
+        const mon = new Date(d);
+        mon.setDate(d.getDate() + diffToMon);
+        const sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+
+        titleEl.innerText = `${mon.getDate()} ОКТ. — ${sun.getDate()} ОКТ. 2026 Г.`;
+        badgeEl.style.display = currentDateOffset === 0 ? 'inline-block' : 'none';
+        badgeEl.innerText = 'ТЕКУЩАЯ НЕДЕЛЯ';
+        subLabelEl.innerText = '(Сводка за 7 дней)';
+      } else if (currentPeriod === 'month') {
+        d.setMonth(d.getMonth() + currentDateOffset);
+        const monthNames = ['ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ', 'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ', 'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ'];
+        titleEl.innerText = `${monthNames[d.getMonth()]} ${d.getFullYear()} Г.`;
+        badgeEl.style.display = currentDateOffset === 0 ? 'inline-block' : 'none';
+        badgeEl.innerText = 'ТЕКУЩИЙ МЕСЯЦ';
+        subLabelEl.innerText = '(Сводка за весь месяц)';
+      }
+    }
+
+    function goMonth(ym) {
+      alert(`Выбран месяц: ${ym}`);
+    }
+
+    function goWeek(wLabel) {
+      alert(`Выбрана неделя: ${wLabel}`);
+    }
+
+    // Раскрытие / сворачивание групп расходов и доходов (Пункт 4)
+    function toggleGroupDetails(groupId) {
+      const sub = document.getElementById(groupId + '-sub');
+      const chevron = document.getElementById(groupId + '-chevron');
+      if (sub) {
+        const isHidden = sub.classList.contains('hidden');
+        if (isHidden) {
+          sub.classList.remove('hidden');
+          if (chevron) chevron.style.transform = 'rotate(0deg)';
+        } else {
+          sub.classList.add('hidden');
+          if (chevron) chevron.style.transform = 'rotate(-90deg)';
+        }
+      }
+    }
+
+    // Фильтр кошельков
+    function filterWallet(w) {
+      const allBtns = ['all', 'bank', 'cash', 'fuel'];
+      allBtns.forEach(id => {
+        const btn = document.getElementById('w-' + id);
+        if (id === w) {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-black bg-slate-900 text-white shadow-2xs cursor-pointer';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1.5 transition cursor-pointer';
+        }
+      });
+    }
+
+    // Модалки
+    function openFeedbackModal() {
+      document.getElementById('feedbackModal').classList.remove('hidden');
+    }
+    function closeFeedbackModal() {
+      document.getElementById('feedbackModal').classList.add('hidden');
+    }
+    function confirmApply() {
+      closeFeedbackModal();
+      alert('Принято! Все 5 доработок зафиксированы. Теперь переходим к их внедрению в код приложения.');
+    }
+
+    function openModalQuick(type) {
+      const title = type === 'expense' ? 'Внесение списания' : 'Внесение пополнения';
+      alert(`${title}: Открыто быстрое окно добавления операции.`);
+    }
+
+    function openModalAudit() {
+      alert('Аудит кассы сейфа (19:30): Фактический остаток подтвержден (2 056 106,67 ₽). Расхождений нет ✓');
+    }
+
+    function editItemDemo(title, amount) {
+      alert(`Редактирование: ${title} (${amount} ₽)`);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Доверенность на водителя — ООО «Байт Транзит Континент»</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 14pt;
+      line-height: 1.35;
+      color: #000;
+      background-color: #f1f5f9;
+      padding: 24px;
+    }
+
+    /* Верхняя панель управления (только на экране) */
+    .toolbar {
+      max-width: 800px;
+      margin: 0 auto 20px auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .toolbar-info {
+      font-size: 13px;
+      color: #334155;
+    }
+    .toolbar-info strong {
+      color: #0f172a;
+      display: block;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+    .btn-secondary {
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    /* Памятка по отправке пакета */
+    .package-memo {
+      max-width: 800px;
+      margin: 0 auto 20px auto;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #2563eb;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 12px;
+      color: #1e3a8a;
+      line-height: 1.5;
+    }
+    .package-memo strong {
+      color: #172554;
+    }
+    .package-memo ol {
+      margin-left: 18px;
+      margin-top: 4px;
+    }
+
+    /* Лист А4 */
+    .sheet {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 20mm 20mm 20mm 25mm;
+      margin: 0 auto;
+      background: #ffffff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    /* Шапка реквизитов ИП */
+    .ip-header {
+      font-size: 10pt;
+      line-height: 1.25;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 8px;
+    }
+    .ip-name {
+      font-weight: bold;
+      font-size: 11pt;
+    }
+
+    /* Заголовок документа */
+    .doc-title {
+      text-align: center;
+      font-size: 16pt;
+      font-weight: bold;
+      letter-spacing: 2px;
+      margin: 20px 0 16px 0;
+      text-transform: uppercase;
+    }
+
+    /* Дата и город */
+    .doc-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 12pt;
+    }
+
+    /* Текст доверенности */
+    .doc-body {
+      text-align: justify;
+      text-indent: 1.25cm;
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+    .doc-body strong {
+      font-weight: bold;
+    }
+
+    /* Список полномочий */
+    .powers-list {
+      margin-left: 1.25cm;
+      margin-bottom: 16px;
+      line-height: 1.4;
+      text-align: justify;
+    }
+    .powers-list li {
+      margin-bottom: 8px;
+    }
+
+    /* Срок действия */
+    .validity {
+      text-align: justify;
+      text-indent: 1.25cm;
+      margin-top: 18px;
+      margin-bottom: 24px;
+      font-weight: normal;
+    }
+
+    /* Образец подписи */
+    .signature-specimen {
+      margin-top: 24px;
+      margin-bottom: 24px;
+      font-size: 13pt;
+    }
+    .underline {
+      display: inline-block;
+      min-width: 180px;
+      border-bottom: 1px solid #000;
+      margin: 0 4px;
+    }
+
+    /* Блок подписи доверителя */
+    .signatures-block {
+      margin-top: 36px;
+      font-size: 13pt;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .seal-place {
+      margin-top: 14px;
+      font-weight: bold;
+      font-size: 11pt;
+    }
+
+    /* Стили для печати */
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .toolbar, .package-memo {
+        display: none !important;
+      }
+      .sheet {
+        box-shadow: none;
+        margin: 0;
+        width: 100%;
+        min-height: auto;
+        padding: 15mm 15mm 15mm 20mm;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Панель действий -->
+  <div class="toolbar">
+    <div class="toolbar-info">
+      <strong>📄 Доверенность на водителя Насртдинова В.А.</strong>
+      <span>Для сдачи оригиналов документов в ООО «Байт Транзит Континент»</span>
+    </div>
+    <div class="toolbar-actions">
+      <button onclick="window.print()" class="btn btn-primary">
+        🖨️ Распечатать / Сохранить в PDF
+      </button>
+      <a href="Doverennost_Voditel_Bayt_Tranzit.docx" download class="btn btn-secondary">
+        📥 Скачать файл Word (.docx)
+      </a>
+    </div>
+  </div>
+
+  <!-- Памятка по требованиям контрагента -->
+  <div class="package-memo">
+    <strong>📦 Требования ООО «Байт-Транзит-Континент» к оплате рейса № 1 (18 000 ₽):</strong>
+    <div>Оригиналы документов отправить по адресу: <strong>620134, г. Екатеринбург, ул. Ангарская, д. 77, офис 208, Байт Транзит Континент</strong>.</div>
+    <div>Полный комплект оригиналов:</div>
+    <ol>
+      <li>Транспортная накладная (ТТН / ТрН) с отметками грузополучателя (г. Уфа, ул. Кирзаводская 1/1);</li>
+      <li>Акт выполненных работ (оказанных услуг) ИП Нигамедьянов А.С. (18 000 руб.);</li>
+      <li>Счёт на оплату № 1 от ИП Нигамедьянов А.С. (18 000 руб., без НДС);</li>
+      <li><strong>Настоящая Доверенность от ИП на водителя</strong> (оригинал с синей печатью ИП);</li>
+      <li>Подписанный экземпляр Договора-Заявки № 1 от 15.10.2026.</li>
+    </ol>
+    <div style="margin-top: 4px; font-weight: bold; color: #b91c1c;">
+      ⏱️ Срок оплаты: 10 банковских дней с момента получения оригиналов по указанному адресу.
+    </div>
+  </div>
+
+  <!-- Официальный бланк на печать -->
+  <div class="sheet">
+    <!-- Шапка реквизитов ИП -->
+    <div class="ip-header">
+      <div class="ip-name">Индивидуальный предприниматель Нигамедьянов Александр Сергеевич</div>
+      <div><strong>Юридический адрес:</strong> 624760, Россия, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22</div>
+      <div><strong>ИНН:</strong> 660704814106 &nbsp;|&nbsp; <strong>ОГРНИП:</strong> 321665800053976</div>
+      <div><strong>Банк:</strong> АО «ТБанк» г. Москва &nbsp;|&nbsp; <strong>БИК:</strong> 044525974</div>
+      <div><strong>Р/С:</strong> 40802810500001961654 &nbsp;|&nbsp; <strong>К/С:</strong> 30101810145250000974</div>
+      <div><strong>Тел:</strong> +7 (922) 180-09-11 &nbsp;|&nbsp; <strong>Email:</strong> uralavto707@mail.ru</div>
+    </div>
+
+    <!-- Заголовок -->
+    <div class="doc-title">ДОВЕРЕННОСТЬ</div>
+
+    <!-- Город и дата -->
+    <div class="doc-meta">
+      <div>г. Верхняя Салда / г. Екатеринбург</div>
+      <div><strong>«15» октября 2026 г.</strong></div>
+    </div>
+
+    <!-- Текст поручения -->
+    <div class="doc-body">
+      Индивидуальный предприниматель <strong>Нигамедьянов Александр Сергеевич</strong> (ОГРНИП 321665800053976, ИНН 660704814106), настоящей доверенностью уполномочивает гражданина РФ <strong>Насртдинова Вячеслава Аксановича</strong>, паспорт серия <strong>6521</strong> номер <strong>342609</strong>, выдан <strong>27.07.2021 г. ГУ МВД России по Свердловской области</strong>, водительское удостоверение <strong>99 31 051064</strong>, управляющего грузовым автомобилем <strong>Валдай (гос. номер О 188 ТА 196)</strong>, производить в <strong>Обществе с ограниченной ответственностью «Байт-Транзит-Континент» (ООО «БТК»)</strong> следующие операции:
+    </div>
+
+    <!-- Пункты полномочий -->
+    <ol class="powers-list">
+      <li>Сдавать и получать грузы для транспортировки;</li>
+      <li>Подписывать заявки на транспортировку груза, транспортные накладные (ТрН / ТТН), акты выполненных работ (оказанных услуг), акты сдачи-приемки, экспедиторские расписки, а также совершать все иные фактические и юридические действия и формальности, связанные с выполнением настоящего поручения.</li>
+    </ol>
+
+    <!-- Срок действия -->
+    <div class="validity">
+      Настоящая доверенность выдана сроком с <strong>15.10.2026 г.</strong> и действительна по <strong>31.12.2026 г.</strong> включительно без права передоверия.
+    </div>
+
+    <!-- Образец подписи -->
+    <div class="signature-specimen">
+      Образец подписи доверенного лица: <span class="underline"></span> / <strong>Насртдинов В. А.</strong> / подтверждаю.
+    </div>
+
+    <!-- Подпись доверителя и печать -->
+    <div class="signatures-block">
+      <div>
+        Индивидуальный предприниматель: <span class="underline"></span> / <strong>Нигамедьянов А. С.</strong> /
+        <div class="seal-place">М. П.</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

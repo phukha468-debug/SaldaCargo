@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import ReceivablesPage from '../receivables/page';
 import { PaymentCalendarPanel } from '@/components/PaymentCalendarPanel';
 import { DailyControlPanel } from '@/components/DailyControlPanel';
+import { cn } from '@saldacargo/ui';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -2047,25 +2048,7 @@ function IncomePanel() {
 
 // ── Tab amount helpers ─────────────────────────────────────────────────────
 
-// ── Tab amount helpers ─────────────────────────────────────────────────────
-
-function TabAmount({ children }: { children: React.ReactNode }) {
-  return (
-    <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 900, opacity: 0.85 }}>
-      {children}
-    </span>
-  );
-}
-
 // ── Main page ──────────────────────────────────────────────────────────────
-
-const TAB_GRADIENTS: Record<Tab, string> = {
-  daily: 'linear-gradient(135deg,#0f172a,#1e293b)',
-  expenses: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-  income: 'linear-gradient(135deg,#10b981,#0891b2)',
-  recv: 'linear-gradient(135deg,#f59e0b,#f97316)',
-  calendar: 'linear-gradient(135deg,#3b82f6,#2563eb)',
-};
 
 export default function FinancePage() {
   const searchParams = useSearchParams();
@@ -2115,51 +2098,33 @@ export default function FinancePage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4">
-      {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          overflowX: 'auto',
-          paddingBottom: 4,
-          scrollbarWidth: 'none',
-        }}
-      >
+      {/* Tab bar — compact single row, Crisp Pro light style */}
+      <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold scrollbar-none pb-1 pt-0.5">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 20px',
-                borderRadius: 12,
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                border: '2px solid transparent',
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                background: isActive ? TAB_GRADIENTS[tab.id] : '#fff',
-                color: isActive ? '#fff' : '#64748b',
-                boxShadow: isActive ? '0 4px 16px rgba(0,0,0,.18)' : '0 1px 3px rgba(0,0,0,.06)',
-                transform: isActive ? 'translateY(-1px)' : 'none',
-                transition: 'all .22s cubic-bezier(.4,0,.2,1)',
-              }}
+              className={cn(
+                'px-3 py-1.5 rounded-lg border flex items-center gap-2 cursor-pointer whitespace-nowrap transition-all shadow-2xs',
+                isActive
+                  ? 'bg-white text-slate-900 font-black border-2 border-slate-900 shadow-sm'
+                  : 'bg-slate-100/90 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-300',
+              )}
             >
-              <span style={{ fontSize: 18, lineHeight: 1 }}>{tab.icon}</span>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 1, textAlign: 'left' }}>
-                <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.1 }}>{tab.label}</span>
-                <span
-                  style={{ fontSize: 9, fontWeight: 600, opacity: 0.7, letterSpacing: '.03em' }}
-                >
-                  {tab.sub}
-                </span>
+              <span className="text-sm">{tab.icon}</span>
+              <span className="text-xs font-black">{tab.label}</span>
+              <span
+                className={cn(
+                  'text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border',
+                  isActive
+                    ? 'bg-sky-100 text-sky-800 border-sky-300'
+                    : 'bg-white text-slate-700 border-slate-300',
+                )}
+              >
+                {tab.amount}
               </span>
-              <TabAmount>{tab.amount}</TabAmount>
             </button>
           );
         })}

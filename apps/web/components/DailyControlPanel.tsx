@@ -20,6 +20,34 @@ function formatDayHeader(dateStr: string): string {
   return `${dow.toUpperCase()}, ${dayMonth}`;
 }
 
+function getWeekDates(dStr: string) {
+  const d = new Date(dStr + 'T12:00:00');
+  const day = d.getDay();
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diffToMon);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return {
+    weekStart: mon.toISOString().slice(0, 10),
+    weekEnd: sun.toISOString().slice(0, 10),
+  };
+}
+
+function formatPeriodHeader(dateStr: string, periodMode: 'day' | 'week' | 'month'): string {
+  if (periodMode === 'day') {
+    return formatDayHeader(dateStr);
+  }
+  if (periodMode === 'week') {
+    const { weekStart, weekEnd } = getWeekDates(dateStr);
+    const ws = new Date(weekStart + 'T12:00:00');
+    const we = new Date(weekEnd + 'T12:00:00');
+    return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })} ${we.getFullYear()} г.`;
+  }
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).toUpperCase();
+}
+
 function cleanExpenseDescription(rawText: string | null | undefined): string {
   if (!rawText) return 'Расход';
   let t = rawText.trim();
@@ -200,6 +228,7 @@ export function DailyControlPanel() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [activeWallet, setActiveWallet] = useState<WalletFilter>('all');
 
   // Accordion state for grouped rows (key -> boolean)
@@ -498,21 +527,21 @@ export function DailyControlPanel() {
       const available = orders.filter((o) => !o.is_already_linked);
       let foundPair: string[] | null = null;
       for (let i = 0; i < available.length; i++) {
+        const ordI = available[i];
+        if (!ordI) continue;
         for (let j = i + 1; j < available.length; j++) {
+          const ordJ = available[j];
+          if (!ordJ) continue;
           const sumAmt =
-            parseFloat(String(available[i].amount || '0')) +
-            parseFloat(String(available[j].amount || '0'));
+            parseFloat(String(ordI.amount || '0')) + parseFloat(String(ordJ.amount || '0'));
           if (Math.abs(sumAmt - opAmt) < 0.01) {
             // Если одинаковый контрагент — высший приоритет
-            if (
-              available[i].counterparty?.name &&
-              available[i].counterparty?.name === available[j].counterparty?.name
-            ) {
-              foundPair = [available[i].id, available[j].id];
+            if (ordI.counterparty?.name && ordI.counterparty?.name === ordJ.counterparty?.name) {
+              foundPair = [ordI.id, ordJ.id];
               break;
             }
             if (!foundPair) {
-              foundPair = [available[i].id, available[j].id];
+              foundPair = [ordI.id, ordJ.id];
             }
           }
         }
@@ -606,6 +635,18 @@ export function DailyControlPanel() {
     setSelectedDate(nextStr);
   }
 
+  function shiftPeriod(delta: number) {
+    if (period === 'day') {
+      shiftDay(delta);
+    } else if (period === 'week') {
+      shiftDay(delta * 7);
+    } else if (period === 'month') {
+      const d = new Date(selectedDate + 'T12:00:00');
+      d.setMonth(d.getMonth() + delta);
+      setSelectedDate(d.toISOString().slice(0, 10));
+    }
+  }
+
   function toggleGroup(key: string) {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   }
@@ -687,7 +728,7 @@ export function DailyControlPanel() {
 
         if (linkedTxs.length > 0) {
           isLinked = true;
-          if (linkedTxs.length === 1) {
+          if (linkedTxs.length === 1 && linkedTxs[0]) {
             const linkedTx = linkedTxs[0];
             const desc = linkedTx.description || '';
             if (desc.includes('Заказ-наряд')) {
@@ -705,7 +746,7 @@ export function DailyControlPanel() {
               linkedDriverName =
                 linkedTx.related_user?.name ||
                 linkedOrder?.trip?.driver?.name ||
-                (matchDriver ? matchDriver[1] : undefined);
+                (matchDriver && matchDriver[1] ? matchDriver[1] : undefined);
               linkTypeLabel = linkedTripNumber
                 ? `Рейс №${linkedTripNumber}${linkedDriverName ? ` (${linkedDriverName})` : ''}`
                 : 'Рейс автопарка';
@@ -718,11 +759,11 @@ export function DailyControlPanel() {
             const driverNames: string[] = [];
             for (const tx of linkedTxs) {
               const matchNum = tx.description?.match(/Рейс №(\d+)/);
-              if (matchNum && !tripNumbers.includes(`№${matchNum[1]}`)) {
+              if (matchNum && matchNum[1] && !tripNumbers.includes(`№${matchNum[1]}`)) {
                 tripNumbers.push(`№${matchNum[1]}`);
               }
               const matchDriver = tx.description?.match(/\((.+?)\)/);
-              if (matchDriver && !driverNames.includes(matchDriver[1])) {
+              if (matchDriver && matchDriver[1] && !driverNames.includes(matchDriver[1])) {
                 driverNames.push(matchDriver[1]);
               }
             }
@@ -923,7 +964,17 @@ export function DailyControlPanel() {
       txMatchesWallet(t),
   );
 
-  const bankCommissions: RawTx[] = [];
+  type BankCommItem = {
+    id: string;
+    title: string;
+    author: string;
+    amount: number;
+    time: string;
+    rawTx?: RawTx;
+    bankOp?: TBankOp;
+  };
+
+  const bankCommissions: BankCommItem[] = [];
   const payrollTxs: RawTx[] = [];
   const fuelTxs: RawTx[] = [];
   const individualExpenses: ExpenseItem[] = [];
@@ -943,7 +994,17 @@ export function DailyControlPanel() {
       desc.includes('за входящий перевод') ||
       desc.includes('плата за обслуживание')
     ) {
-      bankCommissions.push(tx);
+      bankCommissions.push({
+        id: tx.id,
+        title: tx.description || 'Комиссия банка',
+        author: tx.counterparty?.name || 'Т-Банк',
+        amount: parseFloat(tx.amount) || 0,
+        time: new Date(tx.transaction_date || tx.created_at).toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        rawTx: tx,
+      });
     } else if (
       desc.includes('зарплат') ||
       desc.includes('фот') ||
@@ -1035,13 +1096,9 @@ export function DailyControlPanel() {
         desc.includes('тариф') ||
         op.category === 'commission'
       ) {
-        individualExpenses.push({
+        bankCommissions.push({
           id: `tbank-deb-${op.operationId}`,
           title: op.description || op.payPurpose || 'Комиссия банка',
-          category: 'Банковские услуги (API)',
-          categoryId: null,
-          wallet: 'bank',
-          walletName: 'Р/С Банк',
           author: 'Т-Банк (Авто)',
           amount: opAmt,
           time: opTime,
@@ -1071,23 +1128,24 @@ export function DailyControlPanel() {
   // А) Сгруппированные банковские комиссии
   if (bankCommissions.length > 0) {
     if (bankCommissions.length === 1 && bankCommissions[0]) {
-      const tx = bankCommissions[0];
+      const comm = bankCommissions[0];
       expenseItems.push({
-        id: tx.id,
-        title: tx.description || 'Комиссия банка',
+        id: comm.id,
+        title: comm.title,
         category: 'Банковские услуги',
-        categoryId: tx.category_id,
         wallet: 'bank',
         walletName: 'Р/С Банк',
-        author: 'Т-Банк (Авто)',
-        amount: parseFloat(tx.amount) || 0,
-        rawTx: tx,
+        author: comm.author,
+        amount: comm.amount,
+        time: comm.time,
+        rawTx: comm.rawTx,
+        bankOp: comm.bankOp,
       });
     } else {
-      const totalComm = bankCommissions.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const totalComm = bankCommissions.reduce((s, t) => s + t.amount, 0);
       expenseItems.push({
         id: 'group-bank-commission',
-        title: `Комиссии банка за операции (${bankCommissions.length} списаний)`,
+        title: `Банковские комиссии (${bankCommissions.length} списаний)`,
         category: 'Банковские услуги',
         wallet: 'bank',
         walletName: 'Р/С Банк',
@@ -1096,18 +1154,15 @@ export function DailyControlPanel() {
         isGroup: true,
         subItems: bankCommissions.map((t) => ({
           id: t.id,
-          title: t.description || 'Комиссия за операцию',
-          author: 'Т-Банк',
-          amount: parseFloat(t.amount) || 0,
-          time: new Date(t.transaction_date || t.created_at).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+          title: t.title,
+          author: t.author,
+          amount: t.amount,
+          time: t.time,
           category: 'Банковские услуги',
-          categoryId: t.category_id,
-          wallet: 'bank',
+          wallet: 'bank' as const,
           walletName: 'Р/С Банк',
-          rawTx: t,
+          rawTx: t.rawTx,
+          bankOp: t.bankOp,
         })),
       });
     }
@@ -1298,23 +1353,76 @@ export function DailyControlPanel() {
     return { ym, label, isCurrent: selectedDate.startsWith(ym) };
   });
 
+  // Week navigation strips (like Review page)
+  const weekStrip = React.useMemo(() => {
+    const list = [];
+    const base = new Date(selectedDate + 'T12:00:00');
+    for (let i = -2; i <= 2; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i * 7);
+      const { weekStart, weekEnd } = getWeekDates(d.toISOString().slice(0, 10));
+      const ws = new Date(weekStart + 'T12:00:00');
+      const we = new Date(weekEnd + 'T12:00:00');
+      list.push({
+        date: weekStart,
+        label: `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`,
+        isCurrent: getWeekDates(selectedDate).weekStart === weekStart,
+      });
+    }
+    return list;
+  }, [selectedDate]);
+
   return (
     <div className="space-y-3 font-sans pb-10">
-      {/* ── 1. COMPACT DATE NAVIGATOR (Proportionally 2x smaller) ── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-sm overflow-hidden flex flex-col text-slate-200">
-        {/* Top Mini Range Bar */}
-        <div className="flex border-b border-slate-800/80 bg-slate-950/40 px-2 py-1 items-center justify-between">
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+      {/* ── 1. LIGHT CRISP DATE & PERIOD NAVIGATOR (Review Style: Day / Week / Month + Big Buttons) ── */}
+      <div className="bg-white border-2 border-slate-300 rounded-2xl shadow-subtle overflow-hidden flex flex-col text-slate-800">
+        {/* Top Bar: Title + Period Selector (Day / Week / Month) + Quick Actions */}
+        <div className="flex flex-wrap border-b border-slate-300 bg-slate-100/80 px-3 py-2 items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">
               СУТОЧНЫЙ БАЛАНС И КОНТРОЛЬ КАССЫ
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Quick manual operation buttons in top bar */}
+
+          {/* Period Mode Selector: [ ДЕНЬ ] [ НЕДЕЛЯ ] [ МЕСЯЦ ] */}
+          <div className="flex bg-slate-200/80 p-0.5 rounded-xl border border-slate-300 max-w-xs w-full sm:w-auto">
+            <button
+              onClick={() => setPeriod('day')}
+              className={`flex-1 sm:px-4 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition cursor-pointer ${
+                period === 'day'
+                  ? 'bg-white text-slate-900 shadow-2xs border border-slate-300/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              День
+            </button>
+            <button
+              onClick={() => setPeriod('week')}
+              className={`flex-1 sm:px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                period === 'week'
+                  ? 'bg-white text-slate-900 shadow-2xs border border-slate-300/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Неделя
+            </button>
+            <button
+              onClick={() => setPeriod('month')}
+              className={`flex-1 sm:px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                period === 'month'
+                  ? 'bg-white text-slate-900 shadow-2xs border border-slate-300/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Месяц
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => openManualModal('expense')}
-              className="inline-flex items-center gap-1 text-[10px] font-black bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-0.5 rounded-md transition shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 text-[11px] font-black bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-2.5 py-1 rounded-lg transition shadow-2xs cursor-pointer"
               title="Внести расход / списание вручную"
             >
               <span>−</span>
@@ -1322,18 +1430,19 @@ export function DailyControlPanel() {
             </button>
             <button
               onClick={() => openManualModal('income')}
-              className="inline-flex items-center gap-1 text-[10px] font-black bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-0.5 rounded-md transition shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 text-[11px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-lg transition shadow-2xs cursor-pointer"
               title="Внести доход / пополнение вручную"
             >
               <span>+</span>
               <span>Пополнение</span>
             </button>
+
             {data?.audit?.status === 'confirmed' ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-1 rounded-lg">
                 ✓ СЕЙФ ПОДТВЕРЖДЁН (19:30)
               </span>
             ) : data?.audit?.status === 'discrepancy' ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-lg">
                 ⚠️ РАСХОЖДЕНИЕ В СЕЙФЕ ({rub(data.audit.safe_discrepancy)})
               </span>
             ) : (
@@ -1347,89 +1456,130 @@ export function DailyControlPanel() {
                   });
                   setIsAuditModalOpen(true);
                 }}
-                className="text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-md transition shadow-sm cursor-pointer"
+                className="text-[11px] font-black bg-amber-100 hover:bg-amber-200 text-amber-950 px-2.5 py-1 rounded-lg transition border border-amber-400 shadow-2xs cursor-pointer"
               >
                 🔒 ПРОВЕРИТЬ СЕЙФ (19:30)
               </button>
             )}
+
             <button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex items-center gap-1 text-[10px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded transition cursor-pointer border border-slate-700/80 disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-[11px] text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg transition cursor-pointer border border-slate-300 disabled:opacity-50 shadow-2xs"
               title="Запросить свежую выписку из Т-Банка прямо сейчас"
             >
-              <span className={`text-[9px] ${isFetching ? 'animate-spin inline-block' : ''}`}>
+              <span className={`text-[10px] ${isFetching ? 'animate-spin inline-block' : ''}`}>
                 🔄
               </span>
               <span>{isFetching ? 'Синхронизация...' : 'Обновить'}</span>
             </button>
-            <span className="text-[10px] text-slate-400 font-mono">
-              API Т-Банк: {bankWallet?.api_synced ? '🟢 Live' : '⚪ DB'}
+            <span className="text-[10px] text-slate-600 font-mono bg-white px-2 py-0.5 rounded border border-slate-300">
+              API: {bankWallet?.api_synced ? '🟢 Live' : '⚪ DB'}
             </span>
           </div>
         </div>
 
-        {/* Middle Date Bar - Compact Height h-8 (32px) */}
-        <div className="flex items-center justify-between px-3 h-8 bg-slate-900 border-b border-slate-800/70">
+        {/* Middle Date Bar - BIG SWITCH BUTTONS (Height h-14, width w-28 sm:w-40) */}
+        <div className="flex items-stretch h-14 bg-white border-b border-slate-300">
           <button
-            onClick={() => shiftDay(-1)}
-            className="w-6 h-6 flex items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer text-sm font-bold"
-            title="Предыдущий день"
+            onClick={() => shiftPeriod(-1)}
+            className="w-28 sm:w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-600 flex items-center justify-center gap-1 cursor-pointer"
+            title="Предыдущий период"
+            aria-label="Предыдущий период"
           >
-            ‹
+            <span className="text-3xl font-black group-hover:-translate-x-1.5 transition-transform select-none">
+              ←
+            </span>
+            <span className="text-xs font-black uppercase tracking-tight hidden sm:inline">
+              Назад
+            </span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black tracking-tight text-white uppercase">
-              {formatDayHeader(selectedDate)}
-            </span>
-            {selectedDate === todayStr && (
-              <span className="text-[9px] font-extrabold bg-sky-500 text-white px-1.5 py-0.2 rounded tracking-wider">
-                СЕГОДНЯ
+          <div
+            className="flex-1 flex items-center justify-center gap-3 px-3 cursor-pointer hover:bg-slate-50 transition"
+            onClick={() => setSelectedDate(todayStr)}
+            title="Нажмите, чтобы вернуться к сегодняшнему дню"
+          >
+            <span className="text-sky-600 text-xl font-bold">📅</span>
+            <div className="flex items-center gap-2.5 flex-wrap justify-center">
+              <span className="text-sm sm:text-base md:text-lg font-black tracking-tight text-slate-900 uppercase font-display">
+                {formatPeriodHeader(selectedDate, period)}
               </span>
-            )}
+              {selectedDate === todayStr && period === 'day' && (
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-300 font-mono">
+                  СЕГОДНЯ
+                </span>
+              )}
+              {selectedDate !== todayStr && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedDate(todayStr);
+                  }}
+                  className="text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded-full border border-sky-200 transition cursor-pointer"
+                >
+                  → вернуться к сегодня
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setSelectedDate(todayStr)}
-              className="text-[10px] font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded hover:bg-slate-800 transition cursor-pointer"
-            >
-              Сегодня
-            </button>
-            <button
-              onClick={() => shiftDay(1)}
-              className="w-6 h-6 flex items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer text-sm font-bold"
-              title="Следующий день"
-            >
-              ›
-            </button>
-          </div>
+          <button
+            onClick={() => shiftPeriod(1)}
+            className="w-28 sm:w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-l border-sky-600 flex items-center justify-center gap-1 cursor-pointer"
+            title="Следующий период"
+            aria-label="Следующий период"
+          >
+            <span className="text-xs font-black uppercase tracking-tight hidden sm:inline">
+              Вперёд
+            </span>
+            <span className="text-3xl font-black group-hover:translate-x-1.5 transition-transform select-none">
+              →
+            </span>
+          </button>
         </div>
 
-        {/* Bottom Month Strip - Micro Height */}
-        <div className="grid grid-cols-5 bg-slate-950/70 text-center border-t border-slate-800/40">
-          {monthStrip.map((m) => (
-            <button
-              key={m.ym}
-              onClick={() => {
-                const target = m.ym === todayStr.slice(0, 7) ? todayStr : `${m.ym}-01`;
-                setSelectedDate(target);
-              }}
-              className={`py-1 text-[10px] font-bold tracking-wider transition cursor-pointer ${
-                m.isCurrent
-                  ? 'bg-slate-800 text-sky-400 border-b-2 border-sky-400 shadow-inner'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        {/* Bottom Strip: Month strip (for Day / Month) or Week strip (for Week) */}
+        {period !== 'week' ? (
+          <div className="grid grid-cols-5 text-center text-xs font-bold divide-x divide-slate-300 bg-slate-100/70">
+            {monthStrip.map((m) => (
+              <button
+                key={m.ym}
+                onClick={() => {
+                  const target = m.ym === todayStr.slice(0, 7) ? todayStr : `${m.ym}-01`;
+                  setSelectedDate(target);
+                }}
+                className={`py-2 text-[11px] font-bold tracking-wider transition cursor-pointer ${
+                  m.isCurrent
+                    ? 'bg-white text-sky-800 font-black border-b-2 border-sky-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex overflow-x-auto text-xs font-bold divide-x divide-slate-300 bg-slate-100/70 scrollbar-none">
+            {weekStrip.map((w) => (
+              <button
+                key={w.date}
+                onClick={() => setSelectedDate(w.date)}
+                className={`flex-1 py-2 px-3 min-w-[130px] text-[11px] font-bold tracking-wide transition whitespace-nowrap text-center cursor-pointer ${
+                  w.isCurrent
+                    ? 'bg-white text-sky-800 font-black border-b-2 border-sky-600 shadow-2xs'
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                }`}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── 2. BRIGHT WALLET SELECTOR BUTTONS ── */}
-      <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+      <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-slate-300 shadow-2xs overflow-x-auto text-xs">
         <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider pl-1.5 pr-1">
           Кошелёк:
         </span>
@@ -1439,8 +1589,8 @@ export function DailyControlPanel() {
           onClick={() => setActiveWallet('all')}
           className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
             activeWallet === 'all'
-              ? 'bg-slate-900 text-white shadow-md'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-slate-900 text-white shadow-2xs'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
           }`}
         >
           🌐 Все 3 кошелька
@@ -1449,17 +1599,19 @@ export function DailyControlPanel() {
         {/* Bank */}
         <button
           onClick={() => setActiveWallet('bank')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer border ${
             activeWallet === 'bank'
-              ? 'bg-sky-500 text-white ring-2 ring-sky-300 shadow-lg scale-105'
-              : 'text-sky-700 hover:bg-sky-50 border border-sky-200/60'
+              ? 'bg-sky-500 text-white border-sky-600 shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-900 border-slate-300'
           }`}
         >
           <span>🏦</span>
           <span>Р/С БАНК</span>
           <span
-            className={`text-[10px] px-1 py-0.2 rounded font-mono ${
-              activeWallet === 'bank' ? 'bg-sky-700 text-white' : 'bg-sky-100 text-sky-800'
+            className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+              activeWallet === 'bank'
+                ? 'bg-sky-700 text-white'
+                : 'bg-sky-50 text-sky-800 border border-sky-100'
             }`}
           >
             {rub(bankWallet?.evening ?? 0)}
@@ -1469,19 +1621,19 @@ export function DailyControlPanel() {
         {/* Cash Safe */}
         <button
           onClick={() => setActiveWallet('cash')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer border ${
             activeWallet === 'cash'
-              ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 shadow-lg scale-105'
-              : 'text-emerald-700 hover:bg-emerald-50 border border-emerald-200/60'
+              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 border-slate-300'
           }`}
         >
           <span>🔒</span>
           <span>СЕЙФ (НАЛ)</span>
           <span
-            className={`text-[10px] px-1 py-0.2 rounded font-mono ${
+            className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
               activeWallet === 'cash'
                 ? 'bg-emerald-800 text-white'
-                : 'bg-emerald-100 text-emerald-800'
+                : 'bg-emerald-50 text-emerald-800 border border-emerald-100'
             }`}
           >
             {rub(cashWallet?.evening ?? 0)}
@@ -1491,19 +1643,19 @@ export function DailyControlPanel() {
         {/* Fuel Card */}
         <button
           onClick={() => setActiveWallet('fuel_card')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer border ${
             activeWallet === 'fuel_card'
-              ? 'bg-amber-500 text-white ring-2 ring-amber-300 shadow-lg scale-105'
-              : 'text-amber-700 hover:bg-amber-50 border border-amber-200/60'
+              ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-amber-50 hover:text-amber-900 border-slate-300'
           }`}
         >
           <span>⛽</span>
           <span>ТОПЛИВНАЯ КАРТА</span>
           <span
-            className={`text-[10px] px-1 py-0.2 rounded font-mono ${
+            className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
               activeWallet === 'fuel_card'
                 ? 'bg-amber-700 text-white'
-                : 'bg-amber-100 text-amber-800'
+                : 'bg-amber-50 text-amber-800 border border-amber-100'
             }`}
           >
             {rub(fuelWallet?.evening ?? 0)}
@@ -1547,56 +1699,56 @@ export function DailyControlPanel() {
         </div>
       )}
 
-      {/* ── 4. TOP SUMMARY CARDS (Proportionally 2x smaller) ── */}
+      {/* ── 4. TOP SUMMARY CARDS (Crisp Pro Light 0% Black) ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {/* Morning Total */}
-        <div className="bg-gradient-to-br from-slate-700 to-slate-800 text-white rounded-xl p-2.5 relative overflow-hidden shadow-xs">
-          <div className="text-[8px] font-black uppercase tracking-wider text-slate-300">
+        <div className="bg-white rounded-xl p-3 border-2 border-slate-300 shadow-2xs relative overflow-hidden">
+          <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
             {activeWallet === 'all' ? 'ОСТАТОК НА НАЧАЛО (00:00)' : 'УТРЕННИЙ ОСТАТОК'}
           </div>
-          <div className="text-base sm:text-lg font-black font-mono mt-0.5 leading-tight">
+          <div className="text-base sm:text-lg font-black font-mono text-slate-900 mt-0.5 leading-tight">
             {rub(morningTotal)}
           </div>
-          <div className="text-[9px] text-slate-400 mt-0.5">
+          <div className="text-[10px] text-slate-500 mt-0.5">
             {activeWallet === 'all' ? 'Банк + Сейф + Топливо' : 'По выбранной статье'}
           </div>
         </div>
 
         {/* Expenses Total */}
-        <div className="bg-gradient-to-br from-rose-500 to-red-600 text-white rounded-xl p-2.5 relative overflow-hidden shadow-xs">
-          <div className="text-[8px] font-black uppercase tracking-wider text-rose-100">
+        <div className="bg-rose-50/50 rounded-xl p-3 border-2 border-rose-300 shadow-2xs relative overflow-hidden">
+          <div className="text-[9px] font-black uppercase tracking-wider text-rose-700">
             РАСХОДЫ ЗА ДЕНЬ
           </div>
-          <div className="text-base sm:text-lg font-black font-mono mt-0.5 leading-tight">
+          <div className="text-base sm:text-lg font-black font-mono text-rose-600 mt-0.5 leading-tight">
             -{rub(totalDayExpenses)}
           </div>
-          <div className="text-[9px] text-rose-100/80 mt-0.5">
+          <div className="text-[10px] text-rose-700/80 mt-0.5">
             {expenseItems.length} позиций расходов
           </div>
         </div>
 
         {/* Incomes Total */}
-        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl p-2.5 relative overflow-hidden shadow-xs">
-          <div className="text-[8px] font-black uppercase tracking-wider text-emerald-100">
+        <div className="bg-emerald-50/50 rounded-xl p-3 border-2 border-emerald-300 shadow-2xs relative overflow-hidden">
+          <div className="text-[9px] font-black uppercase tracking-wider text-emerald-800">
             ДОХОДЫ ЗА ДЕНЬ
           </div>
-          <div className="text-base sm:text-lg font-black font-mono mt-0.5 leading-tight">
+          <div className="text-base sm:text-lg font-black font-mono text-emerald-700 mt-0.5 leading-tight">
             +{rub(totalDayIncomes)}
           </div>
-          <div className="text-[9px] text-emerald-100/80 mt-0.5">
+          <div className="text-[10px] text-emerald-700/80 mt-0.5">
             {incomeItems.length} поступлений
           </div>
         </div>
 
         {/* Evening Balance */}
-        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-xl p-2.5 relative overflow-hidden shadow-xs">
-          <div className="text-[8px] font-black uppercase tracking-wider text-indigo-100">
+        <div className="bg-sky-50/50 rounded-xl p-3 border-2 border-sky-300 shadow-2xs relative overflow-hidden">
+          <div className="text-[9px] font-black uppercase tracking-wider text-sky-800">
             {activeWallet === 'all' ? 'ИТОГО В КОНЦЕ ДНЯ' : 'ВЕЧЕРНИЙ ИТОГ'}
           </div>
-          <div className="text-base sm:text-lg font-black font-mono mt-0.5 leading-tight">
+          <div className="text-base sm:text-lg font-black font-mono text-slate-900 mt-0.5 leading-tight">
             {rub(eveningTotal)}
           </div>
-          <div className="text-[9px] text-indigo-100/80 mt-0.5 font-mono">
+          <div className="text-[10px] text-sky-700 font-bold font-mono mt-0.5">
             Дельта: {deltaTotal >= 0 ? `+${rub(deltaTotal)}` : rub(deltaTotal)}
           </div>
         </div>
@@ -1640,7 +1792,7 @@ export function DailyControlPanel() {
               expenseItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm flex flex-col overflow-hidden group transition"
+                  className="bg-white rounded-xl border border-slate-300 hover:border-slate-400 shadow-2xs flex flex-col overflow-hidden group transition border-l-4 border-l-rose-500"
                 >
                   <div className="flex items-stretch flex-1">
                     {/* Accent strip 6px */}
@@ -1976,10 +2128,10 @@ export function DailyControlPanel() {
               incomeItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-2xl border-2 shadow-sm flex flex-col overflow-hidden group transition ${
+                  className={`bg-white rounded-xl border shadow-2xs flex flex-col overflow-hidden group transition ${
                     !item.isLinked && item.canLinkToTrip
-                      ? 'border-amber-400 hover:border-amber-500 bg-amber-50/20'
-                      : 'border-slate-300 hover:border-slate-400'
+                      ? 'border-amber-400 hover:border-amber-500 bg-amber-50/20 border-l-4 border-l-amber-500'
+                      : 'border-slate-300 hover:border-slate-400 border-l-4 border-l-emerald-500'
                   }`}
                 >
                   <div className="flex items-stretch flex-1">
@@ -3157,18 +3309,21 @@ export function DailyControlPanel() {
                   onClick={() =>
                     linkBankOpMutation.mutate({
                       operationId: linkingBankOp.operationId,
-                      linkType: linkMode,
+                      linkType: linkMode === 'sto' ? 'service_order' : linkMode,
                       tripOrderIds: linkMode === 'trip' ? selectedOrderIdsToLink : undefined,
                       tripOrderId:
                         linkMode === 'trip' && selectedOrderIdsToLink.length === 1
                           ? selectedOrderIdsToLink[0]
                           : undefined,
-                      stoOrderNumber: linkMode === 'sto' ? stoOrderNumber.trim() : undefined,
-                      stoClientName: linkMode === 'sto' ? stoClientName.trim() : undefined,
+                      serviceOrderId: linkMode === 'sto' ? stoOrderNumber.trim() : undefined,
                       dispatcherDetails:
                         linkMode === 'dispatcher' ? dispatcherDetails.trim() : undefined,
-                      dispatcherClientName:
-                        linkMode === 'dispatcher' ? dispatcherClientName.trim() : undefined,
+                      clientName:
+                        linkMode === 'sto'
+                          ? stoClientName.trim()
+                          : linkMode === 'dispatcher'
+                            ? dispatcherClientName.trim()
+                            : undefined,
                       amount: linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0,
                       operationDate: linkingBankOp.operationDate,
                       date: selectedDate,
