@@ -133,7 +133,7 @@ export default function RootDispatcher() {
           if (res.ok) {
             const user = await res.json();
             if (user && user.id && targetPath) {
-              router.replace(targetPath);
+              window.location.replace(targetPath);
               return;
             }
           } else if (res.status === 401) {
@@ -148,10 +148,9 @@ export default function RootDispatcher() {
           clearTimeout(timeoutId);
         }
 
-        // Если сеть медленная, но у нас есть сохранённая роль и userId — всё равно переходим в панель,
-        // не сбрасывая авторизацию пользователя!
+        // Если сеть медленная, но у нас есть сохранённая роль и userId — всё равно переходим в панель
         if (targetPath) {
-          router.replace(targetPath);
+          window.location.replace(targetPath);
           return;
         }
 
@@ -164,8 +163,16 @@ export default function RootDispatcher() {
 
     restoreSession();
 
+    // Страховочный таймаут: не более 1.5 сек на проверку сессии, затем открываем выбор роли
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) {
+        setStep((current) => (current === 'restoring' ? 'role' : current));
+      }
+    }, 1500);
+
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
     };
   }, []);
 

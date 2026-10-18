@@ -56,11 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body
-        className="font-sans antialiased bg-zinc-50"
-        suppressHydrationWarning
-        onTouchStart={() => {}}
-      >
+      <body className="font-sans antialiased bg-zinc-50" suppressHydrationWarning>
         <Providers>
           <MinimizeOnBack />
           <ScrollOnFocus />
