@@ -69,10 +69,15 @@ export default function AdminTripDetailPage() {
   );
   const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
   const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
-  const loaderPay = activeOrders.reduce(
-    (s: number, o: any) => s + parseFloat(o.loader_pay ?? '0'),
-    0,
-  );
+  const loaderPay = activeOrders.reduce((sum: number, o: any) => {
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      return (
+        sum +
+        o.loaders_data.reduce((sub: number, l: any) => sub + (parseFloat(l.pay || '0') || 0), 0)
+      );
+    }
+    return sum + (parseFloat(o.loader_pay ?? '0') || 0) + (parseFloat(o.loader2_pay ?? '0') || 0);
+  }, 0);
   const expenses = (trip.trip_expenses ?? []).reduce(
     (s: number, e: any) => s + parseFloat(e.amount),
     0,
@@ -149,7 +154,17 @@ export default function AdminTripDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50 pb-40">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-40">
-        <button onClick={() => router.back()} className="text-zinc-500 text-2xl">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push('/admin/trips');
+            }
+          }}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+        >
           ←
         </button>
         <span className="font-black text-zinc-900 text-lg uppercase">Рейс №{trip.trip_number}</span>
@@ -344,10 +359,17 @@ export default function AdminTripDetailPage() {
                           .map((l: any) => `${l.name || 'Грузчик'}: ${l.pay} ₽`)
                           .join(', ')}
                       </>
-                    ) : parseFloat(order.loader_pay ?? '0') > 0 ? (
+                    ) : parseFloat(order.loader_pay ?? '0') > 0 ||
+                      parseFloat(order.loader2_pay ?? '0') > 0 ? (
                       <>
                         {' '}
-                        · Груз: <Money amount={order.loader_pay} />
+                        · Груз:{' '}
+                        <Money
+                          amount={(
+                            (parseFloat(order.loader_pay ?? '0') || 0) +
+                            (parseFloat(order.loader2_pay ?? '0') || 0)
+                          ).toString()}
+                        />
                       </>
                     ) : null}
                   </p>

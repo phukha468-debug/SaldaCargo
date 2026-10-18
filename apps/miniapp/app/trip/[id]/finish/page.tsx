@@ -5,9 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, Money } from '@saldacargo/ui';
+
+import { isGeostroyCounterparty, isGeostroyOrderValid } from '@saldacargo/shared';
 
 const schema = z.object({
   odometer_end: z.coerce.number().optional(),
@@ -20,6 +22,7 @@ export default function FinishTripPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,13 +33,16 @@ export default function FinishTripPage() {
       return res.json() as Promise<{
         trip_number: number;
         odometer_start: number;
-        asset: { short_name: string };
+        asset: { short_name: string } | null;
         trip_orders: Array<{
+          id: string;
           amount: string;
           driver_pay: string;
           payment_method: string;
           settlement_status: string;
           lifecycle_status: string;
+          description?: string | null;
+          counterparty?: { name: string } | null;
         }>;
         trip_expenses: Array<{
           id: string;
@@ -77,7 +83,19 @@ export default function FinishTripPage() {
   const cashToSurrender = Math.max(0, cashRevenue - existingCashExpenses);
   const debtOrders = activeOrders.filter((o) => o.settlement_status === 'pending');
 
+  const invalidGeostroyOrders = activeOrders.filter(
+    (o) => isGeostroyCounterparty(o.counterparty?.name) && !isGeostroyOrderValid(o.description),
+  );
+  const hasGeostroyValidationError = invalidGeostroyOrders.length > 0;
+
   async function onSubmit(data: FormData) {
+    if (hasGeostroyValidationError) {
+      setError(
+        'Нельзя отправить рейс на ревью: для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут и дату начала маршрута по маске (ДД.ММ.ГГГГ).',
+      );
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -94,14 +112,31 @@ export default function FinishTripPage() {
       return;
     }
 
-    router.push('/');
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['driver-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['driver-trips'] }),
+        queryClient.invalidateQueries({ queryKey: ['trip', id] }),
+      ]);
+    } catch {
+      // ignore
+    }
+
+    router.replace('/driver');
   }
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
         <button
-          onClick={() => router.back()}
+          type="button"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push(`/trip/${id}`);
+            }
+          }}
           className="text-zinc-500 text-2xl active:scale-95 transition-transform"
         >
           ←
@@ -169,6 +204,32 @@ export default function FinishTripPage() {
           />
         </div>
 
+        {hasGeostroyValidationError && (
+          <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 space-y-2.5 shadow-xs">
+            <div className="flex items-center gap-2 text-rose-900 font-black text-xs uppercase tracking-wide">
+              <span className="text-lg">🛑</span>
+              <span>Нельзя отправить рейс на ревью</span>
+            </div>
+            <p className="text-xs text-rose-800 font-medium leading-relaxed">
+              В рейсе есть заказ для <strong>«ООО Геостройиндустрия»</strong>, в котором не
+              заполнены <strong>Маршрут</strong> или <strong>Дата начала маршрута</strong> по маске
+              (ДД.ММ.ГГГГ).
+            </p>
+            <div className="pt-1 space-y-2">
+              {invalidGeostroyOrders.map((o, idx) => (
+                <button
+                  key={o.id || idx}
+                  type="button"
+                  onClick={() => router.push(`/trip/${id}/order/${o.id}`)}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider py-2.5 px-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                >
+                  <span>✏️</span> Заполнить маршрут и дату в заказе
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 text-red-700 text-xs font-bold uppercase tracking-wide">
             {error}
@@ -178,10 +239,14 @@ export default function FinishTripPage() {
         <Button
           type="submit"
           size="hero"
-          disabled={submitting}
-          className="font-black uppercase tracking-widest w-full"
+          disabled={submitting || hasGeostroyValidationError}
+          className="font-black uppercase tracking-widest w-full disabled:opacity-50"
         >
-          {submitting ? 'Отправляем...' : '📤 Отправить на ревью'}
+          {submitting
+            ? 'Отправляем...'
+            : hasGeostroyValidationError
+              ? '🛑 Заполните данные Геостройиндустрия'
+              : '📤 Отправить на ревью'}
         </Button>
       </form>
     </div>

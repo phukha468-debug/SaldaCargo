@@ -13,6 +13,12 @@ import {
   isNoCashCounterparty,
   isTerritoryCounterparty,
   formatTerritoryDescription,
+  isGeostroyCounterparty,
+  formatGeostroyDescription,
+  maskDateInput,
+  isValidDateString,
+  getTodayDateString,
+  getYesterdayDateString,
 } from '@saldacargo/shared';
 import {
   calculateOrderPayroll,
@@ -210,6 +216,10 @@ export default function AddOrderPage() {
   const [territoryAddress, setTerritoryAddress] = useState('');
   const [territoryWork, setTerritoryWork] = useState('');
 
+  const isGeostroy = isGeostroyCounterparty(selectedCounterparty);
+  const [geostroyRoute, setGeostroyRoute] = useState('');
+  const [geostroyDate, setGeostroyDate] = useState('');
+
   const DEFAULT_DIRECTION: OrderDirectionItem = {
     id: 'local',
     label: 'По городу',
@@ -281,6 +291,18 @@ export default function AddOrderPage() {
         return;
       }
       description = formatTerritoryDescription(territoryAddress, territoryWork);
+    } else if (isGeostroy) {
+      if (!geostroyRoute.trim()) {
+        setError('Для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут!');
+        return;
+      }
+      if (!isValidDateString(geostroyDate)) {
+        setError(
+          'Для контрагента «ООО Геостройиндустрия» укажите дату начала маршрута по маске ДД.ММ.ГГГГ (например: 18.10.2026)!',
+        );
+        return;
+      }
+      description = formatGeostroyDescription(geostroyRoute, geostroyDate);
     } else {
       const isDebt = data.payment_method === 'debt_cash';
       description = data.description?.trim() || '';
@@ -339,8 +361,23 @@ export default function AddOrderPage() {
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
         <button
-          onClick={() => router.back()}
-          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+          type="button"
+          onClick={() => {
+            const currentPath = window.location.pathname;
+            const fallbackUrl = `/trip/${tripId}`;
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push(fallbackUrl);
+            }
+            setTimeout(() => {
+              if (window.location.pathname === currentPath) {
+                router.push(fallbackUrl);
+              }
+            }, 250);
+          }}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform cursor-pointer p-1 -ml-1"
+          title="Назад"
         >
           ←
         </button>
@@ -934,6 +971,95 @@ export default function AddOrderPage() {
                 <span className="font-bold text-blue-950">В счёт пойдёт:</span>{' '}
                 <span className="font-semibold text-zinc-900">
                   {territoryAddress.trim()} — {territoryWork.trim()}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : isGeostroy ? (
+          <div className="bg-amber-50/90 border-2 border-amber-400 rounded-2xl p-4 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-amber-200 pb-2">
+              <span className="text-xl">🏗️</span>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wide text-amber-950">
+                  Правило для контрагента «ООО Геостройиндустрия»
+                </h3>
+                <p className="text-[10px] text-amber-800 font-medium">
+                  Обязательно укажите маршрут и дату начала по маске (ДД.ММ.ГГГГ) для отправки на
+                  ревью
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black uppercase tracking-wider text-amber-950 flex items-center justify-between">
+                <span>
+                  📍 Маршрут <span className="text-rose-600">*</span>
+                </span>
+                <span className="text-[9px] font-bold text-amber-700 normal-case">Обязательно</span>
+              </label>
+              <input
+                type="text"
+                value={geostroyRoute}
+                onChange={(e) => {
+                  setGeostroyRoute(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder="Например: Верхняя Салда — Екатеринбург (или Н.Тагил)"
+                className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-12 text-sm font-bold text-zinc-900 focus:border-amber-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-wider text-amber-950">
+                  📅 Дата начала маршрута <span className="text-rose-600">*</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGeostroyDate(getTodayDateString());
+                      if (error) setError('');
+                    }}
+                    className="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-amber-300 text-amber-950 text-[10px] font-black tracking-tight active:scale-95 transition-all"
+                  >
+                    Сегодня
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGeostroyDate(getYesterdayDateString());
+                      if (error) setError('');
+                    }}
+                    className="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-amber-300 text-amber-950 text-[10px] font-black tracking-tight active:scale-95 transition-all"
+                  >
+                    Вчера
+                  </button>
+                </div>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                value={geostroyDate}
+                onChange={(e) => {
+                  const masked = maskDateInput(e.target.value);
+                  setGeostroyDate(masked);
+                  if (error) setError('');
+                }}
+                placeholder="ДД.ММ.ГГГГ (например: 18.10.2026)"
+                className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 h-12 text-sm font-bold text-zinc-900 focus:border-amber-600 focus:outline-none transition-colors font-mono"
+              />
+              <p className="text-[10px] text-zinc-500 font-medium pl-1">
+                Маска ввода: 8 цифр даты (день, месяц, 4 цифры года)
+              </p>
+            </div>
+
+            {geostroyRoute.trim() && isValidDateString(geostroyDate) && (
+              <div className="p-2.5 bg-white/90 rounded-xl border border-amber-200 text-[11px] text-amber-950">
+                <span className="font-bold text-amber-950">В отчёт пойдёт:</span>{' '}
+                <span className="font-semibold text-zinc-900 font-mono">
+                  {formatGeostroyDescription(geostroyRoute, geostroyDate)}
                 </span>
               </div>
             )}

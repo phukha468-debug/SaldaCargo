@@ -134,8 +134,23 @@ export default function EditTripPage() {
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
         <button
-          onClick={() => router.back()}
-          className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+          type="button"
+          onClick={() => {
+            const currentPath = window.location.pathname;
+            const fallbackUrl = `/trip/${tripId}`;
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push(fallbackUrl);
+            }
+            setTimeout(() => {
+              if (window.location.pathname === currentPath) {
+                router.push(fallbackUrl);
+              }
+            }, 250);
+          }}
+          className="text-zinc-500 text-2xl active:scale-95 transition-transform cursor-pointer p-1 -ml-1"
+          title="Назад"
         >
           ←
         </button>

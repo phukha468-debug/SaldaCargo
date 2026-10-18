@@ -21,13 +21,13 @@ function formatDayHeader(dateStr: string): string {
 }
 
 function getWeekDates(dStr: string) {
-  const d = new Date(dStr + 'T12:00:00');
-  const day = d.getDay();
+  const d = new Date(dStr + 'T12:00:00Z');
+  const day = d.getUTCDay();
   const diffToMon = day === 0 ? -6 : 1 - day;
   const mon = new Date(d);
-  mon.setDate(d.getDate() + diffToMon);
+  mon.setUTCDate(d.getUTCDate() + diffToMon);
   const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
+  sun.setUTCDate(mon.getUTCDate() + 6);
   return {
     weekStart: mon.toISOString().slice(0, 10),
     weekEnd: sun.toISOString().slice(0, 10),
@@ -270,10 +270,13 @@ export function DailyControlPanel() {
 
   // Fetch daily balance data
   const { data, isFetching, refetch } = useQuery<DailyBalanceData>({
-    queryKey: ['daily-balance', selectedDate],
-    queryFn: () => fetch(`/api/finance/daily-balance?date=${selectedDate}`).then((r) => r.json()),
+    queryKey: ['daily-balance', selectedDate, period],
+    queryFn: () =>
+      fetch(`/api/finance/daily-balance?date=${selectedDate}&period=${period}`).then((r) =>
+        r.json(),
+      ),
     staleTime: 30 * 1000,
-    refetchInterval: selectedDate === todayStr ? 60 * 1000 : false,
+    refetchInterval: selectedDate === todayStr && period === 'day' ? 60 * 1000 : false,
   });
 
   // Fetch active users / staff for linking advances and debt without duplicating
@@ -642,9 +645,20 @@ export function DailyControlPanel() {
       shiftDay(delta * 7);
     } else if (period === 'month') {
       const d = new Date(selectedDate + 'T12:00:00');
+      d.setDate(1);
       d.setMonth(d.getMonth() + delta);
       setSelectedDate(d.toISOString().slice(0, 10));
     }
+  }
+
+  function formatTxTime(dStr: string | Date | null | undefined): string {
+    if (!dStr) return '—';
+    const d = new Date(dStr);
+    if (isNaN(d.getTime())) return '—';
+    if (period === 'day') {
+      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+    return `${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '')} ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   function toggleGroup(key: string) {
@@ -675,6 +689,8 @@ export function DailyControlPanel() {
     walletName: string;
     author: string;
     amount: number;
+    time?: string;
+    dateSort?: number;
     rawTx?: RawTx;
     bankOp?: TBankOp;
     isLinked?: boolean;
@@ -788,6 +804,7 @@ export function DailyControlPanel() {
             )
           : undefined;
 
+        const opDateVal = op.operationDate || op.operationTime;
         incomeItems.push({
           id: `tbank-${op.operationId}`,
           title,
@@ -796,6 +813,8 @@ export function DailyControlPanel() {
           walletName: 'Р/С Банк (API)',
           author,
           amount: opAmt,
+          time: formatTxTime(opDateVal),
+          dateSort: opDateVal ? new Date(opDateVal).getTime() : 0,
           bankOp: op,
           isLinked,
           linkTypeLabel,
@@ -818,6 +837,8 @@ export function DailyControlPanel() {
           walletName: 'Р/С Банк',
           author: driver,
           amount: parseFloat(order.amount) || 0,
+          time: formatTxTime(order.created_at),
+          dateSort: new Date(order.created_at).getTime(),
         });
       });
     }
@@ -835,6 +856,8 @@ export function DailyControlPanel() {
         walletName: 'Сейф (нал)',
         author: col.driver?.name || 'Водитель',
         amount: parseFloat(col.amount) || 0,
+        time: formatTxTime(col.created_at),
+        dateSort: new Date(col.created_at).getTime(),
       });
     });
   }
@@ -872,6 +895,7 @@ export function DailyControlPanel() {
         w = 'fuel_card';
         wName = 'Топливная карта';
       }
+      const txDate = tx.transaction_date || tx.created_at;
       incomeItems.push({
         id: tx.id,
         title: tx.description || 'Погашение задолженности (нал)',
@@ -880,6 +904,8 @@ export function DailyControlPanel() {
         walletName: wName,
         author: tx.counterparty?.name || tx.related_user?.name || 'Администратор',
         amount: parseFloat(tx.amount) || 0,
+        time: formatTxTime(txDate),
+        dateSort: new Date(txDate).getTime(),
         rawTx: tx,
       });
     }
@@ -888,6 +914,7 @@ export function DailyControlPanel() {
   if (acquiringTxs.length > 0) {
     if (acquiringTxs.length === 1 && acquiringTxs[0]) {
       const tx = acquiringTxs[0];
+      const txDate = tx.transaction_date || tx.created_at;
       incomeItems.push({
         id: tx.id,
         title: tx.description || 'Возмещение по эквайрингу',
@@ -896,10 +923,19 @@ export function DailyControlPanel() {
         walletName: 'Р/С Банк',
         author: 'Т-Банк Эквайринг',
         amount: parseFloat(tx.amount) || 0,
+        time: formatTxTime(txDate),
+        dateSort: new Date(txDate).getTime(),
         rawTx: tx,
       });
     } else {
-      const totalAcq = acquiringTxs.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const sortedAcq = [...acquiringTxs].sort(
+        (a, b) =>
+          new Date(b.transaction_date || b.created_at).getTime() -
+          new Date(a.transaction_date || a.created_at).getTime(),
+      );
+      const totalAcq = sortedAcq.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const latestAcq = sortedAcq[0];
+      const latestAcqDate = latestAcq ? latestAcq.transaction_date || latestAcq.created_at : null;
       incomeItems.push({
         id: 'group-acquiring',
         title: `Возмещение по эквайрингу (${acquiringTxs.length} реестра)`,
@@ -908,21 +944,23 @@ export function DailyControlPanel() {
         walletName: 'Р/С Банк',
         author: 'Т-Банк Эквайринг',
         amount: totalAcq,
+        time: formatTxTime(latestAcqDate),
+        dateSort: latestAcqDate ? new Date(latestAcqDate).getTime() : 0,
         isGroup: true,
-        subItems: acquiringTxs.map((t) => ({
+        subItems: sortedAcq.map((t) => ({
           id: t.id,
           title: t.description || 'Реестр эквайринга',
           author: t.counterparty?.name || 'Т-Банк',
           amount: parseFloat(t.amount) || 0,
-          time: new Date(t.created_at).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+          time: formatTxTime(t.transaction_date || t.created_at),
           rawTx: t,
         })),
       });
     }
   }
+
+  // Сортировка поступлений: новые сверху
+  incomeItems.sort((a, b) => (b.dateSort ?? 0) - (a.dateSort ?? 0));
 
   // --- Aggregate & Group Expenses ---
   interface ExpenseItem {
@@ -935,6 +973,7 @@ export function DailyControlPanel() {
     author: string;
     amount: number;
     time?: string;
+    dateSort?: number;
     rawTx?: RawTx;
     bankOp?: TBankOp;
     linkedObligationId?: string | null;
@@ -970,6 +1009,7 @@ export function DailyControlPanel() {
     author: string;
     amount: number;
     time: string;
+    dateSort?: number;
     rawTx?: RawTx;
     bankOp?: TBankOp;
   };
@@ -988,6 +1028,8 @@ export function DailyControlPanel() {
       return;
     }
 
+    const txDate = tx.transaction_date || tx.created_at;
+
     if (
       desc.includes('комисси') ||
       cat.includes('комисси') ||
@@ -999,10 +1041,8 @@ export function DailyControlPanel() {
         title: tx.description || 'Комиссия банка',
         author: tx.counterparty?.name || 'Т-Банк',
         amount: parseFloat(tx.amount) || 0,
-        time: new Date(tx.transaction_date || tx.created_at).toLocaleTimeString('ru-RU', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        time: formatTxTime(txDate),
+        dateSort: new Date(txDate).getTime(),
         rawTx: tx,
       });
     } else if (
@@ -1029,11 +1069,7 @@ export function DailyControlPanel() {
         wName = 'Топливная карта';
       }
 
-      const txTime = new Date(tx.transaction_date || tx.created_at).toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
+      const txTime = formatTxTime(txDate);
       const txAmt = parseFloat(tx.amount) || 0;
       const calendarOverrides = data?.calendar_overrides ?? [];
       const matchedOv = calendarOverrides.find(
@@ -1063,6 +1099,7 @@ export function DailyControlPanel() {
         author: tx.related_user?.name || tx.counterparty?.name || 'Администратор',
         amount: txAmt,
         time: txTime,
+        dateSort: new Date(txDate).getTime(),
         rawTx: tx,
         linkedObligationId: oblId,
         linkedObligationTitle: oblTitle,
@@ -1083,12 +1120,8 @@ export function DailyControlPanel() {
       const desc = (op.description || op.payPurpose || '').toLowerCase();
       const opAmt = op.operationAmount || op.rubleAmount || 0;
       const dateVal = op.operationDate || op.operationTime;
-      const opTime = dateVal
-        ? new Date(dateVal).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : '—';
+      const opTime = formatTxTime(dateVal);
+      const opDateSort = dateVal ? new Date(dateVal).getTime() : 0;
 
       if (
         desc.includes('комисси') ||
@@ -1102,6 +1135,7 @@ export function DailyControlPanel() {
           author: 'Т-Банк (Авто)',
           amount: opAmt,
           time: opTime,
+          dateSort: opDateSort,
           bankOp: op,
         });
       } else {
@@ -1116,6 +1150,7 @@ export function DailyControlPanel() {
           author: receiverName,
           amount: opAmt,
           time: opTime,
+          dateSort: opDateSort,
           bankOp: op,
         });
       }
@@ -1127,8 +1162,9 @@ export function DailyControlPanel() {
 
   // А) Сгруппированные банковские комиссии
   if (bankCommissions.length > 0) {
-    if (bankCommissions.length === 1 && bankCommissions[0]) {
-      const comm = bankCommissions[0];
+    const sortedComm = [...bankCommissions].sort((a, b) => (b.dateSort ?? 0) - (a.dateSort ?? 0));
+    if (sortedComm.length === 1 && sortedComm[0]) {
+      const comm = sortedComm[0];
       expenseItems.push({
         id: comm.id,
         title: comm.title,
@@ -1138,21 +1174,25 @@ export function DailyControlPanel() {
         author: comm.author,
         amount: comm.amount,
         time: comm.time,
+        dateSort: comm.dateSort,
         rawTx: comm.rawTx,
         bankOp: comm.bankOp,
       });
     } else {
-      const totalComm = bankCommissions.reduce((s, t) => s + t.amount, 0);
+      const totalComm = sortedComm.reduce((s, t) => s + t.amount, 0);
+      const latestComm = sortedComm[0];
       expenseItems.push({
         id: 'group-bank-commission',
-        title: `Банковские комиссии (${bankCommissions.length} списаний)`,
+        title: `Банковские комиссии (${sortedComm.length} списаний)`,
         category: 'Банковские услуги',
         wallet: 'bank',
         walletName: 'Р/С Банк',
         author: 'Т-Банк (Авто)',
         amount: totalComm,
+        time: latestComm?.time,
+        dateSort: latestComm?.dateSort,
         isGroup: true,
-        subItems: bankCommissions.map((t) => ({
+        subItems: sortedComm.map((t) => ({
           id: t.id,
           title: t.title,
           author: t.author,
@@ -1170,8 +1210,14 @@ export function DailyControlPanel() {
 
   // Б) Сгруппированные зарплаты
   if (payrollTxs.length > 0) {
-    if (payrollTxs.length === 1 && payrollTxs[0]) {
-      const tx = payrollTxs[0];
+    const sortedPay = [...payrollTxs].sort(
+      (a, b) =>
+        new Date(b.transaction_date || b.created_at).getTime() -
+        new Date(a.transaction_date || a.created_at).getTime(),
+    );
+    if (sortedPay.length === 1 && sortedPay[0]) {
+      const tx = sortedPay[0];
+      const txDate = tx.transaction_date || tx.created_at;
       let w: 'bank' | 'cash' | 'fuel_card' = 'bank';
       let wName = 'Р/С Банк';
       if (tx.from_wallet_id === CASH_ID) {
@@ -1187,28 +1233,31 @@ export function DailyControlPanel() {
         walletName: wName,
         author: tx.related_user?.name || 'Водитель/Сотрудник',
         amount: parseFloat(tx.amount) || 0,
+        time: formatTxTime(txDate),
+        dateSort: new Date(txDate).getTime(),
         rawTx: tx,
       });
     } else {
-      const totalPay = payrollTxs.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const totalPay = sortedPay.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const latestPay = sortedPay[0];
+      const latestPayDate = latestPay ? latestPay.transaction_date || latestPay.created_at : null;
       expenseItems.push({
         id: 'group-payroll',
-        title: `Выплата зарплаты сотрудникам (${payrollTxs.length} выплат)`,
+        title: `Выплата зарплаты сотрудникам (${sortedPay.length} выплат)`,
         category: 'ФОТ / Зарплата',
         wallet: 'bank',
         walletName: 'Сводная выплата',
         author: 'Бухгалтерия / Директор',
         amount: totalPay,
+        time: formatTxTime(latestPayDate),
+        dateSort: latestPayDate ? new Date(latestPayDate).getTime() : 0,
         isGroup: true,
-        subItems: payrollTxs.map((t) => ({
+        subItems: sortedPay.map((t) => ({
           id: t.id,
           title: t.description || 'Зарплата / Аванс',
           author: t.related_user?.name || 'Сотрудник',
           amount: parseFloat(t.amount) || 0,
-          time: new Date(t.transaction_date || t.created_at).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+          time: formatTxTime(t.transaction_date || t.created_at),
           category: 'ФОТ / Зарплата',
           categoryId: t.category_id,
           wallet: t.from_wallet_id === CASH_ID ? 'cash' : 'bank',
@@ -1221,8 +1270,14 @@ export function DailyControlPanel() {
 
   // В) Сгруппированные заправки автопарка
   if (fuelTxs.length > 0) {
-    if (fuelTxs.length === 1 && fuelTxs[0]) {
-      const tx = fuelTxs[0];
+    const sortedFuel = [...fuelTxs].sort(
+      (a, b) =>
+        new Date(b.transaction_date || b.created_at).getTime() -
+        new Date(a.transaction_date || a.created_at).getTime(),
+    );
+    if (sortedFuel.length === 1 && sortedFuel[0]) {
+      const tx = sortedFuel[0];
+      const txDate = tx.transaction_date || tx.created_at;
       expenseItems.push({
         id: tx.id,
         title: tx.description || 'Заправка ГСМ',
@@ -1232,28 +1287,33 @@ export function DailyControlPanel() {
         walletName: 'Топливная карта',
         author: tx.related_user?.name || 'Водитель',
         amount: parseFloat(tx.amount) || 0,
+        time: formatTxTime(txDate),
+        dateSort: new Date(txDate).getTime(),
         rawTx: tx,
       });
     } else {
-      const totalFuel = fuelTxs.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const totalFuel = sortedFuel.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+      const latestFuel = sortedFuel[0];
+      const latestFuelDate = latestFuel
+        ? latestFuel.transaction_date || latestFuel.created_at
+        : null;
       expenseItems.push({
         id: 'group-fuel',
-        title: `Заправки автопарка (${fuelTxs.length} транзакций)`,
+        title: `Заправки автопарка (${sortedFuel.length} транзакций)`,
         category: 'ГСМ / Топливо',
         wallet: 'fuel_card',
         walletName: 'Топливная карта',
         author: 'Водители парка',
         amount: totalFuel,
+        time: formatTxTime(latestFuelDate),
+        dateSort: latestFuelDate ? new Date(latestFuelDate).getTime() : 0,
         isGroup: true,
-        subItems: fuelTxs.map((t) => ({
+        subItems: sortedFuel.map((t) => ({
           id: t.id,
           title: t.description || 'Заправка ТС',
           author: t.related_user?.name || 'Водитель',
           amount: parseFloat(t.amount) || 0,
-          time: new Date(t.transaction_date || t.created_at).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+          time: formatTxTime(t.transaction_date || t.created_at),
           category: 'ГСМ',
           categoryId: t.category_id,
           wallet: 'fuel_card',
@@ -1282,26 +1342,29 @@ export function DailyControlPanel() {
   }
 
   for (const [catKey, list] of groupedByCategoryOrTitle.entries()) {
-    if (list.length === 1 && list[0]) {
-      expenseItems.push(list[0]);
-    } else if (list.length > 1 && list[0]) {
-      const first = list[0];
-      const sumAmt = list.reduce((s, it) => s + it.amount, 0);
-      const groupTitle = `${first.category} (${list.length} операций)`;
-      const groupId = `group-cat-${catKey.slice(0, 30)}-${list.length}`;
+    const sortedList = [...list].sort((a, b) => (b.dateSort ?? 0) - (a.dateSort ?? 0));
+    if (sortedList.length === 1 && sortedList[0]) {
+      expenseItems.push(sortedList[0]);
+    } else if (sortedList.length > 1 && sortedList[0]) {
+      const first = sortedList[0];
+      const sumAmt = sortedList.reduce((s, it) => s + it.amount, 0);
+      const groupTitle = `${first.category} (${sortedList.length} операций)`;
+      const groupId = `group-cat-${catKey.slice(0, 30)}-${sortedList.length}`;
       expenseItems.push({
         id: groupId,
         title: groupTitle,
         category: first.category,
         categoryId: first.categoryId,
         wallet: first.wallet,
-        walletName: list.every((it) => it.wallet === first.wallet)
+        walletName: sortedList.every((it) => it.wallet === first.wallet)
           ? first.walletName
           : 'Разные счета',
         author: first.author,
         amount: sumAmt,
+        time: first.time,
+        dateSort: first.dateSort,
         isGroup: true,
-        subItems: list.map((it) => ({
+        subItems: sortedList.map((it) => ({
           id: it.id,
           title: it.title,
           author: it.author,
@@ -1319,6 +1382,9 @@ export function DailyControlPanel() {
       });
     }
   }
+
+  // Сортировка расходов: новые сверху
+  expenseItems.sort((a, b) => (b.dateSort ?? 0) - (a.dateSort ?? 0));
 
   // Totals calculations
   const totalDayExpenses = expenseItems.reduce((s, i) => s + i.amount, 0);
@@ -1344,14 +1410,27 @@ export function DailyControlPanel() {
   const deltaTotal = eveningTotal - morningTotal;
 
   // Month navigation strips (like Review page)
-  const monthStrip = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - (4 - i));
-    const ym = d.toISOString().slice(0, 7);
-    const label = d.toLocaleDateString('ru-RU', { month: 'short' }).toUpperCase();
-    return { ym, label, isCurrent: selectedDate.startsWith(ym) };
-  });
+  const monthStrip = React.useMemo(() => {
+    const now = new Date();
+    const sel = new Date(selectedDate + 'T12:00:00Z');
+    const monthsDiff =
+      (now.getFullYear() - sel.getFullYear()) * 12 + (now.getMonth() - sel.getMonth());
+    let startOffset = 4;
+    let baseDate = now;
+    if (monthsDiff >= 5 || monthsDiff < 0) {
+      baseDate = sel;
+      startOffset = 2;
+    }
+
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(baseDate);
+      d.setDate(1);
+      d.setMonth(d.getMonth() - (startOffset - i));
+      const ym = d.toISOString().slice(0, 7);
+      const label = d.toLocaleDateString('ru-RU', { month: 'short' }).toUpperCase();
+      return { ym, label, isCurrent: selectedDate.startsWith(ym) };
+    });
+  }, [selectedDate]);
 
   // Week navigation strips (like Review page)
   const weekStrip = React.useMemo(() => {
@@ -1548,6 +1627,7 @@ export function DailyControlPanel() {
                 onClick={() => {
                   const target = m.ym === todayStr.slice(0, 7) ? todayStr : `${m.ym}-01`;
                   setSelectedDate(target);
+                  setPeriod('month');
                 }}
                 className={`py-2 text-[11px] font-bold tracking-wider transition cursor-pointer ${
                   m.isCurrent
@@ -1564,7 +1644,10 @@ export function DailyControlPanel() {
             {weekStrip.map((w) => (
               <button
                 key={w.date}
-                onClick={() => setSelectedDate(w.date)}
+                onClick={() => {
+                  setSelectedDate(w.date);
+                  setPeriod('week');
+                }}
                 className={`flex-1 py-2 px-3 min-w-[130px] text-[11px] font-bold tracking-wide transition whitespace-nowrap text-center cursor-pointer ${
                   w.isCurrent
                     ? 'bg-white text-sky-800 font-black border-b-2 border-sky-600 shadow-2xs'
@@ -1704,7 +1787,9 @@ export function DailyControlPanel() {
         {/* Morning Total */}
         <div className="bg-white rounded-xl p-3 border-2 border-slate-300 shadow-2xs relative overflow-hidden">
           <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
-            {activeWallet === 'all' ? 'ОСТАТОК НА НАЧАЛО (00:00)' : 'УТРЕННИЙ ОСТАТОК'}
+            {activeWallet === 'all'
+              ? `ОСТАТОК НА НАЧАЛО ${period === 'day' ? '(00:00)' : period === 'week' ? 'НЕДЕЛИ' : 'МЕСЯЦА'}`
+              : `НАЧАЛЬНЫЙ ОСТАТОК ${period === 'day' ? '(00:00)' : period === 'week' ? 'НЕДЕЛИ' : 'МЕСЯЦА'}`}
           </div>
           <div className="text-base sm:text-lg font-black font-mono text-slate-900 mt-0.5 leading-tight">
             {rub(morningTotal)}
@@ -1717,7 +1802,7 @@ export function DailyControlPanel() {
         {/* Expenses Total */}
         <div className="bg-rose-50/50 rounded-xl p-3 border-2 border-rose-300 shadow-2xs relative overflow-hidden">
           <div className="text-[9px] font-black uppercase tracking-wider text-rose-700">
-            РАСХОДЫ ЗА ДЕНЬ
+            РАСХОДЫ ЗА {period === 'day' ? 'ДЕНЬ' : period === 'week' ? 'НЕДЕЛЮ' : 'МЕСЯЦ'}
           </div>
           <div className="text-base sm:text-lg font-black font-mono text-rose-600 mt-0.5 leading-tight">
             -{rub(totalDayExpenses)}
@@ -1730,7 +1815,7 @@ export function DailyControlPanel() {
         {/* Incomes Total */}
         <div className="bg-emerald-50/50 rounded-xl p-3 border-2 border-emerald-300 shadow-2xs relative overflow-hidden">
           <div className="text-[9px] font-black uppercase tracking-wider text-emerald-800">
-            ДОХОДЫ ЗА ДЕНЬ
+            ДОХОДЫ ЗА {period === 'day' ? 'ДЕНЬ' : period === 'week' ? 'НЕДЕЛЮ' : 'МЕСЯЦ'}
           </div>
           <div className="text-base sm:text-lg font-black font-mono text-emerald-700 mt-0.5 leading-tight">
             +{rub(totalDayIncomes)}
@@ -1743,7 +1828,9 @@ export function DailyControlPanel() {
         {/* Evening Balance */}
         <div className="bg-sky-50/50 rounded-xl p-3 border-2 border-sky-300 shadow-2xs relative overflow-hidden">
           <div className="text-[9px] font-black uppercase tracking-wider text-sky-800">
-            {activeWallet === 'all' ? 'ИТОГО В КОНЦЕ ДНЯ' : 'ВЕЧЕРНИЙ ИТОГ'}
+            {activeWallet === 'all'
+              ? `ИТОГО В КОНЦЕ ${period === 'day' ? 'ДНЯ' : period === 'week' ? 'НЕДЕЛИ' : 'МЕСЯЦА'}`
+              : `КОНЕЧНЫЙ ИТОГ ${period === 'day' ? 'ДНЯ' : period === 'week' ? 'НЕДЕЛИ' : 'МЕСЯЦА'}`}
           </div>
           <div className="text-base sm:text-lg font-black font-mono text-slate-900 mt-0.5 leading-tight">
             {rub(eveningTotal)}
@@ -1764,7 +1851,7 @@ export function DailyControlPanel() {
                 −
               </span>
               <span className="text-xs font-black uppercase tracking-tight text-slate-900">
-                РАСХОДЫ ЗА СЕГОДНЯ
+                РАСХОДЫ ЗА {period === 'day' ? 'СЕГОДНЯ' : period === 'week' ? 'НЕДЕЛЮ' : 'МЕСЯЦ'}
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-mono">
                 {expenseItems.length}
@@ -1786,7 +1873,12 @@ export function DailyControlPanel() {
           <div className="space-y-2.5">
             {expenseItems.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-                Нет расходов за выбранный день
+                Нет расходов за выбранный{' '}
+                {period === 'day'
+                  ? 'день'
+                  : period === 'week'
+                    ? 'период (неделю)'
+                    : 'период (месяц)'}
               </div>
             ) : (
               expenseItems.map((item) => (
@@ -2020,7 +2112,7 @@ export function DailyControlPanel() {
                 +
               </span>
               <span className="text-xs font-black uppercase tracking-tight text-slate-900">
-                ДОХОДЫ ЗА СЕГОДНЯ
+                ДОХОДЫ ЗА {period === 'day' ? 'СЕГОДНЯ' : period === 'week' ? 'НЕДЕЛЮ' : 'МЕСЯЦ'}
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono">
                 {incomeItems.length}
@@ -2122,7 +2214,12 @@ export function DailyControlPanel() {
           <div className="space-y-2.5">
             {incomeItems.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-                Нет поступлений за выбранный день
+                Нет поступлений за выбранный{' '}
+                {period === 'day'
+                  ? 'день'
+                  : period === 'week'
+                    ? 'период (неделю)'
+                    : 'период (месяц)'}
               </div>
             ) : (
               incomeItems.map((item) => (
@@ -2184,6 +2281,12 @@ export function DailyControlPanel() {
                           </span>
                           <span>·</span>
                           <span className="text-slate-500">{item.author}</span>
+                          {item.time && (
+                            <>
+                              <span>·</span>
+                              <span className="font-mono text-slate-400">{item.time}</span>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -2443,7 +2546,9 @@ export function DailyControlPanel() {
               <div className="flex items-center gap-2">
                 <span className="text-base">✎</span>
                 <span className="text-sm font-black uppercase text-slate-800">
-                  Классификация и редактирование расхода
+                  {editingTx.direction === 'income'
+                    ? 'Классификация и редактирование поступления'
+                    : 'Классификация и редактирование расхода'}
                 </span>
               </div>
               <button
@@ -2455,13 +2560,32 @@ export function DailyControlPanel() {
             </div>
 
             <div className="mt-4 space-y-3.5">
-              <div className="bg-rose-50/60 border border-rose-200/80 rounded-xl p-3 flex items-center justify-between">
+              <div
+                className={
+                  editingTx.direction === 'income'
+                    ? 'bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 flex items-center justify-between'
+                    : 'bg-rose-50/60 border border-rose-200/80 rounded-xl p-3 flex items-center justify-between'
+                }
+              >
                 <div>
-                  <div className="text-[10px] font-black uppercase text-rose-800 tracking-wider">
-                    Сумма списания
+                  <div
+                    className={
+                      editingTx.direction === 'income'
+                        ? 'text-[10px] font-black uppercase text-emerald-800 tracking-wider'
+                        : 'text-[10px] font-black uppercase text-rose-800 tracking-wider'
+                    }
+                  >
+                    {editingTx.direction === 'income' ? 'Сумма поступления' : 'Сумма списания'}
                   </div>
-                  <div className="text-lg font-black font-mono text-rose-600 mt-0.5">
-                    -{rub(editingTx.amount)}
+                  <div
+                    className={
+                      editingTx.direction === 'income'
+                        ? 'text-lg font-black font-mono text-emerald-600 mt-0.5'
+                        : 'text-lg font-black font-mono text-rose-600 mt-0.5'
+                    }
+                  >
+                    {editingTx.direction === 'income' ? '+' : '-'}
+                    {rub(editingTx.amount)}
                   </div>
                 </div>
                 <div className="text-right text-[10px] text-slate-500">
@@ -2834,12 +2958,7 @@ export function DailyControlPanel() {
                     {rub(linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0)}
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono">
-                    {linkingBankOp.operationDate
-                      ? new Date(linkingBankOp.operationDate).toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : ''}
+                    {formatTxTime(linkingBankOp.operationDate)}
                   </div>
                 </div>
                 <div className="text-[11px] text-slate-600 mt-1">

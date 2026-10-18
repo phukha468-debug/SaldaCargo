@@ -36,10 +36,15 @@ function calcTrip(trip: any) {
   const expenses = trip.trip_expenses ?? [];
   const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
   const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
-  const loaderPay = activeOrders.reduce(
-    (s: number, o: any) => s + parseFloat(o.loader_pay ?? '0'),
-    0,
-  );
+  const loaderPay = activeOrders.reduce((sum: number, o: any) => {
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      return (
+        sum +
+        o.loaders_data.reduce((sub: number, l: any) => sub + (parseFloat(l.pay || '0') || 0), 0)
+      );
+    }
+    return sum + (parseFloat(o.loader_pay ?? '0') || 0) + (parseFloat(o.loader2_pay ?? '0') || 0);
+  }, 0);
   const totalExpenses = expenses.reduce((s: number, e: any) => s + parseFloat(e.amount), 0);
   const mileage =
     trip.odometer_end && trip.odometer_start ? trip.odometer_end - trip.odometer_start : null;
@@ -540,7 +545,7 @@ function EditModal({
                 {(order.loader_id || parseFloat(order.loader_pay) > 0 || trip.loader) && (
                   <div>
                     <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
-                      ЗП грузчика, ₽
+                      ЗП 1-го грузчика, ₽
                     </label>
                     <input
                       type="number"
@@ -548,6 +553,20 @@ function EditModal({
                       className={inputCls}
                       value={order.loader_pay}
                       onChange={(e) => update(order.id, 'loader_pay', e.target.value)}
+                    />
+                  </div>
+                )}
+                {(order.loader2_id || parseFloat(order.loader2_pay) > 0) && (
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                      ЗП 2-го грузчика, ₽
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      className={inputCls}
+                      value={order.loader2_pay}
+                      onChange={(e) => update(order.id, 'loader2_pay', e.target.value)}
                     />
                   </div>
                 )}
@@ -706,7 +725,17 @@ function HistoryTripCard({
               activeOrders.map((order: any, i: number) => {
                 const amt = parseFloat(order.amount);
                 const dp = parseFloat(order.driver_pay);
-                const lp = parseFloat(order.loader_pay ?? '0');
+                let lp = 0;
+                if (Array.isArray(order.loaders_data) && order.loaders_data.length > 0) {
+                  lp = order.loaders_data.reduce(
+                    (sub: number, l: any) => sub + (parseFloat(l.pay || '0') || 0),
+                    0,
+                  );
+                } else {
+                  lp =
+                    (parseFloat(order.loader_pay ?? '0') || 0) +
+                    (parseFloat(order.loader2_pay ?? '0') || 0);
+                }
                 const split = amt > 0 ? Math.round((dp / amt) * 100) : 0;
                 return (
                   <div key={order.id} className="flex items-start gap-2">
@@ -720,7 +749,7 @@ function HistoryTripCard({
                         </span>
                         {lp > 0 && (
                           <span className="text-[11px] text-blue-500 font-medium">
-                            Груз: <Money amount={order.loader_pay} />
+                            Груз: <Money amount={lp.toString()} />
                           </span>
                         )}
                       </div>

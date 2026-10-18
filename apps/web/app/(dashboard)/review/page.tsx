@@ -11,6 +11,11 @@ import {
   isTerritoryCounterparty,
   formatTerritoryDescription,
   parseTerritoryDescription,
+  isGeostroyCounterparty,
+  formatGeostroyDescription,
+  parseGeostroyDescription,
+  isGeostroyOrderValid,
+  maskDateInput,
 } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
@@ -100,6 +105,23 @@ interface ReviewServiceOrder {
     unit: string | null;
     part?: { name: string; unit: string | null } | null;
   }>;
+}
+
+interface SettlementOrderItem {
+  id: string;
+  type: 'trip_order' | 'manual';
+  amount: number;
+}
+
+interface SettlementTransactionItem {
+  id: string;
+  amount: number;
+  direction: 'income' | 'expense';
+  description: string;
+  created_at: string;
+  counterparty_id: string | null;
+  counterparty_name: string | null;
+  orders: SettlementOrderItem[];
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -273,6 +295,13 @@ function calcTrip(trip: TripForReview) {
   const driverCarPay = Math.max(0, driverPay - driverLoaderPay);
   const totalLoadingPayroll = thirdPartyLoaderPay + driverLoaderPay;
 
+  const collectedRevenue = activeOrders
+    .filter((o) => o.settlement_status === 'completed')
+    .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
+  const pendingDebt = activeOrders
+    .filter((o) => o.settlement_status === 'pending')
+    .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
+
   const fuelExpense = expenses
     .filter((e) => e.category?.name === 'ГСМ')
     .reduce((s, e) => s + parseFloat(e.amount), 0);
@@ -283,6 +312,8 @@ function calcTrip(trip: TripForReview) {
     activeOrders,
     expenses,
     revenue,
+    collectedRevenue,
+    pendingDebt,
     driverPay,
     driverCarPay,
     driverLoaderPay,
@@ -889,6 +920,14 @@ function EditModal({
           return;
         }
       }
+      if (isGeostroyCounterparty(cp)) {
+        if (!isGeostroyOrderValid(o.description)) {
+          setError(
+            `Для контрагента «ООО Геостройиндустрия» (заявка ${i + 1}) обязательно укажите Маршрут и корректную Дату начала маршрута по маске (ДД.ММ.ГГГГ)!`,
+          );
+          return;
+        }
+      }
     }
 
     const nonDeletedExpenses = expenses.filter((e) => !e._deleted);
@@ -1224,6 +1263,72 @@ function EditModal({
                           {order.description && (
                             <div className="text-[11px] text-blue-900 bg-white/90 p-2 rounded-lg border border-blue-200">
                               <span className="font-bold text-blue-950">В счёт пойдёт:</span>{' '}
+                              <span className="font-semibold text-slate-800">
+                                {order.description}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    if (isGeostroyCounterparty(currentCp)) {
+                      const parsed = parseGeostroyDescription(order.description);
+                      return (
+                        <div className="p-3 bg-amber-50/90 border-2 border-amber-300 rounded-xl space-y-2 mt-2 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
+                            <span>🏗️</span>
+                            <span>Правило для контрагента «ООО Геостройиндустрия»:</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="text-[10px] font-black text-amber-950 uppercase block mb-1">
+                                📍 Маршрут <span className="text-rose-600 font-black">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Например: Верхняя Салда — Екатеринбург"
+                                className={inputCls}
+                                value={parsed.route}
+                                onChange={(e) => {
+                                  const currentStartDate = parseGeostroyDescription(
+                                    order.description,
+                                  ).startDate;
+                                  update(
+                                    order.id,
+                                    'description',
+                                    formatGeostroyDescription(e.target.value, currentStartDate),
+                                  );
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-amber-950 uppercase block mb-1">
+                                📅 Дата начала (ДД.ММ.ГГГГ){' '}
+                                <span className="text-rose-600 font-black">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                maxLength={10}
+                                placeholder="ДД.ММ.ГГГГ"
+                                className={`${inputCls} font-mono`}
+                                value={parsed.startDate}
+                                onChange={(e) => {
+                                  const masked = maskDateInput(e.target.value);
+                                  const currentRoute = parseGeostroyDescription(
+                                    order.description,
+                                  ).route;
+                                  update(
+                                    order.id,
+                                    'description',
+                                    formatGeostroyDescription(currentRoute, masked),
+                                  );
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {order.description && (
+                            <div className="text-[11px] text-amber-950 bg-white/90 p-2 rounded-lg border border-amber-200">
+                              <span className="font-bold text-amber-950">В отчёт пойдёт:</span>{' '}
                               <span className="font-semibold text-slate-800">
                                 {order.description}
                               </span>
@@ -2476,6 +2581,33 @@ export default function ReviewPage() {
     },
   });
 
+  // ── Receivables Settlements Query (погашения долгов контрагентов в периоде) ──
+  const { data: periodSettlementsData } = useQuery<{
+    settlements: SettlementTransactionItem[];
+    totalAmount: number;
+  }>({
+    queryKey: [
+      'receivable-settlements',
+      statsPeriod,
+      statsPeriod === 'day'
+        ? selectedDate
+        : statsPeriod === 'week'
+          ? `${weekStart}_${weekEnd}`
+          : monthKey,
+    ],
+    enabled: mode === 'history',
+    staleTime: 60000,
+    queryFn: async () => {
+      let url = '/api/receivables/settlements';
+      if (statsPeriod === 'day') url += `?date=${selectedDate}`;
+      else if (statsPeriod === 'week') url += `?weekStart=${weekStart}&weekEnd=${weekEnd}`;
+      else url += `?month=${monthKey}`;
+      const res = await fetch(url);
+      if (!res.ok) return { settlements: [], totalAmount: 0 };
+      return res.json();
+    },
+  });
+
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -2488,6 +2620,7 @@ export default function ReviewPage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['trips-review'] });
     queryClient.invalidateQueries({ queryKey: ['service-orders-month'] });
+    queryClient.invalidateQueries({ queryKey: ['receivable-settlements'] });
   };
 
   async function handleApprove(tripId: string) {
@@ -2583,6 +2716,8 @@ export default function ReviewPage() {
         maintenanceSalary: number;
         maintenanceTotal: number;
         netProfit: number;
+        collectedRevenue: number;
+        pendingDebt: number;
       }
     >();
 
@@ -2617,6 +2752,8 @@ export default function ReviewPage() {
           maintenanceSalary: 0,
           maintenanceTotal: 0,
           netProfit: 0,
+          collectedRevenue: 0,
+          pendingDebt: 0,
         });
       }
       const g = map.get(assetKey)!;
@@ -2634,6 +2771,8 @@ export default function ReviewPage() {
       g.tripsFuel += ct.fuelExpense;
       g.tripsExpenses += ct.totalExpenses;
       g.tripsProfit += ct.profit;
+      g.collectedRevenue += ct.collectedRevenue;
+      g.pendingDebt += ct.pendingDebt;
     }
 
     // 2. Process Service Orders (History only)
@@ -2664,6 +2803,8 @@ export default function ReviewPage() {
             maintenanceSalary: 0,
             maintenanceTotal: 0,
             netProfit: 0,
+            collectedRevenue: 0,
+            pendingDebt: 0,
           });
         }
         const g = map.get(assetKey)!;
@@ -2689,6 +2830,14 @@ export default function ReviewPage() {
     () => combinedAssetGroups.reduce((s, g) => s + g.tripsRevenue, 0),
     [combinedAssetGroups],
   );
+  const totalFleetCollectedRevenue = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + (g.collectedRevenue ?? 0), 0),
+    [combinedAssetGroups],
+  );
+  const totalFleetPendingDebt = useMemo(
+    () => combinedAssetGroups.reduce((s, g) => s + (g.pendingDebt ?? 0), 0),
+    [combinedAssetGroups],
+  );
   const totalFleetPayroll = useMemo(
     () => combinedAssetGroups.reduce((s, g) => s + g.tripsPayroll, 0),
     [combinedAssetGroups],
@@ -2708,6 +2857,69 @@ export default function ReviewPage() {
   const totalFleetNetProfit = useMemo(
     () => totalFleetRevenue - totalFleetTripCosts - totalFleetMaintenance,
     [totalFleetRevenue, totalFleetTripCosts, totalFleetMaintenance],
+  );
+
+  // ID всех заказов из рейсов текущего периода (чтобы не задваивать уже учтённые в рейсах оплаты)
+  const periodTripOrderIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of listTrips) {
+      for (const o of t.trip_orders ?? []) {
+        ids.add(o.id);
+      }
+    }
+    return ids;
+  }, [listTrips]);
+
+  // Поступления по долгам контрагентов (погашение дебиторки прошлых периодов / ручных долгов)
+  const { totalFleetExternalDebtCollected, externalSettlements } = useMemo(() => {
+    const settlements = periodSettlementsData?.settlements ?? [];
+    let externalSum = 0;
+    const items: Array<{
+      id: string;
+      description: string;
+      amount: number;
+      counterpartyName: string | null;
+      created_at: string;
+    }> = [];
+
+    for (const s of settlements) {
+      const orders = s.orders ?? [];
+      if (orders.length > 0) {
+        let extAmt = 0;
+        for (const ord of orders) {
+          if (ord.type === 'manual' || !periodTripOrderIds.has(ord.id)) {
+            extAmt += ord.amount;
+          }
+        }
+        if (extAmt !== 0) {
+          externalSum += extAmt;
+          items.push({
+            id: s.id,
+            description: s.description,
+            amount: extAmt,
+            counterpartyName: s.counterparty_name,
+            created_at: s.created_at,
+          });
+        }
+      } else {
+        externalSum += s.amount;
+        items.push({
+          id: s.id,
+          description: s.description,
+          amount: s.amount,
+          counterpartyName: s.counterparty_name,
+          created_at: s.created_at,
+        });
+      }
+    }
+
+    return { totalFleetExternalDebtCollected: externalSum, externalSettlements: items };
+  }, [periodSettlementsData, periodTripOrderIds]);
+
+  // Фактическая прибыль (Cash Flow): реально поступившие средства от клиентов (включая погашение долгов прошлых периодов) минус прямые затраты и ТО
+  const totalFleetActualProfit = useMemo(
+    () => totalFleetNetProfit - totalFleetPendingDebt + totalFleetExternalDebtCollected,
+    [totalFleetNetProfit, totalFleetPendingDebt, totalFleetExternalDebtCollected],
   );
   const totalFleetLoaderProfit = useMemo(
     () => combinedAssetGroups.reduce((s, g) => s + g.loaderProfit, 0),
@@ -3348,16 +3560,48 @@ export default function ReviewPage() {
                         : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
                     </span>
                   </div>
-                  {totalFleetLoaderProfit > 0 && (
-                    <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                      <span className="text-slate-400 font-medium">
-                        в т.ч. заработано на ПРР (грузчики):
-                      </span>
-                      <span className="font-black bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded text-emerald-300">
-                        +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {totalFleetLoaderProfit > 0 && (
+                      <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                        <span className="text-slate-400 font-medium">
+                          в т.ч. заработано на ПРР (грузчики):
+                        </span>
+                        <span className="font-black bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded text-emerald-300">
+                          +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
+                        </span>
+                      </div>
+                    )}
+                    {totalFleetPendingDebt > 0 && (
+                      <div
+                        className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5 cursor-help"
+                        title={`Неоплаченная дебиторка за период: клиенты ещё должны ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽`}
+                      >
+                        <span className="text-slate-400 font-medium">в долгах клиентов:</span>
+                        <span className="font-black bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded text-amber-300">
+                          <Money amount={totalFleetPendingDebt.toFixed(2)} />
+                        </span>
+                      </div>
+                    )}
+                    {totalFleetExternalDebtCollected > 0 && (
+                      <div
+                        className="text-[11px] font-bold text-sky-400 flex items-center gap-1.5 cursor-help"
+                        title={`Погашение задолженностей прошлых периодов, поступившее в выбранном периоде (+${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽):\n${externalSettlements
+                          .slice(0, 5)
+                          .map(
+                            (s) =>
+                              `• ${s.counterpartyName || 'Контрагент'}: +${Math.round(s.amount).toLocaleString('ru-RU')} ₽ (${new Date(s.created_at).toLocaleDateString('ru-RU')})`,
+                          )
+                          .join(
+                            '\n',
+                          )}${externalSettlements.length > 5 ? `\n...и ещё ${externalSettlements.length - 5} платежей` : ''}`}
+                      >
+                        <span className="text-slate-400 font-medium">погашено долгов:</span>
+                        <span className="font-black bg-sky-950/80 border border-sky-500/40 px-2 py-0.5 rounded text-sky-300">
+                          +<Money amount={totalFleetExternalDebtCollected.toFixed(2)} />
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center px-4 py-3">
@@ -3411,7 +3655,10 @@ export default function ReviewPage() {
 
                       <span className="text-slate-600 text-sm hidden sm:block">=</span>
 
-                      <div className="w-[85px] sm:w-[100px] text-center">
+                      <div
+                        className="w-[85px] sm:w-[105px] text-center cursor-help"
+                        title={`Чистый итог (начисленный доход рейсов):\nВыручка: ${Math.round(totalFleetRevenue).toLocaleString('ru-RU')} ₽\n− Зарплаты: ${Math.round(totalFleetPayroll).toLocaleString('ru-RU')} ₽\n− Топливо: ${Math.round(totalFleetFuel).toLocaleString('ru-RU')} ₽\n− Ремонты ТО: ${Math.round(totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n= Чистый итог: ${Math.round(totalFleetNetProfit).toLocaleString('ru-RU')} ₽`}
+                      >
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
                           Чистый итог
                         </span>
@@ -3423,6 +3670,26 @@ export default function ReviewPage() {
                         >
                           {totalFleetNetProfit < 0 ? '−' : ''}
                           <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
+                        </span>
+                      </div>
+
+                      <span className="text-slate-600 text-sm hidden sm:block">|</span>
+
+                      <div
+                        className="w-[95px] sm:w-[115px] text-center bg-slate-900/90 rounded-xl py-1 px-1.5 border border-slate-700/80 cursor-help"
+                        title={`Фактическая прибыль (Cash Flow):\n• Поступило по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽\n• Не оплачено клиентами по рейсам (в долгах): ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n${totalFleetExternalDebtCollected > 0 ? `• Погашение долгов за прошлые периоды: +${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽\n` : ''}• Все расходы (ЗП + Топливо + ТО): ${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
+                      >
+                        <span className="text-[8px] font-bold text-amber-300 uppercase tracking-widest block">
+                          Прибыль
+                        </span>
+                        <span
+                          className={cn(
+                            'text-base sm:text-lg font-black',
+                            totalFleetActualProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
+                          )}
+                        >
+                          {totalFleetActualProfit < 0 ? '−' : ''}
+                          <Money amount={Math.abs(totalFleetActualProfit).toFixed(2)} />
                         </span>
                       </div>
 

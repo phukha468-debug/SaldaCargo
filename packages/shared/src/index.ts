@@ -491,3 +491,132 @@ export function parseTerritoryDescription(desc: string | null | undefined): {
   }
   return { address: '', work: str };
 }
+
+/**
+ * Проверяет, является ли контрагент «ООО Геостройиндустрия».
+ * Для «Геостройиндустрии» водитель обязательно должен указывать Маршрут и Дату начала маршрута.
+ */
+export function isGeostroyCounterparty(
+  cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+): boolean {
+  if (!cp) return false;
+  const name = typeof cp === 'string' ? cp : cp.name || '';
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return /геострой/i.test(trimmed);
+}
+
+/**
+ * Маска ввода даты: принимает пользовательский ввод и форматирует в "ДД.ММ.ГГГГ".
+ */
+export function maskDateInput(val: string): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+/**
+ * Проверяет, является ли строка корректной датой формата ДД.ММ.ГГГГ.
+ */
+export function isValidDateString(val: string | null | undefined): boolean {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  const match = trimmed.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return false;
+  const d = parseInt(match[1]!, 10);
+  const m = parseInt(match[2]!, 10);
+  const y = parseInt(match[3]!, 10);
+  if (m < 1 || m > 12) return false;
+  if (d < 1 || d > 31) return false;
+  if (y < 2020 || y > 2099) return false;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  if (d > daysInMonth) return false;
+  return true;
+}
+
+/**
+ * Форматирует строку описания для заказов контрагента «ООО Геостройиндустрия»:
+ * «Маршрут: {маршрут} | Дата: {дата начала}»
+ */
+export function formatGeostroyDescription(route: string, startDate: string): string {
+  const cleanRoute = route.trim();
+  const cleanDate = startDate.trim();
+  if (cleanRoute && cleanDate) {
+    return `Маршрут: ${cleanRoute} | Дата: ${cleanDate}`;
+  }
+  return cleanRoute || cleanDate || '';
+}
+
+/**
+ * Разбирает описание заказа «ООО Геостройиндустрия» на Маршрут и Дату начала.
+ */
+export function parseGeostroyDescription(desc: string | null | undefined): {
+  route: string;
+  startDate: string;
+} {
+  if (!desc) return { route: '', startDate: '' };
+  const str = desc.trim();
+
+  let startDate = '';
+  const dateMatch = str.match(/\b(\d{2}\.\d{2}\.\d{4})\b/);
+  if (dateMatch && dateMatch[1]) {
+    startDate = dateMatch[1];
+  } else {
+    const isoMatch = str.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if (isoMatch && isoMatch[1] && isoMatch[2] && isoMatch[3]) {
+      startDate = `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
+    }
+  }
+
+  let route = str;
+  if (startDate) {
+    route = route
+      .replace(new RegExp(`\\b${startDate.replace(/\./g, '\\.')}\\b`, 'g'), '')
+      .replace(/Маршрут:\s*/gi, '')
+      .replace(/Дата начала:\s*/gi, '')
+      .replace(/Дата:\s*/gi, '')
+      .replace(/[|()\[\]]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  } else {
+    route = route.replace(/Маршрут:\s*/gi, '').trim();
+  }
+
+  return { route, startDate };
+}
+
+/**
+ * Проверяет, заполнены ли корректно данные для заказа «ООО Геостройиндустрия».
+ */
+export function isGeostroyOrderValid(description: string | null | undefined): boolean {
+  const { route, startDate } = parseGeostroyDescription(description);
+  return Boolean(route.trim() && isValidDateString(startDate));
+}
+
+/**
+ * Возвращает сегодняшнюю дату (Asia/Yekaterinburg) в формате ДД.ММ.ГГГГ
+ */
+export function getTodayDateString(): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Asia/Yekaterinburg',
+  }).format(new Date());
+}
+
+/**
+ * Возвращает вчерашнюю дату (Asia/Yekaterinburg) в формате ДД.ММ.ГГГГ
+ */
+export function getYesterdayDateString(): string {
+  const d = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Asia/Yekaterinburg',
+  }).format(d);
+}

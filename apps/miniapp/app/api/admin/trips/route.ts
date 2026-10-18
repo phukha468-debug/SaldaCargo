@@ -20,7 +20,8 @@ export async function GET(request: Request) {
         driver:users!trips_driver_id_fkey(id, name),
         asset:assets(short_name, reg_number),
         trip_orders(
-          id, amount, driver_pay, loader_pay,
+          id, amount, driver_pay, loader_pay, loader2_pay, loaders_data,
+          is_driver_loader, driver_loader_pay, driver_car_pay,
           payment_method, settlement_status, lifecycle_status,
           counterparty:counterparties(name)
         ),
@@ -51,7 +52,8 @@ export async function GET(request: Request) {
     driver:users!trips_driver_id_fkey(id, name),
     asset:assets(short_name, reg_number),
     trip_orders(
-      id, amount, driver_pay, loader_pay,
+      id, amount, driver_pay, loader_pay, loader2_pay, loaders_data,
+      is_driver_loader, driver_loader_pay, driver_car_pay,
       payment_method, settlement_status, lifecycle_status,
       counterparty:counterparties(name)
     ),
@@ -65,7 +67,7 @@ export async function GET(request: Request) {
     id, trip_number, status, lifecycle_status, started_at, ended_at, trip_type,
     driver:users!trips_driver_id_fkey(name),
     asset:assets(short_name, reg_number),
-    trip_orders(amount, driver_pay, lifecycle_status),
+    trip_orders(amount, driver_pay, loader_pay, loader2_pay, loaders_data, lifecycle_status),
     trip_expenses(amount)
   `;
 

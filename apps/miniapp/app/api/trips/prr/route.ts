@@ -3,7 +3,12 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
-import { isNoCashCounterparty, isTerritoryCounterparty } from '@saldacargo/shared';
+import {
+  isNoCashCounterparty,
+  isTerritoryCounterparty,
+  isGeostroyCounterparty,
+  isGeostroyOrderValid,
+} from '@saldacargo/shared';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 
 /**
@@ -14,7 +19,8 @@ import { syncTripFinancials } from '@/lib/tripFinancials';
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
-    const currentUserId = cookieStore.get('salda_user_id')?.value;
+    const currentUserId =
+      cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
 
     const body = (await request.json()) as {
       counterparty_id?: string;
@@ -110,6 +116,17 @@ export async function POST(request: Request) {
             {
               error:
                 'Для контрагента «Территория» обязательно укажите адрес (улица + дом) и описание работы',
+            },
+            { status: 400 },
+          );
+        }
+      }
+      if (isGeostroyCounterparty(cp?.name)) {
+        if (!isGeostroyOrderValid(body.description)) {
+          return NextResponse.json(
+            {
+              error:
+                'Для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут и дату начала маршрута по маске (ДД.ММ.ГГГГ)',
             },
             { status: 400 },
           );

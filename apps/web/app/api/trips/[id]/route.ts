@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
-import { isNoCashCounterparty, isTerritoryCounterparty } from '@saldacargo/shared';
+import {
+  isNoCashCounterparty,
+  isTerritoryCounterparty,
+  isGeostroyCounterparty,
+  isGeostroyOrderValid,
+} from '@saldacargo/shared';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -152,6 +157,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             {
               error:
                 'Для контрагента «Территория» обязательно укажите адрес (улица + дом) и описание работы',
+            },
+            { status: 400 },
+          );
+        }
+
+        if (isGeostroyCounterparty(cpName) && !isGeostroyOrderValid(order.description)) {
+          return NextResponse.json(
+            {
+              error:
+                'Для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут и дату начала маршрута по маске (ДД.ММ.ГГГГ)',
             },
             { status: 400 },
           );

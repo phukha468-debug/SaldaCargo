@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatDuration } from '@saldacargo/shared';
+import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 type TripCard = {
   id: string;
@@ -14,7 +15,7 @@ type TripCard = {
   status: string;
   lifecycle_status: string;
   started_at: string;
-  asset: { short_name: string };
+  asset: { short_name: string } | null;
   trip_orders: Array<{ amount: string; driver_pay: string; lifecycle_status: string }>;
 };
 
@@ -118,6 +119,7 @@ export default function RootPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [showPrrModal, setShowPrrModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
@@ -178,7 +180,7 @@ export default function RootPage() {
     }
   }, [user, isUserLoading]);
 
-  // 2. Загружаем данные водителя (если это водитель)
+  // 2. Загружаем данные водителя (сразу в параллель)
   const {
     data,
     isLoading: isDataLoading,
@@ -191,10 +193,10 @@ export default function RootPage() {
       return res.json() as Promise<DriverSummary>;
     },
     enabled:
-      !!user &&
-      ((user.roles || []).includes('driver') ||
-        (user.roles || []).includes('owner') ||
-        (user.roles || []).includes('admin')),
+      !user ||
+      (user.roles || []).includes('driver') ||
+      (user.roles || []).includes('owner') ||
+      (user.roles || []).includes('admin'),
   });
 
   const activeAssetId =
@@ -258,6 +260,9 @@ export default function RootPage() {
       return;
     }
 
+    const isPrr =
+      asset.reg_number === 'БЕЗ АВТО' || asset.short_name?.toLowerCase().includes('без авто');
+
     setStartingTrip(true);
     try {
       const res = await fetch('/api/trips', {
@@ -266,7 +271,7 @@ export default function RootPage() {
         body: JSON.stringify({
           asset_id: asset.id,
           odometer_start: asset.odometer_current ?? 0,
-          trip_type: 'local',
+          trip_type: isPrr ? 'loaders_only' : 'local',
           idempotency_key: crypto.randomUUID(),
         }),
       });
@@ -320,11 +325,13 @@ export default function RootPage() {
         <div className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-sm flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">
-              🚚
+              {activeAsset?.reg_number === 'БЕЗ АВТО' ? '👷' : '🚚'}
             </div>
             <div>
               <div className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider">
-                Активный автомобиль
+                {activeAsset?.reg_number === 'БЕЗ АВТО'
+                  ? 'Виртуальный объект'
+                  : 'Активный автомобиль'}
               </div>
               <div className="text-sm font-black text-zinc-900">
                 {activeAsset ? (
@@ -350,17 +357,37 @@ export default function RootPage() {
         </div>
       )}
 
-      {/* Кнопка начала рейса */}
-      {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
-        <button
-          onClick={handleStartTrip}
-          disabled={startingTrip}
-          className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
-        >
-          <span>🚚</span>
-          <span>{startingTrip ? 'Создаём рейс...' : 'Начать рейс'}</span>
-        </button>
-      )}
+      {/* Кнопки начала рейса и создания ПРР */}
+      <div className="space-y-2">
+        {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
+          <button
+            onClick={handleStartTrip}
+            disabled={startingTrip}
+            className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
+          >
+            <span>{activeAsset?.reg_number === 'БЕЗ АВТО' ? '👷' : '🚚'}</span>
+            <span>
+              {startingTrip
+                ? 'Создаём рейс...'
+                : activeAsset?.reg_number === 'БЕЗ АВТО'
+                  ? 'Начать рейс (без авто)'
+                  : 'Начать рейс'}
+            </span>
+          </button>
+        )}
+
+        {isPrrAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowPrrModal(true)}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl py-3.5 text-sm font-black shadow-md active:scale-[0.98] transition-all uppercase tracking-wider"
+          >
+            <span>👷</span>
+            <span>+ ПРР заказ (без авто)</span>
+          </button>
+        )}
+      </div>
+
       {startTripError && (
         <div className="bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm font-bold">
           {startTripError}
@@ -401,6 +428,8 @@ export default function RootPage() {
               ) : (
                 availableVehicles.map((v) => {
                   const isSelected = (selectedVehicleId ?? activeAssetId) === v.id;
+                  const isPrr =
+                    v.reg_number === 'БЕЗ АВТО' || v.short_name?.toLowerCase().includes('без авто');
                   return (
                     <button
                       key={v.id}
@@ -414,11 +443,12 @@ export default function RootPage() {
                       }`}
                     >
                       <div>
-                        <div className="font-black text-zinc-900 text-sm uppercase">
-                          {v.short_name}
+                        <div className="font-black text-zinc-900 text-sm uppercase flex items-center gap-1.5">
+                          <span>{isPrr ? '👷' : '🚚'}</span>
+                          <span>{v.short_name}</span>
                         </div>
                         <div className="text-xs font-bold text-zinc-400 tracking-wider uppercase mt-0.5">
-                          {v.reg_number}
+                          {isPrr ? 'Погрузка без транспорта (ПРР)' : v.reg_number}
                         </div>
                       </div>
                       {isSelected && (
@@ -483,6 +513,19 @@ export default function RootPage() {
 
       {/* Заявки на ремонт */}
       <RepairRequestsList />
+
+      {/* Модалка быстрого создания ПРР */}
+      {showPrrModal && (
+        <CreatePrrModal
+          isOpen={showPrrModal}
+          onClose={() => setShowPrrModal(false)}
+          defaultCreatorId={user?.id}
+          role="driver"
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -566,7 +609,7 @@ function ActiveTripCard({
           <span className="text-xs font-bold text-orange-500">⏱ {formatDuration(durationMin)}</span>
         </div>
         <p className="font-black text-zinc-900 text-lg">
-          Рейс №{trip.trip_number} · {trip.asset.short_name}
+          Рейс №{trip.trip_number} · {trip.asset?.short_name ?? 'Без авто'}
         </p>
         {trip.loader && (
           <p className="text-sm text-zinc-600 font-bold mt-0.5">+ {trip.loader.name}</p>
@@ -580,13 +623,14 @@ function ActiveTripCard({
 }
 
 function ReviewTripCard({ trip }: { trip: TripCard }) {
-  const revenue = trip.trip_orders
-    .filter((o) => o.lifecycle_status !== 'cancelled')
-    .reduce((s, o) => s + parseFloat(o.amount), 0);
+  const orders = trip.trip_orders ?? [];
+  const revenue = orders
+    .filter((o) => o?.lifecycle_status !== 'cancelled')
+    .reduce((s, o) => s + (parseFloat(o?.amount || '0') || 0), 0);
 
-  const driverPay = trip.trip_orders
-    .filter((o) => o.lifecycle_status !== 'cancelled')
-    .reduce((s, o) => s + parseFloat(o.driver_pay), 0);
+  const driverPay = orders
+    .filter((o) => o?.lifecycle_status !== 'cancelled')
+    .reduce((s, o) => s + (parseFloat(o?.driver_pay || '0') || 0), 0);
 
   return (
     <Link href={`/trip/${trip.id}`}>
@@ -597,11 +641,11 @@ function ReviewTripCard({ trip }: { trip: TripCard }) {
             Ждёт проверки
           </span>
           <span className="text-[10px] font-bold text-amber-600">
-            {formatDate(trip.started_at)}
+            {trip.started_at ? formatDate(trip.started_at) : '—'}
           </span>
         </div>
         <p className="font-black text-zinc-900 text-base">
-          Рейс №{trip.trip_number} · {trip.asset.short_name}
+          Рейс №{trip.trip_number} · {trip.asset?.short_name ?? 'Без авто'}
         </p>
         <div className="flex items-center justify-between mt-2">
           <p className="text-xs text-amber-700 font-bold">Администратор ещё не проверил</p>
@@ -618,13 +662,14 @@ function ReviewTripCard({ trip }: { trip: TripCard }) {
 }
 
 function RecentTripCard({ trip }: { trip: TripCard }) {
-  const revenue = trip.trip_orders
-    .filter((o) => o.lifecycle_status !== 'cancelled')
-    .reduce((s, o) => s + parseFloat(o.amount), 0);
+  const orders = trip.trip_orders ?? [];
+  const revenue = orders
+    .filter((o) => o?.lifecycle_status !== 'cancelled')
+    .reduce((s, o) => s + (parseFloat(o?.amount || '0') || 0), 0);
 
-  const driverPay = trip.trip_orders
-    .filter((o) => o.lifecycle_status !== 'cancelled')
-    .reduce((s, o) => s + parseFloat(o.driver_pay), 0);
+  const driverPay = orders
+    .filter((o) => o?.lifecycle_status !== 'cancelled')
+    .reduce((s, o) => s + (parseFloat(o?.driver_pay || '0') || 0), 0);
 
   return (
     <Link href={`/trip/${trip.id}`}>
@@ -632,10 +677,10 @@ function RecentTripCard({ trip }: { trip: TripCard }) {
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
         <div className="pl-2">
           <p className="font-bold text-zinc-900 text-sm">
-            Рейс №{trip.trip_number} · {trip.asset.short_name}
+            Рейс №{trip.trip_number} · {trip.asset?.short_name ?? 'Без авто'}
           </p>
           <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-            {formatDate(trip.started_at)}
+            {trip.started_at ? formatDate(trip.started_at) : '—'}
           </p>
         </div>
         <div className="text-right">

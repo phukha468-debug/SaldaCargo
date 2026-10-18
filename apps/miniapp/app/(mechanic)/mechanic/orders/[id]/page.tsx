@@ -802,7 +802,22 @@ export default function OrderDetailPage() {
         {/* Шапка */}
         <div className="bg-white p-4 border-b border-slate-200">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-xl font-black text-slate-900">Наряд #{order.order_number}</h1>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) {
+                    router.back();
+                  } else {
+                    router.push('/mechanic/orders');
+                  }
+                }}
+                className="text-slate-400 hover:text-slate-600 text-2xl active:scale-95 transition-transform"
+              >
+                ←
+              </button>
+              <h1 className="text-xl font-black text-slate-900">Наряд #{order.order_number}</h1>
+            </div>
             <StatusBadge status={order.status} />
           </div>
           <p className="text-lg font-bold text-slate-700">

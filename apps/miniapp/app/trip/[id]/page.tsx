@@ -4,7 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
-import { formatDuration, formatDate } from '@saldacargo/shared';
+import {
+  formatDuration,
+  formatDate,
+  isGeostroyCounterparty,
+  isGeostroyOrderValid,
+} from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
 import { useState, useEffect, useRef } from 'react';
 
@@ -113,7 +118,7 @@ export default function TripDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
       queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
-      router.push('/');
+      router.replace('/driver');
     },
     onError: (err: Error) => {
       setDeleteTripError(err.message);
@@ -138,7 +143,7 @@ export default function TripDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['trip', id] });
       queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
       queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
-      router.push('/');
+      router.replace('/driver');
     },
     onError: (err: Error) => {
       setFinishError(err.message);
@@ -190,20 +195,27 @@ export default function TripDetailPage() {
     Boolean(trip.asset?.short_name?.includes('Без авто')) ||
     Boolean(trip.asset?.short_name?.includes('ПРР')) ||
     trip.trip_orders?.some((o) => o.direction === 'loaders_only');
-  const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
+  const activeOrders = (trip.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
+  const invalidGeostroyOrders = activeOrders.filter(
+    (o) => isGeostroyCounterparty(o.counterparty?.name) && !isGeostroyOrderValid(o.description),
+  );
+  const hasGeostroyValidationError = invalidGeostroyOrders.length > 0;
 
   const totalExternalLoadersPay = activeOrders.reduce((sum, o) => {
     if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
-      return sum + o.loaders_data.reduce((sub, l) => sub + parseFloat(l.pay || '0'), 0);
+      return sum + o.loaders_data.reduce((sub, l) => sub + (parseFloat(l.pay || '0') || 0), 0);
     }
-    return sum + parseFloat(o.loader_pay ?? '0') + parseFloat(o.loader2_pay ?? '0');
+    return sum + (parseFloat(o.loader_pay ?? '0') || 0) + (parseFloat(o.loader2_pay ?? '0') || 0);
   }, 0);
 
   const totals = {
-    revenue: activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0),
-    driverPay: activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0),
+    revenue: activeOrders.reduce((s, o) => s + (parseFloat(o.amount || '0') || 0), 0),
+    driverPay: activeOrders.reduce((s, o) => s + (parseFloat(o.driver_pay || '0') || 0), 0),
     loadersPay: totalExternalLoadersPay,
-    expenses: (trip.trip_expenses ?? []).reduce((s, e) => s + parseFloat(e.amount), 0),
+    expenses: (trip.trip_expenses ?? []).reduce(
+      (s, e) => s + (parseFloat(e.amount || '0') || 0),
+      0,
+    ),
   };
 
   const hasLoaders = totals.loadersPay > 0;
@@ -214,8 +226,29 @@ export default function TripDetailPage() {
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/')}
-            className="text-zinc-500 text-2xl active:scale-95 transition-transform"
+            type="button"
+            onClick={() => {
+              const currentPath = window.location.pathname;
+              const savedRole =
+                typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
+              const fallbackUrl =
+                savedRole === 'admin' || savedRole === 'owner' ? '/admin/trips' : '/driver';
+
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push(fallbackUrl);
+              }
+
+              // Надежная страховка если история не переключила страницу
+              setTimeout(() => {
+                if (window.location.pathname === currentPath) {
+                  router.push(fallbackUrl);
+                }
+              }, 250);
+            }}
+            className="text-zinc-500 text-2xl active:scale-95 transition-transform cursor-pointer p-1 -ml-1"
+            title="Назад"
           >
             ←
           </button>
@@ -383,6 +416,19 @@ export default function TripDetailPage() {
                                 </span>
                               )}
                             </div>
+
+                            {isGeostroyCounterparty(order.counterparty?.name) &&
+                              !isGeostroyOrderValid(order.description) && (
+                                <div className="my-1.5 flex items-center justify-between bg-rose-50 border border-rose-300 rounded-lg px-2.5 py-1 text-[11px] text-rose-900 font-bold">
+                                  <span>🛑 Укажите маршрут и дату (ДД.ММ.ГГГГ)</span>
+                                  <Link
+                                    href={`/trip/${id}/order/${order.id}`}
+                                    className="text-rose-700 underline font-black ml-2"
+                                  >
+                                    Заполнить →
+                                  </Link>
+                                </div>
+                              )}
 
                             {order.counterparty?.name && order.description && (
                               <p className="text-xs text-zinc-600 font-bold truncate mb-1">
@@ -599,13 +645,43 @@ export default function TripDetailPage() {
               </Link>
             </div>
           )}
+          {hasGeostroyValidationError && (
+            <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-3 text-rose-900 space-y-1.5 shadow-xs">
+              <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide">
+                <span>🛑</span>
+                <span>Нельзя отправить рейс на ревью</span>
+              </div>
+              <p className="text-[11px] font-medium text-rose-800 leading-tight">
+                Для заказов с контрагентом «ООО Геостройиндустрия» необходимо заполнить Маршрут и
+                дату начала (ДД.ММ.ГГГГ).
+              </p>
+            </div>
+          )}
+          {finishError && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-2.5 text-red-700 text-xs font-bold uppercase tracking-wide">
+              {finishError}
+            </div>
+          )}
           <button
             type="button"
-            onClick={() => finishTrip.mutate()}
-            disabled={finishTrip.isPending}
+            onClick={() => {
+              if (hasGeostroyValidationError) {
+                setFinishError(
+                  'Нельзя завершить рейс: для контрагента «ООО Геостройиндустрия» заполните маршрут и дату начала (ДД.ММ.ГГГГ).',
+                );
+                return;
+              }
+              finishTrip.mutate();
+            }}
+            disabled={finishTrip.isPending || hasGeostroyValidationError}
             className="flex items-center justify-center gap-2 w-full bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg h-14 font-black uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            <span>🏁</span> {finishTrip.isPending ? 'Завершаем смену...' : 'Завершить рейс'}
+            <span>🏁</span>{' '}
+            {finishTrip.isPending
+              ? 'Завершаем смену...'
+              : hasGeostroyValidationError
+                ? '🛑 Заполните данные Геостройиндустрия'
+                : 'Завершить рейс'}
           </button>
         </div>
       )}

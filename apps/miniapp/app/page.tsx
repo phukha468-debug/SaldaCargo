@@ -109,9 +109,18 @@ export default function RootDispatcher() {
           setClientCookie('salda_user_id', localId);
         }
 
-        // Проверяем валидность сессии через API с коротким таймаутом
+        // Проверяем валидность сессии через API с таймаутом 5с
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const targetPath =
+          savedRole === 'driver'
+            ? '/driver'
+            : savedRole === 'admin' || savedRole === 'owner'
+              ? '/admin'
+              : savedRole === 'mechanic'
+                ? '/mechanic'
+                : null;
 
         try {
           const res = await fetch('/api/driver/me', {
@@ -123,29 +132,30 @@ export default function RootDispatcher() {
 
           if (res.ok) {
             const user = await res.json();
-            if (user && user.id) {
-              const targetPath =
-                savedRole === 'driver'
-                  ? '/driver'
-                  : savedRole === 'admin' || savedRole === 'owner'
-                    ? '/admin'
-                    : savedRole === 'mechanic'
-                      ? '/mechanic'
-                      : null;
-
-              if (targetPath) {
-                router.replace(targetPath);
-                return;
-              }
+            if (user && user.id && targetPath) {
+              router.replace(targetPath);
+              return;
             }
+          } else if (res.status === 401) {
+            // Пользователь явно не авторизован или удалён
+            console.warn('Session is 401 unauthorized, resetting');
+            handleResetAll();
+            if (!cancelled) setStep('role');
+            return;
           }
         } catch {
-          // ignore network timeout
+          // Игнорируем сетевой таймаут / офлайн
+          clearTimeout(timeoutId);
         }
 
-        // Если сессия недействительна (пользователь удалён или 401) — сбрасываем и даём выбрать роль
-        console.warn('Session verification failed, resetting to role picker');
-        handleResetAll();
+        // Если сеть медленная, но у нас есть сохранённая роль и userId — всё равно переходим в панель,
+        // не сбрасывая авторизацию пользователя!
+        if (targetPath) {
+          router.replace(targetPath);
+          return;
+        }
+
+        if (!cancelled) setStep('role');
       } catch (e) {
         console.error('Session restore error:', e);
         if (!cancelled) setStep('role');

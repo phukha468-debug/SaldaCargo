@@ -576,7 +576,7 @@ function StaffDebtMiniappForm({
 }) {
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
-  const [walletId, setWalletId] = useState(WALLET_OPTIONS[1]?.id ?? ''); // Касса по умолчанию
+  const [walletId, setWalletId] = useState('none'); // По умолчанию БЕЗ списания с кошелька (внутренний долг)
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
@@ -683,20 +683,31 @@ function StaffDebtMiniappForm({
       {/* Источник */}
       <div className="space-y-1">
         <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-          Списать с
+          Источник средств
         </label>
         <select
           value={walletId}
           onChange={(e) => setWalletId(e.target.value)}
           className="w-full rounded-lg border-2 border-zinc-200 px-4 h-12 text-xs font-bold text-zinc-900 focus:border-purple-500 focus:outline-none"
         >
+          <option value="none">🚫 Без списания денег (внутренний долг: комиссия, штраф)</option>
           {WALLET_OPTIONS.map((w) => (
             <option key={w.id} value={w.id}>
-              {w.label}
+              {w.label} (физическая выдача денег)
             </option>
           ))}
-          <option value="none">🚫 Без списания с кошелька (внутренний долг)</option>
         </select>
+        {walletId === 'none' ? (
+          <p className="text-[10px] text-zinc-500 leading-snug">
+            💡 Внутренний долг запишется в карточку сотрудника и удержится при выплате ЗП, но не
+            уменьшит остаток в кассе и не попадёт в расходы компании.
+          </p>
+        ) : (
+          <p className="text-[10px] text-amber-700 leading-snug">
+            ⚠️ Деньги будут физически списаны из выбранной кассы/счёта и попадут в кассовые
+            списания.
+          </p>
+        )}
       </div>
 
       {/* Описание */}

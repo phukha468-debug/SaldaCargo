@@ -4538,7 +4538,7 @@ function AddStaffDebtModal({
   const currentDebt = selectedUser ? parseFloat(selectedUser.advance_balance ?? '0') : 0;
 
   const [amount, setAmount] = useState(initialAction === 'adjust' ? currentDebt.toFixed(0) : '');
-  const [walletId, setWalletId] = useState('10000000-0000-0000-0000-000000000002'); // Касса по умолчанию
+  const [walletId, setWalletId] = useState('none'); // По умолчанию БЕЗ списания с кошелька (внутренний долг)
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -4736,19 +4736,32 @@ function AddStaffDebtModal({
                 onChange={(e) => setWalletId(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
               >
-                <option value="10000000-0000-0000-0000-000000000002">💵 Касса (Наличные)</option>
+                <option value="none">
+                  🚫 Без списания с кошелька (внутренний долг: комиссия, штраф, недостача)
+                </option>
+                <option value="10000000-0000-0000-0000-000000000002">
+                  💵 Касса (Наличные) — выдать физические деньги
+                </option>
                 <option value="10000000-0000-0000-0000-000000000001">
                   🏦 Расчётный счёт (автосвязка с операцией банка)
                 </option>
-                <option value="none">
-                  🚫 Без списания с кошелька (уже списано / внутренний долг)
-                </option>
               </select>
+              {walletId === 'none' && (
+                <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2 mt-1.5 leading-snug">
+                  💡 Внутренний долг запишется сотруднику и удержится при выплате ЗП, но не уменьшит
+                  остаток в кассе и не попадёт в расходы компании.
+                </p>
+              )}
               {walletId === '10000000-0000-0000-0000-000000000001' && (
                 <p className="text-[11px] text-sky-700 bg-sky-50 border border-sky-200 rounded-lg p-2 mt-1.5 leading-snug">
                   ℹ️ Если перевод уже сделан с расчетного счета, система автоматически найдет
                   списание банка на эту сумму и свяжет его с водителем во избежание задвоения
                   расходов.
+                </p>
+              )}
+              {walletId === '10000000-0000-0000-0000-000000000002' && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1.5 leading-snug">
+                  ⚠️ Деньги будут списаны из Кассы (Сейфа) и отразятся в кассовых списаниях за день.
                 </p>
               )}
             </div>

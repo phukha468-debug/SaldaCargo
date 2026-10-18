@@ -7,7 +7,8 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
-    const userId = cookieStore.get('salda_user_id')?.value;
+    const userId =
+      cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Salda Cargo — Факт поступления vs Прибыль рейсов (3 варианта UI)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .badge-debt { background-color: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+    .badge-paid { background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #059669; }
+    .badge-pending { background-color: #fffbeb; border: 1px solid #fde68a; color: #d97706; }
+  </style>
+</head>
+<body class="bg-zinc-100 text-zinc-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+
+  <div class="max-w-6xl mx-auto space-y-8">
+
+    <!-- Заголовок и вводная часть -->
+    <header class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-zinc-200">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-black uppercase tracking-wider mb-2">
+            Финансовая концепция для руководства
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">
+            Фактические деньги (Cash Flow) vs Будущая прибыль (P&L)
+          </h1>
+          <p class="text-zinc-600 text-sm mt-1 max-w-3xl">
+            «Убытки фактические и происходят прямо сейчас (ГСМ, выплаты, запчасти), а прибыль от отсроченных платежей — будущая». 
+            Ниже представлены 3 интерактивных варианта визуализации на живом примере <b>рейса №844</b> («Валдай 6м», ООО «Геостройиндустрия»).
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
+          <div class="text-right">
+            <p class="text-[10px] font-bold text-zinc-400 uppercase">Пример данных</p>
+            <p class="text-sm font-black text-zinc-800">Рейс №844</p>
+          </div>
+          <span class="text-2xl">🚛</span>
+        </div>
+      </div>
+
+      <!-- Быстрый сводный бенчмарк рейса 844 -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-zinc-100">
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Начислено клиенту</p>
+          <p class="text-lg font-black text-zinc-900 mt-0.5">30 000 ₽</p>
+          <p class="text-[11px] text-rose-500 font-bold mt-1">⏳ В долг (0 ₽ получено)</p>
+        </div>
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Реальный расход дня</p>
+          <p class="text-lg font-black text-rose-600 mt-0.5">−9 000 ₽</p>
+          <p class="text-[11px] text-zinc-500 font-medium mt-1">ГСМ с карты прямо сейчас</p>
+        </div>
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Бумажная прибыль (P&L)</p>
+          <p class="text-lg font-black text-emerald-600 mt-0.5">+10 000 ₽</p>
+          <p class="text-[11px] text-zinc-500 font-medium mt-1">Виртуальная (будущая)</p>
+        </div>
+        <div class="bg-rose-50 p-3.5 rounded-2xl border-2 border-rose-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-rose-700">Касса рейса сегодня</p>
+          <p class="text-lg font-black text-rose-700 mt-0.5">−9 000 ₽</p>
+          <p class="text-[11px] text-rose-800 font-bold mt-1">Реальный отток из кармана</p>
+        </div>
+      </div>
+
+      <!-- Навигация по вкладкам -->
+      <div class="flex items-center gap-2 mt-6 overflow-x-auto pb-1">
+        <button onclick="switchTab('all')" id="btn-all" class="tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider bg-zinc-900 text-white transition-all shadow-sm">
+          Все 3 варианта сразу
+        </button>
+        <button onclick="switchTab('card')" id="btn-card" class="tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all">
+          Вариант 1: В карточке рейса
+        </button>
+        <button onclick="switchTab('day')" id="btn-day" class="tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all">
+          Вариант 2: Итоги за день (Daily)
+        </button>
+        <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all">
+          Вариант 3: Сводный фин-дашборд
+        </button>
+      </div>
+    </header>
+
+    <!-- СЕКЦИЯ 1: В карточке рейса -->
+    <section id="section-card" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-black text-zinc-900 flex items-center gap-2">
+            <span class="w-7 h-7 rounded-xl bg-orange-600 text-white inline-flex items-center justify-center text-xs font-black">1</span>
+            Вариант 1: Двухконтурная карточка рейса в мобильном приложении
+          </h2>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Прямо на карточке рейса директор и администратор видят и экономику (+10 000 ₽), и реальные живые деньги (-9 000 ₽ в кассе).
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <!-- Интерактивная карточка в рамке смартфона -->
+        <div class="bg-zinc-900 p-4 rounded-[40px] shadow-xl max-w-sm mx-auto w-full border-4 border-zinc-800">
+          <div class="flex justify-between items-center text-zinc-400 text-xs px-4 pb-2 pt-1 font-semibold">
+            <span>08:49</span>
+            <span>Salda App · Админ</span>
+            <span>📶 100%</span>
+          </div>
+
+          <!-- Сама карточка рейса -->
+          <div class="bg-white rounded-2xl border-2 border-orange-300 overflow-hidden shadow-sm">
+            <div class="flex items-stretch border-b border-zinc-100">
+              <div class="w-1.5 bg-emerald-500 shrink-0"></div>
+              <div class="p-3.5 flex-1">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-black text-zinc-900 text-base">Валдай 6м</span>
+                      <span class="text-[10px] font-black bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">#844</span>
+                      <span class="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Черновик</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 font-medium mt-0.5">Евгений Зеферович · 15:27–08:44</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="font-black text-zinc-900 text-base">30 000 ₽</p>
+                    <p class="text-xs font-bold text-emerald-600">+10 000 ₽ план</p>
+                  </div>
+                </div>
+
+                <!-- НОВЫЙ БЛОК: Статус живых денег рейса -->
+                <div class="mt-3 bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-black text-amber-900 uppercase tracking-wide flex items-center gap-1">
+                      <span>💵</span> Живые деньги сегодня:
+                    </span>
+                    <span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                      Касса: −9 000 ₽
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1 text-[11px] pt-1 border-t border-amber-200/50">
+                    <div>
+                      <span class="text-zinc-500 block text-[9px] uppercase font-bold">Поступило сейчас:</span>
+                      <span class="font-black text-zinc-800">0 ₽</span>
+                      <span class="text-[9px] text-rose-600 block font-semibold">Все 30 000 ₽ в долг</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block text-[9px] uppercase font-bold">Реальный расход:</span>
+                      <span class="font-black text-rose-600">−9 000 ₽</span>
+                      <span class="text-[9px] text-zinc-500 block">ГСМ с карты</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Заявки -->
+                <div class="mt-3 pt-3 border-t border-zinc-100 space-y-2">
+                  <p class="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Заявки (2)</p>
+                  
+                  <div class="flex items-start justify-between text-xs">
+                    <div>
+                      <p class="font-bold text-zinc-900">Геостройиндустрия</p>
+                      <p class="text-[10px] text-emerald-600 font-semibold">ЗП 29% · 7 000 ₽</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="font-bold text-zinc-900">26 000 ₽</p>
+                      <span class="text-[9px] font-black px-1.5 py-0.2 rounded badge-debt">Долг</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-start justify-between text-xs">
+                    <div>
+                      <p class="font-bold text-zinc-900">Геостройиндустрия (ПРР)</p>
+                      <p class="text-[10px] text-blue-600 font-semibold">Грузчики (2 чел): 4 000 ₽</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="font-bold text-zinc-900">4 000 ₽</p>
+                      <span class="text-[9px] font-black px-1.5 py-0.2 rounded badge-debt">Долг</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Расходы -->
+                <div class="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
+                  <span class="text-zinc-500 font-medium">↳ ГСМ (заправка)</span>
+                  <span class="font-bold text-rose-600">−9 000 ₽</span>
+                </div>
+
+                <!-- Итог подвала карточки -->
+                <div class="mt-3 pt-2.5 border-t border-zinc-100 grid grid-cols-3 gap-1 text-center bg-zinc-50 p-2 rounded-xl">
+                  <div>
+                    <span class="text-[8px] font-black text-zinc-400 uppercase block">Выручка</span>
+                    <span class="text-xs font-black text-zinc-900">30 000 ₽</span>
+                  </div>
+                  <div>
+                    <span class="text-[8px] font-black text-zinc-400 uppercase block">ЗП водитель</span>
+                    <span class="text-xs font-black text-emerald-600">7 000 ₽</span>
+                  </div>
+                  <div>
+                    <span class="text-[8px] font-black text-zinc-400 uppercase block">Прибыль</span>
+                    <span class="text-xs font-black text-emerald-600">+10 000 ₽</span>
+                  </div>
+                </div>
+
+                <!-- Кнопки управления -->
+                <div class="mt-3 flex gap-2">
+                  <button class="flex-1 py-2 text-xs font-black bg-zinc-100 text-zinc-700 rounded-xl">✏️ Изменить</button>
+                  <button class="flex-1 py-2 text-xs font-black bg-rose-50 text-rose-700 rounded-xl">Вернуть</button>
+                  <button class="flex-1 py-2 text-xs font-black bg-emerald-600 text-white rounded-xl">✓ Одобрить</button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Описание преимуществ Варианта 1 -->
+        <div class="bg-white rounded-3xl p-6 border border-zinc-200 space-y-4">
+          <h3 class="text-base font-black text-zinc-900 uppercase tracking-tight flex items-center gap-2">
+            <span>🔍</span> Что меняется для директора:
+          </h3>
+          <ul class="space-y-3 text-sm text-zinc-600">
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-500 font-bold">✓</span>
+              <span><b>Никаких иллюзий:</b> Директор сразу видит янтарную плашку: <i>«Живые деньги сегодня: Касса −9 000 ₽»</i>, даже если внизу гордо горит зелёная прибыль <i>+10 000 ₽</i>.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-500 font-bold">✓</span>
+              <span><b>Видно структуру денег:</b> Сразу понятно, почему в кассе минус: <i>«Поступило сейчас: 0 ₽ (все 30 000 ₽ в долг)»</i> и <i>«Реальный расход: −9 000 ₽ ГСМ»</i>.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-500 font-bold">✓</span>
+              <span><b>Когда клиент оплатит долг</b> (через модуль дебиторки), статус рейса автоматически пересчитается в <i>«Поступило живыми: 30 000 ₽ · Касса: +10 000 ₽»</i>.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЕКЦИЯ 2: Итоги дня (Daily) -->
+    <section id="section-day" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-black text-zinc-900 flex items-center gap-2">
+            <span class="w-7 h-7 rounded-xl bg-orange-600 text-white inline-flex items-center justify-center text-xs font-black">2</span>
+            Вариант 2: Двухрежимная сводка «Итоги за день» (P&L vs Касса)
+          </h2>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            В верхней плашке списка рейсов директор одним кликом переключает режим: «Экономика (начислено)» или «Живые деньги (кассовый факт)».
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <!-- Интерактивная плашка в рамке смартфона -->
+        <div class="bg-zinc-900 p-4 rounded-[40px] shadow-xl max-w-sm mx-auto w-full border-4 border-zinc-800">
+          <div class="flex justify-between items-center text-zinc-400 text-xs px-4 pb-2 pt-1 font-semibold">
+            <span>08:49</span>
+            <span>Salda App · Рейсы за день</span>
+            <span>📶 100%</span>
+          </div>
+
+          <!-- Карточка DailyTotals -->
+          <div class="rounded-2xl bg-zinc-950 text-white overflow-hidden border border-zinc-800 shadow-md">
+            
+            <!-- Переключатель режима Начислено / Факт денег -->
+            <div class="p-2 bg-zinc-900 flex items-center gap-1 border-b border-zinc-800">
+              <button onclick="setDailyMode('accrual')" id="btn-mode-accrual" class="flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-zinc-800 text-white transition-all">
+                📊 Начислено (План)
+              </button>
+              <button onclick="setDailyMode('cash')" id="btn-mode-cash" class="flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-white transition-all">
+                💵 Факт денег (Касса)
+              </button>
+            </div>
+
+            <!-- Режим 1: Начислено (P&L) -->
+            <div id="view-accrual" class="p-4 space-y-3">
+              <div class="flex justify-between items-center text-[10px] text-zinc-400 uppercase font-bold">
+                <span>Экономика рейсов за 18 окт</span>
+                <span class="bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">1 рейс</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center pt-1">
+                <div>
+                  <p class="text-[9px] text-zinc-500 font-bold uppercase">Выручка</p>
+                  <p class="text-sm font-black text-white mt-0.5">30 000 ₽</p>
+                </div>
+                <div>
+                  <p class="text-[9px] text-zinc-500 font-bold uppercase">Затраты</p>
+                  <p class="text-sm font-black text-rose-400 mt-0.5">20 000 ₽</p>
+                </div>
+                <div>
+                  <p class="text-[9px] text-zinc-500 font-bold uppercase">Прибыль</p>
+                  <p class="text-base font-black text-emerald-400 mt-0.5">+10 000 ₽</p>
+                </div>
+              </div>
+              <div class="text-[10px] text-zinc-500 text-center pt-2 border-t border-zinc-800/80">
+                Затраты: ГСМ 9 000 ₽ + ЗП вод. 7 000 ₽ + Грузчики 4 000 ₽
+              </div>
+            </div>
+
+            <!-- Режим 2: Факт денег (Cash Flow) -->
+            <div id="view-cash" class="p-4 space-y-3 hidden">
+              <div class="flex justify-between items-center text-[10px] text-orange-400 uppercase font-black">
+                <span>Движение живых денег за день</span>
+                <span class="bg-orange-950/80 border border-orange-800 text-orange-300 px-2 py-0.5 rounded">CASH FLOW</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center pt-1">
+                <div>
+                  <p class="text-[9px] text-zinc-400 font-bold uppercase">Приток в кассу</p>
+                  <p class="text-sm font-black text-zinc-300 mt-0.5">0 ₽</p>
+                  <span class="text-[8px] text-rose-400 block font-bold">все в долг</span>
+                </div>
+                <div>
+                  <p class="text-[9px] text-zinc-400 font-bold uppercase">Реальный отток</p>
+                  <p class="text-sm font-black text-rose-400 mt-0.5">−9 000 ₽</p>
+                  <span class="text-[8px] text-zinc-400 block">ГСМ оплачен</span>
+                </div>
+                <div>
+                  <p class="text-[9px] text-zinc-400 font-bold uppercase">Касса дня</p>
+                  <p class="text-base font-black text-rose-400 mt-0.5">−9 000 ₽</p>
+                  <span class="text-[8px] text-rose-300 block font-bold">кассовый минус</span>
+                </div>
+              </div>
+              <div class="bg-zinc-900/90 rounded-xl p-2.5 text-[11px] border border-zinc-800 flex items-center justify-between">
+                <span class="text-zinc-400 font-medium">⏳ Зависло в дебиторке:</span>
+                <span class="font-black text-amber-400">+30 000 ₽</span>
+              </div>
+            </div>
+
+          </div>
+
+          <p class="text-center text-zinc-500 text-[10px] mt-3">
+            👆 Нажмите на кнопки переключения в шапке смартфона
+          </p>
+        </div>
+
+        <!-- Описание преимуществ Варианта 2 -->
+        <div class="bg-white rounded-3xl p-6 border border-zinc-200 space-y-4">
+          <h3 class="text-base font-black text-zinc-900 uppercase tracking-tight flex items-center gap-2">
+            <span>📊</span> В чём сила переключателя дня:
+          </h3>
+          <p class="text-sm text-zinc-600">
+            Директор открывает приложение в конце дня и видит два разных ответа на два главных вопроса бизнеса:
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div class="p-3.5 bg-zinc-50 rounded-2xl border border-zinc-200">
+              <span class="text-xs font-black text-zinc-800 block uppercase">1. Заработали ли мы?</span>
+              <p class="text-xs text-zinc-600 mt-1">
+                Да, экономика сработала отлично: <b>+10 000 ₽ чистой прибыли</b> заложено в контракты.
+              </p>
+            </div>
+            <div class="p-3.5 bg-rose-50 rounded-2xl border border-rose-200">
+              <span class="text-xs font-black text-rose-900 block uppercase">2. Есть ли деньги прямо сейчас?</span>
+              <p class="text-xs text-rose-800 mt-1">
+                Нет, прямо сейчас в кассе <b>−9 000 ₽ убытка по ликвидности</b>, а 30 000 ₽ нужно выбивать с контрагента.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЕКЦИЯ 3: Сводный фин-дашборд -->
+    <section id="section-dashboard" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-black text-zinc-900 flex items-center gap-2">
+            <span class="w-7 h-7 rounded-xl bg-orange-600 text-white inline-flex items-center justify-center text-xs font-black">3</span>
+            Вариант 3: Аналитический дашборд «План (P&L) vs Факт (Cash Flow)»
+          </h2>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Полноценный экран в веб-кабинете и в разделе «Финансы» для стратегического контроля кассовых разрывов.
+          </p>
+        </div>
+      </div>
+
+      <!-- Большой виджет сравнения -->
+      <div class="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-sm space-y-6">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-100">
+          <div>
+            <h3 class="text-lg font-black text-zinc-900">Сравнение: Начисление vs Живые деньги</h3>
+            <p class="text-xs text-zinc-500">Период: 18 октября 2026 г. (1 рейс)</p>
+          </div>
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black">
+            <span>⚠️</span> Кассовый разрыв: 19 000 ₽ (Прибыль 10 000 ₽ vs Факт −9 000 ₽)
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Левая колонка: P&L (Экономика начисления) -->
+          <div class="bg-zinc-50 rounded-2xl p-5 border border-zinc-200 space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                <span>📈</span> Контур 1: Начисление (P&L)
+              </span>
+              <span class="text-[10px] font-bold bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded">Бумажный доход</span>
+            </div>
+
+            <div class="space-y-2.5 text-sm">
+              <div class="flex justify-between py-1 border-b border-zinc-200/60">
+                <span class="text-zinc-600">Начисленная выручка по актам:</span>
+                <span class="font-black text-zinc-900">30 000 ₽</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-zinc-200/60">
+                <span class="text-zinc-600">Списано ГСМ на рейсы:</span>
+                <span class="font-bold text-rose-600">−9 000 ₽</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-zinc-200/60">
+                <span class="text-zinc-600">Начислена ЗП водителю (обязательство):</span>
+                <span class="font-bold text-rose-600">−7 000 ₽</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-zinc-200/60">
+                <span class="text-zinc-600">Начислена ЗП грузчикам (обязательство):</span>
+                <span class="font-bold text-rose-600">−4 000 ₽</span>
+              </div>
+            </div>
+
+            <div class="pt-2 bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl flex items-center justify-between">
+              <div>
+                <p class="text-[10px] font-black text-emerald-800 uppercase">Экономическая прибыль</p>
+                <p class="text-xs text-emerald-700">Заложено в договора</p>
+              </div>
+              <p class="text-xl font-black text-emerald-700">+10 000 ₽</p>
+            </div>
+          </div>
+
+          <!-- Правая колонка: Cash Flow (Фактическое движение денег) -->
+          <div class="bg-zinc-50 rounded-2xl p-5 border border-zinc-200 space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black uppercase tracking-wider text-orange-600 flex items-center gap-1.5">
+                <span>💰</span> Контур 2: Живые деньги (Cash Flow)
+              </span>
+              <span class="text-[10px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Реальная касса</span>
+            </div>
+
+            <div class="space-y-2.5 text-sm">
+              <div class="flex justify-between py-1 border-b border-zinc-200/60">
+                <span class="text-zinc-600">Фактически поступило денег (Cash In):</span>
+                <span class="font-black text-zinc-900">0 ₽</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-zinc-200/60 text-xs text-rose-600">
+                <span>↳ Оплата наличными / QR:</span>
+                <span class="font-bold">0 ₽</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-zinc-200/60">
+                <span class="text-zinc-600">Реально списано денег (Cash Out):</span>
+                <span class="font-bold text-rose-600">−9 000 ₽</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-zinc-200/60 text-xs text-zinc-500">
+                <span>↳ Оплата ГСМ с карты / счёта:</span>
+                <span class="font-bold text-rose-600">−9 000 ₽</span>
+              </div>
+            </div>
+
+            <div class="pt-2 bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex items-center justify-between">
+              <div>
+                <p class="text-[10px] font-black text-rose-800 uppercase">Чистый денежный поток (Сальдо)</p>
+                <p class="text-xs text-rose-700">Фактический остаток дня</p>
+              </div>
+              <p class="text-xl font-black text-rose-700">−9 000 ₽</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Нижняя плашка: Дебиторка и обязательства -->
+        <div class="bg-zinc-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">⏳</span>
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-zinc-400">Где зависли деньги компании?</p>
+              <p class="text-sm font-bold text-zinc-200">
+                ООО «Геостройиндустрия» должно за рейс <span class="text-amber-400 font-black">30 000 ₽</span> (срок оплаты: по договору).
+              </p>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="text-[10px] uppercase font-bold text-zinc-400 block">Будущий приток после оплаты:</span>
+            <span class="text-lg font-black text-emerald-400">+30 000 ₽ → Касса станет +10 000 ₽</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Итоговое резюме -->
+    <footer class="bg-white rounded-3xl p-6 border border-zinc-200 text-center space-y-2">
+      <p class="text-sm font-black text-zinc-900">
+        Файл сохранён в корне проекта: <code class="bg-zinc-100 text-orange-600 px-2 py-0.5 rounded">c:\salda\financial_views_demo.html</code>
+      </p>
+      <p class="text-xs text-zinc-500">
+        Вы можете открыть его прямо в браузере (двойным кликом), чтобы согласовать с директором подходящий вариант интерфейса.
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- Скрипт переключения табов и режимов -->
+  <script>
+    function switchTab(tab) {
+      const sCard = document.getElementById('section-card');
+      const sDay = document.getElementById('section-day');
+      const sDash = document.getElementById('section-dashboard');
+
+      const btns = ['all', 'card', 'day', 'dashboard'];
+      btns.forEach(b => {
+        const btn = document.getElementById('btn-' + b);
+        if (btn) {
+          btn.className = 'tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ' + 
+            (b === tab ? 'bg-zinc-900 text-white shadow-sm' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200');
+        }
+      });
+
+      if (tab === 'all') {
+        sCard.classList.remove('hidden');
+        sDay.classList.remove('hidden');
+        sDash.classList.remove('hidden');
+      } else if (tab === 'card') {
+        sCard.classList.remove('hidden');
+        sDay.classList.add('hidden');
+        sDash.classList.add('hidden');
+      } else if (tab === 'day') {
+        sCard.classList.add('hidden');
+        sDay.classList.remove('hidden');
+        sDash.classList.add('hidden');
+      } else if (tab === 'dashboard') {
+        sCard.classList.add('hidden');
+        sDay.classList.add('hidden');
+        sDash.classList.remove('hidden');
+      }
+    }
+
+    function setDailyMode(mode) {
+      const btnAccrual = document.getElementById('btn-mode-accrual');
+      const btnCash = document.getElementById('btn-mode-cash');
+      const viewAccrual = document.getElementById('view-accrual');
+      const viewCash = document.getElementById('view-cash');
+
+      if (mode === 'accrual') {
+        btnAccrual.className = 'flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-zinc-800 text-white transition-all';
+        btnCash.className = 'flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-white transition-all';
+        viewAccrual.classList.remove('hidden');
+        viewCash.classList.add('hidden');
+      } else {
+        btnCash.className = 'flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-orange-600 text-white transition-all shadow-sm';
+        btnAccrual.className = 'flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-white transition-all';
+        viewCash.classList.remove('hidden');
+        viewAccrual.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

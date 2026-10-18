@@ -66,7 +66,7 @@ export function MinimizeOnBack() {
     try {
       const WebApp = window.WebApp;
 
-      // ── Уведомляем MAX о готовности приложения (скрывает нативный спиннер MAX) ─
+      // ── Уведомляем MAX о готовности приложения ───────────────────────────
       try {
         WebApp?.ready?.();
       } catch {
@@ -80,19 +80,30 @@ export function MinimizeOnBack() {
         // Not supported — silently skip
       }
 
-      // ── History API barrier (hardware back / environments without BackButton) ─
-      try {
-        if (window.history && window.history.replaceState && window.history.pushState) {
-          window.history.replaceState({ [BARRIER_KEY]: true }, '', window.location.href);
-          window.history.pushState({ [BARRIER_KEY]: false }, '', window.location.href);
+      // ── History API barrier ONLY on root pages to prevent app closing ─────
+      function ensureBarrierOnRoot() {
+        try {
+          if (isRootPath(window.location.pathname)) {
+            if (window.history && window.history.replaceState && window.history.pushState) {
+              window.history.replaceState({ [BARRIER_KEY]: true }, '', window.location.href);
+              window.history.pushState({ [BARRIER_KEY]: false }, '', window.location.href);
+            }
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // Silently skip if restricted environment (e.g. Samsung WebView strict sandbox)
       }
+
+      ensureBarrierOnRoot();
 
       function onPopState(e: PopStateEvent) {
         try {
-          if (e.state?.[BARRIER_KEY] === true && window.history?.pushState) {
+          // Only intercept and bounce back if we are on a root page
+          if (
+            isRootPath(window.location.pathname) &&
+            e.state?.[BARRIER_KEY] === true &&
+            window.history?.pushState
+          ) {
             window.history.pushState({ [BARRIER_KEY]: false }, '', window.location.href);
           }
         } catch {
@@ -102,7 +113,7 @@ export function MinimizeOnBack() {
 
       window.addEventListener('popstate', onPopState);
 
-      // ── MAX BackButton: intercept header back button on root pages ────────────
+      // ── MAX BackButton: show on inner pages, hide on root pages ───────────
       let backButton:
         | {
             isVisible: boolean;
@@ -120,8 +131,22 @@ export function MinimizeOnBack() {
 
       function handleBackButtonClick() {
         try {
-          if (!isRootPath(window.location.pathname)) {
-            window.history.back();
+          const current = window.location.pathname;
+          if (!isRootPath(current)) {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              // Smart fallback navigation
+              if (current.startsWith('/trip/')) {
+                window.location.href = '/driver';
+              } else if (current.startsWith('/admin/')) {
+                window.location.href = '/admin';
+              } else if (current.startsWith('/mechanic/')) {
+                window.location.href = '/mechanic';
+              } else {
+                window.location.href = '/';
+              }
+            }
           }
         } catch {
           // ignore
@@ -132,6 +157,8 @@ export function MinimizeOnBack() {
         try {
           backButton.onClick?.(handleBackButtonClick);
           if (isRootPath(window.location.pathname)) {
+            backButton.hide?.();
+          } else {
             backButton.show?.();
           }
         } catch {
@@ -148,12 +175,11 @@ export function MinimizeOnBack() {
           if (current === lastPathname) return;
           lastPathname = current;
 
-          if (!backButton) return;
-
           if (isRootPath(current)) {
-            if (!backButton.isVisible) backButton.show?.();
+            ensureBarrierOnRoot();
+            if (backButton?.isVisible) backButton.hide?.();
           } else {
-            if (backButton.isVisible) backButton.hide?.();
+            if (backButton && !backButton.isVisible) backButton.show?.();
           }
         } catch {
           // ignore

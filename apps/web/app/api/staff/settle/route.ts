@@ -508,7 +508,7 @@ export async function POST(request: Request) {
     }
 
     if (actualOffset > 0) {
-      // Запись о зачёте аванса (income = уменьшает остаток долга, плюсует кошелёк для баланса)
+      // Запись о зачёте аванса (income = уменьшает остаток долга сотрудника, но НЕ пополняет кошелёк, т.к. деньги уже были выданы ранее)
       ops.push(
         (supabase.from('transactions') as any).insert({
           direction: 'income',
@@ -518,7 +518,7 @@ export async function POST(request: Request) {
           transaction_date: new Date().toISOString(),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
-          to_wallet_id: body.from_wallet_id || null,
+          to_wallet_id: null,
           related_user_id: body.user_id,
           created_by: adminId,
           idempotency_key: crypto.randomUUID(),

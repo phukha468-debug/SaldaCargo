@@ -14,18 +14,29 @@ const dailyBalanceCache = new Map<string, { data: any; timestamp: number }>();
 const DAILY_BALANCE_CACHE_TTL = 20000; // 20 секунд
 
 export function invalidateDailyBalanceCache(date?: string) {
-  if (date) dailyBalanceCache.delete(date);
-  else dailyBalanceCache.clear();
+  if (date) {
+    dailyBalanceCache.delete(date);
+    dailyBalanceCache.delete(`${date}:day`);
+    dailyBalanceCache.delete(`${date}:week`);
+    dailyBalanceCache.delete(`${date}:month`);
+    for (const k of dailyBalanceCache.keys()) {
+      if (k.startsWith(date) || k.includes(date.slice(0, 7))) dailyBalanceCache.delete(k);
+    }
+  } else {
+    dailyBalanceCache.clear();
+  }
 }
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const period = (searchParams.get('period') as 'day' | 'week' | 'month') || 'day';
     const forceRefresh = searchParams.get('force') === '1';
 
+    const cacheKey = `${date}:${period}`;
     if (!forceRefresh) {
-      const cached = dailyBalanceCache.get(date);
+      const cached = dailyBalanceCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < DAILY_BALANCE_CACHE_TTL) {
         return NextResponse.json(cached.data, {
           headers: {
@@ -36,8 +47,26 @@ export async function GET(request: Request) {
       }
     }
 
-    const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd = `${date}T23:59:59.999Z`;
+    let rangeStart = `${date}T00:00:00.000Z`;
+    let rangeEnd = `${date}T23:59:59.999Z`;
+
+    if (period === 'week') {
+      const d = new Date(date + 'T12:00:00Z');
+      const day = d.getUTCDay();
+      const diffToMon = day === 0 ? -6 : 1 - day;
+      const mon = new Date(d);
+      mon.setUTCDate(d.getUTCDate() + diffToMon);
+      const sun = new Date(mon);
+      sun.setUTCDate(mon.getUTCDate() + 6);
+      rangeStart = `${mon.toISOString().slice(0, 10)}T00:00:00.000Z`;
+      rangeEnd = `${sun.toISOString().slice(0, 10)}T23:59:59.999Z`;
+    } else if (period === 'month') {
+      const y = parseInt(date.slice(0, 4), 10);
+      const m = parseInt(date.slice(5, 7), 10);
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      rangeStart = `${date.slice(0, 7)}-01T00:00:00.000Z`;
+      rangeEnd = `${date.slice(0, 7)}-${String(lastDay).padStart(2, '0')}T23:59:59.999Z`;
+    }
 
     const supabase = createAdminClient();
 
@@ -46,13 +75,17 @@ export async function GET(request: Request) {
     let isApiSynced = false;
     let tbankAccountNum = '';
     let bankStatementOps: TBankOperation[] = [];
-    const isToday = date === new Date().toISOString().slice(0, 10);
+    const todayYmd = new Date().toISOString().slice(0, 10);
+    const isCurrentPeriod =
+      period === 'day'
+        ? date === todayYmd
+        : todayYmd >= rangeStart.slice(0, 10) && todayYmd <= rangeEnd.slice(0, 10);
 
-    const fromIso = `${date}T00:00:00Z`;
-    const toIso = `${date}T23:59:59Z`;
+    const fromIso = rangeStart.replace('.000Z', 'Z');
+    const toIso = rangeEnd.replace('.999Z', 'Z');
 
     try {
-      const syncPromise = isToday ? syncTBankBalance() : Promise.resolve(null);
+      const syncPromise = isCurrentPeriod ? syncTBankBalance() : Promise.resolve(null);
       const statementPromise = fetchTBankStatement(fromIso, toIso);
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
 
@@ -74,7 +107,7 @@ export async function GET(request: Request) {
       console.error('TBank auto-sync/statement error in daily-balance:', e);
     }
 
-    // 2. Fetch all transactions for this day
+    // 2. Fetch all transactions for this period
     const txSelect =
       'id, amount, direction, description, created_at, transaction_date, from_wallet_id, to_wallet_id, category_id, counterparty_id, related_user_id, trip_order_id, trip_id, idempotency_key, ' +
       'category:transaction_categories(id, name, code), ' +
@@ -89,7 +122,7 @@ export async function GET(request: Request) {
       { data: categoriesList },
       { data: calendarOverrides },
     ] = await Promise.all([
-      // Transactions of the day (по transaction_date, либо по created_at если transaction_date не задан)
+      // Transactions of the period
       (supabase.from('transactions') as any)
         .select(txSelect)
         .eq('lifecycle_status', 'approved')
@@ -97,25 +130,25 @@ export async function GET(request: Request) {
         .or('from_wallet_id.not.is.null,to_wallet_id.not.is.null')
         .or('description.is.null,description.neq.Корректировка остатка')
         .or(
-          `and(transaction_date.gte.${dayStart},transaction_date.lte.${dayEnd}),and(transaction_date.is.null,created_at.gte.${dayStart},created_at.lte.${dayEnd})`,
+          `and(transaction_date.gte.${rangeStart},transaction_date.lte.${rangeEnd}),and(transaction_date.is.null,created_at.gte.${rangeStart},created_at.lte.${rangeEnd})`,
         )
         .order('created_at', { ascending: false }),
 
-      // All Trip orders of this day with Bank/QR payment
+      // All Trip orders of this period with Bank/QR payment
       (supabase.from('trip_orders') as any)
         .select(
           'id, amount, created_at, payment_method, description, settlement_status, lifecycle_status, counterparty:counterparties(id, name), trip:trips!inner(id, trip_number, driver_id, driver:users!trips_driver_id_fkey(id, name))',
         )
         .in('payment_method', ['bank_invoice', 'qr'])
-        .gte('created_at', dayStart)
-        .lte('created_at', dayEnd)
+        .gte('created_at', rangeStart)
+        .lte('created_at', rangeEnd)
         .order('created_at', { ascending: false }),
 
-      // Cash collections settled on this day (Safe income)
+      // Cash collections settled in this period (Safe income)
       (supabase.from('cash_collections') as any)
         .select('id, amount, created_at, note, driver:users!cash_collections_driver_id_fkey(name)')
-        .gte('created_at', dayStart)
-        .lte('created_at', dayEnd),
+        .gte('created_at', rangeStart)
+        .lte('created_at', rangeEnd),
 
       // Audit status for this date
       (supabase.from('daily_finance_audits') as any).select('*').eq('date', date).maybeSingle(),
@@ -131,8 +164,7 @@ export async function GET(request: Request) {
         .eq('period', date.slice(0, 7)),
     ]);
 
-    // 3. Historical totals up to dayStart (to compute morning opening balance)
-    // and up to dayEnd (to compute evening closing balance)
+    // 3. Historical totals up to rangeStart (to compute morning opening balance)
     const [
       { data: priorBankOrders },
       { data: priorCollections },
@@ -148,51 +180,51 @@ export async function GET(request: Request) {
         .in('payment_method', ['bank_invoice', 'qr'])
         .eq('settlement_status', 'completed')
         .eq('lifecycle_status', 'approved')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
 
-      (supabase.from('cash_collections') as any).select('amount').lt('created_at', dayStart),
+      (supabase.from('cash_collections') as any).select('amount').lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount, trip_order_id')
         .eq('to_wallet_id', BANK_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('from_wallet_id', BANK_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('to_wallet_id', CASH_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('from_wallet_id', CASH_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('to_wallet_id', FUEL_CARD_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount')
         .eq('from_wallet_id', FUEL_CARD_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
-        .lt('created_at', dayStart),
+        .lt('created_at', rangeStart),
     ]);
 
     const sumArr = (arr: any[]) => (arr ?? []).reduce((s, r) => s + parseFloat(r.amount ?? '0'), 0);
@@ -259,10 +291,11 @@ export async function GET(request: Request) {
     }
 
     const eveningBankCalc = morningBank + bankDayIn - bankDayOut;
-    const actualEveningBank = isToday && apiBalance !== null ? apiBalance : eveningBankCalc;
-    // Для сегодняшнего дня при известном текущем балансе из API утро = вечер - приход + расход
+    const actualEveningBank = isCurrentPeriod && apiBalance !== null ? apiBalance : eveningBankCalc;
     const actualMorningBank =
-      isToday && apiBalance !== null ? actualEveningBank - bankDayIn + bankDayOut : morningBank;
+      isCurrentPeriod && apiBalance !== null
+        ? actualEveningBank - bankDayIn + bankDayOut
+        : morningBank;
 
     // Фактические остатки сейфа (29 000 ₽) и топливной карты (926,13 ₽),
     // зафиксированные директором, отсекающие старые виртуальные накопления из прошлых периодов
@@ -275,7 +308,7 @@ export async function GET(request: Request) {
     if (auditRow && auditRow.safe_cash_actual !== undefined && auditRow.safe_cash_actual !== null) {
       actualEveningCash = Number(auditRow.safe_cash_actual);
       actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
-    } else if (isToday) {
+    } else if (isCurrentPeriod) {
       actualEveningCash = BASE_ACTUAL_CASH;
       actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
     }
@@ -290,14 +323,17 @@ export async function GET(request: Request) {
     ) {
       actualEveningFuel = Number(auditRow.fuel_card_balance);
       actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
-    } else if (isToday) {
+    } else if (isCurrentPeriod) {
       actualEveningFuel = BASE_ACTUAL_FUEL;
       actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
     }
 
     const result = {
       date,
-      is_today: isToday,
+      period,
+      range_start: rangeStart.slice(0, 10),
+      range_end: rangeEnd.slice(0, 10),
+      is_today: isCurrentPeriod,
       wallets: {
         bank: {
           id: BANK_ID,
@@ -335,7 +371,7 @@ export async function GET(request: Request) {
       calendar_overrides: calendarOverrides ?? [],
     };
 
-    dailyBalanceCache.set(date, { data: result, timestamp: Date.now() });
+    dailyBalanceCache.set(cacheKey, { data: result, timestamp: Date.now() });
 
     return NextResponse.json(result, {
       headers: {

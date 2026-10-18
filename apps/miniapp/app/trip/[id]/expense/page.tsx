@@ -76,7 +76,14 @@ export default function AddFuelExpensePage() {
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-50">
         <button
-          onClick={() => router.back()}
+          type="button"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push(`/trip/${tripId}`);
+            }
+          }}
           className="text-zinc-500 text-2xl active:scale-95 transition-transform"
         >
           ←
