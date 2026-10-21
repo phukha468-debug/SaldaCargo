@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1.5. Проверяем: если рейс создаётся на "БЕЗ АВТО", разрешено ли пользователю
+    // 1.5. Проверяем тип машины
     const { data: asset } = await (supabase
       .from('assets')
       .select('id, short_name, reg_number')
@@ -49,27 +49,6 @@ export async function POST(request: Request) {
 
     const isPrrAsset =
       asset?.reg_number === 'БЕЗ АВТО' || asset?.short_name?.toLowerCase().includes('без авто');
-
-    if (isPrrAsset) {
-      const { data: user } = await (supabase
-        .from('users')
-        .select('name, roles')
-        .eq('id', userId)
-        .maybeSingle() as any);
-
-      const roles = Array.isArray(user?.roles) ? user.roles : [];
-      const isPrrAdmin =
-        roles.includes('admin') ||
-        roles.includes('owner') ||
-        Boolean(user?.name && /Нигамед|Шахмаев|Роман.*Радик|Радикович/i.test(user.name));
-
-      if (!isPrrAdmin) {
-        return NextResponse.json(
-          { error: 'Рейс без автомобиля могут создавать только администраторы' },
-          { status: 403 },
-        );
-      }
-    }
 
     // 2. Создаем новый рейс
     const finalTripType = isPrrAsset ? 'loaders_only' : (body.trip_type as any);

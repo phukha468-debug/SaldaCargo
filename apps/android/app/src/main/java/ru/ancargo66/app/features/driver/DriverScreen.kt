@@ -42,8 +42,23 @@ fun DriverScreen(
     var startTripError by remember { mutableStateOf<String?>(null) }
     var financeInitialTab by remember { mutableStateOf<Int?>(null) }
     var showCreatePrrDialog by remember { mutableStateOf(false) }
+    var showAllTripsModal by remember { mutableStateOf(false) }
+    var allTrips by remember { mutableStateOf<List<TripSummaryItem>>(emptyList()) }
+    var isLoadingAllTrips by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(showAllTripsModal) {
+        if (showAllTripsModal) {
+            isLoadingAllTrips = true
+            try {
+                allTrips = SaldaApiClient.getDriverTrips(user.id)
+            } catch (_: Exception) {
+            } finally {
+                isLoadingAllTrips = false
+            }
+        }
+    }
 
     val refreshData = {
         scope.launch {
@@ -52,13 +67,13 @@ fun DriverScreen(
             try {
                 // Параллельная загрузка сводки и списка машин вместо последовательной
                 coroutineScope {
-                    val sumDeferred = async { SaldaApiClient.getDriverSummary(user.id, forceRefresh = true) }
+                    val sumDeferred = async { SaldaApiClient.getDriverSummary(user.id, forceRefresh = summary == null) }
                     val astsDeferred = async { SaldaApiClient.getDriverAssets(user.id) }
                     summary = sumDeferred.await()
                     val asts = astsDeferred.await()
                     assets = asts
                     if (currentAssetId == null && asts.isNotEmpty()) {
-                        currentAssetId = asts.first().id
+                        currentAssetId = user.currentAssetId ?: asts.first().id
                     }
                 }
             } catch (e: Exception) {
@@ -618,11 +633,139 @@ fun DriverScreen(
                     }
                 }
 
+                // Кнопка перехода ко всей истории рейсов
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { showAllTripsModal = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Zinc300),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
+                    ) {
+                        Icon(Icons.Default.History, contentDescription = null, tint = Zinc700, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "📜 ВСЯ ИСТОРИЯ РЕЙСОВ",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Zinc900
+                        )
+                    }
+                }
+
                 item {
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }
+    }
+
+    // Модалка истории всех рейсов водителя
+    if (showAllTripsModal) {
+        AlertDialog(
+            onDismissRequest = { showAllTripsModal = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("История рейсов", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    IconButton(onClick = { showAllTripsModal = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Zinc500)
+                    }
+                }
+            },
+            text = {
+                if (isLoadingAllTrips) {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = SaldaOrangePrimary)
+                    }
+                } else if (allTrips.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                        Text("Рейсов пока нет", color = Zinc400, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 500.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(allTrips, key = { it.id }) { trip ->
+                            val orders = trip.tripOrders.filter { it.lifecycleStatus != "cancelled" }
+                            val rev = orders.sumOf { it.amount }
+                            val pay = orders.sumOf { it.driverPay }
+                            val isApproved = trip.lifecycleStatus == "approved"
+                            val isDraft = trip.lifecycleStatus == "draft"
+
+                            Card(
+                                onClick = {
+                                    showAllTripsModal = false
+                                    selectedTripIdForDetails = trip.id
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                border = CardDefaults.outlinedCardBorder(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Рейс №${trip.tripNumber} · ${trip.asset?.shortName ?: "Без авто"}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = Zinc900
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${trip.startedAt?.take(10) ?: ""} · Выручка: ${rev.toInt()} ₽",
+                                            fontSize = 11.sp,
+                                            color = Zinc500
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "ЗП: ${pay.toInt()} ₽",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = GreenOnline
+                                        )
+                                        Surface(
+                                            color = if (isApproved) GreenOnline.copy(alpha = 0.1f) else Color(0xFFFEF3C7),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isApproved) "Утверждён" else if (isDraft) "На проверке" else trip.lifecycleStatus,
+                                                color = if (isApproved) GreenOnline else Color(0xFFB45309),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAllTripsModal = false }) {
+                    Text("Закрыть", color = Zinc700)
+                }
+            }
+        )
     }
 
     // Модалка создания ПРР заказа
@@ -655,10 +798,11 @@ fun DriverScreen(
 
                         Card(
                             onClick = {
-                                currentAssetId = v.id
+                                val selectedId = v.id
+                                currentAssetId = selectedId
+                                showVehiclePicker = false
                                 scope.launch {
-                                    SaldaApiClient.switchDriverAsset(user.id, v.id)
-                                    showVehiclePicker = false
+                                    SaldaApiClient.switchDriverAsset(user.id, selectedId)
                                     refreshData()
                                 }
                             },

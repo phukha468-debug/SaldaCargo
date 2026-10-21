@@ -27,6 +27,54 @@ import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
 
+private fun computeOrderPayroll(
+    amount: Double,
+    direction: String,
+    isDriverLoader: Boolean,
+    isPrr: Boolean
+): Pair<Double, Double> {
+    if (amount <= 0.0) return Pair(0.0, 0.0)
+    val effDir = if (isPrr) "loaders_only" else direction
+    if (effDir == "ekb") return Pair(0.0, 0.0)
+
+    if (effDir == "loaders_only") {
+        val loaderPay = Math.round(amount * 0.7).toDouble()
+        return Pair(0.0, loaderPay)
+    }
+
+    val baseRate = when (effDir) {
+        "local" -> 1000.0
+        "n_salda" -> 1500.0
+        "n_salda_dam" -> 2000.0
+        "nikitino" -> 1500.0
+        "neloba" -> 2500.0
+        "basyanovka", "akinfievo" -> 4000.0
+        else -> 1000.0
+    }
+
+    val totalLoadersCount = if (isDriverLoader) 1 else 0
+    if (totalLoadersCount == 0) {
+        val carPay = Math.round(amount * 0.3).toDouble()
+        return Pair(carPay, 0.0)
+    }
+
+    val loaderUnitRate = 1000.0
+    val nominalRate = baseRate + totalLoadersCount * loaderUnitRate
+    val machinePool: Double
+    val loadersPool: Double
+    if (amount >= nominalRate) {
+        machinePool = Math.round(amount * (baseRate / nominalRate)).toDouble()
+        loadersPool = amount - machinePool
+    } else {
+        machinePool = minOf(amount, baseRate)
+        loadersPool = maxOf(0.0, amount - machinePool)
+    }
+
+    val carPay = Math.round(machinePool * 0.3).toDouble()
+    val loaderPay = Math.round(loadersPool * 0.7).toDouble()
+    return Pair(carPay, loaderPay)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripDetailScreen(
@@ -38,6 +86,8 @@ fun TripDetailScreen(
     var tripDetail by remember { mutableStateOf<TripDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val isPrr = tripDetail?.asset?.regNumber == "БЕЗ АВТО" || tripDetail?.tripType == "loaders_only"
 
     // Диалоги
     var showAddOrderDialog by remember { mutableStateOf(false) }
@@ -65,6 +115,18 @@ fun TripDetailScreen(
     var orderGeostroyDate by remember { mutableStateOf("") }
     var orderTerritoryAddress by remember { mutableStateOf("") }
     var orderTerritoryWork by remember { mutableStateOf("") }
+
+    fun recalculatePay(amtStr: String, dir: String, isLoader: Boolean) {
+        val amt = amtStr.toDoubleOrNull() ?: 0.0
+        if (dir == "ekb") return
+        val (carPay, loaderPay) = computeOrderPayroll(amt, dir, isLoader, isPrr)
+        val total = carPay + loaderPay
+        if (total > 0) {
+            orderPayInput = "${total.toInt()}"
+        } else if (amt == 0.0) {
+            orderPayInput = ""
+        }
+    }
 
     // Поля нового расхода
     var expenseAmountInput by remember { mutableStateOf("") }
@@ -198,7 +260,21 @@ fun TripDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Button(
-                                onClick = { showAddOrderDialog = true },
+                                onClick = {
+                                    if (isPrr) {
+                                        orderDirectionInput = "loaders_only"
+                                        isDriverLoaderChecked = true
+                                    } else {
+                                        orderDirectionInput = "local"
+                                        isDriverLoaderChecked = false
+                                    }
+                                    orderAmountInput = ""
+                                    orderPayInput = ""
+                                    orderDescInput = ""
+                                    selectedCounterpartyId = null
+                                    orderClientSearch = ""
+                                    showAddOrderDialog = true
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
                                 shape = RoundedCornerShape(10.dp)
@@ -686,16 +762,55 @@ fun TripDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf(
-                                "local" to "🏙️ По городу",
-                                "n_salda" to "Н. Салда",
-                                "tagil" to "Тагил",
-                                "ekb" to "Екб"
-                            ).forEach { (dir, label) ->
+                            val directions = if (isPrr) {
+                                listOf("loaders_only" to "👷 ПРР (без авто)")
+                            } else {
+                                listOf(
+                                    "local" to "🏙️ По городу",
+                                    "n_salda" to "Н. Салда",
+                                    "tagil" to "Тагил",
+                                    "ekb" to "Екб"
+                                )
+                            }
+                            directions.forEach { (dir, label) ->
                                 FilterChip(
                                     selected = orderDirectionInput == dir,
-                                    onClick = { orderDirectionInput = dir },
+                                    onClick = {
+                                        orderDirectionInput = dir
+                                        recalculatePay(orderAmountInput, dir, isDriverLoaderChecked)
+                                    },
                                     label = { Text(label, fontSize = 11.sp) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Водитель-грузчик (только для рейсов с автомобилем)
+                    if (!isPrr) {
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val next = !isDriverLoaderChecked
+                                        isDriverLoaderChecked = next
+                                        recalculatePay(orderAmountInput, orderDirectionInput, next)
+                                    }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("👷", fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Водитель — грузчик", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Zinc800)
+                                }
+                                Switch(
+                                    checked = isDriverLoaderChecked,
+                                    onCheckedChange = { next ->
+                                        isDriverLoaderChecked = next
+                                        recalculatePay(orderAmountInput, orderDirectionInput, next)
+                                    }
                                 )
                             }
                         }
@@ -820,10 +935,7 @@ fun TripDetailScreen(
                             value = orderAmountInput,
                             onValueChange = {
                                 orderAmountInput = it
-                                val amt = it.toDoubleOrNull() ?: 0.0
-                                if (orderPayInput.isBlank() || orderPayInput == "0") {
-                                    orderPayInput = "${(amt * 0.25).toInt()}"
-                                }
+                                recalculatePay(it, orderDirectionInput, isDriverLoaderChecked)
                             },
                             label = { Text("Сумма заказа (₽)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -834,7 +946,8 @@ fun TripDetailScreen(
                         OutlinedTextField(
                             value = orderPayInput,
                             onValueChange = { orderPayInput = it },
-                            label = { Text("ЗП водителя (₽)") },
+                            label = { Text("ЗП водителя (₽) — авторасчёт") },
+                            placeholder = { Text("Рассчитывается автоматически") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
@@ -872,7 +985,9 @@ fun TripDetailScreen(
                 Button(
                     onClick = {
                         val amt = orderAmountInput.toDoubleOrNull() ?: return@Button
-                        val pay = orderPayInput.toDoubleOrNull() ?: (amt * 0.25)
+                        val (defCarPay, defLoaderPay) = computeOrderPayroll(amt, orderDirectionInput, isDriverLoaderChecked, isPrr)
+                        val totalDefPay = defCarPay + defLoaderPay
+                        val pay = orderPayInput.toDoubleOrNull() ?: (if (totalDefPay > 0) totalDefPay else (if (isPrr) amt * 0.7 else amt * 0.3))
                         val finalDesc = when {
                             isGeostroy -> "МАРШРУТ: $orderGeostroyRoute ДАТА НАЧАЛА: $orderGeostroyDate"
                             isTerritory -> "АДРЕС: $orderTerritoryAddress РАБОТА: $orderTerritoryWork"
@@ -890,6 +1005,9 @@ fun TripDetailScreen(
                                 direction = orderDirectionInput,
                                 paymentMethod = orderPaymentMethodInput,
                                 counterpartyId = selectedCounterpartyId,
+                                driverCarPay = defCarPay,
+                                driverLoaderPay = defLoaderPay,
+                                isDriverLoader = isDriverLoaderChecked,
                                 userId = userId
                             )
                             isSubmitting = false

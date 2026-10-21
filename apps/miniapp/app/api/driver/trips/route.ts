@@ -4,9 +4,10 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 /** GET /api/driver/trips — история рейсов текущего водителя */
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies();
-  const driverId = cookieStore.get('salda_user_id')?.value;
+  const driverId =
+    request.headers.get('x-salda-user-id') || cookieStore.get('salda_user_id')?.value;
 
   if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -20,7 +21,7 @@ export async function GET() {
        trip_orders(amount, driver_pay, lifecycle_status)`,
     )
     .eq('driver_id', driverId)
-    .eq('lifecycle_status', 'approved')
+    .neq('lifecycle_status', 'cancelled')
     .order('started_at', { ascending: false }) as any);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

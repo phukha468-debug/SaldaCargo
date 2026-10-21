@@ -118,6 +118,15 @@ object SaldaApiClient {
         }
     }
 
+    suspend fun getDriverTrips(driverId: String): List<TripSummaryItem> = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/driver/trips", userId = driverId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext emptyList()
+            val body = response.body?.string() ?: "[]"
+            json.decodeFromString<List<TripSummaryItem>>(body)
+        }
+    }
+
     suspend fun getDriverAssets(driverId: String? = null, forceRefresh: Boolean = false): List<Asset> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         if (!forceRefresh) {
@@ -207,12 +216,29 @@ object SaldaApiClient {
         direction: String = "local",
         paymentMethod: String = "cash",
         counterpartyId: String? = null,
+        driverCarPay: Double = 0.0,
+        driverLoaderPay: Double = 0.0,
+        isDriverLoader: Boolean = false,
+        loadersData: List<LoaderPayItem> = emptyList(),
         userId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         cachedDriverSummary = null
+        val loadersArray = kotlinx.serialization.json.buildJsonArray {
+            loadersData.forEach { l ->
+                add(buildJsonObject {
+                    put("id", l.id ?: "")
+                    put("name", l.name ?: "Грузчик")
+                    put("pay", l.pay)
+                })
+            }
+        }
         val body = buildJsonObject {
             put("amount", amount.toString())
             put("driver_pay", driverPay.toString())
+            put("driver_car_pay", driverCarPay.toString())
+            put("driver_loader_pay", driverLoaderPay.toString())
+            put("is_driver_loader", isDriverLoader)
+            put("loaders_data", loadersArray)
             put("direction", direction)
             put("payment_method", paymentMethod)
             put("idempotency_key", UUID.randomUUID().toString())
