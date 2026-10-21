@@ -46,6 +46,12 @@ export type AtiOrder = {
   payment_terms: string;
   postal_address?: string;
   postal_tracking_number?: string;
+  // Документооборот
+  docs_sent?: boolean;
+  docs_sent_date?: string | null;
+  docs_received?: boolean;
+  docs_received_date?: string | null;
+  payment_promised_date?: string | null;
   // Отмена и срыв
   is_cancelled?: boolean;
   cancel_reason?: string;
@@ -146,10 +152,16 @@ export async function GET(request?: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    let orders: AtiOrder[] = (rawOrders || []).map((row: any) => ({
-      id: row.id,
-      ...row.new_values,
-    }));
+    let orders: AtiOrder[] = (rawOrders || []).map((row: any) => {
+      const v = row.new_values || {};
+      let stage = Number(v.stage ?? 1);
+      if (stage === 8) stage = 7;
+      return {
+        id: row.id,
+        ...v,
+        stage,
+      };
+    });
 
     // Если база пуста — создаем сид заявки № 001
     if (orders.length === 0) {

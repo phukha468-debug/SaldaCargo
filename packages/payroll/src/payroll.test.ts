@@ -241,4 +241,33 @@ assert(t18.loaderPayEach === 2100, 'T18 loaderPayEach should be 2100');
 assert(t18.totalLoadersPay === 2100, 'T18 totalLoadersPay should be 2100');
 assert(t18.companyShare === 900, 'T18 companyShare should be 900');
 
+// 19. ПРР (без авто): 2 000 ₽, водитель сам выполнил разгрузку (isDriverLoader = true, без сторонних грузчиков)
+const t19 = calculateOrderPayroll({
+  direction: 'loaders_only',
+  amount: 2000,
+  isDriverLoader: true,
+  loadersCount: 0,
+});
+console.log('T19 (2000 PRR no vehicle, driver alone as loader):', t19);
+assert(t19.driverCarPay === 0, 'T19 driverCarPay should be 0');
+assert(t19.driverLoaderPay === 1400, 'T19 driverLoaderPay should be 1400 (70% of 2000)');
+assert(t19.driverTotalPay === 1400, 'T19 driverTotalPay should be 1400');
+assert(t19.totalLoadersPay === 0, 'T19 totalLoadersPay should be 0');
+assert(t19.companyShare === 600, 'T19 companyShare should be 600 (30% of 2000)');
+
+// 20. ПРР (без авто): 3 000 ₽, водитель + 1 сторонний грузчик
+const t20 = calculateOrderPayroll({
+  direction: 'loaders_only',
+  amount: 3000,
+  isDriverLoader: true,
+  loadersCount: 1,
+});
+console.log('T20 (3000 PRR no vehicle, driver + 1 loader):', t20);
+assert(t20.driverCarPay === 0, 'T20 driverCarPay should be 0');
+assert(t20.driverLoaderPay === 1050, 'T20 driverLoaderPay should be 1050 (70% of 1500)');
+assert(t20.driverTotalPay === 1050, 'T20 driverTotalPay should be 1050');
+assert(t20.loaderPayEach === 1050, 'T20 loaderPayEach should be 1050');
+assert(t20.totalLoadersPay === 1050, 'T20 totalLoadersPay should be 1050');
+assert(t20.companyShare === 900, 'T20 companyShare should be 900 (30% of 3000)');
+
 console.log('ALL PAYROLL TESTS PASSED SUCCESSFULLY! ✅');

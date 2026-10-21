@@ -34,6 +34,7 @@ interface CreatePrrModalProps {
   onClose: () => void;
   onSuccess?: (data: any) => void;
   defaultCreatorId?: string;
+  creatorName?: string;
   role?: 'driver' | 'mechanic' | 'admin';
 }
 
@@ -66,6 +67,7 @@ export function CreatePrrModal({
   onClose,
   onSuccess,
   defaultCreatorId,
+  creatorName,
   role = 'driver',
 }: CreatePrrModalProps) {
   const queryClient = useQueryClient();
@@ -105,6 +107,29 @@ export function CreatePrrModal({
     staleTime: 10 * 60 * 1000,
     enabled: isOpen,
   });
+
+  const availableWorkers = useMemo(() => {
+    const list = [...allLoaders];
+    if (defaultCreatorId && !list.some((l) => l.id === defaultCreatorId)) {
+      list.unshift({
+        id: defaultCreatorId,
+        name: creatorName ? `${creatorName} (Я)` : 'Я (водитель)',
+      });
+    }
+    return list;
+  }, [allLoaders, defaultCreatorId, creatorName]);
+
+  // Если открывает водитель, по умолчанию выбираем его самого как исполнителя
+  useEffect(() => {
+    if (isOpen && role === 'driver' && defaultCreatorId && selectedLoaders.length === 0) {
+      setSelectedLoaders([
+        {
+          id: defaultCreatorId,
+          name: creatorName ? `${creatorName} (Я)` : 'Я (водитель)',
+        },
+      ]);
+    }
+  }, [isOpen, role, defaultCreatorId, creatorName, selectedLoaders.length]);
 
   // По умолчанию выбираем "Частный клиент"
   useEffect(() => {
@@ -532,12 +557,12 @@ export function CreatePrrModal({
 
             {/* Список всех грузчиков (чипы / чекбоксы) */}
             <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 border border-zinc-200 rounded-xl bg-zinc-50/50">
-              {allLoaders.length === 0 ? (
+              {availableWorkers.length === 0 ? (
                 <div className="col-span-2 p-3 text-xs text-zinc-400 text-center font-bold">
-                  Загрузка списка грузчиков...
+                  Загрузка списка исполнителей...
                 </div>
               ) : (
-                allLoaders.map((loader) => {
+                availableWorkers.map((loader) => {
                   const isChecked = selectedLoaders.some((l) => l.id === loader.id);
                   return (
                     <button

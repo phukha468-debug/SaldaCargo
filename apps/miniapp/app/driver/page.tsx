@@ -153,15 +153,7 @@ export default function RootPage() {
     staleTime: 300000,
   });
 
-  const isPrrAdmin =
-    (user?.roles || []).includes('admin') ||
-    (user?.roles || []).includes('owner') ||
-    Boolean(user?.name && /Нигамед|Шахмаев|Роман.*Радик|Радикович/i.test(user.name));
-
-  const availableVehicles = vehicles.filter((v) => {
-    const isPrr = v.reg_number === 'БЕЗ АВТО' || v.short_name?.toLowerCase().includes('без авто');
-    return isPrr ? isPrrAdmin : true;
-  });
+  const availableVehicles = vehicles;
 
   useEffect(() => {
     if (!isUserLoading) {
@@ -376,16 +368,14 @@ export default function RootPage() {
           </button>
         )}
 
-        {isPrrAdmin && (
-          <button
-            type="button"
-            onClick={() => setShowPrrModal(true)}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl py-3.5 text-sm font-black shadow-md active:scale-[0.98] transition-all uppercase tracking-wider"
-          >
-            <span>👷</span>
-            <span>+ ПРР заказ (без авто)</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setShowPrrModal(true)}
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl py-3.5 text-sm font-black shadow-md active:scale-[0.98] transition-all uppercase tracking-wider"
+        >
+          <span>👷</span>
+          <span>+ ПРР заказ (без авто)</span>
+        </button>
       </div>
 
       {startTripError && (
@@ -520,6 +510,7 @@ export default function RootPage() {
           isOpen={showPrrModal}
           onClose={() => setShowPrrModal(false)}
           defaultCreatorId={user?.id}
+          creatorName={user?.name}
           role="driver"
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['driver-summary'] });

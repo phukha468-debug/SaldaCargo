@@ -6,7 +6,7 @@
  *
  * Выполняет 2 автоматические задачи:
  * 1. 1-го числа каждого месяца в автоматическом режиме создаёт запись налога за
- *    официальное трудоустройство (10 000 ₽) в долг сотрудника (ADVANCE_CATEGORY_ID).
+ *    официальное трудоустройство (с ноября 2026 — 5 000 ₽, ранее 10 000 ₽) в долг сотрудника (ADVANCE_CATEGORY_ID).
  *    Эта сумма автоматически вычитается из сдельных рейсов водителя при расчёте выплаты.
  *
  * 2. В назначенный день выплаты (например, 25-е или 10-е число месяца) автоматически
@@ -116,11 +116,13 @@ async function handleOfficialPayrollCron(req: NextRequest) {
 
     // ──────────────────────────────────────────────────────────────────────────
     // ЗАДАЧА 1: 1-е число месяца — Автоматическое начисление долгов сотрудникам:
-    // 1) Налог за официальное трудоустройство ТК РФ (10 000 ₽)
+    // 1) Налог за официальное трудоустройство ТК РФ (с ноября 2026 — 5 000 ₽, ранее 10 000 ₽)
     // 2) Долги по исполнительным листам (алименты и ФССП) — вместо разделения по дням!
     // ──────────────────────────────────────────────────────────────────────────
     if (currentDay === 1 || searchParams.get('force_accrual') === 'true') {
-      const MONTHLY_TAX_AMOUNT = 10000; // Каждый сотрудник с официальной ЗП платит 10 000 ₽ в счёт компании за налоги
+      // С ноября 2026 года начисление за официальное трудоустройство снижено с 10 000 до 5 000 ₽
+      const isBeforeNov2026 = currentYear < 2026 || (currentYear === 2026 && currentMonth < 10);
+      const MONTHLY_TAX_AMOUNT = isBeforeNov2026 ? 10000 : 5000;
 
       const { data: adminUser } = await (supabase as any)
         .from('users')
@@ -136,7 +138,7 @@ async function handleOfficialPayrollCron(req: NextRequest) {
       let totalTaxAccrued = 0;
       let totalCourtAccrued = 0;
 
-      // 1.1 Начисление налога ТК РФ (10 000 ₽)
+      // 1.1 Начисление налога ТК РФ (5 000 ₽)
       for (const user of officialList) {
         // Проверяем, нет ли уже начисления налога за этот месяц
         const { data: existingTax } = await (supabase as any)
@@ -311,8 +313,14 @@ async function handleOfficialPayrollCron(req: NextRequest) {
       officialList.length > 0
     ) {
       const nextMonthName = MONTH_NAMES_RU[tomorrow.getMonth()] ?? 'месяца';
-      const totalTax = officialList.length * 10000;
-      const taxLines = officialList.map((u) => `• 👤 ${u.name} — 10 000 ₽`);
+      const isTomorrowBeforeNov2026 =
+        tomorrow.getFullYear() < 2026 ||
+        (tomorrow.getFullYear() === 2026 && tomorrow.getMonth() < 10);
+      const taxAmount = isTomorrowBeforeNov2026 ? 10000 : 5000;
+      const totalTax = officialList.length * taxAmount;
+      const taxLines = officialList.map(
+        (u) => `• 👤 ${u.name} — ${taxAmount.toLocaleString('ru-RU')} ₽`,
+      );
 
       const courtUsers = officialList.filter((u) => u.has_court_orders);
       let totalCourt = 0;
@@ -328,7 +336,7 @@ async function handleOfficialPayrollCron(req: NextRequest) {
       const preAlertParts: string[] = [
         `📢 НАПОМИНАНИЕ: ЗАВТРА 1 ${nextMonthName.toUpperCase()} — НАЧИСЛЕНИЕ ДОЛГОВ ПО СОТРУДНИКАМ`,
         `Завтра в 09:00 МСК в систему будет автоматически начислено в долг сотрудникам:`,
-        `🏛️ НАЛОГ ТК РФ (10 000 ₽):\n${taxLines.join('\n')}\nВсего налог: ${totalTax.toLocaleString('ru-RU')} ₽`,
+        `🏛️ НАЛОГ ТК РФ (${taxAmount.toLocaleString('ru-RU')} ₽):\n${taxLines.join('\n')}\nВсего налог: ${totalTax.toLocaleString('ru-RU')} ₽`,
       ];
 
       if (courtLines.length > 0) {
@@ -428,12 +436,16 @@ async function handleOfficialPayrollCron(req: NextRequest) {
           );
         }
 
+        const isCurrentBeforeNov2026 =
+          currentYear < 2026 || (currentYear === 2026 && currentMonth < 10);
+        const currentTaxAmount = isCurrentBeforeNov2026 ? 10000 : 5000;
+
         messageParts.push(
           `📊 СВОДНЫЙ РАСЧЁТ:\n` +
             `• Всего официальная часть: ${totalSalary.toLocaleString('ru-RU')} ₽\n` +
             `• ➜ Водителям на карты: ${totalDriversPay.toLocaleString('ru-RU')} ₽\n` +
             `• ➜ Приставам (ФССП / Алименты): ${totalCourtPay.toLocaleString('ru-RU')} ₽\n\n` +
-            `ℹ️ Долг сотрудников перед компанией (налог 10 000 ₽ + алименты/ФССП) уже начислен 1-го числа в системе и удерживается из сдельной оплаты за рейсы (без разделения по дням).`,
+            `ℹ️ Долг сотрудников перед компанией (налог ${currentTaxAmount.toLocaleString('ru-RU')} ₽ + алименты/ФССП) уже начислен 1-го числа в системе и удерживается из сдельной оплаты за рейсы (без разделения по дням).`,
         );
 
         // 1. Компактный красный блок предупреждения ФССП

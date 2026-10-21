@@ -22,7 +22,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const currentValues = current.new_values || {};
-    const newStage = body.stage !== undefined ? Number(body.stage) : currentValues.stage;
+    let newStage = body.stage !== undefined ? Number(body.stage) : currentValues.stage;
+    if (newStage === 8) newStage = 7;
 
     const updatedValues = {
       ...currentValues,
@@ -30,6 +31,43 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       stage: newStage,
       updated_at: new Date().toISOString(),
     };
+
+    // Автоматическая обработка статусов документооборота
+    if (body.postal_tracking_number !== undefined) {
+      const track = String(body.postal_tracking_number).trim();
+      updatedValues.postal_tracking_number = track;
+      if (track) {
+        // При вводе кода отправления ставится галочка о выполнении и дата
+        updatedValues.docs_sent = true;
+        if (!updatedValues.docs_sent_date) {
+          updatedValues.docs_sent_date = new Date().toISOString().split('T')[0];
+        }
+      }
+    }
+
+    if (body.docs_sent !== undefined) {
+      updatedValues.docs_sent = Boolean(body.docs_sent);
+      if (updatedValues.docs_sent && !updatedValues.docs_sent_date) {
+        updatedValues.docs_sent_date =
+          body.docs_sent_date || new Date().toISOString().split('T')[0];
+      } else if (!updatedValues.docs_sent) {
+        updatedValues.docs_sent_date = null;
+      }
+    }
+
+    if (body.docs_received !== undefined) {
+      updatedValues.docs_received = Boolean(body.docs_received);
+      if (updatedValues.docs_received && !updatedValues.docs_received_date) {
+        updatedValues.docs_received_date =
+          body.docs_received_date || new Date().toISOString().split('T')[0];
+      } else if (!updatedValues.docs_received) {
+        updatedValues.docs_received_date = null;
+      }
+    }
+
+    if (body.payment_promised_date !== undefined) {
+      updatedValues.payment_promised_date = body.payment_promised_date || null;
+    }
 
     // Если заявка сорвана / отменена
     if (body.is_cancelled) {
@@ -182,40 +220,55 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    // 2. Интеграция с Дебиторкой:
+    // 2. Интеграция с Дебиторкой (Этап 6: Ожидание оплаты / Дебиторка):
     if (
-      newStage === 7 &&
+      (newStage === 6 || newStage === 7) &&
       currentValues.counterparty_id &&
       updatedValues.price > 0 &&
       !updatedValues.is_cancelled
     ) {
-      try {
-        const atiRefDesc = `АТИ Заявка ${updatedValues.order_number}`;
-        const { data: existingRec } = await (supabase.from('manual_receivables') as any)
-          .select('id')
-          .eq('counterparty_id', currentValues.counterparty_id)
-          .ilike('description', `%${updatedValues.order_number}%`)
-          .limit(1);
+      if (newStage === 6) {
+        try {
+          const atiRefDesc = `АТИ Заявка ${updatedValues.order_number}`;
 
-        if (!existingRec || existingRec.length === 0) {
-          await (supabase.from('manual_receivables') as any).insert({
-            counterparty_id: currentValues.counterparty_id,
-            amount: updatedValues.price,
-            date: new Date().toISOString().split('T')[0],
-            description: atiRefDesc,
-            settled: false,
-          });
+          // Проверяем: есть ли уже заказ в trip_orders по этому контрагенту и этой сумме (чтобы не дублировать рейс, напр. рейс 840!)
+          const { data: existingTripOrders } = await (supabase.from('trip_orders') as any)
+            .select('id, trip_id, amount')
+            .eq('counterparty_id', currentValues.counterparty_id)
+            .eq('amount', updatedValues.price)
+            .neq('settlement_status', 'settled')
+            .limit(1);
+
+          const hasTripOrder = existingTripOrders && existingTripOrders.length > 0;
+
+          // Проверяем: есть ли уже запись в manual_receivables
+          const { data: existingRec } = await (supabase.from('manual_receivables') as any)
+            .select('id')
+            .eq('counterparty_id', currentValues.counterparty_id)
+            .ilike('description', `%${updatedValues.order_number}%`)
+            .limit(1);
+
+          // Вставляем в manual_receivables ТОЛЬКО если долга еще нет в рейсах и нет в ручных записях!
+          if (!hasTripOrder && (!existingRec || existingRec.length === 0)) {
+            await (supabase.from('manual_receivables') as any).insert({
+              counterparty_id: currentValues.counterparty_id,
+              amount: updatedValues.price,
+              date: new Date().toISOString().split('T')[0],
+              description: atiRefDesc,
+              settled: false,
+            });
+          }
+        } catch (recErr) {
+          console.warn('Warning: could not sync manual_receivables for ATI order:', recErr);
         }
-      } catch (recErr) {
-        console.warn('Warning: could not sync manual_receivables for ATI order:', recErr);
       }
     }
 
-    // Если переведена на этап 8 (Оплачено) — закрываем в дебиторке
-    if (newStage === 8 && currentValues.counterparty_id) {
+    // Если переведена на этап 7 (Оплачено) — закрываем в дебиторке
+    if (newStage === 7 && currentValues.counterparty_id) {
       try {
         await (supabase.from('manual_receivables') as any)
-          .update({ settled: true })
+          .update({ settled: true, settled_at: new Date().toISOString() })
           .eq('counterparty_id', currentValues.counterparty_id)
           .ilike('description', `%${updatedValues.order_number}%`);
       } catch (recCloseErr) {

@@ -1,231 +1,64 @@
 package ru.ancargo66.app
 
-import android.annotation.SuppressLint
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
-import android.view.View
-import android.webkit.*
-import android.widget.Button
-import android.widget.LinearLayout
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import java.io.File
-import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.*
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import ru.ancargo66.app.core.model.User
+import ru.ancargo66.app.core.storage.SessionManager
+import ru.ancargo66.app.features.auth.LoginScreen
+import ru.ancargo66.app.features.dispatcher.DispatcherScreen
+import ru.ancargo66.app.features.driver.DriverScreen
+import ru.ancargo66.app.features.loader.LoaderScreen
+import ru.ancargo66.app.features.mechanic.MechanicScreen
+import ru.ancargo66.app.ui.theme.SaldaCargoTheme
 
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var webView: WebView
-    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
-    private lateinit var errorContainer: LinearLayout
-    private lateinit var btnRetry: Button
-
-    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
-    private var cameraPhotoUri: Uri? = null
-
-    companion object {
-        const val APP_URL = "https://app.tk501.ru"
-        const val FALLBACK_APP_URL = "https://app.ancargo66.ru"
-    }
-
-    private val fileChooserLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val callback = fileChooserCallback ?: return@registerForActivityResult
-        var results: Array<Uri>? = null
-
-        if (result.resultCode == RESULT_OK) {
-            val data = result.data
-            if (data?.data != null) {
-                results = arrayOf(data.data!!)
-            } else if (cameraPhotoUri != null) {
-                results = arrayOf(cameraPhotoUri!!)
-            }
-        }
-        callback.onReceiveValue(results)
-        fileChooserCallback = null
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        enableEdgeToEdge()
 
-        webView = findViewById(R.id.webView)
-        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
-        errorContainer = findViewById(R.id.errorContainer)
-        btnRetry = findViewById(R.id.btnRetry)
+        val sessionManager = SessionManager(applicationContext)
 
-        setupWebView()
-        setupBackHandler()
+        setContent {
+            SaldaCargoTheme {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.background
+                ) { innerPadding ->
+                    var currentUser by remember { mutableStateOf(sessionManager.getCurrentUser()) }
+                    var activeRole by remember { mutableStateOf(sessionManager.getActiveRole()) }
 
-        swipeRefreshLayout.setColorSchemeResources(R.color.primary)
-        swipeRefreshLayout.setOnRefreshListener {
-            webView.reload()
-        }
+                    val onLogout = {
+                        sessionManager.clear()
+                        currentUser = null
+                    }
 
-        btnRetry.setOnClickListener {
-            showLoading()
-            webView.loadUrl(APP_URL)
-        }
-
-        if (savedInstanceState == null) {
-            webView.loadUrl(APP_URL)
-        } else {
-            webView.restoreState(savedInstanceState)
-        }
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun setupWebView() {
-        val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
-        settings.allowFileAccess = true
-        settings.mediaPlaybackRequiresUserGesture = false
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
-
-        val cookieManager = CookieManager.getInstance()
-        cookieManager.setAcceptCookie(true)
-        cookieManager.setAcceptThirdPartyCookies(webView, true)
-
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url?.toString() ?: return false
-                if (url.startsWith(APP_URL) || url.startsWith(FALLBACK_APP_URL) || url.startsWith("https://tk501.ru") || url.startsWith("https://ancargo66.ru")) {
-                    return false
-                }
-                if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("whatsapp:")) {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        startActivity(intent)
-                        return true
-                    } catch (_: Exception) {}
-                }
-                return false
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                swipeRefreshLayout.isRefreshing = false
-                cookieManager.flush()
-                showContent()
-            }
-
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: WebResourceError?
-            ) {
-                super.onReceivedError(view, request, error)
-                if (request?.isForMainFrame == true) {
-                    swipeRefreshLayout.isRefreshing = false
-                    showError()
+                    val user = currentUser
+                    if (user == null) {
+                        LoginScreen(
+                            onLoginSuccess = { loggedUser, role ->
+                                sessionManager.saveUser(loggedUser, role)
+                                activeRole = role
+                                currentUser = loggedUser
+                            }
+                        )
+                    } else {
+                        when (activeRole) {
+                            "driver" -> DriverScreen(user = user, onLogout = onLogout)
+                            "loader" -> LoaderScreen(user = user, sessionManager = sessionManager, onLogout = onLogout)
+                            "mechanic" -> MechanicScreen(user = user, onLogout = onLogout)
+                            else -> DispatcherScreen(user = user, onLogout = onLogout)
+                        }
+                    }
                 }
             }
         }
-
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
-            ): Boolean {
-                fileChooserCallback?.onReceiveValue(null)
-                fileChooserCallback = filePathCallback
-
-                val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                var photoFile: File? = null
-                try {
-                    photoFile = createImageFile()
-                } catch (ex: IOException) {
-                    ex.printStackTrace()
-                }
-
-                if (photoFile != null) {
-                    cameraPhotoUri = FileProvider.getUriForFile(
-                        this@MainActivity,
-                        "${applicationContext.packageName}.fileprovider",
-                        photoFile
-                    )
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
-                }
-
-                val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*"
-                    putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "application/pdf"))
-                }
-
-                val intentArray: Array<Intent> = if (photoFile != null) {
-                    arrayOf(takePictureIntent)
-                } else {
-                    emptyArray()
-                }
-
-                val chooserIntent = Intent(Intent.ACTION_CHOOSER).apply {
-                    putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
-                    putExtra(Intent.EXTRA_TITLE, "Выберите файл или сделайте фото")
-                    putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray)
-                }
-
-                fileChooserLauncher.launch(chooserIntent)
-                return true
-            }
-        }
-    }
-
-    private fun createImageFile(): File {
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val storageDir: File = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
-        return File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
-    }
-
-    private fun setupBackHandler() {
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                } else {
-                    moveTaskToBack(true) // Minimize app instead of killing
-                }
-            }
-        })
-    }
-
-    private fun showContent() {
-        errorContainer.visibility = View.GONE
-        swipeRefreshLayout.visibility = View.VISIBLE
-    }
-
-    private fun showError() {
-        swipeRefreshLayout.visibility = View.GONE
-        errorContainer.visibility = View.VISIBLE
-    }
-
-    private fun showLoading() {
-        swipeRefreshLayout.isRefreshing = true
-        errorContainer.visibility = View.GONE
-        swipeRefreshLayout.visibility = View.VISIBLE
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        webView.saveState(outState)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        CookieManager.getInstance().flush()
     }
 }

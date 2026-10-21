@@ -8,7 +8,7 @@ export type AtiOrder = {
   id: string;
   order_number: string;
   order_date: string;
-  stage: number; // 1..8
+  stage: number; // 1..7 (без промежуточного блока 'в пути')
   doc_type: 'etrn' | 'paper';
   counterparty_id?: string | null;
   counterparty_name: string;
@@ -42,6 +42,11 @@ export type AtiOrder = {
   payment_terms: string;
   postal_address?: string;
   postal_tracking_number?: string;
+  docs_sent?: boolean;
+  docs_sent_date?: string | null;
+  docs_received?: boolean;
+  docs_received_date?: string | null;
+  payment_promised_date?: string | null;
   is_cancelled?: boolean;
   cancel_reason?: string;
   cancelled_at?: string;
@@ -72,7 +77,7 @@ type ApiResponse = {
   drivers: { id: string; name: string; phone?: string }[];
 };
 
-// Конфигурация 8 этапов
+// Конфигурация 7 этапов (лишний блок 'в пути' исключён)
 const STAGE_CONFIG: Record<
   number,
   {
@@ -109,48 +114,39 @@ const STAGE_CONFIG: Record<
     colorDot: 'bg-amber-500',
     bgHeader: 'bg-amber-50/80',
     borderCol: 'border-amber-200',
-    btnForward: 'В путь →',
+    btnForward: 'На выгрузку →',
     btnClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black',
   },
   4: {
-    title: '4. В пути на выгрузку',
-    shortTitle: '4. В пути',
-    colorDot: 'bg-blue-600',
-    bgHeader: 'bg-blue-50/80',
-    borderCol: 'border-blue-200',
-    btnForward: 'На выгрузку →',
-    btnClass: 'bg-blue-600 hover:bg-blue-500 text-white',
-  },
-  5: {
-    title: '5. Выгрузка & Сдача рейса',
-    shortTitle: '5. Выгрузка',
+    title: '4. Выгрузка & Сдача рейса',
+    shortTitle: '4. Выгрузка',
     colorDot: 'bg-indigo-600',
     bgHeader: 'bg-indigo-50/80',
     borderCol: 'border-indigo-200',
     btnForward: 'В документы →',
     btnClass: 'bg-indigo-600 hover:bg-indigo-500 text-white',
   },
-  6: {
-    title: '6. Документооборот (ЭДО / Почта)',
-    shortTitle: '6. Документы',
+  5: {
+    title: '5. Документооборот (ЭДО / Почта)',
+    shortTitle: '5. Документы',
     colorDot: 'bg-purple-600',
     bgHeader: 'bg-purple-50/80',
     borderCol: 'border-purple-200',
-    btnForward: 'В Дебиторку →',
+    btnForward: 'В оплату →',
     btnClass: 'bg-purple-600 hover:bg-purple-500 text-white',
   },
-  7: {
-    title: '7. Дебиторка (Ожидание оплаты)',
-    shortTitle: '7. Дебиторка',
+  6: {
+    title: '6. Ожидание оплаты (Дебиторка)',
+    shortTitle: '6. Дебиторка',
     colorDot: 'bg-rose-600',
     bgHeader: 'bg-rose-50/80',
     borderCol: 'border-rose-200',
     btnForward: '✓ Оплачено на Р/С',
     btnClass: 'bg-emerald-600 hover:bg-emerald-500 text-white',
   },
-  8: {
-    title: '8. Оплачено и закрыто',
-    shortTitle: '8. Оплачено',
+  7: {
+    title: '7. Оплачено и закрыто',
+    shortTitle: '7. Оплачено',
     colorDot: 'bg-emerald-600',
     bgHeader: 'bg-emerald-50/80',
     borderCol: 'border-emerald-200',
@@ -283,25 +279,32 @@ export default function AtiPage() {
     },
   });
 
-  // Мутация сохранения трек-номера Почты РФ
-  const updateTrackingMutation = useMutation({
+  // Мутация сохранения трек-номера Почты РФ и статусов документооборота
+  const updateDocFieldsMutation = useMutation({
     mutationFn: async ({
       id,
-      postal_tracking_number,
+      ...fields
     }: {
       id: string;
-      postal_tracking_number: string;
+      postal_tracking_number?: string;
+      docs_sent?: boolean;
+      docs_sent_date?: string | null;
+      docs_received?: boolean;
+      docs_received_date?: string | null;
+      payment_promised_date?: string | null;
+      stage?: number;
     }) => {
       const res = await fetch(`/api/ati/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postal_tracking_number }),
+        body: JSON.stringify(fields),
       });
-      if (!res.ok) throw new Error('Ошибка сохранения трек-номера');
+      if (!res.ok) throw new Error('Ошибка обновления статуса документов');
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ati-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
     },
   });
 
@@ -487,18 +490,17 @@ export default function AtiPage() {
     5: [],
     6: [],
     7: [],
-    8: [],
   };
 
   for (const ord of filteredOrders) {
-    const st = ord.stage >= 1 && ord.stage <= 8 ? ord.stage : 1;
+    const st = ord.stage >= 1 && ord.stage <= 7 ? ord.stage : 1;
     ordersByStage[st]?.push(ord);
   }
 
   // Общая сумма активных
   const totalFreight = activeOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
   const inReceivables = activeOrders
-    .filter((o) => o.stage === 7)
+    .filter((o) => o.stage === 6)
     .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
 
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -849,8 +851,8 @@ export default function AtiPage() {
           Загрузка канбан-доски АТИ...
         </div>
       ) : (
-        <div className="grid grid-cols-8 gap-1.5 w-full items-start">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((stageNum) => {
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-1.5 w-full items-start">
+          {[1, 2, 3, 4, 5, 6, 7].map((stageNum) => {
             const cfg = STAGE_CONFIG[stageNum];
             if (!cfg) return null;
             const colOrders = ordersByStage[stageNum] || [];
@@ -946,39 +948,165 @@ export default function AtiPage() {
                           </span>
                         </div>
 
-                        {/* На этапе 6 (Документы) — ввод трек-номера для Почты РФ */}
-                        {stageNum === 6 && order.doc_type === 'paper' && (
+                        {/* На этапе 5 (Документы) — полный блок документооборота */}
+                        {stageNum === 5 && (
                           <div
-                            className="space-y-0.5 pt-1 border-t border-purple-100"
+                            className="space-y-1.5 pt-1.5 border-t border-purple-200 bg-purple-50/60 p-2 rounded-lg"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <span className="text-[9px] font-bold text-slate-500 block">
-                              Трек Почты РФ:
-                            </span>
-                            <input
-                              type="text"
-                              defaultValue={order.postal_tracking_number || ''}
-                              onBlur={(e) =>
-                                updateTrackingMutation.mutate({
-                                  id: order.id,
-                                  postal_tracking_number: e.target.value.trim(),
-                                })
-                              }
-                              placeholder="620000..."
-                              className="w-full px-1.5 py-0.5 border border-purple-300 rounded text-[10px] font-mono font-bold bg-purple-50/40"
-                            />
+                            <div className="text-[10px] font-black text-purple-950 uppercase tracking-wider flex items-center justify-between">
+                              <span>📄 Документооборот</span>
+                              <span className="text-[9px] font-bold text-purple-700 font-mono">
+                                {order.doc_type === 'paper' ? '📮 Почта / СДЭК' : '⚡ ЭТрН / ЭДО'}
+                              </span>
+                            </div>
+
+                            {/* 1. Галочка «Документы отправлены» + «Код отправления» */}
+                            <div className="space-y-1 bg-white/95 p-1.5 rounded border border-purple-200">
+                              <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-800 select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(order.docs_sent)}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    updateDocFieldsMutation.mutate({
+                                      id: order.id,
+                                      docs_sent: checked,
+                                      docs_sent_date: checked
+                                        ? order.docs_sent_date ||
+                                          new Date().toISOString().split('T')[0]
+                                        : null,
+                                    });
+                                  }}
+                                  className="rounded border-purple-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                                />
+                                <span>Документы отправлены</span>
+                                {order.docs_sent_date && (
+                                  <span className="text-[9px] font-mono font-bold text-purple-700 bg-purple-100 px-1 py-0.5 rounded ml-auto">
+                                    {order.docs_sent_date}
+                                  </span>
+                                )}
+                              </label>
+
+                              {/* Код отправления (после ввода ставится галочка и дата) */}
+                              <div className="flex items-center gap-1 pt-0.5">
+                                <span className="text-[9px] text-slate-500 font-medium whitespace-nowrap">
+                                  Код:
+                                </span>
+                                <input
+                                  type="text"
+                                  defaultValue={order.postal_tracking_number || ''}
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (order.postal_tracking_number || '')) {
+                                      updateDocFieldsMutation.mutate({
+                                        id: order.id,
+                                        postal_tracking_number: val,
+                                        docs_sent: val ? true : order.docs_sent,
+                                        docs_sent_date:
+                                          val && !order.docs_sent_date
+                                            ? new Date().toISOString().split('T')[0]
+                                            : order.docs_sent_date,
+                                      });
+                                    }
+                                  }}
+                                  placeholder="Код отправления (трек)..."
+                                  className="w-full px-1.5 py-0.5 border border-purple-300 rounded text-[10px] font-mono font-bold bg-white text-slate-900"
+                                />
+                              </div>
+                            </div>
+
+                            {/* 2. Галочка «Документы получены контрагентом» */}
+                            <div className="bg-white/95 p-1.5 rounded border border-purple-200">
+                              <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-800 select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(order.docs_received)}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    updateDocFieldsMutation.mutate({
+                                      id: order.id,
+                                      docs_received: checked,
+                                      docs_received_date: checked
+                                        ? order.docs_received_date ||
+                                          new Date().toISOString().split('T')[0]
+                                        : null,
+                                    });
+                                  }}
+                                  className="rounded border-purple-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                                />
+                                <span>Получены контрагентом</span>
+                                {order.docs_received_date && (
+                                  <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded ml-auto">
+                                    {order.docs_received_date}
+                                  </span>
+                                )}
+                              </label>
+                            </div>
+
+                            {/* 3. Прозвон контрагента логистом: согласование даты оплаты */}
+                            <div className="space-y-1 bg-amber-50/90 p-1.5 rounded border border-amber-300">
+                              <div className="text-[9px] font-black text-amber-950 flex items-center justify-between">
+                                <span className="flex items-center gap-1">
+                                  <span>📞</span>
+                                  <span>Прозвон логиста:</span>
+                                </span>
+                                {order.payment_promised_date ? (
+                                  <span className="text-[8px] font-mono font-black text-emerald-800 bg-emerald-100 px-1 py-0.2 rounded">
+                                    В графике
+                                  </span>
+                                ) : (
+                                  <span className="text-[8px] text-amber-850 font-bold">
+                                    уточнить дату
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[9px] text-amber-900 font-bold whitespace-nowrap">
+                                  Дата оплаты:
+                                </span>
+                                <input
+                                  type="date"
+                                  defaultValue={order.payment_promised_date || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    updateDocFieldsMutation.mutate({
+                                      id: order.id,
+                                      payment_promised_date: val || null,
+                                    });
+                                  }}
+                                  className="w-full px-1.5 py-0.5 border border-amber-300 rounded text-[10px] font-mono font-bold bg-white text-slate-900"
+                                />
+                              </div>
+                              {order.payment_promised_date && (
+                                <div className="text-[9px] font-bold text-amber-900 flex items-center justify-between pt-0.5 border-t border-amber-200/60">
+                                  <span>Согласовано к оплате:</span>
+                                  <span className="font-mono font-black text-amber-950">
+                                    {order.payment_promised_date}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 
-                        {/* На этапе 7 (Дебиторка) — бейдж связки с дебиторкой */}
-                        {stageNum === 7 && (
-                          <div className="bg-rose-50 rounded p-1 border border-rose-200 text-[9px] space-y-0.5">
+                        {/* На этапе 6 (Дебиторка / Ожидание оплаты) — бейдж связки с дебиторкой */}
+                        {stageNum === 6 && (
+                          <div className="bg-rose-50 rounded p-1.5 border border-rose-200 text-[9px] space-y-1">
                             <div className="text-rose-700 font-bold flex justify-between">
                               <span>В Дебиторке:</span>
                               <span className="font-mono font-black">
                                 {Number(order.price || 0).toLocaleString('ru-RU')} ₽
                               </span>
                             </div>
+                            {order.payment_promised_date && (
+                              <div className="text-[9px] text-amber-900 font-medium bg-amber-50 p-1 rounded border border-amber-200">
+                                📅 Оплата обещана:{' '}
+                                <span className="font-mono font-bold text-amber-950">
+                                  {order.payment_promised_date}
+                                </span>
+                              </div>
+                            )}
                             <Link
                               href="/receivables"
                               onClick={(e) => e.stopPropagation()}
@@ -994,8 +1122,8 @@ export default function AtiPage() {
                           className="pt-1 border-t border-slate-100 flex items-center gap-1"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {/* Кнопка срыва / отмены с Канбана (доступна на этапах 1..6) */}
-                          {stageNum <= 6 && (
+                          {/* Кнопка срыва / отмены с Канбана (доступна на этапах 1..5) */}
+                          {stageNum <= 5 && (
                             <button
                               type="button"
                               onClick={() => {
@@ -1038,7 +1166,7 @@ export default function AtiPage() {
                           )}
 
                           {/* Кнопка шага вперед */}
-                          {stageNum < 8 ? (
+                          {stageNum < 7 ? (
                             <button
                               onClick={() =>
                                 updateStageMutation.mutate({
@@ -1121,16 +1249,16 @@ export default function AtiPage() {
                   <span className="text-[11px] text-slate-500">Связка с Дебиторкой:</span>
                   <span
                     className={`px-2 py-0.5 rounded font-bold border ${
-                      selectedOrder.stage >= 7
+                      selectedOrder.stage >= 6
                         ? 'bg-rose-50 text-rose-800 border-rose-300'
                         : 'bg-amber-50 text-amber-800 border-amber-300'
                     }`}
                   >
-                    {selectedOrder.stage >= 8
+                    {selectedOrder.stage >= 7
                       ? 'Оплачено и закрыто'
-                      : selectedOrder.stage === 7
-                        ? 'В реестре дебиторки'
-                        : 'Будет привязана после сдачи рейса'}
+                      : selectedOrder.stage === 6
+                        ? 'В реестре дебиторки (ожидание оплаты)'
+                        : 'Будет привязана после документооборота'}
                   </span>
                 </div>
               </div>
@@ -1327,14 +1455,59 @@ export default function AtiPage() {
                     <div className="text-slate-600">{selectedOrder.postal_address}</div>
                   </div>
                 )}
-                {selectedOrder.postal_tracking_number && (
-                  <div className="p-2 bg-purple-50 rounded-xl border border-purple-200 text-[11px] flex items-center justify-between">
-                    <span className="font-bold text-purple-900">Трек-номер Почты РФ:</span>
-                    <span className="font-mono font-black text-purple-950">
-                      {selectedOrder.postal_tracking_number}
+                {/* Блок статуса документов в модалке */}
+                <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 text-[11px] space-y-2">
+                  <div className="font-black text-purple-950 uppercase tracking-wide flex items-center justify-between">
+                    <span>📄 Документооборот и оплата</span>
+                    <span className="font-mono text-purple-700">
+                      {selectedOrder.doc_type === 'paper' ? '📮 Почта / СДЭК' : '⚡ ЭТрН / ЭДО'}
                     </span>
                   </div>
-                )}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
+                    <div className="p-1.5 bg-white rounded border border-purple-100 space-y-0.5">
+                      <div className="text-slate-500 font-bold">1. Отправка документов:</div>
+                      <div className="font-bold text-slate-800">
+                        {selectedOrder.docs_sent ? '✓ Отправлены' : '— Не отправлены'}
+                      </div>
+                      {selectedOrder.docs_sent_date && (
+                        <div className="text-purple-700 font-mono font-bold">
+                          {selectedOrder.docs_sent_date}
+                        </div>
+                      )}
+                      {selectedOrder.postal_tracking_number && (
+                        <div className="text-purple-900 font-mono text-[9px] truncate">
+                          Трек: {selectedOrder.postal_tracking_number}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-1.5 bg-white rounded border border-purple-100 space-y-0.5">
+                      <div className="text-slate-500 font-bold">2. Получение контрагентом:</div>
+                      <div className="font-bold text-slate-800">
+                        {selectedOrder.docs_received ? '✓ Получены' : '— В пути / Ожидание'}
+                      </div>
+                      {selectedOrder.docs_received_date && (
+                        <div className="text-emerald-700 font-mono font-bold">
+                          {selectedOrder.docs_received_date}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-1.5 bg-white rounded border border-purple-100 space-y-0.5">
+                      <div className="text-slate-500 font-bold">3. Согласованная оплата:</div>
+                      <div className="font-bold text-slate-800">
+                        {selectedOrder.payment_promised_date
+                          ? '✓ Дата назначена'
+                          : '— Не согласована'}
+                      </div>
+                      {selectedOrder.payment_promised_date && (
+                        <div className="text-amber-800 font-mono font-black">
+                          {selectedOrder.payment_promised_date}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 {selectedOrder.notes && (
                   <div className="p-2.5 bg-amber-50/90 rounded-xl border-2 border-amber-300 text-[11px] space-y-1">
                     <div className="font-black text-amber-950 flex items-center gap-1.5">

@@ -194,7 +194,7 @@ export default function TripDetailPage() {
     trip.asset?.reg_number === 'БЕЗ АВТО' ||
     Boolean(trip.asset?.short_name?.includes('Без авто')) ||
     Boolean(trip.asset?.short_name?.includes('ПРР')) ||
-    trip.trip_orders?.some((o) => o.direction === 'loaders_only');
+    trip.trip_type === 'loaders_only';
   const activeOrders = (trip.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
   const invalidGeostroyOrders = activeOrders.filter(
     (o) => isGeostroyCounterparty(o.counterparty?.name) && !isGeostroyOrderValid(o.description),
@@ -407,10 +407,16 @@ export default function TripDetailPage() {
                               <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight truncate">
                                 {order.counterparty?.name ?? order.description ?? 'Без названия'}
                               </h3>
-                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
-                                {dirLabel}
-                              </span>
-                              {order.is_driver_loader && (
+                              {order.direction === 'loaders_only' ? (
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300">
+                                  👷 Без машины
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
+                                  {dirLabel}
+                                </span>
+                              )}
+                              {order.is_driver_loader && order.direction !== 'loaders_only' && (
                                 <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
                                   🚚 Грузчик
                                 </span>
@@ -436,15 +442,19 @@ export default function TripDetailPage() {
                               </p>
                             )}
 
-                            {order.direction !== 'loaders_only' && !isPrrTrip && (
+                            {parseFloat(order.driver_pay || '0') > 0 && (
                               <p className="text-[11px] font-bold text-green-700 uppercase tracking-wide">
                                 ЗП водителя: <Money amount={order.driver_pay} />
-                                {hasDriverLoaderPay && (
+                                {order.direction === 'loaders_only' ? (
+                                  <span className="ml-1 text-[10px] text-zinc-400 lowercase font-medium">
+                                    (погрузка/разгрузка)
+                                  </span>
+                                ) : hasDriverLoaderPay ? (
                                   <span className="ml-1 text-[10px] text-zinc-400 lowercase font-medium">
                                     ({order.driver_car_pay} ₽ авто + {order.driver_loader_pay} ₽
                                     погрузка)
                                   </span>
-                                )}
+                                ) : null}
                               </p>
                             )}
 

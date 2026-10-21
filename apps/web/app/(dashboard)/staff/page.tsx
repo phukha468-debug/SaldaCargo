@@ -375,7 +375,7 @@ function StaffModal({
               </label>
               {form.is_officially_employed && (
                 <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
-                  Налог 10 000 ₽ в долг 1-го числа
+                  Налог 5 000 ₽ в долг 1-го числа
                 </span>
               )}
             </div>
@@ -3709,7 +3709,7 @@ function PayrollRow({
             {user.is_officially_employed && (
               <span
                 className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0"
-                title={`ТК РФ: выплата ${parseFloat(user.official_salary_amount || '22500').toLocaleString('ru-RU')} ₽ (налог 10 000 ₽ в долг 1-го числа)`}
+                title={`ТК РФ: выплата ${parseFloat(user.official_salary_amount || '22500').toLocaleString('ru-RU')} ₽ (налог 5 000 ₽ в долг 1-го числа)`}
               >
                 💼 ТК РФ
               </span>
@@ -5054,7 +5054,7 @@ export default function StaffPage() {
             </span>
             <span className="text-emerald-950 font-medium">
               1-го числа каждого месяца в долг сотрудников начисляется налог за официальное
-              трудоустройство (10 000 ₽) и удержания по исполнительным листам (алименты / ФССП),
+              трудоустройство (5 000 ₽) и удержания по исполнительным листам (алименты / ФССП),
               вычитаемые из рейсов (вместо разделения по дням).
             </span>
           </div>

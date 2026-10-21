@@ -167,22 +167,29 @@ export async function POST(request: Request) {
     }
 
     // 4. Создаем заказ внутри рейса
-    const loader1 = loadersData[0] || null;
-    const loader2 = loadersData[1] || null;
+    const driverLoader = loadersData.find((l) => l.id === effectiveUserId);
+    const otherLoaders = loadersData.filter((l) => l.id !== effectiveUserId);
+
+    const isDriverLoader = Boolean(driverLoader);
+    const driverLoaderPay = driverLoader?.pay ? String(driverLoader.pay) : '0';
+    const driverPay = driverLoaderPay;
+
+    const loader1 = otherLoaders[0] || null;
+    const loader2 = otherLoaders[1] || null;
 
     const { data: newOrder, error: orderError } = await (supabase
       .from('trip_orders')
       .insert({
         trip_id: newTrip.id,
         direction: 'loaders_only',
-        is_driver_loader: false,
+        is_driver_loader: isDriverLoader,
         counterparty_id: body.counterparty_id || null,
         description: orderDescription,
         amount: numAmount,
         driver_car_pay: '0',
-        driver_loader_pay: '0',
-        driver_pay: '0',
-        loaders_data: loadersData,
+        driver_loader_pay: driverLoaderPay,
+        driver_pay: driverPay,
+        loaders_data: otherLoaders,
         loader_id: loader1?.id || null,
         loader_pay: loader1?.pay ? String(loader1.pay) : '0',
         loader2_id: loader2?.id || null,
