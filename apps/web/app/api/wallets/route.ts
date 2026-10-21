@@ -29,12 +29,7 @@ export async function GET(request?: Request) {
     const forceRefresh = url?.searchParams.get('force') === '1';
 
     if (!forceRefresh && walletsCache && Date.now() - walletsCache.timestamp < WALLETS_CACHE_TTL) {
-      return NextResponse.json(walletsCache.data, {
-        headers: {
-          'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
-          'X-Cache': 'HIT',
-        },
-      });
+      return NextResponse.json(walletsCache.data);
     }
 
     if (inFlightWalletsPromise) {
@@ -195,12 +190,7 @@ export async function GET(request?: Request) {
 
     walletsCache = { data: result, timestamp: Date.now() };
 
-    return NextResponse.json(result, {
-      headers: {
-        'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
-        'X-Cache': 'MISS',
-      },
-    });
+    return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

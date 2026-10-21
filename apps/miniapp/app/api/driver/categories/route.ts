@@ -19,9 +19,5 @@ export async function GET() {
   const driverCodes = ['FUEL', 'REPAIR_PARTS', 'WASH', 'PARKING', 'OTHER_EXPENSE'];
   const filtered = (data ?? []).filter((c: any) => driverCodes.includes(c.code) || !c.code);
 
-  return NextResponse.json(filtered, {
-    headers: {
-      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
-    },
-  });
+  return NextResponse.json(filtered);
 }

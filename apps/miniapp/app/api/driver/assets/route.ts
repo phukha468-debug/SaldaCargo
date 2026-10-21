@@ -63,11 +63,7 @@ export async function GET() {
     });
 
     console.log(`[API Assets] Returning ${filtered.length} rows (isPrrAdmin: ${isPrrAdmin})`);
-    return NextResponse.json(filtered, {
-      headers: {
-        'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-      },
-    });
+    return NextResponse.json(filtered);
   } catch (err: any) {
     console.error('[API Assets] Fatal Error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

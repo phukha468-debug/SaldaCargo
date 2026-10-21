@@ -113,55 +113,48 @@ export async function GET() {
     [PAYROLL_LOADER_CAT]: 'ЗП грузчика',
   };
 
-  return NextResponse.json(
-    {
-      accountable: {
-        balance: cashBalance,
-        transactions: freshCashOrders.slice(0, 20).map((o: any) => ({
-          id: o.id,
-          amount: o.amount,
-          description: `Рейс №${o.trip_number} · ${o.asset?.short_name ?? ''}`,
-          payment_method: o.payment_method,
-          created_at: o.created_at,
-        })),
-      },
-      salary: {
-        pending_confirmation: (pendingConfirmation ?? []).map((t: any) => {
-          const d = t.trip?.started_at ?? t.transaction_date;
-          const dateStr = d
-            ? new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-            : null;
-          return {
-            id: t.id,
-            amount: t.amount,
-            category_id: t.category_id,
-            label: PAYROLL_LABELS[t.category_id] ?? 'ЗП',
-            context: [
-              t.trip ? `Рейс №${t.trip.trip_number}` : null,
-              t.trip?.asset?.short_name ?? null,
-              dateStr,
-            ]
-              .filter(Boolean)
-              .join(' · '),
-          };
-        }),
-        accumulated_total,
-        accruals: (monthlyAccruals ?? []).map((t: any) => ({
+  return NextResponse.json({
+    accountable: {
+      balance: cashBalance,
+      transactions: freshCashOrders.slice(0, 20).map((o: any) => ({
+        id: o.id,
+        amount: o.amount,
+        description: `Рейс №${o.trip_number} · ${o.asset?.short_name ?? ''}`,
+        payment_method: o.payment_method,
+        created_at: o.created_at,
+      })),
+    },
+    salary: {
+      pending_confirmation: (pendingConfirmation ?? []).map((t: any) => {
+        const d = t.trip?.started_at ?? t.transaction_date;
+        const dateStr = d
+          ? new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+          : null;
+        return {
           id: t.id,
           amount: t.amount,
           category_id: t.category_id,
           label: PAYROLL_LABELS[t.category_id] ?? 'ЗП',
-          settlement_status: t.settlement_status,
-          date: t.trip?.started_at ?? t.transaction_date,
-          trip_number: t.trip?.trip_number ?? null,
-          asset_name: t.trip?.asset?.short_name ?? null,
-        })),
-      },
+          context: [
+            t.trip ? `Рейс №${t.trip.trip_number}` : null,
+            t.trip?.asset?.short_name ?? null,
+            dateStr,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        };
+      }),
+      accumulated_total,
+      accruals: (monthlyAccruals ?? []).map((t: any) => ({
+        id: t.id,
+        amount: t.amount,
+        category_id: t.category_id,
+        label: PAYROLL_LABELS[t.category_id] ?? 'ЗП',
+        settlement_status: t.settlement_status,
+        date: t.trip?.started_at ?? t.transaction_date,
+        trip_number: t.trip?.trip_number ?? null,
+        asset_name: t.trip?.asset?.short_name ?? null,
+      })),
     },
-    {
-      headers: {
-        'Cache-Control': 'private, no-cache, stale-while-revalidate=15',
-      },
-    },
-  );
+  });
 }

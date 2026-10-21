@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     console.log('[API /me] Success for:', user.name);
 
     return NextResponse.json(user, {
-      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch (err) {
     console.error('[API /me] Fatal error:', err);

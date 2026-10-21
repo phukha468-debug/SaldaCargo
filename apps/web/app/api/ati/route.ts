@@ -131,21 +131,43 @@ export async function GET(request?: Request) {
     const forceRefresh = url?.searchParams.get('force') === '1';
 
     if (!forceRefresh && atiCache && Date.now() - atiCache.timestamp < ATI_CACHE_TTL) {
-      return NextResponse.json(atiCache.data, {
-        headers: {
-          'Cache-Control': 'public, max-age=10, stale-while-revalidate=20',
-          'X-Cache': 'HIT',
-        },
-      });
+      return NextResponse.json(atiCache.data);
     }
 
     const supabase = createAdminClient();
 
-    // 1. Получаем заявки АТИ из audit_log
-    const { data: rawOrders, error } = await (supabase.from('audit_log') as any)
-      .select('id, new_values, changed_at')
-      .eq('table_name', 'ati_orders')
-      .order('changed_at', { ascending: false });
+    // Параллельный запуск всех 4 запросов к БД в один такт
+    const [ordersRes, counterpartiesRes, assetsRes, driversRes] = await Promise.all([
+      // 1. Заявки АТИ из audit_log
+      (supabase.from('audit_log') as any)
+        .select('id, new_values, changed_at')
+        .eq('table_name', 'ati_orders')
+        .order('changed_at', { ascending: false }),
+
+      // 2. Список контрагентов
+      (supabase.from('counterparties') as any)
+        .select('id, name, phone, email, is_legal_entity')
+        .eq('is_active', true)
+        .order('name'),
+
+      // 3. Список автомобилей
+      (supabase.from('assets') as any)
+        .select('id, name, short_name, reg_number')
+        .eq('is_active', true)
+        .order('name'),
+
+      // 4. Список водителей (поиск в массиве roles)
+      (supabase.from('users') as any)
+        .select('id, name, phone')
+        .contains('roles', ['driver'])
+        .eq('is_active', true)
+        .order('name'),
+    ]);
+
+    const { data: rawOrders, error } = ordersRes;
+    const { data: counterparties } = counterpartiesRes;
+    const { data: assets } = assetsRes;
+    const { data: drivers } = driversRes;
 
     if (error) {
       console.error('Error fetching ati_orders from audit_log:', error);
@@ -209,25 +231,6 @@ export async function GET(request?: Request) {
       }
     }
 
-    // 2. Получаем список контрагентов для выпадающего списка
-    const { data: counterparties } = await (supabase.from('counterparties') as any)
-      .select('id, name, phone, email, is_legal_entity')
-      .eq('is_active', true)
-      .order('name');
-
-    // 3. Получаем список автомобилей
-    const { data: assets } = await (supabase.from('assets') as any)
-      .select('id, name, short_name, reg_number')
-      .eq('is_active', true)
-      .order('name');
-
-    // 4. Получаем список водителей
-    const { data: drivers } = await (supabase.from('users') as any)
-      .select('id, name, phone')
-      .eq('role', 'driver')
-      .eq('is_active', true)
-      .order('name');
-
     const result = {
       success: true,
       orders,
@@ -238,12 +241,7 @@ export async function GET(request?: Request) {
 
     atiCache = { data: result, timestamp: Date.now() };
 
-    return NextResponse.json(result, {
-      headers: {
-        'Cache-Control': 'public, max-age=10, stale-while-revalidate=20',
-        'X-Cache': 'MISS',
-      },
-    });
+    return NextResponse.json(result);
   } catch (err: any) {
     console.error('Fatal GET /api/ati error:', err);
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });

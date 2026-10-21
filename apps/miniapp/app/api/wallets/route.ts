@@ -81,12 +81,7 @@ export async function GET(request: Request) {
     const forceFresh = url.searchParams.get('fresh') === 'true';
 
     if (!forceFresh && cachedWallets && Date.now() - cachedWallets.timestamp < CACHE_TTL_MS) {
-      return NextResponse.json(cachedWallets.data, {
-        headers: {
-          'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
-          'X-Cache': 'HIT',
-        },
-      });
+      return NextResponse.json(cachedWallets.data);
     }
 
     let apiBalance: number | null = null;
@@ -244,12 +239,7 @@ export async function GET(request: Request) {
       timestamp: Date.now(),
     };
 
-    return NextResponse.json(responseData, {
-      headers: {
-        'Cache-Control': 'public, max-age=15, stale-while-revalidate=30',
-        'X-Cache': 'MISS',
-      },
-    });
+    return NextResponse.json(responseData);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

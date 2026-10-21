@@ -31,11 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .single() as any);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data, {
-    headers: {
-      'Cache-Control': 'private, no-cache, stale-while-revalidate=10',
-    },
-  });
+  return NextResponse.json(data);
 }
 
 /** PATCH /api/trips/:id — обновить поля рейса (только loaders_count, trip_type) */

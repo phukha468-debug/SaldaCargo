@@ -23,46 +23,13 @@ export async function GET(request: Request) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Вычисление подотчёта водителя в параллельном потоке
-  const getAccountableBalanceTask = async (): Promise<string> => {
-    try {
-      const { data: wallet } = await (supabase
-        .from('wallets')
-        .select('id')
-        .eq('owner_user_id', driverId)
-        .eq('type', 'driver_accountable')
-        .maybeSingle() as any);
-
-      if (!wallet) return '0.00';
-
-      const { data: txns } = await (supabase
-        .from('transactions')
-        .select('direction, amount, from_wallet_id, to_wallet_id')
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
-        .or(`from_wallet_id.eq.${wallet.id},to_wallet_id.eq.${wallet.id}`) as any);
-
-      if (!txns || txns.length === 0) return '0.00';
-
-      const balance = (txns as any[]).reduce((sum, t) => {
-        const amount = parseFloat(t.amount);
-        if (t.to_wallet_id === wallet.id) return sum + amount;
-        if (t.from_wallet_id === wallet.id) return sum - amount;
-        return sum;
-      }, 0);
-      return balance.toFixed(2);
-    } catch (e) {
-      console.warn('Error fetching driver wallet balance:', e);
-      return '0.00';
-    }
-  };
-
   // Параллельный запуск всех независимых запросов к БД в один такт
   const [
     activeTripRes,
     reviewTripsRes,
     recentTripsRes,
-    accountableBalance,
+    cashTripsRes,
+    collectionsRes,
     monthOrdersRes,
     pendingPayrollCountRes,
   ] = await Promise.all([
@@ -110,10 +77,25 @@ export async function GET(request: Request) {
       .order('started_at', { ascending: false })
       .limit(3) as any,
 
-    // 4. Подотчёт водителя (кошелёк + транзакции параллельно)
-    getAccountableBalanceTask(),
+    // 4. Рейсы с наличными для точного подотчёта (согласно LL-ARCH-001)
+    supabase
+      .from('trips')
+      .select(
+        `
+        id, trip_number, started_at, ended_at,
+        trip_orders(amount, payment_method, lifecycle_status, created_at),
+        trip_expenses(amount, payment_method)
+      `,
+      )
+      .eq('driver_id', driverId)
+      .neq('lifecycle_status', 'cancelled')
+      .order('started_at', { ascending: false })
+      .limit(30) as any,
 
-    // 5. ЗП за текущий месяц (из утверждённых рейсов)
+    // 5. Инкассации наличных
+    supabase.from('cash_collections').select('amount, created_at').eq('driver_id', driverId) as any,
+
+    // 6. ЗП за текущий месяц (из утверждённых рейсов)
     supabase
       .from('trip_orders')
       .select('driver_pay, lifecycle_status, trips!inner(driver_id, started_at, lifecycle_status)')
@@ -121,7 +103,7 @@ export async function GET(request: Request) {
       .gte('trips.started_at', monthStart)
       .neq('trips.lifecycle_status', 'cancelled') as any,
 
-    // 6. Количество ЗП-транзакций, ожидающих подтверждения сотрудника
+    // 7. Количество ЗП-транзакций, ожидающих подтверждения сотрудника
     (supabase.from('transactions') as any)
       .select('*', { count: 'exact', head: true })
       .eq('related_user_id', driverId)
@@ -134,8 +116,43 @@ export async function GET(request: Request) {
   const activeTrip = activeTripRes.data;
   const reviewTrips = reviewTripsRes.data;
   const recentTrips = recentTripsRes.data;
+  const cashTrips = cashTripsRes.data;
+  const collections = collectionsRes.data;
   const monthOrders = monthOrdersRes.data;
   const pendingPayrollCount = pendingPayrollCountRes.count;
+
+  // Точный расчёт подотчёта водителя (нал на руках)
+  const lastCollectedAt =
+    (collections ?? []).length > 0
+      ? (collections ?? []).sort(
+          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )[0].created_at
+      : null;
+
+  let cashIn = 0;
+  let cashSpent = 0;
+
+  for (const t of cashTrips ?? []) {
+    for (const o of t.trip_orders ?? []) {
+      if (
+        o.lifecycle_status !== 'cancelled' &&
+        o.payment_method === 'cash' &&
+        (!lastCollectedAt || o.created_at > lastCollectedAt)
+      ) {
+        cashIn += parseFloat(o.amount ?? '0');
+      }
+    }
+    for (const e of t.trip_expenses ?? []) {
+      if (
+        e.payment_method === 'cash' &&
+        (!lastCollectedAt || (t.ended_at && t.ended_at > lastCollectedAt))
+      ) {
+        cashSpent += parseFloat(e.amount ?? '0');
+      }
+    }
+  }
+
+  const accountableBalance = Math.max(0, cashIn - cashSpent).toFixed(2);
 
   const approvedPay = (monthOrders ?? [])
     .filter((o: any) => o.lifecycle_status === 'approved')
@@ -147,20 +164,13 @@ export async function GET(request: Request) {
     )
     .reduce((sum: number, o: any) => sum + parseFloat(o.driver_pay), 0);
 
-  return NextResponse.json(
-    {
-      activeTrip,
-      reviewTrips: reviewTrips ?? [],
-      recentTrips: recentTrips ?? [],
-      accountableBalance,
-      monthPayApproved: approvedPay.toFixed(2),
-      monthPayDraft: draftPay.toFixed(2),
-      pendingPayrollCount: pendingPayrollCount ?? 0,
-    },
-    {
-      headers: {
-        'Cache-Control': 'private, no-cache, stale-while-revalidate=15',
-      },
-    },
-  );
+  return NextResponse.json({
+    activeTrip,
+    reviewTrips: reviewTrips ?? [],
+    recentTrips: recentTrips ?? [],
+    accountableBalance,
+    monthPayApproved: approvedPay.toFixed(2),
+    monthPayDraft: draftPay.toFixed(2),
+    pendingPayrollCount: pendingPayrollCount ?? 0,
+  });
 }
