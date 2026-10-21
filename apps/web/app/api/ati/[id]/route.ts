@@ -25,6 +25,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     let newStage = body.stage !== undefined ? Number(body.stage) : currentValues.stage;
     if (newStage === 8) newStage = 7;
 
+    // ВАЛИДАЦИЯ ПЕРЕХОДА В ДЕБИТОРКУ:
+    // На этапе 5 (Документы) нельзя переместить в дебиторку (этап 6), если не заполнены все 3 пункта:
+    // 1) отправлено на почту, 2) получено на почте, 3) согласованная дата оплаты
+    if (newStage === 6 && currentValues.stage === 5) {
+      const isDocsSent = Boolean(body.docs_sent ?? currentValues.docs_sent);
+      const isDocsReceived = Boolean(body.docs_received ?? currentValues.docs_received);
+      const hasPaymentDate = Boolean(
+        body.payment_promised_date !== undefined
+          ? body.payment_promised_date
+          : currentValues.payment_promised_date,
+      );
+
+      if (!isDocsSent || !isDocsReceived || !hasPaymentDate) {
+        return NextResponse.json(
+          {
+            error:
+              'Нельзя переместить в Дебиторку: необходимо заполнить все 3 пункта — отправку на почту, получение на почте и согласованную дату оплаты.',
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const updatedValues = {
       ...currentValues,
       ...body,
