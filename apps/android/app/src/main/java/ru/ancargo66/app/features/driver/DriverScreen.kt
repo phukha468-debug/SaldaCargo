@@ -395,28 +395,11 @@ fun DriverScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (isStartingTrip) "СОЗДАЁМ РЕЙС..." else "НАЧАТЬ РЕЙС",
+                                        text = if (isStartingTrip) "СОЗДАЁМ РЕЙС..." else if (currentAsset?.regNumber == "БЕЗ АВТО") "НАЧАТЬ РЕЙС (БЕЗ АВТО)" else "НАЧАТЬ РЕЙС",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 16.sp
                                     )
                                 }
-                            }
-
-                            Button(
-                                onClick = {
-                                    showCreatePrrDialog = true
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Zinc800),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(
-                                    text = "👷 + ПРР ЗАКАЗ (БЕЗ АВТО)",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
                             }
                         }
                     }

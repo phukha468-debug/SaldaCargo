@@ -349,8 +349,8 @@ export default function RootPage() {
         </div>
       )}
 
-      {/* Кнопки начала рейса и создания ПРР */}
-      <div className="space-y-2">
+      {/* Кнопка начала рейса */}
+      <div>
         {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
           <button
             onClick={handleStartTrip}
@@ -367,15 +367,6 @@ export default function RootPage() {
             </span>
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={() => setShowPrrModal(true)}
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl py-3.5 text-sm font-black shadow-md active:scale-[0.98] transition-all uppercase tracking-wider"
-        >
-          <span>👷</span>
-          <span>+ ПРР заказ (без авто)</span>
-        </button>
       </div>
 
       {startTripError && (
