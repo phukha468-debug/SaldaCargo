@@ -1045,6 +1045,172 @@ export default function AtiPage() {
                                 </div>
                               </div>
 
+                              {/* 1. КОНТАКТЫ КОНТРАГЕНТА (ЗАКАЗЧИКА) */}
+                              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-1 text-[10px]">
+                                <div className="text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                                  <span>👤 Контрагент / Заказчик</span>
+                                  {order.ati_code && (
+                                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 rounded border border-indigo-200 text-[9px]">
+                                      {order.ati_code}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-bold text-slate-900 truncate text-[11px]">
+                                  {order.counterparty_name}
+                                </div>
+                                {order.counterparty_contact && (
+                                  <div className="text-slate-700 text-[10px]">
+                                    <span className="text-slate-500">Контакт: </span>
+                                    <span className="font-semibold">
+                                      {order.counterparty_contact}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                                  {order.counterparty_phone && (
+                                    <a
+                                      href={`tel:${order.counterparty_phone.replace(/[^\d+]/g, '')}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline flex items-center gap-0.5"
+                                      title="Позвонить контрагенту"
+                                    >
+                                      <span>📞</span>
+                                      <span>{order.counterparty_phone}</span>
+                                    </a>
+                                  )}
+                                  {order.counterparty_email && (
+                                    <a
+                                      href={`mailto:${order.counterparty_email}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-slate-600 hover:text-slate-900 font-medium hover:underline flex items-center gap-0.5"
+                                      title="Написать email"
+                                    >
+                                      <span>✉️</span>
+                                      <span className="truncate max-w-[130px]">
+                                        {order.counterparty_email}
+                                      </span>
+                                    </a>
+                                  )}
+                                </div>
+                                {order.counterparty_inn && (
+                                  <div className="text-[9px] text-slate-500 font-mono">
+                                    ИНН: {order.counterparty_inn}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 2. МАРШРУТ И ТОЧКИ (ПОГРУЗКА И ВЫГРУЗКА) */}
+                              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-1.5 text-[10px]">
+                                {/* Погрузка */}
+                                <div className="space-y-0.5">
+                                  <div className="text-[9px] font-bold text-emerald-800 flex items-center gap-1">
+                                    <span>🟢</span>
+                                    <span>Погрузка:</span>
+                                    {order.pickup_date_time && (
+                                      <span className="font-mono text-slate-600 font-semibold ml-auto text-[9px]">
+                                        {order.pickup_date_time}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-slate-800 text-[10px] leading-tight font-medium pl-3">
+                                    {order.pickup_address || 'Адрес не указан'}
+                                  </div>
+                                  {order.pickup_contact && (
+                                    <div className="text-[9px] text-slate-600 pl-3">
+                                      <span className="text-slate-400">Склад: </span>
+                                      <span className="font-medium">{order.pickup_contact}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Выгрузка */}
+                                <div className="space-y-0.5 pt-1 border-t border-slate-200/80">
+                                  <div className="text-[9px] font-bold text-rose-800 flex items-center gap-1">
+                                    <span>🔴</span>
+                                    <span>Выгрузка:</span>
+                                    {order.delivery_date && (
+                                      <span className="font-mono text-slate-600 font-semibold ml-auto text-[9px]">
+                                        {order.delivery_date}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-slate-800 text-[10px] leading-tight font-medium pl-3">
+                                    {order.delivery_address || 'Адрес не указан'}
+                                  </div>
+                                  {order.delivery_contact && (
+                                    <div className="text-[9px] text-slate-600 pl-3">
+                                      <span className="text-slate-400">Контакт: </span>
+                                      <span className="font-medium">{order.delivery_contact}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 3. ГРУЗ, АВТОМОБИЛЬ И ВОДИТЕЛЬ */}
+                              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-1 text-[10px]">
+                                {order.cargo_description && (
+                                  <div>
+                                    <span className="text-[9px] text-slate-500 font-bold uppercase">
+                                      Груз:{' '}
+                                    </span>
+                                    <span className="text-slate-800 font-medium">
+                                      {order.cargo_description}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-between gap-1 text-[9px] pt-0.5">
+                                  <span className="text-slate-500">Авто / Госномер:</span>
+                                  <span className="font-bold text-slate-800 font-mono">
+                                    {order.asset_name}{' '}
+                                    {order.asset_reg_number ? `(${order.asset_reg_number})` : ''}
+                                  </span>
+                                </div>
+                                {order.driver_name && (
+                                  <div className="flex items-center justify-between gap-1 text-[9px]">
+                                    <span className="text-slate-500">Водитель:</span>
+                                    <div className="font-semibold text-slate-800 text-right">
+                                      <div>{order.driver_name}</div>
+                                      {order.driver_phone && (
+                                        <a
+                                          href={`tel:${order.driver_phone.replace(/[^\d+]/g, '')}`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="text-blue-600 hover:underline font-mono text-[9px]"
+                                        >
+                                          📞 {order.driver_phone}
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 4. УСЛОВИЯ ОПЛАТЫ И ПОЧТОВЫЙ АДРЕС */}
+                              <div className="bg-amber-50/80 p-1.5 rounded-lg border border-amber-200 space-y-1 text-[10px]">
+                                <div className="text-[9px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                                  <span>💳</span>
+                                  <span>Условия оплаты и документы</span>
+                                </div>
+                                {order.payment_terms && (
+                                  <div className="text-slate-800 text-[10px]">
+                                    <span className="text-amber-800 font-bold">Сроки оплаты: </span>
+                                    <span className="font-medium">{order.payment_terms}</span>
+                                  </div>
+                                )}
+                                {order.postal_address && (
+                                  <div className="text-slate-700 text-[9px] leading-tight">
+                                    <span className="text-amber-800 font-bold">
+                                      Адрес для почты:{' '}
+                                    </span>
+                                    <span>{order.postal_address}</span>
+                                  </div>
+                                )}
+                                {order.notes && (
+                                  <div className="text-slate-600 text-[9px] italic border-t border-amber-200/60 pt-0.5">
+                                    {order.notes}
+                                  </div>
+                                )}
+                              </div>
+
                               {/* На этапе 5 (Документы) — полный блок документооборота с 3 галочками */}
                               {stageNum === 5 && (
                                 <div className="space-y-1.5 bg-purple-50/70 p-2 rounded-lg border border-purple-200">
