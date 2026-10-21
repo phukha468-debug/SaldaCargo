@@ -15,22 +15,23 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const supabase = createAdminClient();
 
-  // 1. Все активные клиенты
-  const { data: clients, error } = await (supabase
-    .from('counterparties')
-    .select('id, name, is_legal_entity, is_regular')
-    .in('type', ['client', 'both'])
-    .eq('is_active', true)
-    .order('name') as any);
+  // 1 & 2. Параллельный запрос активных клиентов и количества заказов
+  const [clientsRes, orderCountsRes] = await Promise.all([
+    supabase
+      .from('counterparties')
+      .select('id, name, is_legal_entity, is_regular')
+      .in('type', ['client', 'both'])
+      .eq('is_active', true)
+      .order('name') as any,
+    (supabase.from('trip_orders').select('counterparty_id') as any)
+      .neq('lifecycle_status', 'cancelled')
+      .not('counterparty_id', 'is', null),
+  ]);
+
+  const { data: clients, error } = clientsRes;
+  const { data: orderCounts } = orderCountsRes;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // 2. Количество заказов по каждому контрагенту (approved/draft, не cancelled)
-  const { data: orderCounts } = await (
-    supabase.from('trip_orders').select('counterparty_id') as any
-  )
-    .neq('lifecycle_status', 'cancelled')
-    .not('counterparty_id', 'is', null);
 
   // Подсчитать количество заказов для каждого counterparty_id
   const countMap = new Map<string, number>();
@@ -72,5 +73,9 @@ export async function GET() {
     is_top: idx < 10,
   }));
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+    },
+  });
 }

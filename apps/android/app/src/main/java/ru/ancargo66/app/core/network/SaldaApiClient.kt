@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -20,10 +21,25 @@ object SaldaApiClient {
     private const val BASE_URL = "https://app.tk501.ru"
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
+        .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
+        .retryOnConnectionFailure(true)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
         .build()
+
+    private const val CACHE_TTL_MS = 60_000L // 1 минута
+
+    // Быстрый in-memory кэш для справочников и данных
+    private var cachedAssets: Pair<Long, List<Asset>>? = null
+    private var cachedCategories: Pair<Long, List<ExpenseCategory>>? = null
+    private var cachedCounterparties: Pair<Long, List<Counterparty>>? = null
+    private var cachedLoaders: Pair<Long, List<User>>? = null
+    var cachedDriverSummary: Pair<Long, DriverSummary>? = null
+
+    fun getCachedAssets(): List<Asset>? = cachedAssets?.second
+    fun getCachedSummary(): DriverSummary? = cachedDriverSummary?.second
+    fun invalidateSummary() { cachedDriverSummary = null }
 
     val json = Json {
         ignoreUnknownKeys = true
@@ -85,25 +101,42 @@ object SaldaApiClient {
 
     // ── Модуль водителя ─────────────────────────────────────────────────────
 
-    suspend fun getDriverSummary(driverId: String): DriverSummary = withContext(Dispatchers.IO) {
+    suspend fun getDriverSummary(driverId: String, forceRefresh: Boolean = false): DriverSummary = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            cachedDriverSummary?.let { (timestamp, data) ->
+                if (now - timestamp < 15_000L) return@withContext data
+            }
+        }
         val request = buildRequest("/api/driver/summary", userId = driverId)
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("Не удалось загрузить сводку: ${response.code}")
             val body = response.body?.string() ?: "{}"
-            json.decodeFromString<DriverSummary>(body)
+            val res = json.decodeFromString<DriverSummary>(body)
+            cachedDriverSummary = Pair(now, res)
+            res
         }
     }
 
-    suspend fun getDriverAssets(driverId: String? = null): List<Asset> = withContext(Dispatchers.IO) {
+    suspend fun getDriverAssets(driverId: String? = null, forceRefresh: Boolean = false): List<Asset> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            cachedAssets?.let { (timestamp, data) ->
+                if (now - timestamp < CACHE_TTL_MS) return@withContext data
+            }
+        }
         val request = buildRequest("/api/driver/assets", userId = driverId)
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("Не удалось загрузить авто: ${response.code}")
             val body = response.body?.string() ?: "[]"
-            json.decodeFromString<List<Asset>>(body)
+            val res = json.decodeFromString<List<Asset>>(body)
+            cachedAssets = Pair(now, res)
+            res
         }
     }
 
     suspend fun switchDriverAsset(driverId: String, assetId: String): Boolean = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val body = buildJsonObject {
             put("asset_id", assetId)
         }.toString()
@@ -114,6 +147,7 @@ object SaldaApiClient {
     }
 
     suspend fun startTrip(driverId: String, assetId: String, odometerStart: Long, isPrr: Boolean = false): TripDetail = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val body = buildJsonObject {
             put("asset_id", assetId)
             put("odometer_start", odometerStart)
@@ -145,6 +179,7 @@ object SaldaApiClient {
         driverNote: String?,
         userId: String? = null
     ): Result<TripDetail> = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val body = buildJsonObject {
             if (endOdometer != null) put("odometer_end", endOdometer)
             if (driverNote != null) put("driver_note", driverNote)
@@ -174,6 +209,7 @@ object SaldaApiClient {
         counterpartyId: String? = null,
         userId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val body = buildJsonObject {
             put("amount", amount.toString())
             put("driver_pay", driverPay.toString())
@@ -191,6 +227,7 @@ object SaldaApiClient {
     }
 
     suspend fun cancelTripOrder(tripId: String, orderId: String, userId: String? = null): Boolean = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val body = buildJsonObject { put("action", "cancel") }.toString()
         val request = buildRequest("/api/trips/$tripId/orders/$orderId", method = "PATCH", bodyJson = body, userId = userId)
         client.newCall(request).execute().use { response ->
@@ -199,6 +236,7 @@ object SaldaApiClient {
     }
 
     suspend fun deleteTrip(tripId: String, userId: String? = null): Boolean = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val request = buildRequest("/api/trips/$tripId", method = "DELETE", userId = userId)
         client.newCall(request).execute().use { response ->
             response.isSuccessful
@@ -213,6 +251,7 @@ object SaldaApiClient {
         description: String? = null,
         userId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val body = buildJsonObject {
             put("category_id", categoryId)
             put("amount", amount.toString())
@@ -227,21 +266,37 @@ object SaldaApiClient {
         }
     }
 
-    suspend fun getExpenseCategories(userId: String? = null): List<ExpenseCategory> = withContext(Dispatchers.IO) {
+    suspend fun getExpenseCategories(userId: String? = null, forceRefresh: Boolean = false): List<ExpenseCategory> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            cachedCategories?.let { (timestamp, data) ->
+                if (now - timestamp < CACHE_TTL_MS * 5) return@withContext data
+            }
+        }
         val request = buildRequest("/api/driver/categories", userId = userId)
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext emptyList()
             val body = response.body?.string() ?: "[]"
-            json.decodeFromString<List<ExpenseCategory>>(body)
+            val res = json.decodeFromString<List<ExpenseCategory>>(body)
+            cachedCategories = Pair(now, res)
+            res
         }
     }
 
-    suspend fun getCounterparties(userId: String? = null): List<Counterparty> = withContext(Dispatchers.IO) {
+    suspend fun getCounterparties(userId: String? = null, forceRefresh: Boolean = false): List<Counterparty> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            cachedCounterparties?.let { (timestamp, data) ->
+                if (now - timestamp < CACHE_TTL_MS) return@withContext data
+            }
+        }
         val request = buildRequest("/api/driver/counterparties", userId = userId)
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext emptyList()
             val body = response.body?.string() ?: "[]"
-            json.decodeFromString<List<Counterparty>>(body)
+            val res = json.decodeFromString<List<Counterparty>>(body)
+            cachedCounterparties = Pair(now, res)
+            res
         }
     }
 
@@ -253,6 +308,7 @@ object SaldaApiClient {
         description: String? = null,
         userId: String
     ): Boolean = withContext(Dispatchers.IO) {
+        cachedDriverSummary = null
         val loadersArray = kotlinx.serialization.json.buildJsonArray {
             loaders.forEach { l ->
                 add(buildJsonObject {
@@ -369,12 +425,20 @@ object SaldaApiClient {
 
     // ── Модуль грузчиков ────────────────────────────────────────────────────
 
-    suspend fun getLoaders(): List<User> = withContext(Dispatchers.IO) {
+    suspend fun getLoaders(forceRefresh: Boolean = false): List<User> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            cachedLoaders?.let { (timestamp, data) ->
+                if (now - timestamp < CACHE_TTL_MS) return@withContext data
+            }
+        }
         val request = buildRequest("/api/driver/loaders")
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext emptyList()
             val body = response.body?.string() ?: "[]"
-            json.decodeFromString<List<User>>(body)
+            val res = json.decodeFromString<List<User>>(body)
+            cachedLoaders = Pair(now, res)
+            res
         }
     }
 }

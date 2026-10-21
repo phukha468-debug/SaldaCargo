@@ -23,12 +23,46 @@ export async function GET(request: Request) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Параллельный запуск всех независимых запросов к БД
+  // Вычисление подотчёта водителя в параллельном потоке
+  const getAccountableBalanceTask = async (): Promise<string> => {
+    try {
+      const { data: wallet } = await (supabase
+        .from('wallets')
+        .select('id')
+        .eq('owner_user_id', driverId)
+        .eq('type', 'driver_accountable')
+        .maybeSingle() as any);
+
+      if (!wallet) return '0.00';
+
+      const { data: txns } = await (supabase
+        .from('transactions')
+        .select('direction, amount, from_wallet_id, to_wallet_id')
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed')
+        .or(`from_wallet_id.eq.${wallet.id},to_wallet_id.eq.${wallet.id}`) as any);
+
+      if (!txns || txns.length === 0) return '0.00';
+
+      const balance = (txns as any[]).reduce((sum, t) => {
+        const amount = parseFloat(t.amount);
+        if (t.to_wallet_id === wallet.id) return sum + amount;
+        if (t.from_wallet_id === wallet.id) return sum - amount;
+        return sum;
+      }, 0);
+      return balance.toFixed(2);
+    } catch (e) {
+      console.warn('Error fetching driver wallet balance:', e);
+      return '0.00';
+    }
+  };
+
+  // Параллельный запуск всех независимых запросов к БД в один такт
   const [
     activeTripRes,
     reviewTripsRes,
     recentTripsRes,
-    walletRes,
+    accountableBalance,
     monthOrdersRes,
     pendingPayrollCountRes,
   ] = await Promise.all([
@@ -76,13 +110,8 @@ export async function GET(request: Request) {
       .order('started_at', { ascending: false })
       .limit(3) as any,
 
-    // 4. Подотчёт водителя (кошелёк)
-    supabase
-      .from('wallets')
-      .select('id')
-      .eq('owner_user_id', driverId)
-      .eq('type', 'driver_accountable')
-      .maybeSingle() as any,
+    // 4. Подотчёт водителя (кошелёк + транзакции параллельно)
+    getAccountableBalanceTask(),
 
     // 5. ЗП за текущий месяц (из утверждённых рейсов)
     supabase
@@ -105,30 +134,8 @@ export async function GET(request: Request) {
   const activeTrip = activeTripRes.data;
   const reviewTrips = reviewTripsRes.data;
   const recentTrips = recentTripsRes.data;
-  const wallet = walletRes.data;
   const monthOrders = monthOrdersRes.data;
   const pendingPayrollCount = pendingPayrollCountRes.count;
-
-  // Подотчёт водителя (наличные на руках)
-  let accountableBalance = '0';
-  if (wallet) {
-    const { data: txns } = await (supabase
-      .from('transactions')
-      .select('direction, amount, from_wallet_id, to_wallet_id')
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'completed')
-      .or(`from_wallet_id.eq.${wallet.id},to_wallet_id.eq.${wallet.id}`) as any);
-
-    if (txns) {
-      const balance = (txns as any[]).reduce((sum, t) => {
-        const amount = parseFloat(t.amount);
-        if (t.to_wallet_id === wallet.id) return sum + amount;
-        if (t.from_wallet_id === wallet.id) return sum - amount;
-        return sum;
-      }, 0);
-      accountableBalance = balance.toFixed(2);
-    }
-  }
 
   const approvedPay = (monthOrders ?? [])
     .filter((o: any) => o.lifecycle_status === 'approved')
@@ -140,13 +147,20 @@ export async function GET(request: Request) {
     )
     .reduce((sum: number, o: any) => sum + parseFloat(o.driver_pay), 0);
 
-  return NextResponse.json({
-    activeTrip,
-    reviewTrips: reviewTrips ?? [],
-    recentTrips: recentTrips ?? [],
-    accountableBalance,
-    monthPayApproved: approvedPay.toFixed(2),
-    monthPayDraft: draftPay.toFixed(2),
-    pendingPayrollCount: pendingPayrollCount ?? 0,
-  });
+  return NextResponse.json(
+    {
+      activeTrip,
+      reviewTrips: reviewTrips ?? [],
+      recentTrips: recentTrips ?? [],
+      accountableBalance,
+      monthPayApproved: approvedPay.toFixed(2),
+      monthPayDraft: draftPay.toFixed(2),
+      pendingPayrollCount: pendingPayrollCount ?? 0,
+    },
+    {
+      headers: {
+        'Cache-Control': 'private, no-cache, stale-while-revalidate=15',
+      },
+    },
+  );
 }

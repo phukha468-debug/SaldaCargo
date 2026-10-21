@@ -20,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
@@ -96,18 +98,42 @@ fun TripDetailScreen(
     }
 
     LaunchedEffect(tripId) {
-        loadTrip()
-        scope.launch {
-            categories = SaldaApiClient.getExpenseCategories(userId)
-            counterparties = SaldaApiClient.getCounterparties(userId)
-            allLoaders = SaldaApiClient.getLoaders()
-            if (categories.isNotEmpty()) {
-                selectedCategoryId = categories.first().id
+        isLoading = true
+        errorMessage = null
+        try {
+            // Параллельная загрузка рейса, категорий, клиентов и грузчиков
+            coroutineScope {
+                val tripDeferred = async { SaldaApiClient.getTripDetail(tripId, userId) }
+                val catDeferred = async { SaldaApiClient.getExpenseCategories(userId) }
+                val cpDeferred = async { SaldaApiClient.getCounterparties(userId) }
+                val loadersDeferred = async { SaldaApiClient.getLoaders() }
+
+                val trip = tripDeferred.await()
+                tripDetail = trip
+                if (endOdometerInput.isBlank()) {
+                    val defaultOdo = if (trip.odometerEnd != null && trip.odometerEnd > 0) trip.odometerEnd else trip.odometerStart + 35
+                    endOdometerInput = defaultOdo.toString()
+                }
+
+                val cats = catDeferred.await()
+                categories = cats
+                if (cats.isNotEmpty() && selectedCategoryId == null) {
+                    selectedCategoryId = cats.first().id
+                }
+
+                val cps = cpDeferred.await()
+                counterparties = cps
+                if (selectedCounterpartyId == null && cps.isNotEmpty()) {
+                    val generic = cps.find { it.name == "Частный клиент" } ?: cps.firstOrNull()
+                    selectedCounterpartyId = generic?.id
+                }
+
+                allLoaders = loadersDeferred.await()
             }
-            if (selectedCounterpartyId == null && counterparties.isNotEmpty()) {
-                val generic = counterparties.find { it.name == "Частный клиент" } ?: counterparties.firstOrNull()
-                selectedCounterpartyId = generic?.id
-            }
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Ошибка загрузки данных рейса"
+        } finally {
+            isLoading = false
         }
     }
 

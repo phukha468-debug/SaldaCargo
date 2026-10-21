@@ -30,10 +30,10 @@ fun DriverScreen(
     user: User,
     onLogout: () -> Unit
 ) {
-    var summary by remember { mutableStateOf<DriverSummary?>(null) }
-    var assets by remember { mutableStateOf<List<Asset>>(emptyList()) }
+    var summary by remember { mutableStateOf<DriverSummary?>(SaldaApiClient.getCachedSummary()) }
+    var assets by remember { mutableStateOf<List<Asset>>(SaldaApiClient.getCachedAssets() ?: emptyList()) }
     var selectedTripIdForDetails by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(SaldaApiClient.getCachedSummary() == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     var showVehiclePicker by remember { mutableStateOf(false) }
@@ -52,7 +52,7 @@ fun DriverScreen(
             try {
                 // Параллельная загрузка сводки и списка машин вместо последовательной
                 coroutineScope {
-                    val sumDeferred = async { SaldaApiClient.getDriverSummary(user.id) }
+                    val sumDeferred = async { SaldaApiClient.getDriverSummary(user.id, forceRefresh = true) }
                     val astsDeferred = async { SaldaApiClient.getDriverAssets(user.id) }
                     summary = sumDeferred.await()
                     val asts = astsDeferred.await()

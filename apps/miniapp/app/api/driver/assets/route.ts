@@ -14,31 +14,30 @@ export async function GET() {
 
     console.log(`[API Assets] Connecting to: ${supabaseUrl}`);
 
-    // Проверяем права пользователя: администратор или доверенные лица для ПРР
-    let isPrrAdmin = false;
-    if (customUserId) {
-      const { data: user } = await (supabase.from('users') as any)
-        .select('name, roles')
-        .eq('id', customUserId)
-        .maybeSingle();
+    // Параллельно запрашиваем пользователя и список машин
+    const userPromise = customUserId
+      ? (supabase.from('users') as any).select('name, roles').eq('id', customUserId).maybeSingle()
+      : Promise.resolve({ data: null });
 
-      if (user) {
-        const roles = Array.isArray(user.roles) ? user.roles : [];
-        const isAdmin = roles.includes('admin') || roles.includes('owner');
-        const isWhitelisted = Boolean(
-          user.name && /Нигамед|Шахмаев|Роман.*Радик|Радикович/i.test(user.name),
-        );
-        isPrrAdmin = isAdmin || isWhitelisted;
-      }
-    }
-
-    const { data, error } = await supabase
+    const assetsPromise = supabase
       .from('assets')
       .select('*')
       .not('status', 'in', '("sold","written_off")')
       .not('short_name', 'ilike', '%STRESS%')
       .not('short_name', 'ilike', '%TEST%')
       .order('short_name');
+
+    const [{ data: user }, { data, error }] = await Promise.all([userPromise, assetsPromise]);
+
+    let isPrrAdmin = false;
+    if (user) {
+      const roles = Array.isArray(user.roles) ? user.roles : [];
+      const isAdmin = roles.includes('admin') || roles.includes('owner');
+      const isWhitelisted = Boolean(
+        user.name && /Нигамед|Шахмаев|Роман.*Радик|Радикович/i.test(user.name),
+      );
+      isPrrAdmin = isAdmin || isWhitelisted;
+    }
 
     if (error) {
       console.error('[API Assets] DB Error:', error);
@@ -64,7 +63,11 @@ export async function GET() {
     });
 
     console.log(`[API Assets] Returning ${filtered.length} rows (isPrrAdmin: ${isPrrAdmin})`);
-    return NextResponse.json(filtered);
+    return NextResponse.json(filtered, {
+      headers: {
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+      },
+    });
   } catch (err: any) {
     console.error('[API Assets] Fatal Error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
