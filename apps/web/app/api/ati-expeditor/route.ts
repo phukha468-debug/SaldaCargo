@@ -25,7 +25,13 @@ export type ExpeditorOrder = {
   client_id?: string | null;
   client_name: string;
   client_inn?: string;
-  client_passport?: string; // для физлиц
+  client_passport?: string; // для физлиц (полная строка)
+  client_passport_series?: string; // серия паспорта
+  client_passport_number?: string; // номер паспорта
+  client_passport_issued_by?: string; // кем выдан
+  client_passport_issued_date?: string; // дата выдачи
+  client_passport_code?: string; // код подразделения
+  client_reg_address?: string; // адрес регистрации
   client_contact?: string;
   client_phone?: string;
   client_email?: string;
@@ -73,8 +79,14 @@ export type ExpeditorOrder = {
   delivery_contact: string;
 
   // Финансы
-  total_client_price: number; // Общая стоимость для Заказчика (напр. 70 000 ₽ или 85 000 ₽)
+  total_client_price: number; // Общая стоимость для Заказчика (напр. 100 000 ₽)
   carrier_freight_price: number; // Общая ставка перевозчика (напр. 70 000 ₽)
+
+  // Задаток (предоплата при заключении договора)
+  deposit_amount?: number; // Задаток (напр. 5 000 ₽)
+  deposit_paid?: boolean; // Отметка внесения задатка
+  deposit_paid_at?: string;
+  deposit_terms?: string;
 
   // Поэтапная оплата (как в договоре физлица)
   payment_scheme: 'two_stage' | 'full_prepay' | 'full_postpay';
@@ -111,16 +123,23 @@ export type ExpeditorOrder = {
   updated_at: string;
 };
 
-// Сидовая заявка № 1 (в точности по загруженному вами фото договора)
+// Сидовая заявка № 1 (в точности по загруженному вами фото договора с Вельбой В.М.)
 const SEED_EXPEDITOR_ORDER_001: Omit<ExpeditorOrder, 'id'> = {
   order_number: '№ 1 от 22.10.2026',
   order_date: '2026-10-22',
-  stage: 3, // На этапе "В пути"
+  stage: 2, // Оформление / подготовка к погрузке 30.10.2026
   doc_type: 'paper',
   client_type: 'individual',
-  client_name: 'Физическое лицо (Заказчик переезда)',
-  client_phone: '+7 (922) 180-09-11',
-  client_passport: 'Паспорт гражданина РФ',
+  client_name: 'Вельбой Василий Михайлович',
+  client_phone: '+7 961 226-94-95',
+  client_passport_series: '6500',
+  client_passport_number: '794763',
+  client_passport_issued_by: 'ОВД г.Верхняя Салда, по Свердловской области',
+  client_passport_issued_date: '13.07.2001г.',
+  client_passport_code: '662020',
+  client_reg_address: 'Свердловская обл., г. Верхняя Салда, ул. Энгельса, д. 85, корп. 2, кв. 135',
+  client_passport:
+    'Паспорт РФ: серия 6500 № 794763, выдан ОВД г.Верхняя Салда, по Свердловской области 13.07.2001г., код подр. 662020. Зарег.: г. Верхняя Салда, ул. Энгельса, д. 85, корп. 2, кв. 135',
   passenger_in_cabin: true, // В кабине совместно с водителем следует Заказчик
 
   carrier_name: 'ИП Салихов Руслан Маснавиевич',
@@ -147,7 +166,7 @@ const SEED_EXPEDITOR_ORDER_001: Omit<ExpeditorOrder, 'id'> = {
   pickup_address: 'г. Верхняя Салда (2 адреса погрузки)',
   pickup_points: ['г. Верхняя Салда, Адрес 1', 'г. Верхняя Салда, Адрес 2'],
   pickup_date_time: '30.10.2026 г. ровно к 08:00',
-  pickup_contact: '+7 (922) 180-09-11',
+  pickup_contact: '+7 961 226-94-95 / Вельбой В.М.',
   cargo_description:
     'Личные (домашние) вещи физического лица, бытовой инвентарь. Способ: исключительно задняя погрузка, без растентовки кузова.',
   loading_conditions:
@@ -160,16 +179,21 @@ const SEED_EXPEDITOR_ORDER_001: Omit<ExpeditorOrder, 'id'> = {
     'Новосибирская обл., р.п. Кольцово, Адрес 2',
   ],
   delivery_date: '02.11.2026',
-  delivery_contact: 'Заказчик в кабине / +7 (922) 180-09-11',
+  delivery_contact: 'Заказчик в кабине (Вельбой В.М.) / +7 961 226-94-95',
 
-  total_client_price: 70000,
+  total_client_price: 100000,
   carrier_freight_price: 70000,
+
+  deposit_amount: 5000,
+  deposit_paid: true,
+  deposit_paid_at: '2026-10-22T11:00:00.000Z',
+  deposit_terms: 'Задаток при заключении договора (оплачен Заказчиком Экспедитору)',
+
   payment_scheme: 'two_stage',
   stage1_amount: 20000,
   stage1_terms:
     'Выплачивается Экспедитором наличными сразу после завершения погрузки на обеих точках непосредственно перед отправлением.',
-  stage1_paid: true,
-  stage1_paid_at: '2026-10-30T09:30:00.000Z',
+  stage1_paid: false,
 
   stage2_amount: 50000,
   stage2_terms:
@@ -369,6 +393,12 @@ export async function POST(request: Request) {
       client_name: body.client_name || 'Заказчик',
       client_inn: body.client_inn || '',
       client_passport: body.client_passport || '',
+      client_passport_series: body.client_passport_series || '',
+      client_passport_number: body.client_passport_number || '',
+      client_passport_issued_by: body.client_passport_issued_by || '',
+      client_passport_issued_date: body.client_passport_issued_date || '',
+      client_passport_code: body.client_passport_code || '',
+      client_reg_address: body.client_reg_address || '',
       client_contact: body.client_contact || '',
       client_phone: body.client_phone || '',
       client_email: body.client_email || '',
@@ -412,6 +442,13 @@ export async function POST(request: Request) {
 
       total_client_price: Number(body.total_client_price || 0),
       carrier_freight_price: Number(body.carrier_freight_price || 0),
+
+      deposit_amount: Number(body.deposit_amount || 0),
+      deposit_paid: Boolean(body.deposit_paid),
+      deposit_paid_at: body.deposit_paid
+        ? body.deposit_paid_at || new Date().toISOString()
+        : undefined,
+      deposit_terms: body.deposit_terms || 'Задаток при заключении договора (оплачен клиентом)',
 
       payment_scheme: body.payment_scheme || 'two_stage',
       stage1_amount: Number(body.stage1_amount || 0),

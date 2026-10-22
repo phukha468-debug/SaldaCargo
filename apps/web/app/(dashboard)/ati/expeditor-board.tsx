@@ -83,6 +83,10 @@ export const ExpeditorBoard: React.FC = () => {
   } | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'individual' | 'legal'>('all');
 
+  // Режим редактирования карточки
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<ExpeditorOrder>>({});
+
   // Форма добавления новой заявки
   const [newClientType, setNewClientType] = useState<'individual' | 'legal'>('individual');
   const [newOrderNumber, setNewOrderNumber] = useState(
@@ -90,7 +94,12 @@ export const ExpeditorBoard: React.FC = () => {
   );
   const [newClientName, setNewClientName] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
-  const [newClientPassport, setNewClientPassport] = useState('');
+  const [newClientPassportSeries, setNewClientPassportSeries] = useState('');
+  const [newClientPassportNumber, setNewClientPassportNumber] = useState('');
+  const [newClientPassportIssuedBy, setNewClientPassportIssuedBy] = useState('');
+  const [newClientPassportIssuedDate, setNewClientPassportIssuedDate] = useState('');
+  const [newClientPassportCode, setNewClientPassportCode] = useState('');
+  const [newClientRegAddress, setNewClientRegAddress] = useState('');
   const [newPassengerInCabin, setNewPassengerInCabin] = useState(true);
 
   const [newCarrierName, setNewCarrierName] = useState('');
@@ -105,8 +114,10 @@ export const ExpeditorBoard: React.FC = () => {
   const [newPickupDateTime, setNewPickupDateTime] = useState('');
   const [newCargo, setNewCargo] = useState('Личные (домашние) вещи, бытовой инвентарь');
 
-  const [newTotalClientPrice, setNewTotalClientPrice] = useState('70000');
+  const [newTotalClientPrice, setNewTotalClientPrice] = useState('100000');
   const [newCarrierFreightPrice, setNewCarrierFreightPrice] = useState('70000');
+  const [newDepositAmount, setNewDepositAmount] = useState('5000');
+  const [newDepositPaid, setNewDepositPaid] = useState(true);
   const [newStage1Amount, setNewStage1Amount] = useState('20000');
   const [newStage2Amount, setNewStage2Amount] = useState('50000');
 
@@ -264,12 +275,27 @@ export const ExpeditorBoard: React.FC = () => {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Автоматически формируем полную строку паспорта, если заполнены отдельные поля
+    let fullPassport = '';
+    if (newClientPassportSeries && newClientPassportNumber) {
+      fullPassport = `Паспорт РФ: серия ${newClientPassportSeries} № ${newClientPassportNumber}, выдан ${newClientPassportIssuedBy} ${newClientPassportIssuedDate}, код подр. ${newClientPassportCode}. Зарег.: ${newClientRegAddress}`;
+    }
+
     createOrderMutation.mutate({
       order_number: newOrderNumber,
       client_type: newClientType,
-      client_name: newClientName || (newClientType === 'individual' ? 'Физлицо' : 'ООО Заказчик'),
+      client_name:
+        newClientName ||
+        (newClientType === 'individual' ? 'Вельбой Василий Михайлович' : 'ООО Заказчик'),
       client_phone: newClientPhone,
-      client_passport: newClientPassport,
+      client_passport: fullPassport,
+      client_passport_series: newClientPassportSeries,
+      client_passport_number: newClientPassportNumber,
+      client_passport_issued_by: newClientPassportIssuedBy,
+      client_passport_issued_date: newClientPassportIssuedDate,
+      client_passport_code: newClientPassportCode,
+      client_reg_address: newClientRegAddress,
       passenger_in_cabin: newPassengerInCabin,
 
       carrier_name: newCarrierName || 'ИП Перевозчик',
@@ -286,6 +312,8 @@ export const ExpeditorBoard: React.FC = () => {
 
       total_client_price: Number(newTotalClientPrice) || 0,
       carrier_freight_price: Number(newCarrierFreightPrice) || 0,
+      deposit_amount: Number(newDepositAmount) || 0,
+      deposit_paid: newDepositPaid,
       payment_scheme: 'two_stage',
       stage1_amount: Number(newStage1Amount) || 0,
       stage2_amount: Number(newStage2Amount) || 0,
@@ -630,8 +658,26 @@ export const ExpeditorBoard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Быстрая печать */}
+              {/* Быстрая печать и редактирование */}
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (isEditingOrder) {
+                      setIsEditingOrder(false);
+                    } else {
+                      setEditForm(selectedOrder);
+                      setIsEditingOrder(true);
+                    }
+                  }}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl cursor-pointer shadow flex items-center gap-1 transition ${
+                    isEditingOrder
+                      ? 'bg-amber-400 text-slate-950 font-black'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  }`}
+                  title="Редактировать параметры заказчика, паспорта, ставок и адресов"
+                >
+                  <span>{isEditingOrder ? '✕ Отмена' : '✏️ Изменить'}</span>
+                </button>
                 <button
                   onClick={() => setPrintDoc({ order: selectedOrder, type: 'order' })}
                   className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow flex items-center gap-1 transition"
@@ -647,7 +693,10 @@ export const ExpeditorBoard: React.FC = () => {
                   <span>📜 Оферта</span>
                 </button>
                 <button
-                  onClick={() => setSelectedOrder(null)}
+                  onClick={() => {
+                    setSelectedOrder(null);
+                    setIsEditingOrder(false);
+                  }}
                   className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold cursor-pointer ml-2"
                 >
                   ✕
@@ -657,7 +706,420 @@ export const ExpeditorBoard: React.FC = () => {
 
             {/* Тело модала с прокруткой */}
             <div className="p-5 overflow-y-auto space-y-5 text-xs text-slate-800">
-              {/* Сетка основных реквизитов */}
+              {/* РЕЖИМ РЕДАКТИРОВАНИЯ КАРТОЧКИ МЕНЕДЖЕРОМ */}
+              {isEditingOrder ? (
+                <div className="bg-amber-50/80 border-2 border-amber-300 rounded-2xl p-4 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">✏️</span>
+                      <h4 className="font-black text-amber-950 uppercase text-xs">
+                        Редактирование параметров заявки (для любого менеджера)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                      Изменения сразу сохраняются в базу и отражаются во всех договорах
+                    </span>
+                  </div>
+
+                  {/* 1. Блок Заказчика */}
+                  <div className="space-y-3 bg-white p-3.5 rounded-xl border border-amber-200">
+                    <div className="font-black text-slate-900 uppercase text-[11px] flex items-center justify-between">
+                      <span>1. Заказчик перевозки</span>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] font-bold text-slate-600">Тип:</label>
+                        <select
+                          value={editForm.client_type || 'individual'}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              client_type: e.target.value as 'individual' | 'legal',
+                            })
+                          }
+                          className="p-1 rounded border border-slate-300 font-bold text-slate-900"
+                        >
+                          <option value="individual">👤 Физическое лицо</option>
+                          <option value="legal">🏢 Юридическое лицо</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700">ФИО / Наименование:</label>
+                        <input
+                          type="text"
+                          value={editForm.client_name || ''}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, client_name: e.target.value })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-bold"
+                          placeholder="Вельбой Василий Михайлович"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700">
+                          Телефон (мессенджер MAX):
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.client_phone || ''}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, client_phone: e.target.value })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold"
+                          placeholder="+7 961 226-94-95"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Поля паспорта физлица */}
+                    {editForm.client_type === 'individual' && (
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <div className="text-[10px] font-black uppercase text-slate-500">
+                          Паспортные данные гражданина РФ:
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          <div>
+                            <label className="text-[10.5px] font-bold text-slate-700">Серия:</label>
+                            <input
+                              type="text"
+                              value={editForm.client_passport_series || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, client_passport_series: e.target.value })
+                              }
+                              className="w-full p-1.5 rounded-lg border border-slate-300 mt-0.5 font-mono"
+                              placeholder="6500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10.5px] font-bold text-slate-700">Номер:</label>
+                            <input
+                              type="text"
+                              value={editForm.client_passport_number || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, client_passport_number: e.target.value })
+                              }
+                              className="w-full p-1.5 rounded-lg border border-slate-300 mt-0.5 font-mono"
+                              placeholder="794763"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10.5px] font-bold text-slate-700">
+                              Дата выдачи:
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.client_passport_issued_date || ''}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  client_passport_issued_date: e.target.value,
+                                })
+                              }
+                              className="w-full p-1.5 rounded-lg border border-slate-300 mt-0.5"
+                              placeholder="13.07.2001г."
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10.5px] font-bold text-slate-700">
+                              Код подразделения:
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.client_passport_code || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, client_passport_code: e.target.value })
+                              }
+                              className="w-full p-1.5 rounded-lg border border-slate-300 mt-0.5 font-mono"
+                              placeholder="662020"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10.5px] font-bold text-slate-700">
+                            Кем выдан:
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.client_passport_issued_by || ''}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                client_passport_issued_by: e.target.value,
+                              })
+                            }
+                            className="w-full p-1.5 rounded-lg border border-slate-300 mt-0.5"
+                            placeholder="ОВД г.Верхняя Салда, по Свердловской области"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10.5px] font-bold text-slate-700">
+                            Адрес регистрации (по паспорту):
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.client_reg_address || ''}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, client_reg_address: e.target.value })
+                            }
+                            className="w-full p-1.5 rounded-lg border border-slate-300 mt-0.5"
+                            placeholder="Верхняя Салда, Энгельса 85 корп 2 кв 135"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <input
+                            type="checkbox"
+                            id="editPassCabin"
+                            checked={Boolean(editForm.passenger_in_cabin)}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, passenger_in_cabin: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-indigo-600"
+                          />
+                          <label htmlFor="editPassCabin" className="font-bold text-slate-800">
+                            💺 Пассажирское место в кабине закреплено за Заказчиком на всем маршруте
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Блок Финансов и Ставок */}
+                  <div className="space-y-3 bg-white p-3.5 rounded-xl border border-amber-200">
+                    <div className="font-black text-slate-900 uppercase text-[11px]">
+                      2. Финансы, Ставки и Порядок оплат
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700">Сумма Заказчика (Всего):</label>
+                        <input
+                          type="number"
+                          value={editForm.total_client_price ?? 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              total_client_price: Number(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold text-emerald-900"
+                          placeholder="100000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700">Ставка перевозчика:</label>
+                        <input
+                          type="number"
+                          value={editForm.carrier_freight_price ?? 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              carrier_freight_price: Number(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold text-slate-900"
+                          placeholder="70000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700">Задаток клиента (₽):</label>
+                        <input
+                          type="number"
+                          value={editForm.deposit_amount ?? 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              deposit_amount: Number(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold text-indigo-900"
+                          placeholder="5000"
+                        />
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <label className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg border border-emerald-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(editForm.deposit_paid)}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, deposit_paid: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-emerald-600"
+                          />
+                          <span className="font-bold text-emerald-950 text-[11px]">
+                            Задаток получен
+                          </span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700">1 этап (на погрузке):</label>
+                        <input
+                          type="number"
+                          value={editForm.stage1_amount ?? 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              stage1_amount: Number(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                          placeholder="20000"
+                        />
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <label className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(editForm.stage1_paid)}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, stage1_paid: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-indigo-600"
+                          />
+                          <span className="font-bold text-slate-800 text-[11px]">
+                            Аванс погрузки выплачен
+                          </span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700">2 этап (на выгрузке):</label>
+                        <input
+                          type="number"
+                          value={editForm.stage2_amount ?? 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              stage2_amount: Number(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                          placeholder="50000"
+                        />
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <label className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(editForm.stage2_paid)}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, stage2_paid: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-indigo-600"
+                          />
+                          <span className="font-bold text-slate-800 text-[11px]">
+                            Расчет на выгрузке получен
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Блок Маршрута и Перевозчика */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3.5 rounded-xl border border-amber-200">
+                    <div>
+                      <label className="font-bold text-slate-700">Дата и время погрузки:</label>
+                      <input
+                        type="text"
+                        value={editForm.pickup_date_time || ''}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, pickup_date_time: e.target.value })
+                        }
+                        className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-bold"
+                        placeholder="30.10.2026 г. ровно к 08:00"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700">
+                        Срок прибытия на разгрузку:
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.delivery_date || ''}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, delivery_date: e.target.value })
+                        }
+                        className="w-full p-2 rounded-lg border border-slate-300 mt-1"
+                        placeholder="02.11.2026"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700">Адрес погрузки:</label>
+                      <input
+                        type="text"
+                        value={editForm.pickup_address || ''}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, pickup_address: e.target.value })
+                        }
+                        className="w-full p-2 rounded-lg border border-slate-300 mt-1"
+                        placeholder="г. Верхняя Салда (2 адреса погрузки)"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700">Адрес разгрузки:</label>
+                      <input
+                        type="text"
+                        value={editForm.delivery_address || ''}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, delivery_address: e.target.value })
+                        }
+                        className="w-full p-2 rounded-lg border border-slate-300 mt-1"
+                        placeholder="Новосибирская обл., р.п. Кольцово (2 адреса)"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Кнопки сохранения изменений */}
+                  <div className="flex justify-end gap-2 pt-2 border-t border-amber-200">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingOrder(false)}
+                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold cursor-pointer"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Собираем полный паспорт
+                        let fullPass = editForm.client_passport || '';
+                        if (editForm.client_passport_series && editForm.client_passport_number) {
+                          fullPass = `Паспорт РФ: серия ${editForm.client_passport_series} № ${editForm.client_passport_number}, выдан ${editForm.client_passport_issued_by} ${editForm.client_passport_issued_date}, код подр. ${editForm.client_passport_code}. Зарег.: ${editForm.client_reg_address}`;
+                        }
+                        const payload = {
+                          ...editForm,
+                          client_passport: fullPass,
+                        };
+                        updatePaymentStatusMutation.mutate(
+                          { id: selectedOrder.id, fields: payload },
+                          {
+                            onSuccess: () => {
+                              setIsEditingOrder(false);
+                            },
+                          },
+                        );
+                      }}
+                      disabled={updatePaymentStatusMutation.isPending}
+                      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black cursor-pointer shadow"
+                    >
+                      {updatePaymentStatusMutation.isPending
+                        ? 'Сохранение...'
+                        : '✓ Сохранить изменения'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Сетка основных реквизитов (просмотр) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* 1. Блок Заказчика */}
                 <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-3.5 space-y-2">
@@ -673,16 +1135,37 @@ export const ExpeditorBoard: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <div>
-                      <strong>ФИО / Наименование:</strong> {selectedOrder.client_name}
+                      <strong>ФИО / Наименование:</strong>{' '}
+                      <span className="font-black text-slate-950 text-sm">
+                        {selectedOrder.client_name}
+                      </span>
                     </div>
                     <div>
-                      <strong>Телефон:</strong> {selectedOrder.client_phone || 'Не указан'}
+                      <strong>Телефон (мессенджер MAX):</strong>{' '}
+                      <span className="font-mono font-bold text-indigo-700">
+                        {selectedOrder.client_phone || 'Не указан'}
+                      </span>
                     </div>
-                    {selectedOrder.client_passport && (
-                      <div>
+                    {selectedOrder.client_passport_series &&
+                    selectedOrder.client_passport_number ? (
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 mt-1 space-y-0.5 text-[11px]">
+                        <div>
+                          <strong>Паспорт:</strong> серия {selectedOrder.client_passport_series} №{' '}
+                          {selectedOrder.client_passport_number}, выдан{' '}
+                          {selectedOrder.client_passport_issued_by}{' '}
+                          {selectedOrder.client_passport_issued_date}, код{' '}
+                          {selectedOrder.client_passport_code}
+                        </div>
+                        <div>
+                          <strong>Регистрация:</strong> {selectedOrder.client_reg_address}
+                        </div>
+                      </div>
+                    ) : selectedOrder.client_passport ? (
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 mt-1 text-[11px]">
                         <strong>Паспорт:</strong> {selectedOrder.client_passport}
                       </div>
-                    )}
+                    ) : null}
+
                     {selectedOrder.passenger_in_cabin && (
                       <div className="bg-amber-100 text-amber-900 border border-amber-300 p-2 rounded-xl font-bold mt-2">
                         💺 Пассажирское место в кабине закреплено за Заказчиком на всем маршруте
@@ -725,27 +1208,89 @@ export const ExpeditorBoard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. Финансовая схема и 2 этапа оплаты */}
+              {/* 3. Финансовая схема: Задаток, Ставка клиента, Фрахт водителя, Маржа и 2 этапа оплаты */}
               <div className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-200 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">💰</span>
                     <span className="font-black text-emerald-950 uppercase">
                       Порядок расчётов и фиксация оплаты
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 font-mono font-black text-sm">
-                    <span className="text-slate-600">Всего:</span>
-                    <span className="text-emerald-900">
-                      {selectedOrder.carrier_freight_price.toLocaleString('ru-RU')} ₽
-                    </span>
+                  <div className="flex items-center gap-3 font-mono font-black text-xs sm:text-sm">
+                    <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700">
+                      Клиент:{' '}
+                      <span className="text-emerald-950">
+                        {selectedOrder.total_client_price.toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700">
+                      Водитель:{' '}
+                      <span className="text-slate-900">
+                        {selectedOrder.carrier_freight_price.toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <div className="bg-emerald-600 px-2.5 py-1 rounded-lg text-white">
+                      Маржа:{' '}
+                      <span>
+                        +
+                        {(
+                          selectedOrder.total_client_price - selectedOrder.carrier_freight_price
+                        ).toLocaleString('ru-RU')}{' '}
+                        ₽
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Задаток */}
+                  <div
+                    className={`p-3 rounded-xl border-2 transition ${
+                      selectedOrder.deposit_paid
+                        ? 'bg-emerald-100/50 border-emerald-400'
+                        : 'bg-white border-amber-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900">Задаток клиента</span>
+                      <span className="font-mono font-black text-emerald-900">
+                        {(selectedOrder.deposit_amount || 5000).toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1">
+                      {selectedOrder.deposit_terms ||
+                        'Внесён клиентом Экспедитору при согласовании договора.'}
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500">
+                        {selectedOrder.deposit_paid ? '✓ Задаток оплачен' : '⏳ Ожидает внесения'}
+                      </span>
+                      <button
+                        onClick={() =>
+                          updatePaymentStatusMutation.mutate({
+                            id: selectedOrder.id,
+                            fields: { deposit_paid: !selectedOrder.deposit_paid },
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black cursor-pointer transition ${
+                          selectedOrder.deposit_paid
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                        }`}
+                      >
+                        {selectedOrder.deposit_paid ? '✓ Оплачен' : 'Отметить задаток'}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Этап 1 */}
                   <div
-                    className={`p-3 rounded-xl border-2 transition ${selectedOrder.stage1_paid ? 'bg-emerald-100/50 border-emerald-400' : 'bg-white border-amber-300'}`}
+                    className={`p-3 rounded-xl border-2 transition ${
+                      selectedOrder.stage1_paid
+                        ? 'bg-emerald-100/50 border-emerald-400'
+                        : 'bg-white border-amber-300'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">1 этап: Аванс на погрузке</span>
@@ -754,14 +1299,15 @@ export const ExpeditorBoard: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-600 mt-1">
-                      {selectedOrder.stage1_terms ||
-                        'Выплачивается Экспедитором наличными на погрузке перед отправлением.'}
+                      Погрузка: <strong>{selectedOrder.pickup_date_time || '30.10.2026 г.'}</strong>
+                      . Выплачивается Экспедитором наличными сразу после погрузки перед
+                      отправлением.
                     </p>
                     <div className="mt-2.5 pt-2 border-t border-slate-200 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-500">
                         {selectedOrder.stage1_paid
                           ? '✓ Выплачено на погрузке'
-                          : '⏳ Ожидает выплаты'}
+                          : '⏳ Ожидает погрузки 30.10'}
                       </span>
                       <button
                         onClick={() =>
@@ -783,7 +1329,11 @@ export const ExpeditorBoard: React.FC = () => {
 
                   {/* Этап 2 */}
                   <div
-                    className={`p-3 rounded-xl border-2 transition ${selectedOrder.stage2_paid ? 'bg-emerald-100/50 border-emerald-400' : 'bg-white border-slate-300'}`}
+                    className={`p-3 rounded-xl border-2 transition ${
+                      selectedOrder.stage2_paid
+                        ? 'bg-emerald-100/50 border-emerald-400'
+                        : 'bg-white border-slate-300'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">2 этап: Расчет на выгрузке</span>
@@ -1192,19 +1742,75 @@ export const ExpeditorBoard: React.FC = () => {
                   />
                 </div>
                 {newClientType === 'individual' && (
-                  <div className="md:col-span-2 space-y-2">
+                  <div className="md:col-span-2 space-y-2 pt-2 border-t border-slate-200">
+                    <div className="text-[10px] font-black uppercase text-slate-500">
+                      Паспорт гражданина РФ (для бланков Договора-Заявки и Оферты):
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <div>
+                        <label className="font-bold text-slate-700">Серия:</label>
+                        <input
+                          type="text"
+                          value={newClientPassportSeries}
+                          onChange={(e) => setNewClientPassportSeries(e.target.value)}
+                          placeholder="6500"
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700">Номер:</label>
+                        <input
+                          type="text"
+                          value={newClientPassportNumber}
+                          onChange={(e) => setNewClientPassportNumber(e.target.value)}
+                          placeholder="794763"
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700">Дата выдачи:</label>
+                        <input
+                          type="text"
+                          value={newClientPassportIssuedDate}
+                          onChange={(e) => setNewClientPassportIssuedDate(e.target.value)}
+                          placeholder="13.07.2001г."
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700">Код подр.:</label>
+                        <input
+                          type="text"
+                          value={newClientPassportCode}
+                          onChange={(e) => setNewClientPassportCode(e.target.value)}
+                          placeholder="662020"
+                          className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="font-bold text-slate-700">
-                        Паспортные данные заказчика (для договора/расписки):
-                      </label>
+                      <label className="font-bold text-slate-700">Кем выдан:</label>
                       <input
                         type="text"
-                        value={newClientPassport}
-                        onChange={(e) => setNewClientPassport(e.target.value)}
-                        placeholder="Серия, номер, кем и когда выдан, адрес регистрации"
+                        value={newClientPassportIssuedBy}
+                        onChange={(e) => setNewClientPassportIssuedBy(e.target.value)}
+                        placeholder="ОВД г.Верхняя Салда, по Свердловской области"
                         className="w-full p-2 rounded-lg border border-slate-300 mt-1"
                       />
                     </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700">Адрес регистрации:</label>
+                      <input
+                        type="text"
+                        value={newClientRegAddress}
+                        onChange={(e) => setNewClientRegAddress(e.target.value)}
+                        placeholder="Верхняя Салда, Энгельса 85 корп 2 кв 135"
+                        className="w-full p-2 rounded-lg border border-slate-300 mt-1"
+                      />
+                    </div>
+
                     <div className="flex items-center gap-2 pt-1">
                       <input
                         type="checkbox"
@@ -1334,43 +1940,85 @@ export const ExpeditorBoard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Финансы: клиент, водитель и этапы */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-emerald-50/70 p-3 rounded-xl border border-emerald-300">
-                <div>
-                  <label className="font-bold text-slate-700">Ставка заказчика:</label>
-                  <input
-                    type="number"
-                    value={newTotalClientPrice}
-                    onChange={(e) => setNewTotalClientPrice(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold"
-                  />
+              {/* Финансы: клиент, задаток, водитель и этапы */}
+              <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-300 space-y-2">
+                <div className="font-bold text-emerald-950 text-[11px] uppercase">
+                  Финансовые условия рейса:
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700">Ставка перевозчика:</label>
-                  <input
-                    type="number"
-                    value={newCarrierFreightPrice}
-                    onChange={(e) => setNewCarrierFreightPrice(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold"
-                  />
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700">Сумма Заказчика (Всего):</label>
+                    <input
+                      type="number"
+                      value={newTotalClientPrice}
+                      onChange={(e) => setNewTotalClientPrice(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold text-emerald-900"
+                      placeholder="100000"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700">Ставка перевозчика:</label>
+                    <input
+                      type="number"
+                      value={newCarrierFreightPrice}
+                      onChange={(e) => setNewCarrierFreightPrice(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold text-slate-900"
+                      placeholder="70000"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700">Задаток клиента (₽):</label>
+                    <input
+                      type="number"
+                      value={newDepositAmount}
+                      onChange={(e) => setNewDepositAmount(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono font-bold text-indigo-900"
+                      placeholder="5000"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700">1 этап (на погрузке):</label>
+                    <input
+                      type="number"
+                      value={newStage1Amount}
+                      onChange={(e) => setNewStage1Amount(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                      placeholder="20000"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700">2 этап (на выгрузке):</label>
+                    <input
+                      type="number"
+                      value={newStage2Amount}
+                      onChange={(e) => setNewStage2Amount(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
+                      placeholder="50000"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700">1 этап (на погрузке):</label>
-                  <input
-                    type="number"
-                    value={newStage1Amount}
-                    onChange={(e) => setNewStage1Amount(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700">2 этап (на выгрузке):</label>
-                  <input
-                    type="number"
-                    value={newStage2Amount}
-                    onChange={(e) => setNewStage2Amount(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 mt-1 font-mono"
-                  />
+
+                <div className="flex items-center justify-between pt-1 border-t border-emerald-200">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newDepositPaid}
+                      onChange={(e) => setNewDepositPaid(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600"
+                    />
+                    <span className="font-bold text-emerald-950 text-[11px]">
+                      Задаток {Number(newDepositAmount || 0).toLocaleString('ru-RU')} ₽ уже внесён
+                      клиентом
+                    </span>
+                  </label>
+
+                  <div className="text-[11px] font-mono font-black text-emerald-900">
+                    Ожидаемая маржа: +
+                    {(
+                      Number(newTotalClientPrice || 0) - Number(newCarrierFreightPrice || 0)
+                    ).toLocaleString('ru-RU')}{' '}
+                    ₽
+                  </div>
                 </div>
               </div>
 

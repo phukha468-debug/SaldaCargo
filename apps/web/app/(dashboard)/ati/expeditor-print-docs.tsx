@@ -98,8 +98,57 @@ export const ExpeditorPrintDocs: React.FC<ExpeditorPrintDocsProps> = ({
                       БИК 044525974
                     </div>
                     <div className="font-bold text-slate-900 mt-1">
-                      Официальный номер для связи и фиксации инцидентов: +7 (922) 180-09-11
+                      Официальный номер для связи и фиксации инцидентов (MAX): +7 (922) 180-09-11
                     </div>
+                  </td>
+                </tr>
+
+                {/* 1.1. ЗАКАЗЧИК ПЕРЕВОЗКИ */}
+                <tr className="border-b border-slate-900 bg-sky-50/40">
+                  <td className="p-2 font-bold bg-slate-100 border-r border-slate-900 align-top uppercase">
+                    1.1. ЗАКАЗЧИК
+                  </td>
+                  <td className="p-2 align-top">
+                    <div className="font-bold text-slate-950 text-[11.5px]">
+                      {order.client_name || 'Вельбой Василий Михайлович'}
+                    </div>
+                    {order.client_type === 'individual' ? (
+                      <div className="space-y-0.5 mt-0.5">
+                        <div>
+                          <strong>Паспортные данные:</strong>{' '}
+                          {order.client_passport_series && order.client_passport_number ? (
+                            <>
+                              серия {order.client_passport_series} № {order.client_passport_number},
+                              выдан {order.client_passport_issued_by}{' '}
+                              {order.client_passport_issued_date}, код подразделения{' '}
+                              {order.client_passport_code}
+                            </>
+                          ) : (
+                            order.client_passport || 'Паспорт гражданина РФ'
+                          )}
+                        </div>
+                        <div>
+                          <strong>Адрес регистрации:</strong>{' '}
+                          {order.client_reg_address ||
+                            'Свердловская обл., г. Верхняя Салда, ул. Энгельса, д. 85, корп. 2, кв. 135'}
+                        </div>
+                        <div>
+                          <strong>Телефон (мессенджер «MAX»):</strong>{' '}
+                          <span className="font-mono font-bold text-slate-900">
+                            {order.client_phone || '+7 961 226-94-95'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5 mt-0.5">
+                        <div>
+                          <strong>ИНН:</strong> {order.client_inn || '—'}
+                        </div>
+                        <div>
+                          <strong>Телефон:</strong> {order.client_phone || '—'}
+                        </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
 
@@ -229,14 +278,31 @@ export const ExpeditorPrintDocs: React.FC<ExpeditorPrintDocsProps> = ({
                   <td className="p-2 font-bold bg-slate-100 border-r border-slate-900 align-top uppercase">
                     7. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ
                   </td>
-                  <td className="p-2 align-top space-y-1">
-                    <div className="font-bold">
-                      Общая стоимость перевозки:{' '}
+                  <td className="p-2 align-top space-y-1.5">
+                    {order.total_client_price ? (
+                      <div className="font-bold text-slate-950">
+                        Общая стоимость услуг для Заказчика:{' '}
+                        {order.total_client_price.toLocaleString('ru-RU')} рублей (НДС не
+                        облагается).
+                      </div>
+                    ) : null}
+
+                    {order.deposit_amount ? (
+                      <div className="bg-emerald-50/80 border border-emerald-300 p-1 rounded text-emerald-950 font-sans">
+                        <strong>Задаток:</strong> {order.deposit_amount.toLocaleString('ru-RU')}{' '}
+                        рублей{' '}
+                        {order.deposit_paid ? '(внесён Заказчиком Экспедитору)' : '(к оплате)'}.
+                      </div>
+                    ) : null}
+
+                    <div className="font-bold text-slate-800">
+                      Ставка Перевозчика (фрахт):{' '}
                       {order.carrier_freight_price.toLocaleString('ru-RU')} рублей (НДС не
                       облагается).
                     </div>
+
                     {order.payment_scheme === 'two_stage' ? (
-                      <>
+                      <div className="space-y-1 pt-1 border-t border-slate-300">
                         <div>
                           <strong>
                             1 этап: {order.stage1_amount?.toLocaleString('ru-RU')} рублей
@@ -253,7 +319,7 @@ export const ExpeditorPrintDocs: React.FC<ExpeditorPrintDocsProps> = ({
                           {order.stage2_terms ||
                             'оплачивается Заказчиком (физическим лицом) наличными денежными средствами Перевозчику на второй (конечной) точке разгрузки.'}
                         </div>
-                      </>
+                      </div>
                     ) : (
                       <div>Оплата по договоренности: 100% постоплата по оригиналам документов.</div>
                     )}
@@ -292,7 +358,7 @@ export const ExpeditorPrintDocs: React.FC<ExpeditorPrintDocsProps> = ({
             </div>
 
             {/* Подписи и печати */}
-            <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-400">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-slate-400">
               <div className="space-y-1">
                 <div className="font-bold uppercase text-[11px]">ЭКСПЕДИТОР</div>
                 <div className="font-bold">ИП Нигамедьянов Александр Сергеевич</div>
@@ -300,10 +366,10 @@ export const ExpeditorPrintDocs: React.FC<ExpeditorPrintDocsProps> = ({
                   ИНН: 660704814106 / ОГРНИП: 321665800053976
                 </div>
                 <div className="pt-8 flex items-end">
-                  <div className="border-b border-slate-900 w-48 text-center text-[10px] text-slate-500">
+                  <div className="border-b border-slate-900 w-full text-center text-[10px] text-slate-500">
                     / Нигамедьянов А.С. /
                   </div>
-                  <div className="ml-2 text-[10px] text-slate-400">М.П.</div>
+                  <div className="ml-1 text-[10px] text-slate-400">М.П.</div>
                 </div>
               </div>
 
@@ -314,10 +380,27 @@ export const ExpeditorPrintDocs: React.FC<ExpeditorPrintDocsProps> = ({
                   ИНН: {order.carrier_inn} / ОГРНИП: {order.carrier_ogrnip}
                 </div>
                 <div className="pt-8 flex items-end">
-                  <div className="border-b border-slate-900 w-48 text-center text-[10px] text-slate-500">
+                  <div className="border-b border-slate-900 w-full text-center text-[10px] text-slate-500">
                     / {order.carrier_driver_name || 'Салихов Р.М.'} /
                   </div>
-                  <div className="ml-2 text-[10px] text-slate-400">М.П.</div>
+                  <div className="ml-1 text-[10px] text-slate-400">М.П.</div>
+                </div>
+              </div>
+
+              <div className="space-y-1 bg-slate-50 p-2 rounded border border-slate-300">
+                <div className="font-bold uppercase text-[11px] text-slate-900">
+                  ЗАКАЗЧИК ПЕРЕВОЗКИ
+                </div>
+                <div className="font-bold truncate">{order.client_name || 'Вельбой В.М.'}</div>
+                <div className="text-[10px] text-slate-600">
+                  {order.client_passport_series && order.client_passport_number
+                    ? `Паспорт ${order.client_passport_series} ${order.client_passport_number}`
+                    : 'Паспорт гражданина РФ'}
+                </div>
+                <div className="pt-6 flex items-end">
+                  <div className="border-b border-slate-900 w-full text-center text-[10px] text-slate-500">
+                    / {order.client_name.split(' ').slice(0, 2).join(' ') || 'Заказчик'} /
+                  </div>
                 </div>
               </div>
             </div>
