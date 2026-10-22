@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 
@@ -160,17 +160,6 @@ export default function AtiPage() {
   const [filterDoc, setFilterDoc] = useState<'all' | 'etrn' | 'paper'>('all');
   const [selectedOrder, setSelectedOrder] = useState<AtiOrder | null>(null);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-
-  // Состояние раскрытых спойлеров для карточек заявок
-  const [expandedOrderIds, setExpandedOrderIds] = useState<Record<string, boolean>>({});
-
-  const toggleOrderExpand = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setExpandedOrderIds((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
 
   // Форма новой заявки
   const [newOrderNumber, setNewOrderNumber] = useState(
@@ -478,6 +467,39 @@ export default function AtiPage() {
   const orders = data?.orders || [];
   const counterparties = data?.counterparties || [];
 
+  // Синхронизация активного выбранного договора с актуальными данными из кэша
+  const activeSelectedOrder = useMemo(
+    () => (selectedOrder ? (orders.find((o) => o.id === selectedOrder.id) ?? selectedOrder) : null),
+    [orders, selectedOrder],
+  );
+
+  const contractModalBackdropRef = useRef(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (viewingPowerOfAttorney) {
+          setViewingPowerOfAttorney(null);
+          return;
+        }
+        if (cancellingOrder) {
+          setCancellingOrder(null);
+          return;
+        }
+        if (selectedOrder) {
+          setSelectedOrder(null);
+          return;
+        }
+        if (isNewModalOpen) {
+          setIsNewModalOpen(false);
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedOrder, viewingPowerOfAttorney, cancellingOrder, isNewModalOpen]);
+
   // Разделение на активные, претензии и простые срывы
   const cancelledOrders = orders.filter((o) => o.is_cancelled || o.stage === 0);
   const claimOrders = cancelledOrders.filter((o) => o.has_claim);
@@ -615,33 +637,6 @@ export default function AtiPage() {
               📮 Почта РФ ({activeOrders.filter((o) => o.doc_type === 'paper').length})
             </button>
           </div>
-
-          {/* Кнопка спойлеров: свернуть/развернуть все */}
-          {activeOrders.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                const anyCollapsed = activeOrders.some((o) => !expandedOrderIds[o.id]);
-                if (anyCollapsed) {
-                  const all: Record<string, boolean> = {};
-                  activeOrders.forEach((o) => {
-                    all[o.id] = true;
-                  });
-                  setExpandedOrderIds(all);
-                } else {
-                  setExpandedOrderIds({});
-                }
-              }}
-              className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
-              title="Переключить компактный вид всех карточек заявок"
-            >
-              <span>
-                {activeOrders.some((o) => !expandedOrderIds[o.id])
-                  ? '🔽 Развернуть все'
-                  : '🔼 Свернуть все'}
-              </span>
-            </button>
-          )}
 
           {/* Кнопка претензий и архива */}
           {claimOrders.length > 0 && (
@@ -932,8 +927,6 @@ export default function AtiPage() {
                     </div>
                   ) : (
                     colOrders.map((order) => {
-                      const isExpanded = Boolean(expandedOrderIds[order.id]);
-
                       // Валидация 3 пунктов на этапе 5 (Документы)
                       const isStage5 = stageNum === 5;
                       const isDocsSent = Boolean(order.docs_sent);
@@ -950,547 +943,203 @@ export default function AtiPage() {
                       return (
                         <div
                           key={order.id}
-                          className="bg-white rounded-xl border-2 border-slate-300 hover:border-indigo-400 hover:shadow-card p-2 space-y-1.5 text-xs shadow-2xs transition relative"
+                          onClick={() => setSelectedOrder(order)}
+                          className="bg-white rounded-2xl border-2 border-slate-300 hover:border-indigo-500 hover:shadow-md p-2.5 space-y-2 text-xs shadow-2xs transition cursor-pointer group select-none relative"
+                          title="Нажмите, чтобы открыть полноэкранный договор-заявку"
                         >
-                          {/* ── КОМПАКТНАЯ ШАПКА КАРТОЧКИ: ВСЕГДА ВИДНО ТОЛЬКО КОНТРАГЕНТА И РЕЙС ── */}
-                          <div
-                            onClick={() => toggleOrderExpand(order.id)}
-                            className="cursor-pointer select-none group"
-                            title={
-                              isExpanded
-                                ? 'Нажмите, чтобы свернуть'
-                                : 'Нажмите, чтобы раскрыть подробности'
-                            }
-                          >
-                            {/* Контрагент */}
-                            <div className="flex items-start justify-between gap-1">
-                              <div
-                                className="font-black text-slate-900 truncate text-[11px] group-hover:text-indigo-600 transition"
-                                title={order.counterparty_name}
-                              >
-                                {order.counterparty_name}
-                              </div>
+                          {/* Шапка: Номер, Документ, Фрахт */}
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-mono font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] shrink-0 border border-slate-200">
+                                {order.order_number.split(' ')[0] || order.order_number}
+                              </span>
                               <span
-                                className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold shrink-0 transition ${
-                                  isExpanded
-                                    ? 'bg-slate-200 text-slate-700'
-                                    : 'bg-indigo-50 text-indigo-700 group-hover:bg-indigo-100'
+                                className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                                  order.doc_type === 'etrn'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : 'bg-amber-100 text-amber-900 border-amber-300'
                                 }`}
                               >
-                                {isExpanded ? '▲' : '▼'}
+                                {order.doc_type === 'etrn' ? '⚡ ЭТрН' : '📮 Почта'}
                               </span>
                             </div>
+                            <span className="font-mono font-black text-slate-900 text-xs shrink-0">
+                              {Number(order.price || 0).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
 
-                            {/* Рейс: Номер + Маршрут + Авто */}
-                            <div className="pt-0.5">
-                              <div className="text-[10px] font-bold text-slate-700 truncate flex items-center gap-1">
-                                <span className="font-mono text-slate-900 bg-slate-100 px-1 rounded text-[9px] shrink-0">
-                                  {order.order_number.split(' ')[0] || order.order_number}
-                                </span>
-                                <span className="truncate">
-                                  {order.pickup_address
-                                    ? order.pickup_address.split(',')[1] ||
-                                      order.pickup_address.split(',')[0]
-                                    : 'Погрузка'}
-                                  {' ➔ '}
-                                  {order.delivery_address
-                                    ? order.delivery_address.split(',')[1] ||
-                                      order.delivery_address.split(',')[0]
-                                    : 'Выгрузка'}
-                                </span>
-                              </div>
-                              {order.asset_name && (
-                                <div className="text-[9px] text-slate-500 truncate flex items-center justify-between pt-0.5">
-                                  <span>{order.asset_name}</span>
-                                  {isStage5 && !isExpanded && (
-                                    <span
-                                      className={`text-[8px] font-mono font-black px-1 rounded border ${
-                                        isStage5Ready
-                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                          : 'bg-amber-50 text-amber-900 border-amber-300'
-                                      }`}
-                                      title={
-                                        isStage5Ready
-                                          ? 'Все 3 пункта заполнены (готово к дебиторке)'
-                                          : `Заполнено ${stage5CompletedCount} из 3 пунктов для дебиторки`
-                                      }
-                                    >
-                                      {isStage5Ready ? '3/3 ✓' : `${stage5CompletedCount}/3`}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+                          {/* Контрагент */}
+                          <div>
+                            <div
+                              className="font-black text-slate-900 text-[11px] leading-snug line-clamp-2 group-hover:text-indigo-600 transition"
+                              title={order.counterparty_name}
+                            >
+                              {order.counterparty_name}
+                            </div>
+                            {order.ati_code && (
+                              <span className="text-[9px] font-mono text-indigo-700 font-bold">
+                                АТИ {order.ati_code}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Маршрут */}
+                          <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/80 space-y-1 text-[10px]">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-700 truncate">
+                              <span className="text-emerald-600 text-xs shrink-0">🟢</span>
+                              <span className="truncate">
+                                {order.pickup_address
+                                  ? order.pickup_address.split(',')[1] ||
+                                    order.pickup_address.split(',')[0]
+                                  : 'Погрузка'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 font-bold text-slate-700 truncate">
+                              <span className="text-rose-600 text-xs shrink-0">🔴</span>
+                              <span className="truncate">
+                                {order.delivery_address
+                                  ? order.delivery_address.split(',')[1] ||
+                                    order.delivery_address.split(',')[0]
+                                  : 'Выгрузка'}
+                              </span>
                             </div>
                           </div>
 
-                          {/* ── ТЕЛО СПОЙЛЕРА (ОТКРЫВАЕТСЯ ПО КЛИКУ НА КАРТОЧКУ) ── */}
-                          {isExpanded && (
-                            <div className="space-y-2 pt-1 border-t border-slate-200 animate-in fade-in duration-150">
-                              {/* Тип документа и Фрахт */}
-                              <div className="flex justify-between items-center text-[10px] bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                                <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
-                                    order.doc_type === 'etrn'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                      : 'bg-amber-100 text-amber-900 border-amber-300'
-                                  }`}
-                                >
-                                  {order.doc_type === 'etrn' ? '⚡ ЭТрН' : '📮 Почта'}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-slate-500">Фрахт:</span>
-                                  <span className="font-mono font-black text-slate-900">
-                                    {Number(order.price || 0).toLocaleString('ru-RU')} ₽
+                          {/* Авто и Водитель */}
+                          <div className="text-[10px] text-slate-600 space-y-0.5 pt-0.5">
+                            {order.asset_name && (
+                              <div className="truncate flex items-center gap-1">
+                                <span>🚛</span>
+                                <span className="font-bold text-slate-800">{order.asset_name}</span>
+                                {order.asset_reg_number && (
+                                  <span className="font-mono text-[9px] text-slate-500">
+                                    ({order.asset_reg_number})
                                   </span>
-                                </div>
-                              </div>
-
-                              {/* 1. КОНТАКТЫ КОНТРАГЕНТА (ЗАКАЗЧИКА) */}
-                              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-1 text-[10px]">
-                                <div className="text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
-                                  <span>👤 Контрагент / Заказчик</span>
-                                  {order.ati_code && (
-                                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 rounded border border-indigo-200 text-[9px]">
-                                      {order.ati_code}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="font-bold text-slate-900 truncate text-[11px]">
-                                  {order.counterparty_name}
-                                </div>
-                                {order.counterparty_contact && (
-                                  <div className="text-slate-700 text-[10px]">
-                                    <span className="text-slate-500">Контакт: </span>
-                                    <span className="font-semibold">
-                                      {order.counterparty_contact}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
-                                  {order.counterparty_phone && (
-                                    <a
-                                      href={`tel:${order.counterparty_phone.replace(/[^\d+]/g, '')}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline flex items-center gap-0.5"
-                                      title="Позвонить контрагенту"
-                                    >
-                                      <span>📞</span>
-                                      <span>{order.counterparty_phone}</span>
-                                    </a>
-                                  )}
-                                  {order.counterparty_email && (
-                                    <a
-                                      href={`mailto:${order.counterparty_email}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="text-slate-600 hover:text-slate-900 font-medium hover:underline flex items-center gap-0.5"
-                                      title="Написать email"
-                                    >
-                                      <span>✉️</span>
-                                      <span className="truncate max-w-[130px]">
-                                        {order.counterparty_email}
-                                      </span>
-                                    </a>
-                                  )}
-                                </div>
-                                {order.counterparty_inn && (
-                                  <div className="text-[9px] text-slate-500 font-mono">
-                                    ИНН: {order.counterparty_inn}
-                                  </div>
                                 )}
                               </div>
-
-                              {/* 2. МАРШРУТ И ТОЧКИ (ПОГРУЗКА И ВЫГРУЗКА) */}
-                              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-1.5 text-[10px]">
-                                {/* Погрузка */}
-                                <div className="space-y-0.5">
-                                  <div className="text-[9px] font-bold text-emerald-800 flex items-center gap-1">
-                                    <span>🟢</span>
-                                    <span>Погрузка:</span>
-                                    {order.pickup_date_time && (
-                                      <span className="font-mono text-slate-600 font-semibold ml-auto text-[9px]">
-                                        {order.pickup_date_time}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-slate-800 text-[10px] leading-tight font-medium pl-3">
-                                    {order.pickup_address || 'Адрес не указан'}
-                                  </div>
-                                  {order.pickup_contact && (
-                                    <div className="text-[9px] text-slate-600 pl-3">
-                                      <span className="text-slate-400">Склад: </span>
-                                      <span className="font-medium">{order.pickup_contact}</span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Выгрузка */}
-                                <div className="space-y-0.5 pt-1 border-t border-slate-200/80">
-                                  <div className="text-[9px] font-bold text-rose-800 flex items-center gap-1">
-                                    <span>🔴</span>
-                                    <span>Выгрузка:</span>
-                                    {order.delivery_date && (
-                                      <span className="font-mono text-slate-600 font-semibold ml-auto text-[9px]">
-                                        {order.delivery_date}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-slate-800 text-[10px] leading-tight font-medium pl-3">
-                                    {order.delivery_address || 'Адрес не указан'}
-                                  </div>
-                                  {order.delivery_contact && (
-                                    <div className="text-[9px] text-slate-600 pl-3">
-                                      <span className="text-slate-400">Контакт: </span>
-                                      <span className="font-medium">{order.delivery_contact}</span>
-                                    </div>
-                                  )}
-                                </div>
+                            )}
+                            {order.driver_name && (
+                              <div className="truncate flex items-center gap-1 text-[9px] text-slate-500">
+                                <span>👤</span>
+                                <span className="truncate">{order.driver_name}</span>
                               </div>
+                            )}
+                          </div>
 
-                              {/* 3. ГРУЗ, АВТОМОБИЛЬ И ВОДИТЕЛЬ */}
-                              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-1 text-[10px]">
-                                {order.cargo_description && (
-                                  <div>
-                                    <span className="text-[9px] text-slate-500 font-bold uppercase">
-                                      Груз:{' '}
-                                    </span>
-                                    <span className="text-slate-800 font-medium">
-                                      {order.cargo_description}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex items-center justify-between gap-1 text-[9px] pt-0.5">
-                                  <span className="text-slate-500">Авто / Госномер:</span>
-                                  <span className="font-bold text-slate-800 font-mono">
-                                    {order.asset_name}{' '}
-                                    {order.asset_reg_number ? `(${order.asset_reg_number})` : ''}
-                                  </span>
-                                </div>
-                                {order.driver_name && (
-                                  <div className="flex items-center justify-between gap-1 text-[9px]">
-                                    <span className="text-slate-500">Водитель:</span>
-                                    <div className="font-semibold text-slate-800 text-right">
-                                      <div>{order.driver_name}</div>
-                                      {order.driver_phone && (
-                                        <a
-                                          href={`tel:${order.driver_phone.replace(/[^\d+]/g, '')}`}
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="text-blue-600 hover:underline font-mono text-[9px]"
-                                        >
-                                          📞 {order.driver_phone}
-                                        </a>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* 4. УСЛОВИЯ ОПЛАТЫ И ПОЧТОВЫЙ АДРЕС */}
-                              <div className="bg-amber-50/80 p-1.5 rounded-lg border border-amber-200 space-y-1 text-[10px]">
-                                <div className="text-[9px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
-                                  <span>💳</span>
-                                  <span>Условия оплаты и документы</span>
-                                </div>
-                                {order.payment_terms && (
-                                  <div className="text-slate-800 text-[10px]">
-                                    <span className="text-amber-800 font-bold">Сроки оплаты: </span>
-                                    <span className="font-medium">{order.payment_terms}</span>
-                                  </div>
-                                )}
-                                {order.postal_address && (
-                                  <div className="text-slate-700 text-[9px] leading-tight">
-                                    <span className="text-amber-800 font-bold">
-                                      Адрес для почты:{' '}
-                                    </span>
-                                    <span>{order.postal_address}</span>
-                                  </div>
-                                )}
-                                {order.notes && (
-                                  <div className="text-slate-600 text-[9px] italic border-t border-amber-200/60 pt-0.5">
-                                    {order.notes}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* На этапе 5 (Документы) — полный блок документооборота с 3 галочками */}
-                              {stageNum === 5 && (
-                                <div className="space-y-1.5 bg-purple-50/70 p-2 rounded-lg border border-purple-200">
-                                  <div className="text-[10px] font-black text-purple-950 uppercase tracking-wider flex items-center justify-between">
-                                    <span>📄 Документооборот</span>
-                                    <span
-                                      className={`text-[9px] font-mono font-bold px-1 rounded ${
-                                        isStage5Ready
-                                          ? 'bg-emerald-100 text-emerald-800'
-                                          : 'bg-amber-100 text-amber-900'
-                                      }`}
-                                    >
-                                      {stage5CompletedCount}/3 галочек
-                                    </span>
-                                  </div>
-
-                                  {/* 1. Галочка «Документы отправлены» + «Код отправления» */}
-                                  <div className="space-y-1 bg-white/95 p-1.5 rounded border border-purple-200">
-                                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-800 select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={Boolean(order.docs_sent)}
-                                        onChange={(e) => {
-                                          const checked = e.target.checked;
-                                          updateDocFieldsMutation.mutate({
-                                            id: order.id,
-                                            docs_sent: checked,
-                                            docs_sent_date: checked
-                                              ? order.docs_sent_date ||
-                                                new Date().toISOString().split('T')[0]
-                                              : null,
-                                          });
-                                        }}
-                                        className="rounded border-purple-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                                      />
-                                      <span>1. Отправлено на почту</span>
-                                      {order.docs_sent_date && (
-                                        <span className="text-[8px] font-mono font-bold text-purple-700 bg-purple-100 px-1 py-0.2 rounded ml-auto">
-                                          {order.docs_sent_date}
-                                        </span>
-                                      )}
-                                    </label>
-
-                                    <div className="flex items-center gap-1 pt-0.5">
-                                      <span className="text-[9px] text-slate-500 font-medium whitespace-nowrap">
-                                        Код:
-                                      </span>
-                                      <input
-                                        type="text"
-                                        defaultValue={order.postal_tracking_number || ''}
-                                        onBlur={(e) => {
-                                          const val = e.target.value.trim();
-                                          if (val !== (order.postal_tracking_number || '')) {
-                                            updateDocFieldsMutation.mutate({
-                                              id: order.id,
-                                              postal_tracking_number: val,
-                                              docs_sent: val ? true : order.docs_sent,
-                                              docs_sent_date:
-                                                val && !order.docs_sent_date
-                                                  ? new Date().toISOString().split('T')[0]
-                                                  : order.docs_sent_date,
-                                            });
-                                          }
-                                        }}
-                                        placeholder="Код отправления (трек)..."
-                                        className="w-full px-1.5 py-0.5 border border-purple-300 rounded text-[10px] font-mono font-bold bg-white text-slate-900"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* 2. Галочка «Документы получены на почте / контрагентом» */}
-                                  <div className="bg-white/95 p-1.5 rounded border border-purple-200">
-                                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-800 select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={Boolean(order.docs_received)}
-                                        onChange={(e) => {
-                                          const checked = e.target.checked;
-                                          updateDocFieldsMutation.mutate({
-                                            id: order.id,
-                                            docs_received: checked,
-                                            docs_received_date: checked
-                                              ? order.docs_received_date ||
-                                                new Date().toISOString().split('T')[0]
-                                              : null,
-                                          });
-                                        }}
-                                        className="rounded border-purple-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                                      />
-                                      <span>2. Получено на почте</span>
-                                      {order.docs_received_date && (
-                                        <span className="text-[8px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded ml-auto">
-                                          {order.docs_received_date}
-                                        </span>
-                                      )}
-                                    </label>
-                                  </div>
-
-                                  {/* 3. Согласованная дата оплаты (прозвон логиста) */}
-                                  <div className="space-y-1 bg-amber-50/90 p-1.5 rounded border border-amber-300">
-                                    <div className="text-[9px] font-black text-amber-950 flex items-center justify-between">
-                                      <span className="flex items-center gap-1">
-                                        <span>📞</span>
-                                        <span>3. Дата оплаты (согласована):</span>
-                                      </span>
-                                      {order.payment_promised_date ? (
-                                        <span className="text-[8px] font-mono font-black text-emerald-800 bg-emerald-100 px-1 py-0.2 rounded">
-                                          В графике ✓
-                                        </span>
-                                      ) : (
-                                        <span className="text-[8px] text-amber-850 font-bold">
-                                          уточнить
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <input
-                                        type="date"
-                                        defaultValue={order.payment_promised_date || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          updateDocFieldsMutation.mutate({
-                                            id: order.id,
-                                            payment_promised_date: val || null,
-                                          });
-                                        }}
-                                        className="w-full px-1.5 py-0.5 border border-amber-300 rounded text-[10px] font-mono font-bold bg-white text-slate-900"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Статус готовности к перемещению в дебиторку */}
-                                  {isStage5Ready ? (
-                                    <div className="bg-emerald-100/90 border border-emerald-300 text-emerald-950 rounded p-1 text-[9px] font-bold flex items-center gap-1">
-                                      <span>✓</span>
-                                      <span>
-                                        Все 3 галочки заполнены! Можно переводить в Дебиторку.
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="bg-amber-100/90 border border-amber-300 text-amber-950 rounded p-1 text-[9px] font-bold flex items-center gap-1">
-                                      <span>⚠️</span>
-                                      <span>
-                                        Заполните 3 пункта для перехода в Дебиторку (
-                                        {stage5CompletedCount}/3).
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* На этапе 6 (Дебиторка / Ожидание оплаты) */}
-                              {stageNum === 6 && (
-                                <div className="bg-rose-50 rounded p-1.5 border border-rose-200 text-[9px] space-y-1">
-                                  <div className="text-rose-700 font-bold flex justify-between">
-                                    <span>В Дебиторке:</span>
-                                    <span className="font-mono font-black">
-                                      {Number(order.price || 0).toLocaleString('ru-RU')} ₽
-                                    </span>
-                                  </div>
-                                  {order.payment_promised_date && (
-                                    <div className="text-[9px] text-amber-900 font-medium bg-amber-50 p-1 rounded border border-amber-200">
-                                      📅 Оплата обещана:{' '}
-                                      <span className="font-mono font-bold text-amber-950">
-                                        {order.payment_promised_date}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <Link
-                                    href="/receivables"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="text-rose-700 hover:underline font-bold block"
-                                  >
-                                    Открыть в Дебиторке ↗
-                                  </Link>
-                                </div>
-                              )}
-
-                              {/* Кнопка открывания полного договора/заявки */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedOrder(order);
-                                }}
-                                className="w-full py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] flex items-center justify-center gap-1 transition"
+                          {/* Индикаторы этапа 5 и 6 */}
+                          {isStage5 && (
+                            <div className="pt-0.5">
+                              <span
+                                className={`w-full block text-center text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                  isStage5Ready
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : 'bg-amber-50 text-amber-900 border-amber-300'
+                                }`}
                               >
-                                <span>📋</span>
-                                <span>Полноэкранный договор-заявка</span>
-                              </button>
-
-                              {/* Кнопки управления этапами: Вперед, Назад ↶, Срыв ✕ */}
-                              <div
-                                className="pt-1 border-t border-slate-100 flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {/* Кнопка срыва / отмены с Канбана (доступна на этапах 1..5) */}
-                                {stageNum <= 5 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCancellingOrder(order);
-                                      setCancelMode('claim');
-                                      setCancelReason('Отказ заказчика по обоюдному согласию');
-                                      const penalty = Math.round(
-                                        (Number(order.price) || 30000) * 0.2,
-                                      );
-                                      setClaimPenaltyAmount(String(penalty));
-                                      setClaimEmptyRunAmount('0');
-                                      setClaimIdleAmount('0');
-                                      setClaimNumber(
-                                        order.order_number.includes('001')
-                                          ? '01-ПР'
-                                          : `${order.order_number.replace(/\D/g, '') || '1'}-ПР`,
-                                      );
-                                      setClaimDate(new Date().toISOString().split('T')[0] ?? '');
-                                      setClaimDueDays('5');
-                                    }}
-                                    title="Срыв договора-заявки / Претензия / Снять с доски"
-                                    className="px-1.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-black text-[10px] border border-rose-200 cursor-pointer active:scale-95 transition"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-
-                                {/* Кнопка возврата ↶ (доступна со 2 этапа) */}
-                                {stageNum > 1 && (
-                                  <button
-                                    onClick={() =>
-                                      updateStageMutation.mutate({
-                                        id: order.id,
-                                        stage: stageNum - 1,
-                                      })
-                                    }
-                                    title="Вернуть на предыдущий этап"
-                                    className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-black text-[10px] border border-slate-300 cursor-pointer active:scale-95 transition"
-                                  >
-                                    ↶
-                                  </button>
-                                )}
-
-                                {/* Кнопка шага вперед (на этапе 5: заблокирована если не выполнены 3 условия!) */}
-                                {stageNum < 7 ? (
-                                  <button
-                                    disabled={isStage5 && !isStage5Ready}
-                                    onClick={() => {
-                                      if (isStage5 && !isStage5Ready) {
-                                        alert(
-                                          'Нельзя переместить в Дебиторку: необходимо заполнить все 3 пункта — отправку на почту, получение на почте и согласованную дату оплаты.',
-                                        );
-                                        return;
-                                      }
-                                      updateStageMutation.mutate({
-                                        id: order.id,
-                                        stage: stageNum + 1,
-                                      });
-                                    }}
-                                    title={
-                                      isStage5 && !isStage5Ready
-                                        ? 'Заполните все 3 пункта: 1) отправлено на почту, 2) получено на почте, 3) дата оплаты'
-                                        : cfg.btnForward
-                                    }
-                                    className={`flex-1 py-1 rounded font-black text-[10px] transition text-center ${
-                                      isStage5 && !isStage5Ready
-                                        ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
-                                        : `${cfg.btnClass} cursor-pointer active:scale-95`
-                                    }`}
-                                  >
-                                    {isStage5 && !isStage5Ready
-                                      ? '🔒 В оплату (нужно 3/3)'
-                                      : cfg.btnForward}
-                                  </button>
-                                ) : (
-                                  <div className="flex-1 text-center py-1 bg-emerald-100 text-emerald-900 rounded font-black text-[10px]">
-                                    ✓ Закрыто
-                                  </div>
-                                )}
-                              </div>
+                                {isStage5Ready
+                                  ? '3/3 готово к оплате ✓'
+                                  : `Документы: ${stage5CompletedCount}/3`}
+                              </span>
                             </div>
                           )}
+
+                          {stageNum === 6 && order.payment_promised_date && (
+                            <div className="pt-0.5">
+                              <span className="w-full block text-center text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-900 border-amber-300">
+                                📅 Оплата: {order.payment_promised_date}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Кнопка открытия полноэкранного договора-заявки */}
+                          <div className="pt-1">
+                            <div className="w-full py-1.5 px-2 bg-indigo-50/80 group-hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-[10px] flex items-center justify-center gap-1.5 transition">
+                              <span>📋</span>
+                              <span>Открыть договор-заявку</span>
+                              <span className="text-[10px] text-indigo-500">↗</span>
+                            </div>
+                          </div>
+
+                          {/* Кнопки управления этапами на карточке */}
+                          <div
+                            className="pt-1 border-t border-slate-100 flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {stageNum <= 5 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCancellingOrder(order);
+                                  setCancelMode('claim');
+                                  setCancelReason('Отказ заказчика по обоюдному согласию');
+                                  const penalty = Math.round((Number(order.price) || 30000) * 0.2);
+                                  setClaimPenaltyAmount(String(penalty));
+                                  setClaimEmptyRunAmount('0');
+                                  setClaimIdleAmount('0');
+                                  setClaimNumber(
+                                    order.order_number.includes('001')
+                                      ? '01-ПР'
+                                      : `${order.order_number.replace(/\D/g, '') || '1'}-ПР`,
+                                  );
+                                  setClaimDate(new Date().toISOString().split('T')[0] ?? '');
+                                  setClaimDueDays('5');
+                                }}
+                                title="Срыв договора-заявки / Претензия"
+                                className="px-1.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-black text-[10px] border border-rose-200 cursor-pointer active:scale-95 transition"
+                              >
+                                ✕
+                              </button>
+                            )}
+
+                            {stageNum > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateStageMutation.mutate({
+                                    id: order.id,
+                                    stage: stageNum - 1,
+                                  })
+                                }
+                                title="Вернуть на предыдущий этап"
+                                className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-black text-[10px] border border-slate-300 cursor-pointer active:scale-95 transition"
+                              >
+                                ↶
+                              </button>
+                            )}
+
+                            {stageNum < 7 ? (
+                              <button
+                                type="button"
+                                disabled={isStage5 && !isStage5Ready}
+                                onClick={() => {
+                                  if (isStage5 && !isStage5Ready) {
+                                    setSelectedOrder(order);
+                                    return;
+                                  }
+                                  updateStageMutation.mutate({
+                                    id: order.id,
+                                    stage: stageNum + 1,
+                                  });
+                                }}
+                                title={
+                                  isStage5 && !isStage5Ready
+                                    ? 'Нажмите, чтобы открыть заявку и заполнить 3 пункта'
+                                    : cfg.btnForward
+                                }
+                                className={`flex-1 py-1 rounded-lg font-black text-[10px] transition text-center ${
+                                  isStage5 && !isStage5Ready
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300 cursor-pointer hover:bg-amber-200'
+                                    : `${cfg.btnClass} cursor-pointer active:scale-95`
+                                }`}
+                              >
+                                {isStage5 && !isStage5Ready ? 'Заполнить 3/3 ↗' : cfg.btnForward}
+                              </button>
+                            ) : (
+                              <div className="flex-1 text-center py-1 bg-emerald-100 text-emerald-900 rounded-lg font-black text-[10px]">
+                                ✓ Закрыто
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })
@@ -1503,361 +1152,696 @@ export default function AtiPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-           МОДАЛЬНОЕ ОКНО ДЕТАЛЕЙ ДОГОВОР-ЗАЯВКИ
-           (Полный образец по предоставленному документу № 001)
+           ПОЛНОЭКРАННОЕ ОКНО ДОГОВОР-ЗАЯВКИ
            ══════════════════════════════════════════════════════════════════════ */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl border-2 border-slate-300 shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
-            {/* Шапка модалки */}
-            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">📋</span>
+      {activeSelectedOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 lg:p-6 overflow-y-auto"
+          onMouseDown={(e) => {
+            contractModalBackdropRef.current = e.target === e.currentTarget;
+          }}
+          onMouseUp={(e) => {
+            if (contractModalBackdropRef.current && e.target === e.currentTarget) {
+              setSelectedOrder(null);
+            }
+            contractModalBackdropRef.current = false;
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl border border-slate-300 shadow-2xl w-full max-w-6xl max-h-[96vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ── ШАПКА ПОЛНОЭКРАННОГО ДОГОВОРА ── */}
+            <div className="px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white flex items-center justify-between gap-4 shrink-0 border-b border-slate-800">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-2xl shrink-0">
+                  📋
+                </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-black font-display tracking-tight">
-                      Договор-Заявка {selectedOrder.order_number}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-black font-display tracking-tight text-white">
+                      Договор-Заявка {activeSelectedOrder.order_number}
                     </h2>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        selectedOrder.doc_type === 'etrn'
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                        activeSelectedOrder.doc_type === 'etrn'
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400'
                           : 'bg-amber-500/20 text-amber-300 border-amber-400'
                       }`}
                     >
-                      {selectedOrder.doc_type === 'etrn' ? '⚡ ЭТрН' : '📮 Почта РФ'}
+                      {activeSelectedOrder.doc_type === 'etrn'
+                        ? '⚡ ЭТрН (ЭДО)'
+                        : '📮 Почта РФ / СДЭК'}
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">
+                      от {new Date(activeSelectedOrder.created_at).toLocaleDateString('ru-RU')}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Междугородняя перевозка груза автотранспортом
+                  <p className="text-xs text-slate-400 pt-0.5">
+                    Междугородняя перевозка груза автотранспортом • Статус:{' '}
+                    <strong className="text-indigo-300">
+                      {STAGE_CONFIG[activeSelectedOrder.stage]?.title}
+                    </strong>
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-black cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Тело модалки */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-700">
-              {/* Текущий этап и Дебиторка */}
-              <div className="bg-slate-50 rounded-2xl border-2 border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                    Текущий этап заявки
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex flex-col items-end">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Стоимость перевозки
                   </span>
-                  <span className="text-xs font-black text-indigo-700">
-                    {STAGE_CONFIG[selectedOrder.stage]?.title}
+                  <span className="text-lg sm:text-xl font-black font-mono text-emerald-400">
+                    {Number(activeSelectedOrder.price || 0).toLocaleString('ru-RU')} ₽
                   </span>
+                  <span className="text-[10px] text-slate-400">без НДС</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-500">Связка с Дебиторкой:</span>
-                  <span
-                    className={`px-2 py-0.5 rounded font-bold border ${
-                      selectedOrder.stage >= 6
-                        ? 'bg-rose-50 text-rose-800 border-rose-300'
-                        : 'bg-amber-50 text-amber-800 border-amber-300'
-                    }`}
-                  >
-                    {selectedOrder.stage >= 7
-                      ? 'Оплачено и закрыто'
-                      : selectedOrder.stage === 6
-                        ? 'В реестре дебиторки (ожидание оплаты)'
-                        : 'Будет привязана после документооборота'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Стороны договора */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Заказчик */}
-                <div className="bg-indigo-50/40 rounded-2xl border border-indigo-200 p-3 space-y-1.5">
-                  <div className="text-[11px] font-black uppercase text-indigo-950 flex items-center justify-between">
-                    <span>🏢 1. ЗАКАЗЧИК</span>
-                    <span className="text-[10px] font-mono text-indigo-700">
-                      {selectedOrder.ati_code || 'АТИ'}
-                    </span>
-                  </div>
-                  <div className="font-bold text-slate-900 text-sm">
-                    {selectedOrder.counterparty_name}
-                  </div>
-                  {selectedOrder.counterparty_inn && (
-                    <div className="text-slate-600">
-                      ИНН:{' '}
-                      <span className="font-mono font-bold">{selectedOrder.counterparty_inn}</span>
-                    </div>
-                  )}
-                  {selectedOrder.counterparty_contact && (
-                    <div className="text-slate-600">
-                      Контакт: <strong>{selectedOrder.counterparty_contact}</strong>
-                    </div>
-                  )}
-                  {selectedOrder.counterparty_phone && (
-                    <div className="text-slate-600">
-                      Тел: <strong>{selectedOrder.counterparty_phone}</strong>
-                    </div>
-                  )}
-                  {selectedOrder.counterparty_email && (
-                    <div className="text-slate-600">
-                      Email:{' '}
-                      <span className="text-indigo-600">{selectedOrder.counterparty_email}</span>
-                    </div>
-                  )}
-                  <div className="pt-1 text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                    <span>✓</span> <span>Контрагент сохранён в единой базе</span>
-                  </div>
-                </div>
-
-                {/* Перевозчик */}
-                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 space-y-1.5">
-                  <div className="text-[11px] font-black uppercase text-slate-800 flex items-center justify-between">
-                    <span>🚚 ПЕРЕВОЗЧИК</span>
-                    <span className="text-[10px] font-mono text-slate-500">ИП</span>
-                  </div>
-                  <div className="font-bold text-slate-900 text-sm">
-                    {selectedOrder.carrier_name}
-                  </div>
-                  <div className="text-slate-600">
-                    ИНН: <span className="font-mono font-bold">{selectedOrder.carrier_inn}</span>
-                  </div>
-                  <div className="text-slate-600">
-                    Контакт: <strong>{selectedOrder.carrier_contact}</strong>
-                  </div>
-                  <div className="text-slate-600">
-                    Р/С:{' '}
-                    <span className="font-mono font-semibold">{selectedOrder.carrier_account}</span>
-                  </div>
-                  <div className="text-slate-600">
-                    Банк: <strong>{selectedOrder.carrier_bank}</strong> (БИК{' '}
-                    {selectedOrder.carrier_bik})
-                  </div>
-                </div>
-              </div>
-
-              {/* Транспорт и водитель */}
-              <div className="bg-amber-50/40 rounded-2xl border border-amber-200 p-3 space-y-2">
-                <div className="text-[11px] font-black uppercase text-amber-950 flex items-center justify-between">
-                  <span>🚛 2.7. СВЕДЕНИЯ ОБ АВТОТРАНСПОРТЕ И ВОДИТЕЛЕ</span>
-                  <span className="text-[10px] font-bold text-amber-800">
-                    {selectedOrder.asset_name}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Автомобиль:</span>
-                    <span className="font-bold text-slate-900 text-xs">
-                      {selectedOrder.asset_name} ({selectedOrder.asset_reg_number})
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Водитель:</span>
-                    <span className="font-bold text-slate-900 text-xs">
-                      {selectedOrder.driver_name}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Телефон водителя:</span>
-                    <span className="font-bold font-mono text-slate-900">
-                      {selectedOrder.driver_phone}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Документы водителя:</span>
-                    <span className="font-mono text-slate-700 text-[11px]">
-                      {selectedOrder.driver_passport || 'Паспорт указан'} •{' '}
-                      {selectedOrder.driver_license || 'ВУ указано'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Погрузка и Разгрузка */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* 2.3 Погрузка */}
-                <div className="bg-emerald-50/40 rounded-2xl border border-emerald-200 p-3 space-y-1.5">
-                  <div className="text-[11px] font-black uppercase text-emerald-950 flex items-center justify-between">
-                    <span>📦 2.3. ПОГРУЗКА</span>
-                    <span className="font-mono text-emerald-800 font-bold">
-                      {selectedOrder.pickup_date_time || 'По графику'}
-                    </span>
-                  </div>
-                  {selectedOrder.shipper_name && (
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Грузоотправитель:</span>
-                      <span className="font-bold text-slate-900">{selectedOrder.shipper_name}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Адрес погрузки:</span>
-                    <span className="font-semibold text-slate-800">
-                      {selectedOrder.pickup_address || 'Не указан'}
-                    </span>
-                  </div>
-                  {selectedOrder.pickup_contact && (
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Контакты склада:</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {selectedOrder.pickup_contact}
-                      </span>
-                    </div>
-                  )}
-                  {selectedOrder.cargo_description && (
-                    <div className="text-[10px] text-slate-700 bg-white p-1 rounded border border-emerald-100 mt-1">
-                      Груз: <strong>{selectedOrder.cargo_description}</strong>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2.4 Разгрузка */}
-                <div className="bg-blue-50/40 rounded-2xl border border-blue-200 p-3 space-y-1.5">
-                  <div className="text-[11px] font-black uppercase text-blue-950 flex items-center justify-between">
-                    <span>🏁 2.4. РАЗГРУЗКА</span>
-                    <span className="font-mono text-blue-800 font-bold">
-                      {selectedOrder.delivery_date || 'По графику'}
-                    </span>
-                  </div>
-                  {selectedOrder.consignee_name && (
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Грузополучатель:</span>
-                      <span className="font-bold text-slate-900">
-                        {selectedOrder.consignee_name}
-                      </span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Адрес разгрузки:</span>
-                    <span className="font-semibold text-slate-800">
-                      {selectedOrder.delivery_address || 'Не указан'}
-                    </span>
-                  </div>
-                  {selectedOrder.delivery_contact && (
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Контакты приёмки:</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {selectedOrder.delivery_contact}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 2.5 Финансы и оплата */}
-              <div className="bg-white rounded-2xl border-2 border-slate-200 p-3 space-y-2">
-                <div className="text-[11px] font-black uppercase text-slate-900 flex items-center justify-between">
-                  <span>💰 2.5. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ</span>
-                  <span className="text-sm font-mono font-black text-emerald-600">
-                    {Number(selectedOrder.price || 0).toLocaleString('ru-RU')} ₽ без НДС
-                  </span>
-                </div>
-                <div className="text-xs text-slate-700">
-                  <strong>Форма и срок:</strong> {selectedOrder.payment_terms}
-                </div>
-                {selectedOrder.postal_address && (
-                  <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 text-[11px] space-y-1">
-                    <div className="font-bold text-slate-800">
-                      Почтовый адрес для оригиналов документов:
-                    </div>
-                    <div className="text-slate-600">{selectedOrder.postal_address}</div>
-                  </div>
-                )}
-                {/* Блок статуса документов в модалке */}
-                <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 text-[11px] space-y-2">
-                  <div className="font-black text-purple-950 uppercase tracking-wide flex items-center justify-between">
-                    <span>📄 Документооборот и оплата</span>
-                    <span className="font-mono text-purple-700">
-                      {selectedOrder.doc_type === 'paper' ? '📮 Почта / СДЭК' : '⚡ ЭТрН / ЭДО'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
-                    <div className="p-1.5 bg-white rounded border border-purple-100 space-y-0.5">
-                      <div className="text-slate-500 font-bold">1. Отправка документов:</div>
-                      <div className="font-bold text-slate-800">
-                        {selectedOrder.docs_sent ? '✓ Отправлены' : '— Не отправлены'}
-                      </div>
-                      {selectedOrder.docs_sent_date && (
-                        <div className="text-purple-700 font-mono font-bold">
-                          {selectedOrder.docs_sent_date}
-                        </div>
-                      )}
-                      {selectedOrder.postal_tracking_number && (
-                        <div className="text-purple-900 font-mono text-[9px] truncate">
-                          Трек: {selectedOrder.postal_tracking_number}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-1.5 bg-white rounded border border-purple-100 space-y-0.5">
-                      <div className="text-slate-500 font-bold">2. Получение контрагентом:</div>
-                      <div className="font-bold text-slate-800">
-                        {selectedOrder.docs_received ? '✓ Получены' : '— В пути / Ожидание'}
-                      </div>
-                      {selectedOrder.docs_received_date && (
-                        <div className="text-emerald-700 font-mono font-bold">
-                          {selectedOrder.docs_received_date}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-1.5 bg-white rounded border border-purple-100 space-y-0.5">
-                      <div className="text-slate-500 font-bold">3. Согласованная оплата:</div>
-                      <div className="font-bold text-slate-800">
-                        {selectedOrder.payment_promised_date
-                          ? '✓ Дата назначена'
-                          : '— Не согласована'}
-                      </div>
-                      {selectedOrder.payment_promised_date && (
-                        <div className="text-amber-800 font-mono font-black">
-                          {selectedOrder.payment_promised_date}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                {selectedOrder.notes && (
-                  <div className="p-2.5 bg-amber-50/90 rounded-xl border-2 border-amber-300 text-[11px] space-y-1">
-                    <div className="font-black text-amber-950 flex items-center gap-1.5">
-                      <span>📌</span>
-                      <span>Требования к оплате и документам:</span>
-                    </div>
-                    <div className="text-slate-800 leading-snug font-medium">
-                      {selectedOrder.notes}
-                    </div>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-lg font-black transition cursor-pointer"
+                  title="Закрыть (Esc)"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
-            {/* Подвал модалки */}
-            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
-              <span className="text-[11px] text-slate-500">
-                Создана: {new Date(selectedOrder.created_at).toLocaleDateString('ru-RU')}
-              </span>
+            {/* ── ИНТЕРАКТИВНЫЙ STEPPER ЭТАПОВ (1..7) ── */}
+            <div className="bg-slate-100 border-b border-slate-200 px-6 py-2.5 shrink-0 overflow-x-auto">
+              <div className="flex items-center justify-between gap-1.5 min-w-[700px]">
+                {[1, 2, 3, 4, 5, 6, 7].map((s) => {
+                  const cfg = STAGE_CONFIG[s] || STAGE_CONFIG[1];
+                  const isCurrent = activeSelectedOrder.stage === s;
+                  const isPast = activeSelectedOrder.stage > s;
+                  return (
+                    <div
+                      key={s}
+                      className={`flex-1 flex items-center gap-2 py-1.5 px-2.5 rounded-xl border transition select-none ${
+                        isCurrent
+                          ? 'bg-white border-indigo-500 shadow-xs text-indigo-950 font-black ring-2 ring-indigo-500/20'
+                          : isPast
+                            ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 font-bold'
+                            : 'bg-slate-50/60 border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                          isCurrent
+                            ? 'bg-indigo-600 text-white'
+                            : isPast
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-300 text-slate-600'
+                        }`}
+                      >
+                        {isPast ? '✓' : s}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] leading-tight truncate">
+                          {cfg?.shortTitle || ''}
+                        </div>
+                        {isCurrent && (
+                          <div className="text-[9px] text-indigo-600 uppercase font-black tracking-wider">
+                            Текущий
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── ТЕЛО ДОГОВОР-ЗАЯВКИ (ПРОСТОРНАЯ СЕТКА) ── */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-700 flex-1 bg-slate-50/60">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                {/* ── ЛЕВАЯ КОЛОНКА (7 ИЗ 12): СТОРОНЫ, МАРШРУТ, ТРАНСПОРТ ── */}
+                <div className="lg:col-span-7 space-y-4">
+                  {/* Блок 1: Стороны договора */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {/* Заказчик */}
+                    <div className="bg-white rounded-2xl border-2 border-indigo-100 shadow-2xs p-4 space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-indigo-50">
+                        <span className="text-[11px] font-black uppercase text-indigo-950 tracking-wider flex items-center gap-1.5">
+                          <span>🏢</span> 1. ЗАКАЗЧИК
+                        </span>
+                        {activeSelectedOrder.ati_code && (
+                          <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
+                            Код АТИ: {activeSelectedOrder.ati_code}
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-black text-slate-900 text-sm leading-snug">
+                        {activeSelectedOrder.counterparty_name}
+                      </div>
+                      {activeSelectedOrder.counterparty_inn && (
+                        <div className="text-slate-600 text-xs">
+                          ИНН:{' '}
+                          <span className="font-mono font-bold text-slate-800">
+                            {activeSelectedOrder.counterparty_inn}
+                          </span>
+                        </div>
+                      )}
+                      {activeSelectedOrder.counterparty_contact && (
+                        <div className="text-slate-600 text-xs">
+                          Контактное лицо:{' '}
+                          <strong className="text-slate-800">
+                            {activeSelectedOrder.counterparty_contact}
+                          </strong>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {activeSelectedOrder.counterparty_phone && (
+                          <a
+                            href={`tel:${activeSelectedOrder.counterparty_phone.replace(/[^\d+]/g, '')}`}
+                            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg border border-indigo-200 flex items-center gap-1 transition"
+                            title="Позвонить заказчику"
+                          >
+                            <span>📞</span>
+                            <span>{activeSelectedOrder.counterparty_phone}</span>
+                          </a>
+                        )}
+                        {activeSelectedOrder.counterparty_email && (
+                          <a
+                            href={`mailto:${activeSelectedOrder.counterparty_email}`}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg border border-slate-200 flex items-center gap-1 transition"
+                            title="Написать письмо"
+                          >
+                            <span>✉️</span>
+                            <span className="truncate max-w-[150px]">
+                              {activeSelectedOrder.counterparty_email}
+                            </span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Перевозчик */}
+                    <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-2xs p-4 space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                        <span className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                          <span>🚚</span> 2. ПЕРЕВОЗЧИК
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500 font-bold">ИП</span>
+                      </div>
+                      <div className="font-black text-slate-900 text-sm leading-snug">
+                        {activeSelectedOrder.carrier_name}
+                      </div>
+                      <div className="text-slate-600 text-xs">
+                        ИНН:{' '}
+                        <span className="font-mono font-bold text-slate-800">
+                          {activeSelectedOrder.carrier_inn}
+                        </span>
+                      </div>
+                      <div className="text-slate-600 text-xs">
+                        Контакт:{' '}
+                        <strong className="text-slate-800">
+                          {activeSelectedOrder.carrier_contact}
+                        </strong>
+                      </div>
+                      <div className="text-[11px] text-slate-600 space-y-0.5 pt-1 border-t border-slate-100">
+                        <div>
+                          Р/С:{' '}
+                          <span className="font-mono font-bold text-slate-800">
+                            {activeSelectedOrder.carrier_account}
+                          </span>
+                        </div>
+                        <div>
+                          Банк:{' '}
+                          <strong className="text-slate-800">
+                            {activeSelectedOrder.carrier_bank}
+                          </strong>{' '}
+                          (БИК {activeSelectedOrder.carrier_bik})
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Блок 2: Маршрут (Погрузка и Выгрузка) */}
+                  <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-2xs p-4 space-y-3">
+                    <div className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-100">
+                      <span>🗺️</span> 3. МАРШРУТ И АДРЕСА СКЛАДОВ
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Погрузка */}
+                      <div className="bg-emerald-50/50 rounded-xl border border-emerald-200 p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                            <span className="text-sm">🟢</span> ПОГРУЗКА
+                          </span>
+                          <span className="font-mono font-black text-emerald-800 text-xs bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                            {activeSelectedOrder.pickup_date_time || 'По графику'}
+                          </span>
+                        </div>
+                        {activeSelectedOrder.shipper_name && (
+                          <div className="text-xs">
+                            <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                              Грузоотправитель:
+                            </span>
+                            <span className="font-bold text-slate-900">
+                              {activeSelectedOrder.shipper_name}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                            Точный адрес:
+                          </span>
+                          <span className="font-bold text-slate-800 text-xs leading-snug">
+                            {activeSelectedOrder.pickup_address || 'Адрес не указан'}
+                          </span>
+                        </div>
+                        {activeSelectedOrder.pickup_contact && (
+                          <div className="text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-emerald-100">
+                            <span className="text-slate-400">Контакты склада: </span>
+                            <span className="font-bold text-slate-800">
+                              {activeSelectedOrder.pickup_contact}
+                            </span>
+                          </div>
+                        )}
+                        {activeSelectedOrder.cargo_description && (
+                          <div className="text-[11px] text-slate-700 bg-white p-2 rounded-lg border border-emerald-100">
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                              Характер груза:
+                            </span>
+                            <span className="font-bold text-slate-900">
+                              {activeSelectedOrder.cargo_description}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Выгрузка */}
+                      <div className="bg-rose-50/50 rounded-xl border border-rose-200 p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-rose-900 flex items-center gap-1.5">
+                            <span className="text-sm">🔴</span> ВЫГРУЗКА
+                          </span>
+                          <span className="font-mono font-black text-rose-800 text-xs bg-rose-100/80 px-2 py-0.5 rounded-md">
+                            {activeSelectedOrder.delivery_date || 'По графику'}
+                          </span>
+                        </div>
+                        {activeSelectedOrder.consignee_name && (
+                          <div className="text-xs">
+                            <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                              Грузополучатель:
+                            </span>
+                            <span className="font-bold text-slate-900">
+                              {activeSelectedOrder.consignee_name}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                            Точный адрес:
+                          </span>
+                          <span className="font-bold text-slate-800 text-xs leading-snug">
+                            {activeSelectedOrder.delivery_address || 'Адрес не указан'}
+                          </span>
+                        </div>
+                        {activeSelectedOrder.delivery_contact && (
+                          <div className="text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-rose-100">
+                            <span className="text-slate-400">Контакты приемки: </span>
+                            <span className="font-bold text-slate-800">
+                              {activeSelectedOrder.delivery_contact}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Блок 3: Транспорт и водитель */}
+                  <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-2xs p-4 space-y-3">
+                    <div className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-100">
+                      <span>🚛</span> 4. СВЕДЕНИЯ О ТРАНСПОРТЕ И ВОДИТЕЛЕ
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="space-y-1">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                          Автомобиль и госномер:
+                        </span>
+                        <div className="font-black text-slate-900 text-sm flex items-center gap-2">
+                          <span>{activeSelectedOrder.asset_name}</span>
+                          {activeSelectedOrder.asset_reg_number && (
+                            <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-300">
+                              {activeSelectedOrder.asset_reg_number}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                          Водитель:
+                        </span>
+                        <div className="font-black text-slate-900 text-sm">
+                          {activeSelectedOrder.driver_name || 'Не назначен'}
+                        </div>
+                        {activeSelectedOrder.driver_phone && (
+                          <a
+                            href={`tel:${activeSelectedOrder.driver_phone.replace(/[^\d+]/g, '')}`}
+                            className="inline-flex items-center gap-1 font-mono font-bold text-xs text-blue-600 hover:underline pt-0.5"
+                          >
+                            <span>📞</span>
+                            <span>{activeSelectedOrder.driver_phone}</span>
+                          </a>
+                        )}
+                      </div>
+                      <div className="sm:col-span-2 text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <div>
+                          Паспорт:{' '}
+                          <strong className="text-slate-800">
+                            {activeSelectedOrder.driver_passport || 'Указан в системе'}
+                          </strong>
+                        </div>
+                        <div>
+                          В/У:{' '}
+                          <strong className="text-slate-800">
+                            {activeSelectedOrder.driver_license || 'Указано в системе'}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── ПРАВАЯ КОЛОНКА (5 ИЗ 12): ФИНАНСЫ, ДОКУМЕНТООБОРОТ, ДЕЙСТВИЯ ── */}
+                <div className="lg:col-span-5 space-y-4">
+                  {/* Финансы и оплата */}
+                  <div className="bg-white rounded-2xl border-2 border-emerald-200 shadow-2xs p-4 space-y-3">
+                    <div className="flex items-center justify-between pb-1 border-b border-emerald-100">
+                      <span className="text-[11px] font-black uppercase text-emerald-950 tracking-wider flex items-center gap-1.5">
+                        <span>💰</span> 5. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ
+                      </span>
+                      <span className="font-mono font-black text-base text-emerald-700">
+                        {Number(activeSelectedOrder.price || 0).toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 text-xs text-slate-700">
+                      <div>
+                        <span className="text-slate-500 font-bold">Форма и срок расчетов: </span>
+                        <span className="font-semibold text-slate-900">
+                          {activeSelectedOrder.payment_terms || 'Безналичный расчет без НДС'}
+                        </span>
+                      </div>
+                      {activeSelectedOrder.postal_address && (
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px] space-y-0.5">
+                          <span className="text-slate-500 font-bold block uppercase text-[10px]">
+                            Почтовый адрес для оригиналов:
+                          </span>
+                          <span className="font-medium text-slate-800">
+                            {activeSelectedOrder.postal_address}
+                          </span>
+                        </div>
+                      )}
+                      {activeSelectedOrder.notes && (
+                        <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-[11px] text-amber-950 font-medium">
+                          📌 {activeSelectedOrder.notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ИНТЕРАКТИВНЫЙ БЛОК: ДОКУМЕНТООБОРОТ (3 ПУНКТА) */}
+                  <div className="bg-white rounded-2xl border-2 border-purple-200 shadow-2xs p-4 space-y-3">
+                    <div className="flex items-center justify-between pb-1 border-b border-purple-100">
+                      <span className="text-[11px] font-black uppercase text-purple-950 tracking-wider flex items-center gap-1.5">
+                        <span>📄</span> 6. ДОКУМЕНТООБОРОТ И ОПЛАТА
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full border ${
+                          activeSelectedOrder.docs_sent &&
+                          activeSelectedOrder.docs_received &&
+                          activeSelectedOrder.payment_promised_date
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            : 'bg-amber-100 text-amber-900 border-amber-300'
+                        }`}
+                      >
+                        {
+                          [
+                            activeSelectedOrder.docs_sent,
+                            activeSelectedOrder.docs_received,
+                            Boolean(activeSelectedOrder.payment_promised_date),
+                          ].filter(Boolean).length
+                        }
+                        /3 пунктов
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500">
+                      Для перевода заявки в статус <strong>Ожидание оплаты (Дебиторка)</strong>{' '}
+                      необходимо заполнить все 3 пункта:
+                    </p>
+
+                    <div className="space-y-2.5">
+                      {/* Пункт 1 */}
+                      <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-200 space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer font-black text-xs text-slate-900 select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(activeSelectedOrder.docs_sent)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              updateDocFieldsMutation.mutate({
+                                id: activeSelectedOrder.id,
+                                docs_sent: checked,
+                                docs_sent_date: checked
+                                  ? activeSelectedOrder.docs_sent_date ||
+                                    new Date().toISOString().split('T')[0]
+                                  : null,
+                              });
+                            }}
+                            className="rounded border-purple-400 text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                          />
+                          <span>1. Документы отправлены на почту</span>
+                          {activeSelectedOrder.docs_sent_date && (
+                            <span className="font-mono text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded ml-auto">
+                              {activeSelectedOrder.docs_sent_date}
+                            </span>
+                          )}
+                        </label>
+                        <div className="flex items-center gap-2 pt-1 pl-6">
+                          <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
+                            Трек-номер:
+                          </span>
+                          <input
+                            type="text"
+                            defaultValue={activeSelectedOrder.postal_tracking_number || ''}
+                            onBlur={(e) => {
+                              const val = e.target.value.trim();
+                              if (val !== (activeSelectedOrder.postal_tracking_number || '')) {
+                                updateDocFieldsMutation.mutate({
+                                  id: activeSelectedOrder.id,
+                                  postal_tracking_number: val,
+                                  docs_sent: val ? true : activeSelectedOrder.docs_sent,
+                                  docs_sent_date:
+                                    val && !activeSelectedOrder.docs_sent_date
+                                      ? new Date().toISOString().split('T')[0]
+                                      : activeSelectedOrder.docs_sent_date,
+                                });
+                              }
+                            }}
+                            placeholder="Почтовый трек / код отправления..."
+                            className="w-full px-2.5 py-1 border border-purple-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 focus:ring-2 focus:ring-purple-400"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Пункт 2 */}
+                      <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-200">
+                        <label className="flex items-center gap-2 cursor-pointer font-black text-xs text-slate-900 select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(activeSelectedOrder.docs_received)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              updateDocFieldsMutation.mutate({
+                                id: activeSelectedOrder.id,
+                                docs_received: checked,
+                                docs_received_date: checked
+                                  ? activeSelectedOrder.docs_received_date ||
+                                    new Date().toISOString().split('T')[0]
+                                  : null,
+                              });
+                            }}
+                            className="rounded border-purple-400 text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                          />
+                          <span>2. Документы получены заказчиком / на почте</span>
+                          {activeSelectedOrder.docs_received_date && (
+                            <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded ml-auto">
+                              {activeSelectedOrder.docs_received_date}
+                            </span>
+                          )}
+                        </label>
+                      </div>
+
+                      {/* Пункт 3 */}
+                      <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-300 space-y-1.5">
+                        <div className="flex items-center justify-between font-black text-xs text-amber-950">
+                          <span className="flex items-center gap-1.5">
+                            <span>📞</span> 3. Согласованная дата оплаты (прозвон):
+                          </span>
+                          {activeSelectedOrder.payment_promised_date ? (
+                            <span className="text-[10px] font-mono font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                              В графике ✓
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-amber-800 font-bold">не указана</span>
+                          )}
+                        </div>
+                        <input
+                          type="date"
+                          defaultValue={activeSelectedOrder.payment_promised_date || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateDocFieldsMutation.mutate({
+                              id: activeSelectedOrder.id,
+                              payment_promised_date: val || null,
+                            });
+                          }}
+                          className="w-full px-3 py-1.5 border border-amber-400 rounded-lg text-xs font-mono font-bold bg-white text-slate-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Быстрые документы */}
+                  <div className="bg-slate-100/90 rounded-2xl border border-slate-200 p-4 space-y-2">
+                    <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider block">
+                      Документы и действия
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setViewingPowerOfAttorney(activeSelectedOrder)}
+                      className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs transition active:scale-95"
+                    >
+                      <span>📄</span>
+                      <span>Сформировать доверенность на водителя</span>
+                    </button>
+                    {activeSelectedOrder.stage >= 6 && (
+                      <Link
+                        href="/receivables"
+                        className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-xs transition text-center"
+                      >
+                        <span>📊</span>
+                        <span>Открыть в разделе Дебиторка ↗</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── ПОДВАЛ ПОЛНОЭКРАННОГО ОКНА: КНОПКИ ДЕЙСТВИЙ И ПЕРЕХОДОВ ── */}
+            <div className="px-6 py-4 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setViewingPowerOfAttorney(selectedOrder)}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition active:scale-95"
-                  title="Сформировать и распечатать доверенность от ИП на водителя"
-                >
-                  <span>📄</span>
-                  <span>Доверенность на водителя</span>
-                </button>
-                <button
                   onClick={() => setSelectedOrder(null)}
-                  className="px-4 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 cursor-pointer transition text-xs"
                 >
                   Закрыть
                 </button>
-                <Link
-                  href="/receivables"
-                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black shadow-xs flex items-center gap-1"
-                >
-                  <span>В Дебиторку</span>
-                  <span>↗</span>
-                </Link>
+                {activeSelectedOrder.stage <= 5 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCancellingOrder(activeSelectedOrder);
+                      setCancelMode('claim');
+                      setCancelReason('Отказ заказчика по обоюдному согласию');
+                      const penalty = Math.round(
+                        (Number(activeSelectedOrder.price) || 30000) * 0.2,
+                      );
+                      setClaimPenaltyAmount(String(penalty));
+                      setClaimEmptyRunAmount('0');
+                      setClaimIdleAmount('0');
+                      setClaimNumber(
+                        activeSelectedOrder.order_number.includes('001')
+                          ? '01-ПР'
+                          : `${activeSelectedOrder.order_number.replace(/\D/g, '') || '1'}-ПР`,
+                      );
+                      setClaimDate(new Date().toISOString().split('T')[0] ?? '');
+                      setClaimDueDays('5');
+                    }}
+                    className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-black text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <span>✕</span>
+                    <span>Срыв заявки / Претензия</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeSelectedOrder.stage > 1 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateStageMutation.mutate({
+                        id: activeSelectedOrder.id,
+                        stage: activeSelectedOrder.stage - 1,
+                      })
+                    }
+                    className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <span>↶</span>
+                    <span>Назад на этап {activeSelectedOrder.stage - 1}</span>
+                  </button>
+                )}
+
+                {activeSelectedOrder.stage < 7 ? (
+                  <button
+                    type="button"
+                    disabled={
+                      activeSelectedOrder.stage === 5 &&
+                      !(
+                        activeSelectedOrder.docs_sent &&
+                        activeSelectedOrder.docs_received &&
+                        activeSelectedOrder.payment_promised_date
+                      )
+                    }
+                    onClick={() => {
+                      const isReady5 =
+                        activeSelectedOrder.docs_sent &&
+                        activeSelectedOrder.docs_received &&
+                        activeSelectedOrder.payment_promised_date;
+                      if (activeSelectedOrder.stage === 5 && !isReady5) {
+                        alert(
+                          'Заполните 3 пункта документооборота выше перед переводом в Дебиторку!',
+                        );
+                        return;
+                      }
+                      updateStageMutation.mutate({
+                        id: activeSelectedOrder.id,
+                        stage: activeSelectedOrder.stage + 1,
+                      });
+                    }}
+                    className={`px-5 py-2 rounded-xl font-black text-xs transition flex items-center gap-2 shadow-sm ${
+                      activeSelectedOrder.stage === 5 &&
+                      !(
+                        activeSelectedOrder.docs_sent &&
+                        activeSelectedOrder.docs_received &&
+                        activeSelectedOrder.payment_promised_date
+                      )
+                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        : `${STAGE_CONFIG[activeSelectedOrder.stage]?.btnClass || ''} cursor-pointer active:scale-95`
+                    }`}
+                  >
+                    <span>
+                      {activeSelectedOrder.stage === 5 &&
+                      !(
+                        activeSelectedOrder.docs_sent &&
+                        activeSelectedOrder.docs_received &&
+                        activeSelectedOrder.payment_promised_date
+                      )
+                        ? '🔒 Требуется 3/3 для Дебиторки'
+                        : STAGE_CONFIG[activeSelectedOrder.stage]?.btnForward || 'Вперед →'}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="px-4 py-2 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl font-black text-xs">
+                    ✓ Заявка оплачена и закрыта
+                  </div>
+                )}
               </div>
             </div>
           </div>
