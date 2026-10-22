@@ -70,24 +70,11 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   const weekCycle = getThursdayCycle(now);
 
   const allHistory: PayrollHistoryItem[] = user.history || [];
+  const userDebt = parseFloat(user.debt || '0');
+  const userAdvanceOffset = parseFloat(user.advance_offset || '0');
 
-  // Фильтруем историю:
-  // Если режим "week": строго с прошлой пятницы 00:00 по четверг 23:59 (пятница идет в след. неделю)
-  // Если режим "month": за весь выбранный месяц
-  const filteredHistory = allHistory.filter((t) => {
-    const rawDate = t.transaction_date || t.created_at;
-    if (!rawDate) return false;
-    const d = new Date(rawDate);
-
-    if (periodMode === 'week') {
-      return d >= weekCycle.start && d <= weekCycle.end;
-    } else {
-      return d.getFullYear() === year && d.getMonth() + 1 === monthNumber;
-    }
-  });
-
-  // 1. НАЧИСЛЕНО (Заработок за рейсы / заказ-наряды)
-  const accruals = filteredHistory.filter((t) => {
+  // Хелперы фильтрации типов записей
+  const isSalaryAccrual = (t: PayrollHistoryItem) => {
     const desc = (t.description || '').toLowerCase();
     const isPayout =
       Boolean(t.from_wallet_id) ||
@@ -99,10 +86,9 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       !isPayout &&
       !isAdv
     );
-  });
+  };
 
-  // 2. ПОГАШЕНИЕ ДОЛГА / ЗАЧЁТ АВАНСА (Сотрудник гасил долг)
-  const debtRepayments = filteredHistory.filter((t) => {
+  const isDebtRepayment = (t: PayrollHistoryItem) => {
     const desc = (t.description || '').toLowerCase();
     return (
       (t.category_id === ADVANCE_CATEGORY_ID && t.direction === 'income') ||
@@ -110,10 +96,9 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       desc.includes('погашение долга') ||
       desc.includes('зачтено в счёт зп')
     );
-  });
+  };
 
-  // 3. ФАКТИЧЕСКИ ВЫДАННАЯ ЗАРПЛАТА (Деньги на руки / карту)
-  const salaryPayouts = filteredHistory.filter((t) => {
+  const isSalaryPayout = (t: PayrollHistoryItem) => {
     const desc = (t.description || '').toLowerCase();
     const isAdvance = t.category_id === ADVANCE_CATEGORY_ID && !desc.startsWith('выплата');
     return (
@@ -123,7 +108,109 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         (t.settlement_status === 'completed' && desc.includes('выплата'))) &&
       !isAdvance
     );
-  });
+  };
+
+  // 1. НАЧИСЛЕНО (Заработок за рейсы / заказ-наряды)
+  // В недельном режиме:
+  // Если у сотрудника есть невыплаченные смены (pending), именно они составляют текущий расчётный лист к выплате в пятницу!
+  // Прошлая выплата за пятницу (которая закрывала прошлую неделю) не должна смешиваться с новыми сменами.
+  let accruals: PayrollHistoryItem[] = [];
+  let debtRepayments: PayrollHistoryItem[] = [];
+  let salaryPayouts: PayrollHistoryItem[] = [];
+
+  if (periodMode === 'week') {
+    if (userDebt > 0) {
+      // Все pending-начисления, сформированные к этому срезу (до четверга включительно)
+      accruals = allHistory.filter((t) => {
+        if (!isSalaryAccrual(t)) return false;
+        if (t.settlement_status !== 'pending') return false;
+        const rawDate = t.transaction_date || t.created_at;
+        if (!rawDate) return true;
+        const d = new Date(rawDate);
+        return d <= weekCycle.end;
+      });
+
+      // Если по дате фильтрация ничего не дала, берем все pending начисления
+      if (accruals.length === 0) {
+        accruals = allHistory.filter(
+          (t) => isSalaryAccrual(t) && t.settlement_status === 'pending',
+        );
+      }
+
+      // Погашение аванса: берем зафиксированные зачеты аванса в этом цикле,
+      // либо рассчитываемый системой advance_offset
+      debtRepayments = allHistory.filter((t) => {
+        if (!isDebtRepayment(t)) return false;
+        const rawDate = t.transaction_date || t.created_at;
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return d >= weekCycle.start && d <= weekCycle.end;
+      });
+
+      if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
+        debtRepayments = [
+          {
+            id: 'current-advance-offset',
+            amount: userAdvanceOffset.toFixed(2),
+            direction: 'income',
+            description: 'Удержание аванса в счёт ЗП за текущую неделю',
+            created_at: new Date().toISOString(),
+            transaction_date: new Date().toISOString(),
+            settlement_status: 'pending',
+            category_id: ADVANCE_CATEGORY_ID,
+            employee_confirmed: null,
+          },
+        ];
+      }
+
+      // Выплаты ЗП: только выплаты, сделанные строго после начала текущего цикла смен
+      // (выплата прошлой пятницы закрывала прошлую неделю и не вычитается из этого заработка)
+      salaryPayouts = allHistory.filter((t) => {
+        if (!isSalaryPayout(t)) return false;
+        const rawDate = t.transaction_date || t.created_at;
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return d > weekCycle.start && d <= weekCycle.end && t.settlement_status === 'completed';
+      });
+    } else {
+      // Если все смены уже закрыты выплатой
+      accruals = allHistory.filter((t) => {
+        if (!isSalaryAccrual(t)) return false;
+        const rawDate = t.transaction_date || t.created_at;
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return d >= weekCycle.start && d <= weekCycle.end;
+      });
+
+      debtRepayments = allHistory.filter((t) => {
+        if (!isDebtRepayment(t)) return false;
+        const rawDate = t.transaction_date || t.created_at;
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return d >= weekCycle.start && d <= weekCycle.end;
+      });
+
+      salaryPayouts = allHistory.filter((t) => {
+        if (!isSalaryPayout(t)) return false;
+        const rawDate = t.transaction_date || t.created_at;
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return d >= weekCycle.start && d <= weekCycle.end;
+      });
+    }
+  } else {
+    // Режим "month" (весь календарный месяц)
+    const monthHistory = allHistory.filter((t) => {
+      const rawDate = t.transaction_date || t.created_at;
+      if (!rawDate) return false;
+      const d = new Date(rawDate);
+      return d.getFullYear() === year && d.getMonth() + 1 === monthNumber;
+    });
+
+    accruals = monthHistory.filter(isSalaryAccrual);
+    debtRepayments = monthHistory.filter(isDebtRepayment);
+    salaryPayouts = monthHistory.filter(isSalaryPayout);
+  }
 
   // Подсчёт сумм за выбранный период
   const sumAccruals = accruals.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
@@ -137,7 +224,11 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   // Если начислено больше, чем выплачено и удержано
   const periodNetPayout = Math.max(0, sumAccruals - sumDebtRepayments - sumSalaryPayouts);
   const totalPayoutOnHand =
-    periodMode === 'week' ? periodNetPayout : parseFloat(user.payout || '0');
+    periodMode === 'week'
+      ? userDebt > 0
+        ? parseFloat(user.payout || user.debt || '0')
+        : periodNetPayout
+      : parseFloat(user.payout || user.debt || '0');
 
   // Роли сотрудника
   const rolesLabel = (user.roles || [])
