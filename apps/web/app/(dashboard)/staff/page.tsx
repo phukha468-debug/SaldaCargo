@@ -6,6 +6,7 @@ import { Money } from '@saldacargo/ui';
 import { formatPhone } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 import { DriverDocuments } from '@/components/DriverDocuments';
+import { PayslipModal } from './payslip-modal';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type UserRole =
@@ -21,7 +22,7 @@ type UserRole =
   | 'electrician'
   | 'handyman';
 
-type PayrollUser = {
+export type PayrollUser = {
   id: string;
   name: string;
   roles: UserRole[];
@@ -2651,11 +2652,13 @@ function PayrollHistoryModal({
   user,
   onClose,
   onChanged,
+  onOpenPayslip,
 }: {
   user: PayrollUser;
   onClose: () => void;
   onSettle?: () => void;
   onChanged: () => void;
+  onOpenPayslip?: (u: PayrollUser) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'accruals' | 'payouts' | 'advances'>('accruals');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -2917,12 +2920,25 @@ function PayrollHistoryModal({
                 </h2>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 text-xl leading-none transition-colors cursor-pointer"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-2">
+              {onOpenPayslip && (
+                <button
+                  type="button"
+                  onClick={() => onOpenPayslip(user)}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                  title="Сформировать печатный расчётный листок"
+                >
+                  <span>📄</span>
+                  <span>Расчётный лист</span>
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 text-xl leading-none transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* ── Tabs Navigation ── */}
@@ -3693,6 +3709,7 @@ function PayrollRow({
   onManualPay,
   onHistory,
   onAdjustDebt,
+  onPayslip,
 }: {
   user: PayrollUser;
   onSettle: () => void;
@@ -3702,6 +3719,7 @@ function PayrollRow({
   onManualPay: () => void;
   onHistory: () => void;
   onAdjustDebt?: () => void;
+  onPayslip?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
@@ -3917,6 +3935,19 @@ function PayrollRow({
               ✏️ Долг
             </button>
           )}
+          {onPayslip && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPayslip();
+              }}
+              className="text-xs font-black px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center gap-1"
+              title="Сформировать расчётный лист сотрудника"
+            >
+              <span>📄</span>
+              <span className="hidden sm:inline">Лист</span>
+            </button>
+          )}
           <span
             className={cn(
               'material-symbols-outlined text-slate-300 text-[18px] shrink-0 transition-transform duration-200',
@@ -3949,6 +3980,18 @@ function PayrollRow({
           {user.notes && <span className="text-xs text-slate-400 italic">{user.notes}</span>}
 
           <div className="ml-auto flex items-center gap-2">
+            {onPayslip && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPayslip();
+                }}
+                className="text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg py-1 px-3 transition-colors flex items-center gap-1"
+              >
+                <span>📄</span>
+                <span>Расчётный лист</span>
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -3998,6 +4041,7 @@ function PayrollSection({
   onManualPay,
   onHistory,
   onAdjustDebt,
+  onPayslip,
 }: {
   users: PayrollUser[];
   headerBg: string;
@@ -4009,6 +4053,7 @@ function PayrollSection({
   onManualPay: (u: PayrollUser) => void;
   onHistory: (u: PayrollUser) => void;
   onAdjustDebt?: (u: PayrollUser) => void;
+  onPayslip?: (u: PayrollUser) => void;
 }) {
   if (users.length === 0)
     return (
@@ -4075,6 +4120,7 @@ function PayrollSection({
           onManualPay={() => onManualPay(u)}
           onHistory={() => onHistory(u)}
           onAdjustDebt={onAdjustDebt ? () => onAdjustDebt(u) : undefined}
+          onPayslip={onPayslip ? () => onPayslip(u) : undefined}
         />
       ))}
     </div>
@@ -4886,6 +4932,7 @@ export default function StaffPage() {
   const [manualPayUser, setManualPayUser] = useState<PayrollUser | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
   const [historyUser, setHistoryUser] = useState<PayrollUser | null>(null);
+  const [payslipUser, setPayslipUser] = useState<PayrollUser | null>(null);
   const [debtModalUser, setDebtModalUser] = useState<{
     user?: PayrollUser;
     action?: 'add' | 'repay' | 'adjust';
@@ -5087,7 +5134,19 @@ export default function StaffPage() {
             );
           })}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {activeUsers.length > 0 && (
+            <button
+              onClick={() => {
+                if (activeUsers[0]) setPayslipUser(activeUsers[0]);
+              }}
+              className="bg-indigo-600 text-white text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Сформировать расчётный лист сотрудника"
+            >
+              <span>📄</span>
+              <span>Расчётный лист</span>
+            </button>
+          )}
           <button
             onClick={() => setDebtModalUser({ action: 'add' })}
             className="bg-violet-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-violet-700 transition-colors shadow-sm"
@@ -5181,6 +5240,7 @@ export default function StaffPage() {
               ? (u) => setDebtModalUser({ user: u, action: 'adjust' })
               : undefined
           }
+          onPayslip={setPayslipUser}
         />
       )}
 
@@ -5198,6 +5258,20 @@ export default function StaffPage() {
             setHistoryUser(null);
             qc.invalidateQueries({ queryKey: ['staff-payroll'] });
           }}
+          onOpenPayslip={(u) => {
+            setHistoryUser(null);
+            setPayslipUser(u);
+          }}
+        />
+      )}
+
+      {/* Модал печатного расчётного листка */}
+      {payslipUser && (
+        <PayslipModal
+          user={payslipUser}
+          monthName={MONTH_NAMES[month - 1] ?? 'Текущий месяц'}
+          year={year}
+          onClose={() => setPayslipUser(null)}
         />
       )}
 
