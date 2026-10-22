@@ -148,14 +148,26 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         );
       }
 
+      // Хелпер: выплата или зачёт в прошлую пятницу (день закрытия старой недели)
+      const isOldFridayAction = (rawDate: string | null | undefined) => {
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return (
+          d.getFullYear() === weekCycle.start.getFullYear() &&
+          d.getMonth() === weekCycle.start.getMonth() &&
+          d.getDate() === weekCycle.start.getDate()
+        );
+      };
+
       // Погашение аванса: берем зафиксированные зачеты аванса в этом цикле,
       // либо рассчитываемый системой advance_offset
       debtRepayments = allHistory.filter((t) => {
         if (!isDebtRepayment(t)) return false;
         const rawDate = t.transaction_date || t.created_at;
         if (!rawDate) return false;
+        if (isOldFridayAction(rawDate)) return false;
         const d = new Date(rawDate);
-        return d >= weekCycle.start && d <= weekCycle.end;
+        return d > weekCycle.start && d <= weekCycle.end;
       });
 
       if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
@@ -174,17 +186,30 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         ];
       }
 
-      // Выплаты ЗП: только выплаты, сделанные строго после начала текущего цикла смен
-      // (выплата прошлой пятницы закрывала прошлую неделю и не вычитается из этого заработка)
+      // Выплаты ЗП: только выплаты за ТЕКУЩИЙ цикл смен (суббота - четверг).
+      // Выплата в прошлую пятницу (weekCycle.start) закрывала предыдущую неделю
+      // и не относится к сменам этого периода.
       salaryPayouts = allHistory.filter((t) => {
         if (!isSalaryPayout(t)) return false;
+        if (t.settlement_status !== 'completed') return false;
         const rawDate = t.transaction_date || t.created_at;
         if (!rawDate) return false;
+        if (isOldFridayAction(rawDate)) return false;
         const d = new Date(rawDate);
-        return d > weekCycle.start && d <= weekCycle.end && t.settlement_status === 'completed';
+        return d > weekCycle.start && d <= weekCycle.end;
       });
     } else {
       // Если все смены уже закрыты выплатой
+      const isOldFridayAction = (rawDate: string | null | undefined) => {
+        if (!rawDate) return false;
+        const d = new Date(rawDate);
+        return (
+          d.getFullYear() === weekCycle.start.getFullYear() &&
+          d.getMonth() === weekCycle.start.getMonth() &&
+          d.getDate() === weekCycle.start.getDate()
+        );
+      };
+
       accruals = allHistory.filter((t) => {
         if (!isSalaryAccrual(t)) return false;
         const rawDate = t.transaction_date || t.created_at;
@@ -197,16 +222,19 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         if (!isDebtRepayment(t)) return false;
         const rawDate = t.transaction_date || t.created_at;
         if (!rawDate) return false;
+        if (isOldFridayAction(rawDate)) return false;
         const d = new Date(rawDate);
         return d >= weekCycle.start && d <= weekCycle.end;
       });
 
       salaryPayouts = allHistory.filter((t) => {
         if (!isSalaryPayout(t)) return false;
+        if (t.settlement_status !== 'completed') return false;
         const rawDate = t.transaction_date || t.created_at;
         if (!rawDate) return false;
+        if (isOldFridayAction(rawDate)) return false;
         const d = new Date(rawDate);
-        return d >= weekCycle.start && d <= weekCycle.end;
+        return d >= weekCycle.start;
       });
     }
   } else {
