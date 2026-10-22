@@ -216,8 +216,55 @@ const SEED_EXPEDITOR_ORDER_001: Omit<ExpeditorOrder, 'id'> = {
 let expCache: { data: any; timestamp: number } | null = null;
 const EXP_CACHE_TTL = 15000;
 
+export const STORAGE_LIMITS = {
+  MAX_ORDERS: 500,
+  PURGE_THRESHOLD: 450,
+  PURGE_BATCH: 150,
+};
+
 export function invalidateExpCache() {
   expCache = null;
+}
+
+/**
+ * Авто-ротация: удаление первых 150 старых закрытых/отмененных заявок при достижении 450
+ */
+async function autoPurgeOldOrdersIfExceeded(supabase: any) {
+  try {
+    const { data: rows, error: countErr } = await supabase
+      .from('audit_log')
+      .select('id, new_values, changed_at')
+      .eq('table_name', 'ati_expeditor_orders')
+      .order('changed_at', { ascending: true });
+
+    if (countErr || !rows || rows.length < STORAGE_LIMITS.PURGE_THRESHOLD) {
+      return 0;
+    }
+
+    // Ищем старые завершенные (stage === 6) или отмененные (is_cancelled === true)
+    const candidatesForPurge = rows.filter((r: any) => {
+      const v = r.new_values || {};
+      return v.stage === 6 || v.is_cancelled === true;
+    });
+
+    const toDeleteIds = candidatesForPurge
+      .slice(0, STORAGE_LIMITS.PURGE_BATCH)
+      .map((r: any) => r.id);
+
+    if (toDeleteIds.length > 0) {
+      await supabase
+        .from('audit_log')
+        .delete()
+        .in('id', toDeleteIds)
+        .eq('table_name', 'ati_expeditor_orders');
+
+      invalidateExpCache();
+      return toDeleteIds.length;
+    }
+  } catch (err) {
+    console.error('Error during autoPurgeOldOrdersIfExceeded:', err);
+  }
+  return 0;
 }
 
 export async function GET(request?: Request) {
@@ -281,6 +328,13 @@ export async function GET(request?: Request) {
       success: true,
       orders,
       counterparties: counterparties || [],
+      storage_stats: {
+        total_orders: orders.length,
+        max_orders: STORAGE_LIMITS.MAX_ORDERS,
+        purge_threshold: STORAGE_LIMITS.PURGE_THRESHOLD,
+        purge_batch: STORAGE_LIMITS.PURGE_BATCH,
+        is_near_limit: orders.length >= STORAGE_LIMITS.PURGE_THRESHOLD,
+      },
     };
 
     expCache = { data: result, timestamp: Date.now() };
@@ -296,6 +350,10 @@ export async function POST(request: Request) {
   try {
     invalidateExpCache();
     const supabase = createAdminClient();
+
+    // Авто-ротация: если накопилось 450+ заявок, автоматически очищаем 150 старых закрытых
+    await autoPurgeOldOrdersIfExceeded(supabase);
+
     const body = await request.json();
 
     const orderData: Omit<ExpeditorOrder, 'id'> = {

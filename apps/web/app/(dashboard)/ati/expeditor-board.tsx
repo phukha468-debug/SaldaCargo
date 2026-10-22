@@ -111,7 +111,17 @@ export const ExpeditorBoard: React.FC = () => {
   const [newStage2Amount, setNewStage2Amount] = useState('50000');
 
   // Загрузка заявок
-  const { data, isLoading } = useQuery<{ success: boolean; orders: ExpeditorOrder[] }>({
+  const { data, isLoading } = useQuery<{
+    success: boolean;
+    orders: ExpeditorOrder[];
+    storage_stats?: {
+      total_orders: number;
+      max_orders: number;
+      purge_threshold: number;
+      purge_batch: number;
+      is_near_limit: boolean;
+    };
+  }>({
     queryKey: ['ati-expeditor-orders'],
     queryFn: async () => {
       const res = await fetch('/api/ati-expeditor');
@@ -119,6 +129,26 @@ export const ExpeditorBoard: React.FC = () => {
       return res.json();
     },
     staleTime: 15000,
+  });
+
+  // Мутация ручной очистки старых завершенных заявок
+  const purgeOldOrdersMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/ati-expeditor/purge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_size: 150 }),
+      });
+      if (!res.ok) throw new Error('Ошибка очистки архива');
+      return res.json();
+    },
+    onSuccess: (resData) => {
+      queryClient.invalidateQueries({ queryKey: ['ati-expeditor-orders'] });
+      alert(resData.message || 'Очистка успешно выполнена');
+    },
+    onError: (err: Error) => {
+      alert(err.message);
+    },
   });
 
   // Мутация смены этапа
@@ -286,8 +316,27 @@ export const ExpeditorBoard: React.FC = () => {
           </div>
         </div>
 
-        {/* Метрики маржинальности */}
+        {/* Метрики маржинальности и индикатор лимита */}
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Индикатор лимита бесплатного тарифа (500 рейсов / авто-очистка при 450) */}
+          <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 text-right">
+            <div className="flex items-center gap-1.5 justify-end">
+              <span
+                className={`w-2 h-2 rounded-full ${orders.length >= 450 ? 'bg-rose-500 animate-pulse' : orders.length >= 400 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+              />
+              <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">
+                Лимит: {orders.length} / 500
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400 font-medium">
+              {orders.length >= 450 ? (
+                <span className="text-rose-300 font-bold">Авто-ротация активна</span>
+              ) : (
+                'Авто-очистка при 450'
+              )}
+            </div>
+          </div>
+
           <div className="bg-white/10 backdrop-blur-xs px-3 py-2 rounded-xl border border-white/10 text-right">
             <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">
               Выручка от клиентов
@@ -314,6 +363,27 @@ export const ExpeditorBoard: React.FC = () => {
               +{totalMargin.toLocaleString('ru-RU')} ₽
             </div>
           </div>
+
+          {/* Кнопка ручной очистки архива старых завершённых заявок */}
+          {orders.some((o) => o.stage === 6 || o.is_cancelled) && (
+            <button
+              onClick={() => {
+                if (
+                  confirm(
+                    'Очистить до 150 самых старых закрытых/отмененных заявок для освобождения памяти? Активные рейсы не затрагиваются.',
+                  )
+                ) {
+                  purgeOldOrdersMutation.mutate();
+                }
+              }}
+              disabled={purgeOldOrdersMutation.isPending}
+              className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 cursor-pointer transition flex items-center gap-1"
+              title="Удалить закрытые рейсы для освобождения лимита"
+            >
+              <span>🧹</span>
+              <span>Очистить архив</span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsNewModalOpen(true)}
@@ -751,40 +821,53 @@ export const ExpeditorBoard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 4. СИСТЕМА ПАПОК ДОКУМЕНТОВ РЕЙСА */}
+              {/* 4. СИСТЕМА ПАПОК ДОКУМЕНТОВ РЕЙСА (ZERO STORAGE / ЛАЙФХАКИ ХРАНЕНИЯ) */}
               <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">📁</span>
                     <div>
                       <h4 className="font-black text-slate-900 uppercase">
-                        Папки документов рейса (Всегда под рукой)
+                        Папки документов рейса (Zero-Storage архитектура)
                       </h4>
                       <p className="text-[10px] text-slate-500">
-                        Электронный архив по рейсу: договоры, паспорта, фото кузова, расписки
+                        PDF формируются на лету (0 байт в базе). Фото и файлы хранятся в
+                        MAX/Telegram/E-mail и на диске.
                       </p>
                     </div>
                   </div>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                    ✓ Не расходует лимит Supabase
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   {/* Папка 1: С Заказчиком */}
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900 border-b pb-1">
+                    <div className="flex items-center justify-between font-bold text-slate-900 border-b pb-1">
                       <span>📂 1. С Заказчиком</span>
+                      <span className="text-[9px] text-indigo-700 bg-indigo-50 px-1 rounded">
+                        PDF live
+                      </span>
                     </div>
                     <div className="space-y-1">
                       <button
                         onClick={() => setPrintDoc({ order: selectedOrder, type: 'order' })}
-                        className="w-full text-left p-1.5 rounded bg-white hover:bg-indigo-50 border border-slate-200 text-[10.5px] font-medium text-slate-800 flex items-center gap-1"
+                        className="w-full text-left p-1.5 rounded bg-white hover:bg-indigo-50 border border-slate-200 text-[10.5px] font-medium text-slate-800 flex items-center justify-between"
                       >
-                        <span>📄</span> <span className="truncate">Договор-Заявка</span>
+                        <span className="flex items-center gap-1 truncate">
+                          <span>📄</span> <span>Договор-Заявка</span>
+                        </span>
+                        <span className="text-[9px] font-bold text-indigo-600">Печать/PDF ↗</span>
                       </button>
                       <button
                         onClick={() => setPrintDoc({ order: selectedOrder, type: 'offer' })}
-                        className="w-full text-left p-1.5 rounded bg-white hover:bg-indigo-50 border border-slate-200 text-[10.5px] font-medium text-slate-800 flex items-center gap-1"
+                        className="w-full text-left p-1.5 rounded bg-white hover:bg-indigo-50 border border-slate-200 text-[10.5px] font-medium text-slate-800 flex items-center justify-between"
                       >
-                        <span>📜</span> <span className="truncate">Договор-Оферта</span>
+                        <span className="flex items-center gap-1 truncate">
+                          <span>📜</span> <span>Договор-Оферта</span>
+                        </span>
+                        <span className="text-[9px] font-bold text-indigo-600">Печать/PDF ↗</span>
                       </button>
                       {selectedOrder.documents
                         ?.filter((d) => d.category === 'client')
@@ -797,38 +880,64 @@ export const ExpeditorBoard: React.FC = () => {
                           </div>
                         ))}
                     </div>
-                    <button
-                      onClick={() => {
-                        const name = prompt(
-                          'Название документа от Заказчика (напр. Паспорт, Опись):',
-                        );
-                        if (name)
-                          addDocumentMutation.mutate({
-                            id: selectedOrder.id,
-                            category: 'client',
-                            name,
-                          });
-                      }}
-                      className="w-full py-1 bg-slate-200 hover:bg-slate-300 rounded text-[10px] font-bold text-slate-700 cursor-pointer"
-                    >
-                      + Прикрепить файл
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 pt-1">
+                      <button
+                        onClick={() => {
+                          const note = prompt(
+                            'Отметка о сообщении в мессенджере MAX / Telegram (напр: Согласовано в MAX от 22.10):',
+                          );
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'client',
+                              name: `💬 MAX/TG: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                        title="Добавить ссылку или заметку о согласовании в MAX/TG"
+                      >
+                        💬 MAX/TG
+                      </button>
+                      <button
+                        onClick={() => {
+                          const emailNote = prompt(
+                            'Отметка о письме (напр: Скан на e-mail от 22.10):',
+                          );
+                          if (emailNote)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'client',
+                              name: `📧 E-mail: ${emailNote}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                        title="Добавить отметку о письме"
+                      >
+                        📧 E-mail
+                      </button>
+                    </div>
                   </div>
 
                   {/* Папка 2: С Перевозчиком */}
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900 border-b pb-1">
+                    <div className="flex items-center justify-between font-bold text-slate-900 border-b pb-1">
                       <span>📂 2. С Перевозчиком</span>
+                      <span className="text-[9px] text-indigo-700 bg-indigo-50 px-1 rounded">
+                        Штамп
+                      </span>
                     </div>
                     <div className="space-y-1">
                       <button
                         onClick={() => setPrintDoc({ order: selectedOrder, type: 'order' })}
-                        className="w-full text-left p-1.5 rounded bg-white hover:bg-indigo-50 border border-slate-200 text-[10.5px] font-medium text-slate-800 flex items-center gap-1"
+                        className="w-full text-left p-1.5 rounded bg-white hover:bg-indigo-50 border border-slate-200 text-[10.5px] font-medium text-slate-800 flex items-center justify-between"
                       >
-                        <span>📑</span>{' '}
-                        <span className="truncate">
-                          Заявка ИП {selectedOrder.carrier_name.split(' ')[1] || 'Перевозчик'}
+                        <span className="flex items-center gap-1 truncate">
+                          <span>📑</span>{' '}
+                          <span>
+                            Заявка ИП {selectedOrder.carrier_name.split(' ')[1] || 'Перевозчик'}
+                          </span>
                         </span>
+                        <span className="text-[9px] font-bold text-indigo-600">Печать ↗</span>
                       </button>
                       {selectedOrder.documents
                         ?.filter((d) => d.category === 'carrier')
@@ -841,28 +950,45 @@ export const ExpeditorBoard: React.FC = () => {
                           </div>
                         ))}
                     </div>
-                    <button
-                      onClick={() => {
-                        const name = prompt(
-                          'Название документа перевозчика (напр. Скан со штампом):',
-                        );
-                        if (name)
-                          addDocumentMutation.mutate({
-                            id: selectedOrder.id,
-                            category: 'carrier',
-                            name,
-                          });
-                      }}
-                      className="w-full py-1 bg-slate-200 hover:bg-slate-300 rounded text-[10px] font-bold text-slate-700 cursor-pointer"
-                    >
-                      + Прикрепить файл
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 pt-1">
+                      <button
+                        onClick={() => {
+                          const note = prompt('Отметка о согласовании с перевозчиком в MAX/TG:');
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'carrier',
+                              name: `💬 MAX/TG: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                      >
+                        💬 MAX/TG
+                      </button>
+                      <button
+                        onClick={() => {
+                          const note = prompt('Отметка о проверке АТИ / договоре на E-mail:');
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'carrier',
+                              name: `📧 E-mail: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                      >
+                        📧 E-mail
+                      </button>
+                    </div>
                   </div>
 
                   {/* Папка 3: Транспорт и водитель */}
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900 border-b pb-1">
+                    <div className="flex items-center justify-between font-bold text-slate-900 border-b pb-1">
                       <span>📂 3. Транспорт и ТС</span>
+                      <span className="text-[9px] text-amber-800 bg-amber-100 px-1 rounded">
+                        Фото кузова
+                      </span>
                     </div>
                     <div className="space-y-1">
                       {selectedOrder.documents
@@ -876,28 +1002,47 @@ export const ExpeditorBoard: React.FC = () => {
                           </div>
                         ))}
                     </div>
-                    <button
-                      onClick={() => {
-                        const name = prompt(
-                          'Название файла ТС (напр. ВУ, СТС, Фото кузова до погрузки):',
-                        );
-                        if (name)
-                          addDocumentMutation.mutate({
-                            id: selectedOrder.id,
-                            category: 'vehicle',
-                            name,
-                          });
-                      }}
-                      className="w-full py-1 bg-slate-200 hover:bg-slate-300 rounded text-[10px] font-bold text-slate-700 cursor-pointer"
-                    >
-                      + Прикрепить файл
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 pt-1">
+                      <button
+                        onClick={() => {
+                          const note = prompt(
+                            'Фото кузова / ТС в мессенджере (напр: Фото чистого кузова получено в MAX в 07:50):',
+                          );
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'vehicle',
+                              name: `📷 Фото в MAX: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                      >
+                        📷 Фото MAX
+                      </button>
+                      <button
+                        onClick={() => {
+                          const note = prompt('Данные ВУ / СТС / Локальный диск:');
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'vehicle',
+                              name: `💾 Диск: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                      >
+                        💾 Локально
+                      </button>
+                    </div>
                   </div>
 
                   {/* Папка 4: Финансы и чеки */}
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900 border-b pb-1">
+                    <div className="flex items-center justify-between font-bold text-slate-900 border-b pb-1">
                       <span>📂 4. Чеки и расписки</span>
+                      <span className="text-[9px] text-emerald-800 bg-emerald-100 px-1 rounded">
+                        Оплата
+                      </span>
                     </div>
                     <div className="space-y-1">
                       {selectedOrder.documents
@@ -911,22 +1056,36 @@ export const ExpeditorBoard: React.FC = () => {
                           </div>
                         ))}
                     </div>
-                    <button
-                      onClick={() => {
-                        const name = prompt(
-                          'Название платежного документа (Чек, Расписка в получении 20 000 ₽):',
-                        );
-                        if (name)
-                          addDocumentMutation.mutate({
-                            id: selectedOrder.id,
-                            category: 'finance',
-                            name,
-                          });
-                      }}
-                      className="w-full py-1 bg-slate-200 hover:bg-slate-300 rounded text-[10px] font-bold text-slate-700 cursor-pointer"
-                    >
-                      + Прикрепить файл
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 pt-1">
+                      <button
+                        onClick={() => {
+                          const note = prompt('Отметка о расписке/чеке в MAX/TG:');
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'finance',
+                              name: `💵 Чек/Расписка: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                      >
+                        💵 Чек MAX
+                      </button>
+                      <button
+                        onClick={() => {
+                          const note = prompt('Чек из банка / E-mail:');
+                          if (note)
+                            addDocumentMutation.mutate({
+                              id: selectedOrder.id,
+                              category: 'finance',
+                              name: `📧 Банк: ${note}`,
+                            });
+                        }}
+                        className="py-1 bg-slate-200 hover:bg-slate-300 rounded text-[9.5px] font-bold text-slate-700 cursor-pointer"
+                      >
+                        📧 E-mail чек
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
