@@ -5270,6 +5270,7 @@ export default function StaffPage() {
         <PayslipModal
           user={payslipUser}
           monthName={MONTH_NAMES[month - 1] ?? 'Текущий месяц'}
+          monthNumber={month}
           year={year}
           onClose={() => setPayslipUser(null)}
         />
