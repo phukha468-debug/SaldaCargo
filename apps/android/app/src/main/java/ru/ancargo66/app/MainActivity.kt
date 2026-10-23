@@ -4,13 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import ru.ancargo66.app.core.model.User
 import ru.ancargo66.app.core.storage.SessionManager
 import ru.ancargo66.app.features.auth.LoginScreen
 import ru.ancargo66.app.features.dispatcher.DispatcherScreen
@@ -40,21 +41,28 @@ class MainActivity : ComponentActivity() {
                         currentUser = null
                     }
 
-                    val user = currentUser
-                    if (user == null) {
-                        LoginScreen(
-                            onLoginSuccess = { loggedUser, role ->
-                                sessionManager.saveUser(loggedUser, role)
-                                activeRole = role
-                                currentUser = loggedUser
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding)
+                    ) {
+                        val user = currentUser
+                        if (user == null) {
+                            LoginScreen(
+                                onLoginSuccess = { loggedUser, role ->
+                                    sessionManager.saveUser(loggedUser, role)
+                                    activeRole = role
+                                    currentUser = loggedUser
+                                }
+                            )
+                        } else {
+                            when (activeRole) {
+                                "driver" -> DriverScreen(user = user, onLogout = onLogout)
+                                "loader" -> LoaderScreen(user = user, sessionManager = sessionManager, onLogout = onLogout)
+                                "mechanic" -> MechanicScreen(user = user, onLogout = onLogout)
+                                else -> DispatcherScreen(user = user, onLogout = onLogout)
                             }
-                        )
-                    } else {
-                        when (activeRole) {
-                            "driver" -> DriverScreen(user = user, onLogout = onLogout)
-                            "loader" -> LoaderScreen(user = user, sessionManager = sessionManager, onLogout = onLogout)
-                            "mechanic" -> MechanicScreen(user = user, onLogout = onLogout)
-                            else -> DispatcherScreen(user = user, onLogout = onLogout)
                         }
                     }
                 }

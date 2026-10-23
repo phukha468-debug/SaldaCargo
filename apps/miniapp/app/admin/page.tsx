@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Money } from '@saldacargo/ui';
-import { CreatePrrModal } from '@/components/CreatePrrModal';
 import { performLogout } from '@/lib/auth/logout';
 
 type Wallets = {
@@ -22,7 +21,7 @@ const WALLET_OPTIONS = [
 
 export default function AdminDashboard() {
   const qc = useQueryClient();
-  const [showPrrModal, setShowPrrModal] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -50,236 +49,224 @@ export default function AdminDashboard() {
     refetchOnWindowFocus: false,
   });
 
-  const handleLogout = () => {
-    performLogout();
+  const handleRefreshWallets = () => {
+    fetch('/api/wallets?fresh=true')
+      .then(() => refetchWallets())
+      .catch(() => refetchWallets());
   };
 
+  const totalBalance = (
+    parseFloat(wallets?.bank?.balance || '0') +
+    parseFloat(wallets?.cash?.balance || '0') +
+    parseFloat(wallets?.fuel_card?.balance || '0')
+  ).toFixed(2);
+
   return (
-    <div className="p-4 space-y-6">
-      <header className="pt-4 flex items-center justify-between">
+    <div className="max-w-lg mx-auto p-4 space-y-4">
+      {/* Шапка пульта */}
+      <header className="pt-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-xs border border-zinc-200 flex items-center justify-center bg-white shrink-0">
             <img src="/logo.png" alt="TK501" className="w-full h-full object-cover" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
-              Пульт <span className="text-orange-600">Админа</span>
-            </h1>
-            <p className="text-zinc-400 font-bold text-xs uppercase tracking-widest mt-1">
-              {me?.name ?? '...'}
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black text-zinc-900 uppercase tracking-tight">
+                Пульт <span className="text-orange-600">Директора</span>
+              </h1>
+            </div>
+            <p className="text-zinc-400 font-bold text-xs uppercase tracking-wider">
+              {me?.name ?? 'Управление'}
             </p>
           </div>
         </div>
+
         <button
-          onClick={handleLogout}
-          className="text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:text-red-400 transition-colors"
+          onClick={() => performLogout()}
+          className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-red-500 py-1.5 px-2.5 rounded-lg border border-zinc-200 hover:border-red-200 transition-colors"
         >
           Выйти
         </button>
       </header>
-
-      {/* Кошельки */}
-      <WalletsSection
-        wallets={wallets}
-        isLoading={walletsLoading}
-        isFetching={walletsFetching}
-        onRefresh={() => {
-          fetch('/api/wallets?fresh=true')
-            .then(() => refetchWallets())
-            .catch(() => refetchWallets());
-        }}
-        onTransferred={() => qc.invalidateQueries({ queryKey: ['wallets'] })}
-      />
-
-      {/* Статус */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard
-          label="На ревью"
-          value={summaryLoading ? '...' : String(summary?.pendingReview ?? 0)}
-          accent={summary?.pendingReview > 0}
-          href="/admin/trips?filter=review"
-        />
-        <StatCard
-          label="В рейсе"
-          value={summaryLoading ? '...' : String(summary?.activeTrips ?? 0)}
-          href="/admin/trips?filter=active"
-        />
-        <StatCard
-          label="Сегодня"
-          value={summaryLoading ? '...' : undefined}
-          money={summary?.todayRevenue}
-        />
-      </div>
-
-      {/* Быстрые действия */}
-      <section className="space-y-3">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-          Быстрые действия
-        </h2>
-        <div className="grid grid-cols-3 gap-2.5">
-          <Link
-            href="/admin/finance?action=income_menu"
-            className="bg-green-600 text-white rounded-2xl p-4 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-all shadow-sm text-center"
-          >
-            <span className="text-xl">➕</span>
-            <span className="text-[11px] font-black uppercase tracking-wider">Доход</span>
-          </Link>
-          <Link
-            href="/admin/finance?action=expense_menu"
-            className="bg-zinc-800 text-white rounded-2xl p-4 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-all shadow-sm text-center"
-          >
-            <span className="text-xl">➖</span>
-            <span className="text-[11px] font-black uppercase tracking-wider">Расход</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => setShowPrrModal(true)}
-            className="bg-amber-500 hover:bg-amber-600 text-white rounded-2xl p-4 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-all shadow-sm text-center"
-          >
-            <span className="text-xl">👷</span>
-            <span className="text-[11px] font-black uppercase tracking-wider">ПРР без авто</span>
-          </button>
-        </div>
-      </section>
-
-      {/* Рейсы на ревью */}
-      {(summary?.pendingReview ?? 0) > 0 && (
-        <section>
-          <Link
-            href="/admin/trips?filter=review"
-            className="block bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-black text-orange-700 uppercase tracking-tight">
-                  {summary.pendingReview} рейс{summary.pendingReview > 1 ? 'а' : ''} ждут ревью
-                </p>
-                <p className="text-orange-500 text-xs font-bold uppercase tracking-widest mt-1">
-                  Нажми чтобы проверить →
-                </p>
-              </div>
-              <span className="text-3xl">📋</span>
-            </div>
-          </Link>
-        </section>
-      )}
-
-      {/* Модалка создания ПРР (без авто) */}
-      <CreatePrrModal
-        isOpen={showPrrModal}
-        onClose={() => setShowPrrModal(false)}
-        defaultCreatorId={me?.id}
-        role="admin"
-        onSuccess={() => {
-          qc.invalidateQueries({ queryKey: ['admin-summary'] });
-          qc.invalidateQueries({ queryKey: ['wallets'] });
-        }}
-      />
-    </div>
-  );
-}
-
-// ─── Wallets Section ─────────────────────────────────────────────────────────
-
-function WalletsSection({
-  wallets,
-  isLoading,
-  isFetching,
-  onRefresh,
-  onTransferred,
-}: {
-  wallets: Wallets | undefined;
-  isLoading: boolean;
-  isFetching?: boolean;
-  onRefresh?: () => void;
-  onTransferred: () => void;
-}) {
-  const [showTransfer, setShowTransfer] = useState(false);
-
-  const WALLET_CONFIGS = [
-    {
-      key: 'bank' as const,
-      icon: '🏦',
-      color: 'bg-sky-50 border-sky-200',
-      textColor: 'text-sky-700',
-    },
-    {
-      key: 'cash' as const,
-      icon: '💵',
-      color: 'bg-emerald-50 border-emerald-200',
-      textColor: 'text-emerald-700',
-    },
-    {
-      key: 'fuel_card' as const,
-      icon: '⛽',
-      color: 'bg-amber-50 border-amber-200',
-      textColor: 'text-amber-700',
-    },
-  ];
-
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-            Деньги компании
-          </h2>
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              disabled={isFetching}
-              title="Обновить с Т-Банком"
-              className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg transition-colors"
-            >
-              <span className={`inline-block text-xs ${isFetching ? 'animate-spin' : ''}`}>🔄</span>
-            </button>
-          )}
-        </div>
-        <button
-          onClick={() => setShowTransfer((v) => !v)}
-          className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl transition-colors ${
-            showTransfer ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-zinc-600 active:bg-zinc-200'
-          }`}
-        >
-          ↔ Перевести
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {WALLET_CONFIGS.map(({ key, icon, color, textColor }) => (
-          <div key={key} className={`rounded-2xl border-2 p-3 ${color}`}>
-            <p className="text-lg mb-1">{icon}</p>
-            <p
-              className={`text-[9px] font-black uppercase tracking-widest ${textColor} opacity-70`}
-            >
-              {wallets?.[key]?.name.split(' ')[0] ?? '...'}
-            </p>
-            {isLoading ? (
-              <div className="h-5 w-16 bg-zinc-200 rounded animate-pulse mt-1" />
-            ) : (
-              <Money
-                amount={wallets?.[key]?.balance ?? '0'}
-                className={`text-sm font-black ${textColor} mt-0.5`}
-              />
-            )}
-          </div>
-        ))}
-      </div>
 
       {/* Форма перевода */}
       {showTransfer && (
         <TransferForm
           onDone={() => {
             setShowTransfer(false);
-            onTransferred();
+            qc.invalidateQueries({ queryKey: ['wallets'] });
           }}
           onCancel={() => setShowTransfer(false)}
         />
       )}
-    </section>
+
+      {/* Главный виджет: Общий баланс компании */}
+      <div className="bg-white border-2 border-zinc-200/80 rounded-3xl p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+            Капитал компании
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleRefreshWallets}
+              disabled={walletsFetching}
+              className="p-1 text-zinc-400 hover:text-zinc-700 transition-colors"
+              title="Обновить"
+            >
+              <span className={`inline-block text-xs ${walletsFetching ? 'animate-spin' : ''}`}>
+                🔄
+              </span>
+            </button>
+            <button
+              onClick={() => setShowTransfer((v) => !v)}
+              className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg transition-colors ${
+                showTransfer ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'
+              }`}
+            >
+              ↔ Перевод
+            </button>
+          </div>
+        </div>
+
+        <div>
+          {walletsLoading ? (
+            <div className="h-9 w-48 bg-zinc-100 rounded-xl animate-pulse" />
+          ) : (
+            <Money
+              amount={totalBalance}
+              className="text-3xl font-black text-zinc-900 tracking-tight"
+            />
+          )}
+        </div>
+
+        {/* Счета в виде чистых плашек */}
+        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-100">
+          <div className="bg-sky-50/70 border border-sky-100 rounded-xl p-2.5">
+            <div className="flex items-center gap-1 text-[9px] font-black uppercase text-sky-700">
+              <span>🏦</span> Р/Счёт
+            </div>
+            {walletsLoading ? (
+              <div className="h-4 w-14 bg-sky-200/50 rounded animate-pulse mt-1" />
+            ) : (
+              <Money
+                amount={wallets?.bank?.balance ?? '0'}
+                className="text-xs font-black text-sky-900 mt-0.5 block truncate"
+              />
+            )}
+          </div>
+
+          <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-2.5">
+            <div className="flex items-center gap-1 text-[9px] font-black uppercase text-emerald-700">
+              <span>💵</span> Сейф
+            </div>
+            {walletsLoading ? (
+              <div className="h-4 w-14 bg-emerald-200/50 rounded animate-pulse mt-1" />
+            ) : (
+              <Money
+                amount={wallets?.cash?.balance ?? '0'}
+                className="text-xs font-black text-emerald-900 mt-0.5 block truncate"
+              />
+            )}
+          </div>
+
+          <div className="bg-amber-50/70 border border-amber-100 rounded-xl p-2.5">
+            <div className="flex items-center gap-1 text-[9px] font-black uppercase text-amber-700">
+              <span>⛽</span> Топливо
+            </div>
+            {walletsLoading ? (
+              <div className="h-4 w-14 bg-amber-200/50 rounded animate-pulse mt-1" />
+            ) : (
+              <Money
+                amount={wallets?.fuel_card?.balance ?? '0'}
+                className="text-xs font-black text-amber-900 mt-0.5 block truncate"
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Быстрые действия: 2 большие удобные кнопки */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          href="/admin/finance?action=income_menu"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-4 flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all shadow-sm font-black text-sm uppercase tracking-wider"
+        >
+          <span className="text-xl">➕</span>
+          <span>Доход</span>
+        </Link>
+        <Link
+          href="/admin/finance?action=expense_menu"
+          className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl p-4 flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all shadow-sm font-black text-sm uppercase tracking-wider"
+        >
+          <span className="text-xl">➖</span>
+          <span>Расход</span>
+        </Link>
+      </div>
+
+      {/* Строка операционной сводки */}
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href="/admin/trips?filter=active"
+          className="bg-white border border-zinc-200 rounded-2xl p-3 flex items-center justify-between active:bg-zinc-50 transition-colors"
+        >
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
+              В рейсе сейчас
+            </p>
+            <p className="text-xl font-black text-zinc-900 mt-0.5">
+              {summaryLoading ? '...' : (summary?.activeTrips ?? 0)}
+            </p>
+          </div>
+          <span className="text-2xl">🚛</span>
+        </Link>
+
+        <div className="bg-white border border-zinc-200 rounded-2xl p-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
+              Выручка сегодня
+            </p>
+            {summaryLoading ? (
+              <div className="h-6 w-20 bg-zinc-100 rounded animate-pulse mt-1" />
+            ) : (
+              <Money
+                amount={summary?.todayRevenue ?? '0'}
+                className="text-lg font-black text-zinc-900 mt-0.5 block truncate"
+              />
+            )}
+          </div>
+          <span className="text-2xl">📈</span>
+        </div>
+      </div>
+
+      {/* Сигнальный баннер: Рейсы на проверке (если есть) */}
+      {(summary?.pendingReview ?? 0) > 0 && (
+        <Link
+          href="/admin/trips?filter=review"
+          className="block bg-orange-50 border-2 border-orange-200 rounded-2xl p-3.5 active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📋</span>
+              <div>
+                <p className="font-black text-orange-950 text-sm uppercase tracking-tight">
+                  {summary.pendingReview} рейс{summary.pendingReview > 1 ? 'а' : ''} ждут ревью
+                </p>
+                <p className="text-orange-600 text-[11px] font-bold">Нажмите для проверки →</p>
+              </div>
+            </div>
+            <span className="bg-orange-600 text-white text-xs font-black px-2.5 py-1 rounded-xl">
+              {summary.pendingReview}
+            </span>
+          </div>
+        </Link>
+      )}
+    </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ФОРМА ПЕРЕВОДА МЕЖДУ СЧЕТАМИ
+// ─────────────────────────────────────────────────────────────────────────────
 function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const [from, setFrom] = useState(WALLET_OPTIONS[0]?.id ?? '');
   const [to, setTo] = useState(WALLET_OPTIONS[1]?.id ?? '');
@@ -316,15 +303,20 @@ function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
   };
 
   const selectCls =
-    'w-full bg-white border-2 border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-zinc-400';
+    'w-full bg-white border-2 border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-zinc-400';
   const inputCls =
-    'w-full bg-white border-2 border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-zinc-400';
+    'w-full bg-white border-2 border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-zinc-400';
 
   return (
     <div className="bg-zinc-50 border-2 border-zinc-200 rounded-2xl p-4 space-y-3">
-      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-        Перевод между кошельками
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+          Перевод между кошельками
+        </p>
+        <button onClick={onCancel} className="text-xs text-zinc-400 hover:text-zinc-600 font-bold">
+          ✕
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div>
@@ -353,31 +345,32 @@ function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         </div>
       </div>
 
-      <div>
-        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-wider block mb-1">
-          Сумма (₽)
-        </label>
-        <input
-          type="number"
-          inputMode="decimal"
-          className={inputCls}
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-      </div>
-
-      <div>
-        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-wider block mb-1">
-          Описание (необязательно)
-        </label>
-        <input
-          type="text"
-          className={inputCls}
-          placeholder="Например: снятие наличных"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[9px] font-black text-zinc-400 uppercase tracking-wider block mb-1">
+            Сумма (₽)
+          </label>
+          <input
+            type="number"
+            inputMode="decimal"
+            className={inputCls}
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-[9px] font-black text-zinc-400 uppercase tracking-wider block mb-1">
+            Описание
+          </label>
+          <input
+            type="text"
+            className={inputCls}
+            placeholder="Примечание"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
       </div>
 
       {error && <p className="text-xs font-bold text-red-600">{error}</p>}
@@ -386,55 +379,17 @@ function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         <button
           onClick={handleSubmit}
           disabled={mutation.isPending}
-          className="flex-1 bg-zinc-900 text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl active:scale-[0.98] transition-all disabled:opacity-50"
+          className="flex-1 bg-zinc-900 text-white text-xs font-black uppercase tracking-widest py-2.5 rounded-xl active:scale-[0.98] transition-all disabled:opacity-50"
         >
-          {mutation.isPending ? 'Перевод...' : 'Перевести'}
+          {mutation.isPending ? 'Перевод...' : 'Подтвердить перевод'}
         </button>
         <button
           onClick={onCancel}
-          className="px-4 text-xs font-black text-zinc-500 uppercase tracking-widest border-2 border-zinc-200 rounded-xl active:bg-zinc-100 transition-colors"
+          className="px-3 text-xs font-black text-zinc-500 uppercase tracking-widest border border-zinc-200 rounded-xl active:bg-zinc-100 transition-colors"
         >
           Отмена
         </button>
       </div>
     </div>
   );
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function StatCard({
-  label,
-  value,
-  money,
-  accent,
-  href,
-}: {
-  label: string;
-  value?: string;
-  money?: string;
-  accent?: boolean;
-  href?: string;
-}) {
-  const inner = (
-    <div
-      className={`bg-white rounded-2xl p-4 border-2 text-center shadow-sm ${
-        accent ? 'border-orange-400 bg-orange-50' : 'border-zinc-100'
-      }`}
-    >
-      <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">{label}</p>
-      {money !== undefined ? (
-        <Money
-          amount={money}
-          className={`text-lg font-black ${accent ? 'text-orange-600' : 'text-zinc-900'}`}
-        />
-      ) : (
-        <p className={`text-2xl font-black ${accent ? 'text-orange-600' : 'text-zinc-900'}`}>
-          {value}
-        </p>
-      )}
-    </div>
-  );
-  if (href) return <Link href={href}>{inner}</Link>;
-  return inner;
 }

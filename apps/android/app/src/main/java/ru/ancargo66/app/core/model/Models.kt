@@ -76,7 +76,11 @@ data class Asset(
 @Serializable
 data class Counterparty(
     val id: String? = null,
-    val name: String = "Клиент"
+    val name: String = "Клиент",
+    @SerialName("is_legal_entity") val isLegalEntity: Boolean = false,
+    @SerialName("is_top") val isTop: Boolean = false,
+    @SerialName("is_delivery_zone_client") val isDeliveryZoneClient: Boolean = false,
+    @SerialName("min_delivery_base") val minDeliveryBase: Double? = null
 )
 
 @Serializable

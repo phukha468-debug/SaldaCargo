@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Пульт Директора — 3 варианта дизайна (МАХ Mini App)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom sleek scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+
+    .phone-shell {
+      width: 375px;
+      height: 760px;
+      border-radius: 44px;
+      border: 10px solid #1e293b;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: relative;
+      overflow: hidden;
+      background: #fafafa;
+    }
+
+    .phone-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 140px;
+      height: 22px;
+      background: #1e293b;
+      border-bottom-left-radius: 14px;
+      border-bottom-right-radius: 14px;
+      z-index: 60;
+    }
+
+    .phone-indicator {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 4px;
+      background: #cbd5e1;
+      border-radius: 9999px;
+      z-index: 60;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-x-hidden selection:bg-orange-500 selection:text-white">
+
+  <!-- Header панель управления презентацией -->
+  <header class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/60 sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-orange-600/30">
+          MAX
+        </div>
+        <div>
+          <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
+            Пульт Директора / Администратора
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+              3 Дизайна Mini App
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">
+            Очищен нижний бар (убраны «Наряды» и «Гараж»), убрана кнопка «ПРР без авто», только ключевой контроль.
+          </p>
+        </div>
+      </div>
+
+      <!-- Переключатель режима просмотра -->
+      <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-700">
+        <button id="viewSideBySide" onclick="switchView('grid')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-orange-600 text-white shadow-sm">
+          Все 3 рядом
+        </button>
+        <button id="viewSingle" onclick="switchView('single')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+          По одному (С переключателем)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Информационный баннер об изменениях -->
+  <div class="max-w-7xl mx-auto px-6 pt-6 w-full">
+    <div class="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">⚡</span>
+        <div>
+          <p class="text-sm font-bold text-white">Код и архитектура интерфейса перебраны:</p>
+          <p class="text-xs text-slate-400">
+            В нижнем баре осталось ровно 4 таба: <span class="text-white font-semibold">Главная</span>, <span class="text-white font-semibold">Рейсы</span>, <span class="text-white font-semibold">Финансы</span>, <span class="text-white font-semibold">Персонал</span>. Доход и Расход выведены крупными быстрыми кнопками.
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 font-bold">❌ Наряды убраны</span>
+        <span class="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 font-bold">❌ Гараж убран</span>
+        <span class="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 font-bold">❌ ПРР без авто убран</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Главная область презентации -->
+  <main class="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
+
+    <!-- РЕЖИМ 1: Сетка из 3 телефонов рядом -->
+    <div id="gridContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+
+      <!-- ================= ВАРИАНТ 1 ================= -->
+      <div class="flex flex-col items-center gap-3">
+        <div class="text-center">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20 mb-1">
+            Вариант 1
+          </span>
+          <h3 class="text-base font-black text-white">«Минимал / ФинКонтроль»</h3>
+          <p class="text-xs text-slate-400 max-w-xs">Общий капитал крупной цифрой, таблетки счетов, 2 широкие кнопки</p>
+        </div>
+
+        <div class="phone-shell text-zinc-900">
+          <div class="phone-notch"></div>
+          <div class="phone-indicator"></div>
+
+          <!-- Контент приложения (Вариант 1) -->
+          <div class="h-full flex flex-col justify-between pt-7 pb-16 px-4 bg-zinc-50 overflow-y-auto">
+            <div class="space-y-4">
+              <!-- Шапка -->
+              <div class="flex items-center justify-between pt-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-orange-600 flex items-center justify-center text-white font-black text-xs shadow-xs">
+                    TK
+                  </div>
+                  <div>
+                    <h2 class="text-base font-black text-zinc-900 uppercase tracking-tight leading-none">
+                      Пульт <span class="text-orange-600">Директора</span>
+                    </h2>
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">Сальда Карго</p>
+                  </div>
+                </div>
+                <button class="text-[10px] font-black uppercase tracking-widest text-zinc-400 px-2 py-1 border border-zinc-200 rounded-lg">
+                  Выйти
+                </button>
+              </div>
+
+              <!-- Виджет 1: Общий капитал компании -->
+              <div class="bg-white border-2 border-zinc-200/80 rounded-3xl p-4 shadow-xs space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                    Капитал компании
+                  </span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs text-zinc-400 cursor-pointer">🔄</span>
+                    <button class="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-zinc-100 text-zinc-600">
+                      ↔ Перевод
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <p class="text-2xl font-black text-zinc-900 tracking-tight">2 485 000 ₽</p>
+                </div>
+
+                <!-- Микро-таблетки счетов -->
+                <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-zinc-100">
+                  <div class="bg-sky-50/70 border border-sky-100 rounded-xl p-2">
+                    <div class="text-[8px] font-black uppercase text-sky-700">🏦 Р/Счёт</div>
+                    <p class="text-xs font-black text-sky-900 mt-0.5 truncate">1.82 млн ₽</p>
+                  </div>
+                  <div class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-2">
+                    <div class="text-[8px] font-black uppercase text-emerald-700">💵 Сейф</div>
+                    <p class="text-xs font-black text-emerald-900 mt-0.5 truncate">540 000 ₽</p>
+                  </div>
+                  <div class="bg-amber-50/70 border border-amber-100 rounded-xl p-2">
+                    <div class="text-[8px] font-black uppercase text-amber-700">⛽ Топливо</div>
+                    <p class="text-xs font-black text-amber-900 mt-0.5 truncate">125 000 ₽</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Быстрые действия: 2 большие удобные кнопки -->
+              <div class="grid grid-cols-2 gap-2.5">
+                <button class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl py-3.5 px-3 flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm font-black text-xs uppercase tracking-wider">
+                  <span class="text-lg leading-none">➕</span>
+                  <span>Доход</span>
+                </button>
+                <button class="bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl py-3.5 px-3 flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm font-black text-xs uppercase tracking-wider">
+                  <span class="text-lg leading-none">➖</span>
+                  <span>Расход</span>
+                </button>
+              </div>
+
+              <!-- Операционная сводка -->
+              <div class="grid grid-cols-2 gap-2">
+                <div class="bg-white border border-zinc-200 rounded-2xl p-3 flex items-center justify-between">
+                  <div>
+                    <p class="text-[9px] font-black uppercase tracking-wider text-zinc-400">В рейсе</p>
+                    <p class="text-lg font-black text-zinc-900 mt-0.5">4 авто</p>
+                  </div>
+                  <span class="text-xl">🚛</span>
+                </div>
+                <div class="bg-white border border-zinc-200 rounded-2xl p-3 flex items-center justify-between">
+                  <div>
+                    <p class="text-[9px] font-black uppercase tracking-wider text-zinc-400">Сегодня</p>
+                    <p class="text-sm font-black text-zinc-900 mt-0.5">87 500 ₽</p>
+                  </div>
+                  <span class="text-xl">📈</span>
+                </div>
+              </div>
+
+              <!-- Алерт ревью -->
+              <div class="bg-orange-50 border-2 border-orange-200 rounded-2xl p-3 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-xl">📋</span>
+                  <div>
+                    <p class="font-black text-orange-950 text-xs uppercase tracking-tight">2 рейса на ревью</p>
+                    <p class="text-orange-600 text-[10px] font-bold">Нажмите для проверки →</p>
+                  </div>
+                </div>
+                <span class="bg-orange-600 text-white text-[11px] font-black px-2 py-0.5 rounded-lg">2</span>
+              </div>
+            </div>
+
+            <!-- Нижний бар: ровно 4 таба -->
+            <nav class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 py-2.5 px-2 flex justify-around items-center z-50">
+              <div class="flex flex-col items-center gap-0.5 text-orange-600 font-bold">
+                <span class="text-lg leading-none">🏠</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Главная</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">🚛</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Рейсы</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">💰</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Финансы</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">👥</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Персонал</span>
+              </div>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= ВАРИАНТ 2 ================= -->
+      <div class="flex flex-col items-center gap-3">
+        <div class="text-center">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-1">
+            Вариант 2
+          </span>
+          <h3 class="text-base font-black text-white">«Операционный пульс»</h3>
+          <p class="text-xs text-slate-400 max-w-xs">3 карточки KPI сверху, раздельные цветные карточки счетов</p>
+        </div>
+
+        <div class="phone-shell text-zinc-900">
+          <div class="phone-notch"></div>
+          <div class="phone-indicator"></div>
+
+          <!-- Контент приложения (Вариант 2) -->
+          <div class="h-full flex flex-col justify-between pt-7 pb-16 px-4 bg-zinc-50 overflow-y-auto">
+            <div class="space-y-4">
+              <!-- Шапка -->
+              <div class="flex items-center justify-between pt-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-orange-600 flex items-center justify-center text-white font-black text-xs shadow-xs">
+                    TK
+                  </div>
+                  <div>
+                    <h2 class="text-base font-black text-zinc-900 uppercase tracking-tight leading-none">
+                      Пульт <span class="text-orange-600">Директора</span>
+                    </h2>
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">Оперативный пульс</p>
+                  </div>
+                </div>
+                <button class="text-[10px] font-black uppercase tracking-widest text-zinc-400 px-2 py-1 border border-zinc-200 rounded-lg">
+                  Выйти
+                </button>
+              </div>
+
+              <!-- 3 KPI метрики в фокусе -->
+              <div class="grid grid-cols-3 gap-2">
+                <div class="bg-orange-50 border-2 border-orange-400 rounded-2xl p-2.5 text-center shadow-xs">
+                  <p class="text-[8px] font-black text-zinc-400 uppercase tracking-wider mb-0.5">На ревью</p>
+                  <p class="text-xl font-black text-orange-600">2</p>
+                </div>
+                <div class="bg-white border-2 border-zinc-200 rounded-2xl p-2.5 text-center">
+                  <p class="text-[8px] font-black text-zinc-400 uppercase tracking-wider mb-0.5">В рейсе</p>
+                  <p class="text-xl font-black text-zinc-900">4</p>
+                </div>
+                <div class="bg-white border-2 border-zinc-200 rounded-2xl p-2.5 text-center">
+                  <p class="text-[8px] font-black text-zinc-400 uppercase tracking-wider mb-0.5">Сегодня</p>
+                  <p class="text-xs font-black text-zinc-900 mt-1 truncate">87 500 ₽</p>
+                </div>
+              </div>
+
+              <!-- Раздельные карточки счетов -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-zinc-400">Счета компании</span>
+                  <button class="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-zinc-100 text-zinc-600">
+                    ↔ Перевести
+                  </button>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <div class="rounded-2xl border-2 border-sky-200 bg-sky-50/70 p-2.5">
+                    <p class="text-sm mb-0.5">🏦</p>
+                    <p class="text-[8px] font-black uppercase text-sky-700">Р/Счёт</p>
+                    <p class="text-xs font-black text-sky-950 mt-0.5 truncate">1.82 млн</p>
+                  </div>
+                  <div class="rounded-2xl border-2 border-emerald-200 bg-emerald-50/70 p-2.5">
+                    <p class="text-sm mb-0.5">💵</p>
+                    <p class="text-[8px] font-black uppercase text-emerald-700">Сейф</p>
+                    <p class="text-xs font-black text-emerald-950 mt-0.5 truncate">540 000</p>
+                  </div>
+                  <div class="rounded-2xl border-2 border-amber-200 bg-amber-50/70 p-2.5">
+                    <p class="text-sm mb-0.5">⛽</p>
+                    <p class="text-[8px] font-black uppercase text-amber-700">Топливо</p>
+                    <p class="text-xs font-black text-amber-950 mt-0.5 truncate">125 000</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Быстрые действия: крупные тактильные блоки -->
+              <div class="space-y-1.5 pt-1">
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-400">Быстрые действия</span>
+                <div class="grid grid-cols-2 gap-2.5">
+                  <button class="bg-emerald-600 text-white rounded-2xl p-3.5 flex flex-col items-center gap-1 active:scale-95 transition-all shadow-sm">
+                    <span class="text-xl">➕</span>
+                    <span class="text-xs font-black uppercase tracking-wider">Приход</span>
+                  </button>
+                  <button class="bg-zinc-900 text-white rounded-2xl p-3.5 flex flex-col items-center gap-1 active:scale-95 transition-all shadow-sm">
+                    <span class="text-xl">➖</span>
+                    <span class="text-xs font-black uppercase tracking-wider">Расход</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Нижний бар: ровно 4 таба -->
+            <nav class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 py-2.5 px-2 flex justify-around items-center z-50">
+              <div class="flex flex-col items-center gap-0.5 text-orange-600 font-bold">
+                <span class="text-lg leading-none">🏠</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Главная</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">🚛</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Рейсы</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">💰</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Финансы</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">👥</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Персонал</span>
+              </div>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= ВАРИАНТ 3 ================= -->
+      <div class="flex flex-col items-center gap-3">
+        <div class="text-center">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-1">
+            Вариант 3
+          </span>
+          <h3 class="text-base font-black text-white">«Компакт под МАХ»</h3>
+          <p class="text-xs text-slate-400 max-w-xs">100% экран без скролла (Zero-Scroll), сплит-панель под большой палец</p>
+        </div>
+
+        <div class="phone-shell text-zinc-900">
+          <div class="phone-notch"></div>
+          <div class="phone-indicator"></div>
+
+          <!-- Контент приложения (Вариант 3) -->
+          <div class="h-full flex flex-col justify-between pt-7 pb-16 px-4 bg-zinc-50 overflow-y-auto">
+            <div class="space-y-3">
+              <!-- Шапка -->
+              <div class="flex items-center justify-between pt-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-xl bg-orange-600 flex items-center justify-center text-white font-black text-xs shadow-xs">
+                    TK
+                  </div>
+                  <div>
+                    <h2 class="text-sm font-black text-zinc-900 uppercase tracking-tight leading-none">
+                      Пульт <span class="text-orange-600">Директора</span>
+                    </h2>
+                    <p class="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">Управление в МАХ</p>
+                  </div>
+                </div>
+                <button class="text-[9px] font-black uppercase tracking-widest text-zinc-400 px-2 py-1 border border-zinc-200 rounded-lg">
+                  Выйти
+                </button>
+              </div>
+
+              <!-- Тёмная экспресс-панель капитала -->
+              <div class="bg-zinc-900 text-white rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-[8px] font-black uppercase tracking-widest text-zinc-400">
+                      Баланс кассы и счетов
+                    </p>
+                    <p class="text-xl font-black text-white">2 485 000 ₽</p>
+                  </div>
+                  <button class="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700">
+                    ↔ Перевод
+                  </button>
+                </div>
+
+                <!-- 3 счета в строчку -->
+                <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-zinc-800 text-center">
+                  <div>
+                    <span class="text-[8px] font-bold text-zinc-400 block uppercase">🏦 Р/С</span>
+                    <span class="text-xs font-black text-sky-400 block truncate">1.82M</span>
+                  </div>
+                  <div>
+                    <span class="text-[8px] font-bold text-zinc-400 block uppercase">💵 Сейф</span>
+                    <span class="text-xs font-black text-emerald-400 block truncate">540k</span>
+                  </div>
+                  <div>
+                    <span class="text-[8px] font-bold text-zinc-400 block uppercase">⛽ Топливо</span>
+                    <span class="text-xs font-black text-amber-400 block truncate">125k</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Компактные рейсы и выручка -->
+              <div class="grid grid-cols-2 gap-2">
+                <div class="bg-white border border-zinc-200 rounded-2xl p-2.5 flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase text-zinc-600">🚛 В рейсе:</span>
+                  <span class="text-base font-black text-zinc-900">4</span>
+                </div>
+                <div class="bg-white border border-zinc-200 rounded-2xl p-2.5 flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase text-zinc-600">💰 Сегодня:</span>
+                  <span class="text-xs font-black text-zinc-900 truncate">87 500 ₽</span>
+                </div>
+              </div>
+
+              <!-- Сплит-кнопки действий (вплотную под большой палец) -->
+              <div class="flex gap-2 pt-1">
+                <button class="flex-1 bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-xs uppercase tracking-wider shadow-sm">
+                  <span>➕</span>
+                  <span>Доход</span>
+                </button>
+                <button class="flex-1 bg-zinc-900 active:bg-zinc-800 text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-xs uppercase tracking-wider shadow-sm">
+                  <span>➖</span>
+                  <span>Расход</span>
+                </button>
+              </div>
+
+              <!-- Алерт ревью компактный -->
+              <div class="bg-orange-50 border border-orange-300 rounded-xl p-2.5 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">📋</span>
+                  <span class="text-[11px] font-black text-orange-950">2 рейса ждут проверки</span>
+                </div>
+                <span class="text-orange-600 text-xs font-black">→</span>
+              </div>
+            </div>
+
+            <!-- Нижний бар: ровно 4 таба -->
+            <nav class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 py-2.5 px-2 flex justify-around items-center z-50">
+              <div class="flex flex-col items-center gap-0.5 text-orange-600 font-bold">
+                <span class="text-lg leading-none">🏠</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Главная</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">🚛</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Рейсы</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">💰</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Финансы</span>
+              </div>
+              <div class="flex flex-col items-center gap-0.5 text-zinc-400">
+                <span class="text-lg leading-none">👥</span>
+                <span class="text-[9px] font-black uppercase tracking-wider">Персонал</span>
+              </div>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- РЕЖИМ 2: Интерактивный телефон одиночный с переключением табов -->
+    <div id="singleContainer" class="hidden flex flex-col items-center justify-center py-4">
+      <div class="flex items-center gap-2 mb-4 bg-slate-800 p-1.5 rounded-2xl border border-slate-700">
+        <button onclick="setSingleMode(1)" id="tabBtn1" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-orange-600 text-white">
+          1. Минимал
+        </button>
+        <button onclick="setSingleMode(2)" id="tabBtn2" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white">
+          2. Пульс
+        </button>
+        <button onclick="setSingleMode(3)" id="tabBtn3" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white">
+          3. Компакт
+        </button>
+      </div>
+
+      <div id="singlePhoneMount" class="flex justify-center">
+        <!-- Клон выбранного телефона подставляется скриптом -->
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function switchView(mode) {
+      const grid = document.getElementById('gridContainer');
+      const single = document.getElementById('singleContainer');
+      const btnGrid = document.getElementById('viewSideBySide');
+      const btnSingle = document.getElementById('viewSingle');
+
+      if (mode === 'grid') {
+        grid.classList.remove('hidden');
+        single.classList.add('hidden');
+        btnGrid.classList.add('bg-orange-600', 'text-white');
+        btnGrid.classList.remove('text-slate-400');
+        btnSingle.classList.remove('bg-orange-600', 'text-white');
+        btnSingle.classList.add('text-slate-400');
+      } else {
+        grid.classList.add('hidden');
+        single.classList.remove('hidden');
+        btnSingle.classList.add('bg-orange-600', 'text-white');
+        btnSingle.classList.remove('text-slate-400');
+        btnGrid.classList.remove('bg-orange-600', 'text-white');
+        btnGrid.classList.add('text-slate-400');
+        setSingleMode(1);
+      }
+    }
+
+    function setSingleMode(index) {
+      [1, 2, 3].forEach(i => {
+        const btn = document.getElementById('tabBtn' + i);
+        if (i === index) {
+          btn.className = "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-orange-600 text-white";
+        } else {
+          btn.className = "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white";
+        }
+      });
+
+      const cards = document.querySelectorAll('#gridContainer > div');
+      const targetCard = cards[index - 1];
+      if (targetCard) {
+        const phone = targetCard.querySelector('.phone-shell').cloneNode(true);
+        const mount = document.getElementById('singlePhoneMount');
+        mount.innerHTML = '';
+        mount.appendChild(phone);
+      }
+    }
+  </script>
+</body>
+</html>

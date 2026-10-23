@@ -27,54 +27,6 @@ import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
 
-private fun computeOrderPayroll(
-    amount: Double,
-    direction: String,
-    isDriverLoader: Boolean,
-    isPrr: Boolean
-): Pair<Double, Double> {
-    if (amount <= 0.0) return Pair(0.0, 0.0)
-    val effDir = if (isPrr) "loaders_only" else direction
-    if (effDir == "ekb") return Pair(0.0, 0.0)
-
-    if (effDir == "loaders_only") {
-        val loaderPay = Math.round(amount * 0.7).toDouble()
-        return Pair(0.0, loaderPay)
-    }
-
-    val baseRate = when (effDir) {
-        "local" -> 1000.0
-        "n_salda" -> 1500.0
-        "n_salda_dam" -> 2000.0
-        "nikitino" -> 1500.0
-        "neloba" -> 2500.0
-        "basyanovka", "akinfievo" -> 4000.0
-        else -> 1000.0
-    }
-
-    val totalLoadersCount = if (isDriverLoader) 1 else 0
-    if (totalLoadersCount == 0) {
-        val carPay = Math.round(amount * 0.3).toDouble()
-        return Pair(carPay, 0.0)
-    }
-
-    val loaderUnitRate = 1000.0
-    val nominalRate = baseRate + totalLoadersCount * loaderUnitRate
-    val machinePool: Double
-    val loadersPool: Double
-    if (amount >= nominalRate) {
-        machinePool = Math.round(amount * (baseRate / nominalRate)).toDouble()
-        loadersPool = amount - machinePool
-    } else {
-        machinePool = minOf(amount, baseRate)
-        loadersPool = maxOf(0.0, amount - machinePool)
-    }
-
-    val carPay = Math.round(machinePool * 0.3).toDouble()
-    val loaderPay = Math.round(loadersPool * 0.7).toDouble()
-    return Pair(carPay, loaderPay)
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripDetailScreen(
@@ -100,33 +52,6 @@ fun TripDetailScreen(
     var categories by remember { mutableStateOf<List<ExpenseCategory>>(emptyList()) }
     var counterparties by remember { mutableStateOf<List<Counterparty>>(emptyList()) }
     var allLoaders by remember { mutableStateOf<List<User>>(emptyList()) }
-
-    // Поля нового заказа
-    var orderAmountInput by remember { mutableStateOf("") }
-    var orderPayInput by remember { mutableStateOf("") }
-    var orderDescInput by remember { mutableStateOf("") }
-    var orderDirectionInput by remember { mutableStateOf("local") }
-    var orderPaymentMethodInput by remember { mutableStateOf("cash") }
-    var selectedCounterpartyId by remember { mutableStateOf<String?>(null) }
-    var orderClientSearch by remember { mutableStateOf("") }
-    var isDriverLoaderChecked by remember { mutableStateOf(false) }
-    var orderSelectedLoaders by remember { mutableStateOf<List<LoaderPayItem>>(emptyList()) }
-    var orderGeostroyRoute by remember { mutableStateOf("") }
-    var orderGeostroyDate by remember { mutableStateOf("") }
-    var orderTerritoryAddress by remember { mutableStateOf("") }
-    var orderTerritoryWork by remember { mutableStateOf("") }
-
-    fun recalculatePay(amtStr: String, dir: String, isLoader: Boolean) {
-        val amt = amtStr.toDoubleOrNull() ?: 0.0
-        if (dir == "ekb") return
-        val (carPay, loaderPay) = computeOrderPayroll(amt, dir, isLoader, isPrr)
-        val total = carPay + loaderPay
-        if (total > 0) {
-            orderPayInput = "${total.toInt()}"
-        } else if (amt == 0.0) {
-            orderPayInput = ""
-        }
-    }
 
     // Поля нового расхода
     var expenseAmountInput by remember { mutableStateOf("") }
@@ -185,10 +110,6 @@ fun TripDetailScreen(
 
                 val cps = cpDeferred.await()
                 counterparties = cps
-                if (selectedCounterpartyId == null && cps.isNotEmpty()) {
-                    val generic = cps.find { it.name == "Частный клиент" } ?: cps.firstOrNull()
-                    selectedCounterpartyId = generic?.id
-                }
 
                 allLoaders = loadersDeferred.await()
             }
@@ -260,21 +181,7 @@ fun TripDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Button(
-                                onClick = {
-                                    if (isPrr) {
-                                        orderDirectionInput = "loaders_only"
-                                        isDriverLoaderChecked = true
-                                    } else {
-                                        orderDirectionInput = "local"
-                                        isDriverLoaderChecked = false
-                                    }
-                                    orderAmountInput = ""
-                                    orderPayInput = ""
-                                    orderDescInput = ""
-                                    selectedCounterpartyId = null
-                                    orderClientSearch = ""
-                                    showAddOrderDialog = true
-                                },
+                                onClick = { showAddOrderDialog = true },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
                                 shape = RoundedCornerShape(10.dp)
@@ -740,294 +647,16 @@ fun TripDetailScreen(
 
     // ── Диалог добавления заказа ────────────────────────────────────────────
     if (showAddOrderDialog) {
-        val selectedClient = counterparties.find { it.id == selectedCounterpartyId }
-        val isGeostroy = selectedClient?.name?.contains("Геострой", ignoreCase = true) == true
-        val isTerritory = selectedClient?.name?.contains("Территория", ignoreCase = true) == true
-
-        AlertDialog(
-            onDismissRequest = { if (!isSubmitting) showAddOrderDialog = false },
-            title = { Text("Добавить заказ", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-            text = {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 480.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Направление
-                    item {
-                        Text("НАПРАВЛЕНИЕ РЕЙСА", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            val directions = if (isPrr) {
-                                listOf("loaders_only" to "👷 ПРР (без авто)")
-                            } else {
-                                listOf(
-                                    "local" to "🏙️ По городу",
-                                    "n_salda" to "Н. Салда",
-                                    "tagil" to "Тагил",
-                                    "ekb" to "Екб"
-                                )
-                            }
-                            directions.forEach { (dir, label) ->
-                                FilterChip(
-                                    selected = orderDirectionInput == dir,
-                                    onClick = {
-                                        orderDirectionInput = dir
-                                        recalculatePay(orderAmountInput, dir, isDriverLoaderChecked)
-                                    },
-                                    label = { Text(label, fontSize = 11.sp) }
-                                )
-                            }
-                        }
-                    }
-
-                    // Водитель-грузчик (только для рейсов с автомобилем)
-                    if (!isPrr) {
-                        item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val next = !isDriverLoaderChecked
-                                        isDriverLoaderChecked = next
-                                        recalculatePay(orderAmountInput, orderDirectionInput, next)
-                                    }
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("👷", fontSize = 18.sp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Водитель — грузчик", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Zinc800)
-                                }
-                                Switch(
-                                    checked = isDriverLoaderChecked,
-                                    onCheckedChange = { next ->
-                                        isDriverLoaderChecked = next
-                                        recalculatePay(orderAmountInput, orderDirectionInput, next)
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    // Клиент / Контрагент
-                    item {
-                        Text("КЛИЕНТ / КОНТРАГЕНТ", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = orderClientSearch,
-                            onValueChange = { orderClientSearch = it },
-                            placeholder = { Text(selectedClient?.name ?: "Поиск клиента...") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Zinc500) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Топ клиенты
-                    val displayedClients = if (orderClientSearch.isNotBlank()) {
-                        counterparties.filter { it.name.contains(orderClientSearch, ignoreCase = true) }.take(6)
-                    } else {
-                        counterparties.take(5)
-                    }
-
-                    items(displayedClients, key = { it.id ?: it.name }) { cp ->
-                        val isSelected = cp.id == selectedCounterpartyId
-                        Surface(
-                            onClick = {
-                                selectedCounterpartyId = cp.id
-                                orderClientSearch = ""
-                                if (cp.name.contains("Геострой") || cp.name.contains("ВСМПО")) {
-                                    orderPaymentMethodInput = "debt_cash"
-                                }
-                            },
-                            color = if (isSelected) SaldaOrange50 else Color.White,
-                            shape = RoundedCornerShape(8.dp),
-                            border = CardDefaults.outlinedCardBorder().copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(if (isSelected) SaldaOrangePrimary else Zinc200)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = cp.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, fontSize = 13.sp)
-                                if (isSelected) {
-                                    Text("✓", color = SaldaOrangePrimary, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    // Спец поля для Геостройиндустрия
-                    if (isGeostroy) {
-                        item {
-                            Surface(
-                                color = Color(0xFFEFF6FF),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Обязательно для ООО Геостройиндустрия:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E40AF))
-                                    OutlinedTextField(
-                                        value = orderGeostroyRoute,
-                                        onValueChange = { orderGeostroyRoute = it },
-                                        label = { Text("Маршрут") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    OutlinedTextField(
-                                        value = orderGeostroyDate,
-                                        onValueChange = { orderGeostroyDate = it },
-                                        label = { Text("Дата начала (ДД.ММ.ГГГГ)") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Спец поля для Территория
-                    if (isTerritory) {
-                        item {
-                            Surface(
-                                color = Color(0xFFEFF6FF),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Обязательно для Территория:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E40AF))
-                                    OutlinedTextField(
-                                        value = orderTerritoryAddress,
-                                        onValueChange = { orderTerritoryAddress = it },
-                                        label = { Text("Адрес (улица + дом)") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    OutlinedTextField(
-                                        value = orderTerritoryWork,
-                                        onValueChange = { orderTerritoryWork = it },
-                                        label = { Text("Вид работы") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Сумма и ЗП
-                    item {
-                        Text("СТОИМОСТЬ И ОПЛАТА", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = orderAmountInput,
-                            onValueChange = {
-                                orderAmountInput = it
-                                recalculatePay(it, orderDirectionInput, isDriverLoaderChecked)
-                            },
-                            label = { Text("Сумма заказа (₽)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = orderPayInput,
-                            onValueChange = { orderPayInput = it },
-                            label = { Text("ЗП водителя (₽) — авторасчёт") },
-                            placeholder = { Text("Рассчитывается автоматически") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = orderDescInput,
-                            onValueChange = { orderDescInput = it },
-                            label = { Text("Примечание / Адрес") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Способ оплаты
-                    item {
-                        Text("СПОСОБ ОПЛАТЫ", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            listOf("cash" to "💵 Нал", "qr" to "⚡ QR", "debt_cash" to "⏳ Долг").forEach { (method, label) ->
-                                FilterChip(
-                                    selected = orderPaymentMethodInput == method,
-                                    onClick = { orderPaymentMethodInput = method },
-                                    label = { Text(label, fontSize = 11.sp) }
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val amt = orderAmountInput.toDoubleOrNull() ?: return@Button
-                        val (defCarPay, defLoaderPay) = computeOrderPayroll(amt, orderDirectionInput, isDriverLoaderChecked, isPrr)
-                        val totalDefPay = defCarPay + defLoaderPay
-                        val pay = orderPayInput.toDoubleOrNull() ?: (if (totalDefPay > 0) totalDefPay else (if (isPrr) amt * 0.7 else amt * 0.3))
-                        val finalDesc = when {
-                            isGeostroy -> "МАРШРУТ: $orderGeostroyRoute ДАТА НАЧАЛА: $orderGeostroyDate"
-                            isTerritory -> "АДРЕС: $orderTerritoryAddress РАБОТА: $orderTerritoryWork"
-                            orderDescInput.isNotBlank() -> orderDescInput
-                            else -> null
-                        }
-
-                        scope.launch {
-                            isSubmitting = true
-                            SaldaApiClient.addTripOrder(
-                                tripId = tripId,
-                                amount = amt,
-                                driverPay = pay,
-                                description = finalDesc,
-                                direction = orderDirectionInput,
-                                paymentMethod = orderPaymentMethodInput,
-                                counterpartyId = selectedCounterpartyId,
-                                driverCarPay = defCarPay,
-                                driverLoaderPay = defLoaderPay,
-                                isDriverLoader = isDriverLoaderChecked,
-                                userId = userId
-                            )
-                            isSubmitting = false
-                            showAddOrderDialog = false
-                            orderAmountInput = ""
-                            orderPayInput = ""
-                            orderDescInput = ""
-                            loadTrip()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
-                    enabled = !isSubmitting && orderAmountInput.isNotBlank()
-                ) {
-                    Text(if (isSubmitting) "Сохранение..." else "Добавить заказ")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddOrderDialog = false }) {
-                    Text("Отмена", color = Zinc500)
-                }
+        AddOrderDialog(
+            tripId = tripId,
+            userId = userId,
+            isTripPrr = isPrr,
+            counterparties = counterparties,
+            allLoaders = allLoaders,
+            onDismiss = { showAddOrderDialog = false },
+            onSuccess = {
+                showAddOrderDialog = false
+                loadTrip()
             }
         )
     }

@@ -1,5 +1,6 @@
 package ru.ancargo66.app.features.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,12 +12,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.User
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.core.network.SupabaseApi
@@ -95,18 +99,41 @@ fun LoginScreen(
             .background(Zinc50)
             .padding(20.dp)
     ) {
-        // Заголовок
-        Text(
-            text = "Вход в SaldaCargo",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Транспортная компания TK501 • Верхняя Салда",
-            fontSize = 13.sp,
-            color = Zinc500
-        )
+        // Заголовок с фирменным логотипом
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 6.dp)
+        ) {
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(12.dp),
+                shadowElevation = 2.dp,
+                modifier = Modifier.size(52.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo),
+                    contentDescription = "TK501 Logo",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column {
+                Text(
+                    text = "SaldaCargo",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Транспортная компания TK501 • В. Салда",
+                    fontSize = 12.sp,
+                    color = Zinc500
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(18.dp))
 
