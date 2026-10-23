@@ -292,6 +292,7 @@ export function DailyControlPanel() {
       id: string;
       description: string;
       category_id?: string | null;
+      categoryName?: string;
       amount?: number;
       direction?: string;
       to_wallet_id?: string | null;
@@ -303,7 +304,18 @@ export function DailyControlPanel() {
       const res = await fetch('/api/finance/categorize-op', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          id: payload.id,
+          description: payload.description,
+          category_id: payload.category_id,
+          amount: payload.amount,
+          direction: payload.direction,
+          to_wallet_id: payload.to_wallet_id,
+          from_wallet_id: payload.from_wallet_id,
+          transaction_date: payload.transaction_date,
+          obligation_id: payload.obligation_id,
+          related_user_id: payload.related_user_id,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -311,14 +323,99 @@ export function DailyControlPanel() {
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-balance', selectedDate] });
-      queryClient.invalidateQueries({ queryKey: ['finance-month'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-calendar'] });
-      queryClient.invalidateQueries({ queryKey: ['wallets'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-payroll'] });
+    onMutate: async (newOp) => {
+      // 1. Мгновенно закрываем модалку для пользователя (0 ms отклик)
       setEditingTx(null);
+
+      // 2. Отменяем фоновые запросы по daily-balance, чтобы они не перезаписали оптимистичный результат
+      await queryClient.cancelQueries({ queryKey: ['daily-balance', selectedDate, period] });
+
+      // 3. Сохраняем предыдущее состояние кэша для отката при ошибке
+      const previousData = queryClient.getQueryData<DailyBalanceData>([
+        'daily-balance',
+        selectedDate,
+        period,
+      ]);
+
+      // 4. Оптимистично обновляем локальный кэш
+      if (previousData) {
+        const cleanId = String(newOp.id)
+          .replace(/^tbank-deb-/, '')
+          .replace(/^tbank-/, '');
+
+        const updatedTxList = [...(previousData.transactions || [])];
+        const txIdx = updatedTxList.findIndex(
+          (t) => t.id === cleanId || t.idempotency_key === cleanId,
+        );
+
+        const categoryObj = newOp.category_id
+          ? previousData.categories?.find((c) => c.id === newOp.category_id) || {
+              id: newOp.category_id,
+              name: newOp.categoryName || 'Обновлено',
+              code: 'UPDATED',
+            }
+          : null;
+
+        if (txIdx >= 0 && updatedTxList[txIdx]) {
+          const target = updatedTxList[txIdx]!;
+          updatedTxList[txIdx] = {
+            ...target,
+            description: newOp.description,
+            category_id: newOp.category_id,
+            category: categoryObj,
+            to_wallet_id:
+              newOp.to_wallet_id !== undefined ? newOp.to_wallet_id : target.to_wallet_id,
+            from_wallet_id:
+              newOp.from_wallet_id !== undefined ? newOp.from_wallet_id : target.from_wallet_id,
+            related_user_id:
+              newOp.related_user_id !== undefined ? newOp.related_user_id : target.related_user_id,
+          };
+        } else {
+          // Если это была банковская операция без записи в transactions, создаем оптимистичную запись
+          updatedTxList.unshift({
+            id: cleanId,
+            amount: String(newOp.amount || 0),
+            direction: newOp.direction || 'expense',
+            description: newOp.description,
+            created_at: newOp.transaction_date || new Date().toISOString(),
+            transaction_date: newOp.transaction_date || new Date().toISOString(),
+            from_wallet_id: newOp.from_wallet_id || BANK_ID,
+            to_wallet_id: newOp.to_wallet_id || null,
+            category_id: newOp.category_id,
+            idempotency_key: cleanId,
+            category: categoryObj,
+            counterparty: null,
+            related_user: null,
+          });
+        }
+
+        queryClient.setQueryData<DailyBalanceData>(['daily-balance', selectedDate, period], {
+          ...previousData,
+          transactions: updatedTxList,
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, _newOp, context) => {
+      // При ошибке откатываем кэш и сообщаем пользователю
+      if (context?.previousData) {
+        queryClient.setQueryData(['daily-balance', selectedDate, period], context.previousData);
+      }
+      alert('Ошибка при сохранении: ' + (err.message || 'Сбой сети'));
+    },
+    onSettled: () => {
+      // В фоне актуализируем данные без блокировки интерфейса
+      queryClient.invalidateQueries({
+        queryKey: ['daily-balance', selectedDate],
+        refetchType: 'active',
+      });
+      // Второстепенные запросы инвалидируем как неактивные, чтобы не перегружать пул запросов
+      queryClient.invalidateQueries({ queryKey: ['finance-month'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['wallets'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['staff-payroll'], refetchType: 'none' });
     },
   });
 
@@ -2744,12 +2841,13 @@ export function DailyControlPanel() {
                 Отмена
               </button>
               <button
-                disabled={categorizeMutation.isPending || !editingTx.description?.trim()}
+                disabled={!editingTx.description?.trim()}
                 onClick={() =>
                   categorizeMutation.mutate({
                     id: editingTx.id,
                     description: editingTx.description,
                     category_id: editingTx.categoryId,
+                    categoryName: editingTx.categoryName,
                     amount: editingTx.amount,
                     to_wallet_id: editingTx.toWalletId,
                     from_wallet_id: editingTx.fromWalletId,
@@ -2761,7 +2859,7 @@ export function DailyControlPanel() {
                 }
                 className="px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"
               >
-                {categorizeMutation.isPending ? 'Сохранение...' : '✓ Сохранить и распределить'}
+                ✓ Сохранить и распределить
               </button>
             </div>
           </div>

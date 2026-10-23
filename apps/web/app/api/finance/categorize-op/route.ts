@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { invalidateDailyBalanceCache } from '../daily-balance/route';
 import fs from 'fs';
 import path from 'path';
 
@@ -76,19 +77,23 @@ export async function POST(req: Request) {
     const numAmount = parseFloat(amount || '0') || 0;
     const txDate = transaction_date || new Date().toISOString();
 
-    // Находим админа для поля created_by при вставке
-    const { data: adminUser } = await (supabase.from('users') as any)
-      .select('id')
-      .or('roles.cs.{admin},roles.cs.{owner}')
-      .limit(1)
-      .single();
-
     // 1. Проверяем, существует ли уже такая транзакция в transactions
     // (по id или по idempotency_key = cleanId)
     const { data: existingTx } = await (supabase.from('transactions') as any)
-      .select('*')
+      .select('id, idempotency_key, from_wallet_id, to_wallet_id, related_user_id')
       .or(`id.eq.${cleanId},idempotency_key.eq.${cleanId}`)
       .maybeSingle();
+
+    // Находим админа для поля created_by только при вставке новой записи
+    let adminUserId: string | null = null;
+    if (!existingTx) {
+      const { data: adminUser } = await (supabase.from('users') as any)
+        .select('id')
+        .or('roles.cs.{admin},roles.cs.{owner}')
+        .limit(1)
+        .single();
+      adminUserId = adminUser?.id || null;
+    }
 
     // Определение направления и кошельков
     let direction = body.direction || 'expense';
@@ -177,7 +182,7 @@ export async function POST(req: Request) {
         transaction_date: txDate,
         created_at: txDate,
         idempotency_key: cleanId,
-        created_by: adminUser?.id || null,
+        created_by: adminUserId,
         trip_order_id: body.trip_order_id || null,
         related_user_id: finalRelatedUserId || null,
       };
@@ -265,6 +270,11 @@ export async function POST(req: Request) {
       // Обновляем локальный JSON резерв
       updateLocalSettlements(period, matchedOblId, payAmount, fromWallet, txDate);
     }
+
+    // Сбрасываем кэш daily-balance, чтобы новые категории и переименования
+    // отображались мгновенно без 20-секундной задержки
+    invalidateDailyBalanceCache(txDate.slice(0, 10));
+    invalidateDailyBalanceCache();
 
     return NextResponse.json({
       success: true,
