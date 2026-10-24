@@ -193,30 +193,34 @@ fun DriverScreen(
                     val bal = summary?.accountableBalance ?: "0"
                     Card(
                         onClick = { financeInitialTab = 0 },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bouncyTouch(),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                        border = CardDefaults.outlinedCardBorder()
+                        shape = RoundedCornerShape(18.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(18.dp)) {
                             Text(
                                 text = "НА РУКАХ",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Zinc400,
-                                letterSpacing = 1.sp
+                                letterSpacing = 1.2.sp
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "$bal ₽",
-                                fontSize = 26.sp,
+                                fontSize = 28.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Zinc900
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = "Подотчётные наличные →",
                                 fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
                                 color = Zinc500
                             )
                         }
@@ -232,10 +236,13 @@ fun DriverScreen(
 
                     Card(
                         onClick = { financeInitialTab = 1 },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bouncyTouch(),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                        border = CardDefaults.outlinedCardBorder()
+                        shape = RoundedCornerShape(18.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(

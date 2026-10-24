@@ -240,14 +240,22 @@ fun AddOrderDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Zinc50)
-                .statusBarsPadding()
-                .navigationBarsPadding()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
+                // 1. АБСОЛЮТНАЯ ЗАЩИТА СВЕРХУ:
+                // Физический разделитель ровно на высоту статус-бара и выреза камеры
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .background(Color.White)
+                )
+
                 // Шапка
                 Surface(
                     color = Color.White,
-                    shadowElevation = 2.dp
+                    shadowElevation = 2.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
                 ) {
                     Row(
                         modifier = Modifier
@@ -1091,98 +1099,111 @@ fun AddOrderDialog(
                 Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Zinc200)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
                 ) {
-                    Box(modifier = Modifier.padding(16.dp)) {
-                        Button(
-                            onClick = {
-                                if (amountDouble <= 0.0) {
-                                    errorMessage = "Введите корректную сумму заказа"
-                                    return@Button
-                                }
-                                if (selectedCounterpartyId == null) {
-                                    errorMessage = "Укажите клиента перед добавлением заказа"
-                                    return@Button
-                                }
-                                if (isLoadersOnly && !isDriverLoader && selectedLoaders.isEmpty()) {
-                                    errorMessage = "Укажите, кто выполнял разгрузку/погрузку: водитель или грузчики"
-                                    return@Button
-                                }
-                                if (isGeostroy && (geostroyRoute.isBlank() || geostroyDate.isBlank())) {
-                                    errorMessage = "Для Геостройиндустрия заполните маршрут и дату!"
-                                    return@Button
-                                }
-                                if (isTerritory && (territoryAddress.isBlank() || territoryWork.isBlank())) {
-                                    errorMessage = "Для контрагента Территория заполните адрес и работу!"
-                                    return@Button
-                                }
-
-                                val finalDriverPay = if (payroll.isAutomatic) {
-                                    payroll.driverTotalPay.toDouble()
-                                } else {
-                                    manualDriverPayInput.toDoubleOrNull() ?: Math.round(amountDouble * 0.3).toDouble()
-                                }
-
-                                val finalDesc = when {
-                                    isGeostroy -> "МАРШРУТ: $geostroyRoute ДАТА НАЧАЛА: $geostroyDate"
-                                    isTerritory -> "АДРЕС: $territoryAddress РАБОТА: $territoryWork"
-                                    descriptionInput.isNotBlank() -> descriptionInput
-                                    paymentMethod == "debt_cash" -> "Долг: ${selectedClient?.name ?: "Клиент"}"
-                                    else -> null
-                                }
-
-                                val loadersData = selectedLoaders.map { l ->
-                                    LoaderPayItem(
-                                        id = l.id,
-                                        name = l.name,
-                                        pay = payroll.loaderPayEach.toString()
-                                    )
-                                }
-
-                                scope.launch {
-                                    isSubmitting = true
-                                    errorMessage = null
-                                    try {
-                                        val ok = SaldaApiClient.addTripOrder(
-                                            tripId = tripId,
-                                            amount = amountDouble,
-                                            driverPay = finalDriverPay,
-                                            description = finalDesc,
-                                            direction = if (isLoadersOnly) "loaders_only" else direction,
-                                            paymentMethod = paymentMethod,
-                                            counterpartyId = selectedCounterpartyId,
-                                            driverCarPay = payroll.driverCarPay.toDouble(),
-                                            driverLoaderPay = payroll.driverLoaderPay.toDouble(),
-                                            isDriverLoader = isDriverLoader,
-                                            loadersData = loadersData,
-                                            userId = userId
-                                        )
-                                        if (ok) {
-                                            onSuccess()
-                                            onDismiss()
-                                        } else {
-                                            errorMessage = "Ошибка при сохранении заказа"
-                                        }
-                                    } catch (e: Exception) {
-                                        errorMessage = e.message ?: "Сетевая ошибка"
-                                    } finally {
-                                        isSubmitting = false
+                    Column {
+                        Box(modifier = Modifier.padding(16.dp)) {
+                            Button(
+                                onClick = {
+                                    if (amountDouble <= 0.0) {
+                                        errorMessage = "Введите корректную сумму заказа"
+                                        return@Button
                                     }
+                                    if (selectedCounterpartyId == null) {
+                                        errorMessage = "Укажите клиента перед добавлением заказа"
+                                        return@Button
+                                    }
+                                    if (isLoadersOnly && !isDriverLoader && selectedLoaders.isEmpty()) {
+                                        errorMessage = "Укажите, кто выполнял разгрузку/погрузку: водитель или грузчики"
+                                        return@Button
+                                    }
+                                    if (isGeostroy && (geostroyRoute.isBlank() || geostroyDate.isBlank())) {
+                                        errorMessage = "Для Геостройиндустрия заполните маршрут и дату!"
+                                        return@Button
+                                    }
+                                    if (isTerritory && (territoryAddress.isBlank() || territoryWork.isBlank())) {
+                                        errorMessage = "Для контрагента Территория заполните адрес и работу!"
+                                        return@Button
+                                    }
+
+                                    val finalDriverPay = if (payroll.isAutomatic) {
+                                        payroll.driverTotalPay.toDouble()
+                                    } else {
+                                        manualDriverPayInput.toDoubleOrNull() ?: Math.round(amountDouble * 0.3).toDouble()
+                                    }
+
+                                    val finalDesc = when {
+                                        isGeostroy -> "МАРШРУТ: $geostroyRoute ДАТА НАЧАЛА: $geostroyDate"
+                                        isTerritory -> "АДРЕС: $territoryAddress РАБОТА: $territoryWork"
+                                        descriptionInput.isNotBlank() -> descriptionInput
+                                        paymentMethod == "debt_cash" -> "Долг: ${selectedClient?.name ?: "Клиент"}"
+                                        else -> null
+                                    }
+
+                                    val loadersData = selectedLoaders.map { l ->
+                                        LoaderPayItem(
+                                            id = l.id,
+                                            name = l.name,
+                                            pay = payroll.loaderPayEach.toString()
+                                        )
+                                    }
+
+                                    scope.launch {
+                                        isSubmitting = true
+                                        errorMessage = null
+                                        try {
+                                            val ok = SaldaApiClient.addTripOrder(
+                                                tripId = tripId,
+                                                amount = amountDouble,
+                                                driverPay = finalDriverPay,
+                                                description = finalDesc,
+                                                direction = if (isLoadersOnly) "loaders_only" else direction,
+                                                paymentMethod = paymentMethod,
+                                                counterpartyId = selectedCounterpartyId,
+                                                driverCarPay = payroll.driverCarPay.toDouble(),
+                                                driverLoaderPay = payroll.driverLoaderPay.toDouble(),
+                                                isDriverLoader = isDriverLoader,
+                                                loadersData = loadersData,
+                                                userId = userId
+                                            )
+                                            if (ok) {
+                                                onSuccess()
+                                                onDismiss()
+                                            } else {
+                                                errorMessage = "Ошибка при сохранении заказа"
+                                            }
+                                        } catch (e: Exception) {
+                                            errorMessage = e.message ?: "Сетевая ошибка"
+                                        } finally {
+                                            isSubmitting = false
+                                        }
+                                    }
+                                },
+                                enabled = !isSubmitting,
+                                colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .bouncyTouch()
+                            ) {
+                                if (isSubmitting) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                                } else {
+                                    Text("✅ ДОБАВИТЬ ЗАКАЗ", fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                 }
-                            },
-                            enabled = !isSubmitting,
-                            colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                        ) {
-                            if (isSubmitting) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                            } else {
-                                Text("✅ ДОБАВИТЬ ЗАКАЗ", fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                             }
                         }
+
+                        // 2. АБСОЛЮТНАЯ ЗАЩИТА СНИЗУ:
+                        // Физический разделитель под жестовую полоску / кнопки навигации телефона
+                        Spacer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .windowInsetsBottomHeight(WindowInsets.navigationBars)
+                                .background(Color.White)
+                        )
                     }
                 }
             }
