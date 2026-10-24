@@ -563,52 +563,70 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
               ТИКУЛЬНЫЙ БЛОК БАНДЕРОЛИ (ЛИЦЕВАЯ СТОРОНА ПРИ СКЛАДЫВАНИИ ВОКРУГ ДЕНЕГ)
               Снаружи: ТК501, РАСЧЕТНЫЙ ЛИСТ, ФИО, СУММА К ВЫДАЧЕ, ДАТЫ ВЫПЛАТЫ
               ═════════════════════════════════════════════════════════════════════ */}
-          <div className="border-2 border-slate-950 rounded-xl p-2.5 sm:p-3 bg-white shadow-xs">
-            <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1.5 mb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-black text-xs tracking-wider uppercase px-2 py-0.5 bg-slate-950 text-white rounded">
-                  ТК501
+          {/* ═════════════════════════════════════════════════════════════════════
+              ЗОНА БАНДЕРОЛИ-КОЛЬЦА: 3 КОЛОНКИ С ВЕРТИКАЛЬНЫМИ ЛИНИЯМИ СГИБА
+              ═════════════════════════════════════════════════════════════════════ */}
+          <div className="relative border-2 border-slate-900 rounded-xl p-2 bg-white mb-2 shadow-xs">
+            <div className="grid grid-cols-3 gap-2 items-stretch min-h-[140px]">
+              {/* Левое крыло: вертикальная линия сгиба 1 и стрелка */}
+              <div className="border-r-2 border-dashed border-slate-400 pr-2 text-center flex flex-col justify-center items-center h-full py-1">
+                <span className="text-[9px] font-mono font-black text-slate-700 uppercase tracking-wider mb-1">
+                  ✂ СГИБ 1 ➔
                 </span>
-                <span className="font-black text-xs tracking-wide uppercase text-slate-950">
-                  РАСЧЁТНЫЙ ЛИСТ
+                <span className="text-[7.5px] text-slate-500 leading-tight">
+                  Загнуть левую треть листа внутрь по этой линии
                 </span>
-              </div>
-              <div className="text-[10px] font-bold text-slate-800">Период: {periodLabel}</div>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-[8.5px] uppercase tracking-wider text-slate-500 font-bold">
-                  Сотрудник:
-                </div>
-                <div className="text-base sm:text-lg font-black text-slate-950 uppercase tracking-tight">
-                  {user.name}
-                </div>
-                <div className="text-[9px] text-slate-600 font-medium">
-                  {rolesLabel || 'Сотрудник'}
-                  {user.asset ? ` • ${user.asset.short_name} (${user.asset.reg_number})` : ''}
-                </div>
+                <span className="text-slate-400 text-base font-black mt-1">➔</span>
               </div>
 
-              <div className="text-right shrink-0">
-                <div className="text-[9px] uppercase tracking-wider text-slate-700 font-bold">
-                  К выдаче на руки:
+              {/* ЦЕНТРАЛЬНАЯ ВЕРТИКАЛЬНАЯ КАРТОЧКА БАНДЕРОЛИ (ЛИЦЕВАЯ СТОРОНА КОЛЬЦА) */}
+              <div className="border-2 border-slate-950 rounded-xl p-2 bg-white text-center flex flex-col justify-between shadow-xs">
+                <div className="border-b border-slate-300 pb-1 mb-1">
+                  <span className="bg-slate-950 text-white text-[9px] font-black px-2 py-0.5 rounded tracking-wider uppercase inline-block">
+                    ТК501
+                  </span>
+                  <div className="text-[8.5px] font-black tracking-wider uppercase text-slate-900 mt-0.5">
+                    РАСЧЁТНЫЙ ЛИСТ
+                  </div>
                 </div>
-                <div className="font-mono font-black text-xl sm:text-2xl text-slate-950 px-3 py-1 border-2 border-slate-950 rounded-lg bg-slate-50 inline-block mt-0.5">
-                  {payoutToPrint.toLocaleString('ru-RU')} ₽
+
+                <div className="py-0.5">
+                  <div className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">
+                    СОТРУДНИК:
+                  </div>
+                  <div className="text-xs sm:text-sm font-black uppercase text-slate-950 tracking-tight leading-snug">
+                    {user.name}
+                  </div>
+                  <div className="text-[8px] text-slate-600 font-medium truncate">
+                    {rolesLabel || 'Сотрудник'}
+                  </div>
+
+                  <div className="font-mono font-black text-lg text-slate-950 bg-slate-100 border-2 border-slate-950 rounded-lg py-1 px-3 mt-1 inline-block">
+                    {payoutToPrint.toLocaleString('ru-RU')} ₽
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-300 pt-1 mt-1 text-[8px] font-bold text-slate-600 font-mono">
+                  {periodLabel}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Пунктирная линия сгиба 1 с подсказкой */}
-          <div className="relative my-1 text-center select-none">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t-2 border-dashed border-slate-400"></div>
+              {/* Правое крыло: вертикальная линия сгиба 2 и стрелка */}
+              <div className="border-l-2 border-dashed border-slate-400 pl-2 text-center flex flex-col justify-center items-center h-full py-1">
+                <span className="text-[9px] font-mono font-black text-slate-700 uppercase tracking-wider mb-1">
+                  ⬅ СГИБ 2 ✂
+                </span>
+                <span className="text-[7.5px] text-slate-500 leading-tight">
+                  Загнуть правую треть листа внутрь по этой линии
+                </span>
+                <span className="text-slate-400 text-base font-black mt-1">⬅</span>
+              </div>
             </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2.5 text-[8px] font-mono text-slate-500 uppercase tracking-wider">
-                ✂ - - - ЛИНИЯ СГИБА (ОБОРОТ ВОКРУГ КУПЮР) - - -
+
+            {/* Подсказка горизонтального оборота вокруг денег */}
+            <div className="mt-1.5 pt-1 border-t border-dashed border-slate-300 text-center select-none">
+              <span className="text-[8px] font-mono text-slate-500 uppercase tracking-wider">
+                ✂ ── ГОРИЗОНТАЛЬНАЯ ЛИНИЯ ОБОРОТА (ОБЕРНУТЬ ПОЛУЧЕННУЮ ПОЛОСУ ВОКРУГ ДЕНЕГ) ── ✂
               </span>
             </div>
           </div>
