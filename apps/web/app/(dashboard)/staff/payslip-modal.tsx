@@ -74,8 +74,26 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
     window.print();
   };
 
-  // Режим периода: по умолчанию "week" (недельный четверговый цикл), переключатель на "month" (полный месяц)
-  const [periodMode, setPeriodMode] = useState<'week' | 'month'>('week');
+  // Авто-определение типа автомобиля: Валдай (по факту) или Газель (Чт-срез)
+  const isValdayDriver = Boolean(
+    user.asset?.short_name?.toLowerCase().includes('валдай') ||
+    (user.roles?.includes('driver') && user.asset?.short_name?.toLowerCase().includes('валдай')),
+  );
+
+  type PeriodMode = 'valday' | 'gazelle' | 'custom' | 'month';
+  const [periodMode, setPeriodMode] = useState<PeriodMode>(() =>
+    isValdayDriver ? 'valday' : 'gazelle',
+  );
+
+  // Для произвольного диапазона дат (по умолчанию последние 14 дней)
+  const [customStart, setCustomStart] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    return d.toISOString().slice(0, 10);
+  });
+  const [customEnd, setCustomEnd] = useState(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
 
   const now = new Date();
   const weekCycle = getThursdayCycle(now);
@@ -129,50 +147,40 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   let debtRepayments: PayrollHistoryItem[] = [];
   let salaryPayouts: PayrollHistoryItem[] = [];
 
-  if (periodMode === 'week') {
-    // Хелпер: выплата или зачёт в прошлую пятницу (день закрытия старой недели)
-    const isOldFridayAction = (rawDate: string | null | undefined) => {
-      if (!rawDate) return false;
-      const d = new Date(rawDate);
-      return (
-        d.getFullYear() === weekCycle.start.getFullYear() &&
-        d.getMonth() === weekCycle.start.getMonth() &&
-        d.getDate() === weekCycle.start.getDate()
-      );
-    };
+  // Хелпер: выплата или зачёт в прошлую пятницу (день закрытия старой недели)
+  const isOldFridayAction = (rawDate: string | null | undefined) => {
+    if (!rawDate) return false;
+    const d = new Date(rawDate);
+    return (
+      d.getFullYear() === weekCycle.start.getFullYear() &&
+      d.getMonth() === weekCycle.start.getMonth() &&
+      d.getDate() === weekCycle.start.getDate()
+    );
+  };
 
+  if (periodMode === 'valday') {
+    // 🚛 ВАЛДАЙ: По факту / все невыплаченные рейсы без отсечения четвергом
     if (userDebt > 0) {
-      // Все невыплаченные смены (pending), ожидающие выплаты за этот цикл (включая пятницу)
       accruals = allHistory.filter((t) => isSalaryAccrual(t) && t.settlement_status === 'pending');
-
-      // Если по какой-то причине pending пустой, берем все начисления с начала цикла
       if (accruals.length === 0) {
-        accruals = allHistory.filter((t) => {
-          if (!isSalaryAccrual(t)) return false;
-          const rawDate = t.transaction_date || t.created_at;
-          if (!rawDate) return false;
-          const d = new Date(rawDate);
-          return d >= weekCycle.start;
-        });
+        accruals = allHistory.filter(
+          (t) =>
+            isSalaryAccrual(t) && new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+        );
       }
-
-      // Зачёт аванса в текущем цикле
-      debtRepayments = allHistory.filter((t) => {
-        if (!isDebtRepayment(t)) return false;
-        const rawDate = t.transaction_date || t.created_at;
-        if (!rawDate) return false;
-        if (isOldFridayAction(rawDate)) return false;
-        const d = new Date(rawDate);
-        return d > weekCycle.start;
-      });
-
+      debtRepayments = allHistory.filter(
+        (t) =>
+          isDebtRepayment(t) &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) > weekCycle.start,
+      );
       if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
         debtRepayments = [
           {
             id: 'current-advance-offset',
             amount: userAdvanceOffset.toFixed(2),
             direction: 'income',
-            description: 'Зачёт аванса в счёт ЗП за текущую неделю',
+            description: 'Зачёт аванса в счёт ЗП за текущий расчёт',
             created_at: new Date().toISOString(),
             transaction_date: new Date().toISOString(),
             settlement_status: 'pending',
@@ -181,49 +189,121 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
           },
         ];
       }
-
-      // Выплаты ЗП в текущем цикле
-      salaryPayouts = allHistory.filter((t) => {
-        if (!isSalaryPayout(t)) return false;
-        if (t.settlement_status !== 'completed') return false;
-        const rawDate = t.transaction_date || t.created_at;
-        if (!rawDate) return false;
-        if (isOldFridayAction(rawDate)) return false;
-        const d = new Date(rawDate);
-        return d > weekCycle.start;
-      });
+      salaryPayouts = allHistory.filter(
+        (t) =>
+          isSalaryPayout(t) &&
+          t.settlement_status === 'completed' &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) > weekCycle.start,
+      );
     } else {
-      // Если все смены уже закрыты выплатой:
-      // Показываем все начисления текущего цикла (от старта недели до момента выплаты, включая пятницу/субботу)
+      accruals = allHistory.filter(
+        (t) =>
+          isSalaryAccrual(t) && new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+      );
+      debtRepayments = allHistory.filter(
+        (t) =>
+          isDebtRepayment(t) &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+      );
+      salaryPayouts = allHistory.filter(
+        (t) =>
+          isSalaryPayout(t) &&
+          t.settlement_status === 'completed' &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+      );
+    }
+  } else if (periodMode === 'gazelle') {
+    // 🚚 ГАЗЕЛЬ: Четверговый срез (Пт 00:00 - Чт 23:59:59)
+    if (userDebt > 0) {
       accruals = allHistory.filter((t) => {
         if (!isSalaryAccrual(t)) return false;
+        if (t.settlement_status !== 'pending') return false;
         const rawDate = t.transaction_date || t.created_at;
-        if (!rawDate) return false;
-        const d = new Date(rawDate);
-        return d >= weekCycle.start;
+        if (!rawDate) return true;
+        return new Date(rawDate) <= weekCycle.end;
       });
-
-      debtRepayments = allHistory.filter((t) => {
-        if (!isDebtRepayment(t)) return false;
-        const rawDate = t.transaction_date || t.created_at;
-        if (!rawDate) return false;
-        if (isOldFridayAction(rawDate)) return false;
-        const d = new Date(rawDate);
-        return d >= weekCycle.start;
-      });
-
-      salaryPayouts = allHistory.filter((t) => {
-        if (!isSalaryPayout(t)) return false;
-        if (t.settlement_status !== 'completed') return false;
-        const rawDate = t.transaction_date || t.created_at;
-        if (!rawDate) return false;
-        if (isOldFridayAction(rawDate)) return false;
-        const d = new Date(rawDate);
-        return d >= weekCycle.start;
-      });
+      if (accruals.length === 0) {
+        accruals = allHistory.filter(
+          (t) => isSalaryAccrual(t) && t.settlement_status === 'pending',
+        );
+      }
+      debtRepayments = allHistory.filter(
+        (t) =>
+          isDebtRepayment(t) &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) > weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+      );
+      if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
+        debtRepayments = [
+          {
+            id: 'current-advance-offset',
+            amount: userAdvanceOffset.toFixed(2),
+            direction: 'income',
+            description: 'Зачёт аванса в счёт ЗП (Чт-срез)',
+            created_at: new Date().toISOString(),
+            transaction_date: new Date().toISOString(),
+            settlement_status: 'pending',
+            category_id: ADVANCE_CATEGORY_ID,
+            employee_confirmed: null,
+          },
+        ];
+      }
+      salaryPayouts = allHistory.filter(
+        (t) =>
+          isSalaryPayout(t) &&
+          t.settlement_status === 'completed' &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) > weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+      );
+    } else {
+      accruals = allHistory.filter(
+        (t) =>
+          isSalaryAccrual(t) &&
+          new Date(t.transaction_date || t.created_at) >= weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+      );
+      debtRepayments = allHistory.filter(
+        (t) =>
+          isDebtRepayment(t) &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) >= weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+      );
+      salaryPayouts = allHistory.filter(
+        (t) =>
+          isSalaryPayout(t) &&
+          t.settlement_status === 'completed' &&
+          !isOldFridayAction(t.transaction_date || t.created_at) &&
+          new Date(t.transaction_date || t.created_at) >= weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+      );
     }
+  } else if (periodMode === 'custom') {
+    // 🗓️ ПРОИЗВОЛЬНЫЙ ВЫБОР ДАТ: С customStart ПО customEnd
+    const sDate = new Date(customStart + 'T00:00:00');
+    const eDate = new Date(customEnd + 'T23:59:59.999');
+    accruals = allHistory.filter((t) => {
+      if (!isSalaryAccrual(t)) return false;
+      const d = new Date(t.transaction_date || t.created_at);
+      return d >= sDate && d <= eDate;
+    });
+    debtRepayments = allHistory.filter((t) => {
+      if (!isDebtRepayment(t)) return false;
+      const d = new Date(t.transaction_date || t.created_at);
+      return d >= sDate && d <= eDate;
+    });
+    salaryPayouts = allHistory.filter((t) => {
+      if (!isSalaryPayout(t)) return false;
+      const d = new Date(t.transaction_date || t.created_at);
+      return d >= sDate && d <= eDate;
+    });
   } else {
-    // Режим "month" (весь календарный месяц)
+    // 📅 МЕСЯЦ (весь календарный месяц)
     const monthHistory = allHistory.filter((t) => {
       const rawDate = t.transaction_date || t.created_at;
       if (!rawDate) return false;
@@ -245,14 +325,15 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   const advanceBalanceCurrent = parseFloat(user.advance_balance || '0');
 
   // Расчёт остатка к выдаче на руки за период:
-  // Если начислено больше, чем выплачено и удержано
   const periodNetPayout = Math.max(0, sumAccruals - sumDebtRepayments - sumSalaryPayouts);
   const totalPayoutOnHand =
-    periodMode === 'week'
+    periodMode === 'valday'
       ? userDebt > 0
         ? parseFloat(user.payout || user.debt || '0')
         : periodNetPayout
-      : parseFloat(user.payout || user.debt || '0');
+      : periodNetPayout > 0
+        ? periodNetPayout
+        : parseFloat(user.payout || user.debt || '0');
 
   // Фактическая сумма к выдаче для печати на бандероли/в шапке:
   // Если выплата уже проведена (sumSalaryPayouts > 0) и остаток обнулился,
@@ -278,8 +359,22 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       : weekCycle.end.toLocaleDateString('ru-RU');
   const dynamicCycleLabel = `${actualStart} — ${actualEnd}`;
 
+  const customLabel = `${new Date(customStart + 'T00:00:00').toLocaleDateString('ru-RU')} — ${new Date(customEnd + 'T23:59:59').toLocaleDateString('ru-RU')}`;
   const periodLabel =
-    periodMode === 'week' ? dynamicCycleLabel : `${monthName.toUpperCase()} ${year} Г.`;
+    periodMode === 'custom'
+      ? customLabel
+      : periodMode === 'month'
+        ? `${monthName.toUpperCase()} ${year} Г.`
+        : dynamicCycleLabel;
+
+  const modeBadge =
+    periodMode === 'gazelle'
+      ? 'НЕДЕЛЬНЫЙ РАСЧЁТ (ГАЗЕЛЬ • ЧТ-СРЕЗ)'
+      : periodMode === 'valday'
+        ? 'РАСЧЁТ ПО ФАКТУ (ВАЛДАЙ • МЕЖГОРОД)'
+        : periodMode === 'custom'
+          ? 'РАСЧЁТ ЗА ПРОИЗВОЛЬНЫЙ ПЕРИОД'
+          : 'МЕСЯЧНЫЙ РАСЧЁТ';
 
   // Роли сотрудника
   const rolesLabel = (user.roles || [])
@@ -368,45 +463,84 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
             <div>
               <h3 className="font-bold text-sm">Расчётный листок: {user.name}</h3>
               <p className="text-xs text-slate-300">
-                {periodMode === 'week' ? (
-                  <span className="text-amber-300 font-bold">
-                    🗓️ Неделя (Четверг-вечер срез): {weekCycle.label}
-                  </span>
-                ) : (
-                  <span className="text-sky-300 font-bold">
-                    🗓️ Полный месяц: {monthName} {year} г.
-                  </span>
-                )}
+                <span className="text-amber-300 font-bold">
+                  {modeBadge}: {periodLabel}
+                </span>
               </p>
             </div>
           </div>
 
-          {/* Переключатель: Неделя (срез по четвергу) / Месяц */}
-          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-end">
-            <div className="bg-slate-800 p-1 rounded-xl border border-slate-700 flex items-center text-xs font-bold">
+          {/* Переключатель: Газель / Валдай / Свои даты / Месяц */}
+          <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-end">
+            <div className="bg-slate-800 p-1 rounded-xl border border-slate-700 flex flex-wrap items-center gap-1 text-xs font-bold">
               <button
-                onClick={() => setPeriodMode('week')}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  periodMode === 'week'
+                onClick={() => setPeriodMode('gazelle')}
+                className={`px-2.5 py-1.5 rounded-lg transition ${
+                  periodMode === 'gazelle'
                     ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
                     : 'text-slate-300 hover:text-white'
                 }`}
-                title="Расчёт за отчётную неделю: с пятницы по четверг включительно"
+                title="Четверговый срез (Пт-Чт) для водителей Газелей"
               >
-                ⚡ Неделя (Чт срез)
+                🚚 Газель (Чт срез)
               </button>
+
               <button
-                onClick={() => setPeriodMode('month')}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  periodMode === 'month'
+                onClick={() => setPeriodMode('valday')}
+                className={`px-2.5 py-1.5 rounded-lg transition ${
+                  periodMode === 'valday'
+                    ? 'bg-emerald-600 text-white font-black shadow-xs'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="Все невыплаченные рейсы без привязки к четвергу (Валдай)"
+              >
+                🚛 Валдай (По факту)
+              </button>
+
+              <button
+                onClick={() => setPeriodMode('custom')}
+                className={`px-2.5 py-1.5 rounded-lg transition ${
+                  periodMode === 'custom'
                     ? 'bg-indigo-600 text-white font-black shadow-xs'
                     : 'text-slate-300 hover:text-white'
                 }`}
-                title="Показать за весь календарный месяц"
+                title="Выбрать любые произвольные даты"
               >
-                📅 Весь месяц
+                🗓️ Выбор дат
+              </button>
+
+              <button
+                onClick={() => setPeriodMode('month')}
+                className={`px-2.5 py-1.5 rounded-lg transition ${
+                  periodMode === 'month'
+                    ? 'bg-sky-600 text-white font-black shadow-xs'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="За весь календарный месяц"
+              >
+                📅 Месяц
               </button>
             </div>
+
+            {/* Выбор дат календариками для custom */}
+            {periodMode === 'custom' && (
+              <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700 text-xs">
+                <span className="text-slate-400 font-bold text-[10px]">С:</span>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="bg-slate-900 text-white px-2 py-0.5 rounded border border-slate-600 text-xs font-mono"
+                />
+                <span className="text-slate-400 font-bold text-[10px]">ПО:</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="bg-slate-900 text-white px-2 py-0.5 rounded border border-slate-600 text-xs font-mono"
+                />
+              </div>
+            )}
 
             <button
               onClick={handlePrint}
@@ -484,7 +618,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded border border-slate-900 text-slate-950 bg-white tracking-wider">
-                  {periodMode === 'week' ? 'НЕДЕЛЬНЫЙ РАСЧЁТ (ЧТ-СРЕЗ)' : 'МЕСЯЧНЫЙ РАСЧЁТ'}
+                  {modeBadge}
                 </span>
                 <span className="font-bold text-[10px] text-slate-700">
                   ИП Нигамедьянов Александр Сергеевич (ИНН: 660704814106)
@@ -494,7 +628,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                 РАСЧЁТНЫЙ ЛИСТОК ЗА ПЕРИОД: {periodLabel}
               </h1>
               <div className="text-[9.5px] text-slate-600 italic">
-                {periodMode === 'week'
+                {periodMode !== 'month'
                   ? 'Расчёт за отчётный период выплат (все фактически выполненные смены)'
                   : `Полный отчётный период: 01.${String(monthNumber).padStart(2, '0')} — конец месяца`}
               </div>
