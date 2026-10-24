@@ -8,7 +8,19 @@ import path from 'path';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
-const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001';
+const FALLBACK_ADMIN_USER_ID = 'f3ec66fd-57dc-5017-a8c1-ce12ffc34ead';
+
+const OBLIGATION_CATEGORY_MAP: Record<string, string> = {
+  leasing_loan: '00000000-0000-0000-0000-000000000020', // LOAN_REPAYMENT
+  fuel: '62cebf3f-9982-4cc6-904b-48c6169cf5e4', // FUEL
+  rent: '59ef1110-6c3f-49c7-a29c-b9e97a3a3d92', // RENT
+  comms: '73f565eb-f509-4538-9658-9cdff69bee37', // OFFICE_COMMS
+  tax: 'f4a66f83-63c0-4ba0-8eaa-0d42ce19d3ca', // TAX
+  insurance: '992ed3ae-66a7-4a16-a2da-cecd9b7086c5', // INSURANCE
+  salary: 'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
+  court_order: 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30', // OTHER_EXPENSE
+  other: 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30', // OTHER_EXPENSE
+};
 
 function getLocalFilePath(filename: string): string {
   const inAppsWeb = path.join(process.cwd(), 'apps', 'web', 'data', filename);
@@ -621,19 +633,35 @@ export async function POST(request: Request) {
           ? `Оплата по календарю: ${body.title}`
           : 'Плановый платеж по календарю';
 
-        await (supabase.from('transactions') as any).insert({
+        const { data: adminUser } = await (supabase.from('users') as any)
+          .select('id')
+          .or('roles.cs.{admin},roles.cs.{owner}')
+          .limit(1)
+          .single();
+
+        const catId =
+          (body.category && OBLIGATION_CATEGORY_MAP[body.category]) ||
+          (body.title && /кредит|лизинг|займ/i.test(body.title)
+            ? '00000000-0000-0000-0000-000000000020'
+            : 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30');
+
+        const { error: insErr } = await (supabase.from('transactions') as any).insert({
           direction: 'expense',
           amount: payAmount.toFixed(2),
           from_wallet_id: chosenWallet,
           to_wallet_id: null,
-          category_id: '00000000-0000-0000-0000-000000000010', // OTHER_EXPENSE
+          category_id: catId,
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           transaction_date: new Date().toISOString(),
           description: desc,
           idempotency_key: crypto.randomUUID(),
-          created_by: SYSTEM_USER_ID,
+          created_by: adminUser?.id || FALLBACK_ADMIN_USER_ID,
         });
+
+        if (insErr) {
+          console.error('Error inserting transaction in payment-calendar:', insErr);
+        }
       }
 
       return NextResponse.json({ success: true, message: 'Платеж отмечен как выполненный' });

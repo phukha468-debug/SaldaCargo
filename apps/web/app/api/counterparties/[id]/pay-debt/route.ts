@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 const CAT_PARTS = '9d18370d-3228-4f2a-8530-52b168cfa8d7';
-const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001';
+const FALLBACK_ADMIN_USER_ID = 'f3ec66fd-57dc-5017-a8c1-ce12ffc34ead';
 
 /** POST /api/counterparties/[id]/pay-debt — быстрая выплата долга поставщику */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -49,6 +49,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       categoryId = CAT_FUEL;
     }
 
+    // Находим пользователя для created_by
+    const { data: adminUser } = await (supabase.from('users') as any)
+      .select('id')
+      .or('roles.cs.{admin},roles.cs.{owner}')
+      .limit(1)
+      .single();
+
     // Создаем транзакцию выплаты
     const desc = body.description?.trim() || `Оплата поставщику: ${cp.name}`;
     const { data: tx, error: txErr } = await (supabase.from('transactions') as any)
@@ -64,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         transaction_date: new Date().toISOString(),
         description: desc,
         idempotency_key: crypto.randomUUID(),
-        created_by: SYSTEM_USER_ID,
+        created_by: adminUser?.id || FALLBACK_ADMIN_USER_ID,
       })
       .select()
       .single();

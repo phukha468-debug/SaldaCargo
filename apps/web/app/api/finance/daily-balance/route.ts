@@ -30,7 +30,11 @@ export function invalidateDailyBalanceCache(date?: string) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date') || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const TIMEZONE_OFFSET_HOURS = 5; // Верхняя Салда (UTC+5 / Asia/Yekaterinburg)
+    const nowLocal = new Date(Date.now() + TIMEZONE_OFFSET_HOURS * 3600 * 1000);
+    const todayYmd = nowLocal.toISOString().slice(0, 10);
+
+    const date = searchParams.get('date') || todayYmd; // YYYY-MM-DD
     const period = (searchParams.get('period') as 'day' | 'week' | 'month') || 'day';
     const forceRefresh = searchParams.get('force') === '1';
 
@@ -47,25 +51,71 @@ export async function GET(request: Request) {
       }
     }
 
-    let rangeStart = `${date}T00:00:00.000Z`;
-    let rangeEnd = `${date}T23:59:59.999Z`;
+    let rangeStart = '';
+    let rangeEnd = '';
+    let displayRangeStart = date;
+    let displayRangeEnd = date;
 
-    if (period === 'week') {
-      const d = new Date(date + 'T12:00:00Z');
-      const day = d.getUTCDay();
+    if (period === 'day') {
+      const parts = date.split('-').map(Number);
+      const y = parts[0] ?? 2026;
+      const m = parts[1] ?? 1;
+      const d = parts[2] ?? 1;
+      const startUtc = new Date(Date.UTC(y, m - 1, d, -TIMEZONE_OFFSET_HOURS, 0, 0, 0));
+      const endUtc = new Date(Date.UTC(y, m - 1, d, 23 - TIMEZONE_OFFSET_HOURS, 59, 59, 999));
+      rangeStart = startUtc.toISOString();
+      rangeEnd = endUtc.toISOString();
+    } else if (period === 'week') {
+      const parts = date.split('-').map(Number);
+      const y = parts[0] ?? 2026;
+      const m = parts[1] ?? 1;
+      const d = parts[2] ?? 1;
+      const mid = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+      const day = mid.getUTCDay();
       const diffToMon = day === 0 ? -6 : 1 - day;
-      const mon = new Date(d);
-      mon.setUTCDate(d.getUTCDate() + diffToMon);
+      const mon = new Date(mid);
+      mon.setUTCDate(mid.getUTCDate() + diffToMon);
       const sun = new Date(mon);
       sun.setUTCDate(mon.getUTCDate() + 6);
-      rangeStart = `${mon.toISOString().slice(0, 10)}T00:00:00.000Z`;
-      rangeEnd = `${sun.toISOString().slice(0, 10)}T23:59:59.999Z`;
+
+      displayRangeStart = mon.toISOString().slice(0, 10);
+      displayRangeEnd = sun.toISOString().slice(0, 10);
+
+      const startUtc = new Date(
+        Date.UTC(
+          mon.getUTCFullYear(),
+          mon.getUTCMonth(),
+          mon.getUTCDate(),
+          -TIMEZONE_OFFSET_HOURS,
+          0,
+          0,
+          0,
+        ),
+      );
+      const endUtc = new Date(
+        Date.UTC(
+          sun.getUTCFullYear(),
+          sun.getUTCMonth(),
+          sun.getUTCDate(),
+          23 - TIMEZONE_OFFSET_HOURS,
+          59,
+          59,
+          999,
+        ),
+      );
+      rangeStart = startUtc.toISOString();
+      rangeEnd = endUtc.toISOString();
     } else if (period === 'month') {
       const y = parseInt(date.slice(0, 4), 10);
       const m = parseInt(date.slice(5, 7), 10);
       const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-      rangeStart = `${date.slice(0, 7)}-01T00:00:00.000Z`;
-      rangeEnd = `${date.slice(0, 7)}-${String(lastDay).padStart(2, '0')}T23:59:59.999Z`;
+      displayRangeStart = `${date.slice(0, 7)}-01`;
+      displayRangeEnd = `${date.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`;
+
+      const startUtc = new Date(Date.UTC(y, m - 1, 1, -TIMEZONE_OFFSET_HOURS, 0, 0, 0));
+      const endUtc = new Date(Date.UTC(y, m - 1, lastDay, 23 - TIMEZONE_OFFSET_HOURS, 59, 59, 999));
+      rangeStart = startUtc.toISOString();
+      rangeEnd = endUtc.toISOString();
     }
 
     const supabase = createAdminClient();
@@ -75,11 +125,10 @@ export async function GET(request: Request) {
     let isApiSynced = false;
     let tbankAccountNum = '';
     let bankStatementOps: TBankOperation[] = [];
-    const todayYmd = new Date().toISOString().slice(0, 10);
     const isCurrentPeriod =
       period === 'day'
         ? date === todayYmd
-        : todayYmd >= rangeStart.slice(0, 10) && todayYmd <= rangeEnd.slice(0, 10);
+        : new Date() >= new Date(rangeStart) && new Date() <= new Date(rangeEnd);
 
     const fromIso = rangeStart.replace('.000Z', 'Z');
     const toIso = rangeEnd.replace('.999Z', 'Z');
@@ -331,8 +380,8 @@ export async function GET(request: Request) {
     const result = {
       date,
       period,
-      range_start: rangeStart.slice(0, 10),
-      range_end: rangeEnd.slice(0, 10),
+      range_start: displayRangeStart,
+      range_end: displayRangeEnd,
       is_today: isCurrentPeriod,
       wallets: {
         bank: {

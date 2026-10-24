@@ -620,3 +620,127 @@ export function getYesterdayDateString(): string {
     timeZone: 'Asia/Yekaterinburg',
   }).format(d);
 }
+
+// ── ODOMETER RULES (ПРАВИЛА ОДОМЕТРА) ──────────────────────────────────────
+
+/**
+ * Проверяет, относится ли автомобиль к Газелям (все типы Газелей)
+ */
+export function isGazelleAsset(
+  asset:
+    | {
+        short_name?: string | null;
+        reg_number?: string | null;
+        asset_type_code?: string | null;
+        asset_type?: { code?: string | null } | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!asset) return false;
+  const name = (asset.short_name || '').toLowerCase();
+  const code = (asset.asset_type_code || asset.asset_type?.code || '').toLowerCase();
+  const reg = (asset.reg_number || '').toUpperCase();
+  if (reg === 'БЕЗ АВТО' || name.includes('без авто')) return false;
+  return name.includes('газель') || code.includes('gazelle');
+}
+
+/**
+ * Проверяет, относится ли автомобиль к грузовикам (Валдай, Митсубиси Кантер)
+ */
+export function isTruckAsset(
+  asset:
+    | {
+        short_name?: string | null;
+        reg_number?: string | null;
+        asset_type_code?: string | null;
+        asset_type?: { code?: string | null } | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!asset) return false;
+  const name = (asset.short_name || '').toLowerCase();
+  const code = (asset.asset_type_code || asset.asset_type?.code || '').toLowerCase();
+  const reg = (asset.reg_number || '').toUpperCase();
+  if (reg === 'БЕЗ АВТО' || name.includes('без авто')) return false;
+  return (
+    name.includes('валдай') ||
+    name.includes('кантер') ||
+    code.startsWith('valdai') ||
+    code === 'canter'
+  );
+}
+
+/**
+ * Проверяет, наступил ли конец месяца (с 25-го числа месяца по 2-е число следующего месяца)
+ */
+export function isEndOfMonth(d = new Date()): boolean {
+  const day = d.getDate();
+  return day >= 25 || day <= 2;
+}
+
+/**
+ * Проверяет, относится ли работа или запчасть к замене масла или фильтров
+ */
+export function isOilOrFilterWork(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const s = name.toLowerCase();
+  return /масл|фильтр|то-1|то-2|регламент/i.test(s);
+}
+
+export type OdometerCheckResult = {
+  required: boolean;
+  reason: 'gazelle_shift' | 'truck_month_end' | null;
+  message: string;
+};
+
+/**
+ * Проверяет обязательность ввода одометра при сдаче смены / завершении рейса:
+ * 1. Все Газели: обязательно в конце каждой смены. Без одометра нельзя сдать смену.
+ * 2. Грузовики (Валдаи, Митсубиси Кантер): обязательно 1 раз в конце месяца (с 25 числа).
+ */
+export function checkOdometerRequirement(
+  asset:
+    | {
+        short_name?: string | null;
+        reg_number?: string | null;
+        asset_type_code?: string | null;
+      }
+    | null
+    | undefined,
+  date = new Date(),
+): OdometerCheckResult {
+  if (!asset) {
+    return { required: false, reason: null, message: '' };
+  }
+
+  // 1. Все Газели
+  if (isGazelleAsset(asset)) {
+    return {
+      required: true,
+      reason: 'gazelle_shift',
+      message:
+        'Для всех Газелей обязателен ввод одометра в конце смены. Без одометра смену сдать нельзя.',
+    };
+  }
+
+  // 2. Грузовики: Валдаи и Митсубиши Кантер
+  if (isTruckAsset(asset)) {
+    if (isEndOfMonth(date)) {
+      return {
+        required: true,
+        reason: 'truck_month_end',
+        message: 'Для грузовиков (Валдай, Кантер) обязателен ввод одометра в конце месяца.',
+      };
+    }
+    return {
+      required: false,
+      reason: null,
+      message:
+        'Одометр вводится по желанию (для грузовиков обязателен в конце месяца с 25-го числа).',
+    };
+  }
+
+  return { required: false, reason: null, message: '' };
+}

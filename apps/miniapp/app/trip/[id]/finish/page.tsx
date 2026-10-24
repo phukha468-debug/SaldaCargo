@@ -9,7 +9,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, Money } from '@saldacargo/ui';
 
-import { isGeostroyCounterparty, isGeostroyOrderValid } from '@saldacargo/shared';
+import {
+  isGeostroyCounterparty,
+  isGeostroyOrderValid,
+  checkOdometerRequirement,
+} from '@saldacargo/shared';
 
 const schema = z.object({
   odometer_end: z.coerce.number().optional(),
@@ -32,8 +36,15 @@ export default function FinishTripPage() {
       const res = await fetch(`/api/trips/${id}`);
       return res.json() as Promise<{
         trip_number: number;
+        trip_type?: string;
         odometer_start: number;
-        asset: { short_name: string } | null;
+        asset: {
+          short_name: string;
+          reg_number?: string;
+          asset_type_code?: string;
+          asset_type?: { code?: string };
+          odometer_current?: number;
+        } | null;
         trip_orders: Array<{
           id: string;
           amount: string;
@@ -55,9 +66,16 @@ export default function FinishTripPage() {
     },
   });
 
-  const { register, handleSubmit } = useForm<FormData>({
+  const { register, handleSubmit, watch } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
   });
+
+  const odoEndVal = watch('odometer_end');
+  const odoEndNum = odoEndVal != null && !isNaN(Number(odoEndVal)) ? Number(odoEndVal) : null;
+  const startOdo = trip?.odometer_start ?? trip?.asset?.odometer_current ?? 0;
+  const tripMileage =
+    odoEndNum && startOdo > 0 && odoEndNum >= startOdo ? odoEndNum - startOdo : null;
+  const odoReq = checkOdometerRequirement(trip?.asset);
 
   const activeOrders = (trip?.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
   const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
@@ -92,6 +110,24 @@ export default function FinishTripPage() {
     if (hasGeostroyValidationError) {
       setError(
         'Нельзя отправить рейс на ревью: для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут и дату начала маршрута по маске (ДД.ММ.ГГГГ).',
+      );
+      return;
+    }
+
+    const odoNum =
+      data.odometer_end != null && !isNaN(Number(data.odometer_end))
+        ? Number(data.odometer_end)
+        : null;
+    const minOdo = trip?.odometer_start || trip?.asset?.odometer_current || 0;
+
+    if (odoReq.required && (!odoNum || odoNum <= 0)) {
+      setError(`${odoReq.message} Укажите показания одометра для завершения смены.`);
+      return;
+    }
+
+    if (odoNum != null && odoNum > 0 && minOdo > 0 && odoNum < minOdo) {
+      setError(
+        `Конечный одометр (${odoNum.toLocaleString('ru-RU')} км) не может быть меньше начального (${minOdo.toLocaleString('ru-RU')} км).`,
       );
       return;
     }
@@ -189,7 +225,62 @@ export default function FinishTripPage() {
               }
             />
           )}
+          {tripMileage != null && (
+            <SummaryRow
+              label="🛣️ Пробег за смену"
+              value={<span className="text-emerald-600 font-black">+{tripMileage} км</span>}
+            />
+          )}
         </div>
+
+        {/* Одометр */}
+        {trip?.trip_type !== 'loaders_only' && trip?.asset?.reg_number !== 'БЕЗ АВТО' && (
+          <div className="bg-white rounded-lg border-2 border-zinc-200 p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-black text-zinc-900 uppercase tracking-wider">
+                Одометр на конец смены, км{' '}
+                {odoReq.required && <span className="text-red-500">*</span>}
+              </label>
+              {odoReq.required ? (
+                <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                  Обязательно
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">
+                  Необязательно
+                </span>
+              )}
+            </div>
+
+            <div className="text-xs text-zinc-500 font-medium">
+              {startOdo > 0 && (
+                <span>
+                  Начальный одометр: <strong>{startOdo.toLocaleString('ru-RU')} км</strong>.{' '}
+                </span>
+              )}
+              {odoReq.message}
+            </div>
+
+            <div className="relative">
+              <input
+                type="number"
+                inputMode="numeric"
+                {...register('odometer_end')}
+                placeholder={startOdo > 0 ? String(startOdo) : '0'}
+                className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                км
+              </span>
+            </div>
+
+            {tripMileage != null && tripMileage >= 0 && (
+              <div className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
+                Пробег за смену: +{tripMileage.toLocaleString('ru-RU')} км
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Заметка */}
         <div className="space-y-2">

@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .select(
       `
       *,
-      asset:assets(short_name, reg_number),
+      asset:assets(id, short_name, reg_number, odometer_current, asset_type:asset_types(code)),
       driver:users!trips_driver_id_fkey(name),
       trip_orders(
         id, counterparty_id, amount, driver_pay, driver_car_pay, driver_loader_pay,

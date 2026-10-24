@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@saldacargo/ui';
+import { isOilOrFilterWork } from '@saldacargo/shared';
 
 interface CatalogItem {
   id: string;
@@ -42,6 +43,8 @@ interface OrderDetail {
   problem_description: string;
   assigned_mechanic_id?: string;
   admin_note?: string;
+  odometer_start?: number | null;
+  odometer_end?: number | null;
   works: WorkItem[];
   parts: Array<{
     id: string;
@@ -767,20 +770,32 @@ export default function OrderDetailPage() {
     onError: (e: Error) => setAcceptError(e.message),
   });
 
+  const [showCloseOdometerModal, setShowCloseOdometerModal] = useState(false);
+  const [closeOdometerVal, setCloseOdometerVal] = useState('');
+  const [closeOdometerError, setCloseOdometerError] = useState('');
+
   const completeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload?: { odometer_end?: number } | void) => {
       const res = await fetch(`/api/mechanic/orders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
+        body: JSON.stringify({ status: 'completed', ...(payload || {}) }),
       });
-      if (!res.ok) throw new Error('Ошибка завершения');
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Ошибка завершения');
+      }
       return res.json();
     },
     onSuccess: () => {
+      setShowCloseOdometerModal(false);
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-orders'] });
       router.push('/mechanic/orders');
+    },
+    onError: (e: Error) => {
+      setAcceptError(e.message);
+      setCloseOdometerError(e.message);
     },
   });
 
@@ -967,6 +982,17 @@ export default function OrderDetailPage() {
           ) : (
             <button
               onClick={() => {
+                const hasOil = safeWorks.some(
+                  (w) =>
+                    isOilOrFilterWork(w.work_catalog?.name) ||
+                    isOilOrFilterWork(w.custom_work_name),
+                );
+                if (hasOil && !order.odometer_end) {
+                  setCloseOdometerVal(order.odometer_start ? String(order.odometer_start) : '');
+                  setCloseOdometerError('');
+                  setShowCloseOdometerModal(true);
+                  return;
+                }
                 if (window.confirm('Закрыть наряд и отправить на утверждение?')) {
                   completeMutation.mutate();
                 }
@@ -977,6 +1003,108 @@ export default function OrderDetailPage() {
               {completeMutation.isPending ? 'Закрываем...' : '✓ Закрыть наряд'}
             </button>
           )}
+        </div>
+      )}
+
+      {showCloseOdometerModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            if (!completeMutation.isPending) setShowCloseOdometerModal(false);
+          }}
+        >
+          <div
+            className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t-2 sm:border-2 border-slate-200 overflow-hidden p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                  🛢️ Замена масла/фильтра
+                </h2>
+                <p className="text-xs font-bold text-slate-500 mt-0.5">
+                  Наряд #{order.order_number} ·{' '}
+                  {order.asset?.short_name || order.client_vehicle_brand || 'Автомобиль'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCloseOdometerModal(false)}
+                disabled={completeMutation.isPending}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1 leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl p-3 bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium space-y-1">
+              <div className="flex items-center gap-1.5 font-bold uppercase tracking-wide text-[11px]">
+                <span>⚠️</span>
+                <span>Обязательный ввод одометра</span>
+              </div>
+              <p className="leading-relaxed">
+                В наряде выполнялись работы по замене масла или фильтров. Для корректного сброса
+                интервала ТО укажите текущий одометр автомобиля.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 space-y-2">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-700">
+                  Текущий одометр (выезд из сервиса), км <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={closeOdometerVal}
+                    onChange={(e) => {
+                      setCloseOdometerVal(e.target.value);
+                      setCloseOdometerError('');
+                    }}
+                    placeholder={order.odometer_start ? String(order.odometer_start) : '0'}
+                    className="w-full rounded-lg border-2 border-slate-300 px-4 h-14 text-2xl font-black text-slate-900 focus:border-green-600 focus:outline-none transition-colors"
+                    autoFocus
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 uppercase">
+                    км
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {closeOdometerError && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-2.5 text-red-700 text-xs font-bold text-center">
+                {closeOdometerError}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCloseOdometerModal(false)}
+                disabled={completeMutation.isPending}
+                className="w-1/3 h-12 rounded-lg border-2 border-slate-200 font-bold text-xs uppercase tracking-wide text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const num = Number(closeOdometerVal);
+                  if (!closeOdometerVal.trim() || isNaN(num) || num <= 0) {
+                    setCloseOdometerError('Укажите корректный одометр автомобиля при замене масла');
+                    return;
+                  }
+                  completeMutation.mutate({ odometer_end: num });
+                }}
+                disabled={completeMutation.isPending}
+                className="flex-1 h-12 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>{completeMutation.isPending ? 'Закрываем...' : '✓ Закрыть наряд'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

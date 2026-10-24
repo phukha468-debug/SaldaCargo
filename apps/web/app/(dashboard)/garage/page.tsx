@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { cn, Money } from '@saldacargo/ui';
+import { isOilOrFilterWork } from '@saldacargo/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -2699,59 +2700,97 @@ function OrderDetailModal({
                     </div>
 
                     {/* Пробег заезда и выезда (после тестов) */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Пробег при заезде и выезде из сервиса:
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
-                            Пробег заезда (км)
-                          </label>
-                          <input
-                            type="number"
-                            value={closeOdometerStart}
-                            onChange={(e) => setCloseOdometerStart(e.target.value)}
-                            placeholder="Одометр на входе..."
-                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono"
-                          />
+                    {(() => {
+                      const hasOilWork = (order.works || []).some(
+                        (w: {
+                          work_catalog?: { name?: string | null } | null;
+                          custom_work_name?: string | null;
+                          work_description?: string | null;
+                        }) =>
+                          isOilOrFilterWork(w.work_catalog?.name) ||
+                          isOilOrFilterWork(w.custom_work_name) ||
+                          isOilOrFilterWork(w.work_description),
+                      );
+                      const hasOdo = Boolean(
+                        (closeOdometerEnd && Number(closeOdometerEnd) > 0) ||
+                        (closeOdometerStart && Number(closeOdometerStart) > 0),
+                      );
+
+                      return (
+                        <div
+                          className={`border rounded-xl p-3 space-y-2 ${
+                            hasOilWork
+                              ? 'bg-amber-50/70 border-amber-300'
+                              : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                              Пробег при заезде и выезде из сервиса:
+                            </p>
+                            {hasOilWork && (
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 text-amber-900 uppercase tracking-wide">
+                                🛢️ Замена масла/фильтра (одометр обязателен)
+                              </span>
+                            )}
+                          </div>
+                          {hasOilWork && !hasOdo && (
+                            <p className="text-xs text-rose-600 font-bold">
+                              ⚠️ В наряде есть замена масла/фильтров! Без указания одометра закрыть
+                              наряд нельзя.
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                                Пробег заезда (км)
+                              </label>
+                              <input
+                                type="number"
+                                value={closeOdometerStart}
+                                onChange={(e) => setCloseOdometerStart(e.target.value)}
+                                placeholder="Одометр на входе..."
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                                Пробег выезда / после тестов (км)
+                              </label>
+                              <input
+                                type="number"
+                                value={closeOdometerEnd}
+                                onChange={(e) => setCloseOdometerEnd(e.target.value)}
+                                placeholder="Одометр на выходе..."
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono font-bold"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              Быстро прибавить тест-драйв:
+                            </span>
+                            {[
+                              { label: '+0 км (без тестов)', add: 0 },
+                              { label: '+5 км (тест-драйв)', add: 5 },
+                              { label: '+10 км', add: 10 },
+                            ].map((preset) => (
+                              <button
+                                key={preset.add}
+                                type="button"
+                                onClick={() => {
+                                  const base = Number(closeOdometerStart || 0);
+                                  if (base > 0) setCloseOdometerEnd(String(base + preset.add));
+                                }}
+                                className="bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded transition-all"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
-                            Пробег выезда / после тестов (км)
-                          </label>
-                          <input
-                            type="number"
-                            value={closeOdometerEnd}
-                            onChange={(e) => setCloseOdometerEnd(e.target.value)}
-                            placeholder="Одометр на выходе..."
-                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono font-bold"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <span className="text-[10px] text-slate-400 font-semibold">
-                          Быстро прибавить тест-драйв:
-                        </span>
-                        {[
-                          { label: '+0 км (без тестов)', add: 0 },
-                          { label: '+5 км (тест-драйв)', add: 5 },
-                          { label: '+10 км', add: 10 },
-                        ].map((preset) => (
-                          <button
-                            key={preset.add}
-                            type="button"
-                            onClick={() => {
-                              const base = Number(closeOdometerStart || 0);
-                              if (base > 0) setCloseOdometerEnd(String(base + preset.add));
-                            }}
-                            className="bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded transition-all"
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -2763,25 +2802,48 @@ function OrderDetailModal({
                   >
                     Отмена
                   </button>
-                  <button
-                    onClick={() => {
-                      const updates: Record<string, unknown> = {
-                        status: 'completed',
-                        lifecycle_status: 'approved',
-                        mechanic_pays: closePays,
-                        mechanic_note: closeRecommendation.trim() || null,
-                        due_km: closeDueKm ? Number(closeDueKm) : null,
-                        due_date: closeDueDate || null,
-                      };
-                      if (closeOdometerStart) updates.odometer_start = Number(closeOdometerStart);
-                      if (closeOdometerEnd) updates.odometer_end = Number(closeOdometerEnd);
-                      patchMutation.mutate(updates);
-                    }}
-                    disabled={patchMutation.isPending}
-                    className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
-                  >
-                    {patchMutation.isPending ? 'Сохраняем...' : 'Подтвердить и закрыть наряд'}
-                  </button>
+                  {(() => {
+                    const hasOilWork = (order.works || []).some(
+                      (w: {
+                        work_catalog?: { name?: string | null } | null;
+                        custom_work_name?: string | null;
+                        work_description?: string | null;
+                      }) =>
+                        isOilOrFilterWork(w.work_catalog?.name) ||
+                        isOilOrFilterWork(w.custom_work_name) ||
+                        isOilOrFilterWork(w.work_description),
+                    );
+                    const hasOdo = Boolean(
+                      (closeOdometerEnd && Number(closeOdometerEnd) > 0) ||
+                      (closeOdometerStart && Number(closeOdometerStart) > 0),
+                    );
+                    return (
+                      <button
+                        onClick={() => {
+                          if (hasOilWork && !hasOdo) {
+                            alert('При замене масла или фильтров ввод одометра обязателен!');
+                            return;
+                          }
+                          const updates: Record<string, unknown> = {
+                            status: 'completed',
+                            lifecycle_status: 'approved',
+                            mechanic_pays: closePays,
+                            mechanic_note: closeRecommendation.trim() || null,
+                            due_km: closeDueKm ? Number(closeDueKm) : null,
+                            due_date: closeDueDate || null,
+                          };
+                          if (closeOdometerStart)
+                            updates.odometer_start = Number(closeOdometerStart);
+                          if (closeOdometerEnd) updates.odometer_end = Number(closeOdometerEnd);
+                          patchMutation.mutate(updates);
+                        }}
+                        disabled={patchMutation.isPending || (hasOilWork && !hasOdo)}
+                        className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
+                      >
+                        {patchMutation.isPending ? 'Сохраняем...' : 'Подтвердить и закрыть наряд'}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
-import { formatDate, formatDuration } from '@saldacargo/shared';
+import { formatDate, formatDuration, isTruckAsset, isEndOfMonth } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 type TripCard = {
@@ -124,6 +124,53 @@ export default function RootPage() {
   const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
   const [startTripError, setStartTripError] = useState('');
+
+  const [showTruckOdometerModal, setShowTruckOdometerModal] = useState(false);
+  const [truckOdometerVal, setTruckOdometerVal] = useState('');
+  const [truckOdometerSubmitting, setTruckOdometerSubmitting] = useState(false);
+  const [truckOdometerError, setTruckOdometerError] = useState('');
+  const [truckOdometerSuccess, setTruckOdometerSuccess] = useState(false);
+
+  async function handleSaveTruckOdometer() {
+    if (!activeAsset) return;
+    const odoNum = Number(truckOdometerVal);
+    if (!truckOdometerVal.trim() || isNaN(odoNum) || odoNum <= 0) {
+      setTruckOdometerError('Укажите корректный одометр (положительное число)');
+      return;
+    }
+    const prevOdo = Number(activeAsset.odometer_current || 0);
+    if (prevOdo > 0 && odoNum < prevOdo) {
+      setTruckOdometerError(
+        `Одометр не может быть меньше текущего (${prevOdo.toLocaleString('ru-RU')} км)`,
+      );
+      return;
+    }
+
+    setTruckOdometerSubmitting(true);
+    setTruckOdometerError('');
+    try {
+      const res = await fetch('/api/driver/vehicle-odometer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: activeAsset.id, odometer: odoNum }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setTruckOdometerError(resData.error || 'Ошибка сохранения одометра');
+        return;
+      }
+      setTruckOdometerSuccess(true);
+      await queryClient.invalidateQueries({ queryKey: ['driver-assets'] });
+      setTimeout(() => {
+        setShowTruckOdometerModal(false);
+        setTruckOdometerSuccess(false);
+      }, 1000);
+    } catch {
+      setTruckOdometerError('Ошибка сети');
+    } finally {
+      setTruckOdometerSubmitting(false);
+    }
+  }
 
   // 1. Проверяем профиль и роли
   const { data: user, isLoading: isUserLoading } = useQuery<{
@@ -349,6 +396,48 @@ export default function RootPage() {
         </div>
       )}
 
+      {/* Конец месяца — обязательный ввод одометра для грузовиков (Валдай, Кантер) */}
+      {!data?.activeTrip && activeAsset && isTruckAsset(activeAsset) && isEndOfMonth() && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 shadow-sm space-y-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <span className="text-2xl mt-0.5">📅</span>
+              <div>
+                <h3 className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                  Конец месяца — одометр грузовика
+                </h3>
+                <p className="text-[11px] font-medium text-amber-800 leading-tight mt-0.5">
+                  Для грузовиков ({activeAsset.short_name}) 1 раз в конце месяца обязателен ввод
+                  одометра.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setTruckOdometerVal(
+                  activeAsset.odometer_current ? String(activeAsset.odometer_current) : '',
+                );
+                setTruckOdometerError('');
+                setTruckOdometerSuccess(false);
+                setShowTruckOdometerModal(true);
+              }}
+              className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider active:scale-95 transition-all shrink-0 shadow-sm"
+            >
+              Ввести одометр
+            </button>
+          </div>
+          <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 pt-1.5 border-t border-amber-200/80">
+            <span className="text-amber-800">Текущий пробег в системе:</span>
+            <span className="font-mono font-black text-zinc-900">
+              {activeAsset.odometer_current
+                ? `${activeAsset.odometer_current.toLocaleString('ru-RU')} км`
+                : 'Не зафиксирован'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Кнопка начала рейса */}
       <div>
         {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
@@ -507,6 +596,139 @@ export default function RootPage() {
             queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
           }}
         />
+      )}
+
+      {/* Модалка ввода одометра в конце месяца для грузовиков */}
+      {showTruckOdometerModal && activeAsset && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            if (!truckOdometerSubmitting) setShowTruckOdometerModal(false);
+          }}
+        >
+          <div
+            className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t-2 sm:border-2 border-zinc-200 overflow-hidden p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-black text-zinc-900 uppercase tracking-tight">
+                  📅 Одометр грузовика (конец месяца)
+                </h2>
+                <p className="text-xs font-bold text-zinc-500 mt-0.5">
+                  {activeAsset.short_name} · {activeAsset.reg_number}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTruckOdometerModal(false)}
+                disabled={truckOdometerSubmitting}
+                className="text-zinc-400 hover:text-zinc-600 text-xl font-bold p-1 leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl p-3 bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium space-y-1">
+              <div className="flex items-center gap-1.5 font-bold uppercase tracking-wide text-[11px]">
+                <span>ℹ️</span>
+                <span>Обязательное правило ERP</span>
+              </div>
+              <p className="leading-relaxed">
+                Для грузовиков (Валдаи и Митсубиши Кантер) 1 раз в конце каждого месяца обязателен
+                контрольный ввод фактического одометра.
+              </p>
+            </div>
+
+            <div className="bg-zinc-50 rounded-xl p-3.5 border border-zinc-200 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-zinc-500">
+                <span>Текущий пробег в системе:</span>
+                <span className="font-mono text-zinc-800">
+                  {activeAsset.odometer_current
+                    ? `${activeAsset.odometer_current.toLocaleString('ru-RU')} км`
+                    : 'Не зафиксирован'}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-700">
+                  Фактический одометр, км <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={truckOdometerVal}
+                    onChange={(e) => {
+                      setTruckOdometerVal(e.target.value);
+                      setTruckOdometerError('');
+                    }}
+                    placeholder={
+                      activeAsset.odometer_current ? String(activeAsset.odometer_current) : '0'
+                    }
+                    className="w-full rounded-lg border-2 border-zinc-300 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-amber-500 focus:outline-none transition-colors"
+                    autoFocus
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400 uppercase">
+                    км
+                  </span>
+                </div>
+              </div>
+
+              {(() => {
+                const cur = Number(activeAsset.odometer_current || 0);
+                const next = Number(truckOdometerVal || 0);
+                if (cur > 0 && next > 0) {
+                  if (next >= cur) {
+                    return (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center text-xs font-black text-emerald-700">
+                        Прирост за период: +{(next - cur).toLocaleString('ru-RU')} км
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="bg-rose-50 border border-rose-300 rounded-lg p-2 text-center text-xs font-bold text-rose-700">
+                        Одометр не может быть меньше текущего ({cur.toLocaleString('ru-RU')} км)
+                      </div>
+                    );
+                  }
+                }
+                return null;
+              })()}
+            </div>
+
+            {truckOdometerError && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-2.5 text-red-700 text-xs font-bold text-center">
+                {truckOdometerError}
+              </div>
+            )}
+
+            {truckOdometerSuccess && (
+              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-2.5 text-emerald-700 text-xs font-bold text-center">
+                ✓ Одометр успешно сохранён!
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowTruckOdometerModal(false)}
+                disabled={truckOdometerSubmitting}
+                className="w-1/3 h-12 rounded-lg border-2 border-zinc-200 font-bold text-xs uppercase tracking-wide text-zinc-600 hover:bg-zinc-100 active:scale-95 transition-all"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTruckOdometer}
+                disabled={truckOdometerSubmitting || truckOdometerSuccess}
+                className="flex-1 h-12 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>{truckOdometerSubmitting ? 'Сохраняем...' : '✓ Зафиксировать одометр'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

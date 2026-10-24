@@ -9,6 +9,7 @@ import {
   formatDate,
   isGeostroyCounterparty,
   isGeostroyOrderValid,
+  checkOdometerRequirement,
 } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
 import { useState, useEffect, useRef } from 'react';
@@ -41,7 +42,16 @@ interface TripDetail {
   lifecycle_status: string;
   started_at: string;
   trip_type: string;
-  asset: { short_name: string; reg_number: string };
+  odometer_start?: number | null;
+  odometer_end?: number | null;
+  asset: {
+    id?: string;
+    short_name: string;
+    reg_number: string;
+    odometer_current?: number | null;
+    asset_type?: { code?: string | null } | null;
+    asset_type_code?: string | null;
+  };
   driver: { name: string };
   trip_orders: TripOrder[];
   trip_expenses: Array<{
@@ -127,19 +137,23 @@ export default function TripDetailPage() {
   });
 
   const [finishError, setFinishError] = useState<string | null>(null);
+  const [showOdometerModal, setShowOdometerModal] = useState(false);
+  const [odometerInput, setOdometerInput] = useState('');
+  const [odometerError, setOdometerError] = useState<string | null>(null);
 
   const finishTrip = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload?: { odometer_end?: number } | void) => {
       const res = await fetch(`/api/trips/${id}/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(payload ?? {}),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Ошибка завершения');
       return body;
     },
     onSuccess: () => {
+      setShowOdometerModal(false);
       queryClient.invalidateQueries({ queryKey: ['trip', id] });
       queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
       queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
@@ -147,6 +161,7 @@ export default function TripDetailPage() {
     },
     onError: (err: Error) => {
       setFinishError(err.message);
+      setOdometerError(err.message);
     },
   });
 
@@ -681,7 +696,21 @@ export default function TripDetailPage() {
                 );
                 return;
               }
-              finishTrip.mutate();
+              if (isPrrTrip) {
+                finishTrip.mutate();
+                return;
+              }
+              setOdometerError(null);
+              setOdometerInput(
+                trip?.odometer_end
+                  ? String(trip.odometer_end)
+                  : trip?.odometer_start
+                    ? String(trip.odometer_start)
+                    : trip?.asset?.odometer_current
+                      ? String(trip.asset.odometer_current)
+                      : '',
+              );
+              setShowOdometerModal(true);
             }}
             disabled={finishTrip.isPending || hasGeostroyValidationError}
             className="flex items-center justify-center gap-2 w-full bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg h-14 font-black uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:opacity-50"
@@ -693,6 +722,165 @@ export default function TripDetailPage() {
                 ? '🛑 Заполните данные Геостройиндустрия'
                 : 'Завершить рейс'}
           </button>
+        </div>
+      )}
+
+      {showOdometerModal && trip && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            if (!finishTrip.isPending) setShowOdometerModal(false);
+          }}
+        >
+          <div
+            className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t-2 sm:border-2 border-zinc-200 overflow-hidden p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-black text-zinc-900 uppercase tracking-tight">
+                  🏁 Сдача смены (Рейс №{trip.trip_number})
+                </h2>
+                <p className="text-xs font-bold text-zinc-500 mt-0.5">
+                  {trip.asset?.short_name} · {trip.asset?.reg_number}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOdometerModal(false)}
+                disabled={finishTrip.isPending}
+                className="text-zinc-400 hover:text-zinc-600 text-xl font-bold p-1 leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {(() => {
+              const odoReq = checkOdometerRequirement(trip.asset);
+              const startOdo = trip.odometer_start ?? trip.asset?.odometer_current ?? 0;
+              const inputNum = odometerInput.trim() ? Number(odometerInput) : null;
+              const delta =
+                inputNum && startOdo > 0 && inputNum >= startOdo ? inputNum - startOdo : null;
+              const isInvalidLower = inputNum != null && startOdo > 0 && inputNum < startOdo;
+              const isRequiredMissing = odoReq.required && (!inputNum || inputNum <= 0);
+
+              return (
+                <>
+                  <div
+                    className={`rounded-xl p-3 border text-xs font-medium ${
+                      odoReq.required
+                        ? 'bg-amber-50 border-amber-300 text-amber-900'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold uppercase tracking-wide text-[11px] mb-1">
+                      <span>{odoReq.required ? '⚠️' : 'ℹ️'}</span>
+                      <span>
+                        {odoReq.reason === 'gazelle_shift'
+                          ? 'Все Газели — обязательный одометр'
+                          : odoReq.reason === 'truck_month_end'
+                            ? 'Грузовик — обязательный одометр в конце месяца'
+                            : 'Одометр на конец рейса'}
+                      </span>
+                    </div>
+                    <p className="leading-relaxed">{odoReq.message}</p>
+                  </div>
+
+                  <div className="bg-zinc-50 rounded-xl p-3.5 border border-zinc-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-zinc-500">
+                      <span>Начальный пробег:</span>
+                      <span className="font-mono text-zinc-800">
+                        {startOdo > 0
+                          ? `${startOdo.toLocaleString('ru-RU')} км`
+                          : 'Не зафиксирован'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-700">
+                        Одометр на конец смены, км{' '}
+                        {odoReq.required && <span className="text-red-500">*</span>}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={odometerInput}
+                          onChange={(e) => {
+                            setOdometerInput(e.target.value);
+                            setOdometerError(null);
+                          }}
+                          placeholder={startOdo > 0 ? String(startOdo) : 'например, 145200'}
+                          className="w-full rounded-lg border-2 border-zinc-300 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+                          autoFocus
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400 uppercase">
+                          км
+                        </span>
+                      </div>
+                    </div>
+
+                    {delta != null && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center text-xs font-black text-emerald-700">
+                        Пробег за смену: +{delta.toLocaleString('ru-RU')} км
+                      </div>
+                    )}
+
+                    {isInvalidLower && (
+                      <div className="bg-rose-50 border border-rose-300 rounded-lg p-2 text-center text-xs font-bold text-rose-700">
+                        Одометр не может быть меньше начального ({startOdo.toLocaleString('ru-RU')}{' '}
+                        км)
+                      </div>
+                    )}
+                  </div>
+
+                  {(odometerError || finishError) && (
+                    <div className="bg-red-50 border-2 border-red-200 rounded-lg p-2.5 text-red-700 text-xs font-bold text-center">
+                      {odometerError || finishError}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowOdometerModal(false)}
+                      disabled={finishTrip.isPending}
+                      className="w-1/3 h-12 rounded-lg border-2 border-zinc-200 font-bold text-xs uppercase tracking-wide text-zinc-600 hover:bg-zinc-100 active:scale-95 transition-all"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isRequiredMissing) {
+                          setOdometerError(
+                            odoReq.reason === 'gazelle_shift'
+                              ? 'Для Газелей ввод одометра обязателен при сдаче каждой смены'
+                              : 'Для грузовиков в конце месяца ввод одометра обязателен',
+                          );
+                          return;
+                        }
+                        if (isInvalidLower) {
+                          setOdometerError(
+                            `Одометр не может быть меньше начального (${startOdo} км)`,
+                          );
+                          return;
+                        }
+                        finishTrip.mutate({
+                          odometer_end: inputNum && inputNum > 0 ? inputNum : undefined,
+                        });
+                      }}
+                      disabled={finishTrip.isPending || isInvalidLower || isRequiredMissing}
+                      className="flex-1 h-12 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <span>🏁</span>
+                      <span>{finishTrip.isPending ? 'Завершаем...' : 'Сдать смену'}</span>
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
       )}
     </div>
