@@ -37,6 +37,7 @@ export async function GET() {
       )
       .eq('driver_id', driverId)
       .neq('lifecycle_status', 'cancelled')
+      .neq('lifecycle_status', 'approved')
       .order('started_at', { ascending: false })
       .limit(60) as any,
 

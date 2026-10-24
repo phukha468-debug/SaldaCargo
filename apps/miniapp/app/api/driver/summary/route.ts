@@ -77,7 +77,7 @@ export async function GET(request: Request) {
       .order('started_at', { ascending: false })
       .limit(3) as any,
 
-    // 4. Рейсы с наличными для точного подотчёта (согласно LL-ARCH-001)
+    // 4. Рейсы с наличными для точного подотчёта (только активные и на ревью, т.к. утверждённые уже сданы)
     supabase
       .from('trips')
       .select(
@@ -89,6 +89,7 @@ export async function GET(request: Request) {
       )
       .eq('driver_id', driverId)
       .neq('lifecycle_status', 'cancelled')
+      .neq('lifecycle_status', 'approved')
       .order('started_at', { ascending: false })
       .limit(30) as any,
 

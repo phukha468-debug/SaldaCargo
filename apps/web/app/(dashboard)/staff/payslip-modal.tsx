@@ -269,6 +269,19 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         : periodNetPayout
       : parseFloat(user.payout || user.debt || '0');
 
+  // Фактическая сумма к выдаче для печати на бандероли/в шапке:
+  // Если выплата уже проведена (sumSalaryPayouts > 0) и остаток обнулился,
+  // берем сумму проведенной выплаты, иначе текущий расчетный остаток.
+  const payoutToPrint =
+    totalPayoutOnHand > 0
+      ? totalPayoutOnHand
+      : sumSalaryPayouts > 0
+        ? sumSalaryPayouts
+        : Math.max(0, sumAccruals - sumDebtRepayments);
+
+  const periodLabel =
+    periodMode === 'week' ? weekCycle.label : `${monthName.toUpperCase()} ${year} Г.`;
+
   // Роли сотрудника
   const rolesLabel = (user.roles || [])
     .map((r: string) => {
@@ -412,7 +425,61 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         </div>
 
         {/* ── КОМПАКТНЫЙ ЛИСТ A4 (100% БЕЛЫЙ ФОН, ЧЕРНЫЙ ТЕКСТ, ПОМЕЩАЕТСЯ НА 1 ЛИСТ) ── */}
-        <div className="payslip-sheet w-full max-w-4xl bg-white text-slate-950 p-5 sm:p-6 shadow-2xl rounded-2xl print:shadow-none print:rounded-none print:p-0 font-sans text-[10.5px] leading-tight border border-slate-200 print:border-none space-y-2.5">
+        <div className="payslip-sheet w-full max-w-4xl bg-white text-slate-950 p-5 sm:p-6 shadow-2xl rounded-2xl print:shadow-none print:rounded-none print:p-0 font-sans text-[10px] leading-tight border border-slate-200 print:border-none space-y-2">
+          {/* ═════════════════════════════════════════════════════════════════════
+              ТИКУЛЬНЫЙ БЛОК БАНДЕРОЛИ (ЛИЦЕВАЯ СТОРОНА ПРИ СКЛАДЫВАНИИ ВОКРУГ ДЕНЕГ)
+              Снаружи: ТК501, РАСЧЕТНЫЙ ЛИСТ, ФИО, СУММА К ВЫДАЧЕ, ДАТЫ ВЫПЛАТЫ
+              ═════════════════════════════════════════════════════════════════════ */}
+          <div className="border-2 border-slate-950 rounded-xl p-2.5 sm:p-3 bg-white shadow-xs">
+            <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1.5 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-xs tracking-wider uppercase px-2 py-0.5 bg-slate-950 text-white rounded">
+                  ТК501
+                </span>
+                <span className="font-black text-xs tracking-wide uppercase text-slate-950">
+                  РАСЧЁТНЫЙ ЛИСТ
+                </span>
+              </div>
+              <div className="text-[10px] font-bold text-slate-800">Период: {periodLabel}</div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[8.5px] uppercase tracking-wider text-slate-500 font-bold">
+                  Сотрудник:
+                </div>
+                <div className="text-base sm:text-lg font-black text-slate-950 uppercase tracking-tight">
+                  {user.name}
+                </div>
+                <div className="text-[9px] text-slate-600 font-medium">
+                  {rolesLabel || 'Сотрудник'}
+                  {user.asset ? ` • ${user.asset.short_name} (${user.asset.reg_number})` : ''}
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <div className="text-[9px] uppercase tracking-wider text-slate-700 font-bold">
+                  К выдаче на руки:
+                </div>
+                <div className="font-mono font-black text-xl sm:text-2xl text-slate-950 px-3 py-1 border-2 border-slate-950 rounded-lg bg-slate-50 inline-block mt-0.5">
+                  {payoutToPrint.toLocaleString('ru-RU')} ₽
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Пунктирная линия сгиба 1 с подсказкой */}
+          <div className="relative my-1 text-center select-none">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t-2 border-dashed border-slate-400"></div>
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-2.5 text-[8px] font-mono text-slate-500 uppercase tracking-wider">
+                ✂ - - - ЛИНИЯ СГИБА (ОБОРОТ ВОКРУГ КУПЮР) - - -
+              </span>
+            </div>
+          </div>
+
           {/* Шапка организации */}
           <div className="border-b-2 border-slate-900 pb-2 flex justify-between items-start">
             <div>
@@ -689,7 +756,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                 </div>
               </div>
               <div className="text-xl sm:text-2xl font-black font-mono text-slate-950 px-3 py-1 border-2 border-slate-900 rounded bg-white">
-                {totalPayoutOnHand.toLocaleString('ru-RU')} ₽
+                {payoutToPrint.toLocaleString('ru-RU')} ₽
               </div>
             </div>
           </div>
