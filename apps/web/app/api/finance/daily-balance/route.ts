@@ -131,7 +131,9 @@ export async function GET(request: Request) {
         : new Date() >= new Date(rangeStart) && new Date() <= new Date(rangeEnd);
 
     const fromIso = rangeStart.replace('.000Z', 'Z');
-    const toIso = rangeEnd.replace('.999Z', 'Z');
+    // Для текущего периода не ограничиваем to жестко сутками, так как Т-Банк в выходные
+    // присваивает операциям дату клиринга понедельником (следующим рабочим днем)
+    const toIso = isCurrentPeriod ? undefined : rangeEnd.replace('.999Z', 'Z');
 
     try {
       const syncPromise = isCurrentPeriod ? syncTBankBalance() : Promise.resolve(null);

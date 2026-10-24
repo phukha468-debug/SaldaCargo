@@ -151,6 +151,10 @@ interface TBankOp {
   operationId: string;
   operationDate: string;
   operationTime?: string;
+  trxnPostDate?: string;
+  authorizationDate?: string;
+  drawDate?: string;
+  chargeDate?: string;
   typeOfOperation: 'Credit' | 'Debit' | string;
   operationAmount: number;
   rubleAmount?: number;
@@ -901,7 +905,8 @@ export function DailyControlPanel() {
             )
           : undefined;
 
-        const opDateVal = op.operationDate || op.operationTime;
+        const opDateVal =
+          op.trxnPostDate || op.authorizationDate || op.operationDate || op.operationTime;
         incomeItems.push({
           id: `tbank-${op.operationId}`,
           title,
@@ -1216,7 +1221,8 @@ export function DailyControlPanel() {
     debitBankOps.forEach((op) => {
       const desc = (op.description || op.payPurpose || '').toLowerCase();
       const opAmt = op.operationAmount || op.rubleAmount || 0;
-      const dateVal = op.operationDate || op.operationTime;
+      const dateVal =
+        op.trxnPostDate || op.authorizationDate || op.operationDate || op.operationTime;
       const opTime = formatTxTime(dateVal);
       const opDateSort = dateVal ? new Date(dateVal).getTime() : 0;
 
@@ -2101,7 +2107,12 @@ export function DailyControlPanel() {
                                 transactionDate:
                                   raw?.transaction_date ||
                                   raw?.created_at ||
-                                  (op ? op.operationDate || op.operationTime : selectedDate),
+                                  (op
+                                    ? op.trxnPostDate ||
+                                      op.authorizationDate ||
+                                      op.operationDate ||
+                                      op.operationTime
+                                    : selectedDate),
                                 obligationId: item.linkedObligationId || null,
                                 relatedUserId:
                                   raw?.related_user_id || raw?.related_user?.id || null,
@@ -2176,7 +2187,12 @@ export function DailyControlPanel() {
                                   transactionDate:
                                     raw?.transaction_date ||
                                     raw?.created_at ||
-                                    (op ? op.operationDate || op.operationTime : selectedDate),
+                                    (op
+                                      ? op.trxnPostDate ||
+                                        op.authorizationDate ||
+                                        op.operationDate ||
+                                        op.operationTime
+                                      : selectedDate),
                                   obligationId: sub.linkedObligationId || null,
                                   relatedUserId:
                                     raw?.related_user_id || raw?.related_user?.id || null,
@@ -2433,7 +2449,10 @@ export function DailyControlPanel() {
                                       operationId: item.bankOp!.operationId,
                                       tripOrderId: item.suggestedOrder!.id,
                                       amount: item.amount,
-                                      operationDate: item.bankOp?.operationDate,
+                                      operationDate:
+                                        item.bankOp?.trxnPostDate ||
+                                        item.bankOp?.authorizationDate ||
+                                        item.bankOp?.operationDate,
                                       date: selectedDate,
                                       action: 'link',
                                     })
@@ -3090,7 +3109,11 @@ export function DailyControlPanel() {
                     {rub(linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0)}
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono">
-                    {formatTxTime(linkingBankOp.operationDate)}
+                    {formatTxTime(
+                      linkingBankOp.trxnPostDate ||
+                        linkingBankOp.authorizationDate ||
+                        linkingBankOp.operationDate,
+                    )}
                   </div>
                 </div>
                 <div className="text-[11px] text-slate-600 mt-1">
@@ -3576,7 +3599,10 @@ export function DailyControlPanel() {
                             ? dispatcherClientName.trim()
                             : undefined,
                       amount: linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0,
-                      operationDate: linkingBankOp.operationDate,
+                      operationDate:
+                        linkingBankOp.trxnPostDate ||
+                        linkingBankOp.authorizationDate ||
+                        linkingBankOp.operationDate,
                       date: selectedDate,
                       action: 'link',
                     })
