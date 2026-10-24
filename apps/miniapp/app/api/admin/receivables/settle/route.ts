@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
   const cpName = order.counterparty?.name ?? 'Должник';
   const isLegal = order.counterparty?.is_legal_entity ?? false;
-  const toWalletId = walletForDebt(isLegal);
+  const toWalletId = body.to_wallet_id ?? walletForDebt(isLegal);
   const description = body.note ? body.note : `Погашение: ${cpName}`;
 
   const meta = JSON.stringify({

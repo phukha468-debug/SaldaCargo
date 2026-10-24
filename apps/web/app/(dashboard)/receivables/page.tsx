@@ -1182,7 +1182,6 @@ function selectByAmount(
 export default function ReceivablesPage() {
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [markingId, setMarkingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
@@ -1356,29 +1355,6 @@ export default function ReceivablesPage() {
     return allDebtors.filter((d) => passesAgingFilter(d, filter)).length;
   }
 
-  async function handleMarkPaid(order: Order, defaultWalletId?: string) {
-    setMarkingId(order.id);
-    try {
-      const url =
-        order.type === 'manual'
-          ? `/api/receivables/manual/${order.id}`
-          : `/api/receivables/${order.id}`;
-      const r = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: defaultWalletId ? JSON.stringify({ to_wallet_id: defaultWalletId }) : undefined,
-      });
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? `Статус ${r.status}`);
-      await queryClient.invalidateQueries({ queryKey: ['receivables'] });
-      await queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
-    } catch (e: unknown) {
-      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setMarkingId(null);
-    }
-  }
-
   async function handleDeleteManual(orderId: string) {
     if (!confirm('Удалить эту запись?')) return;
     setDeletingId(orderId);
@@ -1508,9 +1484,11 @@ export default function ReceivablesPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-black text-slate-900">
-                {closeAllModal.orders.length === closeAllModal.debtor.orders.length
-                  ? 'Закрыть весь долг'
-                  : `Погасить ${closeAllModal.orders.length} выбр. записей`}
+                {closeAllModal.orders.length === 1
+                  ? 'Погасить платёж'
+                  : closeAllModal.orders.length === closeAllModal.debtor.orders.length
+                    ? 'Закрыть весь долг'
+                    : `Погасить ${closeAllModal.orders.length} выбр. записей`}
               </h2>
               <button
                 onClick={() => setCloseAllModal(null)}
@@ -1531,9 +1509,9 @@ export default function ReceivablesPage() {
                 />
               </p>
               <p className="text-[10px] text-slate-400">
-                {closeAllModal.orders.length}{' '}
-                {closeAllModal.orders.length === 1 ? 'запись' : 'записей'} из{' '}
-                {closeAllModal.debtor.orders.length} будут закрыты
+                {closeAllModal.orders.length === 1
+                  ? '1 запись будет закрыта'
+                  : `${closeAllModal.orders.length} записей из ${closeAllModal.debtor.orders.length} будут закрыты`}
               </p>
             </div>
             <div>
@@ -2743,26 +2721,21 @@ export default function ReceivablesPage() {
                                                 )}
                                                 <button
                                                   onClick={() =>
-                                                    handleMarkPaid(
-                                                      order,
-                                                      isLegal
+                                                    setCloseAllModal({
+                                                      debtor,
+                                                      orders: [order],
+                                                      walletId: isLegal
                                                         ? '10000000-0000-0000-0000-000000000001'
-                                                        : undefined,
-                                                    )
+                                                        : '10000000-0000-0000-0000-000000000002',
+                                                    })
                                                   }
-                                                  disabled={markingId === order.id}
+                                                  disabled={closingAllId === debtor.counterparty_id}
                                                   className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow-xs transition-colors disabled:opacity-50"
-                                                  title={
-                                                    isLegal
-                                                      ? 'Погасить платёж на Расчётный счёт'
-                                                      : 'Погасить'
-                                                  }
+                                                  title="Погасить платёж (выбор: Р/С Банк или Наличные)"
                                                 >
-                                                  {markingId === order.id
+                                                  {closingAllId === debtor.counterparty_id
                                                     ? '...'
-                                                    : isLegal
-                                                      ? 'Погасить (Р/С)'
-                                                      : 'Погасить'}
+                                                    : 'Погасить'}
                                                 </button>
                                               </div>
                                             </td>

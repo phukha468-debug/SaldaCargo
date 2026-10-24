@@ -2490,6 +2490,9 @@ export function DailyControlPanel() {
                                 categoryId: item.rawTx!.category_id,
                                 categoryName: item.rawTx!.category?.name,
                                 direction: 'income',
+                                toWalletId:
+                                  item.rawTx!.to_wallet_id ||
+                                  (item.wallet === 'cash' ? CASH_ID : BANK_ID),
                               })
                             }
                             className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center text-xs font-black cursor-pointer shadow-2xs transition"
@@ -2527,6 +2530,9 @@ export function DailyControlPanel() {
                                     categoryId: sub.rawTx!.category_id,
                                     categoryName: sub.rawTx!.category?.name,
                                     direction: 'income',
+                                    toWalletId:
+                                      sub.rawTx!.to_wallet_id ||
+                                      (item.wallet === 'cash' ? CASH_ID : BANK_ID),
                                   })
                                 }
                                 className="text-[9px] text-slate-400 hover:text-sky-600 cursor-pointer ml-1 font-bold underline"
@@ -2714,7 +2720,9 @@ export function DailyControlPanel() {
 
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
-                  Статья расходов (Группа расходов) *
+                  {editingTx.direction === 'income'
+                    ? 'Статья доходов / категория'
+                    : 'Статья расходов (Группа расходов) *'}
                 </label>
                 <select
                   value={editingTx.categoryId || ''}
@@ -2734,7 +2742,11 @@ export function DailyControlPanel() {
                   }}
                   className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white font-medium"
                 >
-                  <option value="">(Выберите статью расходов)</option>
+                  <option value="">
+                    {editingTx.direction === 'income'
+                      ? '(Выберите статью поступления)'
+                      : '(Выберите статью расходов)'}
+                  </option>
                   {(data?.categories ?? []).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -2743,33 +2755,55 @@ export function DailyControlPanel() {
                 </select>
               </div>
 
-              {/* Destination wallet (for Fuel Card / Inter-wallet transfer) */}
-              {(editingTx.categoryId === '62cebf3f-9982-4cc6-904b-48c6169cf5e4' ||
-                editingTx.categoryId === 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93' ||
-                (editingTx.description || '').toLowerCase().includes('топливн') ||
-                (editingTx.description || '').toLowerCase().includes('пополнение тк') ||
-                (editingTx.description || '').toLowerCase().includes('гсм')) && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-amber-900 tracking-wider">
-                    ⛽ Зачислить на кошелек / карту:
+              {/* Destination wallet for income */}
+              {editingTx.direction === 'income' && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-emerald-900 tracking-wider">
+                    📥 Зачислить в кошелёк / на счёт:
                   </label>
                   <select
-                    value={editingTx.toWalletId || ''}
-                    onChange={(e) =>
-                      setEditingTx({ ...editingTx, toWalletId: e.target.value || null })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-amber-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    value={editingTx.toWalletId || BANK_ID}
+                    onChange={(e) => setEditingTx({ ...editingTx, toWalletId: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value={FUEL_CARD_ID}>⛽ Топливная карта (ГСМ)</option>
+                    <option value={BANK_ID}>💳 Расчётный счёт (Банк / Р/С)</option>
                     <option value={CASH_ID}>🔒 Сейф (Наличные)</option>
-                    <option value="">(Не переводить, оставить прямым списанием)</option>
+                    <option value={FUEL_CARD_ID}>⛽ Топливная карта (ГСМ)</option>
                   </select>
-                  <div className="text-[10px] text-amber-800">
-                    💡 При выборе Топливной карты баланс ГСМ автоматически пополнится на эту сумму
-                    (+{rub(editingTx.amount)}).
-                  </div>
                 </div>
               )}
+
+              {/* Destination wallet (for Fuel Card / Inter-wallet transfer) */}
+              {editingTx.direction !== 'income' &&
+                (editingTx.categoryId === '62cebf3f-9982-4cc6-904b-48c6169cf5e4' ||
+                  editingTx.categoryId === 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93' ||
+                  (editingTx.categoryName || '').toLowerCase().includes('перевод') ||
+                  (editingTx.description || '').toLowerCase().includes('перевод') ||
+                  (editingTx.description || '').toLowerCase().includes('топливн') ||
+                  (editingTx.description || '').toLowerCase().includes('пополнение тк') ||
+                  (editingTx.description || '').toLowerCase().includes('гсм')) && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-amber-900 tracking-wider">
+                      🔄 Зачислить на кошелек / карту:
+                    </label>
+                    <select
+                      value={editingTx.toWalletId || ''}
+                      onChange={(e) =>
+                        setEditingTx({ ...editingTx, toWalletId: e.target.value || null })
+                      }
+                      className="w-full px-3 py-2 text-xs border border-amber-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value={BANK_ID}>💳 Расчётный счёт (Банк / Р/С)</option>
+                      <option value={CASH_ID}>🔒 Сейф (Наличные)</option>
+                      <option value={FUEL_CARD_ID}>⛽ Топливная карта (ГСМ)</option>
+                      <option value="">(Не переводить, оставить прямым списанием)</option>
+                    </select>
+                    <div className="text-[10px] text-amber-800">
+                      💡 При выборе кошелька баланс автоматически пополнится на эту сумму (+
+                      {rub(editingTx.amount)}).
+                    </div>
+                  </div>
+                )}
 
               {/* Link with Payment Calendar */}
               <div>

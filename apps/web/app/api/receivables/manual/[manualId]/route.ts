@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
-const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 
 /** PATCH /api/receivables/manual/[manualId] — погасить ручной долг (полностью или частично)
@@ -53,7 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ manual
     partialAmount > 0 &&
     partialAmount < fullAmount;
   const payAmount = isPartial ? partialAmount : fullAmount;
-  const walletId = isPartial ? toWalletId : toWalletId === BANK_ID ? CASH_ID : toWalletId;
+  const walletId = toWalletId;
 
   if (isPartial) {
     // Уменьшаем остаток долга, не закрываем

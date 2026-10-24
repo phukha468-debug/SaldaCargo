@@ -71,12 +71,6 @@ const PM_LABELS: Record<string, string> = {
   cash: '💵 Нал',
 };
 
-const PM_WALLET_LABEL: Record<string, string> = {
-  qr: '→ 🏦 Р/С',
-  card_driver: '→ 💵 Касса',
-  debt_cash: '→ зависит от типа клиента',
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysAgo(dateStr: string): number {
@@ -144,6 +138,7 @@ export default function ReceivablesPage() {
   const [selectedOrder, setSelectedOrder] = useState<ReceivableOrder | null>(null);
   const [showFollowUpId, setShowFollowUpId] = useState<string | null>(null);
   const [closeAllWallet, setCloseAllWallet] = useState(WALLET_OPTIONS[0]!.id);
+  const [settleWallet, setSettleWallet] = useState(WALLET_OPTIONS[0]!.id);
   const [closingAllId, setClosingAllId] = useState<string | null>(null);
   const [settleNote, setSettleNote] = useState('');
   const [settleError, setSettleError] = useState('');
@@ -215,6 +210,7 @@ export default function ReceivablesPage() {
           id: selectedOrder.id,
           type: selectedOrder.type,
           note: settleNote || undefined,
+          to_wallet_id: settleWallet,
         }),
       });
       const json = await r.json();
@@ -837,7 +833,16 @@ export default function ReceivablesPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                setSelectedOrder(isOrderSelected ? null : order);
+                                if (isOrderSelected) {
+                                  setSelectedOrder(null);
+                                } else {
+                                  setSelectedOrder(order);
+                                  setSettleWallet(
+                                    !debtor.is_individual
+                                      ? WALLET_OPTIONS[0]!.id
+                                      : WALLET_OPTIONS[1]!.id,
+                                  );
+                                }
                                 setSettleNote('');
                                 setSettleError('');
                               }}
@@ -890,16 +895,27 @@ export default function ReceivablesPage() {
                             {/* Settle panel for individual order */}
                             {isOrderSelected && (
                               <div className="mt-1 ml-2 p-3 bg-orange-50 rounded-xl border-2 border-orange-200 space-y-3">
-                                {order.payment_method && PM_WALLET_LABEL[order.payment_method] && (
-                                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                    {PM_WALLET_LABEL[order.payment_method]}
+                                <div>
+                                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1.5">
+                                    Куда поступили деньги:
                                   </p>
-                                )}
-                                {order.type === 'manual' && (
-                                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                    → 💵 Сейф
-                                  </p>
-                                )}
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {WALLET_OPTIONS.map((w) => (
+                                      <button
+                                        key={w.id}
+                                        type="button"
+                                        onClick={() => setSettleWallet(w.id)}
+                                        className={`h-10 rounded-lg text-xs font-black transition-all border-2 ${
+                                          settleWallet === w.id
+                                            ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                                            : 'bg-white text-zinc-700 border-zinc-200'
+                                        }`}
+                                      >
+                                        {w.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
                                 <input
                                   type="text"
                                   value={settleNote}
