@@ -122,13 +122,13 @@ fun LoginScreen(
             Spacer(modifier = Modifier.width(14.dp))
             Column {
                 Text(
-                    text = "SaldaCargo",
+                    text = "TK501",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Транспортная компания TK501 • В. Салда",
+                    text = "Транспортная компания • Верхняя Салда",
                     fontSize = 12.sp,
                     color = Zinc500
                 )

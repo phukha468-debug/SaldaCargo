@@ -451,20 +451,38 @@ object SaldaApiClient {
 
     // ── Модуль грузчиков ────────────────────────────────────────────────────
 
-    suspend fun getLoaders(forceRefresh: Boolean = false): List<User> = withContext(Dispatchers.IO) {
+    suspend fun getLoaders(forceRefresh: Boolean = false, userId: String? = null): List<User> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         if (!forceRefresh) {
             cachedLoaders?.let { (timestamp, data) ->
-                if (now - timestamp < CACHE_TTL_MS) return@withContext data
+                if (now - timestamp < CACHE_TTL_MS && data.isNotEmpty()) return@withContext data
             }
         }
-        val request = buildRequest("/api/driver/loaders")
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@withContext emptyList()
-            val body = response.body?.string() ?: "[]"
-            val res = json.decodeFromString<List<User>>(body)
-            cachedLoaders = Pair(now, res)
-            res
+        val fetched = try {
+            val request = buildRequest("/api/driver/loaders", userId = userId)
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: "[]"
+                    json.decodeFromString<List<User>>(body)
+                } else {
+                    emptyList()
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
+
+        val result = if (fetched.isNotEmpty()) fetched else {
+            try {
+                getUsers(role = "loader")
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+        if (result.isNotEmpty()) {
+            cachedLoaders = Pair(now, result)
+        }
+        result
     }
 }

@@ -6,9 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -27,7 +29,56 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
 import ru.ancargo66.app.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
+
+private fun formatMonthRussian(yyyyMm: String): String {
+    val parts = yyyyMm.split("-")
+    if (parts.size != 2) return yyyyMm
+    val monthNames = listOf(
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    )
+    val mIndex = (parts[1].toIntOrNull() ?: 1) - 1
+    val mName = if (mIndex in 0..11) monthNames[mIndex] else parts[1]
+    return "$mName ${parts[0]}"
+}
+
+private fun formatDayRussian(yyyyMmDd: String): String {
+    val parts = yyyyMmDd.split("-")
+    if (parts.size != 3) return yyyyMmDd
+    val monthNamesGenitive = listOf(
+        "января", "февраля", "марта", "апреля", "мая", "июня",
+        "июля", "августа", "сентября", "октября", "ноября", "декабря"
+    )
+    val dayNum = parts[2].toIntOrNull() ?: parts[2]
+    val mIndex = (parts[1].toIntOrNull() ?: 1) - 1
+    val mName = if (mIndex in 0..11) monthNamesGenitive[mIndex] else parts[1]
+    return "$dayNum $mName ${parts[0]}"
+}
+
+private fun shiftMonthKey(current: String, delta: Int): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+        val cal = Calendar.getInstance()
+        cal.time = sdf.parse(current) ?: Date()
+        cal.add(Calendar.MONTH, delta)
+        sdf.format(cal.time)
+    } catch (_: Exception) { current }
+}
+
+private fun shiftDayKey(current: String, delta: Int): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val cal = Calendar.getInstance()
+        cal.time = sdf.parse(current) ?: Date()
+        cal.add(Calendar.DAY_OF_MONTH, delta)
+        sdf.format(cal.time)
+    } catch (_: Exception) { current }
+}
 
 @Composable
 fun DriverScreen(
@@ -36,19 +87,24 @@ fun DriverScreen(
 ) {
     var summary by remember { mutableStateOf<DriverSummary?>(SaldaApiClient.getCachedSummary()) }
     var assets by remember { mutableStateOf<List<Asset>>(SaldaApiClient.getCachedAssets() ?: emptyList()) }
-    var selectedTripIdForDetails by remember { mutableStateOf<String?>(null) }
+    var selectedTripIdForDetails by rememberSaveable { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(SaldaApiClient.getCachedSummary() == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     var showVehiclePicker by remember { mutableStateOf(false) }
-    var currentAssetId by remember { mutableStateOf(user.currentAssetId) }
+    var currentAssetId by rememberSaveable { mutableStateOf(user.currentAssetId) }
     var isStartingTrip by remember { mutableStateOf(false) }
     var startTripError by remember { mutableStateOf<String?>(null) }
-    var financeInitialTab by remember { mutableStateOf<Int?>(null) }
-    var showCreatePrrDialog by remember { mutableStateOf(false) }
-    var showAllTripsModal by remember { mutableStateOf(false) }
+    var financeInitialTab by rememberSaveable { mutableStateOf<Int?>(null) }
+    var showCreatePrrDialog by rememberSaveable { mutableStateOf(false) }
+    var showAllTripsModal by rememberSaveable { mutableStateOf(false) }
     var allTrips by remember { mutableStateOf<List<TripSummaryItem>>(emptyList()) }
     var isLoadingAllTrips by remember { mutableStateOf(false) }
+
+    // Фильтр истории рейсов (Все, За месяц, За день)
+    var tripsFilterMode by rememberSaveable { mutableStateOf("ALL") } // "ALL", "MONTH", "DAY"
+    var selectedMonthKey by rememberSaveable { mutableStateOf("") }
+    var selectedDayKey by rememberSaveable { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
 
@@ -56,7 +112,16 @@ fun DriverScreen(
         if (showAllTripsModal) {
             isLoadingAllTrips = true
             try {
-                allTrips = SaldaApiClient.getDriverTrips(user.id)
+                val fetched = SaldaApiClient.getDriverTrips(user.id)
+                allTrips = fetched
+                if (selectedMonthKey.isBlank()) {
+                    val latest = fetched.firstOrNull()?.startedAt?.take(7)
+                    selectedMonthKey = if (!latest.isNullOrBlank()) latest else SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
+                }
+                if (selectedDayKey.isBlank()) {
+                    val latest = fetched.firstOrNull()?.startedAt?.take(10)
+                    selectedDayKey = if (!latest.isNullOrBlank()) latest else SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                }
             } catch (_: Exception) {
             } finally {
                 isLoadingAllTrips = false
@@ -188,46 +253,7 @@ fun DriverScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Карточка подотчёта (На руках)
-                item {
-                    val bal = summary?.accountableBalance ?: "0"
-                    Card(
-                        onClick = { financeInitialTab = 0 },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .bouncyTouch(),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(18.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text(
-                                text = "НА РУКАХ",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Zinc400,
-                                letterSpacing = 1.2.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "$bal ₽",
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Zinc900
-                            )
-                            Spacer(modifier = Modifier.height(3.dp))
-                            Text(
-                                text = "Подотчётные наличные →",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Zinc500
-                            )
-                        }
-                    }
-                }
-
-                // Карточка ЗП за месяц
+                // Карточка ЗП и заработка водителя за текущий месяц
                 item {
                     val approvedPay = summary?.monthPayApproved ?: "0.00"
                     val draftPay = summary?.monthPayDraft ?: "0.00"
@@ -244,57 +270,66 @@ fun DriverScreen(
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(18.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "ЗП ЗА МЕСЯЦ",
+                                    text = "МОЙ ДОХОД ЗА МЕСЯЦ",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Zinc400,
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 1.2.sp
                                 )
-                                if (pendingCount > 0) {
+                                Surface(
+                                    color = Color(0xFFECFDF5),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0))
+                                ) {
+                                    Text(
+                                        text = "Зарплата →",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GreenOnline,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "${approvedPay.toDoubleOrNull()?.toInt() ?: approvedPay} ₽",
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Zinc900
+                            )
+                            if (hasDraft) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(
-                                        color = AmberPending,
-                                        shape = RoundedCornerShape(12.dp)
+                                        color = AmberPending.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp)
                                     ) {
                                         Text(
-                                            text = "$pendingCount ожидает подтв.",
-                                            color = Color.White,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            text = "+${draftPay.toDoubleOrNull()?.toInt() ?: draftPay} ₽ на проверке",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AmberPending,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "$approvedPay ₽",
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Black,
-                                color = GreenOnline
-                            )
-                            if (hasDraft) {
-                                Spacer(modifier = Modifier.height(2.dp))
+                            if (pendingCount > 0) {
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "В черновиках: $draftPay ₽",
-                                    fontSize = 12.sp,
+                                    text = "Ожидают подтверждения: $pendingCount выплат",
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = AmberPending
+                                    color = RedAlert
                                 )
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (pendingCount > 0) "⚠️ Требует подтверждения →" else "Детализация и подтверждение →",
-                                fontSize = 12.sp,
-                                color = if (pendingCount > 0) AmberPending else Zinc500,
-                                fontWeight = if (pendingCount > 0) FontWeight.Bold else FontWeight.Normal
-                            )
                         }
                     }
                 }
@@ -680,8 +715,28 @@ fun DriverScreen(
         }
     }
 
-    // Модалка истории всех рейсов водителя
+    // Модалка истории всех рейсов водителя с компактным фильтром по времени
     if (showAllTripsModal) {
+        BackHandler { showAllTripsModal = false }
+
+        // Расчёт отфильтрованных рейсов
+        val filteredTrips = when (tripsFilterMode) {
+            "MONTH" -> allTrips.filter { it.startedAt?.take(7) == selectedMonthKey }
+            "DAY" -> allTrips.filter { it.startedAt?.take(10) == selectedDayKey }
+            else -> allTrips
+        }
+
+        val totalPayForPeriod = filteredTrips.sumOf { tr ->
+            tr.tripOrders.filter { it.lifecycleStatus != "cancelled" }.sumOf { it.driverPay }
+        }
+
+        // Дни, в которые есть рейсы в выбранном месяце
+        val activeDaysInMonth = allTrips
+            .mapNotNull { it.startedAt?.take(10) }
+            .filter { it.startsWith(selectedMonthKey) }
+            .distinct()
+            .sortedDescending()
+
         AlertDialog(
             onDismissRequest = { showAllTripsModal = false },
             title = {
@@ -691,84 +746,259 @@ fun DriverScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("История рейсов", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    IconButton(onClick = { showAllTripsModal = false }) {
+                    IconButton(onClick = { showAllTripsModal = false }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Zinc500)
                     }
                 }
             },
             text = {
-                if (isLoadingAllTrips) {
-                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = SaldaOrangePrimary)
-                    }
-                } else if (allTrips.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                        Text("Рейсов пока нет", color = Zinc400, fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    LazyColumn(
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Компактные переключатели режима фильтрации: [Все] [Месяц] [День]
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 500.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .background(Zinc100, shape = RoundedCornerShape(10.dp))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        items(allTrips, key = { it.id }) { trip ->
-                            val orders = trip.tripOrders.filter { it.lifecycleStatus != "cancelled" }
-                            val rev = orders.sumOf { it.amount }
-                            val pay = orders.sumOf { it.driverPay }
-                            val isApproved = trip.lifecycleStatus == "approved"
-                            val isDraft = trip.lifecycleStatus == "draft"
-
-                            Card(
-                                onClick = {
-                                    showAllTripsModal = false
-                                    selectedTripIdForDetails = trip.id
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                border = CardDefaults.outlinedCardBorder(),
-                                shape = RoundedCornerShape(10.dp)
+                        listOf("ALL" to "Все", "MONTH" to "Месяц", "DAY" to "День").forEach { (mode, label) ->
+                            val isSelected = tripsFilterMode == mode
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        tripsFilterMode = mode
+                                        if (mode == "DAY" && selectedDayKey.isBlank()) {
+                                            selectedDayKey = allTrips.firstOrNull()?.startedAt?.take(10)
+                                                ?: SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                                        }
+                                        if (mode == "MONTH" && selectedMonthKey.isBlank()) {
+                                            selectedMonthKey = allTrips.firstOrNull()?.startedAt?.take(7)
+                                                ?: SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
+                                        }
+                                    },
+                                color = if (isSelected) SaldaOrangePrimary else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color.White else Zinc600,
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    // Переключатель периода для месяца
+                    if (tripsFilterMode == "MONTH") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White, shape = RoundedCornerShape(10.dp))
+                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = { selectedMonthKey = shiftMonthKey(selectedMonthKey, -1) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Пред. месяц", tint = Zinc700, modifier = Modifier.size(16.dp))
+                            }
+                            Text(
+                                text = formatMonthRussian(selectedMonthKey.ifBlank { SimpleDateFormat("yyyy-MM", Locale.US).format(Date()) }),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Zinc900
+                            )
+                            IconButton(
+                                onClick = { selectedMonthKey = shiftMonthKey(selectedMonthKey, 1) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.ArrowForward, contentDescription = "След. месяц", tint = Zinc700, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+
+                    // Переключатель периода для дня
+                    if (tripsFilterMode == "DAY") {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White, shape = RoundedCornerShape(10.dp))
+                                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { selectedDayKey = shiftDayKey(selectedDayKey, -1) },
+                                    modifier = Modifier.size(28.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Рейс №${trip.tripNumber} · ${trip.asset?.shortName ?: "Без авто"}",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = Zinc900
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "${trip.startedAt?.take(10) ?: ""} · Выручка: ${rev.toInt()} ₽",
-                                            fontSize = 11.sp,
-                                            color = Zinc500
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "ЗП: ${pay.toInt()} ₽",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = GreenOnline
-                                        )
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Пред. день", tint = Zinc700, modifier = Modifier.size(16.dp))
+                                }
+                                Text(
+                                    text = formatDayRussian(selectedDayKey.ifBlank { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Zinc900
+                                )
+                                IconButton(
+                                    onClick = { selectedDayKey = shiftDayKey(selectedDayKey, 1) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.ArrowForward, contentDescription = "След. день", tint = Zinc700, modifier = Modifier.size(16.dp))
+                                }
+                            }
+
+                            // Быстрые чипы дней с рейсами
+                            if (activeDaysInMonth.isNotEmpty()) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(activeDaysInMonth) { dayStr ->
+                                        val dayPart = dayStr.split("-").lastOrNull() ?: dayStr
+                                        val isCur = selectedDayKey == dayStr
                                         Surface(
-                                            color = if (isApproved) GreenOnline.copy(alpha = 0.1f) else Color(0xFFFEF3C7),
-                                            shape = RoundedCornerShape(4.dp),
-                                            modifier = Modifier.padding(top = 2.dp)
+                                            modifier = Modifier.clickable { selectedDayKey = dayStr },
+                                            color = if (isCur) SaldaOrange50 else Zinc100,
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isCur) SaldaOrangePrimary else Zinc200),
+                                            shape = RoundedCornerShape(6.dp)
                                         ) {
                                             Text(
-                                                text = if (isApproved) "Утверждён" else if (isDraft) "На проверке" else trip.lifecycleStatus,
-                                                color = if (isApproved) GreenOnline else Color(0xFFB45309),
-                                                fontSize = 9.sp,
+                                                text = "$dayPart число",
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                color = if (isCur) SaldaOrangePrimary else Zinc600,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Сводка по выбранному фильтру
+                    Surface(
+                        color = Zinc50,
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Zinc200),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Рейсов: ${filteredTrips.size}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Zinc600
+                            )
+                            Text(
+                                text = "ЗП: ${totalPayForPeriod.toInt()} ₽",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                color = GreenOnline
+                            )
+                        }
+                    }
+
+                    // Список рейсов
+                    if (isLoadingAllTrips) {
+                        Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = SaldaOrangePrimary)
+                        }
+                    } else if (filteredTrips.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Нет рейсов за выбранный период", color = Zinc400, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                if (tripsFilterMode != "ALL") {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    TextButton(onClick = { tripsFilterMode = "ALL" }) {
+                                        Text("Показать все рейсы", fontSize = 11.sp, color = SaldaOrangePrimary)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 380.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(filteredTrips, key = { it.id }) { trip ->
+                                val orders = trip.tripOrders.filter { it.lifecycleStatus != "cancelled" }
+                                val rev = orders.sumOf { it.amount }
+                                val pay = orders.sumOf { it.driverPay }
+                                val isApproved = trip.lifecycleStatus == "approved"
+                                val isDraft = trip.lifecycleStatus == "draft"
+
+                                Card(
+                                    onClick = {
+                                        showAllTripsModal = false
+                                        selectedTripIdForDetails = trip.id
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    border = CardDefaults.outlinedCardBorder(),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Рейс №${trip.tripNumber} · ${trip.asset?.shortName ?: "Без авто"}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = Zinc900
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "${trip.startedAt?.take(10) ?: ""} · Выручка: ${rev.toInt()} ₽",
+                                                fontSize = 11.sp,
+                                                color = Zinc500
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                text = "ЗП: ${pay.toInt()} ₽",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = GreenOnline
+                                            )
+                                            Surface(
+                                                color = if (isApproved) GreenOnline.copy(alpha = 0.1f) else Color(0xFFFEF3C7),
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isApproved) "Утверждён" else if (isDraft) "На проверке" else trip.lifecycleStatus,
+                                                    color = if (isApproved) GreenOnline else Color(0xFFB45309),
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }

@@ -2,6 +2,7 @@ package ru.ancargo66.app.features.driver
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -58,7 +59,7 @@ fun CreatePrrDialog(
         scope.launch {
             try {
                 counterparties = SaldaApiClient.getCounterparties(userId)
-                allLoaders = SaldaApiClient.getLoaders()
+                allLoaders = SaldaApiClient.getLoaders(userId = userId)
                 val generic = counterparties.find { it.name == "Частный клиент" } ?: counterparties.firstOrNull()
                 if (generic != null) {
                     selectedCounterpartyId = generic.id
@@ -70,6 +71,8 @@ fun CreatePrrDialog(
     val selectedClient = counterparties.find { it.id == selectedCounterpartyId }
     val isGeostroy = selectedClient?.name?.contains("Геострой", ignoreCase = true) == true
     val isTerritory = selectedClient?.name?.contains("Территория", ignoreCase = true) == true
+
+    BackHandler(enabled = !isSubmitting) { onDismiss() }
 
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },

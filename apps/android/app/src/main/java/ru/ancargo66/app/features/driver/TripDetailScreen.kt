@@ -11,8 +11,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,9 +44,9 @@ fun TripDetailScreen(
     val isPrr = tripDetail?.asset?.regNumber == "БЕЗ АВТО" || tripDetail?.tripType == "loaders_only"
 
     // Диалоги
-    var showAddOrderDialog by remember { mutableStateOf(false) }
-    var showAddExpenseDialog by remember { mutableStateOf(false) }
-    var showFinishDialog by remember { mutableStateOf(false) }
+    var showAddOrderDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddExpenseDialog by rememberSaveable { mutableStateOf(false) }
+    var showFinishDialog by rememberSaveable { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
     var finishError by remember { mutableStateOf<String?>(null) }
 
@@ -54,14 +56,14 @@ fun TripDetailScreen(
     var allLoaders by remember { mutableStateOf<List<User>>(emptyList()) }
 
     // Поля нового расхода
-    var expenseAmountInput by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
-    var expensePaymentMethod by remember { mutableStateOf("fuel_card") }
-    var expenseDescInput by remember { mutableStateOf("") }
+    var expenseAmountInput by rememberSaveable { mutableStateOf("") }
+    var selectedCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
+    var expensePaymentMethod by rememberSaveable { mutableStateOf("fuel_card") }
+    var expenseDescInput by rememberSaveable { mutableStateOf("") }
 
     // Поля завершения рейса
-    var endOdometerInput by remember { mutableStateOf("") }
-    var driverNoteInput by remember { mutableStateOf("") }
+    var endOdometerInput by rememberSaveable { mutableStateOf("") }
+    var driverNoteInput by rememberSaveable { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
 
@@ -93,7 +95,7 @@ fun TripDetailScreen(
                 val tripDeferred = async { SaldaApiClient.getTripDetail(tripId, userId) }
                 val catDeferred = async { SaldaApiClient.getExpenseCategories(userId) }
                 val cpDeferred = async { SaldaApiClient.getCounterparties(userId) }
-                val loadersDeferred = async { SaldaApiClient.getLoaders() }
+                val loadersDeferred = async { SaldaApiClient.getLoaders(userId = userId) }
 
                 val trip = tripDeferred.await()
                 tripDetail = trip
@@ -124,7 +126,12 @@ fun TripDetailScreen(
     val isActive = trip?.status == "in_progress" || trip?.status == "active"
     val isDraftReview = trip?.status == "completed" && trip.lifecycleStatus == "draft"
 
+    BackHandler(onBack = onBack)
+
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .swipeToBack(onBack = onBack),
         topBar = {
             TopAppBar(
                 title = {

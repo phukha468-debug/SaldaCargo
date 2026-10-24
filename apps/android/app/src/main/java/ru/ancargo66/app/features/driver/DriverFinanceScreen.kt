@@ -1,5 +1,6 @@
 package ru.ancargo66.app.features.driver
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,7 +27,7 @@ import ru.ancargo66.app.ui.theme.*
 @Composable
 fun DriverFinanceScreen(
     user: User,
-    initialTab: Int = 0, // 0: Подотчёт, 1: Зарплата
+    initialTab: Int = 1, // 0: Подотчёт, 1: Зарплата (по умолчанию Зарплата)
     onBack: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
@@ -51,7 +52,12 @@ fun DriverFinanceScreen(
         loadFinance()
     }
 
+    BackHandler(onBack = onBack)
+
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .swipeToBack(onBack = onBack),
         topBar = {
             TopAppBar(
                 title = {

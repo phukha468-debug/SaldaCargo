@@ -1,5 +1,6 @@
 package ru.ancargo66.app.features.driver
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,12 +15,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -87,7 +90,6 @@ fun calculateOrderPayroll(
 ): OrderPayrollResult {
     val dirObj = ORDER_DIRECTIONS.find { it.id == direction }
     val isAutomatic = direction != "ekb"
-    val baseRate = if (direction == "local") minMachineBase else (dirObj?.baseMachinePrice ?: minMachineBase)
 
     if (amount <= 0.0) {
         return OrderPayrollResult(0, 0, 0, 0, 0, 0, 0, 0, isAutomatic)
@@ -95,8 +97,37 @@ fun calculateOrderPayroll(
 
     val totalLoadersCount = (if (isDriverLoader) 1 else 0) + loadersCount
 
-    // Сценарий 1: Только водитель (без погрузки)
-    if (totalLoadersCount == 0 && (loadingAmount == null || loadingAmount <= 0.0)) {
+    // Сценарий 1: ПРР без авто (Только грузчики)
+    if (direction == "loaders_only") {
+        val poolPerLoader = if (totalLoadersCount > 0) amount / totalLoadersCount else 0.0
+        val loaderPayEach = Math.round(poolPerLoader * 0.7).toInt()
+        val driverLoaderPay = if (isDriverLoader) loaderPayEach else 0
+        val totalLoadersPay = loaderPayEach * loadersCount
+        val companyShare = (amount - driverLoaderPay - totalLoadersPay).toInt()
+
+        return OrderPayrollResult(
+            driverCarPay = 0,
+            driverLoaderPay = driverLoaderPay,
+            driverTotalPay = driverLoaderPay,
+            loaderPayEach = loaderPayEach,
+            totalLoadersPay = totalLoadersPay,
+            companyShare = companyShare,
+            machinePool = 0,
+            loadersPool = amount.toInt(),
+            isAutomatic = isAutomatic
+        )
+    }
+
+    // Сценарий 2: Обычный рейс с машиной.
+    // Пока водитель собственноручно не ввёл сумму за погрузку > 0,
+    // на машину приходится ровно 100% суммы заказа!
+    val explicitLoading = if (loadingAmount != null && loadingAmount > 0.0) {
+        minOf(amount, loadingAmount)
+    } else {
+        0.0
+    }
+
+    if (explicitLoading <= 0.0) {
         val driverCarPay = Math.round(amount * 0.3).toInt()
         val companyShare = (amount - driverCarPay).toInt()
         return OrderPayrollResult(
@@ -112,27 +143,9 @@ fun calculateOrderPayroll(
         )
     }
 
-    // Сценарий 2: Есть грузчики или сумма за погрузку
-    var machinePool = 0.0
-    var loadersPool = 0.0
-
-    if (direction == "loaders_only") {
-        machinePool = 0.0
-        loadersPool = amount
-    } else if (loadingAmount != null && loadingAmount >= 0.0) {
-        loadersPool = minOf(amount, maxOf(0.0, loadingAmount))
-        machinePool = maxOf(0.0, amount - loadersPool)
-    } else {
-        val loaderUnitRate = 1000.0
-        val nominalPackageRate = baseRate + totalLoadersCount * loaderUnitRate
-        if (amount >= nominalPackageRate) {
-            machinePool = Math.round(amount * (baseRate / nominalPackageRate)).toDouble()
-            loadersPool = amount - machinePool
-        } else {
-            machinePool = minOf(amount, baseRate)
-            loadersPool = maxOf(0.0, amount - machinePool)
-        }
-    }
+    // Сценарий 3: Явно указана сумма за погрузку > 0
+    val loadersPool = explicitLoading
+    val machinePool = maxOf(0.0, amount - loadersPool)
 
     val driverCarPay = Math.round(machinePool * 0.3).toInt()
     val poolPerLoader = if (totalLoadersCount > 0) loadersPool / totalLoadersCount else 0.0
@@ -175,15 +188,33 @@ fun AddOrderDialog(
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {
-    var direction by remember { mutableStateOf(if (isTripPrr) "loaders_only" else "local") }
-    var isDriverLoader by remember { mutableStateOf(isTripPrr) }
-    var amountInput by remember { mutableStateOf("") }
-    var loadingAmountInput by remember { mutableStateOf("") }
-    var manualDriverPayInput by remember { mutableStateOf("") }
-    var selectedCounterpartyId by remember { mutableStateOf<String?>(null) }
-    var clientSearch by remember { mutableStateOf("") }
-    var paymentMethod by remember { mutableStateOf("cash") } // cash, qr, debt_cash
-    var descriptionInput by remember { mutableStateOf("") }
+    var direction by rememberSaveable { mutableStateOf(if (isTripPrr) "loaders_only" else "local") }
+    var isDriverLoader by rememberSaveable { mutableStateOf(isTripPrr) }
+    var amountInput by rememberSaveable { mutableStateOf("") }
+    var loadingAmountInput by rememberSaveable { mutableStateOf("") }
+    var manualDriverPayInput by rememberSaveable { mutableStateOf("") }
+    var selectedCounterpartyId by rememberSaveable { mutableStateOf<String?>(null) }
+    var clientSearch by rememberSaveable { mutableStateOf("") }
+    var paymentMethod by rememberSaveable { mutableStateOf("cash") } // cash, qr, debt_cash
+    var descriptionInput by rememberSaveable { mutableStateOf("") }
+
+    // Локальный список грузчиков с авто-подгрузкой при необходимости
+    var localLoaders by remember { mutableStateOf(allLoaders) }
+    var isLoadingLoaders by remember { mutableStateOf(false) }
+
+    LaunchedEffect(allLoaders) {
+        if (allLoaders.isNotEmpty()) {
+            localLoaders = allLoaders
+        } else {
+            isLoadingLoaders = true
+            try {
+                localLoaders = SaldaApiClient.getLoaders(forceRefresh = true, userId = userId)
+            } catch (_: Exception) {
+            } finally {
+                isLoadingLoaders = false
+            }
+        }
+    }
 
     // Сторонние грузчики
     var selectedLoaders by remember { mutableStateOf<List<User>>(emptyList()) }
@@ -191,12 +222,12 @@ fun AddOrderDialog(
     var showDirectionPicker by remember { mutableStateOf(false) }
 
     // Спец поля для Геострой
-    var geostroyRoute by remember { mutableStateOf("") }
-    var geostroyDate by remember { mutableStateOf("") }
+    var geostroyRoute by rememberSaveable { mutableStateOf("") }
+    var geostroyDate by rememberSaveable { mutableStateOf("") }
 
     // Спец поля для Территория
-    var territoryAddress by remember { mutableStateOf("") }
-    var territoryWork by remember { mutableStateOf("") }
+    var territoryAddress by rememberSaveable { mutableStateOf("") }
+    var territoryWork by rememberSaveable { mutableStateOf("") }
 
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -232,6 +263,8 @@ fun AddOrderDialog(
         }
     }
 
+    BackHandler(enabled = !isSubmitting) { onDismiss() }
+
     Dialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -240,6 +273,7 @@ fun AddOrderDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Zinc50)
+                .swipeToBack(onBack = { if (!isSubmitting) onDismiss() })
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // 1. АБСОЛЮТНАЯ ЗАЩИТА СВЕРХУ:
@@ -383,24 +417,32 @@ fun AddOrderDialog(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Text(currentDirectionObj.icon, fontSize = 24.sp)
                                             Spacer(modifier = Modifier.width(12.dp))
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f, fill = false)) {
                                                 Text(
                                                     text = currentDirectionObj.label,
                                                     fontSize = 15.sp,
                                                     fontWeight = FontWeight.Black,
-                                                    color = Zinc900
+                                                    color = Zinc900,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
                                                     text = currentDirectionObj.desc,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Zinc500
+                                                    color = Zinc500,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                         }
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Surface(
                                             color = SaldaOrange50,
                                             shape = RoundedCornerShape(8.dp),
@@ -411,7 +453,9 @@ fun AddOrderDialog(
                                                 color = SaldaOrangePrimary,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Black,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                             )
                                         }
                                     }
@@ -610,13 +654,22 @@ fun AddOrderDialog(
 
                     // 5. Роль водителя (Я работал грузчиком)
                     item {
+                        val loadingAmt = loadingAmountInput.toDoubleOrNull() ?: 0.0
+                        val canBeDriverLoader = isLoadersOnly || loadingAmt > 0.0
+
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { isDriverLoader = !isDriverLoader },
-                            color = SaldaOrange50,
+                                .clickable {
+                                    if (!canBeDriverLoader) {
+                                        errorMessage = "Сначала укажите сумму за погрузку в графе ниже"
+                                    } else {
+                                        isDriverLoader = !isDriverLoader
+                                    }
+                                },
+                            color = if (canBeDriverLoader) SaldaOrange50 else Zinc100,
                             shape = RoundedCornerShape(16.dp),
-                            border = androidx.compose.foundation.BorderStroke(2.dp, SaldaOrangeLight)
+                            border = androidx.compose.foundation.BorderStroke(2.dp, if (canBeDriverLoader) SaldaOrangeLight else Zinc200)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -625,36 +678,53 @@ fun AddOrderDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Checkbox(
-                                        checked = isDriverLoader,
-                                        onCheckedChange = { isDriverLoader = it },
+                                        checked = isDriverLoader && canBeDriverLoader,
+                                        onCheckedChange = { checked ->
+                                            if (!canBeDriverLoader && checked) {
+                                                errorMessage = "Сначала укажите сумму за погрузку в графе ниже"
+                                            } else {
+                                                isDriverLoader = checked
+                                            }
+                                        },
+                                        enabled = canBeDriverLoader,
                                         colors = CheckboxDefaults.colors(checkedColor = SaldaOrangePrimary)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f, fill = false)) {
                                         Text(
                                             text = if (isLoadersOnly) "🚚 Я работал на разгрузке/погрузке" else "🚚 Я работал грузчиком",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = Zinc900
+                                            color = if (canBeDriverLoader) Zinc900 else Zinc500,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (isLoadersOnly) "Водитель получает 70% чека" else "Оплата за авто + за работу грузчика",
+                                            text = if (isLoadersOnly) "Водитель получает 70% чека"
+                                                   else if (!canBeDriverLoader) "Введите сумму за погрузку ниже, чтобы включить"
+                                                   else "Оплата за авто + за работу грузчика",
                                             fontSize = 11.sp,
-                                            color = Zinc500
+                                            color = if (!canBeDriverLoader) SaldaOrangePrimary else Zinc500
                                         )
                                     }
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    color = if (isDriverLoader) SaldaOrangePrimary else Zinc200,
+                                    color = if (isDriverLoader && canBeDriverLoader) SaldaOrangePrimary else Zinc200,
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        text = if (isDriverLoader) "ДА" else "НЕТ",
+                                        text = if (isDriverLoader && canBeDriverLoader) "ДА" else "НЕТ",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = if (isDriverLoader) Color.White else Zinc600,
+                                        color = if (isDriverLoader && canBeDriverLoader) Color.White else Zinc600,
+                                        maxLines = 1,
+                                        softWrap = false,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
@@ -749,8 +819,12 @@ fun AddOrderDialog(
                                         onValueChange = {
                                             loadingAmountInput = it
                                             val v = it.toDoubleOrNull() ?: 0.0
-                                            if (v > 0.0 && selectedLoaders.isEmpty() && !isDriverLoader) {
-                                                isDriverLoader = true
+                                            if (!isLoadersOnly) {
+                                                if (v <= 0.0) {
+                                                    isDriverLoader = false
+                                                } else if (selectedLoaders.isEmpty() && !isDriverLoader) {
+                                                    isDriverLoader = true
+                                                }
                                             }
                                         },
                                         placeholder = { Text("0 ₽", fontWeight = FontWeight.Bold) },
@@ -1325,16 +1399,44 @@ fun AddOrderDialog(
                                 }
                             }
 
-                            val availableLoaders = allLoaders.filter { l -> selectedLoaders.none { it.id == l.id } }
+                            val availableLoaders = localLoaders.filter { l -> selectedLoaders.none { it.id == l.id } }
 
-                            if (availableLoaders.isEmpty()) {
+                            if (isLoadingLoaders) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("Все доступные грузчики добавлены", color = Zinc500, fontSize = 13.sp)
+                                    CircularProgressIndicator(color = SaldaOrangePrimary)
+                                }
+                            } else if (availableLoaders.isEmpty()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        if (localLoaders.isEmpty()) "Список грузчиков пуст" else "Все доступные грузчики добавлены",
+                                        color = Zinc500,
+                                        fontSize = 13.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                isLoadingLoaders = true
+                                                try {
+                                                    localLoaders = SaldaApiClient.getLoaders(forceRefresh = true, userId = userId)
+                                                } catch (_: Exception) {}
+                                                finally { isLoadingLoaders = false }
+                                            }
+                                        }
+                                    ) {
+                                        Text("Обновить список", fontSize = 12.sp)
+                                    }
                                 }
                             } else {
                                 LazyColumn(
