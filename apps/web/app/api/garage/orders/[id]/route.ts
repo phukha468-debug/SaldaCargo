@@ -342,8 +342,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
       }
 
-      // Доход с наряда — только для клиентских машин (свои не приносят выручки)
-      if (order.machine_type === 'client') {
+      // Доход с наряда — только для клиентских машин, КОГДА ДЕНЬГИ ФАКТИЧЕСКИ ПОЛУЧЕНЫ
+      if (order.machine_type === 'client' && body.payment_received === true) {
         const CAT_SERVICE_REVENUE = '600e7f70-2797-474d-948b-432230036d67';
         const { data: worksForRevenue } = await (supabase as any)
           .from('service_order_works')
@@ -676,6 +676,74 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           );
         }
       }
+    }
+
+    if (updates.payment_received === true) {
+      // Создаем доходную транзакцию выручки при фактическом получении денег
+      const { data: existingRevenueTx } = await (supabase as any)
+        .from('transactions')
+        .select('id')
+        .eq('service_order_id', id)
+        .eq('direction', 'income')
+        .maybeSingle();
+
+      if (!existingRevenueTx) {
+        const { data: ord } = await (supabase as any)
+          .from('service_orders')
+          .select(
+            `id, order_number, machine_type,
+             works:service_order_works(price_client, status),
+             parts:service_order_parts(client_price, unit_price, quantity)`,
+          )
+          .eq('id', id)
+          .single();
+
+        if (ord && ord.machine_type === 'client') {
+          const worksTotal = ((ord.works ?? []) as any[])
+            .filter((w: any) => w.status !== 'cancelled')
+            .reduce((s: number, w: any) => s + parseFloat(w.price_client ?? '0'), 0);
+          const partsTotal = ((ord.parts ?? []) as any[]).reduce(
+            (s: number, p: any) =>
+              s +
+              (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) *
+                (parseFloat(p.quantity ?? '1') || 1),
+            0,
+          );
+          const revenueTotal = worksTotal + partsTotal;
+
+          if (revenueTotal > 0) {
+            const CAT_SERVICE_REVENUE = '600e7f70-2797-474d-948b-432230036d67';
+            const GARAGE_WALLET_ID =
+              (body.to_wallet_id as string) || '10000000-0000-0000-0000-000000000005';
+            const { data: adminForRevenue } = await (supabase as any)
+              .from('users')
+              .select('id')
+              .filter('roles', 'cs', '{"admin"}')
+              .limit(1)
+              .maybeSingle();
+
+            await (supabase as any).from('transactions').insert({
+              direction: 'income',
+              lifecycle_status: 'approved',
+              settlement_status: 'completed',
+              amount: revenueTotal.toFixed(2),
+              category_id: CAT_SERVICE_REVENUE,
+              service_order_id: id,
+              to_wallet_id: GARAGE_WALLET_ID,
+              created_by: adminForRevenue?.id ?? null,
+              description: `Выручка — наряд #${ord.order_number}`,
+              idempotency_key: crypto.randomUUID(),
+            });
+          }
+        }
+      }
+    } else if (updates.payment_received === false) {
+      // Если оплату отменили — удаляем ошибочно созданную доходную транзакцию
+      await (supabase as any)
+        .from('transactions')
+        .delete()
+        .eq('service_order_id', id)
+        .eq('direction', 'income');
     }
 
     const { data, error } = await (supabase as any)
