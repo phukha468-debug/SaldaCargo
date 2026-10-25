@@ -17,6 +17,9 @@ export async function GET(request: Request) {
     let query = supabase
       .from('users')
       .select('id, name, roles, phone, notes, is_active, pin_code, current_asset_id')
+      .eq('is_active', true)
+      .not('name', 'ilike', '%STRESS%')
+      .not('name', 'ilike', '%TEST%')
       .order('name');
 
     const { data: users, error } = await query;
@@ -69,7 +72,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(safeUsers, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     });
   } catch (err: any) {
