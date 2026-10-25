@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   let query = (supabase.from('users') as any)
     .select(
-      'id, name, phone, max_user_id, roles, current_asset_id, is_active, notes, created_at, is_officially_employed, official_salary_amount, official_salary_day, has_court_orders, court_order_pct, court_order_notes',
+      'id, name, phone, max_user_id, pin_code, roles, current_asset_id, is_active, notes, created_at, is_officially_employed, official_salary_amount, official_salary_day, has_court_orders, court_order_pct, court_order_notes',
     )
     .not('name', 'ilike', '%STRESS%')
     .not('name', 'ilike', '%TEST%')
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, any>;
-    const { name, phone, max_user_id, roles, current_asset_id, notes } = body;
+    const { name, phone, max_user_id, pin_code, roles, current_asset_id, notes } = body;
 
     if (!name?.trim() || !roles?.length) {
       return NextResponse.json({ error: 'Имя и роль обязательны' }, { status: 400 });
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         phone: phone || null,
         max_user_id: max_user_id || null,
+        pin_code: pin_code ? String(pin_code).trim() : null,
         roles,
         current_asset_id: current_asset_id || null,
         auto_settle: body.auto_settle ?? false,

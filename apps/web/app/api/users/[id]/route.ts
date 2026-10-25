@@ -11,6 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'name',
       'phone',
       'max_user_id',
+      'pin_code',
       'roles',
       'current_asset_id',
       'is_active',
@@ -28,6 +29,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (key in body) update[key] = body[key];
     }
     if (update.name) update.name = update.name.trim();
+    if ('pin_code' in update) {
+      update.pin_code = update.pin_code ? String(update.pin_code).trim() : null;
+    }
 
     const supabase = createAdminClient();
     const { data, error } = await (supabase.from('users') as any)

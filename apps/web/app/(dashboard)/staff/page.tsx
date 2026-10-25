@@ -28,6 +28,7 @@ export type PayrollUser = {
   roles: UserRole[];
   auto_settle: boolean;
   max_user_id: string | null;
+  pin_code?: string | null;
   current_asset_id?: string | null;
   phone: string | null;
   notes: string | null;
@@ -78,6 +79,7 @@ type StaffUser = {
   name: string;
   phone: string | null;
   max_user_id: string | null;
+  pin_code?: string | null;
   roles: UserRole[];
   current_asset_id: string | null;
   auto_settle: boolean;
@@ -161,6 +163,7 @@ const emptyForm = {
   name: '',
   phone: '',
   max_user_id: '',
+  pin_code: '',
   roles: [] as UserRole[],
   current_asset_id: '',
   auto_settle: false,
@@ -192,6 +195,7 @@ function StaffModal({
           name: editUser.name,
           phone: editUser.phone ?? '',
           max_user_id: editUser.max_user_id ?? '',
+          pin_code: editUser.pin_code ?? '',
           roles: editUser.roles,
           current_asset_id: editUser.current_asset_id ?? '',
           auto_settle: editUser.auto_settle,
@@ -228,12 +232,17 @@ function StaffModal({
       setError('Выберите хотя бы одну роль');
       return;
     }
+    if (form.pin_code && form.pin_code.trim().length !== 4) {
+      setError('PIN-код должен состоять ровно из 4 цифр');
+      return;
+    }
     setSaving(true);
     setError('');
     const payload = {
       name: form.name,
       phone: form.phone || null,
       max_user_id: form.max_user_id || null,
+      pin_code: form.pin_code ? form.pin_code.trim() : null,
       roles: form.roles,
       current_asset_id: form.current_asset_id || null,
       auto_settle: form.auto_settle,
@@ -327,6 +336,40 @@ function StaffModal({
                 onChange={f('max_user_id')}
               />
             </div>
+          </div>
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <span>🔒</span>
+                <span>Личный PIN-код (4 цифры)</span>
+              </label>
+              {form.pin_code && (
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, pin_code: '' }))}
+                  className="text-[11px] text-rose-600 font-semibold hover:underline"
+                >
+                  Сбросить PIN
+                </button>
+              )}
+            </div>
+            <input
+              className={cn(
+                inputCls,
+                'font-mono tracking-widest text-base font-bold bg-white text-slate-800 placeholder:text-xs placeholder:font-normal placeholder:tracking-normal',
+              )}
+              placeholder="Не установлен (напр. 1234)"
+              maxLength={4}
+              value={form.pin_code}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setForm((p) => ({ ...p, pin_code: val }));
+              }}
+            />
+            <p className="text-[11px] text-amber-800/80 mt-1.5 leading-snug">
+              Используется для авторизации в боте MAX и Android. Оставьте пустым, чтобы сотрудник
+              задал его сам при входе.
+            </p>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">
@@ -3974,6 +4017,15 @@ function PayrollRow({
           ) : (
             <span className="text-xs text-rose-400 font-medium">MAX не привязан</span>
           )}
+          {user.pin_code ? (
+            <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-mono font-bold inline-flex items-center gap-1">
+              🔒 PIN: {user.pin_code}
+            </span>
+          ) : (
+            <span className="text-xs bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1">
+              🔒 PIN не установлен
+            </span>
+          )}
           {user.phone && (
             <span className="text-xs text-slate-500 font-mono">📞 {formatPhone(user.phone)}</span>
           )}
@@ -4982,6 +5034,7 @@ export default function StaffPage() {
       name: u.name,
       phone: u.phone,
       max_user_id: u.max_user_id,
+      pin_code: u.pin_code ?? null,
       roles: u.roles,
       current_asset_id: u.current_asset_id ?? null,
       auto_settle: u.auto_settle,

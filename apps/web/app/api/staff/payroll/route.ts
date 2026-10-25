@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       (supabase as any)
         .from('users')
         .select(
-          'id, name, roles, auto_settle, max_user_id, current_asset_id, is_active, phone, notes, is_officially_employed, official_salary_amount, official_salary_day, has_court_orders, court_order_pct, court_order_notes',
+          'id, name, roles, auto_settle, max_user_id, pin_code, current_asset_id, is_active, phone, notes, is_officially_employed, official_salary_amount, official_salary_day, has_court_orders, court_order_pct, court_order_notes',
         )
         .eq('is_active', true)
         .order('name'),
@@ -345,6 +345,7 @@ export async function GET(request: Request) {
         roles: u.roles,
         auto_settle: u.auto_settle,
         max_user_id: u.max_user_id,
+        pin_code: u.pin_code ?? null,
         phone: u.phone,
         notes: u.notes,
         is_officially_employed: Boolean(u.is_officially_employed),
