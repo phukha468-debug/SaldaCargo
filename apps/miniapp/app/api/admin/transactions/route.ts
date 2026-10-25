@@ -44,7 +44,7 @@ function walletIdByMethod(method: string): string | null {
 /** POST /api/admin/transactions — добавить доход или расход */
 export async function POST(request: Request) {
   const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

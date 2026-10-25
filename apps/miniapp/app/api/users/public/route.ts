@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('users')
-      .select('id, name, roles, pin_code, current_asset_id')
+      .select('id, name, roles, phone, notes, is_active, pin_code, current_asset_id')
       .order('name');
 
     const { data: users, error } = await query;

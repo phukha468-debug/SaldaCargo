@@ -56,7 +56,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value ?? null;
+  const adminId =
+    cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id') || null;
   const body = (await request.json()) as {
     action: 'approve' | 'return' | 'edit_orders' | 'reissue_salary' | 'confirm_payroll';
     note?: string;

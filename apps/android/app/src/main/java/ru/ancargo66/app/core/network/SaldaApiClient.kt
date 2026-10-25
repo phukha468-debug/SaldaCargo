@@ -99,6 +99,17 @@ object SaldaApiClient {
         }
     }
 
+    suspend fun setPin(userId: String, pin: String): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("user_id", userId)
+            put("pin", pin)
+        }.toString()
+        val request = buildRequest("/api/auth/set-pin", method = "POST", bodyJson = body)
+        client.newCall(request).execute().use { response ->
+            response.isSuccessful
+        }
+    }
+
     // ── Модуль водителя ─────────────────────────────────────────────────────
 
     suspend fun getDriverSummary(driverId: String, forceRefresh: Boolean = false): DriverSummary = withContext(Dispatchers.IO) {
@@ -263,9 +274,16 @@ object SaldaApiClient {
 
     suspend fun deleteTrip(tripId: String, userId: String? = null): Boolean = withContext(Dispatchers.IO) {
         cachedDriverSummary = null
-        val request = buildRequest("/api/trips/$tripId", method = "DELETE", userId = userId)
-        client.newCall(request).execute().use { response ->
-            response.isSuccessful
+        val ok = try {
+            val request = buildRequest("/api/trips/$tripId", method = "DELETE", userId = userId)
+            client.newCall(request).execute().use { it.isSuccessful }
+        } catch (_: Exception) { false }
+
+        if (ok) true else {
+            try {
+                val adminReq = buildRequest("/api/admin/trips/$tripId", method = "DELETE", userId = userId)
+                client.newCall(adminReq).execute().use { it.isSuccessful }
+            } catch (_: Exception) { false }
         }
     }
 
@@ -417,6 +435,42 @@ object SaldaApiClient {
     suspend fun approveTrip(tripId: String, adminId: String? = null): Boolean = withContext(Dispatchers.IO) {
         val body = buildJsonObject { put("action", "approve") }.toString()
         val request = buildRequest("/api/admin/trips/$tripId", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { response ->
+            response.isSuccessful
+        }
+    }
+
+    suspend fun returnTrip(tripId: String, adminId: String? = null): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject { put("action", "return") }.toString()
+        val request = buildRequest("/api/admin/trips/$tripId", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { response ->
+            response.isSuccessful
+        }
+    }
+
+    suspend fun deleteAdminTrip(tripId: String, adminId: String? = null): Boolean = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/admin/trips/$tripId", method = "DELETE", userId = adminId)
+        client.newCall(request).execute().use { response ->
+            response.isSuccessful
+        }
+    }
+
+    suspend fun addAdminTransaction(
+        direction: String,
+        categoryId: String,
+        amount: Double,
+        paymentMethod: String = "cash",
+        description: String? = null,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("direction", direction)
+            put("category_id", categoryId)
+            put("amount", amount.toString())
+            put("payment_method", paymentMethod)
+            if (!description.isNullOrBlank()) put("description", description)
+        }.toString()
+        val request = buildRequest("/api/admin/transactions", method = "POST", bodyJson = body, userId = adminId)
         client.newCall(request).execute().use { response ->
             response.isSuccessful
         }

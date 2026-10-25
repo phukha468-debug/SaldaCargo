@@ -18,6 +18,7 @@ const OPERATIONAL_ROLES = [
   'painter',
   'electrician',
   'handyman',
+  'cleaner',
 ];
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';

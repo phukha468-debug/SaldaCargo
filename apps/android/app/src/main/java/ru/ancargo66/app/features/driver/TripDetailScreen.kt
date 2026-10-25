@@ -34,6 +34,7 @@ import ru.ancargo66.app.ui.theme.*
 fun TripDetailScreen(
     tripId: String,
     userId: String,
+    isAdmin: Boolean = false,
     onBack: () -> Unit,
     onTripUpdated: () -> Unit
 ) {
@@ -47,7 +48,10 @@ fun TripDetailScreen(
     var showAddOrderDialog by rememberSaveable { mutableStateOf(false) }
     var showAddExpenseDialog by rememberSaveable { mutableStateOf(false) }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteTripDialog by rememberSaveable { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var isApproving by remember { mutableStateOf(false) }
+    var isReturning by remember { mutableStateOf(false) }
     var finishError by remember { mutableStateOf<String?>(null) }
 
     // Справочники
@@ -125,6 +129,7 @@ fun TripDetailScreen(
     val trip = tripDetail
     val isActive = trip?.status == "in_progress" || trip?.status == "active"
     val isDraftReview = trip?.status == "completed" && trip.lifecycleStatus == "draft"
+    val canDelete = isAdmin || (trip != null && trip.lifecycleStatus != "approved")
 
     BackHandler(onBack = onBack)
 
@@ -156,7 +161,7 @@ fun TripDetailScreen(
                                     isActive -> SaldaOrangePrimary
                                     isDraftReview -> AmberPending
                                     trip.lifecycleStatus == "approved" -> GreenOnline
-                                    else -> Zinc500
+                                    else -> Zinc700
                                 }
                             )
                         }
@@ -167,11 +172,72 @@ fun TripDetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Zinc700)
                     }
                 },
+                actions = {
+                    if (canDelete) {
+                        IconButton(onClick = { showDeleteTripDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Удалить рейс", tint = RedAlert)
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
         bottomBar = {
-            if (isActive && trip != null) {
+            if (isAdmin && isDraftReview && trip != null) {
+                Surface(
+                    color = Color.White,
+                    shadowElevation = 8.dp,
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    isReturning = true
+                                    SaldaApiClient.returnTrip(tripId, userId)
+                                    isReturning = false
+                                    onTripUpdated()
+                                    onBack()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPending),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, AmberPending),
+                            enabled = !isReturning && !isApproving
+                        ) {
+                            Text(if (isReturning) "..." else "↩ Вернуть", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    isApproving = true
+                                    SaldaApiClient.approveTrip(tripId, userId)
+                                    isApproving = false
+                                    onTripUpdated()
+                                    onBack()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = GreenOnline),
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !isReturning && !isApproving
+                        ) {
+                            Text(if (isApproving) "..." else "✓ Одобрить", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            } else if (isActive && trip != null) {
                 Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
@@ -324,7 +390,7 @@ fun TripDetailScreen(
                                 Text(
                                     text = "Водитель: ${trip.driver?.name ?: "—"} • Старт: ${trip.odometerStart} км",
                                     fontSize = 12.sp,
-                                    color = Zinc500
+                                    color = Zinc700
                                 )
                             }
                         }
@@ -412,7 +478,7 @@ fun TripDetailScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("📋", fontSize = 28.sp)
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("В этом рейсе пока нет заказов", color = Zinc500, fontSize = 13.sp)
+                                    Text("В этом рейсе пока нет заказов", color = Zinc700, fontSize = 13.sp)
                                 }
                             }
                         }
@@ -599,7 +665,7 @@ fun TripDetailScreen(
                                     .padding(18.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("⛽ Расходов пока нет", color = Zinc500, fontSize = 13.sp)
+                                Text("⛽ Расходов пока нет", color = Zinc700, fontSize = 13.sp)
                             }
                         }
                     }
@@ -628,7 +694,7 @@ fun TripDetailScreen(
                                     Text(
                                         text = if (exp.paymentMethod == "fuel_card") "Топливная карта Опти24" else "Наличные из подотчёта",
                                         fontSize = 11.sp,
-                                        color = Zinc500
+                                        color = Zinc700
                                     )
                                     if (!exp.description.isNullOrBlank()) {
                                         Text(text = exp.description, fontSize = 11.sp, color = Zinc600)
@@ -641,6 +707,73 @@ fun TripDetailScreen(
                                     color = RedAlert
                                 )
                             }
+                        }
+                    }
+                }
+
+                if (!trip.driverNote.isNullOrBlank()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("💬", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Заметка водителя:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB45309))
+                                    Text(trip.driverNote, fontSize = 13.sp, color = Zinc900)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (trip.odometerEnd != null && trip.odometerEnd > 0) {
+                    item {
+                        val mileage = trip.odometerEnd - trip.odometerStart
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Zinc100),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🛣 Пробег за рейс:", fontSize = 12.sp, color = Zinc600, fontWeight = FontWeight.Medium)
+                                Text("$mileage км (${trip.odometerStart} → ${trip.odometerEnd})", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Zinc900)
+                            }
+                        }
+                    }
+                }
+
+                if (canDelete) {
+                    item {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = { showDeleteTripDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .bouncyTouch(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = RedAlert),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, RedAlert.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("УДАЛИТЬ РЕЙС", fontWeight = FontWeight.Black, fontSize = 13.sp)
                         }
                     }
                 }
@@ -739,7 +872,7 @@ fun TripDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddExpenseDialog = false }) {
-                    Text("Отмена", color = Zinc500)
+                    Text("Отмена", color = Zinc700)
                 }
             }
         )
@@ -769,9 +902,9 @@ fun TripDetailScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Сдать в кассу наличными:", fontSize = 11.sp, color = Zinc500, fontWeight = FontWeight.SemiBold)
+                            Text("Сдать в кассу наличными:", fontSize = 11.sp, color = Zinc700, fontWeight = FontWeight.SemiBold)
                             Text("${cashToSurrender.toInt()} ₽", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Zinc900)
-                            Text("Выручка налом (${cashRevenue.toInt()} ₽) минус расходы (${cashExpenses.toInt()} ₽)", fontSize = 10.sp, color = Zinc500)
+                            Text("Выручка налом (${cashRevenue.toInt()} ₽) минус расходы (${cashExpenses.toInt()} ₽)", fontSize = 10.sp, color = Zinc700)
                         }
                     }
 
@@ -835,7 +968,47 @@ fun TripDetailScreen(
                     onClick = { showFinishDialog = false },
                     enabled = !isSubmitting
                 ) {
-                    Text("Отмена", color = Zinc500)
+                    Text("Отмена", color = Zinc700)
+                }
+            }
+        )
+    }
+
+    if (showDeleteTripDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isSubmitting) showDeleteTripDialog = false },
+            title = { Text("Удалить рейс?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Рейс №${trip?.tripNumber ?: ""} и все связанные заказы будут удалены. Это действие нельзя отменить.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isSubmitting = true
+                            val ok = SaldaApiClient.deleteTrip(tripId, userId)
+                            isSubmitting = false
+                            showDeleteTripDialog = false
+                            if (ok) {
+                                onTripUpdated()
+                                onBack()
+                            } else {
+                                errorMessage = "Не удалось удалить рейс"
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RedAlert),
+                    enabled = !isSubmitting
+                ) {
+                    Text(if (isSubmitting) "Удаляем..." else "Удалить", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteTripDialog = false },
+                    enabled = !isSubmitting
+                ) {
+                    Text("Отмена", color = Zinc700)
                 }
             }
         )

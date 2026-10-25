@@ -69,27 +69,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json(data);
 }
 
-/** DELETE /api/trips/:id — отменить рейс (soft-delete, только свой и не апрувнутый) */
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+/** DELETE /api/trips/:id — отменить/удалить рейс (водитель — свой не апрувнутый, администратор — любой) */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cookieStore = await cookies();
-  const driverId = cookieStore.get('salda_user_id')?.value;
-  if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const callerId =
+    cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+  if (!callerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();
 
-  const { data: trip } = await (supabase.from('trips') as any)
-    .select('driver_id, lifecycle_status')
-    .eq('id', id)
-    .single();
+  const [{ data: trip }, { data: caller }] = await Promise.all([
+    (supabase.from('trips') as any).select('driver_id, lifecycle_status').eq('id', id).single(),
+    (supabase.from('users') as any).select('roles').eq('id', callerId).single(),
+  ]);
 
   if (!trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
-  if (trip.driver_id !== driverId)
+
+  const isAdmin =
+    Array.isArray(caller?.roles) &&
+    caller.roles.some((r: string) => ['admin', 'owner', 'director'].includes(r));
+
+  if (!isAdmin && trip.driver_id !== callerId)
     return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
-  if (trip.lifecycle_status === 'approved') {
+  if (!isAdmin && trip.lifecycle_status === 'approved') {
     return NextResponse.json({ error: 'Рейс уже одобрен администратором' }, { status: 403 });
   }
 
+  // Если удаляет администратор тестовый или черновой рейс — удаляем полностью через cascade
+  if (isAdmin) {
+    const { error: delError } = await supabase.from('trips').delete().eq('id', id);
+    if (!delError) return NextResponse.json({ ok: true, deleted: true });
+  }
+
+  // Иначе мягкая отмена (soft-delete)
   const { error } = await (supabase.from('trips') as any)
     .update({ lifecycle_status: 'cancelled' })
     .eq('id', id);

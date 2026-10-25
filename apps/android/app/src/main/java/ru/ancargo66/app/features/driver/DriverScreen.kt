@@ -174,6 +174,7 @@ fun DriverScreen(
         TripDetailScreen(
             tripId = detailId,
             userId = user.id,
+            isAdmin = user.roles.any { it == "admin" || it == "owner" || it == "director" },
             onBack = { selectedTripIdForDetails = null },
             onTripUpdated = {
                 refreshData()

@@ -68,12 +68,15 @@ fun LoginScreen(
         loadUsers()
     }
 
-    // Если выбран сотрудник с PIN-кодом — показываем банковский PinScreen
+    // Показываем банковский PinScreen для проверки или создания PIN-кода
     val pinUser = userForPin
     if (pinUser != null) {
         PinScreen(
             user = pinUser,
-            onSuccess = { onLoginSuccess(pinUser, selectedRole) },
+            onSuccess = {
+                val loggedUser = pinUser.copy(hasPin = true)
+                onLoginSuccess(loggedUser, selectedRole)
+            },
             onCancel = { userForPin = null }
         )
         return
@@ -248,14 +251,11 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(filteredUsers, key = { it.id }) { user ->
+                    val hasPin = user.hasPin || !user.pinCode.isNullOrBlank()
                     Card(
                         onClick = {
                             keyboardController?.hide()
-                            if (user.hasPin || !user.pinCode.isNullOrBlank()) {
-                                userForPin = user
-                            } else {
-                                onLoginSuccess(user, selectedRole)
-                            }
+                            userForPin = user
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -271,15 +271,15 @@ fun LoginScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Surface(
-                                    color = SaldaOrange50,
+                                    color = if (hasPin) SaldaOrange50 else Color(0xFFFEF3C7),
                                     shape = RoundedCornerShape(20.dp),
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
-                                            imageVector = Icons.Default.Person,
+                                            imageVector = if (hasPin) Icons.Default.Person else Icons.Default.VpnKey,
                                             contentDescription = null,
-                                            tint = SaldaOrangePrimary,
+                                            tint = if (hasPin) SaldaOrangePrimary else AmberWarning,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -293,27 +293,45 @@ fun LoginScreen(
                                         color = Zinc900
                                     )
                                     Text(
-                                        text = if (user.hasPin || !user.pinCode.isNullOrBlank()) "Вход по PIN-коду" else "Быстрый вход в 1 клик",
+                                        text = if (hasPin) "Вход по PIN-коду" else "Требуется создать PIN",
                                         fontSize = 12.sp,
-                                        color = Zinc500
+                                        fontWeight = if (hasPin) FontWeight.Medium else FontWeight.Bold,
+                                        color = if (hasPin) Zinc700 else SaldaOrangePrimary
                                     )
                                 }
                             }
 
-                            if (user.hasPin || !user.pinCode.isNullOrBlank()) {
+                            if (hasPin) {
                                 Icon(
                                     imageVector = Icons.Default.Lock,
                                     contentDescription = "Защищено PIN-кодом",
-                                    tint = Zinc400,
+                                    tint = Zinc700,
                                     modifier = Modifier.size(18.dp)
                                 )
                             } else {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Войти",
-                                    tint = SaldaOrangePrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                Surface(
+                                    color = Color(0xFFFEF3C7),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.VpnKey,
+                                            contentDescription = "Создать PIN",
+                                            tint = AmberWarning,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Создать PIN",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFF92400E)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
