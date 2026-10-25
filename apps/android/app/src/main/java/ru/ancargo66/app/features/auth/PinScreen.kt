@@ -30,6 +30,7 @@ import ru.ancargo66.app.ui.theme.*
 @Composable
 fun PinScreen(
     user: User,
+    isChangePinMode: Boolean = false,
     onSuccess: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -38,8 +39,8 @@ fun PinScreen(
         keyboardController?.hide()
     }
 
-    // Режим: если у пользователя нет PIN — включаем режим первичного создания PIN
-    val isSetupMode = remember(user) { !user.hasPin && user.pinCode.isNullOrBlank() }
+    // Режим: если смена PIN или у пользователя нет PIN — включаем режим создания/смены PIN
+    val isSetupMode = remember(user, isChangePinMode) { isChangePinMode || (!user.hasPin && user.pinCode.isNullOrBlank()) }
 
     var setupStep by remember { mutableStateOf(0) } // 0 = ввод первого PIN, 1 = подтверждение PIN
     var firstEnteredPin by remember { mutableStateOf("") }
@@ -171,7 +172,11 @@ fun PinScreen(
                     modifier = Modifier.padding(bottom = 6.dp)
                 ) {
                     Text(
-                        text = if (setupStep == 0) "ШАГ 1 ИЗ 2: СОЗДАНИЕ PIN" else "ШАГ 2 ИЗ 2: ПОДТВЕРЖДЕНИЕ",
+                        text = if (isChangePinMode) {
+                            if (setupStep == 0) "ШАГ 1 ИЗ 2: НОВЫЙ PIN" else "ШАГ 2 ИЗ 2: ПОДТВЕРЖДЕНИЕ"
+                        } else {
+                            if (setupStep == 0) "ШАГ 1 ИЗ 2: СОЗДАНИЕ PIN" else "ШАГ 2 ИЗ 2: ПОДТВЕРЖДЕНИЕ"
+                        },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = SaldaOrangePrimary,
@@ -184,8 +189,8 @@ fun PinScreen(
                 text = when {
                     isProcessing -> if (isSetupMode) "Сохранение вашего личного PIN..." else "Проверка PIN-кода..."
                     isError -> customErrorMessage ?: "Ошибка ввода, попробуйте снова"
-                    isSetupMode && setupStep == 0 -> "Придумайте личный 4-значный PIN-код"
-                    isSetupMode && setupStep == 1 -> "Повторите придуманный PIN-код"
+                    isSetupMode && setupStep == 0 -> if (isChangePinMode) "Придумайте новый 4-значный PIN-код" else "Придумайте личный 4-значный PIN-код"
+                    isSetupMode && setupStep == 1 -> "Повторите новый PIN-код"
                     else -> "Введите ваш 4-значный PIN-код"
                 },
                 fontSize = 14.sp,
@@ -274,7 +279,7 @@ fun PinScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         ) {
             Text(
-                text = "Выбрать другого сотрудника",
+                text = if (isChangePinMode) "Отмена" else "Выбрать другого сотрудника",
                 color = Zinc700,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp

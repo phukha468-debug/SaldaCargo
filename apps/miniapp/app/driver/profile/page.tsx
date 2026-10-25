@@ -4,10 +4,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { performLogout } from '@/lib/auth/logout';
+import ChangePinModal from '@/components/ChangePinModal';
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
 
   const { data: user, isLoading } = useQuery<any>({
@@ -150,7 +152,35 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Смена PIN-кода */}
+        <div className="bg-white rounded-lg p-4 border border-zinc-200 shadow-sm flex justify-between items-center">
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">🔒</span>
+            <div>
+              <div className="text-xs font-bold text-zinc-400 uppercase tracking-tight">
+                Личный пароль
+              </div>
+              <div className="text-sm font-black text-zinc-900">4-значный PIN-код</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowPinModal(true)}
+            className="text-[10px] font-black uppercase tracking-widest text-orange-600 active:opacity-70 border border-orange-200 bg-orange-50 px-3 py-1.5 rounded-lg"
+          >
+            Сменить PIN
+          </button>
+        </div>
       </section>
+
+      {user?.id && (
+        <ChangePinModal
+          isOpen={showPinModal}
+          userId={user.id}
+          userName={user.name}
+          onClose={() => setShowPinModal(false)}
+        />
+      )}
 
       <section className="space-y-3 pt-4">
         <button

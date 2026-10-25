@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
+import ru.ancargo66.app.features.auth.PinScreen
 import ru.ancargo66.app.features.driver.TripDetailScreen
 import ru.ancargo66.app.ui.theme.*
 
@@ -37,6 +38,7 @@ fun DispatcherScreen(
     user: User,
     onLogout: () -> Unit
 ) {
+    var showChangePinScreen by rememberSaveable { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) } // 0: Ревью, 1: В пути, 2: Счета, 3: Штат
     var adminSummary by remember { mutableStateOf<AdminSummary?>(null) }
     var reviewTrips by remember { mutableStateOf<List<TripDetail>>(emptyList()) }
@@ -82,6 +84,16 @@ fun DispatcherScreen(
 
     // Если открыт детальный экран рейса
     val detailId = selectedTripIdForDetails
+        if (showChangePinScreen) {
+        PinScreen(
+            user = user,
+            isChangePinMode = true,
+            onSuccess = { showChangePinScreen = false },
+            onCancel = { showChangePinScreen = false }
+        )
+        return
+    }
+
     if (detailId != null) {
         TripDetailScreen(
             tripId = detailId,
@@ -181,8 +193,12 @@ fun DispatcherScreen(
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = onLogout,
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(onClick = { showChangePinScreen = true }) {
+                            Icon(Icons.Default.Lock, contentDescription = "Сменить PIN", tint = Zinc700)
+                        }
+                        OutlinedButton(
+                            onClick = onLogout,
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Zinc700),
@@ -190,6 +206,7 @@ fun DispatcherScreen(
                         modifier = Modifier.bouncyTouch()
                     ) {
                         Text("Выйти", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

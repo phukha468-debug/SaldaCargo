@@ -31,6 +31,7 @@ import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
+import ru.ancargo66.app.features.auth.PinScreen
 import ru.ancargo66.app.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -97,6 +98,7 @@ fun DriverScreen(
     var startTripError by remember { mutableStateOf<String?>(null) }
     var financeInitialTab by rememberSaveable { mutableStateOf<Int?>(null) }
     var showCreatePrrDialog by rememberSaveable { mutableStateOf(false) }
+    var showChangePinScreen by rememberSaveable { mutableStateOf(false) }
     var showAllTripsModal by rememberSaveable { mutableStateOf(false) }
     var allTrips by remember { mutableStateOf<List<TripSummaryItem>>(emptyList()) }
     var isLoadingAllTrips by remember { mutableStateOf(false) }
@@ -155,6 +157,17 @@ fun DriverScreen(
 
     LaunchedEffect(user.id) {
         refreshData()
+    }
+
+    // Если открыт экран смены PIN-кода
+    if (showChangePinScreen) {
+        PinScreen(
+            user = user,
+            isChangePinMode = true,
+            onSuccess = { showChangePinScreen = false },
+            onCancel = { showChangePinScreen = false }
+        )
+        return
     }
 
     // Если открыт экран финансов водителя
@@ -229,8 +242,13 @@ fun DriverScreen(
                             Text(text = "Водитель • СалдаКарго", fontSize = 12.sp, color = Zinc500)
                         }
                     }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Выйти", tint = Zinc500)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showChangePinScreen = true }) {
+                            Icon(Icons.Default.Lock, contentDescription = "Сменить PIN", tint = Zinc700)
+                        }
+                        IconButton(onClick = onLogout) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Выйти", tint = Zinc700)
+                        }
                     }
                 }
             }
