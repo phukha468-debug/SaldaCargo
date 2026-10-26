@@ -151,6 +151,14 @@ function cleanExpenseDescription(rawText: string | null | undefined): string {
   if (/комиссия\s+банка|плата\s+за\s+обслуживание|за\s+входящий\s+перевод/i.test(t)) {
     return 'Комиссия банка';
   }
+  if (/фссп|исполнительн|\/\/взп\/\/|\/\/ип\d+/i.test(t)) {
+    return t
+      .replace(/\/\/ВЗП\/\/\s*/gi, 'ФССП · ')
+      .replace(/\/\/ИП[^\/]+\/\/\s*/gi, 'ФССП · ')
+      .replace(/удержание\s+из\s+заработной\s+платы/gi, 'Удержание из ЗП')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
   t = t.replace(/\s*р\/с\s*\d+/gi, '');
   t = t.replace(/\s*счет\s*№?\s*\d+/gi, '');
   t = t.replace(/\s*ИНН\s*\d+/gi, '');
@@ -169,6 +177,8 @@ function resolveExpenseCategory(title: string, rawCatName?: string | null): stri
     return rawCatName;
   }
   const s = (title || '').toLowerCase();
+  if (/фссп|исполнит|взп|судебн|пристав|удержан.*зарплат/i.test(s))
+    return 'ФССП / Исполнительные листы';
   if (/гсм|топлив|бензин|газ|азс|лукойл|газпром/i.test(s)) return 'ГСМ / Топливо';
   if (/комисси|плата\s*за|тариф|обслуживан/i.test(s)) return 'Комиссия банка';
   if (/перевод\s*собственн|между\s*счетами/i.test(s)) return 'Перевод между кошельками';
@@ -1485,11 +1495,37 @@ export function DailyControlPanel() {
   }
 
   // 1. Все расходы и перемещения из transactions
-  const rawExpenseTxs = (data?.transactions ?? []).filter(
+  const allExpenseTxs = (data?.transactions ?? []).filter(
     (t) =>
       (t.direction === 'expense' || (t.direction === 'transfer' && t.from_wallet_id)) &&
       txMatchesWallet(t),
   );
+
+  // Защита от задвоения: если в тот же день заведена сводная ручная операция ФССП,
+  // сумма которой покрывается двумя или более детальными банковскими операциями ФССП
+  const rawExpenseTxs = allExpenseTxs.filter((tx, _, arr) => {
+    const isFssp = /фссп|исполнит|взп|пристав|удержан.*зарплат/i.test(
+      `${tx.description || ''} ${tx.category?.name || ''}`,
+    );
+    if (!isFssp) return true;
+
+    const amt = parseFloat(tx.amount) || 0;
+    const otherFsspTxs = arr.filter(
+      (o) =>
+        o.id !== tx.id &&
+        /фссп|исполнит|взп|пристав|удержан.*зарплат/i.test(
+          `${o.description || ''} ${o.category?.name || ''}`,
+        ),
+    );
+    if (otherFsspTxs.length >= 2) {
+      const sumOthers = otherFsspTxs.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
+      if (Math.abs(sumOthers - amt) < 1) {
+        // Данная операция в точности равна сумме остальных детальных списаний ФССП -> это сводный дубликат!
+        return false;
+      }
+    }
+    return true;
+  });
 
   type BankCommItem = {
     id: string;

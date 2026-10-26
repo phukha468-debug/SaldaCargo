@@ -307,6 +307,34 @@ export async function GET(request: Request) {
     const morningFuel = sumArr(priorFuelIn ?? []) - sumArr(priorFuelOut ?? []);
 
     // 4. Compute day's movements per wallet
+    // Дедупликация: исключаем сводные дубликаты ручных операций (например общая запись ФССП,
+    // когда в тот же день уже есть детальные списания из банка, сумма которых точно совпадает)
+    const filteredDayTxs = ((dayTxs ?? []) as any[]).filter((tx, _, arr) => {
+      const isFssp = /фссп|исполнит|взп|пристав|удержан.*зарплат/i.test(
+        `${tx.description || ''} ${tx.category?.name || ''}`,
+      );
+      if (!isFssp) return true;
+
+      const amt = parseFloat(tx.amount ?? '0');
+      const otherFssp = arr.filter(
+        (o: any) =>
+          o.id !== tx.id &&
+          /фссп|исполнит|взп|пристав|удержан.*зарплат/i.test(
+            `${o.description || ''} ${o.category?.name || ''}`,
+          ),
+      );
+      if (otherFssp.length >= 2) {
+        const sumOthers = otherFssp.reduce(
+          (s: number, o: any) => s + parseFloat(o.amount ?? '0'),
+          0,
+        );
+        if (Math.abs(sumOthers - amt) < 1) {
+          return false;
+        }
+      }
+      return true;
+    });
+
     // From day trip orders
     let bankDayIn = (dayTripOrders ?? []).reduce(
       (s: number, o: any) => s + parseFloat(o.amount ?? '0'),
@@ -323,7 +351,7 @@ export async function GET(request: Request) {
     let fuelDayIn = 0;
     let fuelDayOut = 0;
 
-    for (const tx of (dayTxs ?? []) as any[]) {
+    for (const tx of filteredDayTxs) {
       const amt = parseFloat(tx.amount ?? '0');
       if (tx.direction === 'income') {
         if (tx.to_wallet_id === BANK_ID) bankDayIn += amt;
@@ -396,7 +424,7 @@ export async function GET(request: Request) {
     }
 
     // Привязанные движения по складу запчастей (Гараж)
-    const dayTxIds = (dayTxs ?? []).map((t: any) => t.id).filter(Boolean);
+    const dayTxIds = filteredDayTxs.map((t: any) => t.id).filter(Boolean);
     const movementsMap = new Map<string, any>();
     const movementsListMap = new Map<string, any[]>();
     if (dayTxIds.length > 0) {
@@ -468,7 +496,7 @@ export async function GET(request: Request) {
         },
       },
       audit: auditRow || null,
-      transactions: (dayTxs ?? []).map((t: any) => ({
+      transactions: filteredDayTxs.map((t: any) => ({
         ...t,
         warehouse_part: movementsMap.get(t.id) || null,
         warehouse_parts: movementsListMap.get(t.id) || [],

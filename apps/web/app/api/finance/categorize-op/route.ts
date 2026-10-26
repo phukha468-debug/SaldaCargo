@@ -10,6 +10,7 @@ const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const WALLET_TRANSFER_CAT = 'b9946a5e-4a33-4ed9-a272-5dee12d4ca93';
 const LOAN_REPAYMENT_CAT = '00000000-0000-0000-0000-000000000020';
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
+const FSSP_CATEGORY_ID = '460aa490-b39a-4a06-b8df-dd6aa94b443f';
 
 function getLocalFilePath(filename: string): string {
   const inAppsWeb = path.join(process.cwd(), 'apps', 'web', 'data', filename);
@@ -142,6 +143,15 @@ export async function POST(req: Request) {
       }
     }
 
+    // Автоопределение статьи ФССП, если статья не указана или "Прочий расход"
+    let resolvedCategoryId = category_id || null;
+    const isFsspPattern = /фссп|исполнит|взп|пристав|судебн|удержан.*зарплат/i.test(
+      description || '',
+    );
+    if (!resolvedCategoryId && isFsspPattern) {
+      resolvedCategoryId = FSSP_CATEGORY_ID;
+    }
+
     let savedTx: any = null;
 
     if (existingTx) {
@@ -150,7 +160,11 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       };
       if (description !== undefined) updateData.description = String(description).trim();
-      if (category_id !== undefined) updateData.category_id = category_id;
+      if (category_id !== undefined) {
+        updateData.category_id = category_id || (isFsspPattern ? FSSP_CATEGORY_ID : null);
+      } else if (isFsspPattern && !existingTx.category_id) {
+        updateData.category_id = FSSP_CATEGORY_ID;
+      }
       if (toWallet !== undefined) updateData.to_wallet_id = toWallet;
       if (fromWallet !== undefined) updateData.from_wallet_id = fromWallet;
       if (direction !== undefined) updateData.direction = direction;
@@ -168,11 +182,41 @@ export async function POST(req: Request) {
       }
       savedTx = updated;
     } else {
+      // Защита от ручного задвоения: если пользователь пытается создать общую операцию по ФССП,
+      // в то время как в базе на эту дату уже есть банковские списания ФССП
+      if (isFsspPattern && numAmount > 0) {
+        const txDay = txDate.slice(0, 10);
+        const { data: dayFsspTxs } = await (supabase.from('transactions') as any)
+          .select('id, amount, description')
+          .eq('lifecycle_status', 'approved')
+          .eq('settlement_status', 'completed')
+          .gte('created_at', `${txDay}T00:00:00`)
+          .lte('created_at', `${txDay}T23:59:59`);
+
+        if (Array.isArray(dayFsspTxs)) {
+          const fsspMatches = dayFsspTxs.filter((t: any) =>
+            /фссп|исполнит|взп|пристав|удержан.*зарплат/i.test(t.description || ''),
+          );
+          const totalExistingFssp = fsspMatches.reduce(
+            (s: number, t: any) => s + (parseFloat(t.amount) || 0),
+            0,
+          );
+          if (fsspMatches.length >= 2 && Math.abs(totalExistingFssp - numAmount) < 1) {
+            return NextResponse.json(
+              {
+                error: `Платежи ФССП на общую сумму ${numAmount.toLocaleString('ru-RU')} ₽ уже загружены из банка отдельными операциями (${fsspMatches.map((t: any) => `${t.amount} ₽`).join(' + ')}). Ручной дубликат отменен.`,
+              },
+              { status: 400 },
+            );
+          }
+        }
+      }
+
       // Создаем новую запись транзакции для банковской операции или ручного ввода
       const insertData: Record<string, any> = {
         direction,
         amount: numAmount > 0 ? numAmount : 0,
-        category_id: category_id || null,
+        category_id: resolvedCategoryId,
         from_wallet_id: fromWallet,
         to_wallet_id: toWallet,
         description: description
