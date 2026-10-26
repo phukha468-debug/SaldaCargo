@@ -4,33 +4,232 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isOilOrFilterWork } from '@saldacargo/shared';
 
+const PAYROLL_MECHANIC_CAT = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
+
+async function resolveAdminId(
+  request: Request,
+  cookieStore: any,
+  supabase: any,
+  bodyAdminId?: string,
+): Promise<string | null> {
+  const explicit =
+    bodyAdminId ||
+    cookieStore.get('salda_user_id')?.value ||
+    request.headers.get('x-salda-user-id') ||
+    null;
+  if (explicit) return explicit;
+
+  const { data: adminUser } = await (supabase.from('users') as any)
+    .select('id')
+    .filter('roles', 'cs', '{"admin"}')
+    .limit(1)
+    .maybeSingle();
+  return adminUser?.id ?? null;
+}
+
+/** GET /api/admin/service-orders/:id */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await (supabase.from('service_orders') as any)
+      .select(
+        `
+        id, order_number, machine_type, status, lifecycle_status, priority, payment_received,
+        problem_description, mechanic_note, admin_note, created_at, updated_at,
+        mechanic_pay, second_mechanic_pay, odometer_start, odometer_end,
+        asset_id, asset:assets(id, short_name, reg_number, odometer_current),
+        assigned_mechanic_id, mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+        second_mechanic_id, second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
+        client_vehicle_id, client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
+        client_name, client_phone,
+        works:service_order_works(
+          id, custom_work_name, work_description, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+          work_catalog:work_catalog(id, name, norm_minutes)
+        ),
+        parts:service_order_parts(
+          id, custom_part_name, quantity, unit_price, client_price, unit,
+          part:parts(id, name, unit)
+        )
+      `,
+      )
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
+  }
+}
+
 /** PATCH /api/admin/service-orders/:id */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
-  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const body = (await request.json()) as {
-    action:
+    action?:
       | 'approve'
       | 'return'
       | 'cancel'
       | 'edit_note'
+      | 'edit_order'
       | 'approve_extra_work'
       | 'reject_extra_work';
+    lifecycle_status?: string;
+    admin_id?: string;
     admin_note?: string;
+    mechanic_note?: string;
     adjusted_norm_minutes?: number;
+    mechanic_pay?: number | string;
     work_id?: string;
     mechanic_id?: string;
     second_mechanic_id?: string;
-    odometer_start?: number | string;
-    odometer_end?: number | string;
+    odometer_start?: number | string | null;
+    odometer_end?: number | string | null;
+    client_vehicle_model?: string;
+    client_vehicle_reg?: string;
+    works?: Array<{
+      id?: string;
+      name: string;
+      minutes: number | string;
+      price_client?: number | string;
+    }>;
+    parts?: Array<{
+      id?: string;
+      name: string;
+      quantity: number | string;
+      unit?: string;
+      client_price?: number | string;
+    }>;
   };
+
   const supabase = createAdminClient();
+  const adminId = await resolveAdminId(request, cookieStore, supabase, body.admin_id);
+  const action =
+    body.action ||
+    (body.lifecycle_status === 'approved'
+      ? 'approve'
+      : body.lifecycle_status === 'returned'
+        ? 'return'
+        : body.lifecycle_status === 'cancelled'
+          ? 'cancel'
+          : undefined);
+
+  // ── Редактирование заказ-наряда на ревью ──────────────────────────────
+  if (action === 'edit_order') {
+    const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
+      .select('id, machine_type, assigned_mechanic_id')
+      .eq('id', id)
+      .single();
+    if (ordErr || !ord) {
+      return NextResponse.json({ error: ordErr?.message ?? 'Наряд не найден' }, { status: 404 });
+    }
+
+    const { data: sto } = await (supabase.from('sto_settings') as any)
+      .select('hourly_rate, hourly_rate_own')
+      .limit(1)
+      .maybeSingle();
+    const hourlyRate =
+      ord.machine_type === 'client'
+        ? parseFloat(sto?.hourly_rate ?? '2000') || 2000
+        : parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
+
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (body.odometer_start !== undefined) {
+      updates.odometer_start =
+        body.odometer_start != null && String(body.odometer_start).trim() !== ''
+          ? Number(body.odometer_start)
+          : null;
+      updates.odometer_end = updates.odometer_start;
+    }
+    if (body.odometer_end !== undefined) {
+      updates.odometer_end =
+        body.odometer_end != null && String(body.odometer_end).trim() !== ''
+          ? Number(body.odometer_end)
+          : null;
+    }
+    if (body.client_vehicle_model !== undefined) {
+      updates.client_vehicle_model = body.client_vehicle_model.trim() || null;
+      updates.client_vehicle_brand = updates.client_vehicle_model;
+    }
+    if (body.client_vehicle_reg !== undefined) {
+      updates.client_vehicle_reg = body.client_vehicle_reg.trim().toUpperCase() || null;
+    }
+    if (body.admin_note !== undefined) {
+      updates.admin_note = body.admin_note.trim() || null;
+    }
+    if (body.mechanic_pay !== undefined) {
+      const mp = parseFloat(String(body.mechanic_pay));
+      updates.mechanic_pay = !isNaN(mp) && mp >= 0 ? mp.toFixed(2) : null;
+    }
+
+    if (Array.isArray(body.works)) {
+      const validWorks = body.works
+        .map((w) => ({
+          name: (w.name || '').trim(),
+          minutes: Math.max(1, Math.round(Number(w.minutes) || 0)),
+          price_client:
+            w.price_client != null && !isNaN(Number(w.price_client)) && Number(w.price_client) > 0
+              ? Number(w.price_client).toFixed(2)
+              : ((Math.max(1, Math.round(Number(w.minutes) || 0)) / 60) * hourlyRate).toFixed(2),
+        }))
+        .filter((w) => w.name.length > 0);
+
+      await (supabase.from('service_order_works') as any).delete().eq('service_order_id', id);
+      if (validWorks.length > 0) {
+        await (supabase.from('service_order_works') as any).insert(
+          validWorks.map((w) => ({
+            service_order_id: id,
+            custom_work_name: w.name,
+            norm_minutes: w.minutes,
+            actual_minutes: w.minutes,
+            price_client: w.price_client,
+            quantity: 1,
+            status: 'completed',
+            mechanic_id: ord.assigned_mechanic_id,
+          })),
+        );
+        updates.problem_description = validWorks.map((w) => w.name).join('; ');
+      }
+    }
+
+    if (Array.isArray(body.parts)) {
+      const validParts = body.parts
+        .map((p) => ({
+          name: (p.name || '').trim(),
+          quantity: Math.max(0.1, parseFloat(String(p.quantity ?? 1)) || 1),
+          unit: (p.unit || 'шт').trim() || 'шт',
+          client_price: (parseFloat(String(p.client_price ?? 0)) || 0).toFixed(2),
+        }))
+        .filter((p) => p.name.length > 0);
+
+      await (supabase.from('service_order_parts') as any).delete().eq('service_order_id', id);
+      if (validParts.length > 0) {
+        await (supabase.from('service_order_parts') as any).insert(
+          validParts.map((p) => ({
+            service_order_id: id,
+            custom_part_name: p.name,
+            quantity: p.quantity,
+            unit: p.unit,
+            unit_price: p.client_price,
+            client_price: p.client_price,
+            status: 'reserved',
+          })),
+        );
+      }
+    }
+
+    const { error: updErr } = await (supabase.from('service_orders') as any)
+      .update(updates)
+      .eq('id', id);
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, action: 'edited' });
+  }
 
   // ── Утверждение наряда + начисление ЗП ────────────────────────────────
-  if (body.action === 'approve') {
+  if (action === 'approve') {
     if (body.mechanic_id !== undefined || body.second_mechanic_id !== undefined) {
       await (supabase.from('service_orders') as any)
         .update({
@@ -43,16 +242,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .select(
         `
-        id, asset_id, client_vehicle_id, machine_type, odometer_start, odometer_end,
-        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, mechanic_salary_pct),
-        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, mechanic_salary_pct),
-        service_order_works(id, norm_minutes, actual_minutes, status, extra_work_status, custom_work_name, work_description, work_catalog:work_catalog(name))
+        id, order_number, asset_id, client_vehicle_id, machine_type, odometer_start, odometer_end,
+        lifecycle_status, mechanic_pay,
+        mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+        second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
+        service_order_works(id, norm_minutes, actual_minutes, price_client, quantity, status, extra_work_status, custom_work_name, work_description, work_catalog:work_catalog(name))
       `,
       )
       .eq('id', id)
       .single();
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
+    if (order.lifecycle_status === 'approved') {
+      return NextResponse.json({ ok: true, action: 'already_approved' });
+    }
 
     // Проверка обязательности одометра при замене масла/фильтров
     const hasOilWork = (order.service_order_works ?? []).some(
@@ -89,57 +292,91 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
     const totalNm =
       approvedNm ??
-      works.reduce((sum: number, w: any) => sum + (w.actual_minutes ?? w.norm_minutes), 0);
+      works.reduce(
+        (sum: number, w: any) =>
+          sum +
+          Number(w.actual_minutes ?? w.norm_minutes ?? 0) * Math.max(1, Number(w.quantity ?? 1)),
+        0,
+      );
 
-    const [{ data: settings }, { data: payrollCat }] = await Promise.all([
+    const [{ data: settings }, { data: existingPayrollTx }] = await Promise.all([
       (supabase.from('sto_settings') as any)
         .select('hourly_rate, hourly_rate_own')
         .limit(1)
-        .single(),
-      (supabase.from('transaction_categories') as any)
+        .maybeSingle(),
+      (supabase.from('transactions') as any)
         .select('id')
-        .eq('code', 'PAYROLL_MECHANIC')
-        .single(),
+        .eq('service_order_id', id)
+        .eq('category_id', PAYROLL_MECHANIC_CAT)
+        .neq('lifecycle_status', 'cancelled')
+        .limit(1)
+        .maybeSingle(),
     ]);
+
     const hourlyRate =
       order.machine_type === 'client'
-        ? parseFloat(settings?.hourly_rate ?? '2000')
-        : parseFloat(settings?.hourly_rate_own ?? '1600');
-    const payrollCategoryId = payrollCat?.id;
+        ? parseFloat(settings?.hourly_rate ?? '2000') || 2000
+        : parseFloat(settings?.hourly_rate_own ?? '1600') || 1600;
 
     const accruals: string[] = [];
     const mechanics = [order.mechanic, order.second_mechanic].filter(Boolean);
     const totalNmHours = totalNm / 60;
     const nmPerMechanic = mechanics.length === 2 ? totalNmHours / 2 : totalNmHours;
 
-    for (const mech of mechanics) {
-      if (!mech?.id) continue;
-      const pct = parseFloat(mech.mechanic_salary_pct ?? '50') / 100;
-      const salary = (nmPerMechanic * hourlyRate * pct).toFixed(2);
-      accruals.push(`${mech.id}: ${salary} ₽`);
+    const manualOverridePay =
+      body.mechanic_pay != null &&
+      !isNaN(Number(body.mechanic_pay)) &&
+      Number(body.mechanic_pay) > 0
+        ? Number(body.mechanic_pay)
+        : null;
 
-      await (supabase.from('transactions') as any).insert({
-        direction: 'expense',
-        category_id: payrollCategoryId,
-        amount: salary,
-        service_order_id: id,
-        related_user_id: mech.id,
-        lifecycle_status: 'approved',
-        settlement_status: 'pending',
-        from_wallet_id: null,
-        employee_confirmed: false,
-        description: `ЗП механика: наряд #${id.slice(0, 6)}`,
-        created_by: adminId,
-        idempotency_key: crypto.randomUUID(),
-      });
+    let primaryMechanicPay: string | null = null;
+
+    if (!existingPayrollTx) {
+      for (let idx = 0; idx < mechanics.length; idx++) {
+        const mech = mechanics[idx];
+        if (!mech?.id) continue;
+        const pct = (parseFloat(mech.mechanic_salary_pct ?? '50') || 50) / 100;
+        const calcSalary =
+          manualOverridePay != null && mechanics.length === 1
+            ? manualOverridePay
+            : nmPerMechanic * hourlyRate * pct;
+        const salary = calcSalary.toFixed(2);
+        if (idx === 0) primaryMechanicPay = salary;
+        accruals.push(`${mech.name || mech.id}: ${salary} ₽`);
+
+        if (calcSalary > 0) {
+          await (supabase.from('transactions') as any).insert({
+            direction: 'expense',
+            category_id: PAYROLL_MECHANIC_CAT,
+            amount: salary,
+            service_order_id: id,
+            related_user_id: mech.id,
+            lifecycle_status: 'approved',
+            settlement_status: 'pending',
+            from_wallet_id: null,
+            employee_confirmed: false,
+            description:
+              `ЗП механика ${mech.name || ''}: наряд #${order.order_number || id.slice(0, 6)}`.trim(),
+            created_by: adminId,
+            idempotency_key: crypto.randomUUID(),
+          });
+        }
+      }
     }
 
     const updatePayload: Record<string, unknown> = {
+      status: 'completed',
       lifecycle_status: 'approved',
+      payment_received: order.machine_type === 'own',
       approved_by: adminId,
       approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       admin_note: body.admin_note ?? null,
     };
+    if (primaryMechanicPay) {
+      updatePayload.mechanic_pay = primaryMechanicPay;
+    }
     if (body.odometer_start != null && !isNaN(Number(body.odometer_start))) {
       updatePayload.odometer_start = Number(body.odometer_start);
     }
@@ -147,9 +384,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       updatePayload.odometer_end = Number(body.odometer_end);
     }
 
-    const { error } = await (supabase.from('service_orders') as any)
-      .update(updatePayload)
-      .eq('id', id);
+    const [{ error }] = await Promise.all([
+      (supabase.from('service_orders') as any).update(updatePayload).eq('id', id),
+      (supabase.from('service_order_works') as any)
+        .update({ status: 'completed', salary_paid: true })
+        .eq('service_order_id', id)
+        .neq('status', 'cancelled'),
+    ]);
 
     // Обновляем одометр в карточке авто
     if (finalOdo && finalOdo > 0) {
@@ -205,11 +446,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // ── Возврат на доработку ───────────────────────────────────────────────
-  if (body.action === 'return') {
-    // Удаляем все финансовые транзакции наряда (ЗП, выручка) — при повторном апруве создадутся заново
+  if (action === 'return') {
     await (supabase.from('transactions') as any).delete().eq('service_order_id', id);
-
-    // Сбрасываем флаг salary_paid на работах — иначе при повторном апруве они не попадут в расчёт
     await (supabase.from('service_order_works') as any)
       .update({ salary_paid: false })
       .eq('service_order_id', id);
@@ -219,6 +457,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         lifecycle_status: 'returned',
         status: 'in_progress',
         admin_note: body.admin_note ?? null,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -226,16 +465,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // ── Отмена ────────────────────────────────────────────────────────────
-  if (body.action === 'cancel') {
+  if (action === 'cancel') {
+    await (supabase.from('transactions') as any).delete().eq('service_order_id', id);
     const { error } = await (supabase.from('service_orders') as any)
-      .update({ lifecycle_status: 'cancelled', status: 'cancelled' })
+      .update({
+        lifecycle_status: 'cancelled',
+        status: 'cancelled',
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: 'cancelled' });
   }
 
   // ── Заметка администратора ────────────────────────────────────────────
-  if (body.action === 'edit_note') {
+  if (action === 'edit_note') {
     const { error } = await (supabase.from('service_orders') as any)
       .update({ admin_note: body.admin_note?.trim() ?? null })
       .eq('id', id);
@@ -244,7 +488,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // ── Одобрить доп. работу механика ────────────────────────────────────
-  if (body.action === 'approve_extra_work') {
+  if (action === 'approve_extra_work') {
     if (!body.work_id) return NextResponse.json({ error: 'work_id required' }, { status: 400 });
     const { error } = await (supabase.from('service_order_works') as any)
       .update({
@@ -259,7 +503,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // ── Отклонить доп. работу механика ───────────────────────────────────
-  if (body.action === 'reject_extra_work') {
+  if (action === 'reject_extra_work') {
     if (!body.work_id) return NextResponse.json({ error: 'work_id required' }, { status: 400 });
     const { error } = await (supabase.from('service_order_works') as any)
       .update({
@@ -275,4 +519,37 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+}
+
+/** DELETE /api/admin/service-orders/:id */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  try {
+    const supabase = createAdminClient();
+    const { data: workIds } = await (supabase.from('service_order_works') as any)
+      .select('id')
+      .eq('service_order_id', id);
+    if (workIds?.length) {
+      await (supabase.from('work_time_logs') as any).delete().in(
+        'service_order_work_id',
+        workIds.map((w: any) => w.id),
+      );
+    }
+
+    await Promise.all([
+      (supabase.from('service_order_parts') as any).delete().eq('service_order_id', id),
+      (supabase.from('service_order_works') as any).delete().eq('service_order_id', id),
+      (supabase.from('transactions') as any).delete().eq('service_order_id', id),
+      (supabase.from('purchase_requests') as any).delete().eq('service_order_id', id),
+      (supabase.from('repair_requests') as any)
+        .update({ service_order_id: null })
+        .eq('service_order_id', id),
+    ]);
+
+    const { error } = await (supabase.from('service_orders') as any).delete().eq('id', id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Ошибка удаления' }, { status: 500 });
+  }
 }

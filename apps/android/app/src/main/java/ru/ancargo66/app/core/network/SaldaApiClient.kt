@@ -539,4 +539,317 @@ object SaldaApiClient {
         }
         result
     }
+
+    // ── Модуль зарплат и штата ───────────────────────────────────────────────
+
+    suspend fun getAdminPayroll(year: Int, month: Int, adminId: String? = null): List<PayrollEmployee> = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/admin/payroll?year=$year&month=$month", userId = adminId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext emptyList()
+            val body = response.body?.string() ?: "[]"
+            try {
+                json.decodeFromString<List<PayrollEmployee>>(body)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun getStaffSettleDetails(userId: String, year: Int? = null, month: Int? = null, adminId: String? = null): StaffSettleDetails? = withContext(Dispatchers.IO) {
+        val path = if (year != null && month != null) {
+            "/api/admin/staff-settle?user_id=$userId&year=$year&month=$month"
+        } else {
+            "/api/admin/staff-settle?user_id=$userId"
+        }
+        val request = buildRequest(path, userId = adminId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext null
+            val body = response.body?.string() ?: "{}"
+            try {
+                json.decodeFromString<StaffSettleDetails>(body)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    suspend fun settleStaffPayroll(
+        userId: String,
+        amount: Double,
+        fromWalletId: String,
+        offsetAmount: Double = 0.0,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("user_id", userId)
+            put("partial_amount", amount.toString())
+            put("from_wallet_id", fromWalletId)
+            put("partial_offset", offsetAmount.toString())
+            put("idempotency_key", UUID.randomUUID().toString())
+        }.toString()
+        val request = buildRequest("/api/admin/staff-settle", method = "POST", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { response ->
+            response.isSuccessful
+        }
+    }
+
+    suspend fun confirmStaffUnconfirmed(userId: String, adminId: String? = null): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("action", "confirm_unconfirmed")
+            put("user_id", userId)
+        }.toString()
+        val request = buildRequest("/api/admin/staff-settle", method = "POST", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { response ->
+            response.isSuccessful
+        }
+    }
+
+    // ── Модуль механика (СТО / Гараж) ────────────────────────────────────────
+
+    suspend fun getMechanicOrders(mechanicId: String): List<MechanicOrder> = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/mechanic/orders?mechanic_id=$mechanicId", userId = mechanicId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext emptyList()
+            val body = response.body?.string() ?: "[]"
+            try {
+                json.decodeFromString<List<MechanicOrder>>(body)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun getMechanicOrderDetail(orderId: String, mechanicId: String): MechanicOrder? = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/mechanic/orders/$orderId", userId = mechanicId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext null
+            val body = response.body?.string() ?: "{}"
+            try {
+                json.decodeFromString<MechanicOrder>(body)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    suspend fun getMechanicSalary(mechanicId: String, year: Int, month: Int): MechanicSalaryData = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/mechanic/salary?mechanic_id=$mechanicId&year=$year&month=$month", userId = mechanicId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext MechanicSalaryData()
+            val body = response.body?.string() ?: "{}"
+            try {
+                json.decodeFromString<MechanicSalaryData>(body)
+            } catch (_: Exception) {
+                MechanicSalaryData()
+            }
+        }
+    }
+
+    suspend fun createMechanicOrder(
+        mechanicId: String,
+        orderDate: String,
+        machineType: String,
+        assetId: String? = null,
+        clientVehicleModel: String? = null,
+        clientVehicleReg: String? = null,
+        odometer: Long? = null,
+        works: List<MechanicWorkDraftInput>,
+        partsProvidedByService: Boolean,
+        parts: List<MechanicPartDraftInput>,
+        mechanicNote: String? = null,
+        submitImmediately: Boolean = true
+    ): Result<MechanicOrder> = withContext(Dispatchers.IO) {
+        val worksArray = kotlinx.serialization.json.buildJsonArray {
+            works.forEach { w ->
+                add(buildJsonObject {
+                    put("name", w.name)
+                    put("minutes", w.minutes)
+                })
+            }
+        }
+        val partsArray = kotlinx.serialization.json.buildJsonArray {
+            parts.forEach { p ->
+                add(buildJsonObject {
+                    put("name", p.name)
+                    put("quantity", p.quantity)
+                    put("unit", p.unit)
+                })
+            }
+        }
+        val body = buildJsonObject {
+            put("mechanic_id", mechanicId)
+            put("order_date", orderDate)
+            put("machine_type", machineType)
+            if (!assetId.isNullOrBlank()) put("asset_id", assetId)
+            if (!clientVehicleModel.isNullOrBlank()) {
+                put("client_vehicle_model", clientVehicleModel)
+                put("client_vehicle_brand", clientVehicleModel)
+            }
+            if (!clientVehicleReg.isNullOrBlank()) put("client_vehicle_reg", clientVehicleReg)
+            if (odometer != null && odometer > 0L) put("odometer", odometer)
+            put("works", worksArray)
+            put("parts_provided_by_service", partsProvidedByService)
+            put("parts", partsArray)
+            if (!mechanicNote.isNullOrBlank()) put("mechanic_note", mechanicNote)
+            put("submit_immediately", submitImmediately)
+        }.toString()
+
+        val request = buildRequest("/api/mechanic/orders", method = "POST", bodyJson = body, userId = mechanicId)
+        try {
+            client.newCall(request).execute().use { response ->
+                val resBody = response.body?.string() ?: "{}"
+                if (response.isSuccessful) {
+                    Result.success(json.decodeFromString<MechanicOrder>(resBody))
+                } else {
+                    val errMsg = try {
+                        val el = json.parseToJsonElement(resBody) as? JsonObject
+                        (el?.get("error") as? JsonPrimitive)?.content ?: "Ошибка сохранения наряда"
+                    } catch (_: Exception) {
+                        "Ошибка сохранения наряда (${response.code})"
+                    }
+                    Result.failure(IOException(errMsg))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addMechanicOrderWork(
+        orderId: String,
+        name: String,
+        minutes: Int,
+        mechanicId: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("mechanic_id", mechanicId)
+            put("custom_work_name", name)
+            put("minutes", minutes)
+            put("norm_minutes", minutes)
+            put("actual_minutes", minutes)
+            put("completed", true)
+        }.toString()
+        val request = buildRequest("/api/mechanic/orders/$orderId/works", method = "POST", bodyJson = body, userId = mechanicId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun deleteMechanicOrderWork(
+        orderId: String,
+        workId: String,
+        mechanicId: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/mechanic/orders/$orderId/works?work_id=$workId", method = "DELETE", userId = mechanicId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun addMechanicOrderPart(
+        orderId: String,
+        name: String,
+        quantity: Double,
+        unit: String = "шт",
+        mechanicId: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("mechanic_id", mechanicId)
+            put("custom_part_name", name)
+            put("quantity", quantity)
+            put("unit", unit)
+        }.toString()
+        val request = buildRequest("/api/mechanic/orders/$orderId/parts", method = "POST", bodyJson = body, userId = mechanicId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun deleteMechanicOrderPart(
+        orderId: String,
+        partItemId: String,
+        mechanicId: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/mechanic/orders/$orderId/parts?part_item_id=$partItemId", method = "DELETE", userId = mechanicId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun updateMechanicOrder(
+        orderId: String,
+        status: String? = null,
+        odometerEnd: Long? = null,
+        partsProvidedByService: Boolean? = null,
+        mechanicId: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            if (status != null) put("status", status)
+            if (odometerEnd != null && odometerEnd > 0L) put("odometer_end", odometerEnd)
+            if (partsProvidedByService != null) put("parts_provided_by_service", partsProvidedByService)
+        }.toString()
+        val request = buildRequest("/api/mechanic/orders/$orderId", method = "PATCH", bodyJson = body, userId = mechanicId)
+        try {
+            client.newCall(request).execute().use { response ->
+                val resBody = response.body?.string() ?: "{}"
+                if (response.isSuccessful) {
+                    Result.success(true)
+                } else {
+                    val errMsg = try {
+                        val el = json.parseToJsonElement(resBody) as? JsonObject
+                        (el?.get("error") as? JsonPrimitive)?.content ?: "Ошибка обновления"
+                    } catch (_: Exception) {
+                        "Ошибка обновления (${response.code})"
+                    }
+                    Result.failure(IOException(errMsg))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ── Ревью заказ-нарядов Гаража (для руководителя/диспетчера) ─────────────
+
+    suspend fun getAdminServiceOrders(
+        filter: String = "review",
+        adminId: String? = null
+    ): List<MechanicOrder> = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/admin/service-orders?filter=$filter", userId = adminId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext emptyList()
+            val body = response.body?.string() ?: "[]"
+            try {
+                json.decodeFromString<List<MechanicOrder>>(body)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun approveAdminServiceOrder(
+        orderId: String,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("action", "approve")
+            if (!adminId.isNullOrBlank()) put("admin_id", adminId)
+        }.toString()
+        val request = buildRequest("/api/admin/service-orders/$orderId", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun returnAdminServiceOrder(
+        orderId: String,
+        adminId: String? = null,
+        note: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("action", "return")
+            if (!adminId.isNullOrBlank()) put("admin_id", adminId)
+            if (!note.isNullOrBlank()) put("admin_note", note)
+        }.toString()
+        val request = buildRequest("/api/admin/service-orders/$orderId", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun deleteAdminServiceOrder(
+        orderId: String,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/admin/service-orders/$orderId", method = "DELETE", userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
 }

@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const supabase = createAdminClient();
 
-  const [tripsRes, reviewRes, todayRes] = await Promise.all([
+  const [tripsRes, reviewRes, garageReviewRes, todayRes] = await Promise.all([
     // Активные рейсы прямо сейчас (без отменённых)
     supabase
       .from('trips')
@@ -16,6 +16,12 @@ export async function GET() {
     // Рейсы ожидающие ревью (завершены, но ещё draft)
     supabase
       .from('trips')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'completed')
+      .eq('lifecycle_status', 'draft') as any,
+    // Заказ-наряды ожидающие ревью (завершены механиком, но ещё draft)
+    supabase
+      .from('service_orders')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'completed')
       .eq('lifecycle_status', 'draft') as any,
@@ -32,9 +38,14 @@ export async function GET() {
     0,
   );
 
+  const pendingTrips = reviewRes.count ?? 0;
+  const pendingGarage = garageReviewRes.count ?? 0;
+
   return NextResponse.json({
     activeTrips: tripsRes.count ?? 0,
-    pendingReview: reviewRes.count ?? 0,
+    pendingReview: pendingTrips,
+    pendingGarageReview: pendingGarage,
+    totalPendingReview: pendingTrips + pendingGarage,
     todayRevenue: todayRevenue.toFixed(2),
   });
 }

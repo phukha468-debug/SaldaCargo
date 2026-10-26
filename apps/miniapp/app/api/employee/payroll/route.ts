@@ -15,9 +15,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 /** GET /api/employee/payroll — ожидающие подтверждения + накопленная сумма */
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value;
+  const userId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();
@@ -111,7 +111,7 @@ export async function GET() {
 /** PATCH /api/employee/payroll — подтвердить или отклонить начисление */
 export async function PATCH(request: Request) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value;
+  const userId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

@@ -6,7 +6,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; workId: string }> },
 ) {
-  const { workId } = await params;
+  const { id: orderId, workId } = await params;
   const { actual_minutes } = await request.json();
 
   if (typeof actual_minutes !== 'number') {
@@ -15,11 +15,33 @@ export async function POST(
 
   try {
     const supabase = createAdminClient();
+
+    const [{ data: order }, { data: sto }] = await Promise.all([
+      (supabase.from('service_orders') as any)
+        .select('id, machine_type')
+        .eq('id', orderId)
+        .maybeSingle(),
+      (supabase.from('sto_settings') as any)
+        .select('hourly_rate, hourly_rate_own')
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const isOwn = order?.machine_type === 'own';
+    const rateClient = parseFloat(sto?.hourly_rate ?? '2000') || 2000;
+    const rateOwn = parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
+    const hourlyRate = isOwn ? rateOwn : rateClient;
+
+    const updatePayload: Record<string, unknown> = {
+      status: 'completed',
+      actual_minutes,
+    };
+    if (actual_minutes > 0) {
+      updatePayload.price_client = ((actual_minutes / 60) * hourlyRate).toFixed(2);
+    }
+
     const { data, error } = await (supabase.from('service_order_works') as any)
-      .update({
-        status: 'completed',
-        actual_minutes,
-      })
+      .update(updatePayload)
       .eq('id', workId)
       .select()
       .single();
@@ -27,15 +49,6 @@ export async function POST(
     if (error) {
       throw new Error(error.message);
     }
-
-    // Auto-stop any running time logs just in case (cleanup)
-    await (supabase.from('service_order_work_time_logs') as any)
-      .update({
-        status: 'completed',
-        stopped_at: new Date().toISOString(),
-      })
-      .eq('work_id', workId)
-      .eq('status', 'running');
 
     return NextResponse.json(data);
   } catch (error) {

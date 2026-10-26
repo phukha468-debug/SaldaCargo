@@ -238,10 +238,14 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Сигнальный баннер: Рейсы на проверке (если есть) */}
-      {(summary?.pendingReview ?? 0) > 0 && (
+      {/* Сигнальный баннер: Ревью (Авто + Гараж) */}
+      {((summary?.pendingReview ?? 0) > 0 || (summary?.pendingGarageReview ?? 0) > 0) && (
         <Link
-          href="/admin/trips?filter=review"
+          href={
+            (summary?.pendingReview ?? 0) === 0 && (summary?.pendingGarageReview ?? 0) > 0
+              ? '/admin/trips?filter=review&section=garage'
+              : '/admin/trips?filter=review&section=auto'
+          }
           className="block bg-orange-50 border-2 border-orange-200 rounded-2xl p-3.5 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center justify-between">
@@ -249,13 +253,16 @@ export default function AdminDashboard() {
               <span className="text-2xl">📋</span>
               <div>
                 <p className="font-black text-orange-950 text-sm uppercase tracking-tight">
-                  {summary.pendingReview} рейс{summary.pendingReview > 1 ? 'а' : ''} ждут ревью
+                  Ждут ревью: Авто ({summary?.pendingReview ?? 0}) · Гараж (
+                  {summary?.pendingGarageReview ?? 0})
                 </p>
-                <p className="text-orange-600 text-[11px] font-bold">Нажмите для проверки →</p>
+                <p className="text-orange-600 text-[11px] font-bold">
+                  Нажмите для проверки водителей и механиков →
+                </p>
               </div>
             </div>
             <span className="bg-orange-600 text-white text-xs font-black px-2.5 py-1 rounded-xl">
-              {summary.pendingReview}
+              {(summary?.pendingReview ?? 0) + (summary?.pendingGarageReview ?? 0)}
             </span>
           </div>
         </Link>

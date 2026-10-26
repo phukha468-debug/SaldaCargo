@@ -2,7 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { cn } from '@saldacargo/ui';
+import Link from 'next/link';
+import { Money, cn } from '@saldacargo/ui';
+import { formatDate } from '@saldacargo/shared';
 
 interface Accrual {
   id: string;
@@ -11,11 +13,32 @@ interface Accrual {
   lifecycle_status: string;
   description: string;
   created_at: string;
+  transaction_date?: string;
   service_order?: {
     id: string;
     order_number: number;
+    machine_type?: 'own' | 'client';
+    client_vehicle_brand?: string;
+    client_vehicle_model?: string;
+    client_vehicle_reg?: string;
     asset?: { short_name: string; reg_number: string };
+    service_order_works?: Array<{
+      norm_minutes: number;
+      actual_minutes: number;
+      status: string;
+      custom_work_name?: string;
+      work_catalog?: { name: string };
+    }>;
   };
+}
+
+interface PayoutItem {
+  id: string;
+  amount: string;
+  description: string;
+  wallet_label: string;
+  is_advance: boolean;
+  date: string;
 }
 
 interface PendingItem {
@@ -26,12 +49,19 @@ interface PendingItem {
 
 interface SalaryData {
   accruals: Accrual[];
+  payouts: PayoutItem[];
   pending_confirmation: PendingItem[];
   pending_confirmation_count: number;
+  rates?: {
+    hourly_rate_client: number;
+    hourly_rate_own: number;
+    mechanic_salary_pct: number;
+  };
   summary: {
     total_accrued: string;
     total_paid: string;
     to_pay: string;
+    draft_pay?: string;
   };
 }
 
@@ -54,6 +84,7 @@ export default function MechanicSalaryPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [activeTab, setActiveTab] = useState<'accruals' | 'payouts'>('accruals');
   const [rejecting, setRejecting] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -68,7 +99,6 @@ export default function MechanicSalaryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
-      queryClient.invalidateQueries({ queryKey: ['mechanic-salary-preview'] });
       setRejecting(null);
     },
   });
@@ -98,30 +128,35 @@ export default function MechanicSalaryPage() {
   };
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  const payouts = data?.payouts ?? [];
+  const accruals = data?.accruals ?? [];
+  const draftPay = parseFloat(data?.summary?.draft_pay ?? '0');
 
   return (
-    <div className="min-h-full bg-slate-50 pb-8">
-      {/* Заголовок + переключатель месяца */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-40">
+    <div className="min-h-full bg-[#F2F4F7] pb-8 max-w-lg mx-auto">
+      {/* Переключатель месяца в стиле Сбербанк */}
+      <div className="bg-white border-b border-slate-200/80 px-4 py-3.5 sticky top-0 z-40">
         <div className="flex items-center justify-between">
           <button
             onClick={prevMonth}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 active:scale-90 transition-transform font-black"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#F2F4F7] text-slate-700 active:scale-90 transition-transform font-black"
           >
             ‹
           </button>
           <div className="text-center">
-            <p className="text-sm font-black text-slate-900 uppercase tracking-widest">
+            <p className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
               {MONTHS[month - 1]} {year}
             </p>
             {isCurrentMonth && (
-              <p className="text-[10px] font-bold text-orange-600 uppercase">Текущий месяц</p>
+              <p className="text-[10px] font-bold text-[#21A038] uppercase">
+                Текущий расчётный период
+              </p>
             )}
           </div>
           <button
             onClick={nextMonth}
             disabled={isCurrentMonth}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 active:scale-90 transition-transform font-black disabled:opacity-30"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#F2F4F7] text-slate-700 active:scale-90 transition-transform font-black disabled:opacity-30"
           >
             ›
           </button>
@@ -131,20 +166,61 @@ export default function MechanicSalaryPage() {
       {isLoading ? (
         <div className="p-4 space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-slate-200 rounded-xl animate-pulse" />
+            <div key={i} className="h-20 bg-white rounded-2xl animate-pulse" />
           ))}
         </div>
       ) : (
-        <>
-          {/* Подтверждение ЗП */}
-          {(data?.pending_confirmation ?? []).length > 0 && (
-            <div className="mx-4 mt-4 bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden">
-              <div className="bg-amber-400 px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest">
-                    ⏳ Ожидает подтверждения
+        <div className="p-4 space-y-4">
+          {/* 1. Главная банковская сводка */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-500">К выплате на руки сейчас</p>
+                <p className="text-3xl font-black text-[#21A038] tracking-tight mt-0.5">
+                  <Money amount={data?.summary.to_pay ?? '0'} />
+                </p>
+                {draftPay > 0 && (
+                  <p className="text-xs font-extrabold text-[#0E7C5B] bg-[#E8F7EC] inline-block px-2.5 py-0.5 rounded-lg mt-1.5">
+                    ⏳ +<Money amount={String(draftPay)} /> на проверке в гараже
                   </p>
-                  <p className="text-[10px] text-amber-800 font-bold mt-0.5">
+                )}
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] font-extrabold text-slate-500 bg-[#F2F4F7] px-2.5 py-1 rounded-lg">
+                  Доля ЗП: {data?.rates?.mechanic_salary_pct ?? 50}%
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-slate-100">
+              <div className="bg-[#F2F4F7] rounded-2xl p-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase">
+                  Начислено ({MONTHS[month - 1]})
+                </p>
+                <p className="text-base font-extrabold text-slate-900 mt-0.5">
+                  <Money amount={data?.summary.total_accrued ?? '0'} />
+                </p>
+              </div>
+              <div className="bg-[#F2F4F7] rounded-2xl p-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase">
+                  Оплачено ({MONTHS[month - 1]})
+                </p>
+                <p className="text-base font-extrabold text-[#21A038] mt-0.5">
+                  <Money amount={data?.summary.total_paid ?? '0'} />
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Ожидает подтверждения механика */}
+          {(data?.pending_confirmation ?? []).length > 0 && (
+            <div className="bg-white border-2 border-amber-300 rounded-3xl overflow-hidden shadow-2xs">
+              <div className="bg-amber-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold text-amber-900">
+                    ⏳ Ожидает вашего подтверждения
+                  </p>
+                  <p className="text-[11px] text-amber-700 font-semibold">
                     {data!.pending_confirmation.length} начислений
                   </p>
                 </div>
@@ -152,24 +228,26 @@ export default function MechanicSalaryPage() {
                   <button
                     onClick={() => confirmMutation.mutate({ action: 'confirm' })}
                     disabled={confirmMutation.isPending}
-                    className="bg-amber-900 text-white text-[10px] font-black px-3 py-2 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                    className="bg-[#21A038] text-white text-xs font-extrabold px-3 py-1.5 rounded-xl active:scale-95 transition-all disabled:opacity-50"
                   >
                     Подтвердить всё
                   </button>
                 )}
               </div>
-              <div className="divide-y divide-amber-200">
+              <div className="divide-y divide-slate-100">
                 {data!.pending_confirmation.map((item) => (
                   <div key={item.id} className="p-4">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex-1">
-                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">
-                          ЗП механика
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">
+                          Зарплата за закрытый наряд
                         </p>
-                        <p className="text-xs text-amber-900 font-bold mt-0.5">{item.context}</p>
+                        <p className="text-xs text-slate-900 font-extrabold mt-0.5">
+                          {item.context}
+                        </p>
                       </div>
-                      <p className="text-xl font-black text-amber-900 shrink-0">
-                        +{formatMoney(item.amount)}
+                      <p className="text-lg font-black text-[#21A038] shrink-0">
+                        +<Money amount={item.amount} />
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -178,16 +256,16 @@ export default function MechanicSalaryPage() {
                           confirmMutation.mutate({ action: 'confirm', ids: [item.id] })
                         }
                         disabled={confirmMutation.isPending}
-                        className="flex-1 bg-green-600 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                        className="flex-1 bg-[#21A038] text-white font-extrabold text-xs py-2.5 rounded-xl active:scale-95 transition-all disabled:opacity-50"
                       >
                         ✓ Подтвердить
                       </button>
                       <button
                         onClick={() => setRejecting(item.id)}
                         disabled={confirmMutation.isPending}
-                        className="px-4 border-2 border-amber-400 text-amber-800 font-black text-xs py-2.5 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
+                        className="px-4 border border-slate-200 bg-[#F2F4F7] text-slate-700 font-extrabold text-xs py-2.5 rounded-xl active:scale-95 transition-all disabled:opacity-50"
                       >
-                        ✗ Не согласен
+                        Не согласен
                       </button>
                     </div>
                   </div>
@@ -196,120 +274,126 @@ export default function MechanicSalaryPage() {
             </div>
           )}
 
-          {/* Диалог отклонения */}
-          {rejecting && (
-            <div
-              className="fixed inset-0 z-50 flex items-end justify-center"
-              style={{ background: 'rgba(0,0,0,0.5)' }}
-              onClick={(e) => e.target === e.currentTarget && setRejecting(null)}
+          {/* 3. Переключатель вкладок: Начисления за наряды / История выплат */}
+          <div className="grid grid-cols-2 bg-white border border-slate-200/80 p-1 rounded-2xl gap-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('accruals')}
+              className={cn(
+                'py-2.5 text-xs font-extrabold rounded-xl transition-all',
+                activeTab === 'accruals' ? 'bg-[#21A038] text-white shadow-2xs' : 'text-slate-500',
+              )}
             >
-              <div className="bg-white rounded-t-3xl w-full p-6 space-y-4">
-                <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
-                <p className="font-black text-slate-900 text-base">Не согласны с суммой?</p>
-                <p className="text-sm text-slate-600">
-                  Начисление будет отклонено. Администратор увидит уведомление и скорректирует
-                  сумму.
-                </p>
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                  Наряд остаётся утверждённым — только ЗП вернётся на пересмотр.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setRejecting(null)}
-                    className="flex-1 border-2 border-slate-200 text-slate-600 font-black py-3 rounded-xl text-sm uppercase active:scale-95 transition-all"
-                  >
-                    Вернуться
-                  </button>
-                  <button
-                    onClick={() => confirmMutation.mutate({ action: 'reject', id: rejecting })}
-                    disabled={confirmMutation.isPending}
-                    className="flex-1 bg-red-500 text-white font-black py-3 rounded-xl text-sm uppercase active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    {confirmMutation.isPending ? '...' : 'Отклонить'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+              За закрытые наряды ({accruals.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('payouts')}
+              className={cn(
+                'py-2.5 text-xs font-extrabold rounded-xl transition-all',
+                activeTab === 'payouts' ? 'bg-[#21A038] text-white shadow-2xs' : 'text-slate-500',
+              )}
+            >
+              История выплат ({payouts.length})
+            </button>
+          </div>
 
-          {/* Сводка */}
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white rounded-2xl p-3 border border-slate-200 text-center">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  Начислено
+          {/* 4. Содержимое вкладки */}
+          {activeTab === 'accruals' ? (
+            accruals.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-200/80 p-8 text-center space-y-2">
+                <p className="text-3xl">📋</p>
+                <p className="text-sm font-extrabold text-slate-800">
+                  Начислений за {(MONTHS[month - 1] ?? '').toLowerCase()} нет
                 </p>
-                <p className="text-lg font-black text-slate-900 mt-1">
-                  {formatMoney(data?.summary.total_accrued ?? '0')}
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-3 border border-slate-200 text-center">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  Выплачено
-                </p>
-                <p className="text-lg font-black text-green-600 mt-1">
-                  {formatMoney(data?.summary.total_paid ?? '0')}
-                </p>
-              </div>
-              <div
-                className={cn(
-                  'rounded-2xl p-3 border text-center',
-                  parseFloat(data?.summary.to_pay ?? '0') > 0
-                    ? 'bg-orange-50 border-orange-200'
-                    : 'bg-white border-slate-200',
-                )}
-              >
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  К выплате
-                </p>
-                <p
-                  className={cn(
-                    'text-lg font-black mt-1',
-                    parseFloat(data?.summary.to_pay ?? '0') > 0
-                      ? 'text-orange-600'
-                      : 'text-slate-400',
-                  )}
-                >
-                  {formatMoney(data?.summary.to_pay ?? '0')}
-                </p>
-              </div>
-            </div>
-
-            {/* Список начислений */}
-            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
-              Начисления ({(data?.accruals ?? []).length})
-            </h2>
-
-            {(data?.accruals ?? []).length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-4xl mb-2">💰</p>
-                <p className="font-bold text-slate-400">Начислений нет</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  За {(MONTHS[month - 1] ?? '').toLowerCase()} {year} нарядов не закрывалось
+                <p className="text-xs text-slate-400">
+                  Утверждённые наряды и начисленная по ним зарплата отображаются здесь
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {(data?.accruals ?? []).map((accrual) => (
+              <div className="space-y-2.5">
+                {accruals.map((accrual) => (
                   <AccrualCard key={accrual.id} accrual={accrual} />
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Справка по выплатам */}
-          <div className="px-4">
-            <div className="bg-slate-100 rounded-xl p-4">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-                Справка
-              </p>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                ЗП начисляется автоматически при утверждении наряда администратором. Выплата — 2
-                раза в месяц. По вопросам выплат обратитесь к администратору.
+            )
+          ) : payouts.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-8 text-center space-y-2">
+              <p className="text-3xl">💳</p>
+              <p className="text-sm font-extrabold text-slate-800">Выплат пока не было</p>
+              <p className="text-xs text-slate-400">
+                Все выплаты наличными из кассы, переводы на карту и авансы отображаются здесь
               </p>
             </div>
+          ) : (
+            <div className="space-y-2.5">
+              {payouts.map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          'text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md',
+                          p.is_advance
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-[#E8F7EC] text-[#0E7C5B]',
+                        )}
+                      >
+                        {p.wallet_label}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-400">
+                        {formatDate(p.date)}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 mt-1 leading-snug">
+                      {p.description}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-black text-[#21A038]">
+                      +<Money amount={p.amount} />
+                    </p>
+                    <span className="text-[10px] font-bold text-slate-400">Выплачено</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Диалог отклонения */}
+      {rejecting && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50"
+          onClick={(e) => e.target === e.currentTarget && setRejecting(null)}
+        >
+          <div className="bg-white rounded-t-3xl w-full p-6 space-y-4 max-w-lg">
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
+            <p className="font-extrabold text-slate-900 text-base">Не согласны с суммой?</p>
+            <p className="text-sm text-slate-600">
+              Начисление будет возвращено администратору для проверки и корректировки суммы.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setRejecting(null)}
+                className="flex-1 border border-slate-200 text-slate-700 font-extrabold py-3 rounded-xl text-xs uppercase active:scale-95 transition-all"
+              >
+                Вернуться
+              </button>
+              <button
+                onClick={() => confirmMutation.mutate({ action: 'reject', id: rejecting })}
+                disabled={confirmMutation.isPending}
+                className="flex-1 bg-red-500 text-white font-extrabold py-3 rounded-xl text-xs uppercase active:scale-95 transition-all disabled:opacity-50"
+              >
+                {confirmMutation.isPending ? '...' : 'Отклонить'}
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -317,32 +401,42 @@ export default function MechanicSalaryPage() {
 
 function AccrualCard({ accrual }: { accrual: Accrual }) {
   const isPaid = accrual.settlement_status === 'completed';
-  const orderNum = accrual.service_order?.order_number;
-  const assetName = accrual.service_order?.asset?.short_name;
+  const so = accrual.service_order;
+  const orderNum = so?.order_number;
+  const vehicleName =
+    so?.machine_type === 'own'
+      ? so.asset?.short_name
+      : [so?.client_vehicle_brand || so?.client_vehicle_model, so?.client_vehicle_reg]
+          .filter(Boolean)
+          .join(' · ');
 
-  return (
-    <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-0.5">
+  const content = (
+    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs active:scale-[0.99] transition-transform">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
             {orderNum && (
-              <span className="text-xs font-black text-slate-500">Наряд #{orderNum}</span>
+              <span className="text-xs font-extrabold text-slate-900">Наряд #{orderNum}</span>
             )}
-            {assetName && <span className="text-xs font-bold text-slate-400">· {assetName}</span>}
+            {vehicleName && (
+              <span className="text-xs font-bold text-slate-500">· {vehicleName}</span>
+            )}
           </div>
-          <p className="text-[10px] text-slate-400 font-bold uppercase">
-            {new Date(accrual.created_at).toLocaleDateString('ru-RU', {
-              day: 'numeric',
-              month: 'long',
-            })}
+          <p className="text-xs text-slate-600 font-medium mt-1 line-clamp-2">
+            {accrual.description}
+          </p>
+          <p className="text-[11px] text-slate-400 font-semibold mt-1">
+            {formatDate(accrual.transaction_date || accrual.created_at)}
           </p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-base font-black text-slate-900">{formatMoney(accrual.amount)}</p>
+          <p className="text-base font-black text-[#21A038]">
+            +<Money amount={accrual.amount} />
+          </p>
           <span
             className={cn(
-              'text-[9px] font-black uppercase px-2 py-0.5 rounded-full',
-              isPaid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700',
+              'text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-block mt-1',
+              isPaid ? 'bg-[#E8F7EC] text-[#0E7C5B]' : 'bg-amber-50 text-amber-700',
             )}
           >
             {isPaid ? '✓ Выплачено' : 'К выплате'}
@@ -351,14 +445,9 @@ function AccrualCard({ accrual }: { accrual: Accrual }) {
       </div>
     </div>
   );
-}
 
-function formatMoney(amount: string): string {
-  const num = parseFloat(amount);
-  if (isNaN(num)) return '—';
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    maximumFractionDigits: 0,
-  }).format(num);
+  if (so?.id) {
+    return <Link href={`/mechanic/orders/${so.id}`}>{content}</Link>;
+  }
+  return content;
 }

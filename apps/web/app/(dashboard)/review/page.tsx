@@ -82,17 +82,34 @@ interface ReviewServiceOrder {
   mechanic_note: string | null;
   mechanic_pay: string | null;
   second_mechanic_pay: string | null;
-  asset?: { id?: string; short_name?: string; reg_number?: string } | null;
-  mechanic?: { id: string; name: string } | null;
-  second_mechanic?: { id: string; name: string } | null;
+  odometer_start?: number | null;
+  odometer_end?: number | null;
+  client_vehicle_brand?: string | null;
+  client_vehicle_model?: string | null;
+  client_vehicle_reg?: string | null;
+  client_name?: string | null;
+  asset?: {
+    id?: string;
+    short_name?: string;
+    reg_number?: string;
+    odometer_current?: number | null;
+  } | null;
+  mechanic?: { id: string; name: string; mechanic_salary_pct?: number | string | null } | null;
+  second_mechanic?: {
+    id: string;
+    name: string;
+    mechanic_salary_pct?: number | string | null;
+  } | null;
   works?: Array<{
     id: string;
     custom_work_name: string | null;
+    work_description?: string | null;
     status: string;
     salary_paid: boolean;
     actual_minutes: number | null;
     price_client: string | null;
     norm_minutes: number | null;
+    quantity?: number | null;
     mechanic_id: string | null;
     second_mechanic_id: string | null;
     work_catalog?: { name: string } | null;
@@ -102,6 +119,7 @@ interface ReviewServiceOrder {
     custom_part_name: string | null;
     quantity: number;
     unit_price: string;
+    client_price?: string | null;
     unit: string | null;
     part?: { name: string; unit: string | null } | null;
   }>;
@@ -2421,6 +2439,597 @@ function MaintenanceDetailModal({
   );
 }
 
+// ── Garage Review Components ─────────────────────────────────
+
+function GarageOrderEditModal({
+  order,
+  onClose,
+  onSaved,
+}: {
+  order: ReviewServiceOrder;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isOwn = order.machine_type === 'own';
+  const hourlyRate = isOwn ? 1600 : 2000;
+  const salaryPct = Number(order.mechanic?.mechanic_salary_pct || 50);
+
+  const [odometer, setOdometer] = useState<string>(
+    String(order.odometer_end || order.odometer_start || ''),
+  );
+  const [clientModel, setClientModel] = useState<string>(
+    order.client_vehicle_model || order.client_vehicle_brand || '',
+  );
+  const [clientReg, setClientReg] = useState<string>(order.client_vehicle_reg || '');
+  const [works, setWorks] = useState<Array<{ name: string; minutes: string }>>(() => {
+    const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
+    if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
+    return active.map((w) => ({
+      name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
+      minutes: String(w.actual_minutes || w.norm_minutes || 30),
+    }));
+  });
+  const [parts, setParts] = useState<Array<{ name: string; quantity: string; unit: string }>>(() =>
+    (order.parts ?? []).map((p) => ({
+      name: p.custom_part_name || p.part?.name || '',
+      quantity: String(p.quantity || 1),
+      unit: p.unit || p.part?.unit || 'шт',
+    })),
+  );
+  const [manualPay, setManualPay] = useState<string>(order.mechanic_pay || '');
+  const [adminNote, setAdminNote] = useState<string>(order.admin_note || '');
+  const [saving, setSaving] = useState(false);
+
+  const totalMinutes = works.reduce((s, w) => s + (parseInt(w.minutes, 10) || 0), 0);
+  const autoPay = ((totalMinutes / 60) * hourlyRate * (salaryPct / 100)).toFixed(2);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/garage/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'edit_order',
+          odometer_start: odometer ? Number(odometer) : null,
+          odometer_end: odometer ? Number(odometer) : null,
+          client_vehicle_model: !isOwn ? clientModel : undefined,
+          client_vehicle_reg: !isOwn ? clientReg : undefined,
+          works: works.map((w) => ({
+            name: w.name,
+            minutes: parseInt(w.minutes, 10) || 0,
+          })),
+          parts: parts.map((p) => ({
+            name: p.name,
+            quantity: parseFloat(p.quantity) || 1,
+            unit: p.unit || 'шт',
+          })),
+          mechanic_pay: manualPay ? parseFloat(manualPay) : parseFloat(autoPay),
+          admin_note: adminNote,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Ошибка сохранения');
+      onSaved();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-black text-slate-900 text-lg">
+              Редактировать заказ-наряд №{order.order_number}
+            </h3>
+            <p className="text-xs text-slate-500 font-bold">
+              {isOwn ? '🏢 Свой автопарк (1 600 ₽/ч)' : '🚗 Клиентский авто (2 000 ₽/ч)'} · Механик:{' '}
+              {order.mechanic?.name ?? '—'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        {!isOwn && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold uppercase text-slate-400 block mb-1">
+                Модель авто
+              </label>
+              <input
+                type="text"
+                value={clientModel}
+                onChange={(e) => setClientModel(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase text-slate-400 block mb-1">
+                Госномер
+              </label>
+              <input
+                type="text"
+                value={clientReg}
+                onChange={(e) => setClientReg(e.target.value.toUpperCase())}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold uppercase"
+              />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="text-xs font-bold uppercase text-slate-400 block mb-1">
+            Пробег (одометр, км)
+          </label>
+          <input
+            type="number"
+            value={odometer}
+            onChange={(e) => setOdometer(e.target.value)}
+            placeholder="Пробег в км"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold"
+          />
+        </div>
+
+        {/* Работы */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-slate-400">
+              Перечень работ ({works.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => setWorks((prev) => [...prev, { name: '', minutes: '30' }])}
+              className="text-xs font-black text-emerald-600 hover:text-emerald-700 cursor-pointer"
+            >
+              + Добавить работу
+            </button>
+          </div>
+          {works.map((w, idx) => (
+            <div
+              key={idx}
+              className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-2.5"
+            >
+              <span className="text-xs font-black text-slate-400">{idx + 1}.</span>
+              <input
+                type="text"
+                value={w.name}
+                onChange={(e) =>
+                  setWorks((prev) =>
+                    prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
+                  )
+                }
+                placeholder="Наименование работы"
+                className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold"
+              />
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  value={w.minutes}
+                  onChange={(e) =>
+                    setWorks((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, minutes: e.target.value } : item,
+                      ),
+                    )
+                  }
+                  className="w-20 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm font-black text-center"
+                />
+                <span className="text-xs text-slate-500 font-bold">мин</span>
+              </div>
+              {works.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setWorks((prev) => prev.filter((_, i) => i !== idx))}
+                  className="text-rose-500 hover:text-rose-700 text-sm font-black px-1.5 cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Запчасти */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-slate-400">
+              Запчасти автосервиса ({parts.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => setParts((prev) => [...prev, { name: '', quantity: '1', unit: 'шт' }])}
+              className="text-xs font-black text-emerald-600 hover:text-emerald-700 cursor-pointer"
+            >
+              + Добавить запчасть
+            </button>
+          </div>
+          {parts.map((p, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={p.name}
+                onChange={(e) =>
+                  setParts((prev) =>
+                    prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
+                  )
+                }
+                placeholder="Название запчасти"
+                className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold"
+              />
+              <input
+                type="number"
+                value={p.quantity}
+                onChange={(e) =>
+                  setParts((prev) =>
+                    prev.map((item, i) =>
+                      i === idx ? { ...item, quantity: e.target.value } : item,
+                    ),
+                  )
+                }
+                className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold text-center"
+              />
+              <button
+                type="button"
+                onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))}
+                className="text-rose-500 hover:text-rose-700 text-sm font-black px-1.5 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* ЗП Механика */}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-emerald-900">
+              ЗП Механика (авторасчёт за {totalMinutes} мин: {autoPay} ₽)
+            </span>
+            <button
+              type="button"
+              onClick={() => setManualPay(autoPay)}
+              className="text-xs font-black text-emerald-700 underline cursor-pointer"
+            >
+              Сбросить на авторасчёт
+            </button>
+          </div>
+          <input
+            type="number"
+            step="0.01"
+            value={manualPay}
+            onChange={(e) => setManualPay(e.target.value)}
+            placeholder={autoPay}
+            className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-2 text-sm font-black text-emerald-900"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-bold uppercase text-slate-400 block mb-1">
+            Комментарий руководителя
+          </label>
+          <input
+            type="text"
+            value={adminNote}
+            onChange={(e) => setAdminNote(e.target.value)}
+            placeholder="Заметка к заказ-наряду..."
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 font-bold text-sm text-slate-600 hover:bg-slate-50 cursor-pointer"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+          >
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GarageReviewCard({
+  order,
+  onEdit,
+  onApprove,
+  onReturn,
+  onDelete,
+  approving,
+  deleting,
+}: {
+  order: ReviewServiceOrder;
+  onEdit: () => void;
+  onApprove: () => void;
+  onReturn: () => void;
+  onDelete: () => void;
+  approving: boolean;
+  deleting: boolean;
+}) {
+  const isOwn = order.machine_type === 'own';
+  const hourlyRate = isOwn ? 1600 : 2000;
+  const salaryPct = Number(order.mechanic?.mechanic_salary_pct || 50);
+  const activeWorks = (order.works ?? []).filter((w) => w.status !== 'cancelled');
+  const parts = order.parts ?? [];
+
+  const totalMinutes = activeWorks.reduce(
+    (s, w) =>
+      s + Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1)),
+    0,
+  );
+  const worksSum = activeWorks.reduce((s, w) => {
+    const mins =
+      Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
+    const explicit = parseFloat(w.price_client || '0');
+    return s + (explicit > 0 ? explicit : (mins / 60) * hourlyRate);
+  }, 0);
+
+  const estimatedPay = (worksSum * salaryPct) / 100;
+  const mechanicPay =
+    parseFloat(order.mechanic_pay || '0') > 0 ? parseFloat(order.mechanic_pay!) : estimatedPay;
+
+  const odo = order.odometer_end || order.odometer_start;
+  const canReview = order.lifecycle_status === 'draft' || order.lifecycle_status === 'returned';
+
+  const vehicleTitle = isOwn
+    ? `${order.asset?.short_name ?? 'Свой ТС'} (${order.asset?.reg_number ?? '—'})`
+    : `${order.client_vehicle_model || order.client_vehicle_brand || 'Клиентский авто'} · ${order.client_vehicle_reg || 'без номера'}`;
+
+  const partsFromService =
+    parts.length > 0 ||
+    Boolean(
+      order.mechanic_note && order.mechanic_note.includes('[Запчасти предоставил автосервис]'),
+    );
+
+  const cleanMechanicNote = (order.mechanic_note || '')
+    .replace('[Запчасти предоставил автосервис]', '')
+    .trim();
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+      {/* Header */}
+      <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-100 flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="bg-emerald-600 text-white text-xs font-mono font-black px-2.5 py-1 rounded-lg">
+              НЗ-{order.order_number}
+            </span>
+            <span
+              className={cn(
+                'text-xs font-black px-2.5 py-1 rounded-lg border',
+                isOwn
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-sky-50 text-sky-800 border-sky-200',
+              )}
+            >
+              {isOwn ? '🏢 Свой автомобиль · 1 600 ₽/ч' : '🚗 Клиентский авто · 2 000 ₽/ч'}
+            </span>
+            <span
+              className={cn(
+                'text-xs font-bold px-2.5 py-1 rounded-lg',
+                order.lifecycle_status === 'approved'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : order.lifecycle_status === 'returned'
+                    ? 'bg-rose-100 text-rose-800'
+                    : 'bg-amber-100 text-amber-800',
+              )}
+            >
+              {order.lifecycle_status === 'approved'
+                ? '✓ Утверждён'
+                : order.lifecycle_status === 'returned'
+                  ? '↩ На доработке'
+                  : '⏳ Ждёт проверки'}
+            </span>
+          </div>
+
+          <h3 className="text-base font-black text-slate-900 pt-1">{vehicleTitle}</h3>
+          <div className="flex items-center gap-3 flex-wrap text-xs text-slate-600 font-semibold">
+            <span>
+              👨‍🔧 Механик: {order.mechanic?.name ?? 'Не назначен'} ({salaryPct}%)
+            </span>
+            <span>·</span>
+            <span>
+              📅{' '}
+              {new Date(order.created_at).toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </span>
+            {odo && (
+              <>
+                <span>·</span>
+                <span className="text-slate-800 font-bold">
+                  🛣 Одометр: {Number(odo).toLocaleString('ru-RU')} км
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-5">
+          <div className="text-right">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Время работ
+            </span>
+            <span className="text-sm font-black text-slate-800">
+              {totalMinutes} мин ({(totalMinutes / 60).toFixed(1)} ч)
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Стоимость работ
+            </span>
+            <span className="text-sm font-black text-slate-800">
+              <Money amount={worksSum.toFixed(2)} />
+            </span>
+          </div>
+          <div className="text-right bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block">
+              ЗП Механика
+            </span>
+            <span className="text-base font-black text-emerald-700">
+              <Money amount={mechanicPay.toFixed(2)} />
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Body: Works & Parts */}
+      <div className="p-4 sm:p-5 space-y-4">
+        {/* 4. Перечень работ */}
+        <div>
+          <div className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">
+            Перечень выполненных работ ({activeWorks.length})
+          </div>
+          {activeWorks.length === 0 ? (
+            <p className="text-sm text-slate-500 italic">
+              {order.problem_description || 'Работы не указаны'}
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {activeWorks.map((w, idx) => {
+                const mins =
+                  Number(w.actual_minutes || w.norm_minutes || 0) *
+                  Math.max(1, Number(w.quantity || 1));
+                const wPrice =
+                  parseFloat(w.price_client || '0') > 0
+                    ? parseFloat(w.price_client!)
+                    : (mins / 60) * hourlyRate;
+                const wPay = (wPrice * salaryPct) / 100;
+                return (
+                  <div
+                    key={w.id || idx}
+                    className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">
+                        {idx + 1}.{' '}
+                        {w.custom_work_name ||
+                          w.work_catalog?.name ||
+                          w.work_description ||
+                          'Работа'}
+                      </p>
+                      <p className="text-xs font-extrabold text-emerald-700 mt-0.5">
+                        ⏱ Время: {mins} мин · ЗП механика:{' '}
+                        {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                      </p>
+                    </div>
+                    <span className="text-xs font-black text-slate-700 whitespace-nowrap">
+                      {Math.round(wPrice).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Запчасти предоставил автосервис */}
+        {partsFromService && (
+          <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-black text-emerald-900 uppercase tracking-wider">
+              <span className="text-emerald-600 text-sm">☑</span>
+              <span>Запчасти предоставил автосервис (мы) — {parts.length} поз.</span>
+            </div>
+            {parts.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {parts.map((p, idx) => (
+                  <div
+                    key={p.id || idx}
+                    className="bg-white border border-emerald-100 rounded-lg px-3 py-1.5 flex items-center justify-between text-xs font-bold text-slate-800"
+                  >
+                    <span>
+                      {idx + 1}. {p.custom_part_name || p.part?.name || 'Запчасть'}
+                    </span>
+                    <span className="text-emerald-700 font-black">
+                      {p.quantity} {p.unit || p.part?.unit || 'шт'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(cleanMechanicNote || order.admin_note) && (
+          <div className="flex flex-wrap gap-3 text-xs">
+            {cleanMechanicNote && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl font-medium">
+                💬 Комментарий механика: <span className="font-bold">{cleanMechanicNote}</span>
+              </div>
+            )}
+            {order.admin_note && (
+              <div className="bg-slate-100 border border-slate-200 text-slate-800 px-3 py-2 rounded-xl font-medium">
+                📌 Заметка руководителя: <span className="font-bold">{order.admin_note}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <span>✏️ Редактировать</span>
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={approving || deleting}
+              className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-600 cursor-pointer disabled:opacity-50 transition-colors"
+            >
+              {deleting ? '...' : '🗑️ Удалить'}
+            </button>
+          </div>
+
+          {canReview && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onReturn}
+                disabled={approving}
+                className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-700 cursor-pointer disabled:opacity-50 transition-colors"
+              >
+                ↩ На доработку
+              </button>
+              <button
+                type="button"
+                onClick={onApprove}
+                disabled={approving}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
+              >
+                {approving ? 'Утверждаем...' : '✓ Утвердить наряд (начислить ЗП)'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────
 
 export default function ReviewPage() {
@@ -2452,6 +3061,9 @@ export default function ReviewPage() {
         ? 'history'
         : 'review',
   );
+  const [reviewSection, setReviewSection] = useState<'auto' | 'garage'>(
+    searchParams.get('section') === 'garage' ? 'garage' : 'auto',
+  );
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -2465,6 +3077,7 @@ export default function ReviewPage() {
   };
 
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
+  const [editServiceOrder, setEditServiceOrder] = useState<ReviewServiceOrder | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('month');
@@ -2621,7 +3234,112 @@ export default function ReviewPage() {
     queryClient.invalidateQueries({ queryKey: ['trips-review'] });
     queryClient.invalidateQueries({ queryKey: ['service-orders-month'] });
     queryClient.invalidateQueries({ queryKey: ['receivable-settlements'] });
+    queryClient.invalidateQueries({ queryKey: ['garage-review-orders'] });
   };
+
+  // ── Заказ-наряды Гаража (Механики) для вкладки «Гараж» ─────────
+  const { data: garageOrders = [], isLoading: isGarageLoading } = useQuery<ReviewServiceOrder[]>({
+    queryKey: [
+      'garage-review-orders',
+      mode,
+      statsPeriod,
+      statsPeriod === 'day'
+        ? selectedDate
+        : statsPeriod === 'week'
+          ? `${weekStart}_${weekEnd}`
+          : monthKey,
+    ],
+    staleTime: 30000,
+    queryFn: async () => {
+      if (mode === 'review') {
+        const res = await fetch('/api/garage/orders?filter=review');
+        if (!res.ok) return [];
+        return res.json();
+      }
+      if (mode === 'active') {
+        const res = await fetch('/api/garage/orders?filter=active');
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data)
+          ? data.filter((o: ReviewServiceOrder) => o.status !== 'completed')
+          : [];
+      }
+      let url = '/api/garage/orders?filter=history';
+      if (statsPeriod === 'day') url += `&date=${selectedDate}`;
+      else if (statsPeriod === 'week') url += `&weekStart=${weekStart}&weekEnd=${weekEnd}`;
+      else url += `&month=${monthKey}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  async function handleApproveServiceOrder(orderId: string) {
+    setApprovingId(orderId);
+    try {
+      const res = await fetch(`/api/garage/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', lifecycle_status: 'approved' }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error || 'Ошибка утверждения');
+      }
+      refresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  async function handleReturnServiceOrder(orderId: string) {
+    const note = prompt('Причина возврата наряда механику на доработку (необязательно):');
+    if (note === null) return;
+    setApprovingId(orderId);
+    try {
+      const res = await fetch(`/api/garage/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'return',
+          lifecycle_status: 'returned',
+          admin_note: note || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error || 'Ошибка возврата');
+      }
+      refresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  async function handleDeleteServiceOrder(orderId: string) {
+    if (!confirm('Удалить заказ-наряд и все связанные с ним начисления?')) return;
+    setDeletingId(orderId);
+    try {
+      const res = await fetch(`/api/garage/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error || 'Ошибка удаления');
+      }
+      refresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function handleApprove(tripId: string) {
     setApprovingId(tripId);
@@ -2939,8 +3657,10 @@ export default function ReviewPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Ревью смен</h1>
-          {mode === 'review' && trips.length > 0 && (
+          <h1 className="text-2xl font-black text-slate-900">
+            Ревью · {reviewSection === 'auto' ? 'Авто (Водители)' : 'Гараж (Механики)'}
+          </h1>
+          {reviewSection === 'auto' && mode === 'review' && trips.length > 0 && (
             <p className="text-sm text-slate-500 mt-0.5">
               {trips.length} рейс{trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'} ожидают ·{' '}
               <span className="font-semibold text-slate-700">
@@ -2958,6 +3678,13 @@ export default function ReviewPage() {
               прибыль
             </p>
           )}
+          {reviewSection === 'garage' && mode === 'review' && garageOrders.length > 0 && (
+            <p className="text-sm text-slate-500 mt-0.5">
+              {garageOrders.length} заказ-наряд
+              {garageOrders.length === 1 ? '' : garageOrders.length < 5 ? 'а' : 'ов'} от механиков
+              ожидают проверки и начисления ЗП
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -2965,29 +3692,43 @@ export default function ReviewPage() {
             <button
               onClick={() => setMode('review')}
               className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all',
+                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
                 mode === 'review'
                   ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
                   : 'text-slate-500 hover:text-slate-700',
               )}
             >
-              На ревью{trips.length > 0 && mode === 'review' ? ` (${trips.length})` : ''}
+              На ревью
+              {mode === 'review'
+                ? reviewSection === 'auto' && trips.length > 0
+                  ? ` (${trips.length})`
+                  : reviewSection === 'garage' && garageOrders.length > 0
+                    ? ` (${garageOrders.length})`
+                    : ''
+                : ''}
             </button>
             <button
               onClick={() => setMode('active')}
               className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all',
+                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
                 mode === 'active'
                   ? 'bg-blue-500 text-white shadow-sm shadow-blue-200'
                   : 'text-slate-500 hover:text-slate-700',
               )}
             >
-              Активные{trips.length > 0 && mode === 'active' ? ` (${trips.length})` : ''}
+              {reviewSection === 'auto' ? 'Активные' : 'В работе'}
+              {mode === 'active'
+                ? reviewSection === 'auto' && trips.length > 0
+                  ? ` (${trips.length})`
+                  : reviewSection === 'garage' && garageOrders.length > 0
+                    ? ` (${garageOrders.length})`
+                    : ''
+                : ''}
             </button>
             <button
               onClick={() => setMode('history')}
               className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all',
+                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
                 mode === 'history'
                   ? 'bg-slate-800 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-700',
@@ -2997,6 +3738,61 @@ export default function ReviewPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 2 главные кнопки: АВТО / ГАРАЖ */}
+      <div className="grid grid-cols-2 gap-3 bg-white border border-slate-200 p-1.5 rounded-2xl shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setReviewSection('auto')}
+          className={cn(
+            'py-3 px-4 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer',
+            reviewSection === 'auto'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50',
+          )}
+        >
+          <span className="text-lg">🚛</span>
+          <span>Авто (Водители)</span>
+          {mode !== 'history' && trips.length > 0 && (
+            <span
+              className={cn(
+                'px-2.5 py-0.5 rounded-full text-xs font-black',
+                reviewSection === 'auto'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-slate-200 text-slate-700',
+              )}
+            >
+              {trips.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setReviewSection('garage')}
+          className={cn(
+            'py-3 px-4 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer',
+            reviewSection === 'garage'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50',
+          )}
+        >
+          <span className="text-lg">🔧</span>
+          <span>Гараж (Механики)</span>
+          {mode !== 'history' && garageOrders.length > 0 && (
+            <span
+              className={cn(
+                'px-2.5 py-0.5 rounded-full text-xs font-black',
+                reviewSection === 'garage'
+                  ? 'bg-white text-emerald-700'
+                  : 'bg-emerald-100 text-emerald-800',
+              )}
+            >
+              {garageOrders.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Date navigation — history only */}
@@ -3009,8 +3805,49 @@ export default function ReviewPage() {
         />
       )}
 
-      {/* Summary line */}
-      {!isLoading && (
+      {/* ── GARAGE SECTION (Механики) ── */}
+      {reviewSection === 'garage' && (
+        <div className="space-y-4">
+          {isGarageLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-slate-100 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : garageOrders.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
+              <span className="material-symbols-outlined text-slate-200 text-[72px] mb-4 block">
+                {mode === 'review' ? 'check_circle' : 'build_circle'}
+              </span>
+              <p className="text-slate-500 font-semibold text-lg">
+                {mode === 'review'
+                  ? 'Нет заказ-нарядов на ревью — все работы механиков проверены!'
+                  : mode === 'active'
+                    ? 'Нет открытых заказ-нарядов в работе'
+                    : 'Нет заказ-нарядов за выбранный период'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {garageOrders.map((order) => (
+                <GarageReviewCard
+                  key={order.id}
+                  order={order}
+                  onEdit={() => setEditServiceOrder(order)}
+                  onApprove={() => handleApproveServiceOrder(order.id)}
+                  onReturn={() => handleReturnServiceOrder(order.id)}
+                  onDelete={() => handleDeleteServiceOrder(order.id)}
+                  approving={approvingId === order.id}
+                  deleting={deletingId === order.id}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Summary line (Auto) */}
+      {reviewSection === 'auto' && !isLoading && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-slate-500">
             {mode === 'active' ? (
@@ -3071,7 +3908,7 @@ export default function ReviewPage() {
       )}
 
       {/* Loading skeletons */}
-      {isLoading && (
+      {reviewSection === 'auto' && isLoading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-28 bg-slate-100 rounded-2xl animate-pulse" />
@@ -3080,7 +3917,7 @@ export default function ReviewPage() {
       )}
 
       {/* ── Vehicle Cards List ── */}
-      {!isLoading && (
+      {reviewSection === 'auto' && !isLoading && (
         <div className="space-y-4">
           {combinedAssetGroups.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
@@ -3727,13 +4564,25 @@ export default function ReviewPage() {
         />
       )}
 
-      {/* Edit modal */}
+      {/* Edit modal (Auto) */}
       {editTrip && (
         <EditModal
           trip={editTrip}
           onClose={() => setEditTrip(null)}
           onSaved={() => {
             setEditTrip(null);
+            refresh();
+          }}
+        />
+      )}
+
+      {/* Edit modal (Garage) */}
+      {editServiceOrder && (
+        <GarageOrderEditModal
+          order={editServiceOrder}
+          onClose={() => setEditServiceOrder(null)}
+          onSaved={() => {
+            setEditServiceOrder(null);
             refresh();
           }}
         />

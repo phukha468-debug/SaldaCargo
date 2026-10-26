@@ -539,7 +539,7 @@ export function DailyControlPanel() {
   // Trip link modal search and filters
   const [linkOrderSearch, setLinkOrderSearch] = useState('');
   const [linkOrderPeriod, setLinkOrderPeriod] = useState<
-    'smart' | 'today' | 'yesterday' | '7days' | 'custom'
+    'smart' | 'today' | 'yesterday' | '7days' | '30days' | 'custom'
   >('smart');
   const [linkOrderCustomDate, setLinkOrderCustomDate] = useState('');
 
@@ -599,6 +599,8 @@ export function DailyControlPanel() {
         params.set('date', yesterdayStr);
       } else if (linkOrderPeriod === '7days') {
         params.set('days', '7');
+      } else if (linkOrderPeriod === '30days') {
+        params.set('days', '30');
       } else {
         // 'smart' (default): checks last 14 days and scores matches
         params.set('days', '14');
@@ -611,11 +613,17 @@ export function DailyControlPanel() {
     enabled: !!linkingBankOp && linkMode === 'trip',
   });
 
+  // Ref to track which bank operation was already auto-selected to prevent overwriting user selection
+  const autoSelectedOpIdRef = React.useRef<string | null>(null);
+
   // Auto-select the best matching order(s) when linkableOrdersData loads
   React.useEffect(() => {
     if (!linkingBankOp || linkMode !== 'trip') return;
+    if (autoSelectedOpIdRef.current === linkingBankOp.operationId) return;
+
     const orders = linkableOrdersData?.orders ?? [];
-    if (orders.length > 0 && selectedOrderIdsToLink.length === 0) {
+    if (orders.length > 0) {
+      autoSelectedOpIdRef.current = linkingBankOp.operationId;
       const opAmt = linkingBankOp.operationAmount || linkingBankOp.rubleAmount || 0;
 
       // 1. Сначала ищем одиночный рейс с точным совпадением суммы
@@ -665,7 +673,7 @@ export function DailyControlPanel() {
         setSelectedOrderIdsToLink([best.id]);
       }
     }
-  }, [linkableOrdersData, linkingBankOp, linkMode, selectedOrderIdsToLink.length]);
+  }, [linkableOrdersData, linkingBankOp, linkMode]);
 
   const linkBankOpMutation = useMutation({
     mutationFn: async ({
@@ -728,6 +736,10 @@ export function DailyControlPanel() {
       setStoClientName('');
       setDispatcherDetails('');
       setDispatcherClientName('');
+    },
+    onError: (err: Error) => {
+      console.error('linkBankOp error:', err);
+      alert('Ошибка при связывании операции: ' + (err?.message || 'Не удалось связать с рейсом'));
     },
   });
 
@@ -833,6 +845,7 @@ export function DailyControlPanel() {
         const linkedTxs = (data?.transactions ?? []).filter(
           (t) =>
             t.idempotency_key === op.operationId ||
+            (op.operationId && t.description?.includes(op.operationId)) ||
             (op.operationId && t.idempotency_key?.startsWith(`${op.operationId}_`)),
         );
 
@@ -847,19 +860,21 @@ export function DailyControlPanel() {
           isLinked = true;
           if (linkedTxs.length === 1 && linkedTxs[0]) {
             const linkedTx = linkedTxs[0];
-            const desc = linkedTx.description || '';
-            if (desc.includes('Заказ-наряд')) {
-              linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
-            } else if (desc.includes('Диспетчерский')) {
-              linkTypeLabel = desc.replace(/^Оплата\s*/, '').trim();
+            const cleanDesc = (linkedTx.description || '')
+              .replace(/\s*\[bank_op:[^\]]+\]/g, '')
+              .trim();
+            if (cleanDesc.includes('Заказ-наряд')) {
+              linkTypeLabel = cleanDesc.replace(/^Оплата\s*/, '').trim();
+            } else if (cleanDesc.includes('Диспетчерский')) {
+              linkTypeLabel = cleanDesc.replace(/^Оплата\s*/, '').trim();
             } else {
               const linkedOrder = (data?.trip_orders ?? []).find(
                 (o) => o.id === linkedTx.trip_order_id,
               );
-              const matchNum = linkedTx.description?.match(/Рейс №(\d+)/);
+              const matchNum = cleanDesc.match(/Рейс №(\d+)/);
               linkedTripNumber =
                 linkedOrder?.trip?.trip_number || (matchNum ? matchNum[1] : undefined);
-              const matchDriver = linkedTx.description?.match(/\((.+?)\)/);
+              const matchDriver = cleanDesc.match(/\((.+?)\)/);
               linkedDriverName =
                 linkedTx.related_user?.name ||
                 linkedOrder?.trip?.driver?.name ||
@@ -869,7 +884,7 @@ export function DailyControlPanel() {
                 : 'Рейс автопарка';
             }
             author = linkedDriverName ? `вод. ${linkedDriverName}` : payerName;
-            title = linkedTx.description || title;
+            title = cleanDesc || title;
           } else {
             // Связано несколько рейсов автопарка
             const tripNumbers: string[] = [];
@@ -2470,6 +2485,7 @@ export function DailyControlPanel() {
                               )}
                               <button
                                 onClick={() => {
+                                  autoSelectedOpIdRef.current = null;
                                   setLinkingBankOp(item.bankOp!);
                                   setLinkMode('trip');
                                   setLinkOrderSearch('');
@@ -2477,6 +2493,7 @@ export function DailyControlPanel() {
                                   setLinkOrderCustomDate('');
                                   if (item.suggestedOrder) {
                                     setSelectedOrderIdsToLink([item.suggestedOrder.id]);
+                                    autoSelectedOpIdRef.current = item.bankOp!.operationId;
                                   } else {
                                     setSelectedOrderIdsToLink([]);
                                   }
@@ -3243,6 +3260,21 @@ export function DailyControlPanel() {
                       <span>🗓️</span>
                       <span>За 7 дней</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkOrderPeriod('30days');
+                        setLinkOrderCustomDate('');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-black rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                        linkOrderPeriod === '30days'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>🗓️</span>
+                      <span>За 30 дней</span>
+                    </button>
                     <div className="flex items-center gap-1">
                       <input
                         type="date"
@@ -3311,17 +3343,30 @@ export function DailyControlPanel() {
                           <div className="text-slate-500 text-xs">
                             Рейсы не найдены по выбранным критериям.
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLinkOrderPeriod('7days');
-                              setLinkOrderSearch('');
-                              setLinkOrderCustomDate('');
-                            }}
-                            className="px-2.5 py-1 text-[11px] font-bold bg-white border border-slate-300 rounded-lg text-sky-700 hover:bg-slate-50 cursor-pointer"
-                          >
-                            Показать рейсы за последние 7 дней
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLinkOrderPeriod('7days');
+                                setLinkOrderSearch('');
+                                setLinkOrderCustomDate('');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-bold bg-white border border-slate-300 rounded-lg text-sky-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              Рейсы за 7 дней
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLinkOrderPeriod('30days');
+                                setLinkOrderSearch('');
+                                setLinkOrderCustomDate('');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-bold bg-white border border-slate-300 rounded-lg text-sky-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              Рейсы за 30 дней
+                            </button>
+                          </div>
                         </div>
                       );
                     }
@@ -3607,7 +3652,7 @@ export function DailyControlPanel() {
                       action: 'link',
                     })
                   }
-                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5 transition"
                 >
                   {linkBankOpMutation.isPending
                     ? 'Связывание...'

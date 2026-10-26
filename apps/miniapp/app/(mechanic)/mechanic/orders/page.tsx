@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Money, cn } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
+import CreateOrderModal from '../CreateOrderModal';
 
 export default function MechanicWorksPage() {
-  const [filter, setFilter] = useState<'all' | 'completed' | 'in_progress'>('all');
+  const [filter, setFilter] = useState<'all' | 'approved' | 'review' | 'in_progress'>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -28,184 +30,245 @@ export default function MechanicWorksPage() {
   });
 
   const filteredOrders = orders.filter((order) => {
-    if (filter === 'completed') return order.status === 'completed';
+    if (filter === 'approved') return order.lifecycle_status === 'approved';
+    if (filter === 'review')
+      return order.status === 'completed' && order.lifecycle_status === 'draft';
     if (filter === 'in_progress')
-      return order.status === 'in_progress' || order.status === 'created';
+      return (
+        order.status === 'in_progress' ||
+        order.status === 'created' ||
+        order.lifecycle_status === 'returned'
+      );
     return true;
   });
 
   if (isLoading) {
     return (
       <div className="p-4 space-y-4 animate-pulse max-w-lg mx-auto">
-        <div className="h-8 w-56 bg-zinc-200 rounded-lg mb-6" />
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="bg-zinc-200 rounded-2xl h-24" />
+        <div className="h-8 w-56 bg-slate-200 rounded-lg mb-4" />
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white rounded-2xl h-28" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-5 max-w-lg mx-auto">
-      {/* Заголовок */}
-      <header className="flex items-center justify-between">
+    <div className="p-4 space-y-4 max-w-lg mx-auto">
+      {/* Заголовок + кнопка открытия наряда */}
+      <header className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
-            История работ
-          </h1>
-          <p className="text-xs font-bold text-zinc-400 mt-0.5">
-            Выполненные заказ-наряды и ремонт
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">История нарядов</h1>
+          <p className="text-xs font-semibold text-slate-500 mt-0.5">
+            Все открытые, проверяемые и закрытые заказ-наряды
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          className="bg-[#21A038] text-white font-extrabold text-xs px-4 py-3 rounded-2xl shadow-sm active:scale-95 transition-transform shrink-0"
+        >
+          + Наряд
+        </button>
       </header>
 
-      {/* Быстрые фильтры */}
-      <div className="flex bg-zinc-200/60 p-1 rounded-2xl gap-1">
+      {/* Банковские фильтры */}
+      <div className="grid grid-cols-4 bg-white border border-slate-200/80 p-1 rounded-2xl gap-1">
         <button
           type="button"
           onClick={() => setFilter('all')}
           className={cn(
-            'flex-1 py-2 text-xs font-black uppercase rounded-xl transition-all',
-            filter === 'all'
-              ? 'bg-white text-zinc-900 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-700',
+            'py-2 text-[11px] font-extrabold rounded-xl transition-all',
+            filter === 'all' ? 'bg-[#21A038] text-white shadow-2xs' : 'text-slate-500',
           )}
         >
           Все ({orders.length})
         </button>
         <button
           type="button"
-          onClick={() => setFilter('completed')}
+          onClick={() => setFilter('approved')}
           className={cn(
-            'flex-1 py-2 text-xs font-black uppercase rounded-xl transition-all',
-            filter === 'completed'
-              ? 'bg-white text-zinc-900 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-700',
+            'py-2 text-[11px] font-extrabold rounded-xl transition-all',
+            filter === 'approved' ? 'bg-[#21A038] text-white shadow-2xs' : 'text-slate-500',
           )}
         >
-          Готово ({orders.filter((o) => o.status === 'completed').length})
+          Закрытые ({orders.filter((o) => o.lifecycle_status === 'approved').length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('review')}
+          className={cn(
+            'py-2 text-[11px] font-extrabold rounded-xl transition-all',
+            filter === 'review' ? 'bg-[#21A038] text-white shadow-2xs' : 'text-slate-500',
+          )}
+        >
+          Проверка (
+          {orders.filter((o) => o.status === 'completed' && o.lifecycle_status === 'draft').length})
         </button>
         <button
           type="button"
           onClick={() => setFilter('in_progress')}
           className={cn(
-            'flex-1 py-2 text-xs font-black uppercase rounded-xl transition-all',
-            filter === 'in_progress'
-              ? 'bg-white text-zinc-900 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-700',
+            'py-2 text-[11px] font-extrabold rounded-xl transition-all',
+            filter === 'in_progress' ? 'bg-[#21A038] text-white shadow-2xs' : 'text-slate-500',
           )}
         >
           В работе (
-          {orders.filter((o) => o.status === 'in_progress' || o.status === 'created').length})
+          {
+            orders.filter(
+              (o) =>
+                o.status === 'in_progress' ||
+                o.status === 'created' ||
+                o.lifecycle_status === 'returned',
+            ).length
+          }
+          )
         </button>
       </div>
 
       {/* Список работ */}
       <div className="space-y-3">
         {filteredOrders.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-zinc-200 p-8 space-y-2">
-            <span className="text-4xl block">🔧</span>
-            <p className="text-sm font-black text-zinc-700 uppercase tracking-wide">
-              {filter === 'completed'
-                ? 'Нет завершённых работ'
-                : filter === 'in_progress'
-                  ? 'Нет работ в процессе'
-                  : 'История работ пуста'}
-            </p>
-            <p className="text-xs text-zinc-400">
-              {filter === 'all'
-                ? 'Новые наряды будут появляться здесь при распределении'
-                : 'Попробуйте переключить фильтр'}
+          <div className="text-center py-16 bg-white rounded-3xl border border-slate-200/80 p-8 space-y-2">
+            <span className="text-4xl block">📋</span>
+            <p className="text-sm font-extrabold text-slate-800">Заказ-нарядов не найдено</p>
+            <p className="text-xs text-slate-500">
+              Нажмите «+ Наряд», чтобы самостоятельно открыть заказ-наряд и записать работы
             </p>
           </div>
         ) : (
           filteredOrders.map((order) => <WorkHistoryCard key={order.id} order={order} />)
         )}
       </div>
+
+      <CreateOrderModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        mechanicId={me?.id}
+      />
     </div>
   );
 }
 
 function WorkHistoryCard({ order }: { order: any }) {
+  const isApproved = order.lifecycle_status === 'approved';
   const isCompleted = order.status === 'completed';
-  const isInProgress = order.status === 'in_progress';
-  const pay = parseFloat(order.mechanic_pay || '0');
+  const isReturned = order.lifecycle_status === 'returned';
+  const pay = parseFloat(order.mechanic_pay || order.estimated_pay || '0');
+  const isOwn = order.machine_type === 'own';
 
-  const vehicleName =
-    order.machine_type === 'own'
-      ? order.asset?.short_name || 'Автопарк'
-      : order.client_vehicle_brand || 'Клиентское авто';
+  const vehicleName = isOwn
+    ? order.asset?.short_name || 'Свой автопарк'
+    : order.client_vehicle_brand || order.client_vehicle_model || 'Клиентское авто';
 
-  const regNumber =
-    order.machine_type === 'own' ? order.asset?.reg_number : order.client_vehicle_reg;
+  const regNumber = isOwn ? order.asset?.reg_number : order.client_vehicle_reg;
+  const odo = order.odometer_end || order.odometer_start;
 
-  const worksNames = (order.works ?? [])
-    .map((w: any) => w.custom_work_name || w.work_catalog?.name)
-    .filter(Boolean)
-    .join(', ');
+  const worksList = order.works ?? [];
+  const partsList = order.parts ?? [];
+  const totalMins =
+    order.total_minutes ||
+    worksList.reduce((s: number, w: any) => s + Number(w.actual_minutes || w.norm_minutes || 0), 0);
 
   return (
-    <Link href={`/mechanic/orders/${order.id}`}>
-      <div className="bg-white rounded-2xl p-4 shadow-xs border-2 border-zinc-200 flex items-center justify-between active:scale-[0.99] active:bg-zinc-50 transition-all relative overflow-hidden">
-        {/* Индикатор статуса слева */}
-        <div
-          className={cn(
-            'absolute left-0 top-0 bottom-0 w-1.5',
-            isCompleted
-              ? 'bg-green-500'
-              : isInProgress
-                ? 'bg-orange-500 animate-pulse'
-                : 'bg-zinc-300',
-          )}
-        />
-
-        <div className="pl-2 flex-1 min-w-0 pr-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-              Наряд #{order.order_number}
-            </span>
-            {isInProgress && (
-              <span className="bg-orange-100 text-orange-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
-                В работе
+    <Link href={`/mechanic/orders/${order.id}`} className="block">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs active:scale-[0.99] transition-all">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-extrabold text-slate-900">
+                Наряд #{order.order_number}
               </span>
-            )}
+              <span
+                className={cn(
+                  'text-[10px] font-extrabold px-2 py-0.5 rounded-md',
+                  isOwn ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-blue-700',
+                )}
+              >
+                {isOwn ? '🚛 Свой (1600 ₽/ч)' : '🚗 Клиент (2000 ₽/ч)'}
+              </span>
+              <span className="text-[11px] font-semibold text-slate-400">
+                {formatDate(order.created_at)}
+              </span>
+            </div>
+
+            <p className="font-extrabold text-slate-900 text-sm mt-1 truncate">
+              {vehicleName}
+              {regNumber ? ` · ${regNumber}` : ''}
+              {odo ? ` · ${Number(odo).toLocaleString('ru-RU')} км` : ''}
+            </p>
           </div>
 
-          <p className="font-black text-zinc-900 text-sm mt-0.5 truncate">
-            {vehicleName}
-            {regNumber ? ` · ${regNumber}` : ''}
-          </p>
-
-          {worksNames && (
-            <p className="text-xs text-zinc-500 mt-1 line-clamp-1 font-medium">{worksNames}</p>
-          )}
-
-          <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-            {formatDate(order.created_at)}
-          </p>
+          <div className="text-right shrink-0">
+            {pay > 0 ? (
+              <div className="text-[#21A038] font-black text-base leading-none">
+                +<Money amount={String(pay)} />
+              </div>
+            ) : (
+              <span className="text-xs text-slate-400 font-bold">—</span>
+            )}
+            <span
+              className={cn(
+                'text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-block mt-1',
+                isApproved
+                  ? 'bg-[#E8F7EC] text-[#0E7C5B]'
+                  : isReturned
+                    ? 'bg-red-50 text-red-600'
+                    : isCompleted
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-blue-50 text-blue-700',
+              )}
+            >
+              {isApproved
+                ? '✓ Закрыт'
+                : isReturned
+                  ? 'На доработке'
+                  : isCompleted
+                    ? '⏳ На проверке'
+                    : 'В работе'}
+            </span>
+          </div>
         </div>
 
-        <div className="text-right shrink-0">
-          {pay > 0 ? (
-            <div className="text-green-600 font-black text-sm">
-              +<Money amount={order.mechanic_pay} />
-            </div>
-          ) : (
-            <span className="text-xs text-zinc-400 font-bold">—</span>
-          )}
+        {/* Работы */}
+        {worksList.length > 0 && (
+          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1">
+            {worksList.map((w: any, idx: number) => {
+              const name = w.custom_work_name || w.work_catalog?.name || 'Работа';
+              const mins = w.actual_minutes || w.norm_minutes || 0;
+              return (
+                <div key={w.id || idx} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-700 font-semibold truncate pr-2">
+                    {idx + 1}. {name}
+                  </span>
+                  <span className="text-slate-500 font-bold shrink-0">{mins} мин</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-          <p
-            className={cn(
-              'text-[9px] font-black uppercase mt-1 px-2 py-0.5 rounded-full inline-block',
-              isCompleted
-                ? 'bg-green-100 text-green-700'
-                : isInProgress
-                  ? 'bg-orange-100 text-orange-700'
-                  : 'bg-zinc-100 text-zinc-500',
-            )}
-          >
-            {isCompleted ? '✓ Выполнен' : isInProgress ? 'В работе' : 'Ожидает'}
-          </p>
+        {/* Запчасти сервиса */}
+        {partsList.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
+            <span className="text-[10px] font-extrabold text-[#0E7C5B] bg-[#E8F7EC] px-2 py-0.5 rounded-md">
+              ✓ Запчасти автосервиса:
+            </span>
+            {partsList.map((p: any, i: number) => (
+              <span
+                key={p.id || i}
+                className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md"
+              >
+                {p.custom_part_name || p.part?.name || 'Запчасть'} ({p.quantity}{' '}
+                {p.unit || p.part?.unit || 'шт'})
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold text-slate-400">
+          <span>⏱ Общее время: {totalMins} мин</span>
+          <span className="text-[#21A038]">Открыть карточку →</span>
         </div>
       </div>
     </Link>

@@ -16,11 +16,12 @@ export async function GET(request: Request) {
       problem_description, mechanic_note, admin_note, created_at, updated_at,
       mechanic_pay, second_mechanic_pay, odometer_start, odometer_end,
       asset:assets(id, short_name, reg_number, odometer_current),
-      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
+      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+      second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
@@ -31,12 +32,13 @@ export async function GET(request: Request) {
 
     const activeSelect = `
       id, order_number, machine_type, status, lifecycle_status, priority, payment_received, created_at,
-      problem_description, admin_note,
-      asset:assets(id, short_name, reg_number),
-      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name),
+      problem_description, mechanic_note, admin_note, odometer_start, odometer_end, mechanic_pay,
+      asset:assets(id, short_name, reg_number, odometer_current),
+      mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
+      second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg, client_name,
       works:service_order_works(
-        id, custom_work_name, status, salary_paid, actual_minutes, price_client, norm_minutes, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(

@@ -185,6 +185,176 @@ data class ServiceOrder(
 )
 
 @Serializable
+data class MechanicWorkCatalog(
+    val id: String? = null,
+    val name: String = "",
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("norm_minutes") val normMinutes: Long = 0L
+)
+
+@Serializable
+data class MechanicWorkItem(
+    val id: String = "",
+    @SerialName("custom_work_name") val customWorkName: String? = null,
+    val status: String = "completed",
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("norm_minutes") val normMinutes: Long = 0L,
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("actual_minutes") val actualMinutes: Long = 0L,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("price_client") val priceClient: Double = 0.0,
+    @SerialName("work_catalog") val workCatalog: MechanicWorkCatalog? = null
+) {
+    val displayName: String
+        get() = customWorkName?.takeIf { it.isNotBlank() }
+            ?: workCatalog?.name?.takeIf { it.isNotBlank() }
+            ?: "Работа"
+    val effectiveMinutes: Long
+        get() = if (actualMinutes > 0L) actualMinutes else normMinutes
+}
+
+@Serializable
+data class MechanicPartCatalog(
+    val id: String? = null,
+    val name: String = "",
+    val unit: String = "шт"
+)
+
+@Serializable
+data class MechanicPartItem(
+    val id: String = "",
+    @SerialName("custom_part_name") val customPartName: String? = null,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    val quantity: Double = 1.0,
+    val unit: String = "шт",
+    val part: MechanicPartCatalog? = null
+) {
+    val displayName: String
+        get() = customPartName?.takeIf { it.isNotBlank() }
+            ?: part?.name?.takeIf { it.isNotBlank() }
+            ?: "Запчасть"
+    val displayUnit: String
+        get() = unit.takeIf { it.isNotBlank() } ?: part?.unit ?: "шт"
+}
+
+@Serializable
+data class MechanicOrder(
+    val id: String = "",
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("order_number") val orderNumber: Long = 0L,
+    @SerialName("machine_type") val machineType: String = "own",
+    val status: String = "in_progress",
+    @SerialName("lifecycle_status") val lifecycleStatus: String = "draft",
+    @SerialName("created_at") val createdAt: String? = null,
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("odometer_start") val odometerStart: Long = 0L,
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("odometer_end") val odometerEnd: Long = 0L,
+    @SerialName("problem_description") val problemDescription: String? = null,
+    @SerialName("mechanic_note") val mechanicNote: String? = null,
+    @SerialName("admin_note") val adminNote: String? = null,
+    @SerialName("client_vehicle_brand") val clientVehicleBrand: String? = null,
+    @SerialName("client_vehicle_model") val clientVehicleModel: String? = null,
+    @SerialName("client_vehicle_reg") val clientVehicleReg: String? = null,
+    val asset: TripAsset? = null,
+    val mechanic: TripDriver? = null,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("hourly_rate") val hourlyRate: Double = 1600.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("salary_pct") val salaryPct: Double = 50.0,
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("total_minutes") val totalMinutes: Long = 0L,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("estimated_pay") val estimatedPay: Double = 0.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("approved_pay") val approvedPay: Double = 0.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("mechanic_pay") val mechanicPay: Double = 0.0,
+    @SerialName("parts_provided_by_service") val partsProvidedByService: Boolean = false,
+    @SerialName("settlement_status") val settlementStatus: String = "pending",
+    val works: List<MechanicWorkItem> = emptyList(),
+    val parts: List<MechanicPartItem> = emptyList()
+)
+
+@Serializable
+data class MechanicRates(
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("hourly_rate_client") val hourlyRateClient: Double = 2000.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("hourly_rate_own") val hourlyRateOwn: Double = 1600.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("mechanic_salary_pct") val mechanicSalaryPct: Double = 50.0
+)
+
+@Serializable
+data class MechanicSalarySummary(
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("total_accrued") val totalAccrued: Double = 0.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("total_paid") val totalPaid: Double = 0.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("to_pay") val toPay: Double = 0.0,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    @SerialName("draft_pay") val draftPay: Double = 0.0
+)
+
+@Serializable
+data class MechanicPayoutItem(
+    val id: String = "",
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    val amount: Double = 0.0,
+    val description: String = "",
+    @SerialName("wallet_label") val walletLabel: String = "Выплата",
+    @SerialName("is_advance") val isAdvance: Boolean = false,
+    val date: String? = null
+)
+
+@Serializable
+data class MechanicAccrualServiceOrder(
+    val id: String = "",
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("order_number") val orderNumber: Long = 0L,
+    @SerialName("machine_type") val machineType: String = "own",
+    @SerialName("client_vehicle_brand") val clientVehicleBrand: String? = null,
+    @SerialName("client_vehicle_model") val clientVehicleModel: String? = null,
+    @SerialName("client_vehicle_reg") val clientVehicleReg: String? = null,
+    val asset: TripAsset? = null
+)
+
+@Serializable
+data class MechanicAccrualItem(
+    val id: String = "",
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    val amount: Double = 0.0,
+    @SerialName("settlement_status") val settlementStatus: String = "pending",
+    val description: String = "",
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("transaction_date") val transactionDate: String? = null,
+    @SerialName("service_order") val serviceOrder: MechanicAccrualServiceOrder? = null
+)
+
+@Serializable
+data class MechanicSalaryData(
+    val accruals: List<MechanicAccrualItem> = emptyList(),
+    val payouts: List<MechanicPayoutItem> = emptyList(),
+    @SerialName("pending_confirmation") val pendingConfirmation: List<PendingPayrollItem> = emptyList(),
+    @SerialName("pending_confirmation_count") val pendingConfirmationCount: Int = 0,
+    val rates: MechanicRates = MechanicRates(),
+    val summary: MechanicSalarySummary = MechanicSalarySummary()
+)
+
+data class MechanicWorkDraftInput(
+    val name: String,
+    val minutes: Int
+)
+
+data class MechanicPartDraftInput(
+    val name: String,
+    val quantity: Double,
+    val unit: String = "шт"
+)
+
+@Serializable
 data class TripSummaryItem(
     val id: String,
     @Serializable(with = FlexibleLongSerializer::class)
@@ -216,6 +386,8 @@ data class DriverSummary(
 data class AdminSummary(
     val activeTrips: Int = 0,
     val pendingReview: Int = 0,
+    val pendingGarageReview: Int = 0,
+    val totalPendingReview: Int = 0,
     @Serializable(with = FlexibleStringSerializer::class)
     val todayRevenue: String = "0.00"
 )
@@ -289,4 +461,86 @@ data class LoaderShiftState(
     val address: String = "г. Верхняя Салда",
     val car: Boolean = true,
     @SerialName("updated_at") val updatedAt: Long = 0L
+)
+
+@Serializable
+data class PayrollEmployee(
+    val id: String,
+    val name: String,
+    val roles: List<String> = emptyList(),
+    val role: String? = null,
+    val phone: String? = null,
+    val notes: String? = null,
+    @SerialName("auto_settle") val autoSettle: Boolean = false,
+    @Serializable(with = FlexibleStringSerializer::class)
+    val earned: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val paid: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val debt: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    @SerialName("advance_balance") val advanceBalance: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    @SerialName("advance_offset") val advanceOffset: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val payout: String = "0.00",
+    @SerialName("is_management") val isManagement: Boolean = false,
+    val shifts: Int = 0,
+    @SerialName("unconfirmed_count") val unconfirmedCount: Int = 0
+) {
+    val earnedDouble: Double get() = earned.toDoubleOrNull() ?: 0.0
+    val paidDouble: Double get() = paid.toDoubleOrNull() ?: 0.0
+    val debtDouble: Double get() = debt.toDoubleOrNull() ?: 0.0
+    val advanceDouble: Double get() = advanceBalance.toDoubleOrNull() ?: 0.0
+    val payoutDouble: Double get() = payout.toDoubleOrNull() ?: 0.0
+}
+
+@Serializable
+data class StaffTxTrip(
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("trip_number") val tripNumber: Long? = null,
+    @SerialName("started_at") val startedAt: String? = null
+)
+
+@Serializable
+data class StaffPendingTx(
+    val id: String,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    val amount: Double = 0.0,
+    val description: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("transaction_date") val transactionDate: String? = null,
+    @SerialName("category_id") val categoryId: String? = null,
+    @SerialName("employee_confirmed") val employeeConfirmed: Boolean? = null,
+    val trip: StaffTxTrip? = null
+)
+
+@Serializable
+data class StaffHistoryTx(
+    val id: String,
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    val amount: Double = 0.0,
+    val direction: String = "expense",
+    val description: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("transaction_date") val transactionDate: String? = null,
+    @SerialName("category_id") val categoryId: String? = null,
+    @SerialName("settlement_status") val settlementStatus: String = "completed",
+    @SerialName("is_payroll") val isPayroll: Boolean = false,
+    @SerialName("is_payout") val isPayout: Boolean = false,
+    @SerialName("is_advance") val isAdvance: Boolean = false,
+    val trip: StaffTxTrip? = null
+)
+
+@Serializable
+data class StaffSettleDetails(
+    @Serializable(with = FlexibleStringSerializer::class)
+    @SerialName("salary_total") val salaryTotal: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    @SerialName("advance_balance") val advanceBalance: String = "0.00",
+    @Serializable(with = FlexibleStringSerializer::class)
+    @SerialName("payout_total") val payoutTotal: String = "0.00",
+    @SerialName("unconfirmed_count") val unconfirmedCount: Int = 0,
+    @SerialName("pending_transactions") val pendingTransactions: List<StaffPendingTx> = emptyList(),
+    val history: List<StaffHistoryTx> = emptyList()
 )

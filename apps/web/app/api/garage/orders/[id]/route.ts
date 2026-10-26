@@ -127,8 +127,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const { password } = await req.json().catch(() => ({}));
-    if (password !== '9111') {
+    const body = await req.json().catch(() => ({}));
+    if (body?.password !== undefined && body.password !== '9111') {
       return NextResponse.json({ error: 'Неверный пароль' }, { status: 403 });
     }
     const supabase = createAdminClient();
@@ -181,6 +181,120 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const supabase = createAdminClient();
+
+    if (body.action === 'edit_order') {
+      const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
+        .select('id, machine_type, assigned_mechanic_id')
+        .eq('id', id)
+        .single();
+      if (ordErr || !ord) {
+        return NextResponse.json({ error: ordErr?.message ?? 'Наряд не найден' }, { status: 404 });
+      }
+
+      const { data: sto } = await (supabase.from('sto_settings') as any)
+        .select('hourly_rate, hourly_rate_own')
+        .limit(1)
+        .maybeSingle();
+      const hourlyRate =
+        ord.machine_type === 'client'
+          ? parseFloat(sto?.hourly_rate ?? '2000') || 2000
+          : parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
+
+      const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (body.odometer_start !== undefined) {
+        updates.odometer_start =
+          body.odometer_start != null && String(body.odometer_start).trim() !== ''
+            ? Number(body.odometer_start)
+            : null;
+        updates.odometer_end = updates.odometer_start;
+      }
+      if (body.odometer_end !== undefined) {
+        updates.odometer_end =
+          body.odometer_end != null && String(body.odometer_end).trim() !== ''
+            ? Number(body.odometer_end)
+            : null;
+      }
+      if (typeof body.client_vehicle_model === 'string') {
+        updates.client_vehicle_model = body.client_vehicle_model.trim() || null;
+        updates.client_vehicle_brand = updates.client_vehicle_model;
+      }
+      if (typeof body.client_vehicle_reg === 'string') {
+        updates.client_vehicle_reg = body.client_vehicle_reg.trim().toUpperCase() || null;
+      }
+      if (typeof body.admin_note === 'string') {
+        updates.admin_note = body.admin_note.trim() || null;
+      }
+      if (body.mechanic_pay !== undefined) {
+        const mp = parseFloat(String(body.mechanic_pay));
+        updates.mechanic_pay = !isNaN(mp) && mp >= 0 ? mp.toFixed(2) : null;
+      }
+
+      if (Array.isArray(body.works)) {
+        const validWorks = (body.works as any[])
+          .map((w) => ({
+            name: String(w.name || '').trim(),
+            minutes: Math.max(1, Math.round(Number(w.minutes) || 0)),
+            price_client:
+              w.price_client != null && !isNaN(Number(w.price_client)) && Number(w.price_client) > 0
+                ? Number(w.price_client).toFixed(2)
+                : ((Math.max(1, Math.round(Number(w.minutes) || 0)) / 60) * hourlyRate).toFixed(2),
+          }))
+          .filter((w) => w.name.length > 0);
+
+        await (supabase.from('service_order_works') as any).delete().eq('service_order_id', id);
+        if (validWorks.length > 0) {
+          await (supabase.from('service_order_works') as any).insert(
+            validWorks.map((w) => ({
+              service_order_id: id,
+              custom_work_name: w.name,
+              norm_minutes: w.minutes,
+              actual_minutes: w.minutes,
+              price_client: w.price_client,
+              quantity: 1,
+              status: 'completed',
+              mechanic_id: ord.assigned_mechanic_id,
+            })),
+          );
+          updates.problem_description = validWorks.map((w) => w.name).join('; ');
+        }
+      }
+
+      if (Array.isArray(body.parts)) {
+        const validParts = (body.parts as any[])
+          .map((p) => ({
+            name: String(p.name || '').trim(),
+            quantity: Math.max(0.1, parseFloat(String(p.quantity ?? 1)) || 1),
+            unit: String(p.unit || 'шт').trim() || 'шт',
+            client_price: (parseFloat(String(p.client_price ?? 0)) || 0).toFixed(2),
+          }))
+          .filter((p) => p.name.length > 0);
+
+        await (supabase.from('service_order_parts') as any).delete().eq('service_order_id', id);
+        if (validParts.length > 0) {
+          await (supabase.from('service_order_parts') as any).insert(
+            validParts.map((p) => ({
+              service_order_id: id,
+              custom_part_name: p.name,
+              quantity: p.quantity,
+              unit: p.unit,
+              unit_price: p.client_price,
+              client_price: p.client_price,
+              status: 'reserved',
+            })),
+          );
+        }
+      }
+
+      const { error: updErr } = await (supabase.from('service_orders') as any)
+        .update(updates)
+        .eq('id', id);
+      if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+      return NextResponse.json({ ok: true, action: 'edited' });
+    }
+
+    if (body.action === 'approve') body.lifecycle_status = 'approved';
+    if (body.action === 'return') body.lifecycle_status = 'returned';
+    if (body.action === 'cancel') body.lifecycle_status = 'cancelled';
 
     if (body.lifecycle_status === 'approved') {
       if (body.assigned_mechanic_id !== undefined || body.second_mechanic_id !== undefined) {
@@ -499,6 +613,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
                 direction: 'expense',
                 lifecycle_status: 'approved',
                 settlement_status: 'pending',
+                from_wallet_id: null,
+                employee_confirmed: false,
                 amount: salary.toFixed(2),
                 category_id: CAT_PAYROLL_MECHANIC,
                 related_user_id: mech.id,
@@ -507,10 +623,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
                 description: `ЗП механика ${mech.name} — наряд #${order.order_number}`,
                 idempotency_key: crypto.randomUUID(),
               });
+              if (!payMap.mechanic_pay) payMap.mechanic_pay = salary.toFixed(2);
             }
           }
         } else {
           // Автоматический расчёт на основе нормо-часов для каждой неоплаченной работы отдельно
+          const { data: stoSettings } = await (supabase as any)
+            .from('sto_settings')
+            .select('hourly_rate, hourly_rate_own')
+            .limit(1)
+            .maybeSingle();
+          const defaultHourlyRate =
+            order.machine_type === 'client'
+              ? parseFloat(stoSettings?.hourly_rate ?? '2000') || 2000
+              : parseFloat(stoSettings?.hourly_rate_own ?? '1600') || 1600;
+
           // Сначала получим данные механиков для этих работ
           const mechanicIds = [
             ...new Set(
@@ -547,6 +674,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             return 50;
           };
 
+          let totalPrimaryPay = 0;
+
           for (const work of unpaidWorks) {
             const workMechs = [work.mechanic_id, work.second_mechanic_id].filter(Boolean);
             const targetMechs =
@@ -556,7 +685,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
             if (targetMechs.length === 0) continue;
 
-            const workPrice = parseFloat(work.price_client ?? '0');
+            const explicitPrice = parseFloat(work.price_client ?? '0');
+            const mins = Number(work.actual_minutes ?? work.norm_minutes ?? 0);
+            const workPrice =
+              explicitPrice > 0 ? explicitPrice : mins > 0 ? (mins / 60) * defaultHourlyRate : 0;
             if (workPrice <= 0) continue;
 
             const basePrice = targetMechs.length === 2 ? workPrice / 2 : workPrice;
@@ -569,20 +701,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               const salary = (basePrice * pct) / 100;
 
               if (salary <= 0) continue;
+              totalPrimaryPay += salary;
 
               txns.push({
                 direction: 'expense',
                 lifecycle_status: 'approved',
                 settlement_status: 'pending',
+                from_wallet_id: null,
+                employee_confirmed: false,
                 amount: salary.toFixed(2),
                 category_id: CAT_PAYROLL_MECHANIC,
                 related_user_id: mechData.id,
                 service_order_id: id,
                 created_by: createdBy,
-                description: `ЗП механика ${mechData.name} — наряд #${order.order_number}: ${workName} (${pct}% от ${basePrice.toLocaleString('ru-RU')} ₽)`,
+                description: `ЗП механика ${mechData.name} — наряд #${order.order_number}: ${workName} (${pct}% от ${Math.round(basePrice).toLocaleString('ru-RU')} ₽)`,
                 idempotency_key: crypto.randomUUID(),
               });
             }
+          }
+          if (totalPrimaryPay > 0) {
+            payMap.mechanic_pay = totalPrimaryPay.toFixed(2);
           }
         }
 
@@ -615,8 +753,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // Handle lifecycle changes other than 'approved' (e.g. returned, cancelled)
     if ('lifecycle_status' in body && body.lifecycle_status !== 'approved') {
+      const returnUpdates: Record<string, unknown> = {
+        lifecycle_status: body.lifecycle_status,
+        updated_at: new Date().toISOString(),
+      };
+      if (typeof body.admin_note === 'string') {
+        returnUpdates.admin_note = body.admin_note.trim() || null;
+      }
+
       // При возврате наряда — откатываем финансы: удаляем транзакции и сбрасываем salary_paid
       if (body.lifecycle_status === 'returned') {
+        returnUpdates.status = 'in_progress';
         await Promise.all([
           (supabase as any).from('transactions').delete().eq('service_order_id', id),
           (supabase as any)
@@ -624,12 +771,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             .update({ salary_paid: false })
             .eq('service_order_id', id),
         ]);
+      } else if (body.lifecycle_status === 'cancelled') {
+        returnUpdates.status = 'cancelled';
+        await (supabase as any).from('transactions').delete().eq('service_order_id', id);
       }
 
-      await (supabase as any)
-        .from('service_orders')
-        .update({ lifecycle_status: body.lifecycle_status, updated_at: new Date().toISOString() })
-        .eq('id', id);
+      await (supabase as any).from('service_orders').update(returnUpdates).eq('id', id);
       return NextResponse.json({ id, lifecycle_status: body.lifecycle_status });
     }
 

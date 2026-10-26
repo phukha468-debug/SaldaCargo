@@ -1,34 +1,20 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
-import { cn } from '@saldacargo/ui';
-import { isOilOrFilterWork } from '@saldacargo/shared';
-
-interface CatalogItem {
-  id: string;
-  name: string;
-  norm_minutes: number;
-}
-
-interface Part {
-  id: string;
-  name: string;
-  article?: string;
-  unit: string;
-  stock: number;
-}
+import { useState } from 'react';
+import { Money, cn } from '@saldacargo/ui';
+import { formatDate, isOilOrFilterWork } from '@saldacargo/shared';
 
 interface WorkItem {
   id: string;
   work_catalog?: { name: string; norm_minutes: number };
   custom_work_name?: string;
   status: string;
+  norm_minutes: number;
   actual_minutes: number;
-  extra_work_status?: 'pending_approval' | 'approved' | 'rejected' | null;
-  extra_work_mechanic_note?: string | null;
-  time_logs: Array<{ started_at: string; stopped_at: string | null; status: string }>;
+  price_client?: string;
 }
 
 interface OrderDetail {
@@ -37,692 +23,47 @@ interface OrderDetail {
   status: string;
   lifecycle_status: string;
   machine_type: 'own' | 'client';
-  asset?: { short_name: string; reg_number: string };
+  created_at: string;
+  asset?: { id: string; short_name: string; reg_number: string };
   client_vehicle_brand?: string;
+  client_vehicle_model?: string;
   client_vehicle_reg?: string;
   problem_description: string;
-  assigned_mechanic_id?: string;
+  mechanic_note?: string;
   admin_note?: string;
   odometer_start?: number | null;
   odometer_end?: number | null;
+  hourly_rate?: number;
+  salary_pct?: number;
+  total_minutes?: number;
+  estimated_pay?: string;
+  approved_pay?: string;
+  mechanic_pay?: string;
+  parts_provided_by_service?: boolean;
+  settlement_status?: string;
   works: WorkItem[];
   parts: Array<{
     id: string;
-    part: { name: string; unit: string };
+    custom_part_name?: string;
+    unit?: string;
+    part?: { name: string; unit: string };
     quantity: number;
   }>;
 }
-
-// ─── BottomSheet ──────────────────────────────────────────────────────────────
-
-function BottomSheet({
-  open,
-  onClose,
-  title,
-  children,
-  footer,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        'fixed inset-0 z-[60] transition-all duration-300',
-        open ? 'pointer-events-auto' : 'pointer-events-none',
-      )}
-    >
-      <div
-        className={cn(
-          'absolute inset-0 bg-black/50 transition-opacity duration-300',
-          open ? 'opacity-100' : 'opacity-0',
-        )}
-        onClick={onClose}
-      />
-      <div
-        className={cn(
-          'absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[90vh] flex flex-col transition-transform duration-300',
-          open ? 'translate-y-0' : 'translate-y-full',
-        )}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
-          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{title}</h3>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center text-slate-400 text-xl rounded-full active:bg-slate-100"
-          >
-            ×
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1 p-4 pb-2">{children}</div>
-        {footer && (
-          <div className="shrink-0 px-4 py-4 border-t border-slate-100 bg-white">{footer}</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── AddWorkModal ─────────────────────────────────────────────────────────────
-
-function AddWorkModal({
-  open,
-  onClose,
-  orderId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  orderId: string;
-}) {
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'catalog' | 'custom'>('catalog');
-  const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null);
-  const [customName, setCustomName] = useState('');
-  const [customNorm, setCustomNorm] = useState('');
-  const [validationError, setValidationError] = useState('');
-
-  useEffect(() => {
-    if (!open) {
-      setSelectedCatalogId(null);
-      setCustomName('');
-      setCustomNorm('');
-      setValidationError('');
-      setTab('catalog');
-    }
-  }, [open]);
-
-  const { data: catalog = [] } = useQuery<CatalogItem[]>({
-    queryKey: ['work-catalog'],
-    queryFn: async () => {
-      const r = await fetch('/api/mechanic/catalog');
-      if (!r.ok) return [];
-      return r.json();
-    },
-    enabled: open,
-  });
-
-  const addMutation = useMutation({
-    mutationFn: async (body: object) => {
-      const r = await fetch(`/api/mechanic/orders/${orderId}/works`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) {
-        const err = await r.json();
-        throw new Error(err.error || 'Ошибка сервера');
-      }
-      return r.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
-      onClose();
-    },
-    onError: (e: Error) => setValidationError(e.message),
-  });
-
-  const handleAdd = () => {
-    setValidationError('');
-    if (tab === 'catalog') {
-      if (!selectedCatalogId) {
-        setValidationError('Выберите работу из каталога');
-        return;
-      }
-      addMutation.mutate({ work_catalog_id: selectedCatalogId });
-    } else {
-      if (!customName.trim()) {
-        setValidationError('Введите название работы');
-        return;
-      }
-      addMutation.mutate({
-        custom_work_name: customName.trim(),
-        norm_minutes: customNorm ? Number(customNorm) : 0,
-      });
-    }
-  };
-
-  return (
-    <BottomSheet
-      open={open}
-      onClose={onClose}
-      title="Добавить работу"
-      footer={
-        <div>
-          {validationError && (
-            <p className="text-xs text-red-500 font-bold mb-2 text-center">{validationError}</p>
-          )}
-          <button
-            onClick={handleAdd}
-            disabled={addMutation.isPending}
-            className="w-full bg-orange-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-orange-400"
-          >
-            {addMutation.isPending ? 'Добавляем...' : 'Добавить работу'}
-          </button>
-        </div>
-      }
-    >
-      <div className="flex gap-2 mb-4">
-        {(['catalog', 'custom'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setTab(t);
-              setValidationError('');
-            }}
-            className={cn(
-              'flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-colors',
-              tab === t ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-500',
-            )}
-          >
-            {t === 'catalog' ? 'Из каталога' : 'Своя работа'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'catalog' ? (
-        <div className="space-y-2">
-          {catalog.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-2xl mb-2">📋</p>
-              <p className="text-xs text-slate-400 font-bold">Каталог пуст</p>
-            </div>
-          ) : (
-            catalog.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setSelectedCatalogId(item.id === selectedCatalogId ? null : item.id);
-                  setValidationError('');
-                }}
-                className={cn(
-                  'w-full text-left p-4 rounded-xl border-2 transition-all active:scale-[0.98]',
-                  selectedCatalogId === item.id
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-slate-100 bg-white',
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-slate-900">{item.name}</p>
-                  {selectedCatalogId === item.id && (
-                    <span className="text-orange-600 text-lg">✓</span>
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
-                  Норма: {item.norm_minutes} мин
-                </p>
-              </button>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-              Название работы *
-            </label>
-            <input
-              value={customName}
-              onChange={(e) => {
-                setCustomName(e.target.value);
-                setValidationError('');
-              }}
-              placeholder="Например: Замена масла"
-              className={cn(
-                'w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-400',
-                validationError && !customName.trim()
-                  ? 'border-red-400 bg-red-50'
-                  : 'border-slate-200',
-              )}
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-              Норма (мин) — необязательно
-            </label>
-            <input
-              type="number"
-              value={customNorm}
-              onChange={(e) => setCustomNorm(e.target.value)}
-              placeholder="60"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
-        </div>
-      )}
-    </BottomSheet>
-  );
-}
-
-// ─── CompleteWorkModal ────────────────────────────────────────────────────────
-
-function CompleteWorkModal({
-  open,
-  onClose,
-  work,
-  onComplete,
-}: {
-  open: boolean;
-  onClose: () => void;
-  work: WorkItem | null;
-  onComplete: (minutes: number) => void;
-}) {
-  const [hours, setHours] = useState('0');
-  const [minutes, setMinutes] = useState('0');
-
-  // Default to norm_minutes if available when opening
-  useEffect(() => {
-    if (open && work) {
-      const norm = work.work_catalog?.norm_minutes || 0;
-      if (norm > 0) {
-        setHours(Math.floor(norm / 60).toString());
-        setMinutes((norm % 60).toString());
-      } else {
-        setHours('0');
-        setMinutes('0');
-      }
-    }
-  }, [open, work]);
-
-  if (!work) return null;
-  const workName = work.work_catalog?.name || work.custom_work_name || 'Без названия';
-
-  const handleSave = () => {
-    const h = parseInt(hours || '0', 10);
-    const m = parseInt(minutes || '0', 10);
-    onComplete(h * 60 + m);
-  };
-
-  return (
-    <BottomSheet open={open} onClose={onClose} title="Завершение работы">
-      <div className="space-y-4">
-        <p className="text-sm text-slate-500 text-center mb-4">{workName}</p>
-
-        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
-          <label className="block text-[10px] font-black text-orange-800 uppercase tracking-widest mb-3 text-center">
-            Сколько времени вы потратили?
-          </label>
-          <div className="flex items-center justify-center gap-4">
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
-                min="0"
-                className="w-20 text-center bg-white border-2 border-orange-200 rounded-xl py-3 text-2xl font-black focus:outline-none focus:border-orange-500"
-              />
-              <span className="text-xs font-bold text-orange-600 uppercase mt-2">Часов</span>
-            </div>
-            <span className="text-2xl font-black text-orange-300 mb-6">:</span>
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={minutes}
-                onChange={(e) => setMinutes(e.target.value)}
-                min="0"
-                max="59"
-                className="w-20 text-center bg-white border-2 border-orange-200 rounded-xl py-3 text-2xl font-black focus:outline-none focus:border-orange-500"
-              />
-              <span className="text-xs font-bold text-orange-600 uppercase mt-2">Минут</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-2 justify-center mb-2">
-          <button
-            onClick={() => {
-              setHours('0');
-              setMinutes('30');
-            }}
-            className="bg-slate-100 text-slate-600 text-xs font-black px-4 py-2 rounded-lg active:bg-slate-200"
-          >
-            + 30 мин
-          </button>
-          <button
-            onClick={() => {
-              setHours('1');
-              setMinutes('0');
-            }}
-            className="bg-slate-100 text-slate-600 text-xs font-black px-4 py-2 rounded-lg active:bg-slate-200"
-          >
-            + 1 час
-          </button>
-          {work.work_catalog?.norm_minutes ? (
-            <button
-              onClick={() => {
-                setHours(Math.floor(work.work_catalog!.norm_minutes / 60).toString());
-                setMinutes((work.work_catalog!.norm_minutes % 60).toString());
-              }}
-              className="bg-slate-100 text-slate-600 text-xs font-black px-4 py-2 rounded-lg active:bg-slate-200"
-            >
-              По норме
-            </button>
-          ) : null}
-        </div>
-
-        <button
-          onClick={handleSave}
-          className="w-full bg-green-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform"
-        >
-          ✓ Сохранить и завершить
-        </button>
-      </div>
-    </BottomSheet>
-  );
-}
-
-// ─── AddPartModal ─────────────────────────────────────────────────────────────
-
-function AddPartModal({
-  open,
-  onClose,
-  orderId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  orderId: string;
-}) {
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [selectedPart, setSelectedPart] = useState<Part | null>(null);
-  const [qty, setQty] = useState('1');
-  const [orderRequested, setOrderRequested] = useState(false);
-  const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-
-  useEffect(() => {
-    if (!open) {
-      setSearch('');
-      setSelectedPart(null);
-      setQty('1');
-      setOrderRequested(false);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (searchRef.current) clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => setDebouncedSearch(search), 300);
-  }, [search]);
-
-  const { data: parts = [] } = useQuery<Part[]>({
-    queryKey: ['parts-search', debouncedSearch],
-    queryFn: async () => {
-      const r = await fetch(`/api/mechanic/parts?search=${encodeURIComponent(debouncedSearch)}`);
-      if (!r.ok) return [];
-      return r.json();
-    },
-    enabled: open,
-  });
-
-  const addMutation = useMutation({
-    mutationFn: async () => {
-      const r = await fetch(`/api/mechanic/orders/${orderId}/parts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ part_id: selectedPart!.id, quantity: Number(qty) }),
-      });
-      if (!r.ok) {
-        const err = await r.json();
-        throw new Error(err.error || 'Ошибка');
-      }
-      return r.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
-      onClose();
-    },
-  });
-
-  const noStock = selectedPart ? selectedPart.stock <= 0 : false;
-
-  return (
-    <BottomSheet open={open} onClose={onClose} title="Запчасти">
-      {!selectedPart ? (
-        <>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию или артикулу..."
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium mb-3 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            autoFocus
-          />
-          {parts.length === 0 && debouncedSearch.length > 0 && (
-            <div className="text-center py-8">
-              <p className="text-2xl mb-2">🔍</p>
-              <p className="text-xs text-slate-500 font-bold">Ничего не найдено</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Запчасть «{debouncedSearch}» отсутствует в базе
-              </p>
-            </div>
-          )}
-          {parts.length === 0 && debouncedSearch.length === 0 && (
-            <p className="text-center text-xs text-slate-400 py-6">Начните вводить название</p>
-          )}
-          <div className="space-y-2">
-            {parts.map((part) => (
-              <button
-                key={part.id}
-                onClick={() => setSelectedPart(part)}
-                className="w-full text-left p-3 rounded-xl border border-slate-100 bg-white active:bg-slate-50"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{part.name}</p>
-                    {part.article && (
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">
-                        {part.article}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      'text-xs font-black px-2 py-0.5 rounded-full',
-                      part.stock > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-500',
-                    )}
-                  >
-                    {part.stock > 0 ? `${part.stock} ${part.unit}` : 'Нет в наличии'}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : noStock ? (
-        <div className="space-y-4">
-          <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-            <p className="text-sm font-black text-red-800">{selectedPart.name}</p>
-            <p className="text-[10px] text-red-500 font-bold uppercase mt-1">
-              Остаток: 0 {selectedPart.unit} — отсутствует на складе
-            </p>
-          </div>
-
-          {!orderRequested ? (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Этой запчасти нет в наличии. Отправить администратору запрос на закупку?
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedPart(null)}
-                  className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-3 text-xs font-black uppercase"
-                >
-                  Назад
-                </button>
-                <button
-                  onClick={() => setOrderRequested(true)}
-                  className="flex-[2] bg-zinc-900 text-white rounded-xl py-3 text-xs font-black uppercase active:scale-95 transition-transform"
-                >
-                  Заказать запчасть
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4 space-y-3">
-              <p className="text-3xl">✅</p>
-              <p className="text-sm font-black text-slate-900">Запрос отправлен</p>
-              <p className="text-xs text-slate-500">
-                Администратор получит уведомление о закупке <strong>{selectedPart.name}</strong>
-              </p>
-              <button
-                onClick={onClose}
-                className="w-full bg-slate-100 text-slate-700 rounded-xl py-3 text-sm font-black uppercase"
-              >
-                Закрыть
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-            <p className="text-sm font-black text-green-900">{selectedPart.name}</p>
-            <p className="text-[10px] text-green-600 font-bold uppercase mt-1">
-              На складе: {selectedPart.stock} {selectedPart.unit}
-            </p>
-          </div>
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-              Количество *
-            </label>
-            <input
-              type="number"
-              min="1"
-              max={selectedPart.stock}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-            {Number(qty) > selectedPart.stock && (
-              <p className="text-xs text-red-500 font-bold mt-1">
-                Максимум {selectedPart.stock} {selectedPart.unit}
-              </p>
-            )}
-          </div>
-          {addMutation.isError && (
-            <p className="text-xs text-red-500 font-bold">{(addMutation.error as Error).message}</p>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setSelectedPart(null)}
-              className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-3 text-xs font-black uppercase"
-            >
-              Назад
-            </button>
-            <button
-              onClick={() => addMutation.mutate()}
-              disabled={
-                addMutation.isPending ||
-                !qty ||
-                Number(qty) <= 0 ||
-                Number(qty) > selectedPart.stock
-              }
-              className="flex-[2] bg-orange-600 text-white rounded-xl py-3 text-xs font-black uppercase active:scale-95 transition-transform disabled:bg-orange-300"
-            >
-              {addMutation.isPending ? 'Списываем...' : 'Списать'}
-            </button>
-          </div>
-        </div>
-      )}
-    </BottomSheet>
-  );
-}
-
-// ─── WorkCard ─────────────────────────────────────────────────────────────────
-
-function WorkCard({ work, onCompleteClick }: { work: WorkItem; onCompleteClick: () => void }) {
-  const workName = work.work_catalog?.name || work.custom_work_name || 'Без названия';
-  const normMins = work.work_catalog?.norm_minutes ?? 0;
-  const isDone = work.status === 'completed';
-
-  return (
-    <div
-      className={cn(
-        'bg-white rounded-xl border-2 p-4 transition-all',
-        isDone
-          ? 'border-slate-100 bg-slate-50/50'
-          : 'border-orange-500 shadow-lg shadow-orange-100',
-      )}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-black text-slate-900 leading-tight">{workName}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {normMins > 0 && (
-              <p className="text-[10px] font-bold text-slate-400 uppercase">
-                Норма: {normMins}м {work.actual_minutes ? `· Факт: ${work.actual_minutes}м` : ''}
-              </p>
-            )}
-          </div>
-        </div>
-        <span
-          className={cn(
-            'text-[9px] font-black uppercase px-2 py-1 rounded-full ml-2 shrink-0',
-            work.status === 'completed'
-              ? 'bg-green-100 text-green-700'
-              : 'bg-slate-100 text-slate-500',
-          )}
-        >
-          {work.status === 'completed' ? '✓ Готово' : 'В очереди'}
-        </span>
-      </div>
-
-      {!isDone && (
-        <div className="mt-3">
-          <button
-            onClick={onCompleteClick}
-            className="w-full bg-green-600 text-white rounded-lg py-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
-          >
-            ✓ Указать время и завершить
-          </button>
-        </div>
-      )}
-
-      {isDone && (
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-slate-400 font-bold uppercase">Потрачено времени</span>
-            <span className="font-black text-slate-900">{work.actual_minutes || 0} мин</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── StatusBadge ──────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const labels: Record<string, { label: string; color: string }> = {
-    created: { label: 'Новый', color: 'bg-slate-100 text-slate-500' },
-    in_progress: { label: 'В работе', color: 'bg-orange-100 text-orange-700' },
-    completed: { label: 'На утверждении', color: 'bg-blue-100 text-blue-700' },
-    cancelled: { label: 'Отменён', color: 'bg-red-100 text-red-700' },
-  };
-  const { label, color } = labels[status] ?? {
-    label: status,
-    color: 'bg-slate-100 text-slate-500',
-  };
-  return (
-    <span className={cn('text-[10px] font-black uppercase px-3 py-1 rounded-full', color)}>
-      {label}
-    </span>
-  );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [showAddWork, setShowAddWork] = useState(false);
-  const [showAddPart, setShowAddPart] = useState(false);
-  const [workToComplete, setWorkToComplete] = useState<WorkItem | null>(null);
-  const [acceptError, setAcceptError] = useState('');
+
+  const [workNameInput, setWorkNameInput] = useState('');
+  const [workMinutesInput, setWorkMinutesInput] = useState('');
+  const [partsProvided, setPartsProvided] = useState<boolean | null>(null);
+  const [partNameInput, setPartNameInput] = useState('');
+  const [partQtyInput, setPartQtyInput] = useState('1');
+  const [partUnitInput, setPartUnitInput] = useState('шт');
+  const [odometerInput, setOdometerInput] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['order-detail', id],
@@ -734,390 +75,557 @@ export default function OrderDetailPage() {
     refetchInterval: 15000,
   });
 
-  const completeWorkMutation = useMutation({
-    mutationFn: async ({ workId, actual_minutes }: { workId: string; actual_minutes: number }) => {
-      const res = await fetch(`/api/mechanic/orders/${id}/work/${workId}/complete`, {
+  const addWorkMutation = useMutation({
+    mutationFn: async () => {
+      setActionError('');
+      const cleanName = workNameInput.trim();
+      const mins = Math.round(Number(workMinutesInput) || 0);
+      if (!cleanName) throw new Error('Введите наименование работы');
+      if (mins <= 0) throw new Error('Укажите время выполнения в минутах');
+
+      const res = await fetch(`/api/mechanic/orders/${id}/works`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actual_minutes }),
+        body: JSON.stringify({
+          custom_work_name: cleanName,
+          minutes: mins,
+          norm_minutes: mins,
+          actual_minutes: mins,
+          completed: true,
+        }),
       });
-      if (!res.ok) throw new Error('Ошибка завершения');
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не удалось добавить работу');
+      return data;
+    },
+    onSuccess: () => {
+      setWorkNameInput('');
+      setWorkMinutesInput('');
+      queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
+  const deleteWorkMutation = useMutation({
+    mutationFn: async (workId: string) => {
+      const res = await fetch(`/api/mechanic/orders/${id}/works?work_id=${workId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Ошибка удаления работы');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      setWorkToComplete(null);
+      queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
     },
   });
 
-  const acceptMutation = useMutation({
+  const addPartMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/mechanic/orders/${id}`, {
-        method: 'PATCH',
+      setActionError('');
+      const cleanName = partNameInput.trim();
+      const qty = parseFloat(partQtyInput) || 1;
+      if (!cleanName) throw new Error('Введите название запчасти');
+
+      const res = await fetch(`/api/mechanic/orders/${id}/parts`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'in_progress' }),
+        body: JSON.stringify({
+          custom_part_name: cleanName,
+          quantity: qty,
+          unit: partUnitInput,
+        }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || `Ошибка ${res.status}`);
-      }
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не удалось добавить запчасть');
+      return data;
     },
     onSuccess: () => {
-      setAcceptError('');
+      setPartNameInput('');
+      setPartQtyInput('1');
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
     },
-    onError: (e: Error) => setAcceptError(e.message),
+    onError: (e: Error) => setActionError(e.message),
   });
 
-  const [showCloseOdometerModal, setShowCloseOdometerModal] = useState(false);
-  const [closeOdometerVal, setCloseOdometerVal] = useState('');
-  const [closeOdometerError, setCloseOdometerError] = useState('');
-
-  const completeMutation = useMutation({
-    mutationFn: async (payload?: { odometer_end?: number } | void) => {
-      const res = await fetch(`/api/mechanic/orders/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed', ...(payload || {}) }),
+  const deletePartMutation = useMutation({
+    mutationFn: async (partItemId: string) => {
+      const res = await fetch(`/api/mechanic/orders/${id}/parts?part_item_id=${partItemId}`, {
+        method: 'DELETE',
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || 'Ошибка завершения');
-      }
-      return res.json();
+      if (!res.ok) throw new Error('Ошибка удаления запчасти');
     },
     onSuccess: () => {
-      setShowCloseOdometerModal(false);
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      queryClient.invalidateQueries({ queryKey: ['mechanic-orders'] });
-      router.push('/mechanic/orders');
-    },
-    onError: (e: Error) => {
-      setAcceptError(e.message);
-      setCloseOdometerError(e.message);
+      queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
     },
   });
 
-  if (isLoading) return <div className="p-4 animate-pulse text-sm text-slate-400">Загрузка...</div>;
-  if (!order) return <div className="p-4 text-sm text-red-500">Наряд не найден</div>;
+  const updateOrderMutation = useMutation({
+    mutationFn: async (payload: Record<string, any>) => {
+      setActionError('');
+      const res = await fetch(`/api/mechanic/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Ошибка обновления наряда');
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
+      queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
+      if (variables.status === 'completed') {
+        router.push('/mechanic/orders');
+      }
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-4 space-y-4 animate-pulse max-w-lg mx-auto">
+        <div className="h-24 bg-white rounded-3xl" />
+        <div className="h-40 bg-white rounded-3xl" />
+        <div className="h-40 bg-white rounded-3xl" />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="p-4 text-center max-w-lg mx-auto">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200">
+          <p className="text-sm font-extrabold text-red-500">Заказ-наряд не найден</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isApproved = order.lifecycle_status === 'approved';
+  const isCompleted = order.status === 'completed';
+  const isEditable = !isApproved;
+
+  const isOwn = order.machine_type === 'own';
+  const hourlyRate = order.hourly_rate ?? (isOwn ? 1600 : 2000);
+  const salaryPct = order.salary_pct ?? 50;
+  const calcWorkPay = (mins: number) => Math.round(((mins / 60) * hourlyRate * salaryPct) / 100);
 
   const safeWorks = order.works || [];
-  const canComplete =
-    safeWorks.length > 0 &&
-    safeWorks.every((w) => w.status === 'completed') &&
-    order.status === 'in_progress';
-  const needsAccept = order.status === 'created';
-  const inProgress = order.status === 'in_progress';
-  const isApproved = order.lifecycle_status === 'approved' && order.status === 'completed';
+  const safeParts = order.parts || [];
+  const isPartsChecked =
+    partsProvided !== null
+      ? partsProvided
+      : Boolean(order.parts_provided_by_service || safeParts.length > 0);
+
+  const currentOdo = order.odometer_end || order.odometer_start || null;
+  const hasOil = safeWorks.some(
+    (w) => isOilOrFilterWork(w.work_catalog?.name) || isOilOrFilterWork(w.custom_work_name),
+  );
+
+  const vehicleTitle = isOwn
+    ? order.asset?.short_name || 'Свой автопарк'
+    : order.client_vehicle_brand || order.client_vehicle_model || 'Клиентский автомобиль';
+  const vehicleReg = isOwn ? order.asset?.reg_number : order.client_vehicle_reg;
 
   return (
-    <>
-      <div className="space-y-4 pb-28">
-        {/* Шапка */}
-        <div className="bg-white p-4 border-b border-slate-200">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined' && window.history.length > 1) {
-                    router.back();
-                  } else {
-                    router.push('/mechanic/orders');
-                  }
-                }}
-                className="text-slate-400 hover:text-slate-600 text-2xl active:scale-95 transition-transform"
-              >
-                ←
-              </button>
-              <h1 className="text-xl font-black text-slate-900">Наряд #{order.order_number}</h1>
-            </div>
-            <StatusBadge status={order.status} />
-          </div>
-          <p className="text-lg font-bold text-slate-700">
-            {order.machine_type === 'own' ? order.asset?.short_name : order.client_vehicle_brand}
-          </p>
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-            {order.machine_type === 'own' ? order.asset?.reg_number : order.client_vehicle_reg}
-          </p>
+    <div className="p-4 space-y-4 max-w-lg mx-auto pb-28">
+      {/* ── 1. БАНКОВСКАЯ ШАПКА НАРЯДА ── */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/mechanic/orders');
+              }
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-extrabold text-slate-600 bg-[#F2F4F7] px-3 py-1.5 rounded-xl active:scale-95 transition-transform"
+          >
+            ← Назад
+          </button>
+
+          <span
+            className={cn(
+              'text-[11px] font-extrabold px-3 py-1 rounded-full',
+              isApproved
+                ? 'bg-[#E8F7EC] text-[#0E7C5B]'
+                : isCompleted
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : 'bg-blue-50 text-blue-700',
+            )}
+          >
+            {isApproved
+              ? '✓ Закрыт и утверждён'
+              : isCompleted
+                ? '⏳ На проверке у администратора'
+                : '🔧 В работе'}
+          </span>
         </div>
 
-        {/* Баннер утверждён */}
-        {isApproved && (
-          <section className="px-4">
-            <div className="bg-green-600 text-white rounded-2xl p-4 text-center">
-              <p className="text-lg font-black">✓ Наряд утверждён</p>
-              <p className="text-sm opacity-80 mt-1">ЗП начислена</p>
-            </div>
-          </section>
-        )}
-
-        {/* Баннер: нужно принять */}
-        {needsAccept && (
-          <section className="px-4">
-            <div className="bg-zinc-900 text-white rounded-2xl p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">
-                Новый наряд — требует подтверждения
-              </p>
-              <p className="text-sm font-medium leading-relaxed text-zinc-200">
-                Ознакомьтесь с описанием и нажмите{' '}
-                <strong className="text-white">«Принять в работу»</strong> внизу экрана
-              </p>
-            </div>
-          </section>
-        )}
-
-        {/* Заметка администратора */}
-        {order.admin_note && (
-          <section className="px-4">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">
-                Заметка администратора:
-              </p>
-              <p className="text-sm text-blue-800 font-medium">{order.admin_note}</p>
-            </div>
-          </section>
-        )}
-
-        {/* Описание проблемы */}
-        <section className="px-4">
-          <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
-            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">
-              Задача:
-            </p>
-            <p className="text-sm text-orange-900 font-medium leading-relaxed">
-              {order.problem_description || 'Описание отсутствует'}
-            </p>
-          </div>
-        </section>
-
-        {/* Работы */}
-        <section className="px-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Работы ({safeWorks.length})
-            </h2>
-            <div className="flex gap-2">
-              {order.status !== 'completed' && (
-                <button
-                  onClick={() => setShowAddWork(true)}
-                  className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform"
-                >
-                  + Добавить
-                </button>
-              )}
-            </div>
-          </div>
-
-          {safeWorks.length === 0 && !inProgress && (
-            <p className="text-center text-xs text-slate-400 font-bold italic py-4">
-              Работы не добавлены
-            </p>
-          )}
-          {inProgress && safeWorks.length === 0 && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-wide mb-1">
-                Что делать дальше
-              </p>
-              <p className="text-sm text-blue-800">
-                Нажмите <strong>«+ Добавить»</strong> и выберите работу из каталога
-              </p>
-            </div>
-          )}
-
-          {safeWorks.map((work) => (
-            <WorkCard key={work.id} work={work} onCompleteClick={() => setWorkToComplete(work)} />
-          ))}
-        </section>
-
-        {/* Запчасти */}
-        <section className="px-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Запчасти ({(order.parts || []).length})
-            </h2>
-            {order.status !== 'completed' && (
-              <button
-                onClick={() => setShowAddPart(true)}
-                className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform"
+        <div className="flex items-start justify-between gap-3 pt-1">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-extrabold text-slate-900">
+                Заказ-наряд #{order.order_number}
+              </h1>
+              <span
+                className={cn(
+                  'text-[10px] font-extrabold px-2 py-0.5 rounded-md',
+                  isOwn ? 'bg-slate-100 text-slate-700' : 'bg-blue-50 text-blue-700',
+                )}
               >
-                + Списать
-              </button>
+                {isOwn ? `🚛 Свой (${hourlyRate} ₽/ч)` : `🚗 Клиент (${hourlyRate} ₽/ч)`}
+              </span>
+            </div>
+            <p className="text-xs font-semibold text-slate-400 mt-0.5">
+              Дата: {formatDate(order.created_at)}
+            </p>
+          </div>
+
+          <div className="text-right shrink-0">
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Ваша ЗП</p>
+            <p className="text-xl font-black text-[#21A038]">
+              +<Money amount={order.mechanic_pay || order.estimated_pay || '0'} />
+            </p>
+          </div>
+        </div>
+
+        {/* Автомобиль и одометр */}
+        <div className="bg-[#F2F4F7] rounded-2xl p-3.5 grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Автомобиль</p>
+            <p className="text-sm font-extrabold text-slate-900 mt-0.5">{vehicleTitle}</p>
+            {vehicleReg && (
+              <p className="text-xs font-bold text-slate-500 uppercase">{vehicleReg}</p>
             )}
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-            {(order.parts || []).length === 0 ? (
-              <p className="p-4 text-center text-xs text-slate-400 font-bold italic">
-                Запчасти не списаны
-              </p>
-            ) : (
-              (order.parts || []).map((p) => (
-                <div key={p.id} className="p-3 flex items-center justify-between">
-                  <span className="text-sm font-bold text-slate-700">{p.part.name}</span>
-                  <span className="text-sm font-black text-slate-900">
-                    {p.quantity} {p.part.unit}
-                  </span>
-                </div>
-              ))
-            )}
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Одометр (пробег)</p>
+            <p className="text-sm font-extrabold text-slate-900 mt-0.5">
+              {currentOdo ? `${Number(currentOdo).toLocaleString('ru-RU')} км` : 'Не указан'}
+            </p>
+            <p className="text-[11px] font-semibold text-[#21A038]">
+              Время: {order.total_minutes ?? 0} мин
+            </p>
           </div>
-        </section>
+        </div>
+
+        {order.admin_note && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+            <p className="text-[10px] font-extrabold text-amber-800 uppercase">
+              Комментарий администратора:
+            </p>
+            <p className="text-xs font-semibold text-amber-900 mt-0.5">{order.admin_note}</p>
+          </div>
+        )}
       </div>
 
-      {/* Фиксированная кнопка снизу */}
-      {(needsAccept || canComplete) && (
-        <div className="fixed bottom-0 left-0 right-0 z-[55] bg-white border-t border-slate-200 shadow-lg px-4 pt-3 pb-6">
-          {acceptError && (
-            <p className="text-xs text-red-500 font-bold text-center mb-2">Ошибка: {acceptError}</p>
-          )}
-          {needsAccept ? (
-            <button
-              onClick={() => acceptMutation.mutate()}
-              disabled={acceptMutation.isPending}
-              className="w-full bg-zinc-900 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-zinc-400"
-            >
-              {acceptMutation.isPending ? 'Принимаем...' : '▶ Принять в работу'}
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                const hasOil = safeWorks.some(
-                  (w) =>
-                    isOilOrFilterWork(w.work_catalog?.name) ||
-                    isOilOrFilterWork(w.custom_work_name),
-                );
-                if (hasOil && !order.odometer_end) {
-                  setCloseOdometerVal(order.odometer_start ? String(order.odometer_start) : '');
-                  setCloseOdometerError('');
-                  setShowCloseOdometerModal(true);
-                  return;
-                }
-                if (window.confirm('Закрыть наряд и отправить на утверждение?')) {
-                  completeMutation.mutate();
-                }
-              }}
-              disabled={completeMutation.isPending}
-              className="w-full bg-green-600 text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest active:scale-95 transition-transform disabled:bg-green-400"
-            >
-              {completeMutation.isPending ? 'Закрываем...' : '✓ Закрыть наряд'}
-            </button>
-          )}
+      {/* ── 2. ПЕРЕЧЕНЬ ВЫПОЛНЕННЫХ РАБОТ ── */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-3.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            Перечень работ ({safeWorks.length})
+          </h2>
+          <span className="text-xs font-extrabold text-[#21A038]">
+            Итого: {order.total_minutes ?? 0} мин
+          </span>
         </div>
-      )}
 
-      {showCloseOdometerModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
-          onClick={() => {
-            if (!completeMutation.isPending) setShowCloseOdometerModal(false);
-          }}
-        >
-          <div
-            className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t-2 sm:border-2 border-slate-200 overflow-hidden p-5 space-y-4 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">
-                  🛢️ Замена масла/фильтра
-                </h2>
-                <p className="text-xs font-bold text-slate-500 mt-0.5">
-                  Наряд #{order.order_number} ·{' '}
-                  {order.asset?.short_name || order.client_vehicle_brand || 'Автомобиль'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCloseOdometerModal(false)}
-                disabled={completeMutation.isPending}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1 leading-none"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="rounded-xl p-3 bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium space-y-1">
-              <div className="flex items-center gap-1.5 font-bold uppercase tracking-wide text-[11px]">
-                <span>⚠️</span>
-                <span>Обязательный ввод одометра</span>
-              </div>
-              <p className="leading-relaxed">
-                В наряде выполнялись работы по замене масла или фильтров. Для корректного сброса
-                интервала ТО укажите текущий одометр автомобиля.
-              </p>
-            </div>
-
-            <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 space-y-2">
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-700">
-                  Текущий одометр (выезд из сервиса), км <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={closeOdometerVal}
-                    onChange={(e) => {
-                      setCloseOdometerVal(e.target.value);
-                      setCloseOdometerError('');
-                    }}
-                    placeholder={order.odometer_start ? String(order.odometer_start) : '0'}
-                    className="w-full rounded-lg border-2 border-slate-300 px-4 h-14 text-2xl font-black text-slate-900 focus:border-green-600 focus:outline-none transition-colors"
-                    autoFocus
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 uppercase">
-                    км
-                  </span>
+        {safeWorks.length === 0 ? (
+          <p className="text-xs font-semibold text-slate-400 text-center py-4">
+            Работы ещё не записаны — добавьте выполненную работу ниже
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {safeWorks.map((w, idx) => {
+              const name = w.custom_work_name || w.work_catalog?.name || 'Работа';
+              const mins = w.actual_minutes || w.norm_minutes || 0;
+              const workPay = calcWorkPay(mins);
+              return (
+                <div
+                  key={w.id}
+                  className="bg-[#F8FAFC] border border-slate-200/80 rounded-2xl p-3.5 flex items-start justify-between gap-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-extrabold text-slate-900">
+                      {idx + 1}. {name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-bold text-slate-500">⏱ Время: {mins} мин</span>
+                      <span className="text-xs font-extrabold text-[#21A038] bg-[#E8F7EC] px-2 py-0.5 rounded-md">
+                        +{workPay.toLocaleString('ru-RU')} ₽ в ЗП
+                      </span>
+                    </div>
+                  </div>
+                  {isEditable && (
+                    <button
+                      type="button"
+                      onClick={() => deleteWorkMutation.mutate(w.id)}
+                      disabled={deleteWorkMutation.isPending}
+                      className="w-7 h-7 rounded-lg bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center shrink-0 active:scale-95"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Форма добавления работы (1 строка - название, 2 строка - минуты) */}
+        {isEditable && (
+          <div className="bg-[#F2F4F7] rounded-2xl p-3.5 space-y-2.5 border border-slate-200/70">
+            <div>
+              <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                Строка 1 — Наименование работы
+              </label>
+              <input
+                type="text"
+                value={workNameInput}
+                onChange={(e) => setWorkNameInput(e.target.value)}
+                placeholder="Например: Замена глушителя (бочка)"
+                className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+              />
             </div>
 
-            {closeOdometerError && (
-              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-2.5 text-red-700 text-xs font-bold text-center">
-                {closeOdometerError}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  Строка 2 — Время в минутах
+                </label>
+                {Number(workMinutesInput) > 0 && (
+                  <span className="text-[11px] font-extrabold text-[#21A038]">
+                    +{calcWorkPay(Number(workMinutesInput)).toLocaleString('ru-RU')} ₽ в ЗП
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={workMinutesInput}
+                  onChange={(e) => setWorkMinutesInput(e.target.value)}
+                  placeholder="Минуты (напр. 60)"
+                  className="flex-1 h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                />
+                <button
+                  type="button"
+                  onClick={() => addWorkMutation.mutate()}
+                  disabled={addWorkMutation.isPending}
+                  className="px-4 h-11 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0"
+                >
+                  {addWorkMutation.isPending ? '...' : '+ Добавить'}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[30, 45, 60, 90, 120, 180].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setWorkMinutesInput(String(m))}
+                    className={cn(
+                      'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors',
+                      Number(workMinutesInput) === m
+                        ? 'bg-[#21A038] text-white'
+                        : 'bg-white text-slate-600 border border-slate-200',
+                    )}
+                  >
+                    {m} мин
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. ЗАПЧАСТИ АВТОСЕРВИСА ── */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-3.5">
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isPartsChecked}
+            disabled={!isEditable}
+            onChange={(e) => {
+              setPartsProvided(e.target.checked);
+              updateOrderMutation.mutate({ parts_provided_by_service: e.target.checked });
+            }}
+            className="mt-0.5 w-5 h-5 rounded-md accent-[#21A038] shrink-0"
+          />
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-slate-900 leading-tight">
+              Запчасти предоставил автосервис (мы)
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+              Механик или мастер-приёмщик ездили за запчастями или их привезли в гараж
+            </p>
+          </div>
+        </label>
+
+        {(isPartsChecked || safeParts.length > 0) && (
+          <div className="pt-2 border-t border-slate-100 space-y-3">
+            {safeParts.length === 0 ? (
+              <p className="text-xs font-semibold text-slate-400 text-center py-2">
+                Впишите купленные запчасти по одной ниже
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {safeParts.map((p, idx) => {
+                  const pName = p.custom_part_name || p.part?.name || 'Запчасть';
+                  const pUnit = p.unit || p.part?.unit || 'шт';
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between bg-[#E8F7EC]/60 border border-[#21A038]/20 rounded-xl px-3.5 py-2.5"
+                    >
+                      <span className="text-xs font-extrabold text-slate-900">
+                        {idx + 1}. {pName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-[#0E7C5B]">
+                          {p.quantity} {pUnit}
+                        </span>
+                        {isEditable && (
+                          <button
+                            type="button"
+                            onClick={() => deletePartMutation.mutate(p.id)}
+                            disabled={deletePartMutation.isPending}
+                            className="w-6 h-6 rounded-md bg-white text-red-500 font-bold text-xs flex items-center justify-center"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            <div className="flex gap-2 pt-2">
+            {isEditable && (
+              <div className="bg-[#F2F4F7] rounded-2xl p-3 space-y-2 border border-slate-200/70">
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  Добавить купленную запчасть
+                </label>
+                <input
+                  type="text"
+                  value={partNameInput}
+                  onChange={(e) => setPartNameInput(e.target.value)}
+                  placeholder="Название запчасти (напр. Глушитель бочка)"
+                  className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={partQtyInput}
+                    onChange={(e) => setPartQtyInput(e.target.value)}
+                    placeholder="Кол-во"
+                    className="w-20 h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-extrabold text-slate-900"
+                  />
+                  <select
+                    value={partUnitInput}
+                    onChange={(e) => setPartUnitInput(e.target.value)}
+                    className="w-24 h-11 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700"
+                  >
+                    <option value="шт">шт</option>
+                    <option value="л">л</option>
+                    <option value="компл">компл</option>
+                    <option value="м">м</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => addPartMutation.mutate()}
+                    disabled={addPartMutation.isPending}
+                    className="flex-1 h-11 rounded-xl bg-slate-900 text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform"
+                  >
+                    + Запчасть
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 4. ОДОМЕТР (если не был указан) ── */}
+      {isEditable && (!currentOdo || hasOil) && (
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-2">
+          <label className="block text-xs font-extrabold text-slate-700">
+            Пробег по одометру (км){' '}
+            {(!isOwn || hasOil) && <span className="text-red-500">* обязательно</span>}
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              value={odometerInput}
+              onChange={(e) => setOdometerInput(e.target.value)}
+              placeholder={currentOdo ? String(currentOdo) : 'Например: 154200'}
+              className="flex-1 h-11 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-extrabold text-slate-900"
+            />
+            {odometerInput.trim() && (
               <button
                 type="button"
-                onClick={() => setShowCloseOdometerModal(false)}
-                disabled={completeMutation.isPending}
-                className="w-1/3 h-12 rounded-lg border-2 border-slate-200 font-bold text-xs uppercase tracking-wide text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+                onClick={() => updateOrderMutation.mutate({ odometer_end: Number(odometerInput) })}
+                disabled={updateOrderMutation.isPending}
+                className="px-4 h-11 rounded-xl bg-[#E8F7EC] text-[#0E7C5B] font-extrabold text-xs uppercase"
               >
-                Отмена
+                Сохранить км
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const num = Number(closeOdometerVal);
-                  if (!closeOdometerVal.trim() || isNaN(num) || num <= 0) {
-                    setCloseOdometerError('Укажите корректный одометр автомобиля при замене масла');
-                    return;
-                  }
-                  completeMutation.mutate({ odometer_end: num });
-                }}
-                disabled={completeMutation.isPending}
-                className="flex-1 h-12 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
-              >
-                <span>{completeMutation.isPending ? 'Закрываем...' : '✓ Закрыть наряд'}</span>
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      <AddWorkModal open={showAddWork} onClose={() => setShowAddWork(false)} orderId={id} />
-      <AddPartModal open={showAddPart} onClose={() => setShowAddPart(false)} orderId={id} />
-      <CompleteWorkModal
-        open={!!workToComplete}
-        work={workToComplete}
-        onClose={() => setWorkToComplete(null)}
-        onComplete={(minutes) =>
-          completeWorkMutation.mutate({ workId: workToComplete!.id, actual_minutes: minutes })
-        }
-      />
-    </>
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-3.5 text-xs font-bold text-center">
+          {actionError}
+        </div>
+      )}
+
+      {/* ── 5. ФИКСИРОВАННАЯ ПАНЕЛЬ ЗАКРЫТИЯ НАРЯДА ── */}
+      {!isApproved && (
+        <div className="fixed bottom-20 left-0 right-0 z-40 px-4">
+          <div className="max-w-lg mx-auto bg-white border border-slate-200 shadow-xl rounded-2xl p-3.5 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Расчётная ЗП</p>
+              <p className="text-lg font-black text-[#21A038]">
+                +<Money amount={order.mechanic_pay || order.estimated_pay || '0'} />
+              </p>
+            </div>
+            {order.status !== 'completed' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const odoVal = odometerInput.trim() ? Number(odometerInput) : currentOdo;
+                  updateOrderMutation.mutate({
+                    status: 'completed',
+                    ...(odoVal ? { odometer_end: odoVal } : {}),
+                  });
+                }}
+                disabled={updateOrderMutation.isPending}
+                className="px-6 py-3 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide shadow-md shadow-[#21A038]/20 active:scale-95 transition-transform disabled:opacity-50"
+              >
+                {updateOrderMutation.isPending ? 'Сохраняем...' : '✓ Закрыть заказ-наряд'}
+              </button>
+            ) : (
+              <span className="text-xs font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl">
+                ⏳ Передан на проверку
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,10 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { generateDeterministicUuid } from '@saldacargo/shared';
 
 const BANK_WALLET_ID = '10000000-0000-0000-0000-000000000001';
-const TRIP_REVENUE_CAT_ID = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
-const STO_REVENUE_CAT_ID = '00000000-0000-0000-0000-000000000010'; // Выручка СТО / услуги
+const TRIP_REVENUE_CAT_ID = '74008cf7-0527-4e9f-afd2-d232b8f8125a'; // Выручка с рейса
+const STO_REVENUE_CAT_ID = '600e7f70-2797-474d-948b-432230036d67'; // Выручка с ремонта (SERVICE_REVENUE)
+
+/**
+ * Поиск существующих транзакций, привязанных к данной банковской операции:
+ * по прямому idempotency_key (UUID) или по маркеру [bank_op:UUID] в description.
+ */
+async function findExistingTransactions(supabase: any, idempotencyKey: string) {
+  const { data, error } = await (supabase.from('transactions') as any)
+    .select('id, trip_order_id, idempotency_key, description')
+    .or(`idempotency_key.eq.${idempotencyKey},description.ilike.%${idempotencyKey}%`);
+
+  if (error) {
+    console.error('Error finding existing transactions for link-bank-op:', error);
+    return [];
+  }
+  return data || [];
+}
 
 /**
  * POST /api/finance/link-bank-op
@@ -35,15 +52,22 @@ export async function POST(req: Request) {
 
     // 1. Действие: ОТВЯЗАТЬ
     if (action === 'unlink') {
-      const { data: existingTxs } = await (supabase.from('transactions') as any)
-        .select('id, trip_order_id')
-        .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.like.${idempotencyKey}_%`);
+      const existingTxs = await findExistingTransactions(supabase, idempotencyKey);
 
-      if (existingTxs && existingTxs.length > 0) {
+      if (existingTxs.length > 0) {
         const txIds = existingTxs.map((t: any) => t.id);
         const orderIds = existingTxs.map((t: any) => t.trip_order_id).filter(Boolean);
 
-        await (supabase.from('transactions') as any).delete().in('id', txIds);
+        const { error: delErr } = await (supabase.from('transactions') as any)
+          .delete()
+          .in('id', txIds);
+        if (delErr) {
+          console.error('Error deleting transactions on unlink:', delErr);
+          return NextResponse.json(
+            { error: `Ошибка отвязки транзакции: ${delErr.message}` },
+            { status: 500 },
+          );
+        }
 
         if (orderIds.length > 0) {
           await (supabase.from('trip_orders') as any)
@@ -89,17 +113,24 @@ export async function POST(req: Request) {
       }
 
       // Очищаем старые транзакции для этой банковской операции (если была предыдущая привязка)
-      const { data: prevTxs } = await (supabase.from('transactions') as any)
-        .select('id, trip_order_id')
-        .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.like.${idempotencyKey}_%`);
+      const prevTxs = await findExistingTransactions(supabase, idempotencyKey);
 
-      if (prevTxs && prevTxs.length > 0) {
+      if (prevTxs.length > 0) {
         const prevTxIds = prevTxs.map((t: any) => t.id);
         const prevOrderIds = prevTxs
           .map((t: any) => t.trip_order_id)
           .filter((id: string) => Boolean(id) && !targetOrderIds.includes(id));
 
-        await (supabase.from('transactions') as any).delete().in('id', prevTxIds);
+        const { error: delErr } = await (supabase.from('transactions') as any)
+          .delete()
+          .in('id', prevTxIds);
+        if (delErr) {
+          console.error('Error cleaning prev transactions in link-bank-op:', delErr);
+          return NextResponse.json(
+            { error: `Ошибка обновления связки: ${delErr.message}` },
+            { status: 500 },
+          );
+        }
 
         if (prevOrderIds.length > 0) {
           await (supabase.from('trip_orders') as any)
@@ -132,7 +163,9 @@ export async function POST(req: Request) {
 
         // Если 1 рейс — берём сумму операции или сумму заказа; если несколько — сумму конкретного заказа
         const txAmount = isSingle ? amountVal || orderAmt : orderAmt;
-        const txKey = isSingle ? idempotencyKey : `${idempotencyKey}_${order.id}`;
+        const txKey = isSingle
+          ? idempotencyKey
+          : generateDeterministicUuid(`${idempotencyKey}:${order.id}`);
 
         newTxs.push({
           direction: 'income',
@@ -146,7 +179,7 @@ export async function POST(req: Request) {
           related_user_id: order.trip?.driver_id || null,
           lifecycle_status: 'approved',
           settlement_status: 'completed',
-          description: `Оплата по СБП / Р/С · ${tripNumber} (${driverName})`,
+          description: `Оплата по СБП / Р/С · ${tripNumber} (${driverName}) [bank_op:${idempotencyKey}]`,
           idempotency_key: txKey,
           transaction_date: opDate,
           created_at: opDate,
@@ -154,7 +187,14 @@ export async function POST(req: Request) {
         });
       }
 
-      await (supabase.from('transactions') as any).insert(newTxs);
+      const { error: insErr } = await (supabase.from('transactions') as any).insert(newTxs);
+      if (insErr) {
+        console.error('Error inserting transactions in link-bank-op:', insErr);
+        return NextResponse.json(
+          { error: `Не удалось сохранить транзакцию: ${insErr.message}` },
+          { status: 500 },
+        );
+      }
 
       await (supabase.from('trip_orders') as any)
         .update({
@@ -175,15 +215,22 @@ export async function POST(req: Request) {
     }
 
     // Очищаем старые транзакции для этой банковской операции перед записью СТО / Диспетчера
-    const { data: prevTxs } = await (supabase.from('transactions') as any)
-      .select('id, trip_order_id')
-      .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.like.${idempotencyKey}_%`);
+    const prevTxs = await findExistingTransactions(supabase, idempotencyKey);
 
-    if (prevTxs && prevTxs.length > 0) {
+    if (prevTxs.length > 0) {
       const prevTxIds = prevTxs.map((t: any) => t.id);
       const prevOrderIds = prevTxs.map((t: any) => t.trip_order_id).filter(Boolean);
 
-      await (supabase.from('transactions') as any).delete().in('id', prevTxIds);
+      const { error: delErr } = await (supabase.from('transactions') as any)
+        .delete()
+        .in('id', prevTxIds);
+      if (delErr) {
+        console.error('Error cleaning prev transactions before STO/dispatcher:', delErr);
+        return NextResponse.json(
+          { error: `Ошибка обновления связки: ${delErr.message}` },
+          { status: 500 },
+        );
+      }
 
       if (prevOrderIds.length > 0) {
         await (supabase.from('trip_orders') as any)
@@ -209,14 +256,21 @@ export async function POST(req: Request) {
         counterparty_id: body.counterpartyId || null,
         lifecycle_status: 'approved',
         settlement_status: 'completed',
-        description: `Оплата заказ-наряда · ${orderLabel} (${clientName})`,
+        description: `Оплата заказ-наряда · ${orderLabel} (${clientName}) [bank_op:${idempotencyKey}]`,
         idempotency_key: idempotencyKey,
         transaction_date: opDate,
         created_at: opDate,
         created_by: adminUser?.id || null,
       };
 
-      await (supabase.from('transactions') as any).insert(txPayload);
+      const { error: stoErr } = await (supabase.from('transactions') as any).insert(txPayload);
+      if (stoErr) {
+        console.error('Error inserting STO transaction:', stoErr);
+        return NextResponse.json(
+          { error: `Не удалось сохранить транзакцию СТО: ${stoErr.message}` },
+          { status: 500 },
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -240,14 +294,21 @@ export async function POST(req: Request) {
         counterparty_id: body.counterpartyId || null,
         lifecycle_status: 'approved',
         settlement_status: 'completed',
-        description: `Диспетчерский рейс · ${details} (${clientName})`,
+        description: `Диспетчерский рейс · ${details} (${clientName}) [bank_op:${idempotencyKey}]`,
         idempotency_key: idempotencyKey,
         transaction_date: opDate,
         created_at: opDate,
         created_by: adminUser?.id || null,
       };
 
-      await (supabase.from('transactions') as any).insert(txPayload);
+      const { error: dispErr } = await (supabase.from('transactions') as any).insert(txPayload);
+      if (dispErr) {
+        console.error('Error inserting Dispatcher transaction:', dispErr);
+        return NextResponse.json(
+          { error: `Не удалось сохранить транзакцию диспетчера: ${dispErr.message}` },
+          { status: 500 },
+        );
+      }
 
       return NextResponse.json({
         success: true,
