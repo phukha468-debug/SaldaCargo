@@ -5,8 +5,8 @@ import { NextResponse } from 'next/server';
 /** POST /api/auth/set-pin — устанавливает личный 4-значный PIN сотрудника */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { user_id?: string; pin?: string };
-    const { user_id, pin } = body;
+    const body = (await request.json()) as { user_id?: string; pin?: string; current_pin?: string };
+    const { user_id, pin, current_pin } = body;
 
     if (!user_id || !pin) {
       return NextResponse.json({ error: 'Не указан пользователь или PIN-код' }, { status: 400 });
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     // Проверяем существование пользователя
     const { data: user, error: findError } = await (supabase.from('users') as any)
-      .select('id, name, is_active')
+      .select('id, name, is_active, pin_code')
       .eq('id', user_id)
       .maybeSingle();
 
@@ -34,6 +34,11 @@ export async function POST(request: Request) {
 
     if (!user.is_active) {
       return NextResponse.json({ error: 'Сотрудник деактивирован' }, { status: 403 });
+    }
+
+    // Если PIN уже установлен — требуем верный текущий PIN для смены
+    if (user.pin_code && String(user.pin_code).trim() !== String(current_pin || '').trim()) {
+      return NextResponse.json({ error: 'Неверный текущий PIN-код для смены' }, { status: 403 });
     }
 
     // Сохраняем PIN

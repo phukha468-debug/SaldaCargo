@@ -27,6 +27,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.*
@@ -70,6 +72,8 @@ fun DispatcherScreen(
     var approvingOrderId by remember { mutableStateOf<String?>(null) }
     var returningOrderId by remember { mutableStateOf<String?>(null) }
     var deletingOrderId by remember { mutableStateOf<String?>(null) }
+    var editingServiceOrder by remember { mutableStateOf<MechanicOrder?>(null) }
+    var showWalletTransferDialog by remember { mutableStateOf(false) }
 
     // Диалоги Дохода и Расхода
     var showAddIncomeDialog by rememberSaveable { mutableStateOf(false) }
@@ -97,13 +101,23 @@ fun DispatcherScreen(
         scope.launch {
             isLoading = true
             try {
-                adminSummary = SaldaApiClient.getAdminSummary(user.id)
-                reviewTrips = SaldaApiClient.getAdminTrips(filter = "review", adminId = user.id)
-                reviewServiceOrders = SaldaApiClient.getAdminServiceOrders(filter = "review", adminId = user.id)
-                activeTrips = SaldaApiClient.getAdminTrips(filter = "active", adminId = user.id)
-                wallets = SaldaApiClient.getWallets(userId = user.id)
-                allStaff = SaldaApiClient.getUsers()
-                payrollStaff = SaldaApiClient.getAdminPayroll(year = payrollYear, month = payrollMonth, adminId = user.id)
+                coroutineScope {
+                    val summaryDeferred = async { SaldaApiClient.getAdminSummary(user.id) }
+                    val reviewTripsDeferred = async { SaldaApiClient.getAdminTrips(filter = "review", adminId = user.id) }
+                    val reviewServiceDeferred = async { SaldaApiClient.getAdminServiceOrders(filter = "review", adminId = user.id) }
+                    val activeTripsDeferred = async { SaldaApiClient.getAdminTrips(filter = "active", adminId = user.id) }
+                    val walletsDeferred = async { SaldaApiClient.getWallets(userId = user.id) }
+                    val allStaffDeferred = async { SaldaApiClient.getUsers() }
+                    val payrollStaffDeferred = async { SaldaApiClient.getAdminPayroll(year = payrollYear, month = payrollMonth, adminId = user.id) }
+
+                    adminSummary = summaryDeferred.await()
+                    reviewTrips = reviewTripsDeferred.await()
+                    reviewServiceOrders = reviewServiceDeferred.await()
+                    activeTrips = activeTripsDeferred.await()
+                    wallets = walletsDeferred.await()
+                    allStaff = allStaffDeferred.await()
+                    payrollStaff = payrollStaffDeferred.await()
+                }
             } catch (_: Exception) {}
             finally {
                 isLoading = false
@@ -449,6 +463,21 @@ fun DispatcherScreen(
                         Text("➖", fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("РАСХОД", fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    }
+
+                    Button(
+                        onClick = { showWalletTransferDialog = true },
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(54.dp)
+                            .bouncyTouch(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F46E5)),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 6.dp)
+                    ) {
+                        Text("↔", fontSize = 15.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("ПЕРЕВОД", fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
                     }
                 }
             }
@@ -1342,6 +1371,19 @@ fun DispatcherScreen(
                                             }
 
                                             OutlinedButton(
+                                                onClick = { editingServiceOrder = order },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(40.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Zinc700),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Zinc300),
+                                                shape = RoundedCornerShape(10.dp),
+                                                enabled = !isApprovingOrder && !isReturningOrder && !isDeletingOrder
+                                            ) {
+                                                Text("✏ Изменить", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            OutlinedButton(
                                                 onClick = {
                                                     scope.launch {
                                                         returningOrderId = order.id
@@ -1994,6 +2036,30 @@ fun DispatcherScreen(
                 ) {
                     Text("Отмена", color = Zinc700)
                 }
+            }
+        )
+    }
+
+    if (showWalletTransferDialog) {
+        WalletTransferDialog(
+            wallets = wallets,
+            adminId = user.id,
+            onDismiss = { showWalletTransferDialog = false },
+            onSuccess = {
+                showWalletTransferDialog = false
+                refreshAll()
+            }
+        )
+    }
+
+    editingServiceOrder?.let { orderToEdit ->
+        ServiceOrderEditDialog(
+            order = orderToEdit,
+            adminId = user.id,
+            onDismiss = { editingServiceOrder = null },
+            onSuccess = {
+                editingServiceOrder = null
+                refreshAll()
             }
         )
     }

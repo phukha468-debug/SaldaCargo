@@ -12,27 +12,12 @@ export async function GET() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   const [
-    { data: repairRequests },
     { data: activeOrders },
     { data: pendingApproval },
-    { data: extraWorkPending },
     { data: maintenanceAlerts },
     { data: allServiceOrders },
     { data: salaryTxs },
   ] = await Promise.all([
-    // Новые заявки от водителей
-    (supabase.from('repair_requests') as any)
-      .select(
-        `
-        id, created_at, custom_description,
-        asset:assets(short_name, reg_number),
-        driver:users!repair_requests_driver_id_fkey(name),
-        fault:fault_catalog(name, category)
-      `,
-      )
-      .eq('status', 'new')
-      .order('created_at', { ascending: false }),
-
     // Активные наряды (в работе + открытые)
     (supabase.from('service_orders') as any)
       .select(
@@ -62,22 +47,6 @@ export async function GET() {
       .eq('lifecycle_status', 'draft')
       .order('created_at', { ascending: false }),
 
-    // Доп. работы на согласовании
-    (supabase.from('service_order_works') as any)
-      .select(
-        `
-        id, extra_work_mechanic_note, norm_minutes, created_at, custom_work_name,
-        work:work_catalog(name),
-        service_order:service_orders(
-          id, order_number,
-          asset:assets(short_name, reg_number),
-          mechanic:users!service_orders_assigned_mechanic_id_fkey(name)
-        )
-      `,
-      )
-      .eq('extra_work_status', 'pending_approval')
-      .order('created_at', { ascending: false }),
-
     // Алерты ТО
     (supabase.from('maintenance_items') as any)
       .select(
@@ -102,6 +71,9 @@ export async function GET() {
       .eq('lifecycle_status', 'approved')
       .is('from_wallet_id', null),
   ]);
+
+  const repairRequests: any[] = [];
+  const extraWorkPending: any[] = [];
 
   let clientRevenueThisMonth = 0;
   let clientRevenueAllTime = 0;

@@ -59,7 +59,7 @@ fun LoaderScreen(
         scope.launch {
             isSaving = true
             try {
-                // В локальной сессии и в профиле
+                SaldaApiClient.updateLoaderShift(user.id, online, addr, transport)
             } catch (_: Exception) {}
             finally {
                 isSaving = false

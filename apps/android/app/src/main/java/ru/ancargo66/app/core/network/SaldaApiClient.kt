@@ -7,6 +7,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.addJsonObject
 import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -850,6 +852,78 @@ object SaldaApiClient {
         adminId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         val request = buildRequest("/api/admin/service-orders/$orderId", method = "DELETE", userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun updateLoaderShift(
+        userId: String,
+        isOnline: Boolean,
+        address: String,
+        hasTransport: Boolean
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("user_id", userId)
+            put("is_online", isOnline)
+            put("address", address)
+            put("has_transport", hasTransport)
+        }.toString()
+        val request = buildRequest("/api/loader/shift", method = "POST", bodyJson = body, userId = userId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun updateAdminServiceOrder(
+        orderId: String,
+        adminId: String? = null,
+        works: List<Pair<String, Long>>,
+        parts: List<Triple<String, Double, Double>>,
+        odometer: Long? = null,
+        mechanicPay: Double? = null,
+        vehicleModel: String? = null,
+        vehicleReg: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("action", "edit_order")
+            if (!adminId.isNullOrBlank()) put("admin_id", adminId)
+            if (odometer != null) put("odometer_end", odometer)
+            if (mechanicPay != null) put("mechanic_pay", mechanicPay)
+            if (!vehicleModel.isNullOrBlank()) put("client_vehicle_model", vehicleModel)
+            if (!vehicleReg.isNullOrBlank()) put("client_vehicle_reg", vehicleReg)
+            putJsonArray("works") {
+                works.forEach { (name, mins) ->
+                    addJsonObject {
+                        put("name", name)
+                        put("minutes", mins)
+                    }
+                }
+            }
+            putJsonArray("parts") {
+                parts.forEach { (name, qty, price) ->
+                    addJsonObject {
+                        put("name", name)
+                        put("quantity", qty)
+                        put("client_price", price)
+                    }
+                }
+            }
+        }.toString()
+        val request = buildRequest("/api/admin/service-orders/$orderId", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun transferBetweenWallets(
+        fromWalletId: String,
+        toWalletId: String,
+        amount: Double,
+        comment: String,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("from_wallet_id", fromWalletId)
+            put("to_wallet_id", toWalletId)
+            put("amount", amount.toString())
+            put("description", comment)
+        }.toString()
+        val request = buildRequest("/api/admin/wallet-transfer", method = "POST", bodyJson = body, userId = adminId)
         client.newCall(request).execute().use { it.isSuccessful }
     }
 }

@@ -1,37 +1,28 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const DEFAULT_ADMIN_ID = 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
-
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
-
-  // Если пользователь перешел на /login — сразу редиректим на главную без ввода пароля
-  if (pathname === '/login') {
-    const response = NextResponse.redirect(new URL('/', request.url));
-    response.cookies.set('salda_auth_token', DEFAULT_ADMIN_ID, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365, // 1 год
-      path: '/',
-    });
-    return response;
-  }
-
   const token = request.cookies.get('salda_auth_token')?.value;
 
-  // Если токена нет — автоматически авторизуем как Администратора
+  // Публичные маршруты
+  const isAuthRoute = pathname === '/login' || pathname.startsWith('/api/auth');
+
+  if (isAuthRoute) {
+    // Если уже авторизован и переходит на /login — перенаправляем на главную
+    if (token && pathname === '/login') {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Если токена нет — перенаправляем на страницу входа
   if (!token) {
-    const response = NextResponse.next();
-    response.cookies.set('salda_auth_token', DEFAULT_ADMIN_ID, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
-    return response;
+    const loginUrl = new URL('/login', request.url);
+    if (pathname !== '/') {
+      loginUrl.searchParams.set('from', pathname);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

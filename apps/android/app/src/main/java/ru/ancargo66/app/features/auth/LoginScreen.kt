@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.User
 import ru.ancargo66.app.core.network.SaldaApiClient
-import ru.ancargo66.app.core.network.SupabaseApi
 import ru.ancargo66.app.ui.theme.*
 
 private var cachedUsersMemory: List<User> = emptyList()
@@ -46,12 +45,7 @@ fun LoginScreen(
             if (cachedUsersMemory.isEmpty()) isLoading = true
             errorMessage = null
             try {
-                // Быстрый прямой запрос в Supabase (~300мс) с откатом на API
-                val loaded = try {
-                    SupabaseApi.getUsers()
-                } catch (_: Exception) {
-                    SaldaApiClient.getUsers()
-                }
+                val loaded = SaldaApiClient.getUsers()
                 users = loaded
                 cachedUsersMemory = loaded
             } catch (e: Exception) {

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
+import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate, formatDuration, isTruckAsset, isEndOfMonth } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
 
@@ -35,82 +35,6 @@ interface DriverSummary {
   monthPayApproved: string;
   monthPayDraft: string;
   pendingPayrollCount: number;
-}
-
-// ── Карточка заявки на ремонт ────────────────────────────────
-
-interface RepairRequestCard {
-  id: string;
-  status: 'new' | 'approved' | 'rejected';
-  custom_description: string | null;
-  created_at: string;
-  asset: { short_name: string; reg_number: string } | null;
-  fault: { name: string } | null;
-  service_order: { order_number: number; status: string } | null;
-}
-
-function RepairRequestsList() {
-  const { data: requests = [] } = useQuery<RepairRequestCard[]>({
-    queryKey: ['driver-repair-requests'],
-    queryFn: async () => {
-      const r = await fetch('/api/driver/repair-requests');
-      if (!r.ok) throw new Error('API error');
-      return r.json();
-    },
-    staleTime: 30000,
-  });
-
-  if (!Array.isArray(requests) || requests.length === 0) return null;
-
-  const statusInfo: Record<string, { label: string; color: string }> = {
-    new: { label: 'На рассмотрении', color: 'bg-amber-100 text-amber-700' },
-    approved: { label: 'Наряд создан', color: 'bg-green-100 text-green-700' },
-    rejected: { label: 'Отклонена', color: 'bg-red-100 text-red-700' },
-  };
-
-  return (
-    <section className="pt-2">
-      <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">
-        Мои заявки на ремонт
-      </h2>
-      <div className="space-y-2">
-        {requests.map((req) => {
-          const si = statusInfo[req.status] ?? {
-            label: req.status,
-            color: 'bg-zinc-100 text-zinc-500',
-          };
-          return (
-            <div key={req.id} className="bg-white rounded-lg border border-zinc-200 p-3 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-zinc-900 text-sm truncate">
-                    {req.asset?.short_name ?? '—'}
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">
-                    {req.fault?.name ?? req.custom_description ?? 'Без описания'}
-                  </p>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">{formatDate(req.created_at)}</p>
-                  {req.service_order && (
-                    <p className="text-[10px] font-bold text-green-700 mt-0.5">
-                      Наряд #{req.service_order.order_number}
-                    </p>
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    'text-[9px] font-black px-2 py-1 rounded-full flex-shrink-0',
-                    si.color,
-                  )}
-                >
-                  {si.label}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
 }
 
 // ── Главная страница водителя ────────────────────────────────
@@ -580,9 +504,6 @@ export default function RootPage() {
           </div>
         </section>
       )}
-
-      {/* Заявки на ремонт */}
-      <RepairRequestsList />
 
       {/* Модалка быстрого создания ПРР */}
       {showPrrModal && (

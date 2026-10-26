@@ -12,7 +12,10 @@ const WALLET_NAMES: Record<string, string> = {
 
 export async function POST(request: Request) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value;
+  const userId =
+    cookieStore.get('salda_user_id')?.value ||
+    request.headers.get('x-salda-user-id') ||
+    request.headers.get('Authorization')?.replace('Bearer ', '');
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

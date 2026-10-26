@@ -303,190 +303,6 @@ function BottomSheet({
   );
 }
 
-// ── Approve Request Modal ──────────────────────────────────────
-
-function ApproveRequestModal({
-  request,
-  mechanics,
-  onClose,
-  onSuccess,
-}: {
-  request: RepairRequest;
-  mechanics: Mechanic[];
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [mechanicId, setMechanicId] = useState('');
-  const [secondMechanicId, setSecondMechanicId] = useState('');
-  const [odometer, setOdometer] = useState('');
-  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
-
-  const { data: workCatalog = [] } = useQuery<WorkCatalogItem[]>({
-    queryKey: ['admin-work-catalog'],
-    queryFn: async () => {
-      const r = await fetch('/api/admin/work-catalog');
-      if (!r.ok) throw new Error('Ошибка загрузки каталога');
-      return r.json();
-    },
-    staleTime: 60_000,
-  });
-
-  const toggleWork = (id: string) =>
-    setSelectedWorkIds((p) => {
-      const n = new Set(p);
-      if (n.has(id)) {
-        n.delete(id);
-      } else {
-        n.add(id);
-      }
-      return n;
-    });
-
-  const selectedWorks = workCatalog.filter((w) => selectedWorkIds.has(w.id));
-  const totalNormHours = selectedWorks.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
-  const mechPct = parseFloat(
-    mechanics.find((m) => m.id === mechanicId)?.mechanic_salary_pct ?? '50',
-  );
-  const estimatedSalary = totalNormHours * 2000 * (mechPct / 100);
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/admin/repair-requests/${request.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'approve',
-          mechanic_id: mechanicId || undefined,
-          second_mechanic_id: secondMechanicId || undefined,
-          odometer: odometer ? Number(odometer) : undefined,
-          work_ids: selectedWorkIds.size > 0 ? [...selectedWorkIds] : undefined,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
-      return res.json();
-    },
-    onSuccess: () => {
-      onSuccess();
-      onClose();
-    },
-  });
-
-  return (
-    <BottomSheet
-      title="Одобрить → Создать наряд"
-      onClose={onClose}
-      footer={
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="flex-[2] py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-green-600 text-white disabled:bg-green-300"
-          >
-            {mutation.isPending ? 'Создаём...' : 'Одобрить и создать наряд'}
-          </button>
-        </div>
-      }
-    >
-      <div className="bg-slate-50 rounded-xl p-3 text-sm">
-        <p className="font-bold text-slate-900">
-          {request.asset?.short_name ?? '—'} · {request.asset?.reg_number ?? ''}
-        </p>
-        <p className="text-slate-500 text-xs mt-0.5">
-          {request.fault?.name ?? request.custom_description ?? 'Без описания'}
-        </p>
-        <p className="text-slate-400 text-xs mt-0.5">Водитель: {request.driver?.name ?? '—'}</p>
-      </div>
-
-      <div>
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-          Текущий пробег (км)
-        </label>
-        <input
-          type="number"
-          value={odometer}
-          onChange={(e) => setOdometer(e.target.value)}
-          placeholder="Необязательно"
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold"
-        />
-      </div>
-
-      <div>
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
-          Выбрать работы
-        </label>
-        <WorkSelector
-          workCatalog={workCatalog}
-          selectedIds={selectedWorkIds}
-          onToggle={toggleWork}
-        />
-      </div>
-
-      <div>
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-          Механик
-        </label>
-        <select
-          value={mechanicId}
-          onChange={(e) => setMechanicId(e.target.value)}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold bg-white"
-        >
-          <option value="">— Любой (возьмёт сам) —</option>
-          {mechanics.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-          Второй механик
-        </label>
-        <select
-          value={secondMechanicId}
-          onChange={(e) => setSecondMechanicId(e.target.value)}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-        >
-          <option value="">— Не нужен —</option>
-          {mechanics
-            .filter((m) => m.id !== mechanicId)
-            .map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-        </select>
-      </div>
-
-      {totalNormHours > 0 && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Итого нч план</span>
-            <span className="font-semibold">{totalNormHours.toFixed(1)} нч</span>
-          </div>
-          <div className="flex justify-between text-sm mt-1">
-            <span className="text-slate-500">ЗП механика (при утверждении)</span>
-            <span className="font-semibold text-green-700">
-              ~{Math.round(estimatedSalary).toLocaleString('ru-RU')} ₽
-            </span>
-          </div>
-        </div>
-      )}
-
-      {mutation.isError && (
-        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
-      )}
-    </BottomSheet>
-  );
-}
-
 // ── Approve Order Modal ────────────────────────────────────────
 
 function ApproveOrderModal({
@@ -714,77 +530,6 @@ function ReturnOrderModal({
         onChange={(e) => setNote(e.target.value)}
         rows={4}
         placeholder="Укажите причину возврата..."
-        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
-      />
-      {mutation.isError && (
-        <p className="text-xs text-red-500 font-bold">{(mutation.error as Error).message}</p>
-      )}
-    </BottomSheet>
-  );
-}
-
-// ── Reject Request Modal ───────────────────────────────────────
-
-function RejectRequestModal({
-  request,
-  onClose,
-  onSuccess,
-}: {
-  request: RepairRequest;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [note, setNote] = useState('');
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/admin/repair-requests/${request.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject', admin_note: note.trim() || undefined }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
-      return res.json();
-    },
-    onSuccess: () => {
-      onSuccess();
-      onClose();
-    },
-  });
-
-  return (
-    <BottomSheet
-      title="Отклонить заявку"
-      onClose={onClose}
-      footer={
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600"
-          >
-            Назад
-          </button>
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-red-600 text-white disabled:opacity-50"
-          >
-            {mutation.isPending ? 'Отклоняем...' : 'Отклонить'}
-          </button>
-        </div>
-      }
-    >
-      <div className="bg-slate-50 rounded-xl p-3 text-sm">
-        <p className="font-bold">{request.asset?.short_name ?? '—'}</p>
-        <p className="text-slate-500 text-xs">
-          {request.fault?.name ?? request.custom_description ?? 'Без описания'}
-        </p>
-      </div>
-      <textarea
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={3}
-        placeholder="Причина отклонения (необязательно)..."
         className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none"
       />
       {mutation.isError && (
@@ -1393,17 +1138,13 @@ function CreateOrderModal({
 
 const TABS = [
   { id: 'home', label: 'Главная', countKey: null },
-  { id: 'requests', label: 'Заявки', countKey: 'repairRequests' },
   { id: 'approval', label: 'Утверждение', countKey: 'pendingApproval' },
   { id: 'active', label: 'Наряды', countKey: 'activeOrders' },
-  { id: 'extra', label: 'Доп. работы', countKey: 'extraWorkPending' },
   { id: 'alerts', label: 'ТО', countKey: 'maintenanceAlerts' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
 type Modal =
-  | { type: 'approve-request'; data: RepairRequest }
-  | { type: 'reject-request'; data: RepairRequest }
   | { type: 'approve-order'; data: PendingOrder }
   | { type: 'return-order'; data: PendingOrder }
   | { type: 'create-order' };
@@ -1467,26 +1208,6 @@ export default function AdminGaragePage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-garage'] });
 
-  const extraWorkMutation = useMutation({
-    mutationFn: async ({
-      orderId,
-      workId,
-      action,
-    }: {
-      orderId: string;
-      workId: string;
-      action: 'approve_extra_work' | 'reject_extra_work';
-    }) => {
-      const res = await fetch(`/api/admin/service-orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, work_id: workId }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
-      return res.json();
-    },
-    onSuccess: invalidate,
-  });
   const counts = data?.counts ?? {};
   const stats = data?.stats ?? {
     clientRevenueThisMonth: 0,
@@ -1669,13 +1390,6 @@ export default function AdminGaragePage() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 {
-                  label: 'Заявок водителей',
-                  value: counts.repairRequests ?? 0,
-                  color: 'text-violet-600',
-                  sub: 'ждут одобрения',
-                  onClick: () => setTab('requests'),
-                },
-                {
                   label: 'На утверждении',
                   value: counts.pendingApproval ?? 0,
                   color: 'text-amber-600',
@@ -1765,46 +1479,6 @@ export default function AdminGaragePage() {
               </>
             )}
 
-            {/* Заявки водителей */}
-            {(data?.repairRequests ?? []).length > 0 && (
-              <>
-                <SectionLabel
-                  title="Новые заявки от водителей"
-                  count={data?.repairRequests.length}
-                  color="bg-violet-100 text-violet-700"
-                />
-                {(data?.repairRequests ?? []).slice(0, 2).map((req) => (
-                  <Card key={req.id} className="border-l-4 border-l-violet-400">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black text-slate-900">{req.asset?.short_name ?? '—'}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {req.fault?.name ?? req.custom_description ?? 'Без описания'}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {req.driver?.name ?? '—'} · {formatDate(req.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <ActionBtn
-                        variant="approve"
-                        onClick={() => setModal({ type: 'approve-request', data: req })}
-                      >
-                        Создать наряд
-                      </ActionBtn>
-                      <ActionBtn
-                        variant="reject"
-                        onClick={() => setModal({ type: 'reject-request', data: req })}
-                      >
-                        Отклонить
-                      </ActionBtn>
-                    </div>
-                  </Card>
-                ))}
-              </>
-            )}
-
             {/* В работе */}
             {(data?.activeOrders ?? []).length > 0 && (
               <>
@@ -1828,57 +1502,6 @@ export default function AdminGaragePage() {
             )}
 
             {totalAlerts === 0 && <EmptyState icon="✅" text="Всё под контролем" />}
-          </>
-        )}
-
-        {/* ── Заявки водителей ── */}
-        {tab === 'requests' && (
-          <>
-            <SectionLabel
-              title="Заявки водителей"
-              count={data?.repairRequests.length ?? 0}
-              color="bg-orange-100 text-orange-700"
-            />
-            {(data?.repairRequests ?? []).length === 0 ? (
-              <EmptyState icon="✅" text="Нет новых заявок" />
-            ) : (
-              data?.repairRequests.map((req) => (
-                <Card key={req.id}>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-slate-900 truncate">
-                        {req.asset?.short_name ?? '—'}
-                      </p>
-                      <p className="text-xs font-bold text-slate-500 mt-0.5">
-                        {req.fault?.name ?? req.custom_description ?? 'Без описания'}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {req.driver?.name ?? '—'} · {formatDate(req.created_at)}
-                      </p>
-                    </div>
-                    {req.fault?.category && (
-                      <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-full flex-shrink-0">
-                        {req.fault.category}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <ActionBtn
-                      variant="approve"
-                      onClick={() => setModal({ type: 'approve-request', data: req })}
-                    >
-                      Создать наряд
-                    </ActionBtn>
-                    <ActionBtn
-                      variant="reject"
-                      onClick={() => setModal({ type: 'reject-request', data: req })}
-                    >
-                      Отклонить
-                    </ActionBtn>
-                  </div>
-                </Card>
-              ))
-            )}
           </>
         )}
 
@@ -1971,71 +1594,6 @@ export default function AdminGaragePage() {
           </>
         )}
 
-        {/* ── Доп. работы ── */}
-        {tab === 'extra' && (
-          <>
-            <SectionLabel
-              title="Доп. работы на согласовании"
-              count={data?.extraWorkPending.length ?? 0}
-              color="bg-amber-100 text-amber-700"
-            />
-            {(data?.extraWorkPending ?? []).length === 0 ? (
-              <EmptyState icon="✅" text="Нет доп. работ на согласовании" />
-            ) : (
-              data?.extraWorkPending.map((ew) => (
-                <Card key={ew.id} className="border-amber-200">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <p className="font-black text-slate-900 text-sm">
-                      {ew.work?.name ?? ew.custom_work_name ?? 'Доп. работа'}
-                    </p>
-                    <span className="text-[10px] font-black text-slate-400 flex-shrink-0">
-                      {(ew.norm_minutes / 60).toFixed(1)} н/ч
-                    </span>
-                  </div>
-                  {ew.extra_work_mechanic_note && (
-                    <p className="text-xs text-slate-600 italic mb-2">
-                      «{ew.extra_work_mechanic_note}»
-                    </p>
-                  )}
-                  <p className="text-[10px] text-slate-400 mb-3">
-                    Наряд #{ew.service_order?.order_number ?? '—'} ·{' '}
-                    {ew.service_order?.asset?.short_name ?? '—'} ·{' '}
-                    {ew.service_order?.mechanic?.name ?? '—'}
-                  </p>
-                  <div className="flex gap-2">
-                    <ActionBtn
-                      variant="approve"
-                      disabled={extraWorkMutation.isPending}
-                      onClick={() =>
-                        extraWorkMutation.mutate({
-                          orderId: ew.service_order!.id,
-                          workId: ew.id,
-                          action: 'approve_extra_work',
-                        })
-                      }
-                    >
-                      Одобрить
-                    </ActionBtn>
-                    <ActionBtn
-                      variant="reject"
-                      disabled={extraWorkMutation.isPending}
-                      onClick={() =>
-                        extraWorkMutation.mutate({
-                          orderId: ew.service_order!.id,
-                          workId: ew.id,
-                          action: 'reject_extra_work',
-                        })
-                      }
-                    >
-                      Отклонить
-                    </ActionBtn>
-                  </div>
-                </Card>
-              ))
-            )}
-          </>
-        )}
-
         {/* ── ТО алерты ── */}
         {tab === 'alerts' && (
           <>
@@ -2099,21 +1657,6 @@ export default function AdminGaragePage() {
       </div>
 
       {/* Modals */}
-      {modal?.type === 'approve-request' && (
-        <ApproveRequestModal
-          request={modal.data}
-          mechanics={mechanics}
-          onClose={() => setModal(null)}
-          onSuccess={invalidate}
-        />
-      )}
-      {modal?.type === 'reject-request' && (
-        <RejectRequestModal
-          request={modal.data}
-          onClose={() => setModal(null)}
-          onSuccess={invalidate}
-        />
-      )}
       {modal?.type === 'approve-order' && (
         <ApproveOrderModal
           order={modal.data}
