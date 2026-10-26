@@ -18,6 +18,7 @@ export async function GET() {
         )
         .eq('settlement_status', 'pending')
         .eq('lifecycle_status', 'approved')
+        .in('payment_method', ['debt_cash', 'debt', 'debt_bank'])
         .order('created_at', { ascending: true }),
 
       (supabase as any)

@@ -14,7 +14,8 @@ export async function GET() {
         .from('trip_orders')
         .select('amount, counterparty_id, created_at')
         .eq('settlement_status', 'pending')
-        .eq('lifecycle_status', 'approved'),
+        .eq('lifecycle_status', 'approved')
+        .in('payment_method', ['debt_cash', 'debt', 'debt_bank']),
       (supabase as any).from('manual_receivables').select('amount').eq('settled', false),
       (supabase as any)
         .from('receivable_follow_ups')
