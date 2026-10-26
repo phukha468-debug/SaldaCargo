@@ -792,9 +792,11 @@ function OrderDetailModal({
   const [editWorkSecondMechanic, setEditWorkSecondMechanic] = useState<string | null>(null);
   const [editWorkCustomPct, setEditWorkCustomPct] = useState<string>('');
   const [partPricesDraft, setPartPricesDraft] = useState<Record<string, string>>({});
+  const [partUnitPricesDraft, setPartUnitPricesDraft] = useState<Record<string, string>>({});
   const [showAddPart, setShowAddPart] = useState(false);
   const [addPartName, setAddPartName] = useState('');
   const [addPartQty, setAddPartQty] = useState(1);
+  const [addPartCost, setAddPartCost] = useState('');
   const [addPartPrice, setAddPartPrice] = useState('');
   const [addPartError, setAddPartError] = useState<string | null>(null);
 
@@ -987,11 +989,19 @@ function OrderDetailModal({
   });
 
   const patchPartMutation = useMutation({
-    mutationFn: ({ partId, client_price }: { partId: string; client_price: string }) =>
+    mutationFn: ({
+      partId,
+      client_price,
+      unit_price,
+    }: {
+      partId: string;
+      client_price?: string;
+      unit_price?: string;
+    }) =>
       fetch(`/api/garage/orders/${orderId}/parts/${partId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_price, unit_price: client_price }),
+        body: JSON.stringify({ client_price, unit_price }),
       }).then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
@@ -1005,7 +1015,12 @@ function OrderDetailModal({
   });
 
   const addPartMutation = useMutation({
-    mutationFn: (body: { custom_part_name: string; quantity: number; client_price?: string }) =>
+    mutationFn: (body: {
+      custom_part_name: string;
+      quantity: number;
+      unit_price?: string;
+      client_price?: string;
+    }) =>
       fetch(`/api/garage/orders/${orderId}/parts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1019,6 +1034,7 @@ function OrderDetailModal({
       setAddPartError(null);
       setAddPartName('');
       setAddPartQty(1);
+      setAddPartCost('');
       setAddPartPrice('');
       setShowAddPart(false);
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
@@ -2130,119 +2146,233 @@ function OrderDetailModal({
                   </button>
                 </div>
                 {showAddPart && (
-                  <div className="mb-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl flex gap-2 items-center flex-wrap">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={addPartName}
-                      onChange={(e) => {
-                        setAddPartName(e.target.value);
-                        setAddPartError(null);
-                      }}
-                      placeholder="Название запчасти..."
-                      className="flex-1 text-sm bg-white border border-slate-200 rounded px-2 py-1.5 outline-none min-w-[150px]"
-                    />
-                    <input
-                      type="number"
-                      value={addPartPrice}
-                      onChange={(e) => {
-                        setAddPartPrice(e.target.value);
-                        setAddPartError(null);
-                      }}
-                      placeholder="Цена (₽)"
-                      className="w-20 text-sm bg-white border border-slate-200 rounded px-2 py-1.5 outline-none shrink-0"
-                    />
-                    <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
+                  <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={addPartName}
+                        onChange={(e) => {
+                          setAddPartName(e.target.value);
+                          setAddPartError(null);
+                        }}
+                        placeholder="Название запчасти..."
+                        className="flex-1 text-sm bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none min-w-[160px] font-bold"
+                      />
+                      <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
+                        <button
+                          type="button"
+                          onClick={() => setAddPartQty((q) => Math.max(1, q - 1))}
+                          className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                        >
+                          −
+                        </button>
+                        <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
+                          {addPartQty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setAddPartQty((q) => q + 1)}
+                          className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap text-xs pt-1 border-t border-slate-200">
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold text-slate-500">Закупка:</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={addPartCost}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAddPartCost(val);
+                            const num = parseFloat(val) || 0;
+                            if (num > 0 && !addPartPrice) {
+                              setAddPartPrice(String(Math.round(num * 1.3)));
+                            }
+                          }}
+                          className="w-20 text-xs bg-white border border-slate-200 rounded px-2 py-1 outline-none font-bold text-right"
+                        />
+                        <span className="text-slate-400">₽</span>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => setAddPartQty((q) => Math.max(1, q - 1))}
-                        className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                        onClick={() => {
+                          const cost = parseFloat(addPartCost) || 0;
+                          if (cost > 0) {
+                            setAddPartPrice(String(Math.round(cost * 1.3)));
+                          }
+                        }}
+                        title="Наценка +30%"
+                        className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded font-black text-[11px] cursor-pointer transition-colors shadow-2xs"
                       >
-                        −
+                        +30%
                       </button>
-                      <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
-                        {addPartQty}
-                      </span>
+
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold text-slate-700">Клиенту:</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={addPartPrice}
+                          onChange={(e) => setAddPartPrice(e.target.value)}
+                          className="w-20 text-xs bg-white border border-emerald-300 rounded px-2 py-1 outline-none font-bold text-right text-emerald-900"
+                        />
+                        <span className="text-slate-400">₽</span>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => setAddPartQty((q) => q + 1)}
-                        className="px-2 py-1.5 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                        onClick={() => {
+                          if (!addPartName.trim()) {
+                            setAddPartError('Введите название');
+                            return;
+                          }
+                          addPartMutation.mutate({
+                            custom_part_name: addPartName,
+                            unit_price: addPartCost || undefined,
+                            client_price: addPartPrice || addPartCost || undefined,
+                            quantity: addPartQty,
+                          });
+                        }}
+                        disabled={addPartMutation.isPending}
+                        className="ml-auto text-xs bg-slate-900 text-white px-3 py-1.5 rounded-lg font-bold disabled:opacity-50 shrink-0 cursor-pointer"
                       >
-                        +
+                        Добавить
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!addPartName.trim()) {
-                          setAddPartError('Введите название');
-                          return;
-                        }
-                        addPartMutation.mutate({
-                          custom_part_name: addPartName,
-                          client_price: addPartPrice || undefined,
-                          quantity: addPartQty,
-                        });
-                      }}
-                      disabled={addPartMutation.isPending}
-                      className="text-xs bg-slate-900 text-white px-3 py-2 rounded-lg font-semibold disabled:opacity-50 shrink-0"
-                    >
-                      Добавить
-                    </button>
+
                     {addPartError && (
-                      <div className="w-full mt-1">
-                        <p className="text-xs text-red-600 font-medium">{addPartError}</p>
-                      </div>
+                      <p className="text-xs text-red-600 font-medium">{addPartError}</p>
                     )}
                   </div>
                 )}
                 {order.parts.length > 0 && (
                   <>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {order.parts.map((p) => {
                         const partName = p.part?.name ?? p.custom_part_name ?? '—';
                         const partUnit = p.part?.unit ?? p.unit ?? 'шт';
-                        const draft = partPricesDraft[p.id] ?? '';
-                        const savedPrice = parseFloat(p.client_price ?? '0');
+                        const draftClient =
+                          partPricesDraft[p.id] ?? (p.client_price ? String(p.client_price) : '');
+                        const draftUnit =
+                          partUnitPricesDraft[p.id] ?? (p.unit_price ? String(p.unit_price) : '');
+                        const savedClientPrice = parseFloat(p.client_price ?? '0');
+                        const savedUnitPrice = parseFloat(p.unit_price ?? '0');
+                        const margin = Math.max(
+                          0,
+                          (savedClientPrice - savedUnitPrice) * (p.quantity || 1),
+                        );
+
                         return (
                           <div
                             key={p.id}
-                            className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 group"
+                            className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between gap-3 group text-xs"
                           >
-                            <span className="text-sm text-slate-800 flex-1 truncate">
-                              {partName}
-                            </span>
-                            <span className="text-xs text-slate-500 shrink-0">
-                              {p.quantity} {partUnit}
-                            </span>
-                            <div className="flex items-center shrink-0">
-                              <input
-                                type="number"
-                                min="0"
-                                value={draft}
-                                onChange={(e) =>
-                                  setPartPricesDraft((prev) => ({
-                                    ...prev,
-                                    [p.id]: e.target.value,
-                                  }))
-                                }
-                                onBlur={() => {
-                                  const newVal = parseFloat(draft || '0');
-                                  if (Math.abs(newVal - savedPrice) > 0.01) {
+                            <div className="min-w-0 flex-1 flex items-center gap-2">
+                              <span className="font-bold text-slate-800 truncate">{partName}</span>
+                              <span className="text-slate-500 font-semibold shrink-0">
+                                {p.quantity} {partUnit}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {/* Закупка */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">
+                                  Закупка:
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={draftUnit}
+                                  onChange={(e) =>
+                                    setPartUnitPricesDraft((prev) => ({
+                                      ...prev,
+                                      [p.id]: e.target.value,
+                                    }))
+                                  }
+                                  onBlur={() => {
+                                    const newVal = parseFloat(draftUnit || '0');
+                                    if (Math.abs(newVal - savedUnitPrice) > 0.01) {
+                                      patchPartMutation.mutate({
+                                        partId: p.id,
+                                        unit_price: newVal.toFixed(2),
+                                      });
+                                    }
+                                  }}
+                                  placeholder="0.00"
+                                  className="w-16 text-right text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-white font-bold"
+                                />
+                                <span className="text-slate-400">₽</span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cost = parseFloat(draftUnit || String(savedUnitPrice)) || 0;
+                                  if (cost > 0) {
+                                    const cPrice = Math.round(cost * 1.3).toFixed(2);
+                                    setPartPricesDraft((prev) => ({ ...prev, [p.id]: cPrice }));
                                     patchPartMutation.mutate({
                                       partId: p.id,
-                                      client_price: newVal.toFixed(2),
+                                      client_price: cPrice,
                                     });
                                   }
                                 }}
-                                placeholder="Клиент"
-                                className="w-24 text-right text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-                              />
-                              <span className="text-xs text-slate-400 ml-1.5">₽</span>
+                                title="Рассчитать цену клиенту с накруткой +30%"
+                                className="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded font-black text-[10px] cursor-pointer"
+                              >
+                                +30%
+                              </button>
+
+                              {/* Клиенту */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">
+                                  Клиенту:
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={draftClient}
+                                  onChange={(e) =>
+                                    setPartPricesDraft((prev) => ({
+                                      ...prev,
+                                      [p.id]: e.target.value,
+                                    }))
+                                  }
+                                  onBlur={() => {
+                                    const newVal = parseFloat(draftClient || '0');
+                                    if (Math.abs(newVal - savedClientPrice) > 0.01) {
+                                      patchPartMutation.mutate({
+                                        partId: p.id,
+                                        client_price: newVal.toFixed(2),
+                                      });
+                                    }
+                                  }}
+                                  placeholder="0.00"
+                                  className="w-18 text-right text-xs border border-emerald-300 rounded px-1.5 py-0.5 bg-white font-bold text-emerald-900"
+                                />
+                                <span className="text-slate-400">₽</span>
+                              </div>
+
+                              {margin > 0 && (
+                                <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                  +{Math.round(margin).toLocaleString('ru-RU')} ₽
+                                </span>
+                              )}
+
                               <button
                                 onClick={() => deletePartMutation.mutate(p.id)}
                                 disabled={deletePartMutation.isPending}
-                                className="ml-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="ml-1 text-slate-300 hover:text-rose-500 opacity-60 group-hover:opacity-100 transition-opacity font-bold"
                                 title="Удалить"
                               >
                                 ×
@@ -2252,16 +2382,48 @@ function OrderDetailModal({
                         );
                       })}
                     </div>
-                    {order.parts.some((p) => parseFloat(p.client_price ?? '0') > 0) && (
-                      <div className="mt-1.5 flex justify-end text-xs text-slate-500">
-                        Итого запчасти:{' '}
-                        <span className="font-semibold text-slate-700 ml-1">
-                          {order.parts
-                            .reduce(
-                              (s, p) => s + parseFloat(p.client_price ?? '0') * (p.quantity ?? 1),
+
+                    {order.parts.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-600 bg-emerald-50/50 border border-emerald-200/80 rounded-xl px-3 py-1.5 font-bold">
+                        <span>
+                          Закупка:{' '}
+                          <span className="text-slate-900 font-black">
+                            {order.parts
+                              .reduce(
+                                (s, p) =>
+                                  s + (parseFloat(p.unit_price ?? '0') || 0) * (p.quantity ?? 1),
+                                0,
+                              )
+                              .toLocaleString('ru-RU')}{' '}
+                            ₽
+                          </span>
+                        </span>
+                        <span>
+                          Клиенту:{' '}
+                          <span className="text-slate-900 font-black">
+                            {order.parts
+                              .reduce(
+                                (s, p) =>
+                                  s + (parseFloat(p.client_price ?? '0') || 0) * (p.quantity ?? 1),
+                                0,
+                              )
+                              .toLocaleString('ru-RU')}{' '}
+                            ₽
+                          </span>
+                        </span>
+                        <span className="text-emerald-700 font-black">
+                          Заработок на з/ч: +
+                          {Math.max(
+                            0,
+                            order.parts.reduce(
+                              (s, p) =>
+                                s +
+                                ((parseFloat(p.client_price ?? '0') || 0) -
+                                  (parseFloat(p.unit_price ?? '0') || 0)) *
+                                  (p.quantity ?? 1),
                               0,
-                            )
-                            .toLocaleString('ru-RU')}{' '}
+                            ),
+                          ).toLocaleString('ru-RU')}{' '}
                           ₽
                         </span>
                       </div>
@@ -6594,7 +6756,7 @@ function WorkOrdersSection() {
     setDateMode('all');
   }
 
-  // ── Order card ──────────────────────────────────────────────────────────────
+  // ── Order card (компактный однострочный вид) ─────────────────────────────────
   function OrderCard({ o }: { o: TabOrder }) {
     const works = o.works ?? [];
     const parts = o.parts ?? [];
@@ -6604,8 +6766,6 @@ function WorkOrdersSection() {
       0,
     );
     const cost = worksCost + partsCost;
-    const normH = works.reduce((s, w) => s + (w.norm_minutes ?? 0), 0) / 60;
-    const factH = works.reduce((s, w) => s + (w.actual_minutes ?? 0), 0) / 60;
     const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
     const isReview = !isCancelled && o.lifecycle_status === 'draft' && o.status === 'completed';
     const isPendingPayment =
@@ -6643,16 +6803,18 @@ function WorkOrdersSection() {
       <div
         onClick={() => setSelectedOrderId(o.id)}
         className={cn(
-          'bg-white border rounded-xl px-4 py-3.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all flex gap-4 items-start',
-          isReview ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200',
+          'bg-white border rounded-xl px-4 py-2.5 cursor-pointer hover:border-slate-300 hover:shadow-xs transition-all flex items-center justify-between gap-3',
+          isReview ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200',
         )}
       >
-        {/* Left: number + date + type */}
-        <div className="shrink-0 w-20 flex flex-col gap-1.5">
-          <span className="font-mono text-xs font-black text-slate-700">НЗ-{o.order_number}</span>
+        {/* Left: number + type + vehicle + tags */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="font-mono text-xs font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+            НЗ-{o.order_number}
+          </span>
           <span
             className={cn(
-              'text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit',
+              'text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0',
               o.machine_type === 'own'
                 ? 'bg-blue-100 text-blue-700'
                 : 'bg-amber-100 text-amber-700',
@@ -6660,101 +6822,64 @@ function WorkOrdersSection() {
           >
             {o.machine_type === 'own' ? 'Свой' : 'Клиент'}
           </span>
-          <span className="text-[10px] text-slate-400">
+          <span
+            className="font-bold text-sm text-slate-900 truncate max-w-[200px]"
+            title={vehicleLabel || '—'}
+          >
+            {vehicleLabel || '—'}
+          </span>
+          {clientLabel && (
+            <span className="text-xs text-slate-400 truncate max-w-[120px] hidden sm:block">
+              · {clientLabel}
+            </span>
+          )}
+          <span className="text-[11px] text-slate-400 shrink-0 hidden md:block">
             {new Date(o.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
           </span>
-        </div>
-
-        {/* Center: vehicle + works + parts */}
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm text-slate-900 truncate">
-              {vehicleLabel || '—'}
-            </span>
-            {clientLabel && <span className="text-xs text-slate-500 truncate">{clientLabel}</span>}
+          {/* Работы/запчасти в виде коротких тегов */}
+          <div className="hidden lg:flex items-center gap-1 overflow-hidden max-w-[320px]">
+            {works.slice(0, 2).map((w) => (
+              <span
+                key={w.id}
+                className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 truncate max-w-[140px]"
+              >
+                {w.work_catalog?.name ?? w.custom_work_name ?? '—'}
+              </span>
+            ))}
+            {parts.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                📦 {parts.length} з/ч
+              </span>
+            )}
           </div>
-          {works.length === 0 && parts.length === 0 ? (
-            <span className="text-xs text-amber-600 italic">⚠ Работы и запчасти не указаны</span>
-          ) : (
-            <div className="flex flex-wrap gap-1">
-              {works.slice(0, 4).map((w) => (
-                <span
-                  key={w.id}
-                  className={cn(
-                    'text-[11px] px-2 py-0.5 rounded-full font-medium',
-                    w.status === 'completed'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : w.status === 'in_progress' || w.status === 'paused'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-slate-100 text-slate-600',
-                  )}
-                >
-                  {w.work_catalog?.name ?? w.custom_work_name ?? '—'}
-                </span>
-              ))}
-              {works.length > 4 && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">
-                  +{works.length - 4}
-                </span>
-              )}
-              {parts.slice(0, 3).map((p) => {
-                const partName = p.part?.name ?? p.custom_part_name ?? 'Запчасть';
-                const partPrice =
-                  (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1);
-                return (
-                  <span
-                    key={p.id}
-                    className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-800 border border-amber-200"
-                  >
-                    📦 {partName}
-                    {partPrice > 0 ? ` (${partPrice.toLocaleString('ru-RU')} ₽)` : ''}
-                  </span>
-                );
-              })}
-              {parts.length > 3 && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                  +{parts.length - 3} з/ч
-                </span>
-              )}
-            </div>
-          )}
-          {o.problem_description && (
-            <p className="text-[11px] text-slate-400 truncate">{o.problem_description}</p>
-          )}
         </div>
 
-        {/* Right: mechanic + hours + status + cost */}
-        <div className="shrink-0 flex flex-col items-end gap-1.5">
+        {/* Right: mechanic + cost + status */}
+        <div className="shrink-0 flex items-center gap-4">
+          {o.mechanic?.name && (
+            <span className="text-xs text-slate-500 truncate max-w-[110px] hidden sm:block">
+              👨‍🔧 {o.mechanic.name.split(' ')[0]}
+            </span>
+          )}
+          <div className="text-right min-w-[90px]">
+            <span className="text-sm font-bold text-slate-900 block">
+              {cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : '0 ₽'}
+            </span>
+            {partsCost > 0 && worksCost > 0 && (
+              <span className="text-[9px] text-slate-400 block">
+                раб: {Math.round(worksCost).toLocaleString('ru-RU')} | з/ч:{' '}
+                {Math.round(partsCost).toLocaleString('ru-RU')}
+              </span>
+            )}
+          </div>
           <span
-            className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', statusBadge.cls)}
+            className={cn(
+              'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
+              statusBadge.cls,
+            )}
           >
             {statusBadge.label}
           </span>
-          {cost > 0 && (
-            <div className="flex flex-col items-end leading-tight">
-              <span className="text-sm font-bold text-slate-900">
-                {cost.toLocaleString('ru-RU')} ₽
-              </span>
-              {partsCost > 0 && worksCost > 0 && (
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {worksCost.toLocaleString('ru-RU')} ₽ + {partsCost.toLocaleString('ru-RU')} ₽ з/ч
-                </span>
-              )}
-              {partsCost > 0 && worksCost === 0 && (
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {partsCost.toLocaleString('ru-RU')} ₽ з/ч
-                </span>
-              )}
-            </div>
-          )}
-          {o.mechanic?.name && (
-            <span className="text-[11px] text-slate-500">{o.mechanic.name}</span>
-          )}
-          {normH > 0 && (
-            <span className="text-[10px] font-mono text-slate-400">
-              {normH.toFixed(1)}нч{factH > 0 ? ` / ${factH.toFixed(1)}` : ''}
-            </span>
-          )}
           {isPendingPayment && (
             <button
               onClick={(e) => {
@@ -6762,7 +6887,7 @@ function WorkOrdersSection() {
                 if (!confirm(`Подтвердить оплату наряда НЗ-${o.order_number}?`)) return;
                 patch.mutate({ id: o.id, body: { payment_received: true } });
               }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 mt-1 shadow-sm"
+              className="text-[11px] font-bold px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs shrink-0 cursor-pointer"
             >
               Оплачено ✓
             </button>
@@ -6773,7 +6898,7 @@ function WorkOrdersSection() {
                 e.stopPropagation();
                 patch.mutate({ id: o.id, body: { lifecycle_status: 'draft' } });
               }}
-              className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 mt-0.5"
+              className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200"
             >
               Открыть заново
             </button>

@@ -286,12 +286,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       if (Array.isArray(body.parts)) {
         const validParts = (body.parts as any[])
-          .map((p) => ({
-            name: String(p.name || '').trim(),
-            quantity: Math.max(0.1, parseFloat(String(p.quantity ?? 1)) || 1),
-            unit: String(p.unit || 'шт').trim() || 'шт',
-            client_price: (parseFloat(String(p.client_price ?? 0)) || 0).toFixed(2),
-          }))
+          .map((p) => {
+            const qty = Math.max(0.1, parseFloat(String(p.quantity ?? 1)) || 1);
+            const unitPriceNum = parseFloat(String(p.unit_price ?? p.price ?? 0)) || 0;
+            const clientPriceNum =
+              p.client_price !== undefined &&
+              p.client_price !== null &&
+              String(p.client_price).trim() !== ''
+                ? parseFloat(String(p.client_price)) || 0
+                : unitPriceNum;
+            return {
+              name: String(p.name || p.custom_part_name || '').trim(),
+              quantity: qty,
+              unit: String(p.unit || 'шт').trim() || 'шт',
+              unit_price: unitPriceNum.toFixed(2),
+              client_price: clientPriceNum.toFixed(2),
+            };
+          })
           .filter((p) => p.name.length > 0);
 
         await (supabase.from('service_order_parts') as any).delete().eq('service_order_id', id);
@@ -302,7 +313,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               custom_part_name: p.name,
               quantity: p.quantity,
               unit: p.unit,
-              unit_price: p.client_price,
+              unit_price: p.unit_price,
               client_price: p.client_price,
               status: 'reserved',
             })),

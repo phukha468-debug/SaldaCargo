@@ -2481,12 +2481,31 @@ function GarageOrderEditModal({
       minutes: String(w.actual_minutes || w.norm_minutes || 30),
     }));
   });
-  const [parts, setParts] = useState<Array<{ name: string; quantity: string; unit: string }>>(() =>
-    (order.parts ?? []).map((p) => ({
-      name: p.custom_part_name || p.part?.name || '',
-      quantity: String(p.quantity || 1),
-      unit: p.unit || p.part?.unit || 'шт',
-    })),
+  const [parts, setParts] = useState<
+    Array<{
+      name: string;
+      quantity: string;
+      unit: string;
+      unit_price: string;
+      client_price: string;
+    }>
+  >(() =>
+    (order.parts ?? []).map((p) => {
+      const uPrice = parseFloat(p.unit_price || '0') || 0;
+      const cPrice =
+        p.client_price !== undefined &&
+        p.client_price !== null &&
+        String(p.client_price).trim() !== ''
+          ? parseFloat(String(p.client_price)) || 0
+          : uPrice;
+      return {
+        name: p.custom_part_name || p.part?.name || '',
+        quantity: String(p.quantity || 1),
+        unit: p.unit || p.part?.unit || 'шт',
+        unit_price: uPrice > 0 ? String(uPrice) : '',
+        client_price: cPrice > 0 ? String(cPrice) : '',
+      };
+    }),
   );
   const [manualPay, setManualPay] = useState<string>(order.mechanic_pay || '');
   const [adminNote, setAdminNote] = useState<string>(order.admin_note || '');
@@ -2494,6 +2513,20 @@ function GarageOrderEditModal({
 
   const totalMinutes = works.reduce((s, w) => s + (parseInt(w.minutes, 10) || 0), 0);
   const autoPay = ((totalMinutes / 60) * hourlyRate * (salaryPct / 100)).toFixed(2);
+
+  const totalPartsCost = parts.reduce((s, p) => {
+    const qty = parseFloat(p.quantity) || 1;
+    const cost = parseFloat(p.unit_price) || 0;
+    return s + cost * qty;
+  }, 0);
+
+  const totalPartsClient = parts.reduce((s, p) => {
+    const qty = parseFloat(p.quantity) || 1;
+    const price = parseFloat(p.client_price) || parseFloat(p.unit_price) || 0;
+    return s + price * qty;
+  }, 0);
+
+  const totalPartsMargin = Math.max(0, totalPartsClient - totalPartsCost);
 
   async function handleSave() {
     setSaving(true);
@@ -2513,11 +2546,20 @@ function GarageOrderEditModal({
             name: w.name,
             minutes: parseInt(w.minutes, 10) || 0,
           })),
-          parts: parts.map((p) => ({
-            name: p.name,
-            quantity: parseFloat(p.quantity) || 1,
-            unit: p.unit || 'шт',
-          })),
+          parts: parts.map((p) => {
+            const uPrice = parseFloat(p.unit_price) || 0;
+            const cPrice =
+              p.client_price !== '' && !isNaN(parseFloat(p.client_price))
+                ? parseFloat(p.client_price)
+                : uPrice;
+            return {
+              name: p.name,
+              quantity: parseFloat(p.quantity) || 1,
+              unit: p.unit || 'шт',
+              unit_price: uPrice,
+              client_price: cPrice,
+            };
+          }),
           mechanic_pay: manualPay ? parseFloat(manualPay) : parseFloat(autoPay),
           admin_note: adminNote,
         }),
@@ -2533,7 +2575,7 @@ function GarageOrderEditModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h3 className="font-black text-slate-900 text-lg">
@@ -2680,54 +2722,187 @@ function GarageOrderEditModal({
           ))}
         </div>
 
-        {/* Запчасти */}
-        <div className="space-y-2">
+        {/* Запчасти с двумя графами (закупка + продажа клиенту с кнопкой +30%) */}
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-slate-400">
               Запчасти автосервиса ({parts.length})
             </span>
             <button
               type="button"
-              onClick={() => setParts((prev) => [...prev, { name: '', quantity: '1', unit: 'шт' }])}
+              onClick={() =>
+                setParts((prev) => [
+                  ...prev,
+                  { name: '', quantity: '1', unit: 'шт', unit_price: '', client_price: '' },
+                ])
+              }
               className="text-xs font-black text-emerald-600 hover:text-emerald-700 cursor-pointer"
             >
               + Добавить запчасть
             </button>
           </div>
-          {parts.map((p, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={p.name}
-                onChange={(e) =>
-                  setParts((prev) =>
-                    prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
-                  )
-                }
-                placeholder="Название запчасти"
-                className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold"
-              />
-              <input
-                type="number"
-                value={p.quantity}
-                onChange={(e) =>
-                  setParts((prev) =>
-                    prev.map((item, i) =>
-                      i === idx ? { ...item, quantity: e.target.value } : item,
-                    ),
-                  )
-                }
-                className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold text-center"
-              />
-              <button
-                type="button"
-                onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))}
-                className="text-rose-500 hover:text-rose-700 text-sm font-black px-1.5 cursor-pointer"
+
+          {parts.map((p, idx) => {
+            const uPrice = parseFloat(p.unit_price) || 0;
+            const cPrice = parseFloat(p.client_price) || 0;
+            const qty = parseFloat(p.quantity) || 1;
+            const margin = Math.max(0, (cPrice - uPrice) * qty);
+
+            return (
+              <div
+                key={idx}
+                className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2"
               >
-                ✕
-              </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-400">{idx + 1}.</span>
+                  <input
+                    type="text"
+                    value={p.name}
+                    onChange={(e) =>
+                      setParts((prev) =>
+                        prev.map((item, i) =>
+                          i === idx ? { ...item, name: e.target.value } : item,
+                        ),
+                      )
+                    }
+                    placeholder="Название запчасти (колодки, фильтр...)"
+                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold"
+                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={p.quantity}
+                      onChange={(e) =>
+                        setParts((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, quantity: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      className="w-16 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold text-center"
+                    />
+                    <input
+                      type="text"
+                      value={p.unit}
+                      onChange={(e) =>
+                        setParts((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, unit: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      className="w-12 bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-xs font-bold text-center"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))}
+                    className="text-rose-500 hover:text-rose-700 text-sm font-black px-1.5 cursor-pointer"
+                    title="Удалить позицию"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 2 графы: Закупка и Продажа клиенту */}
+                <div className="flex items-center gap-2 flex-wrap text-xs pt-1 border-t border-slate-200/70">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-500 whitespace-nowrap">Купили за:</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={p.unit_price}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setParts((prev) =>
+                          prev.map((item, i) => {
+                            if (i !== idx) return item;
+                            const num = parseFloat(val) || 0;
+                            // Если клиентская цена была пустая или равна старой накрутке, обновим с +30%
+                            return {
+                              ...item,
+                              unit_price: val,
+                              client_price:
+                                item.client_price || (num > 0 ? String(Math.round(num * 1.3)) : ''),
+                            };
+                          }),
+                        );
+                      }}
+                      className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm font-bold text-right"
+                    />
+                    <span className="text-slate-400">₽</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cost = parseFloat(p.unit_price) || 0;
+                      if (cost > 0) {
+                        const standardPrice = Math.round(cost * 1.3);
+                        setParts((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, client_price: String(standardPrice) } : item,
+                          ),
+                        );
+                      }
+                    }}
+                    title="Стандартная накрутка СТО +30%"
+                    className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg font-black text-[11px] cursor-pointer transition-colors shadow-2xs"
+                  >
+                    +30%
+                  </button>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-700 whitespace-nowrap">Клиенту:</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={p.client_price}
+                      onChange={(e) =>
+                        setParts((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, client_price: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      className="w-24 bg-white border border-emerald-300 rounded-lg px-2 py-1 text-sm font-bold text-right text-emerald-900"
+                    />
+                    <span className="text-slate-400">₽</span>
+                  </div>
+
+                  {cPrice > uPrice && uPrice > 0 && (
+                    <div className="ml-auto text-[11px] font-black text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                      Заработок СТО: +{Math.round(margin).toLocaleString('ru-RU')} ₽ (
+                      {Math.round(((cPrice - uPrice) / uPrice) * 100)}%)
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {parts.length > 0 && (
+            <div className="flex items-center justify-between text-xs font-bold text-slate-600 bg-emerald-50/50 border border-emerald-200/80 rounded-xl px-3.5 py-2">
+              <span>
+                Закупка:{' '}
+                <span className="text-slate-900 font-black">
+                  {Math.round(totalPartsCost).toLocaleString('ru-RU')} ₽
+                </span>
+              </span>
+              <span>
+                Клиенту:{' '}
+                <span className="text-slate-900 font-black">
+                  {Math.round(totalPartsClient).toLocaleString('ru-RU')} ₽
+                </span>
+              </span>
+              <span className="text-emerald-700 font-black">
+                Заработок на з/ч: +{Math.round(totalPartsMargin).toLocaleString('ru-RU')} ₽
+              </span>
             </div>
-          ))}
+          )}
         </div>
 
         {/* ЗП Механика */}
@@ -2789,23 +2964,24 @@ function GarageOrderEditModal({
   );
 }
 
-function GarageReviewCard({
-  order,
-  onEdit,
-  onApprove,
-  onReturn,
-  onDelete,
-  approving,
-  deleting,
-}: {
-  order: ReviewServiceOrder;
-  onEdit: () => void;
-  onApprove: () => void;
-  onReturn: () => void;
-  onDelete: () => void;
-  approving: boolean;
-  deleting: boolean;
-}) {
+function formatOrderDateRange(
+  startedAt?: string | null,
+  completedAt?: string | null,
+  createdAt?: string,
+) {
+  const parse = (s?: string | null) => (s ? new Date(s.slice(0, 10) + 'T12:00:00') : null);
+  const s = parse(startedAt);
+  const c = parse(completedAt);
+  const cr = parse(createdAt);
+  const d1 = s || cr;
+  const d2 = c || d1;
+  if (!d1) return '—';
+  const fmt = (d: Date) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  if (!d2 || d1.getTime() === d2.getTime()) return fmt(d1);
+  return `${fmt(d1)} — ${fmt(d2)}`;
+}
+
+export function calcGarageOrder(order: ReviewServiceOrder) {
   const isOwn = order.machine_type === 'own';
   const hourlyRate = isOwn ? 1600 : 2000;
   const salaryPct = Number(order.mechanic?.mechanic_salary_pct || 50);
@@ -2817,6 +2993,7 @@ function GarageReviewCard({
       s + Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1)),
     0,
   );
+
   const worksSum = activeWorks.reduce((s, w) => {
     const mins =
       Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
@@ -2828,6 +3005,81 @@ function GarageReviewCard({
   const mechanicPay =
     parseFloat(order.mechanic_pay || '0') > 0 ? parseFloat(order.mechanic_pay!) : estimatedPay;
 
+  let partsUnitSum = 0;
+  let partsClientSum = 0;
+
+  for (const p of parts) {
+    const qty = p.quantity || 1;
+    const uPrice = parseFloat(p.unit_price || '0') || 0;
+    const cPrice =
+      p.client_price !== undefined &&
+      p.client_price !== null &&
+      String(p.client_price).trim() !== ''
+        ? parseFloat(String(p.client_price)) || 0
+        : uPrice;
+    partsUnitSum += uPrice * qty;
+    partsClientSum += cPrice * qty;
+  }
+
+  const partsMargin = Math.max(0, partsClientSum - partsUnitSum);
+  const totalRevenue = worksSum + partsClientSum;
+  // Для своего парка внутренняя выработка = worksSum, чистая прибыль сервиса
+  const netProfit = totalRevenue - mechanicPay - partsUnitSum;
+
+  return {
+    isOwn,
+    hourlyRate,
+    salaryPct,
+    activeWorks,
+    parts,
+    totalMinutes,
+    worksSum,
+    mechanicPay,
+    partsUnitSum,
+    partsClientSum,
+    partsMargin,
+    totalRevenue,
+    netProfit,
+  };
+}
+
+function GarageOrderRow({
+  order,
+  expanded,
+  onToggle,
+  onEdit,
+  onApprove,
+  onReturn,
+  onDelete,
+  approving,
+  deleting,
+}: {
+  order: ReviewServiceOrder;
+  expanded: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onApprove: () => void;
+  onReturn: () => void;
+  onDelete: () => void;
+  approving: boolean;
+  deleting: boolean;
+}) {
+  const {
+    isOwn,
+    hourlyRate,
+    salaryPct,
+    activeWorks,
+    parts,
+    totalMinutes,
+    worksSum,
+    mechanicPay,
+    partsUnitSum,
+    partsClientSum,
+    partsMargin,
+    totalRevenue,
+    netProfit,
+  } = calcGarageOrder(order);
+
   const odo = order.odometer_end || order.odometer_start;
   const canReview = order.lifecycle_status === 'draft' || order.lifecycle_status === 'returned';
 
@@ -2835,38 +3087,58 @@ function GarageReviewCard({
     ? `${order.asset?.short_name ?? 'Свой ТС'} (${order.asset?.reg_number ?? '—'})`
     : `${order.client_vehicle_model || order.client_vehicle_brand || 'Клиентский авто'} · ${order.client_vehicle_reg || 'без номера'}`;
 
-  const partsFromService =
-    parts.length > 0 ||
-    Boolean(
-      order.mechanic_note && order.mechanic_note.includes('[Запчасти предоставил автосервис]'),
-    );
-
   const cleanMechanicNote = (order.mechanic_note || '')
     .replace('[Запчасти предоставил автосервис]', '')
     .trim();
 
+  const accentColor =
+    netProfit > 0
+      ? 'border-l-emerald-500'
+      : netProfit < 0
+        ? 'border-l-rose-500'
+        : 'border-l-slate-300';
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-      {/* Header */}
-      <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-100 flex items-start justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="bg-emerald-600 text-white text-xs font-mono font-black px-2.5 py-1 rounded-lg">
+    <div
+      className={cn(
+        'bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all duration-200 hover:shadow-md border-l-4',
+        accentColor,
+      )}
+    >
+      {/* ── Свернутая строка (компактный вид в одну строчку как TripRow) ── */}
+      <div
+        className="px-4 py-2.5 cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3">
+          {/* Слева: Номер, тип, авто, механик, статус */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="font-mono text-xs font-black text-slate-800 shrink-0 bg-slate-100 px-2 py-0.5 rounded">
               НЗ-{order.order_number}
             </span>
             <span
               className={cn(
-                'text-xs font-black px-2.5 py-1 rounded-lg border',
+                'text-[10px] font-black px-1.5 py-0.5 rounded shrink-0',
                 isOwn
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-sky-50 text-sky-800 border-sky-200',
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200',
               )}
             >
-              {isOwn ? '🏢 Свой автомобиль · 1 600 ₽/ч' : '🚗 Клиентский авто · 2 000 ₽/ч'}
+              {isOwn ? '🏢 Свой' : '🚗 Клиент'}
+            </span>
+            <span
+              className="font-bold text-slate-900 text-sm truncate max-w-[190px]"
+              title={vehicleTitle}
+            >
+              {vehicleTitle}
+            </span>
+            <span className="text-slate-300 text-xs">·</span>
+            <span className="text-xs text-slate-600 font-semibold truncate max-w-[120px]">
+              👨‍🔧 {order.mechanic?.name?.split(' ')[0] ?? '—'}
             </span>
             <span
               className={cn(
-                'text-xs font-bold px-2.5 py-1 rounded-lg',
+                'text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0',
                 order.lifecycle_status === 'approved'
                   ? 'bg-emerald-100 text-emerald-800'
                   : order.lifecycle_status === 'returned'
@@ -2875,200 +3147,348 @@ function GarageReviewCard({
               )}
             >
               {order.lifecycle_status === 'approved'
-                ? '✓ Утверждён'
+                ? '✓ Закрыт'
                 : order.lifecycle_status === 'returned'
-                  ? '↩ На доработке'
-                  : '⏳ Ждёт проверки'}
+                  ? '↩ Доработка'
+                  : '⏳ Ревью'}
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden md:block">
+              {formatOrderDateRange(order.started_at, order.completed_at, order.created_at)}
             </span>
           </div>
 
-          <h3 className="text-base font-black text-slate-900 pt-1">{vehicleTitle}</h3>
-          <div className="flex items-center gap-3 flex-wrap text-xs text-slate-600 font-semibold">
-            <span>
-              👨‍🔧 Механик: {order.mechanic?.name ?? 'Не назначен'} ({salaryPct}%)
-            </span>
-            <span>·</span>
-            <span>
-              📅{' '}
-              {new Date(order.created_at).toLocaleDateString('ru-RU', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </span>
-            {odo && (
-              <>
-                <span>·</span>
-                <span className="text-slate-800 font-bold">
-                  🛣 Одометр: {Number(odo).toLocaleString('ru-RU')} км
-                </span>
-              </>
-            )}
+          {/* По центру: финансовые метрики (фиксированная ширина для ровного выравнивания колонок) */}
+          <div className="shrink-0 flex items-center">
+            <div className="w-[90px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Выручка
+              </span>
+              <span className="text-sm font-bold text-slate-700">
+                <Money amount={totalRevenue.toFixed(2)} />
+              </span>
+            </div>
+            <span className="w-4 text-center text-slate-200 text-sm">−</span>
+            <div className="w-[95px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                ЗП Механика
+              </span>
+              <span className="text-sm font-bold text-amber-600">
+                <Money amount={mechanicPay.toFixed(2)} />
+              </span>
+            </div>
+            <span className="w-4 text-center text-slate-200 text-sm">+</span>
+            <div className="w-[90px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Маржа з/ч
+              </span>
+              <span className="text-sm font-bold text-emerald-600">
+                <Money amount={partsMargin.toFixed(2)} />
+              </span>
+            </div>
+            <span className="w-4 text-center text-slate-200 text-sm">=</span>
+            <div className="w-[95px] text-center">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
+                Прибыль
+              </span>
+              <span
+                className={cn(
+                  'text-base font-black',
+                  netProfit > 0
+                    ? 'text-emerald-600'
+                    : netProfit < 0
+                      ? 'text-rose-600'
+                      : 'text-slate-500',
+                )}
+              >
+                {netProfit < 0 ? '−' : ''}
+                <Money amount={Math.abs(netProfit).toFixed(2)} />
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-5">
-          <div className="text-right">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              Время работ
-            </span>
-            <span className="text-sm font-black text-slate-800">
-              {totalMinutes} мин ({(totalMinutes / 60).toFixed(1)} ч)
-            </span>
-          </div>
-          <div className="text-right">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              Стоимость работ
-            </span>
-            <span className="text-sm font-black text-slate-800">
-              <Money amount={worksSum.toFixed(2)} />
-            </span>
-          </div>
-          <div className="text-right bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block">
-              ЗП Механика
-            </span>
-            <span className="text-base font-black text-emerald-700">
-              <Money amount={mechanicPay.toFixed(2)} />
+          {/* Справа: кнопка редактирования и шеврон раскрытия */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-700 cursor-pointer"
+              title="Редактировать наряд"
+            >
+              <span className="material-symbols-outlined text-[16px]">edit</span>
+            </button>
+            <span
+              className={cn(
+                'material-symbols-outlined text-slate-300 text-[20px] transition-transform duration-300',
+                expanded ? 'rotate-180' : '',
+              )}
+            >
+              expand_more
             </span>
           </div>
         </div>
       </div>
 
-      {/* Body: Works & Parts */}
-      <div className="p-4 sm:p-5 space-y-4">
-        {/* 4. Перечень работ */}
-        <div>
-          <div className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">
-            Перечень выполненных работ ({activeWorks.length})
+      {/* ── Развернутый контент (детали наряда) ── */}
+      {expanded && (
+        <div className="animate-in fade-in slide-in-from-top-1 duration-200 border-t border-slate-100 p-4 sm:p-5 space-y-4 bg-slate-50/40">
+          {/* Верхняя плашка с датами, одометром и тарифом */}
+          <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-3 rounded-xl border border-slate-200/80 text-xs text-slate-700">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                  Период выполнения
+                </span>
+                <span className="font-bold text-slate-800">
+                  📅 {formatOrderDateRange(order.started_at, order.completed_at, order.created_at)}
+                </span>
+              </div>
+              {odo && (
+                <div>
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                    Пробег / Одометр
+                  </span>
+                  <span className="font-bold text-slate-800">
+                    🛣 {Number(odo).toLocaleString('ru-RU')} км
+                  </span>
+                </div>
+              )}
+              <div>
+                <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                  Тариф нормо-часа
+                </span>
+                <span className="font-bold text-slate-800">
+                  {hourlyRate.toLocaleString('ru-RU')} ₽/ч ({isOwn ? 'Свой парк' : 'Клиент'})
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                  Ставка механика
+                </span>
+                <span className="font-bold text-emerald-700">{salaryPct}% от работ</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                  Время работ
+                </span>
+                <span className="font-black text-slate-800 text-sm">
+                  {totalMinutes} мин ({(totalMinutes / 60).toFixed(1)} ч)
+                </span>
+              </div>
+              <div className="text-right bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] font-black uppercase text-emerald-800 block">
+                  ЗП Механика
+                </span>
+                <span className="font-black text-emerald-700 text-sm">
+                  <Money amount={mechanicPay.toFixed(2)} />
+                </span>
+              </div>
+            </div>
           </div>
-          {activeWorks.length === 0 ? (
-            <p className="text-sm text-slate-500 italic">
-              {order.problem_description || 'Работы не указаны'}
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {activeWorks.map((w, idx) => {
-                const mins =
-                  Number(w.actual_minutes || w.norm_minutes || 0) *
-                  Math.max(1, Number(w.quantity || 1));
-                const wPrice =
-                  parseFloat(w.price_client || '0') > 0
-                    ? parseFloat(w.price_client!)
-                    : (mins / 60) * hourlyRate;
-                const wPay = (wPrice * salaryPct) / 100;
-                return (
-                  <div
-                    key={w.id || idx}
-                    className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between gap-3"
-                  >
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">
-                        {idx + 1}.{' '}
-                        {w.custom_work_name ||
-                          w.work_catalog?.name ||
-                          w.work_description ||
-                          'Работа'}
-                      </p>
-                      <p className="text-xs font-extrabold text-emerald-700 mt-0.5">
-                        ⏱ Время: {mins} мин · ЗП механика:{' '}
-                        {Math.round(wPay).toLocaleString('ru-RU')} ₽
-                      </p>
+
+          {/* 1. Перечень выполненных работ */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500">
+              <span>Перечень выполненных работ ({activeWorks.length})</span>
+              <span>
+                Итого по работам:{' '}
+                <span className="text-slate-900 font-black">
+                  <Money amount={worksSum.toFixed(2)} />
+                </span>
+              </span>
+            </div>
+            {activeWorks.length === 0 ? (
+              <p className="text-sm text-slate-500 italic bg-white p-3 rounded-xl border border-slate-200">
+                {order.problem_description || 'Работы не указаны'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {activeWorks.map((w, idx) => {
+                  const mins =
+                    Number(w.actual_minutes || w.norm_minutes || 0) *
+                    Math.max(1, Number(w.quantity || 1));
+                  const wPrice =
+                    parseFloat(w.price_client || '0') > 0
+                      ? parseFloat(w.price_client!)
+                      : (mins / 60) * hourlyRate;
+                  const wPay = (wPrice * salaryPct) / 100;
+                  return (
+                    <div
+                      key={w.id || idx}
+                      className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 truncate">
+                          {idx + 1}.{' '}
+                          {w.custom_work_name ||
+                            w.work_catalog?.name ||
+                            w.work_description ||
+                            'Работа'}
+                        </p>
+                        <p className="text-xs font-extrabold text-emerald-700 mt-0.5">
+                          ⏱ {mins} мин · ЗП: {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                        </p>
+                      </div>
+                      <span className="text-xs font-black text-slate-800 whitespace-nowrap bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                        {Math.round(wPrice).toLocaleString('ru-RU')} ₽
+                      </span>
                     </div>
-                    <span className="text-xs font-black text-slate-700 whitespace-nowrap">
-                      {Math.round(wPrice).toLocaleString('ru-RU')} ₽
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Запчасти автосервиса (с двумя графами: закупка и клиенту +30%) */}
+          {parts.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-emerald-600">☑</span>
+                  <span>Запчасти сервиса ({parts.length})</span>
+                </span>
+                <span className="text-emerald-700 font-black">
+                  Заработок на запчастях: +{Math.round(partsMargin).toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-3.5 py-2">Запчасть</th>
+                      <th className="px-3 py-2 text-center">Кол-во</th>
+                      <th className="px-3 py-2 text-right">Закупка</th>
+                      <th className="px-3 py-2 text-right">Клиенту (+30%)</th>
+                      <th className="px-3.5 py-2 text-right">Заработок СТО</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {parts.map((p, idx) => {
+                      const qty = p.quantity || 1;
+                      const uPrice = parseFloat(p.unit_price || '0') || 0;
+                      const cPrice =
+                        p.client_price !== undefined &&
+                        p.client_price !== null &&
+                        String(p.client_price).trim() !== ''
+                          ? parseFloat(String(p.client_price)) || 0
+                          : uPrice;
+                      const margin = Math.max(0, (cPrice - uPrice) * qty);
+                      const markupPct =
+                        uPrice > 0 ? Math.round(((cPrice - uPrice) / uPrice) * 100) : 0;
+
+                      return (
+                        <tr key={p.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-3.5 py-2.5 font-bold text-slate-900">
+                            {idx + 1}. {p.custom_part_name || p.part?.name || 'Запчасть'}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-bold text-slate-600">
+                            {qty} {p.unit || p.part?.unit || 'шт'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-medium text-slate-500">
+                            {uPrice > 0 ? `${(uPrice * qty).toLocaleString('ru-RU')} ₽` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-800">
+                            <span>{(cPrice * qty).toLocaleString('ru-RU')} ₽</span>
+                            {markupPct > 0 && (
+                              <span className="ml-1.5 text-[9px] font-black bg-amber-100 text-amber-800 px-1 py-0.5 rounded">
+                                +{markupPct}%
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right font-black text-emerald-700">
+                            {margin > 0
+                              ? `+${Math.round(margin).toLocaleString('ru-RU')} ₽`
+                              : '0 ₽'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-slate-50/70 border-t border-slate-200 font-bold text-slate-700">
+                    <tr>
+                      <td colSpan={2} className="px-3.5 py-2 text-[11px] font-black uppercase">
+                        Итого запчасти
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-600">
+                        {Math.round(partsUnitSum).toLocaleString('ru-RU')} ₽
+                      </td>
+                      <td className="px-3 py-2 text-right font-black text-slate-900">
+                        {Math.round(partsClientSum).toLocaleString('ru-RU')} ₽
+                      </td>
+                      <td className="px-3.5 py-2 text-right font-black text-emerald-700">
+                        +{Math.round(partsMargin).toLocaleString('ru-RU')} ₽
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Запчасти предоставил автосервис */}
-        {partsFromService && (
-          <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-black text-emerald-900 uppercase tracking-wider">
-              <span className="text-emerald-600 text-sm">☑</span>
-              <span>Запчасти предоставил автосервис (мы) — {parts.length} поз.</span>
+          {/* Заметки */}
+          {(cleanMechanicNote || order.admin_note) && (
+            <div className="flex flex-wrap gap-2.5 text-xs">
+              {cleanMechanicNote && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl font-medium">
+                  💬 Комментарий механика: <span className="font-bold">{cleanMechanicNote}</span>
+                </div>
+              )}
+              {order.admin_note && (
+                <div className="bg-slate-100 border border-slate-200 text-slate-800 px-3 py-2 rounded-xl font-medium">
+                  📌 Заметка руководителя: <span className="font-bold">{order.admin_note}</span>
+                </div>
+              )}
             </div>
-            {parts.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {parts.map((p, idx) => (
-                  <div
-                    key={p.id || idx}
-                    className="bg-white border border-emerald-100 rounded-lg px-3 py-1.5 flex items-center justify-between text-xs font-bold text-slate-800"
-                  >
-                    <span>
-                      {idx + 1}. {p.custom_part_name || p.part?.name || 'Запчасть'}
-                    </span>
-                    <span className="text-emerald-700 font-black">
-                      {p.quantity} {p.unit || p.part?.unit || 'шт'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          )}
 
-        {(cleanMechanicNote || order.admin_note) && (
-          <div className="flex flex-wrap gap-3 text-xs">
-            {cleanMechanicNote && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl font-medium">
-                💬 Комментарий механика: <span className="font-bold">{cleanMechanicNote}</span>
-              </div>
-            )}
-            {order.admin_note && (
-              <div className="bg-slate-100 border border-slate-200 text-slate-800 px-3 py-2 rounded-xl font-medium">
-                📌 Заметка руководителя: <span className="font-bold">{order.admin_note}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <span>✏️ Редактировать</span>
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={approving || deleting}
-              className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-600 cursor-pointer disabled:opacity-50 transition-colors"
-            >
-              {deleting ? '...' : '🗑️ Удалить'}
-            </button>
-          </div>
-
-          {canReview && (
+          {/* Кнопки действий */}
+          <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={onReturn}
-                disabled={approving}
-                className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-700 cursor-pointer disabled:opacity-50 transition-colors"
+                onClick={onEdit}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
               >
-                ↩ На доработку
+                <span>✏️ Редактировать</span>
               </button>
               <button
                 type="button"
-                onClick={onApprove}
-                disabled={approving}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
+                onClick={onDelete}
+                disabled={approving || deleting}
+                className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-600 cursor-pointer disabled:opacity-50 transition-colors"
               >
-                {approving ? 'Утверждаем...' : '✓ Утвердить наряд (начислить ЗП)'}
+                {deleting ? '...' : '🗑️ Удалить'}
               </button>
             </div>
-          )}
+
+            {canReview && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onReturn}
+                  disabled={approving}
+                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-700 cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  ↩ На доработку
+                </button>
+                <button
+                  type="button"
+                  onClick={onApprove}
+                  disabled={approving}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  {approving ? 'Утверждаем...' : '✓ Утвердить наряд (начислить ЗП)'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -3109,12 +3529,22 @@ export default function ReviewPage() {
   );
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedGarageOrderIds, setExpandedGarageOrderIds] = useState<Set<string>>(new Set());
 
   const toggleGroup = (assetKey: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(assetKey)) next.delete(assetKey);
       else next.add(assetKey);
+      return next;
+    });
+  };
+
+  const toggleGarageOrder = (orderId: string) => {
+    setExpandedGarageOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
       return next;
     });
   };
@@ -3316,6 +3746,38 @@ export default function ReviewPage() {
       return res.json();
     },
   });
+
+  const garageSummary = useMemo(() => {
+    let totalRevenue = 0;
+    let totalMechanicPay = 0;
+    let totalPartsClient = 0;
+    let totalPartsCost = 0;
+    let totalPartsMargin = 0;
+    let totalNetProfit = 0;
+    let totalMinutes = 0;
+
+    for (const o of garageOrders) {
+      const m = calcGarageOrder(o);
+      totalRevenue += m.totalRevenue;
+      totalMechanicPay += m.mechanicPay;
+      totalPartsClient += m.partsClientSum;
+      totalPartsCost += m.partsUnitSum;
+      totalPartsMargin += m.partsMargin;
+      totalNetProfit += m.netProfit;
+      totalMinutes += m.totalMinutes;
+    }
+
+    return {
+      totalOrders: garageOrders.length,
+      totalRevenue,
+      totalMechanicPay,
+      totalPartsClient,
+      totalPartsCost,
+      totalPartsMargin,
+      totalNetProfit,
+      totalMinutes,
+    };
+  }, [garageOrders]);
 
   async function handleApproveServiceOrder(orderId: string) {
     setApprovingId(orderId);
@@ -3851,10 +4313,136 @@ export default function ReviewPage() {
       {/* ── GARAGE SECTION (Механики) ── */}
       {reviewSection === 'garage' && (
         <div className="space-y-4">
+          {/* Итоговая статистика по гаражу (банковский стиль как в рейсах) */}
+          {!isGarageLoading && garageOrders.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {/* Выручка / Заработано */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                  <span className="font-bold uppercase tracking-wider text-[10px]">
+                    Выручка СТО
+                  </span>
+                  <span className="text-base">💰</span>
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  <Money amount={garageSummary.totalRevenue.toFixed(2)} />
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
+                  Работы:{' '}
+                  {Math.round(
+                    garageSummary.totalRevenue - garageSummary.totalPartsClient,
+                  ).toLocaleString('ru-RU')}{' '}
+                  ₽
+                </p>
+              </div>
+
+              {/* ЗП Механиков */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                  <span className="font-bold uppercase tracking-wider text-[10px]">
+                    ЗП Механиков
+                  </span>
+                  <span className="text-base">👨‍🔧</span>
+                </div>
+                <div className="text-xl font-black text-amber-600">
+                  <Money amount={garageSummary.totalMechanicPay.toFixed(2)} />
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
+                  Выработка: {(garageSummary.totalMinutes / 60).toFixed(1)} ч
+                </p>
+              </div>
+
+              {/* Запчасти клиенту */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                  <span className="font-bold uppercase tracking-wider text-[10px]">
+                    Запчасти всего
+                  </span>
+                  <span className="text-base">📦</span>
+                </div>
+                <div className="text-xl font-black text-slate-800">
+                  <Money amount={garageSummary.totalPartsClient.toFixed(2)} />
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
+                  Закупка: {Math.round(garageSummary.totalPartsCost).toLocaleString('ru-RU')} ₽
+                </p>
+              </div>
+
+              {/* Заработок на запчастях */}
+              <div className="bg-white border border-emerald-200 bg-emerald-50/30 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex items-center justify-between text-emerald-800 text-xs mb-1">
+                  <span className="font-black uppercase tracking-wider text-[10px]">
+                    Заработок на з/ч
+                  </span>
+                  <span className="text-base">📈</span>
+                </div>
+                <div className="text-xl font-black text-emerald-700">
+                  +{Math.round(garageSummary.totalPartsMargin).toLocaleString('ru-RU')} ₽
+                </div>
+                <p className="text-[11px] text-emerald-700 font-semibold mt-1 truncate">
+                  Маржа сервиса (+30%)
+                </p>
+              </div>
+
+              {/* Чистая прибыль Гаража */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow col-span-2 md:col-span-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                  <span className="font-bold uppercase tracking-wider text-[10px]">
+                    Прибыль Гаража
+                  </span>
+                  <span className="text-base">🏁</span>
+                </div>
+                <div
+                  className={cn(
+                    'text-xl font-black',
+                    garageSummary.totalNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                  )}
+                >
+                  <Money amount={garageSummary.totalNetProfit.toFixed(2)} />
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
+                  Итог за вычетом ЗП и з/ч
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Строка управления (сворачивание/разворачивание всех нарядов) */}
+          {!isGarageLoading && garageOrders.length > 0 && (
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs text-slate-500 font-semibold">
+                {garageOrders.length} заказ-наряд
+                {garageOrders.length === 1 ? '' : garageOrders.length < 5 ? 'а' : 'ов'} ·{' '}
+                {garageOrders.filter((o) => o.machine_type === 'own').length} своих ·{' '}
+                {garageOrders.filter((o) => o.machine_type === 'client').length} клиентских
+              </p>
+              <button
+                onClick={() => {
+                  const allIds = garageOrders.map((o) => o.id);
+                  if (expandedGarageOrderIds.size === allIds.length) {
+                    setExpandedGarageOrderIds(new Set());
+                  } else {
+                    setExpandedGarageOrderIds(new Set(allIds));
+                  }
+                }}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {expandedGarageOrderIds.size === garageOrders.length
+                    ? 'unfold_less'
+                    : 'unfold_more'}
+                </span>
+                {expandedGarageOrderIds.size === garageOrders.length
+                  ? 'Свернуть все'
+                  : 'Развернуть все'}
+              </button>
+            </div>
+          )}
+
           {isGarageLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-slate-100 rounded-2xl animate-pulse" />
+                <div key={i} className="h-14 bg-slate-100 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : garageOrders.length === 0 ? (
@@ -3871,11 +4459,13 @@ export default function ReviewPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {garageOrders.map((order) => (
-                <GarageReviewCard
+                <GarageOrderRow
                   key={order.id}
                   order={order}
+                  expanded={expandedGarageOrderIds.has(order.id)}
+                  onToggle={() => toggleGarageOrder(order.id)}
                   onEdit={() => setEditServiceOrder(order)}
                   onApprove={() => handleApproveServiceOrder(order.id)}
                   onReturn={() => handleReturnServiceOrder(order.id)}

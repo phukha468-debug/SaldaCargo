@@ -6,11 +6,12 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
   const body = await request.json();
-  const { custom_part_name, quantity, unit, client_price } = body as {
+  const { custom_part_name, quantity, unit, client_price, unit_price } = body as {
     custom_part_name: string;
     quantity: number;
     unit?: string;
     client_price?: string;
+    unit_price?: string;
   };
 
   if (!custom_part_name?.trim()) {
@@ -18,7 +19,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const qty = parseFloat(String(quantity)) || 1;
-  const price = parseFloat(client_price || '0').toFixed(2);
+  const uPrice = parseFloat(String(unit_price ?? client_price ?? '0')) || 0;
+  const cPrice =
+    client_price !== undefined && client_price !== null && String(client_price).trim() !== ''
+      ? parseFloat(String(client_price)) || 0
+      : uPrice;
   const supabase = createAdminClient();
 
   const { data, error } = await (supabase.from('service_order_parts') as any)
@@ -27,8 +32,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       custom_part_name: custom_part_name.trim(),
       quantity: qty,
       unit: unit || 'шт',
-      unit_price: price,
-      client_price: price,
+      unit_price: uPrice.toFixed(2),
+      client_price: cPrice.toFixed(2),
       status: 'reserved',
     })
     .select(
