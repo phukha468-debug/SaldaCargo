@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { cn, Money } from '@saldacargo/ui';
 import { isOilOrFilterWork } from '@saldacargo/shared';
+import { WarehouseSection } from './warehouse-section';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,7 @@ type GarageSection =
   | 'dashboard'
   | 'requests'
   | 'workorders'
+  | 'warehouse'
   | 'maintenance'
   | 'worktypes'
   | 'faultcatalog'
@@ -532,6 +534,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'dashboard', label: 'Дашборд', badgeKey: 'total' },
       { id: 'requests', label: 'Заявки', badgeKey: 'repairRequests' },
       { id: 'workorders', label: 'Заказ-наряды' },
+      { id: 'warehouse', label: 'Склад запчастей' },
       { id: 'maintenance', label: 'Регламенты ТО' },
     ],
   },
@@ -6426,9 +6429,9 @@ function WorkOrdersSection() {
   const [showCreate, setShowCreate] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'active' | 'pending_payment' | 'archive' | 'requests'>(
-    'active',
-  );
+  const [activeTab, setActiveTab] = useState<
+    'active' | 'pending_payment' | 'archive' | 'requests' | 'warehouse'
+  >('active');
   // Unified date filter — applies to all tabs
   const [dateMode, setDateMode] = useState<'all' | 'month' | 'day'>('all');
   const [filterDate, setFilterDate] = useState(todayStr());
@@ -7111,10 +7114,21 @@ function WorkOrdersSection() {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('warehouse')}
+          className={cn(
+            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
+            activeTab === 'warehouse'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          📦 Склад и остатки
+        </button>
       </div>
 
       {/* ── Global filter bar (только для вкладок В работе и Ждёт оплаты) ── */}
-      {activeTab !== 'archive' && activeTab !== 'requests' && (
+      {activeTab !== 'archive' && activeTab !== 'requests' && activeTab !== 'warehouse' && (
         <div className="flex flex-wrap gap-2 items-center">
           {/* Поиск */}
           <div className="relative flex-1 min-w-52">
@@ -7259,6 +7273,9 @@ function WorkOrdersSection() {
           setMonth={setArchiveMonth}
         />
       )}
+
+      {/* ── Склад и инвентаризация остатков (Вариант 3) ── */}
+      {activeTab === 'warehouse' && <WarehouseSection />}
 
       {/* ── Заявки водителей ── */}
       {activeTab === 'requests' && (
@@ -9411,6 +9428,7 @@ export default function GaragePage() {
         )}
         {section === 'requests' && <RequestsSection />}
         {section === 'workorders' && <WorkOrdersSection />}
+        {section === 'warehouse' && <WarehouseSection />}
         {section === 'maintenance' && <MaintenanceSection />}
         {section === 'worktypes' && <WorkCatalogSection />}
         {section === 'faultcatalog' && <FaultCatalogSection />}
