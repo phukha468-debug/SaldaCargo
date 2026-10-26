@@ -361,25 +361,6 @@ function getWeekDates(dateStr: string) {
   return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
 }
 
-function formatPeriod(dateStr: string, period: 'day' | 'week' | 'month') {
-  if (period === 'day') {
-    return new Date(dateStr + 'T12:00:00').toLocaleDateString('ru-RU', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'long',
-    });
-  }
-  if (period === 'week') {
-    const { weekStart, weekEnd } = getWeekDates(dateStr);
-    const ws = new Date(weekStart + 'T12:00:00');
-    const we = new Date(weekEnd + 'T12:00:00');
-    return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`;
-  }
-  const d = new Date(dateStr + 'T12:00:00');
-  const monthStr = d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-  return monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
-}
-
 // ── Date Navigation ─────────────────────────────────────────
 
 function DateNav({
@@ -447,61 +428,61 @@ function DateNav({
   const isToday = date === today;
 
   return (
-    <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-      {/* Top Toggle */}
+    <div className="flex flex-wrap items-center justify-between border-b border-sky-100 px-3.5 py-1.5 gap-2 bg-sky-100/40">
+      {/* Переключатель периода: День / Неделя / Месяц */}
       {setPeriod && (
-        <div className="flex border-b border-slate-700 bg-slate-800/50 p-2">
-          <div className="flex bg-slate-700 p-1 rounded-lg mx-auto w-full max-w-sm">
-            <button
-              onClick={() => setPeriod('day')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
-                period === 'day'
-                  ? 'bg-slate-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              День
-            </button>
-            <button
-              onClick={() => setPeriod('week')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
-                period === 'week'
-                  ? 'bg-slate-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              Неделя
-            </button>
-            <button
-              onClick={() => setPeriod('month')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
-                period === 'month'
-                  ? 'bg-slate-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              Месяц
-            </button>
-          </div>
+        <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-sky-200/70">
+          <button
+            type="button"
+            onClick={() => setPeriod('day')}
+            className={cn(
+              'px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
+              period === 'day'
+                ? 'bg-sky-500 text-white shadow-2xs'
+                : 'text-sky-700 hover:bg-sky-50',
+            )}
+          >
+            День
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriod('week')}
+            className={cn(
+              'px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
+              period === 'week'
+                ? 'bg-sky-500 text-white shadow-2xs'
+                : 'text-sky-700 hover:bg-sky-50',
+            )}
+          >
+            Неделя
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriod('month')}
+            className={cn(
+              'px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
+              period === 'month'
+                ? 'bg-sky-500 text-white shadow-2xs'
+                : 'text-sky-700 hover:bg-sky-50',
+            )}
+          >
+            Месяц
+          </button>
         </div>
       )}
 
-      {/* Day nav — compact single row, dark theme */}
-      <div className="flex items-stretch h-14">
+      {/* Компактный выбор даты по центру */}
+      <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={() => shift(-1)}
-          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-600"
-          aria-label="Предыдущий день"
+          className="px-2.5 py-0.5 bg-sky-500 hover:bg-sky-600 active:bg-sky-700 rounded-lg text-white font-black text-xs cursor-pointer shadow-2xs transition-colors"
+          aria-label="Предыдущий период"
         >
-          <span className="text-3xl font-black group-hover:-translate-x-1 transition-transform select-none">
-            ←
-          </span>
+          ←
         </button>
 
-        <label className="flex-1 flex items-center justify-center gap-2.5 cursor-pointer px-4">
+        <label className="flex items-center gap-1.5 px-2 cursor-pointer">
           <input
             type="date"
             value={date}
@@ -509,8 +490,8 @@ function DateNav({
             onChange={(e) => e.target.value && onChange(e.target.value)}
             className="sr-only"
           />
-          <span className="material-symbols-outlined text-sky-400 text-[20px]">calendar_today</span>
-          <span className="text-xl font-black text-white hover:text-sky-300 transition-colors whitespace-nowrap">
+          <span className="material-symbols-outlined text-sky-600 text-[16px]">calendar_today</span>
+          <span className="text-sm font-black text-sky-950 hover:text-sky-700 transition-colors whitespace-nowrap">
             {period === 'day' &&
               new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
                 day: 'numeric',
@@ -529,47 +510,52 @@ function DateNav({
                 year: 'numeric',
               })}
           </span>
-          <span className="text-sm font-medium text-slate-400 whitespace-nowrap hidden sm:block">
-            {period === 'day'
-              ? new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
-                  weekday: 'short',
-                  year: 'numeric',
-                })
-              : null}
-          </span>
-          {!isToday && (
-            <span className="text-[10px] font-bold text-sky-300 bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 rounded-full whitespace-nowrap">
-              → сегодня
+          {period === 'day' && (
+            <span className="text-xs font-medium text-sky-700/70 whitespace-nowrap hidden sm:inline">
+              {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
+                weekday: 'short',
+                year: 'numeric',
+              })}
             </span>
+          )}
+          {!isToday && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                onChange(today);
+              }}
+              className="text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-300/70 px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer transition-colors"
+            >
+              → сегодня
+            </button>
           )}
         </label>
 
         <button
+          type="button"
           onClick={() => shift(1)}
           disabled={date >= today}
-          className="flex items-center justify-center w-40 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed group border-l border-sky-600 disabled:border-slate-600"
-          aria-label="Следующий день"
+          className="px-2.5 py-0.5 bg-sky-500 hover:bg-sky-600 active:bg-sky-700 rounded-lg text-white font-black text-xs cursor-pointer shadow-2xs transition-colors disabled:bg-sky-100 disabled:text-sky-300 disabled:cursor-not-allowed disabled:shadow-none"
+          aria-label="Следующий период"
         >
-          <span className="text-3xl font-black group-hover:translate-x-1 transition-transform select-none">
-            →
-          </span>
+          →
         </button>
       </div>
 
-      {/* Quick buttons */}
+      {/* Быстрые месяцы / недели справа */}
       {period !== 'week' ? (
-        <div className="flex border-t border-slate-700 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto">
           {months.map((m) => {
             const active = m.month === curMonth && m.year === curYear;
             return (
               <button
+                type="button"
                 key={`${m.year}-${m.month}`}
                 onClick={() => goMonth(m.year, m.month)}
                 className={cn(
-                  'flex-1 py-2 px-2 min-w-[70px] text-[11px] font-bold uppercase tracking-wide transition-all border-r border-slate-700 last:border-r-0 whitespace-nowrap',
-                  active
-                    ? 'bg-sky-500 text-white'
-                    : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200',
+                  'px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap cursor-pointer',
+                  active ? 'bg-sky-500 text-white shadow-2xs' : 'text-sky-700 hover:bg-white',
                 )}
               >
                 {m.label}
@@ -578,18 +564,17 @@ function DateNav({
           })}
         </div>
       ) : (
-        <div className="flex border-t border-slate-700 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto">
           {weeks.map((w) => {
             const active = getWeekDates(date).weekStart === w.date;
             return (
               <button
+                type="button"
                 key={w.date}
                 onClick={() => onChange(w.date)}
                 className={cn(
-                  'flex-1 py-2 px-3 min-w-[120px] text-[11px] font-bold tracking-wide transition-all border-r border-slate-700 last:border-r-0 whitespace-nowrap',
-                  active
-                    ? 'bg-sky-500 text-white'
-                    : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200',
+                  'px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide transition-all whitespace-nowrap cursor-pointer',
+                  active ? 'bg-sky-500 text-white shadow-2xs' : 'text-sky-700 hover:bg-white',
                 )}
               >
                 {w.label}
@@ -3113,15 +3098,15 @@ function GarageOrderRow({
         <div className="flex items-center gap-3">
           {/* Слева: Номер, тип, авто, механик, статус */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="font-mono text-xs font-black text-slate-800 shrink-0 bg-slate-100 px-2 py-0.5 rounded">
+            <span className="font-mono text-xs font-black text-sky-900 shrink-0 bg-sky-50 border border-sky-200/70 px-2 py-0.5 rounded">
               НЗ-{order.order_number}
             </span>
             <span
               className={cn(
                 'text-[10px] font-black px-1.5 py-0.5 rounded shrink-0',
                 isOwn
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200',
               )}
             >
               {isOwn ? '🏢 Свой' : '🚗 Клиент'}
@@ -3527,6 +3512,7 @@ export default function ReviewPage() {
   const [reviewSection, setReviewSection] = useState<'auto' | 'garage'>(
     searchParams.get('section') === 'garage' ? 'garage' : 'auto',
   );
+  const [garageMachineFilter, setGarageMachineFilter] = useState<'all' | 'client' | 'own'>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedGarageOrderIds, setExpandedGarageOrderIds] = useState<Set<string>>(new Set());
@@ -3747,8 +3733,14 @@ export default function ReviewPage() {
     },
   });
 
+  const filteredGarageOrders = useMemo(() => {
+    if (garageMachineFilter === 'all') return garageOrders;
+    return garageOrders.filter((o) => o.machine_type === garageMachineFilter);
+  }, [garageOrders, garageMachineFilter]);
+
   const garageSummary = useMemo(() => {
     let totalRevenue = 0;
+    let totalWorks = 0;
     let totalMechanicPay = 0;
     let totalPartsClient = 0;
     let totalPartsCost = 0;
@@ -3756,8 +3748,9 @@ export default function ReviewPage() {
     let totalNetProfit = 0;
     let totalMinutes = 0;
 
-    for (const o of garageOrders) {
+    for (const o of filteredGarageOrders) {
       const m = calcGarageOrder(o);
+      totalWorks += m.worksSum;
       totalRevenue += m.totalRevenue;
       totalMechanicPay += m.mechanicPay;
       totalPartsClient += m.partsClientSum;
@@ -3767,17 +3760,27 @@ export default function ReviewPage() {
       totalMinutes += m.totalMinutes;
     }
 
+    const ownTotalSpent = totalMechanicPay + totalPartsCost;
+    const allCount = garageOrders.length;
+    const clientCount = garageOrders.filter((o) => o.machine_type === 'client').length;
+    const ownCount = garageOrders.filter((o) => o.machine_type === 'own').length;
+
     return {
-      totalOrders: garageOrders.length,
+      totalOrders: filteredGarageOrders.length,
+      allCount,
+      clientCount,
+      ownCount,
+      totalWorks,
       totalRevenue,
       totalMechanicPay,
       totalPartsClient,
       totalPartsCost,
       totalPartsMargin,
       totalNetProfit,
+      ownTotalSpent,
       totalMinutes,
     };
-  }, [garageOrders]);
+  }, [filteredGarageOrders, garageOrders]);
 
   async function handleApproveServiceOrder(orderId: string) {
     setApprovingId(orderId);
@@ -4158,309 +4161,540 @@ export default function ReviewPage() {
   );
 
   return (
-    <div className="space-y-5 max-w-5xl mx-auto animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900">
-            Ревью · {reviewSection === 'auto' ? 'Авто (Водители)' : 'Гараж (Механики)'}
-          </h1>
-          {reviewSection === 'auto' && mode === 'review' && trips.length > 0 && (
-            <p className="text-sm text-slate-500 mt-0.5">
-              {trips.length} рейс{trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'} ожидают ·{' '}
-              <span className="font-semibold text-slate-700">
-                <Money amount={totalFleetRevenue.toFixed(2)} />
-              </span>{' '}
-              выручка ·{' '}
-              <span
-                className={cn(
-                  'font-bold',
-                  totalFleetNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
-                )}
-              >
-                <Money amount={totalFleetNetProfit.toFixed(2)} />
-              </span>{' '}
-              прибыль
-            </p>
-          )}
-          {reviewSection === 'garage' && mode === 'review' && garageOrders.length > 0 && (
-            <p className="text-sm text-slate-500 mt-0.5">
-              {garageOrders.length} заказ-наряд
-              {garageOrders.length === 1 ? '' : garageOrders.length < 5 ? 'а' : 'ов'} от механиков
-              ожидают проверки и начисления ЗП
-            </p>
-          )}
-        </div>
+    <div className="space-y-3 max-w-5xl mx-auto animate-in fade-in duration-300">
+      {/* 1. Компактная светлая верхняя строка: Заголовок + Кнопки Авто/Гараж (Голубая и Изумрудная) + Режимы */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-sky-200/80 rounded-2xl px-3.5 py-1.5 shadow-2xs">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-4 rounded-full bg-gradient-to-b from-sky-500 to-emerald-500" />
+            <h1 className="text-base font-black text-sky-950 tracking-tight">
+              Ревью · {reviewSection === 'auto' ? 'Авто (Водители)' : 'Гараж (Механики)'}
+            </h1>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl">
+          <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+          {/* Уменьшенные в 2 раза кнопки: Голубая для Авто, Изумрудная для Гаража */}
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setMode('review')}
+              type="button"
+              onClick={() => setReviewSection('auto')}
               className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
-                mode === 'review'
-                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
-                  : 'text-slate-500 hover:text-slate-700',
+                'py-1.5 px-3.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer',
+                reviewSection === 'auto'
+                  ? 'bg-sky-600 text-white shadow-xs shadow-sky-200'
+                  : 'bg-sky-50/70 text-sky-800 hover:bg-sky-100 border border-sky-200/60',
               )}
             >
-              На ревью
-              {mode === 'review'
-                ? reviewSection === 'auto' && trips.length > 0
-                  ? ` (${trips.length})`
-                  : reviewSection === 'garage' && garageOrders.length > 0
-                    ? ` (${garageOrders.length})`
-                    : ''
-                : ''}
+              <span>🚛</span>
+              <span>Авто (Водители)</span>
+              {mode !== 'history' && trips.length > 0 && (
+                <span
+                  className={cn(
+                    'px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none',
+                    reviewSection === 'auto'
+                      ? 'bg-white text-sky-700'
+                      : 'bg-sky-200/80 text-sky-900',
+                  )}
+                >
+                  {trips.length}
+                </span>
+              )}
             </button>
+
             <button
-              onClick={() => setMode('active')}
+              type="button"
+              onClick={() => setReviewSection('garage')}
               className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
-                mode === 'active'
-                  ? 'bg-blue-500 text-white shadow-sm shadow-blue-200'
-                  : 'text-slate-500 hover:text-slate-700',
+                'py-1.5 px-3.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer',
+                reviewSection === 'garage'
+                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-200'
+                  : 'bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60',
               )}
             >
-              {reviewSection === 'auto' ? 'Активные' : 'В работе'}
-              {mode === 'active'
-                ? reviewSection === 'auto' && trips.length > 0
-                  ? ` (${trips.length})`
-                  : reviewSection === 'garage' && garageOrders.length > 0
-                    ? ` (${garageOrders.length})`
-                    : ''
-                : ''}
-            </button>
-            <button
-              onClick={() => setMode('history')}
-              className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
-                mode === 'history'
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700',
+              <span>🔧</span>
+              <span>Гараж (Механики)</span>
+              {mode !== 'history' && garageOrders.length > 0 && (
+                <span
+                  className={cn(
+                    'px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none',
+                    reviewSection === 'garage'
+                      ? 'bg-white text-emerald-700'
+                      : 'bg-emerald-200/80 text-emerald-900',
+                  )}
+                >
+                  {garageOrders.length}
+                </span>
               )}
-            >
-              История
             </button>
           </div>
         </div>
+
+        {/* Вкладки На ревью / Активные (В работе) / История в голубых тонах */}
+        <div className="flex items-center gap-1 bg-sky-50/80 p-1 rounded-xl border border-sky-100">
+          <button
+            type="button"
+            onClick={() => setMode('review')}
+            className={cn(
+              'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
+              mode === 'review'
+                ? 'bg-amber-500 text-white shadow-2xs shadow-amber-200'
+                : 'text-sky-700 hover:bg-white/70',
+            )}
+          >
+            На ревью
+            {mode === 'review'
+              ? reviewSection === 'auto' && trips.length > 0
+                ? ` (${trips.length})`
+                : reviewSection === 'garage' && garageOrders.length > 0
+                  ? ` (${garageOrders.length})`
+                  : ''
+              : ''}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('active')}
+            className={cn(
+              'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
+              mode === 'active'
+                ? 'bg-sky-500 text-white shadow-2xs shadow-sky-200'
+                : 'text-sky-700 hover:bg-white/70',
+            )}
+          >
+            {reviewSection === 'auto' ? 'Активные' : 'В работе'}
+            {mode === 'active'
+              ? reviewSection === 'auto' && trips.length > 0
+                ? ` (${trips.length})`
+                : reviewSection === 'garage' && garageOrders.length > 0
+                  ? ` (${garageOrders.length})`
+                  : ''
+              : ''}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('history')}
+            className={cn(
+              'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
+              mode === 'history'
+                ? 'bg-sky-600 text-white shadow-2xs'
+                : 'text-sky-700 hover:bg-white/70',
+            )}
+          >
+            История
+          </button>
+        </div>
       </div>
 
-      {/* 2 главные кнопки: АВТО / ГАРАЖ */}
-      <div className="grid grid-cols-2 gap-3 bg-white border border-slate-200 p-1.5 rounded-2xl shadow-2xs">
-        <button
-          type="button"
-          onClick={() => setReviewSection('auto')}
-          className={cn(
-            'py-3 px-4 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer',
-            reviewSection === 'auto'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50',
-          )}
-        >
-          <span className="text-lg">🚛</span>
-          <span>Авто (Водители)</span>
-          {mode !== 'history' && trips.length > 0 && (
-            <span
-              className={cn(
-                'px-2.5 py-0.5 rounded-full text-xs font-black',
-                reviewSection === 'auto'
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-slate-200 text-slate-700',
-              )}
-            >
-              {trips.length}
-            </span>
-          )}
-        </button>
+      {/* 2. Единый светло-голубой/мятный блок: Календарь + Фильтр парка + ИТОГОВАЯ СТАТИСТИКА СВЕРХУ */}
+      <div className="bg-gradient-to-r from-sky-50/90 via-white to-emerald-50/70 border border-sky-200 rounded-2xl shadow-2xs overflow-hidden">
+        {mode === 'history' && (
+          <DateNav
+            date={selectedDate}
+            period={statsPeriod}
+            onChange={setSelectedDate}
+            setPeriod={setStatsPeriod}
+          />
+        )}
 
-        <button
-          type="button"
-          onClick={() => setReviewSection('garage')}
-          className={cn(
-            'py-3 px-4 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer',
-            reviewSection === 'garage'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50',
-          )}
-        >
-          <span className="text-lg">🔧</span>
-          <span>Гараж (Механики)</span>
-          {mode !== 'history' && garageOrders.length > 0 && (
-            <span
-              className={cn(
-                'px-2.5 py-0.5 rounded-full text-xs font-black',
-                reviewSection === 'garage'
-                  ? 'bg-white text-emerald-700'
-                  : 'bg-emerald-100 text-emerald-800',
+        {reviewSection === 'garage' ? (
+          <>
+            {/* Подшапка фильтра Свои / Клиентские */}
+            <div className="px-4 py-1.5 bg-white/80 border-b border-sky-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-sky-800 uppercase tracking-wider mr-1">
+                  Разрез машин:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGarageMachineFilter('all')}
+                  className={cn(
+                    'px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                    garageMachineFilter === 'all'
+                      ? 'bg-sky-600 text-white shadow-2xs'
+                      : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/70',
+                  )}
+                >
+                  Все машины ({garageSummary.allCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGarageMachineFilter('client')}
+                  className={cn(
+                    'px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                    garageMachineFilter === 'client'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/70',
+                  )}
+                >
+                  🚗 Клиентские — Доход ({garageSummary.clientCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGarageMachineFilter('own')}
+                  className={cn(
+                    'px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                    garageMachineFilter === 'own'
+                      ? 'bg-sky-600 text-white shadow-2xs'
+                      : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/70',
+                  )}
+                >
+                  🏢 Свои машины — Затраты ({garageSummary.ownCount})
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-slate-500 font-medium">
+                  Выработка слесарей:{' '}
+                  <b className="text-sky-950">{(garageSummary.totalMinutes / 60).toFixed(1)} ч</b> ·
+                  Закупка запчастей:{' '}
+                  <b className="text-sky-950">
+                    {Math.round(garageSummary.totalPartsCost).toLocaleString('ru-RU')} ₽
+                  </b>
+                </span>
+                {filteredGarageOrders.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allIds = filteredGarageOrders.map((o) => o.id);
+                      if (allIds.every((id) => expandedGarageOrderIds.has(id))) {
+                        setExpandedGarageOrderIds(new Set());
+                      } else {
+                        setExpandedGarageOrderIds(new Set(allIds));
+                      }
+                    }}
+                    className="text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200/70 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">
+                      {filteredGarageOrders.every((o) => expandedGarageOrderIds.has(o.id))
+                        ? 'unfold_less'
+                        : 'unfold_more'}
+                    </span>
+                    {filteredGarageOrders.every((o) => expandedGarageOrderIds.has(o.id))
+                      ? 'Свернуть все'
+                      : 'Развернуть все'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Полоса цифр Гаража на светлом фоне */}
+            <div className="px-4 py-2.5 flex items-center justify-center flex-wrap gap-3 sm:gap-6">
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  {garageMachineFilter === 'own' ? 'Работы (свои авто)' : 'Выручка СТО'}
+                </span>
+                <span className="text-sm sm:text-base font-black text-sky-950">
+                  <Money
+                    amount={(garageMachineFilter === 'own'
+                      ? garageSummary.totalWorks
+                      : garageSummary.totalRevenue
+                    ).toFixed(2)}
+                  />
+                </span>
+              </div>
+              <span className="text-sky-200">−</span>
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  ЗП Механиков
+                </span>
+                <span className="text-sm sm:text-base font-black text-amber-600">
+                  −<Money amount={garageSummary.totalMechanicPay.toFixed(2)} />
+                </span>
+              </div>
+              <span className="text-sky-200">|</span>
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  {garageMachineFilter === 'own' ? 'Запчасти (закуп)' : 'Запчасти всего'}
+                </span>
+                <span className="text-sm sm:text-base font-black text-sky-700">
+                  <Money
+                    amount={(garageMachineFilter === 'own'
+                      ? garageSummary.totalPartsCost
+                      : garageSummary.totalPartsClient
+                    ).toFixed(2)}
+                  />
+                </span>
+              </div>
+              <span className="text-sky-200">+</span>
+              <div className="text-center bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1">
+                <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest block">
+                  Заработок на з/ч (+30%)
+                </span>
+                <span className="text-sm sm:text-base font-black text-emerald-700">
+                  +<Money amount={garageSummary.totalPartsMargin.toFixed(2)} />
+                </span>
+              </div>
+              <span className="text-sky-200">=</span>
+              <div
+                className={cn(
+                  'text-center border rounded-xl px-3.5 py-1 shadow-2xs',
+                  garageMachineFilter === 'own'
+                    ? 'bg-sky-100/80 border-sky-300 text-sky-900'
+                    : garageSummary.totalNetProfit >= 0
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-rose-600 border-rose-600 text-white',
+                )}
+              >
+                <span
+                  className={cn(
+                    'text-[9px] font-bold uppercase tracking-widest block',
+                    garageMachineFilter === 'own'
+                      ? 'text-sky-700'
+                      : garageSummary.totalNetProfit >= 0
+                        ? 'text-emerald-100'
+                        : 'text-rose-100',
+                  )}
+                >
+                  {garageMachineFilter === 'own'
+                    ? 'Расход на свои авто (ЗП + з/ч)'
+                    : 'Чистая прибыль гаража'}
+                </span>
+                <span className="text-base sm:text-lg font-black">
+                  {garageMachineFilter === 'own' ? (
+                    <>
+                      −<Money amount={garageSummary.ownTotalSpent.toFixed(2)} />
+                    </>
+                  ) : (
+                    <>
+                      {garageSummary.totalNetProfit < 0 ? '−' : ''}
+                      <Money amount={Math.abs(garageSummary.totalNetProfit).toFixed(2)} />
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Итоговая статистика АВТО (СВЕРХУ на светло-голубом/мятном фоне) */}
+            <div className="px-4 py-1.5 bg-white/80 border-b border-sky-100 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sky-800 font-bold uppercase tracking-wider">
+                  {mode === 'history'
+                    ? `Итоговая статистика · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`
+                    : mode === 'active'
+                      ? `Активные · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`
+                      : `На ревью · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {totalFleetLoaderProfit > 0 && (
+                  <span className="text-slate-500 flex items-center gap-1">
+                    <span>в т.ч. ПРР (грузчики):</span>
+                    <b className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
+                    </b>
+                  </span>
+                )}
+                {totalFleetPendingDebt > 0 && (
+                  <span
+                    className="text-slate-500 flex items-center gap-1 cursor-help"
+                    title={`Неоплаченная дебиторка за период: клиенты ещё должны ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽`}
+                  >
+                    <span>в долгах клиентов:</span>
+                    <b className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      <Money amount={totalFleetPendingDebt.toFixed(2)} />
+                    </b>
+                  </span>
+                )}
+                {totalFleetExternalDebtCollected > 0 && (
+                  <span
+                    className="text-slate-500 flex items-center gap-1 cursor-help"
+                    title={`Погашение задолженностей прошлых периодов, поступившее в выбранном периоде (+${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽):\n${externalSettlements
+                      .slice(0, 5)
+                      .map(
+                        (s) =>
+                          `• ${s.counterpartyName || 'Контрагент'}: +${Math.round(s.amount).toLocaleString('ru-RU')} ₽ (${new Date(s.created_at).toLocaleDateString('ru-RU')})`,
+                      )
+                      .join(
+                        '\n',
+                      )}${externalSettlements.length > 5 ? `\n...и ещё ${externalSettlements.length - 5} платежей` : ''}`}
+                  >
+                    <span>погашено долгов:</span>
+                    <b className="text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                      +<Money amount={totalFleetExternalDebtCollected.toFixed(2)} />
+                    </b>
+                  </span>
+                )}
+                {combinedAssetGroups.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allIds = listTrips.map((t) => t.id);
+                      const allGroups = combinedAssetGroups.map((g) => g.assetKey);
+                      const isAllExpanded =
+                        expandedIds.size === allIds.length &&
+                        expandedGroups.size === allGroups.length;
+
+                      if (isAllExpanded) {
+                        setExpandedIds(new Set());
+                        setExpandedGroups(new Set());
+                      } else {
+                        setExpandedIds(new Set(allIds));
+                        setExpandedGroups(new Set(allGroups));
+                      }
+                    }}
+                    className="text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200/70 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">
+                      {expandedIds.size === listTrips.length &&
+                      expandedGroups.size === combinedAssetGroups.length
+                        ? 'unfold_less'
+                        : 'unfold_more'}
+                    </span>
+                    {expandedIds.size === listTrips.length &&
+                    expandedGroups.size === combinedAssetGroups.length
+                      ? 'Свернуть все'
+                      : 'Развернуть все'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="px-4 py-2.5 flex items-center justify-center flex-wrap gap-3 sm:gap-5">
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Выручка
+                </span>
+                <span className="text-sm sm:text-base font-black text-sky-950">
+                  <Money amount={totalFleetRevenue.toFixed(2)} />
+                </span>
+              </div>
+
+              <span className="text-sky-200">|</span>
+
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Зарплаты
+                </span>
+                <span className="text-sm sm:text-base font-black text-amber-600">
+                  −<Money amount={totalFleetPayroll.toFixed(2)} />
+                </span>
+              </div>
+
+              <span className="text-sky-200">|</span>
+
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Топливо
+                </span>
+                <span className="text-sm sm:text-base font-black text-sky-600">
+                  −<Money amount={totalFleetFuel.toFixed(2)} />
+                </span>
+              </div>
+
+              {mode === 'history' && (
+                <>
+                  <span className="text-sky-200">|</span>
+
+                  <div className="text-center">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                      Ремонты ТО
+                    </span>
+                    <span className="text-sm sm:text-base font-black text-rose-600">
+                      −<Money amount={totalFleetMaintenance.toFixed(2)} />
+                    </span>
+                  </div>
+                </>
               )}
-            >
-              {garageOrders.length}
-            </span>
-          )}
-        </button>
+
+              <span className="text-sky-200">=</span>
+
+              <div
+                className="text-center cursor-help"
+                title={`Чистый итог (начисленный доход рейсов):\nВыручка: ${Math.round(totalFleetRevenue).toLocaleString('ru-RU')} ₽\n− Зарплаты: ${Math.round(totalFleetPayroll).toLocaleString('ru-RU')} ₽\n− Топливо: ${Math.round(totalFleetFuel).toLocaleString('ru-RU')} ₽\n− Ремонты ТО: ${Math.round(totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n= Чистый итог: ${Math.round(totalFleetNetProfit).toLocaleString('ru-RU')} ₽`}
+              >
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Чистый итог
+                </span>
+                <span
+                  className={cn(
+                    'text-base sm:text-lg font-black',
+                    totalFleetNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                  )}
+                >
+                  {totalFleetNetProfit < 0 ? '−' : ''}
+                  <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
+                </span>
+              </div>
+
+              <span className="text-sky-200">|</span>
+
+              <div
+                className={cn(
+                  'text-center rounded-xl py-1 px-3.5 shadow-2xs cursor-help',
+                  totalFleetActualProfit >= 0
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-rose-600 text-white',
+                )}
+                title={`Фактическая прибыль (Cash Flow):\n• Поступило по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽\n• Не оплачено клиентами по рейсам (в долгах): ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n${totalFleetExternalDebtCollected > 0 ? `• Погашение долгов за прошлые периоды: +${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽\n` : ''}• Все расходы (ЗП + Топливо + ТО): ${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
+              >
+                <span
+                  className={cn(
+                    'text-[9px] font-bold uppercase tracking-widest block',
+                    totalFleetActualProfit >= 0 ? 'text-emerald-100' : 'text-rose-100',
+                  )}
+                >
+                  Факт. прибыль
+                </span>
+                <span className="text-base sm:text-lg font-black">
+                  {totalFleetActualProfit < 0 ? '−' : ''}
+                  <Money amount={Math.abs(totalFleetActualProfit).toFixed(2)} />
+                </span>
+              </div>
+
+              {totalFleetLoaderProfit > 0 && (
+                <>
+                  <span className="text-sky-200">|</span>
+
+                  <div
+                    className="text-center bg-emerald-50 border border-emerald-200 rounded-xl py-1 px-3 cursor-help"
+                    title={`Сумма уже включена в Чистый итог:\nВсего за ПРР клиенты заплатили ${Math.round(totalFleetLoadingBilled).toLocaleString('ru-RU')} ₽, выплачено рабочим ${Math.round(totalFleetLoadingPayroll).toLocaleString('ru-RU')} ₽, чистая прибыль компании 30% = +${Math.round(totalFleetLoaderProfit).toLocaleString('ru-RU')} ₽`}
+                  >
+                    <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest block">
+                      в т.ч. с ПРР
+                    </span>
+                    <span className="text-sm sm:text-base font-black text-emerald-700">
+                      +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
-
-      {/* Date navigation — history only */}
-      {mode === 'history' && (
-        <DateNav
-          date={selectedDate}
-          period={statsPeriod}
-          onChange={setSelectedDate}
-          setPeriod={setStatsPeriod}
-        />
-      )}
 
       {/* ── GARAGE SECTION (Механики) ── */}
       {reviewSection === 'garage' && (
-        <div className="space-y-4">
-          {/* Итоговая статистика по гаражу (банковский стиль как в рейсах) */}
-          {!isGarageLoading && garageOrders.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {/* Выручка / Заработано */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">
-                    Выручка СТО
-                  </span>
-                  <span className="text-base">💰</span>
-                </div>
-                <div className="text-xl font-black text-slate-900">
-                  <Money amount={garageSummary.totalRevenue.toFixed(2)} />
-                </div>
-                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
-                  Работы:{' '}
-                  {Math.round(
-                    garageSummary.totalRevenue - garageSummary.totalPartsClient,
-                  ).toLocaleString('ru-RU')}{' '}
-                  ₽
-                </p>
-              </div>
-
-              {/* ЗП Механиков */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">
-                    ЗП Механиков
-                  </span>
-                  <span className="text-base">👨‍🔧</span>
-                </div>
-                <div className="text-xl font-black text-amber-600">
-                  <Money amount={garageSummary.totalMechanicPay.toFixed(2)} />
-                </div>
-                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
-                  Выработка: {(garageSummary.totalMinutes / 60).toFixed(1)} ч
-                </p>
-              </div>
-
-              {/* Запчасти клиенту */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">
-                    Запчасти всего
-                  </span>
-                  <span className="text-base">📦</span>
-                </div>
-                <div className="text-xl font-black text-slate-800">
-                  <Money amount={garageSummary.totalPartsClient.toFixed(2)} />
-                </div>
-                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
-                  Закупка: {Math.round(garageSummary.totalPartsCost).toLocaleString('ru-RU')} ₽
-                </p>
-              </div>
-
-              {/* Заработок на запчастях */}
-              <div className="bg-white border border-emerald-200 bg-emerald-50/30 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center justify-between text-emerald-800 text-xs mb-1">
-                  <span className="font-black uppercase tracking-wider text-[10px]">
-                    Заработок на з/ч
-                  </span>
-                  <span className="text-base">📈</span>
-                </div>
-                <div className="text-xl font-black text-emerald-700">
-                  +{Math.round(garageSummary.totalPartsMargin).toLocaleString('ru-RU')} ₽
-                </div>
-                <p className="text-[11px] text-emerald-700 font-semibold mt-1 truncate">
-                  Маржа сервиса (+30%)
-                </p>
-              </div>
-
-              {/* Чистая прибыль Гаража */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow col-span-2 md:col-span-1">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">
-                    Прибыль Гаража
-                  </span>
-                  <span className="text-base">🏁</span>
-                </div>
-                <div
-                  className={cn(
-                    'text-xl font-black',
-                    garageSummary.totalNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600',
-                  )}
-                >
-                  <Money amount={garageSummary.totalNetProfit.toFixed(2)} />
-                </div>
-                <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
-                  Итог за вычетом ЗП и з/ч
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Строка управления (сворачивание/разворачивание всех нарядов) */}
-          {!isGarageLoading && garageOrders.length > 0 && (
-            <div className="flex items-center justify-between px-1">
-              <p className="text-xs text-slate-500 font-semibold">
-                {garageOrders.length} заказ-наряд
-                {garageOrders.length === 1 ? '' : garageOrders.length < 5 ? 'а' : 'ов'} ·{' '}
-                {garageOrders.filter((o) => o.machine_type === 'own').length} своих ·{' '}
-                {garageOrders.filter((o) => o.machine_type === 'client').length} клиентских
-              </p>
-              <button
-                onClick={() => {
-                  const allIds = garageOrders.map((o) => o.id);
-                  if (expandedGarageOrderIds.size === allIds.length) {
-                    setExpandedGarageOrderIds(new Set());
-                  } else {
-                    setExpandedGarageOrderIds(new Set(allIds));
-                  }
-                }}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[14px]">
-                  {expandedGarageOrderIds.size === garageOrders.length
-                    ? 'unfold_less'
-                    : 'unfold_more'}
-                </span>
-                {expandedGarageOrderIds.size === garageOrders.length
-                  ? 'Свернуть все'
-                  : 'Развернуть все'}
-              </button>
-            </div>
-          )}
-
+        <div className="space-y-3">
           {isGarageLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="h-14 bg-slate-100 rounded-2xl animate-pulse" />
               ))}
             </div>
-          ) : garageOrders.length === 0 ? (
+          ) : filteredGarageOrders.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-14 text-center shadow-sm">
               <span className="material-symbols-outlined text-slate-200 text-[72px] mb-4 block">
                 {mode === 'review' ? 'check_circle' : 'build_circle'}
               </span>
               <p className="text-slate-500 font-semibold text-lg">
-                {mode === 'review'
-                  ? 'Нет заказ-нарядов на ревью — все работы механиков проверены!'
-                  : mode === 'active'
-                    ? 'Нет открытых заказ-нарядов в работе'
-                    : 'Нет заказ-нарядов за выбранный период'}
+                {garageOrders.length > 0
+                  ? garageMachineFilter === 'client'
+                    ? 'Нет клиентских заказ-нарядов за выбранный период'
+                    : 'Нет заказ-нарядов по своим машинам за выбранный период'
+                  : mode === 'review'
+                    ? 'Нет заказ-нарядов на ревью — все работы механиков проверены!'
+                    : mode === 'active'
+                      ? 'Нет открытых заказ-нарядов в работе'
+                      : 'Нет заказ-нарядов за выбранный период'}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {garageOrders.map((order) => (
+              {filteredGarageOrders.map((order) => (
                 <GarageOrderRow
                   key={order.id}
                   order={order}
@@ -4475,67 +4709,6 @@ export default function ReviewPage() {
                 />
               ))}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Summary line (Auto) */}
-      {reviewSection === 'auto' && !isLoading && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500">
-            {mode === 'active' ? (
-              <span className="font-semibold text-slate-700">
-                {trips.length} активных рейс
-                {trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}
-              </span>
-            ) : mode === 'history' ? (
-              <>
-                <span className="font-semibold text-slate-700">
-                  {formatPeriod(selectedDate, statsPeriod)}
-                </span>
-                {listTrips.length > 0
-                  ? ` · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 ? 'а' : 'ов'}`
-                  : ' · нет рейсов'}
-                {listServiceOrders.length > 0 && (
-                  <span className="text-rose-600 font-semibold">
-                    {' '}
-                    · {listServiceOrders.length} наряд{listServiceOrders.length === 1 ? '' : 'а'} ТО
-                  </span>
-                )}
-              </>
-            ) : trips.length === 0 ? (
-              'Нет рейсов на ревью — всё проверено!'
-            ) : null}
-          </p>
-          {combinedAssetGroups.length > 0 && (
-            <button
-              onClick={() => {
-                const allIds = listTrips.map((t) => t.id);
-                const allGroups = combinedAssetGroups.map((g) => g.assetKey);
-                const isAllExpanded =
-                  expandedIds.size === allIds.length && expandedGroups.size === allGroups.length;
-
-                if (isAllExpanded) {
-                  setExpandedIds(new Set());
-                  setExpandedGroups(new Set());
-                } else {
-                  setExpandedIds(new Set(allIds));
-                  setExpandedGroups(new Set(allGroups));
-                }
-              }}
-              className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[14px]">
-                {expandedIds.size === listTrips.length &&
-                expandedGroups.size === combinedAssetGroups.length
-                  ? 'unfold_less'
-                  : 'unfold_more'}
-              </span>
-              {expandedIds.size === listTrips.length &&
-              expandedGroups.size === combinedAssetGroups.length
-                ? 'Свернуть все'
-                : 'Развернуть все'}
-            </button>
           )}
         </div>
       )}
@@ -5016,174 +5189,6 @@ export default function ReviewPage() {
                   </div>
                 );
               })}
-
-              {/* Unified Stats Strip */}
-              <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-800 text-white mt-4">
-                <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-slate-400 text-[16px]">
-                      summarize
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {mode === 'history'
-                        ? `Итоговая статистика · ${listTrips.length} рейс${listTrips.length === 1 ? '' : listTrips.length < 5 && listTrips.length > 0 ? 'а' : 'ов'}${listServiceOrders.length > 0 ? ` · ${listServiceOrders.length} ТО` : ''}`
-                        : `Итого · ${trips.length} рейс${trips.length === 1 ? '' : trips.length < 5 && trips.length > 0 ? 'а' : 'ов'}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {totalFleetLoaderProfit > 0 && (
-                      <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                        <span className="text-slate-400 font-medium">
-                          в т.ч. заработано на ПРР (грузчики):
-                        </span>
-                        <span className="font-black bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded text-emerald-300">
-                          +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
-                        </span>
-                      </div>
-                    )}
-                    {totalFleetPendingDebt > 0 && (
-                      <div
-                        className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5 cursor-help"
-                        title={`Неоплаченная дебиторка за период: клиенты ещё должны ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽`}
-                      >
-                        <span className="text-slate-400 font-medium">в долгах клиентов:</span>
-                        <span className="font-black bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded text-amber-300">
-                          <Money amount={totalFleetPendingDebt.toFixed(2)} />
-                        </span>
-                      </div>
-                    )}
-                    {totalFleetExternalDebtCollected > 0 && (
-                      <div
-                        className="text-[11px] font-bold text-sky-400 flex items-center gap-1.5 cursor-help"
-                        title={`Погашение задолженностей прошлых периодов, поступившее в выбранном периоде (+${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽):\n${externalSettlements
-                          .slice(0, 5)
-                          .map(
-                            (s) =>
-                              `• ${s.counterpartyName || 'Контрагент'}: +${Math.round(s.amount).toLocaleString('ru-RU')} ₽ (${new Date(s.created_at).toLocaleDateString('ru-RU')})`,
-                          )
-                          .join(
-                            '\n',
-                          )}${externalSettlements.length > 5 ? `\n...и ещё ${externalSettlements.length - 5} платежей` : ''}`}
-                      >
-                        <span className="text-slate-400 font-medium">погашено долгов:</span>
-                        <span className="font-black bg-sky-950/80 border border-sky-500/40 px-2 py-0.5 rounded text-sky-300">
-                          +<Money amount={totalFleetExternalDebtCollected.toFixed(2)} />
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center px-4 py-3">
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="flex items-center gap-1 sm:gap-3 flex-wrap justify-center">
-                      <div className="w-[85px] sm:w-[100px] text-center">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Выручка
-                        </span>
-                        <span className="text-sm sm:text-base font-black text-white">
-                          <Money amount={totalFleetRevenue.toFixed(2)} />
-                        </span>
-                      </div>
-
-                      <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                      <div className="w-[85px] sm:w-[100px] text-center">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Зарплаты
-                        </span>
-                        <span className="text-sm sm:text-base font-black text-amber-400">
-                          −<Money amount={totalFleetPayroll.toFixed(2)} />
-                        </span>
-                      </div>
-
-                      <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                      <div className="w-[85px] sm:w-[100px] text-center">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Топливо
-                        </span>
-                        <span className="text-sm sm:text-base font-black text-blue-400">
-                          −<Money amount={totalFleetFuel.toFixed(2)} />
-                        </span>
-                      </div>
-
-                      {mode === 'history' && (
-                        <>
-                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                          <div className="w-[85px] sm:w-[100px] text-center">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                              Ремонты ТО
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-rose-400">
-                              −<Money amount={totalFleetMaintenance.toFixed(2)} />
-                            </span>
-                          </div>
-                        </>
-                      )}
-
-                      <span className="text-slate-600 text-sm hidden sm:block">=</span>
-
-                      <div
-                        className="w-[85px] sm:w-[105px] text-center cursor-help"
-                        title={`Чистый итог (начисленный доход рейсов):\nВыручка: ${Math.round(totalFleetRevenue).toLocaleString('ru-RU')} ₽\n− Зарплаты: ${Math.round(totalFleetPayroll).toLocaleString('ru-RU')} ₽\n− Топливо: ${Math.round(totalFleetFuel).toLocaleString('ru-RU')} ₽\n− Ремонты ТО: ${Math.round(totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n= Чистый итог: ${Math.round(totalFleetNetProfit).toLocaleString('ru-RU')} ₽`}
-                      >
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Чистый итог
-                        </span>
-                        <span
-                          className={cn(
-                            'text-base sm:text-lg font-black',
-                            totalFleetNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
-                          )}
-                        >
-                          {totalFleetNetProfit < 0 ? '−' : ''}
-                          <Money amount={Math.abs(totalFleetNetProfit).toFixed(2)} />
-                        </span>
-                      </div>
-
-                      <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                      <div
-                        className="w-[95px] sm:w-[115px] text-center bg-slate-900/90 rounded-xl py-1 px-1.5 border border-slate-700/80 cursor-help"
-                        title={`Фактическая прибыль (Cash Flow):\n• Поступило по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽\n• Не оплачено клиентами по рейсам (в долгах): ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n${totalFleetExternalDebtCollected > 0 ? `• Погашение долгов за прошлые периоды: +${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽\n` : ''}• Все расходы (ЗП + Топливо + ТО): ${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
-                      >
-                        <span className="text-[8px] font-bold text-amber-300 uppercase tracking-widest block">
-                          Прибыль
-                        </span>
-                        <span
-                          className={cn(
-                            'text-base sm:text-lg font-black',
-                            totalFleetActualProfit >= 0 ? 'text-emerald-400' : 'text-rose-400',
-                          )}
-                        >
-                          {totalFleetActualProfit < 0 ? '−' : ''}
-                          <Money amount={Math.abs(totalFleetActualProfit).toFixed(2)} />
-                        </span>
-                      </div>
-
-                      {totalFleetLoaderProfit > 0 && (
-                        <>
-                          <span className="text-slate-600 text-sm hidden sm:block">|</span>
-
-                          <div
-                            className="w-[95px] sm:w-[125px] text-center bg-emerald-950/40 rounded-xl py-1 px-1.5 border border-emerald-500/30 cursor-help"
-                            title={`Сумма уже включена в Чистый итог:\nВсего за ПРР клиенты заплатили ${Math.round(totalFleetLoadingBilled).toLocaleString('ru-RU')} ₽, выплачено рабочим ${Math.round(totalFleetLoadingPayroll).toLocaleString('ru-RU')} ₽, чистая прибыль компании 30% = +${Math.round(totalFleetLoaderProfit).toLocaleString('ru-RU')} ₽`}
-                          >
-                            <span className="text-[8px] font-bold text-emerald-300 uppercase tracking-widest block">
-                              в т.ч. с ПРР
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-emerald-400">
-                              +<Money amount={totalFleetLoaderProfit.toFixed(2)} />
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </>
           )}
         </div>
