@@ -152,9 +152,9 @@ export async function GET(request: Request) {
       }
 
       if (Array.isArray(statementResult)) {
-        // Фильтруем операции строго по реальной локальной дате совершения (trxnPostDate / authorizationDate в UTC+5)
+        // Фильтруем операции строго по реальной локальной дате авторизации клиентом (authorizationDate в UTC+5)
         const getOpLocalDate = (op: any) => {
-          const raw = op.trxnPostDate || op.authorizationDate || op.operationDate;
+          const raw = op.authorizationDate || op.operationDate || op.trxnPostDate;
           if (!raw) return '';
           return new Date(new Date(raw).getTime() + TIMEZONE_OFFSET_HOURS * 3600 * 1000)
             .toISOString()

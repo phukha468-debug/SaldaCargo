@@ -79,9 +79,9 @@ function getOpLocalDate(
   const raw =
     typeof dateOrOp === 'string'
       ? dateOrOp
-      : dateOrOp.trxnPostDate ||
-        dateOrOp.authorizationDate ||
+      : dateOrOp.authorizationDate ||
         dateOrOp.operationDate ||
+        dateOrOp.trxnPostDate ||
         dateOrOp.operationTime;
   if (!raw) return '';
   const d = new Date(new Date(raw).getTime() + tzHours * 3600 * 1000);
@@ -2607,9 +2607,9 @@ export function DailyControlPanel() {
                                   raw?.transaction_date ||
                                   raw?.created_at ||
                                   (op
-                                    ? op.trxnPostDate ||
-                                      op.authorizationDate ||
+                                    ? op.authorizationDate ||
                                       op.operationDate ||
+                                      op.trxnPostDate ||
                                       op.operationTime
                                     : selectedDate),
                                 obligationId: item.linkedObligationId || null,
@@ -2991,92 +2991,6 @@ export function DailyControlPanel() {
                 </div>
               ))
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── 7. BOTTOM EXACT WALLET SUMMARY (100% ФИНАНСОВЫЙ КОНТРОЛЬ) ── */}
-      <div className="bg-white text-slate-900 rounded-2xl p-4 border-2 border-slate-200 shadow-card">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🎯</span>
-            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-              ИТОГОВЫЙ СУТОЧНЫЙ БАЛАНС ПО КОШЕЛЬКАМ (ИТОГО ЗА ДЕНЬ)
-            </span>
-          </div>
-          <div className="text-sm font-mono font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
-            ВСЕГО: {rub(eveningTotal)}
-          </div>
-        </div>
-
-        <div className="mt-3.5 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Bank */}
-          <div className="bg-sky-50/60 rounded-xl p-3 border-2 border-sky-100">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-sky-950">🏦 Р/С Банк (АПИ):</span>
-              <span className="text-sm font-black font-mono text-sky-700">
-                {rub(bankWallet?.evening ?? 0)}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1 flex justify-between font-mono">
-              <span>С утра: {rub(bankWallet?.morning ?? 0)}</span>
-              <span
-                className={
-                  (bankWallet?.evening ?? 0) - (bankWallet?.morning ?? 0) >= 0
-                    ? 'text-emerald-600 font-bold'
-                    : 'text-rose-600 font-bold'
-                }
-              >
-                {(bankWallet?.evening ?? 0) - (bankWallet?.morning ?? 0) >= 0 ? '+' : ''}
-                {rub((bankWallet?.evening ?? 0) - (bankWallet?.morning ?? 0))}
-              </span>
-            </div>
-          </div>
-
-          {/* Cash Safe */}
-          <div className="bg-emerald-50/60 rounded-xl p-3 border-2 border-emerald-100">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-950">🔒 Сейф (Факт директор):</span>
-              <span className="text-sm font-black font-mono text-emerald-700">
-                {rub(cashWallet?.evening ?? 0)}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1 flex justify-between font-mono">
-              <span>С утра: {rub(cashWallet?.morning ?? 0)}</span>
-              <span
-                className={
-                  (cashWallet?.evening ?? 0) - (cashWallet?.morning ?? 0) >= 0
-                    ? 'text-emerald-600 font-bold'
-                    : 'text-rose-600 font-bold'
-                }
-              >
-                {(cashWallet?.evening ?? 0) - (cashWallet?.morning ?? 0) >= 0 ? '+' : ''}
-                {rub((cashWallet?.evening ?? 0) - (cashWallet?.morning ?? 0))}
-              </span>
-            </div>
-          </div>
-
-          {/* Fuel Card */}
-          <div className="bg-amber-50/60 rounded-xl p-3 border-2 border-amber-100">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-950">⛽ Топливная карта:</span>
-              <span className="text-sm font-black font-mono text-amber-700">
-                {rub(fuelWallet?.evening ?? 0)}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1 flex justify-between font-mono">
-              <span>С утра: {rub(fuelWallet?.morning ?? 0)}</span>
-              <span
-                className={
-                  (fuelWallet?.evening ?? 0) - (fuelWallet?.morning ?? 0) >= 0
-                    ? 'text-emerald-600 font-bold'
-                    : 'text-rose-600 font-bold'
-                }
-              >
-                {(fuelWallet?.evening ?? 0) - (fuelWallet?.morning ?? 0) >= 0 ? '+' : ''}
-                {rub((fuelWallet?.evening ?? 0) - (fuelWallet?.morning ?? 0))}
-              </span>
-            </div>
           </div>
         </div>
       </div>
