@@ -26,6 +26,7 @@ export async function GET() {
     { data: pendingConfirmation },
     { data: accumulatedRows },
     { data: monthlyAccruals },
+    { data: holds },
   ] = await Promise.all([
     supabase
       .from('trips')
@@ -78,6 +79,15 @@ export async function GET() {
       .is('from_wallet_id', null)
       .gte('transaction_date', new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
       .order('transaction_date', { ascending: false }),
+
+    // Зафиксированные переносы подотчёта на руках
+    (supabase.from('transactions') as any)
+      .select('id, amount, description, created_at, transaction_date')
+      .eq('related_user_id', driverId)
+      .eq('category_id', '72f677d4-84af-4d0d-a845-a1b63c7ae607')
+      .eq('settlement_status', 'pending')
+      .neq('lifecycle_status', 'cancelled')
+      .order('created_at', { ascending: false }),
   ]);
 
   const lastCollectedAt =
@@ -103,7 +113,25 @@ export async function GET() {
     .filter((e: any) => CASH_METHODS.includes(e.payment_method))
     .reduce((sum: number, e: any) => sum + parseFloat(e.amount ?? '0'), 0);
 
-  const cashBalance = Math.max(0, cashIn - cashSpent).toFixed(2);
+  // Зафиксированные переносы подотчёта на руках
+  const activeHolds = (holds as any[]) ?? [];
+  const carryoverTotal = activeHolds.reduce(
+    (acc: number, h: any) => acc + parseFloat(h.amount ?? '0'),
+    0,
+  );
+  const activeCarryover =
+    activeHolds.length > 0
+      ? {
+          id: activeHolds[0].id,
+          amount: carryoverTotal.toFixed(2),
+          note:
+            activeHolds[0].description?.replace('[CARRYOVER] ', '') ||
+            'Остаток на руках, перенос на следующий день',
+          date: activeHolds[0].created_at,
+        }
+      : null;
+
+  const cashBalance = Math.max(0, cashIn - cashSpent + carryoverTotal).toFixed(2);
 
   const accumulated_total = (accumulatedRows ?? [])
     .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0)
@@ -117,6 +145,8 @@ export async function GET() {
   return NextResponse.json({
     accountable: {
       balance: cashBalance,
+      carryover: carryoverTotal.toFixed(2),
+      activeCarryover,
       transactions: freshCashOrders.slice(0, 20).map((o: any) => ({
         id: o.id,
         amount: o.amount,

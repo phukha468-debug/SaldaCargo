@@ -10,6 +10,8 @@ export default function FinancePage() {
 }
 
 function FinanceContent() {
+  const [tab, setTab] = useState<'salary' | 'accountable'>('salary');
+
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: ['driver-finance'],
     queryFn: async () => {
@@ -35,9 +37,100 @@ function FinanceContent() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      <div className="p-4 border-b border-zinc-200 bg-white sticky top-0 z-10">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTab('salary')}
+            className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wide transition-all ${
+              tab === 'salary'
+                ? 'bg-zinc-900 text-white shadow-sm'
+                : 'bg-zinc-100 text-zinc-600 active:bg-zinc-200'
+            }`}
+          >
+            💰 Зарплата
+          </button>
+          <button
+            onClick={() => setTab('accountable')}
+            className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wide transition-all ${
+              tab === 'accountable'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-zinc-100 text-zinc-600 active:bg-zinc-200'
+            }`}
+          >
+            💵 Подотчёт ({data?.accountable?.balance ?? '0'} ₽)
+          </button>
+        </div>
+      </div>
+
       <main className="p-4 space-y-6">
-        <SalaryTab salary={data?.salary} />
+        {tab === 'salary' ? (
+          <SalaryTab salary={data?.salary} />
+        ) : (
+          <AccountableTab accountable={data?.accountable} />
+        )}
       </main>
+    </div>
+  );
+}
+
+function AccountableTab({ accountable }: { accountable: any }) {
+  const balance = accountable?.balance ?? '0';
+  const carryover = accountable?.activeCarryover;
+  const transactions = accountable?.transactions ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl p-5 border border-zinc-200 shadow-sm">
+        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+          Наличные на руках (к сдаче)
+        </p>
+        <Money amount={balance} className="text-3xl font-black text-zinc-900 mt-1" />
+        <p className="text-xs text-zinc-500 mt-1">
+          Сумма принятых наличных от клиентов, подлежащая сдаче в сейф кассы компании
+        </p>
+
+        {carryover && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl space-y-1">
+            <p className="text-xs font-black text-red-700">
+              ⚠️ В т.ч. перенос с прошлого дня: {carryover.amount} ₽
+            </p>
+            {carryover.note && (
+              <p className="text-[11px] text-red-600">Причина: {carryover.note}</p>
+            )}
+            <p className="text-[11px] font-bold text-red-700">
+              Сдать в кассу поверх выручки текущей смены!
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
+          История приёма наличных
+        </h2>
+        {transactions.length === 0 ? (
+          <p className="text-center py-8 text-zinc-400 font-bold uppercase text-xs">
+            Заказов с наличными нет
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {transactions.map((tx: any) => (
+              <div
+                key={tx.id}
+                className="bg-white rounded-xl p-3 border border-zinc-200 flex justify-between items-center shadow-sm"
+              >
+                <div>
+                  <p className="font-bold text-sm text-zinc-900">{tx.description || 'Рейс'}</p>
+                  <p className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                    {tx.created_at ? new Date(tx.created_at).toLocaleString('ru-RU') : ''}
+                  </p>
+                </div>
+                <Money amount={tx.amount} className="font-black text-base text-zinc-900" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

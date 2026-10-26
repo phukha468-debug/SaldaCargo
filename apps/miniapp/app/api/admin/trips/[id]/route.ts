@@ -96,13 +96,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (cpId) return cpId;
       const name = cpName?.trim();
       if (!name) return null;
-      const { data: found } = await (supabase.from('counterparties') as any)
+      const { data: foundList } = await (supabase.from('counterparties') as any)
         .select('id')
         .ilike('name', name)
-        .maybeSingle();
-      if (found) return found.id;
+        .order('is_active', { ascending: false })
+        .limit(1);
+      if (foundList && foundList.length > 0) return foundList[0].id;
       const { data: created, error: createErr } = await (supabase.from('counterparties') as any)
-        .insert({ name, type: 'client' })
+        .insert({ name, type: 'client', is_active: true })
         .select('id')
         .single();
       if (createErr) throw createErr;

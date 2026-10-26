@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
 
-    let query = supabase
+    const query = supabase
       .from('users')
       .select('id, name, roles, phone, notes, is_active, pin_code, current_asset_id')
       .eq('is_active', true)

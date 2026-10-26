@@ -32,6 +32,7 @@ interface DriverSummary {
   reviewTrips: TripCard[];
   recentTrips: TripCard[];
   accountableBalance: string;
+  activeCarryover?: { id: string; amount: string; note: string; date: string } | null;
   monthPayApproved: string;
   monthPayDraft: string;
   pendingPayrollCount: number;
@@ -170,12 +171,6 @@ export default function RootPage() {
     availableVehicles.find((v) => v.id === activeAssetId) ||
     vehicles.find((v) => v.id === activeAssetId);
 
-  useEffect(() => {
-    if (showVehiclePicker) {
-      setSelectedVehicleId(activeAssetId || null);
-    }
-  }, [showVehiclePicker, activeAssetId]);
-
   async function handleSwitchVehicle(assetId: string) {
     setUpdatingVehicle(true);
     try {
@@ -218,6 +213,7 @@ export default function RootPage() {
     const asset = vehicles.find((a) => a.id === currentVehicleId);
 
     if (!asset) {
+      setSelectedVehicleId(activeAssetId || null);
       setShowVehiclePicker(true);
       setStartTripError('Выберите автомобиль перед началом рейса.');
       return;
@@ -274,7 +270,10 @@ export default function RootPage() {
       </div>
 
       {/* Карточка подотчёта */}
-      <AccountableCard balance={data?.accountableBalance ?? '0'} />
+      <AccountableCard
+        balance={data?.accountableBalance ?? '0'}
+        carryover={data?.activeCarryover}
+      />
 
       {/* Карточка ЗП */}
       <PayCard
@@ -312,7 +311,10 @@ export default function RootPage() {
           </div>
 
           <button
-            onClick={() => setShowVehiclePicker(true)}
+            onClick={() => {
+              setSelectedVehicleId(activeAssetId || null);
+              setShowVehiclePicker(true);
+            }}
             className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-orange-700 text-xs font-black uppercase tracking-wider active:scale-95 transition-all"
           >
             🔄 Сменить
@@ -657,13 +659,40 @@ export default function RootPage() {
 
 // ... (остальные компоненты карточек остаются без изменений)
 
-function AccountableCard({ balance }: { balance: string }) {
+function AccountableCard({
+  balance,
+  carryover,
+}: {
+  balance: string;
+  carryover?: { id: string; amount: string; note: string; date: string } | null;
+}) {
   return (
     <Link href="/driver/finance?tab=accountable">
-      <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 active:bg-zinc-50 transition-colors">
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">На руках</p>
+      <div
+        className={`rounded-lg p-4 shadow-sm border transition-colors ${
+          carryover
+            ? 'bg-orange-50 border-orange-300'
+            : 'bg-white border-zinc-200 active:bg-zinc-50'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+            На руках к сдаче
+          </p>
+          {carryover && (
+            <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">
+              Перенос со вчера
+            </span>
+          )}
+        </div>
         <Money amount={balance} className="text-2xl font-black text-zinc-900 mt-1" />
-        <p className="text-xs text-zinc-400 mt-1 font-medium">Подотчётные наличные →</p>
+        {carryover ? (
+          <p className="text-xs text-red-600 mt-1 font-semibold">
+            ⚠️ В т.ч. перенос: {carryover.amount} ₽ (сдать поверх смены)
+          </p>
+        ) : (
+          <p className="text-xs text-zinc-400 mt-1 font-medium">Подотчётные наличные →</p>
+        )}
       </div>
     </Link>
   );

@@ -154,6 +154,40 @@ fun DriverFinanceScreen(
                                             fontSize = 12.sp,
                                             color = Zinc500
                                         )
+
+                                        if (acc?.activeCarryover != null) {
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Surface(
+                                                color = Color(0xFFFEE2E2),
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(modifier = Modifier.padding(10.dp)) {
+                                                    Text(
+                                                        text = "⚠️ В т.ч. перенос с прошлого дня: ${acc.activeCarryover.amount} ₽",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFB91C1C)
+                                                    )
+                                                    if (acc.activeCarryover.note.isNotBlank()) {
+                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                        Text(
+                                                            text = "Причина: ${acc.activeCarryover.note}",
+                                                            fontSize = 11.sp,
+                                                            color = Color(0xFF7F1D1D)
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "Сдать в кассу поверх выручки текущей смены!",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFB91C1C)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

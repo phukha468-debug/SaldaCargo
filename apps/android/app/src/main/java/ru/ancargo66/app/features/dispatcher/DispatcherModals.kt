@@ -486,3 +486,352 @@ fun ServiceOrderEditDialog(
         }
     )
 }
+
+@Composable
+fun DriverCashHoldDialog(
+    drivers: List<ru.ancargo66.app.core.model.User>,
+    defaultDriverId: String? = null,
+    adminId: String,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var selectedDriverId by remember {
+        mutableStateOf(defaultDriverId ?: drivers.firstOrNull { it.roles.contains("driver") }?.id ?: drivers.firstOrNull()?.id ?: "")
+    }
+    var amountText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val driverList = remember(drivers) {
+        drivers.filter { it.roles.contains("driver") }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("📋 Зафиксировать остаток подотчёта", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Zinc900)
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Zinc500)
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (errorMessage != null) {
+                    Surface(
+                        color = RedAlert.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = errorMessage ?: "",
+                            color = RedAlert,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    "Используется, когда водитель не смог сдать наличные в кассу сегодня и они остаются у него на руках до следующего дня.",
+                    fontSize = 12.sp,
+                    color = Zinc600
+                )
+
+                // Выбор водителя
+                Column {
+                    Text("ВОДИТЕЛЬ", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 140.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(driverList.size) { idx ->
+                            val d = driverList[idx]
+                            val isSelected = d.id == selectedDriverId
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedDriverId = d.id },
+                                color = if (isSelected) SaldaOrange50 else Zinc50,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) SaldaOrangePrimary else Zinc200),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = d.name,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) SaldaOrangePrimary else Zinc800
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Сумма
+                Column {
+                    Text("СУММА НА РУКАХ (₽)", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Например: 5000", color = Zinc400, fontSize = 14.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SaldaOrangePrimary,
+                            unfocusedBorderColor = Zinc300
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                // Причина / заметка
+                Column {
+                    Text("ПРИЧИНА / ПЕРЕНОС", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Не успел в гараж, сдача завтра", color = Zinc400, fontSize = 14.sp) },
+                        singleLine = false,
+                        maxLines = 2,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SaldaOrangePrimary,
+                            unfocusedBorderColor = Zinc300
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amt = amountText.toDoubleOrNull()
+                    if (selectedDriverId.isBlank()) {
+                        errorMessage = "Выберите водителя"
+                        return@Button
+                    }
+                    if (amt == null || amt <= 0.0) {
+                        errorMessage = "Укажите корректную сумму больше нуля"
+                        return@Button
+                    }
+
+                    scope.launch {
+                        isSubmitting = true
+                        errorMessage = null
+                        try {
+                            val ok = SaldaApiClient.createDriverCashHold(
+                                driverId = selectedDriverId,
+                                amount = amt,
+                                note = note.trim().ifBlank { "Остаток на руках, перенос на следующий день" },
+                                adminId = adminId
+                            )
+                            if (ok) {
+                                onSuccess()
+                            } else {
+                                errorMessage = "Ошибка сохранения подотчёта"
+                            }
+                        } catch (e: Exception) {
+                            errorMessage = e.message ?: "Ошибка сохранения"
+                        } finally {
+                            isSubmitting = false
+                        }
+                    }
+                },
+                enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(if (isSubmitting) "Запись..." else "Зафиксировать перенос", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", color = Zinc600)
+            }
+        }
+    )
+}
+
+@Composable
+fun DriverCashCollectDialog(
+    hold: ru.ancargo66.app.core.model.DriverCashHold,
+    adminId: String,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var amountText by remember { mutableStateOf(hold.amount) }
+    var note by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("💵 Принять подотчёт в кассу", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Zinc900)
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Zinc500)
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (errorMessage != null) {
+                    Surface(
+                        color = RedAlert.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = errorMessage ?: "",
+                            color = RedAlert,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = SaldaOrange50,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = hold.driverName,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Zinc900
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Зафиксировано к сдаче: ${hold.amount} ₽",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SaldaOrangePrimary
+                        )
+                        if (hold.note.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Причина: ${hold.note}",
+                                fontSize = 12.sp,
+                                color = Zinc600
+                            )
+                        }
+                    }
+                }
+
+                // Сумма сдачи
+                Column {
+                    Text("ПРИНИМАЕМАЯ СУММА (₽)", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF21A038),
+                            unfocusedBorderColor = Zinc300
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                // Комментарий
+                Column {
+                    Text("КОММЕНТАРИЙ К ИНКАССАЦИИ", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc400)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Принято в сейф", color = Zinc400, fontSize = 14.sp) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF21A038),
+                            unfocusedBorderColor = Zinc300
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amt = amountText.toDoubleOrNull()
+                    if (amt == null || amt <= 0.0) {
+                        errorMessage = "Укажите корректную принимаемую сумму"
+                        return@Button
+                    }
+
+                    scope.launch {
+                        isSubmitting = true
+                        errorMessage = null
+                        try {
+                            val ok = SaldaApiClient.collectDriverCashHold(
+                                holdId = hold.id,
+                                collectedAmount = amt,
+                                note = note.trim().ifBlank { null },
+                                adminId = adminId
+                            )
+                            if (ok) {
+                                onSuccess()
+                            } else {
+                                errorMessage = "Ошибка приёма наличных"
+                            }
+                        } catch (e: Exception) {
+                            errorMessage = e.message ?: "Ошибка приёма наличных"
+                        } finally {
+                            isSubmitting = false
+                        }
+                    }
+                },
+                enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21A038)),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(if (isSubmitting) "Приём..." else "Принять в кассу", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", color = Zinc600)
+            }
+        }
+    )
+}

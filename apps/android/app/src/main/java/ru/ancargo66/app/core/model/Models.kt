@@ -369,12 +369,35 @@ data class TripSummaryItem(
 )
 
 @Serializable
+data class DriverCashHoldItem(
+    val id: String = "",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val amount: String = "0.00",
+    val note: String = "",
+    val date: String? = null
+)
+
+@Serializable
+data class DriverCashHold(
+    val id: String = "",
+    @SerialName("driver_id") val driverId: String = "",
+    @SerialName("driver_name") val driverName: String = "",
+    @SerialName("driver_phone") val driverPhone: String = "",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val amount: String = "0.00",
+    val note: String = "",
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("transaction_date") val transactionDate: String? = null
+)
+
+@Serializable
 data class DriverSummary(
     val activeTrip: TripSummaryItem? = null,
     val reviewTrips: List<TripSummaryItem> = emptyList(),
     val recentTrips: List<TripSummaryItem> = emptyList(),
     @Serializable(with = FlexibleStringSerializer::class)
     val accountableBalance: String = "0",
+    val activeCarryover: DriverCashHoldItem? = null,
     @Serializable(with = FlexibleStringSerializer::class)
     val monthPayApproved: String = "0.00",
     @Serializable(with = FlexibleStringSerializer::class)
@@ -415,6 +438,9 @@ data class CashTransaction(
 data class AccountableFinance(
     @Serializable(with = FlexibleStringSerializer::class)
     val balance: String = "0",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val carryover: String = "0.00",
+    val activeCarryover: DriverCashHoldItem? = null,
     val transactions: List<CashTransaction> = emptyList()
 )
 

@@ -353,6 +353,92 @@ fun DriverScreen(
                     }
                 }
 
+                // Карточка Подотчёта / Наличных на руках
+                val accBal = summary?.accountableBalance ?: "0"
+                val carryover = summary?.activeCarryover
+                val hasAccCash = (accBal.toDoubleOrNull() ?: 0.0) > 0.0 || carryover != null
+
+                if (hasAccCash) {
+                    item {
+                        Card(
+                            onClick = { financeInitialTab = 0 },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .bouncyTouch(),
+                            colors = CardDefaults.cardColors(containerColor = if (carryover != null) Color(0xFFFFF7ED) else Color.White),
+                            shape = RoundedCornerShape(18.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (carryover != null) Color(0xFFFDBA74) else Color(0xFFE2E8F0)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "НАЛИЧНЫЕ НА РУКАХ (К СДАЧЕ)",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (carryover != null) Color(0xFFC2410C) else Zinc400,
+                                        letterSpacing = 1.2.sp
+                                    )
+                                    Surface(
+                                        color = if (carryover != null) Color(0xFFEA580C) else Color(0xFFF4F4F5),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Касса →",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (carryover != null) Color.White else Zinc700,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "$accBal ₽",
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (carryover != null) Color(0xFFEA580C) else Zinc900
+                                )
+                                if (carryover != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Surface(
+                                        color = Color(0xFFFEE2E2),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5))
+                                    ) {
+                                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                            Text(
+                                                text = "⚠️ В т.ч. перенос с прошлого дня: ${carryover.amount} ₽",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFB91C1C)
+                                            )
+                                            if (carryover.note.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "Причина: ${carryover.note}",
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF7F1D1D)
+                                                )
+                                            }
+                                            Text(
+                                                text = "Сдать в кассу поверх смены!",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFB91C1C)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Карточка автомобиля (если нет активного рейса)
                 if (activeTrip == null) {
                     item {

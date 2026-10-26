@@ -926,4 +926,49 @@ object SaldaApiClient {
         val request = buildRequest("/api/admin/wallet-transfer", method = "POST", bodyJson = body, userId = adminId)
         client.newCall(request).execute().use { it.isSuccessful }
     }
+
+    // ── Модуль подотчёта водителей (остатки на руках и перенос) ───────────
+
+    suspend fun getDriverCashHolds(adminId: String? = null): List<DriverCashHold> = withContext(Dispatchers.IO) {
+        val request = buildRequest("/api/admin/driver-cash-holds", userId = adminId)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext emptyList()
+            val body = response.body?.string() ?: "[]"
+            try {
+                json.decodeFromString<List<DriverCashHold>>(body)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun createDriverCashHold(
+        driverId: String,
+        amount: Double,
+        note: String,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("driver_id", driverId)
+            put("amount", amount.toString())
+            put("note", note)
+        }.toString()
+        val request = buildRequest("/api/admin/driver-cash-holds", method = "POST", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    suspend fun collectDriverCashHold(
+        holdId: String,
+        collectedAmount: Double? = null,
+        note: String? = null,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("hold_id", holdId)
+            if (collectedAmount != null) put("collected_amount", collectedAmount.toString())
+            if (note != null) put("note", note)
+        }.toString()
+        val request = buildRequest("/api/admin/driver-cash-holds", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
 }

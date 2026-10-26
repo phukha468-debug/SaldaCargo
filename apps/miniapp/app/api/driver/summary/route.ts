@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
   const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
+  const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
     collectionsRes,
     monthOrdersRes,
     pendingPayrollCountRes,
+    holdsRes,
   ] = await Promise.all([
     // 1. Активный рейс (только in_progress и не отменённые)
     supabase
@@ -112,6 +114,15 @@ export async function GET(request: Request) {
       .eq('settlement_status', 'pending')
       .eq('employee_confirmed', false)
       .in('category_id', [PAYROLL_DRIVER_CAT, PAYROLL_LOADER_CAT]),
+
+    // 8. Зафиксированные переносы подотчёта на руках
+    (supabase.from('transactions') as any)
+      .select('id, amount, description, created_at, transaction_date')
+      .eq('related_user_id', driverId)
+      .eq('category_id', CASH_COLLECT_CAT)
+      .eq('settlement_status', 'pending')
+      .neq('lifecycle_status', 'cancelled')
+      .order('created_at', { ascending: false }),
   ]);
 
   const activeTrip = activeTripRes.data;
@@ -121,6 +132,7 @@ export async function GET(request: Request) {
   const collections = collectionsRes.data;
   const monthOrders = monthOrdersRes.data;
   const pendingPayrollCount = pendingPayrollCountRes.count;
+  const holds = holdsRes?.data ?? [];
 
   // Точный расчёт подотчёта водителя (нал на руках)
   const lastCollectedAt =
@@ -153,7 +165,24 @@ export async function GET(request: Request) {
     }
   }
 
-  const accountableBalance = Math.max(0, cashIn - cashSpent).toFixed(2);
+  // Зафиксированные переносы подотчёта на руках
+  const carryoverTotal = holds.reduce(
+    (acc: number, h: any) => acc + parseFloat(h.amount ?? '0'),
+    0,
+  );
+  const activeCarryover =
+    holds.length > 0
+      ? {
+          id: holds[0].id,
+          amount: carryoverTotal.toFixed(2),
+          note:
+            holds[0].description?.replace('[CARRYOVER] ', '') ||
+            'Остаток на руках, перенос на следующий день',
+          date: holds[0].created_at,
+        }
+      : null;
+
+  const accountableBalance = Math.max(0, cashIn - cashSpent + carryoverTotal).toFixed(2);
 
   const approvedPay = (monthOrders ?? [])
     .filter((o: any) => o.lifecycle_status === 'approved')
@@ -170,6 +199,7 @@ export async function GET(request: Request) {
     reviewTrips: reviewTrips ?? [],
     recentTrips: recentTrips ?? [],
     accountableBalance,
+    activeCarryover,
     monthPayApproved: approvedPay.toFixed(2),
     monthPayDraft: draftPay.toFixed(2),
     pendingPayrollCount: pendingPayrollCount ?? 0,

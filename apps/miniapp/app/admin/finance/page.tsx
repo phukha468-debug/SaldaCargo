@@ -838,6 +838,8 @@ function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucces
     loans.some((l) => parseFloat(l.remaining_amount) > 0) ||
     suppliers.some((s) => parseFloat(s.debt) > 0);
 
+  const nowTime = new Date().getTime();
+
   return (
     <div className="bg-white rounded-2xl border-2 border-zinc-100 p-4 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
@@ -876,7 +878,7 @@ function DebtPaymentForm({ onClose, onSuccess }: { onClose: () => void; onSucces
               };
               const isSelected = selected?.id === l.id;
               const daysLeft = l.next_payment_date
-                ? Math.round((new Date(l.next_payment_date).getTime() - Date.now()) / 86400000)
+                ? Math.round((new Date(l.next_payment_date).getTime() - nowTime) / 86400000)
                 : null;
               return (
                 <button

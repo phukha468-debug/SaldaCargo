@@ -2,7 +2,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { performLogout } from '@/lib/auth/logout';
 import ChangePinModal from '@/components/ChangePinModal';
 
@@ -17,12 +17,6 @@ export default function ProfilePage() {
     queryFn: () => fetch('/api/driver/profile').then((r) => r.json()),
     staleTime: 60000,
   });
-
-  useEffect(() => {
-    if (showVehiclePicker) {
-      setSelectedVehicleId(user?.current_asset_id ?? null);
-    }
-  }, [showVehiclePicker, user?.current_asset_id]);
 
   const { data: vehicles = [] } = useQuery<any[]>({
     queryKey: ['vehicles-public'],
@@ -94,7 +88,10 @@ export default function ProfilePage() {
                   : 'Не закреплена'}
               </span>
               <button
-                onClick={() => setShowVehiclePicker((v) => !v)}
+                onClick={() => {
+                  setSelectedVehicleId(user?.current_asset_id ?? null);
+                  setShowVehiclePicker((v) => !v);
+                }}
                 className="text-[10px] font-black uppercase tracking-widest text-orange-600 active:opacity-70"
               >
                 Сменить

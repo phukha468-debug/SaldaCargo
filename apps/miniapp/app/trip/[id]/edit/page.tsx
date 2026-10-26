@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -38,7 +38,7 @@ export default function EditTripPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
   const { data: trip, isLoading } = useQuery<Trip>({
     queryKey: ['trip', tripId],
@@ -57,11 +57,11 @@ export default function EditTripPage() {
   });
 
   useEffect(() => {
-    if (trip && !initialized) {
+    if (trip && !initializedRef.current) {
+      initializedRef.current = true;
       setValue('trip_type', trip.trip_type as any);
-      setInitialized(true);
     }
-  }, [trip, initialized, setValue]);
+  }, [trip, setValue]);
 
   async function onSubmit(data: FormData) {
     if (submitting) return;
@@ -86,7 +86,7 @@ export default function EditTripPage() {
     router.push(`/trip/${tripId}`);
   }
 
-  if (isLoading || !initialized) {
+  if (isLoading || !trip) {
     return (
       <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
         <div className="animate-spin text-3xl">⚙️</div>

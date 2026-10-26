@@ -75,6 +75,11 @@ fun DispatcherScreen(
     var editingServiceOrder by remember { mutableStateOf<MechanicOrder?>(null) }
     var showWalletTransferDialog by remember { mutableStateOf(false) }
 
+    // Управление подотчётом и переносом остатка на руках
+    var cashHolds by remember { mutableStateOf<List<ru.ancargo66.app.core.model.DriverCashHold>>(emptyList()) }
+    var showCashHoldDialog by remember { mutableStateOf(false) }
+    var selectedHoldForCollect by remember { mutableStateOf<ru.ancargo66.app.core.model.DriverCashHold?>(null) }
+
     // Диалоги Дохода и Расхода
     var showAddIncomeDialog by rememberSaveable { mutableStateOf(false) }
     var showAddExpenseDialog by rememberSaveable { mutableStateOf(false) }
@@ -109,6 +114,7 @@ fun DispatcherScreen(
                     val walletsDeferred = async { SaldaApiClient.getWallets(userId = user.id) }
                     val allStaffDeferred = async { SaldaApiClient.getUsers() }
                     val payrollStaffDeferred = async { SaldaApiClient.getAdminPayroll(year = payrollYear, month = payrollMonth, adminId = user.id) }
+                    val cashHoldsDeferred = async { SaldaApiClient.getDriverCashHolds(user.id) }
 
                     adminSummary = summaryDeferred.await()
                     reviewTrips = reviewTripsDeferred.await()
@@ -117,6 +123,7 @@ fun DispatcherScreen(
                     wallets = walletsDeferred.await()
                     allStaff = allStaffDeferred.await()
                     payrollStaff = payrollStaffDeferred.await()
+                    cashHolds = cashHoldsDeferred.await()
                 }
             } catch (_: Exception) {}
             finally {
@@ -478,6 +485,129 @@ fun DispatcherScreen(
                         Text("↔", fontSize = 15.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("ПЕРЕВОД", fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Кнопка фиксации остатка подотчёта водителя
+                Button(
+                    onClick = { showCashHoldDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .bouncyTouch(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
+                ) {
+                    Text("📋", fontSize = 15.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "ЗАФИКСИРОВАТЬ ОСТАТОК НА РУКАХ (ПЕРЕНОС)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Блок активных остатков на руках у водителей (переносы)
+            if (cashHolds.isNotEmpty()) {
+                item {
+                    Surface(
+                        color = Color(0xFFFFF7ED),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFDBA74)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("⚠️", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "ОСТАТКИ НА РУКАХ (ПЕРЕНОСЫ)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFFC2410C),
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Surface(
+                                    color = Color(0xFFEA580C),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${cashHolds.size}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            cashHolds.forEach { hold ->
+                                Surface(
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFED7AA)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = hold.driverName,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Zinc900
+                                            )
+                                            if (hold.note.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = hold.note,
+                                                    fontSize = 12.sp,
+                                                    color = Zinc600,
+                                                    maxLines = 2
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "${hold.amount} ₽",
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFFEA580C)
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = { selectedHoldForCollect = hold },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21A038)),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Text("Принять", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2059,6 +2189,30 @@ fun DispatcherScreen(
             onDismiss = { editingServiceOrder = null },
             onSuccess = {
                 editingServiceOrder = null
+                refreshAll()
+            }
+        )
+    }
+
+    if (showCashHoldDialog) {
+        DriverCashHoldDialog(
+            drivers = allStaff,
+            adminId = user.id,
+            onDismiss = { showCashHoldDialog = false },
+            onSuccess = {
+                showCashHoldDialog = false
+                refreshAll()
+            }
+        )
+    }
+
+    selectedHoldForCollect?.let { holdToCollect ->
+        DriverCashCollectDialog(
+            hold = holdToCollect,
+            adminId = user.id,
+            onDismiss = { selectedHoldForCollect = null },
+            onSuccess = {
+                selectedHoldForCollect = null
                 refreshAll()
             }
         )
