@@ -2,6 +2,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /** GET /api/admin/receivables — список должников (дебиторка) */
 export async function GET() {
   try {
