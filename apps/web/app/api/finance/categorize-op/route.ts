@@ -64,6 +64,7 @@ export async function POST(req: Request) {
       transaction_date,
       obligation_id,
       related_user_id,
+      warehouse_part,
     } = body;
 
     if (!id) {
@@ -271,6 +272,132 @@ export async function POST(req: Request) {
       updateLocalSettlements(period, matchedOblId, payAmount, fromWallet, txDate);
     }
 
+    // 3. АВТОМАТИЧЕСКАЯ СИНХРОНИЗАЦИЯ СО СКЛАДОМ ЗАПЧАСТЕЙ (ГАРАЖ)
+    const isUUID = (str: any) =>
+      typeof str === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const validTxId = savedTx?.id && isUUID(savedTx.id) ? savedTx.id : null;
+
+    let savedPartMovement = null;
+
+    if (warehouse_part && warehouse_part.enabled && warehouse_part.name?.trim()) {
+      const brand = warehouse_part.brand || 'canter';
+      const partName = warehouse_part.name.trim();
+      const article = warehouse_part.article?.trim() || null;
+      const quantity = Math.max(1, Number(warehouse_part.quantity) || 1);
+      const unitPrice =
+        warehouse_part.unit_price !== undefined &&
+        warehouse_part.unit_price !== null &&
+        warehouse_part.unit_price !== ''
+          ? Number(warehouse_part.unit_price)
+          : Math.round(numAmount / quantity);
+
+      let targetPartId = warehouse_part.part_id || null;
+
+      if (!targetPartId) {
+        // Ищем существующую запчасть по бренду и названию
+        const { data: matchedPart } = await (supabase.from('parts') as any)
+          .select('id, name, purchase_price')
+          .eq('category', brand)
+          .ilike('name', partName)
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedPart) {
+          targetPartId = matchedPart.id;
+          if (unitPrice > 0) {
+            await (supabase.from('parts') as any)
+              .update({
+                purchase_price: unitPrice,
+                article: article || undefined,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', matchedPart.id);
+          }
+        } else {
+          // Создаём новую позицию в номенклатуре склада
+          const clientPrice = Math.round(unitPrice * 1.3);
+          const { data: newPart, error: newPartErr } = await (supabase.from('parts') as any)
+            .insert({
+              name: partName,
+              article,
+              category: brand,
+              unit: 'шт',
+              purchase_price: unitPrice,
+              client_price: clientPrice,
+              min_stock: 1,
+              is_active: true,
+            })
+            .select('id')
+            .single();
+
+          if (!newPartErr && newPart) {
+            targetPartId = newPart.id;
+          } else {
+            console.error('Error creating warehouse part:', newPartErr);
+          }
+        }
+      }
+
+      if (targetPartId) {
+        let actorId = adminUserId;
+        if (!actorId) {
+          const { data: anyUser } = await (supabase.from('users') as any)
+            .select('id')
+            .limit(1)
+            .single();
+          actorId = anyUser?.id || 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
+        }
+
+        // Проверяем, не было ли уже создано движение по этой транзакции
+        let existingMv = null;
+        if (validTxId) {
+          const { data: mv } = await (supabase.from('part_movements') as any)
+            .select('id')
+            .eq('transaction_id', validTxId)
+            .maybeSingle();
+          existingMv = mv;
+        }
+
+        if (existingMv) {
+          const { data: updatedMv } = await (supabase.from('part_movements') as any)
+            .update({
+              part_id: targetPartId,
+              quantity,
+              unit_price: unitPrice,
+              notes: `Оприходовано из расхода: ${description || 'Запчасти'}`,
+            })
+            .eq('id', existingMv.id)
+            .select()
+            .single();
+          savedPartMovement = updatedMv;
+        } else {
+          const { data: insertedMv, error: mvInsertErr } = await (
+            supabase.from('part_movements') as any
+          )
+            .insert({
+              part_id: targetPartId,
+              direction: 'in',
+              quantity,
+              unit_price: unitPrice,
+              transaction_id: validTxId,
+              notes: `Оприходовано из расхода: ${description || 'Запчасти'}`,
+              created_by: actorId,
+            })
+            .select()
+            .single();
+          if (mvInsertErr) {
+            console.error('Error inserting part_movement:', mvInsertErr);
+          } else {
+            savedPartMovement = insertedMv;
+          }
+        }
+      }
+    } else if (warehouse_part && warehouse_part.enabled === false && validTxId) {
+      // Пользователь снял отметку оприходования со склада
+      await (supabase.from('part_movements') as any).delete().eq('transaction_id', validTxId);
+    }
+
     // Сбрасываем кэш daily-balance, чтобы новые категории и переименования
     // отображались мгновенно без 20-секундной задержки
     invalidateDailyBalanceCache(txDate.slice(0, 10));
@@ -280,6 +407,7 @@ export async function POST(req: Request) {
       success: true,
       transaction: savedTx,
       matched_obligation_id: matchedOblId || null,
+      warehouse_movement: savedPartMovement,
     });
   } catch (err: any) {
     console.error('Error in POST /api/finance/categorize-op:', err);

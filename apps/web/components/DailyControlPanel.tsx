@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // --- Helper Functions ---
@@ -119,6 +119,15 @@ interface RawTx {
   category: { id: string; name: string; code: string } | null;
   counterparty: { id: string; name: string } | null;
   related_user: { id: string; name: string } | null;
+  warehouse_part?: {
+    movement_id?: string;
+    part_id: string;
+    name: string;
+    brand: string;
+    article?: string | null;
+    quantity: number;
+    unit_price?: number;
+  } | null;
 }
 
 interface TripOrderTx {
@@ -261,7 +270,100 @@ export function DailyControlPanel() {
     obligationId?: string | null;
     transactionDate?: string;
     relatedUserId?: string | null;
+    warehousePart?: {
+      part_id?: string;
+      name: string;
+      brand: string;
+      article?: string | null;
+      quantity: number;
+      unit_price?: number;
+    } | null;
   } | null>(null);
+
+  // Warehouse link state in modal
+  const [whEnabled, setWhEnabled] = useState(false);
+  const [whBrand, setWhBrand] = useState('canter');
+  const [whPartName, setWhPartName] = useState('');
+  const [whArticle, setWhArticle] = useState('');
+  const [whQty, setWhQty] = useState(1);
+  const [whUnitPrice, setWhUnitPrice] = useState<number | ''>('');
+
+  // Fetch warehouse parts for quick autocomplete / suggestions
+  const { data: warehousePartsData } = useQuery<{
+    parts: Array<{
+      id: string;
+      name: string;
+      category: string;
+      article?: string;
+      purchase_price?: number;
+    }>;
+  }>({
+    queryKey: ['garage-parts-all'],
+    queryFn: () => fetch('/api/garage/parts?brand=all').then((r) => r.json()),
+    staleTime: 60 * 1000,
+  });
+
+  // Автоопределение марки авто по названию/описанию
+  function detectBrandFromText(text: string): string {
+    const s = (text || '').toLowerCase();
+    if (s.includes('валдай')) return 'valday';
+    if (s.includes('газел') || s.includes('next') || s.includes('бизнес')) return 'gazelle';
+    if (
+      s.includes('масло') ||
+      s.includes('фильтр') ||
+      s.includes('гсм') ||
+      s.includes('тосол') ||
+      s.includes('антифриз') ||
+      s.includes('жидкост') ||
+      s.includes('смазк')
+    )
+      return 'consumables';
+    if (
+      s.includes('fuso') ||
+      s.includes('фусо') ||
+      s.includes('canter') ||
+      s.includes('кантер') ||
+      s.includes('мицубиси') ||
+      s.includes('митсубиши')
+    )
+      return 'canter';
+    return 'canter';
+  }
+
+  // При открытии модалки редактирования операции синхронизируем состояние склада
+  useEffect(() => {
+    if (!editingTx) return;
+    const desc = editingTx.description || '';
+    const catName = editingTx.categoryName || '';
+    const isParts =
+      catName.toLowerCase().includes('запчаст') ||
+      catName.toLowerCase().includes('детал') ||
+      desc.toLowerCase().includes('запчаст') ||
+      desc.toLowerCase().includes('детал') ||
+      desc.toLowerCase().includes('fuso') ||
+      desc.toLowerCase().includes('кантер') ||
+      desc.toLowerCase().includes('валдай') ||
+      desc.toLowerCase().includes('газел') ||
+      Boolean(editingTx.warehousePart);
+
+    const autoBrand = detectBrandFromText(desc);
+
+    if (editingTx.warehousePart) {
+      setWhEnabled(true);
+      setWhBrand(editingTx.warehousePart.brand || autoBrand);
+      setWhPartName(editingTx.warehousePart.name || desc);
+      setWhArticle(editingTx.warehousePart.article || '');
+      setWhQty(editingTx.warehousePart.quantity || 1);
+      setWhUnitPrice(editingTx.warehousePart.unit_price || editingTx.amount);
+    } else {
+      setWhEnabled(isParts && editingTx.direction !== 'income');
+      setWhBrand(autoBrand);
+      setWhPartName(desc);
+      setWhArticle('');
+      setWhQty(1);
+      setWhUnitPrice(editingTx.amount);
+    }
+  }, [editingTx?.id]);
 
   // Director Audit Modal state
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
@@ -304,6 +406,15 @@ export function DailyControlPanel() {
       transaction_date?: string;
       obligation_id?: string | null;
       related_user_id?: string | null;
+      warehouse_part?: {
+        enabled: boolean;
+        brand?: string;
+        name?: string;
+        article?: string | null;
+        quantity?: number;
+        unit_price?: number;
+        part_id?: string | null;
+      } | null;
     }) => {
       const res = await fetch('/api/finance/categorize-op', {
         method: 'POST',
@@ -319,6 +430,7 @@ export function DailyControlPanel() {
           transaction_date: payload.transaction_date,
           obligation_id: payload.obligation_id,
           related_user_id: payload.related_user_id,
+          warehouse_part: payload.warehouse_part,
         }),
       });
       if (!res.ok) {
@@ -420,6 +532,10 @@ export function DailyControlPanel() {
       queryClient.invalidateQueries({ queryKey: ['payment-calendar'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['wallets'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['staff-payroll'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['garage-parts'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-parts-all'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
@@ -2067,8 +2183,8 @@ export function DailyControlPanel() {
                         </div>
                       </div>
 
-                      {/* Zone 2: Plan Link */}
-                      <div className="flex-shrink-0 self-start sm:self-center">
+                      {/* Zone 2: Plan Link & Warehouse Badge */}
+                      <div className="flex-shrink-0 self-start sm:self-center flex flex-col sm:flex-row items-start sm:items-center gap-1.5">
                         {item.linkedObligationTitle ? (
                           <div className="inline-flex items-center gap-1.5 bg-blue-50/90 text-blue-950 border-2 border-blue-200 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
                             <span>📅</span>
@@ -2077,7 +2193,19 @@ export function DailyControlPanel() {
                               ✓ Закрыт
                             </span>
                           </div>
-                        ) : (
+                        ) : null}
+
+                        {item.rawTx?.warehouse_part ? (
+                          <div className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-950 border-2 border-sky-300 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
+                            <span>📦</span>
+                            <span>Склад: {item.rawTx.warehouse_part.name}</span>
+                            <span className="text-sky-700 bg-sky-100 font-black px-1.5 py-0.2 rounded text-[10px]">
+                              +{item.rawTx.warehouse_part.quantity} шт
+                            </span>
+                          </div>
+                        ) : null}
+
+                        {!item.linkedObligationTitle && !item.rawTx?.warehouse_part && (
                           <span className="text-[10px] text-slate-400 font-medium">
                             Без привязки
                           </span>
@@ -2131,6 +2259,7 @@ export function DailyControlPanel() {
                                 obligationId: item.linkedObligationId || null,
                                 relatedUserId:
                                   raw?.related_user_id || raw?.related_user?.id || null,
+                                warehousePart: raw?.warehouse_part || null,
                               });
                             }}
                             className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center text-xs font-black cursor-pointer shadow-2xs transition"
@@ -2168,6 +2297,15 @@ export function DailyControlPanel() {
                                 <span>📅</span>
                                 <span>{sub.linkedObligationTitle}</span>
                                 <span className="text-emerald-700 font-black">✓</span>
+                              </span>
+                            )}
+                            {sub.rawTx?.warehouse_part && (
+                              <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded shadow-xs">
+                                <span>📦</span>
+                                <span>{sub.rawTx.warehouse_part.name}</span>
+                                <span className="text-sky-700 font-black">
+                                  +{sub.rawTx.warehouse_part.quantity} шт
+                                </span>
                               </span>
                             )}
                             <button
@@ -2211,6 +2349,7 @@ export function DailyControlPanel() {
                                   obligationId: sub.linkedObligationId || null,
                                   relatedUserId:
                                     raw?.related_user_id || raw?.related_user?.id || null,
+                                  warehousePart: raw?.warehouse_part || null,
                                 });
                               }}
                               className="text-[9px] text-sky-600 hover:text-sky-800 cursor-pointer ml-1 font-bold underline"
@@ -2748,7 +2887,16 @@ export function DailyControlPanel() {
                 <input
                   type="text"
                   value={editingTx.description}
-                  onChange={(e) => setEditingTx({ ...editingTx, description: e.target.value })}
+                  onChange={(e) => {
+                    const newDesc = e.target.value;
+                    const prevDesc = editingTx.description;
+                    setEditingTx({ ...editingTx, description: newDesc });
+                    if (whPartName === prevDesc || !whPartName) {
+                      setWhPartName(newDesc);
+                    }
+                    const detected = detectBrandFromText(newDesc);
+                    if (detected) setWhBrand(detected);
+                  }}
                   placeholder="Например: Пополнение топливной карты, Запчасти на Газель, Кредит Тинькофф"
                   className="w-full mt-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
                 />
@@ -2768,6 +2916,12 @@ export function DailyControlPanel() {
                     let toW = editingTx.toWalletId;
                     if (catObj?.code === 'FUEL' || catObj?.code === 'WALLET_TRANSFER') {
                       toW = FUEL_CARD_ID;
+                    }
+                    const isPartsCat = (catObj?.name || '').toLowerCase().includes('запчаст');
+                    if (isPartsCat && editingTx.direction !== 'income') {
+                      setWhEnabled(true);
+                      if (!whPartName.trim()) setWhPartName(editingTx.description);
+                      if (!whUnitPrice) setWhUnitPrice(editingTx.amount);
                     }
                     setEditingTx({
                       ...editingTx,
@@ -2867,6 +3021,198 @@ export function DailyControlPanel() {
                 </div>
               </div>
 
+              {/* Link with Parts Warehouse (Склад запчастей Гараж) */}
+              {editingTx.direction !== 'income' && (
+                <div
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    whEnabled
+                      ? 'bg-sky-50/80 border-sky-300 ring-2 ring-sky-100'
+                      : 'bg-slate-50/70 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={whEnabled}
+                        onChange={(e) => setWhEnabled(e.target.checked)}
+                        className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 accent-sky-600 cursor-pointer"
+                      />
+                      <span className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                        <span>📦</span> Оприходовать на Склад запчастей (Гараж)
+                      </span>
+                    </label>
+                    {whEnabled && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-200/80 text-sky-900 border border-sky-300">
+                        Учёт в остатках ТМЦ
+                      </span>
+                    )}
+                  </div>
+
+                  {whEnabled && (
+                    <div className="mt-3 space-y-3 pt-3 border-t border-sky-200/60">
+                      {/* 1. Марка автомобиля */}
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-sky-950 tracking-wider">
+                          Марка автомобиля / категория склада: *
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-1">
+                          {[
+                            { id: 'canter', label: '🚚 Canter', sub: 'Mitsubishi Fuso' },
+                            { id: 'gazelle', label: '🚐 ГАЗель', sub: 'Next / Бизнес' },
+                            { id: 'valday', label: '🚛 Валдай', sub: 'ГАЗ-3310' },
+                            { id: 'consumables', label: '🛢️ Масла/ГСМ', sub: 'Расходники' },
+                          ].map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => setWhBrand(b.id)}
+                              className={`p-2 rounded-xl text-left border text-xs font-bold transition cursor-pointer ${
+                                whBrand === b.id
+                                  ? 'bg-sky-600 text-white border-sky-700 shadow-xs'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-sky-100/50'
+                              }`}
+                            >
+                              <div className="font-black">{b.label}</div>
+                              <div
+                                className={`text-[9px] ${
+                                  whBrand === b.id ? 'text-sky-100' : 'text-slate-400'
+                                }`}
+                              >
+                                {b.sub}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 2. Наименование запчасти + Артикул */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="sm:col-span-2">
+                          <label className="text-[10px] font-black uppercase text-sky-950 tracking-wider">
+                            Наименование запчасти: *
+                          </label>
+                          <input
+                            type="text"
+                            list="warehouse-parts-suggestions"
+                            value={whPartName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setWhPartName(val);
+                              const matched = (warehousePartsData?.parts ?? []).find(
+                                (p) => p.name.toLowerCase() === val.toLowerCase(),
+                              );
+                              if (matched) {
+                                if (matched.category) setWhBrand(matched.category);
+                                if (matched.article) setWhArticle(matched.article);
+                              }
+                            }}
+                            placeholder="Например: Ремень генератора Fuso Canter"
+                            className="w-full mt-1 px-3 py-2 text-xs border border-sky-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                          />
+                          <datalist id="warehouse-parts-suggestions">
+                            {(warehousePartsData?.parts ?? [])
+                              .filter((p) => whBrand === 'all' || p.category === whBrand)
+                              .map((p) => (
+                                <option key={p.id} value={p.name}>
+                                  {p.article ? `[${p.article}] ` : ''}
+                                  {p.name}
+                                </option>
+                              ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-sky-950 tracking-wider">
+                            Артикул (OEM):
+                          </label>
+                          <input
+                            type="text"
+                            value={whArticle}
+                            onChange={(e) => setWhArticle(e.target.value)}
+                            placeholder="ME221833"
+                            className="w-full mt-1 px-3 py-2 text-xs border border-sky-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 3. Количество, цена и итог */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-sky-950 tracking-wider">
+                            Количество (шт):
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={whQty}
+                            onChange={(e) => {
+                              const q = Math.max(1, parseInt(e.target.value) || 1);
+                              setWhQty(q);
+                              if (editingTx.amount) {
+                                setWhUnitPrice(Math.round(editingTx.amount / q));
+                              }
+                            }}
+                            className="w-full mt-1 px-3 py-2 text-xs border border-sky-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-sky-950 tracking-wider">
+                            Цена за шт (₽):
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={whUnitPrice}
+                            onChange={(e) =>
+                              setWhUnitPrice(
+                                e.target.value === ''
+                                  ? ''
+                                  : Math.max(0, parseFloat(e.target.value) || 0),
+                              )
+                            }
+                            className="w-full mt-1 px-3 py-2 text-xs border border-sky-300 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="text-[10px] font-black uppercase text-sky-950 tracking-wider">
+                            Сумма на склад:
+                          </label>
+                          <div className="mt-1 px-3 py-2 text-xs font-mono font-black text-sky-800 bg-sky-100/80 border border-sky-300 rounded-lg flex items-center justify-between">
+                            <span>{rub((Number(whQty) || 1) * (Number(whUnitPrice) || 0))}</span>
+                            <span className="text-[9px] text-sky-600 font-sans">({whQty} шт)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] text-sky-900 bg-sky-100/60 p-2.5 rounded-xl border border-sky-200 leading-relaxed flex items-center justify-between">
+                        <div>
+                          💡 Запчасть поступит в <b>Гараж → Склад запчастей</b> в раздел{' '}
+                          <b>
+                            {whBrand === 'canter'
+                              ? 'Mitsubishi Canter'
+                              : whBrand === 'gazelle'
+                                ? 'ГАЗель'
+                                : whBrand === 'valday'
+                                  ? 'Валдай'
+                                  : 'Расходники и масла'}
+                          </b>{' '}
+                          с приходом <b>+{whQty} шт</b>.
+                        </div>
+                        <a
+                          href="/garage?tab=warehouse"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-sky-700 hover:text-sky-900 font-bold underline whitespace-nowrap ml-2"
+                        >
+                          Склад ↗
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Link with Staff (Driver / Employee advance or salary) */}
               {(editingTx.categoryId === 'a0000000-0000-0000-0000-000000000001' ||
                 (editingTx.categoryName || '').toLowerCase().includes('аванс') ||
@@ -2925,6 +3271,22 @@ export function DailyControlPanel() {
                     obligation_id: editingTx.obligationId,
                     transaction_date: editingTx.transactionDate,
                     related_user_id: editingTx.relatedUserId,
+                    warehouse_part:
+                      whEnabled && whPartName.trim()
+                        ? {
+                            enabled: true,
+                            brand: whBrand,
+                            name: whPartName.trim(),
+                            article: whArticle.trim() || null,
+                            quantity: Number(whQty) || 1,
+                            unit_price:
+                              whUnitPrice !== '' && whUnitPrice !== undefined
+                                ? Number(whUnitPrice)
+                                : Math.round(editingTx.amount / (Number(whQty) || 1)),
+                          }
+                        : whEnabled === false && editingTx.warehousePart
+                          ? { enabled: false }
+                          : null,
                   })
                 }
                 className="px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"

@@ -379,6 +379,37 @@ export async function GET(request: Request) {
       actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
     }
 
+    // Привязанные движения по складу запчастей (Гараж)
+    const dayTxIds = (dayTxs ?? []).map((t: any) => t.id).filter(Boolean);
+    const movementsMap = new Map<string, any>();
+    if (dayTxIds.length > 0) {
+      try {
+        const { data: mvs } = await (supabase.from('part_movements') as any)
+          .select(
+            'id, transaction_id, part_id, quantity, unit_price, part:parts(id, name, category, article)',
+          )
+          .in('transaction_id', dayTxIds);
+
+        if (Array.isArray(mvs)) {
+          for (const m of mvs) {
+            if (m.transaction_id) {
+              movementsMap.set(m.transaction_id, {
+                movement_id: m.id,
+                part_id: m.part_id,
+                name: m.part?.name || 'Запчасть',
+                brand: m.part?.category || 'canter',
+                article: m.part?.article || null,
+                quantity: Number(m.quantity) || 1,
+                unit_price: Number(m.unit_price) || 0,
+              });
+            }
+          }
+        }
+      } catch (mvErr) {
+        console.error('Error fetching warehouse movements in daily-balance:', mvErr);
+      }
+    }
+
     const result = {
       date,
       period,
@@ -414,7 +445,10 @@ export async function GET(request: Request) {
         },
       },
       audit: auditRow || null,
-      transactions: dayTxs ?? [],
+      transactions: (dayTxs ?? []).map((t: any) => ({
+        ...t,
+        warehouse_part: movementsMap.get(t.id) || null,
+      })),
       trip_orders: dayTripOrders ?? [],
       cash_collections: dayCollections ?? [],
       bank_operations: bankStatementOps,

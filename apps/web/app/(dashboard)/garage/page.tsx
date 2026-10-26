@@ -6420,11 +6420,20 @@ export default function GaragePage() {
   const searchParams = useSearchParams();
   const orderFromQuery =
     searchParams.get('order') || searchParams.get('order_id') || searchParams.get('id');
+  const tabFromQuery = searchParams.get('tab');
 
   // 3 основные кнопки: 1. В работе, 2. Ждут оплаты, 3. Архив + Дополнительные вкладки
   const [activeTab, setActiveTab] = useState<
     'active' | 'pending_payment' | 'archive' | 'warehouse' | 'clients' | 'maintenance'
-  >('active');
+  >(
+    (tabFromQuery === 'warehouse' ||
+    tabFromQuery === 'clients' ||
+    tabFromQuery === 'archive' ||
+    tabFromQuery === 'pending_payment' ||
+    tabFromQuery === 'maintenance'
+      ? tabFromQuery
+      : 'active') as any,
+  );
   const [showCreate, setShowCreate] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(orderFromQuery || null);
