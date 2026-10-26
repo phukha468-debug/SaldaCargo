@@ -222,7 +222,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
           .select('id, amount, updated_at')
           .eq('counterparty_id', cpId)
           .eq('settlement_status', 'completed')
-          .in('payment_method', ['debt_cash', 'debt', 'debt_bank'])
+          .in('payment_method', ['debt_cash', 'bank_invoice'])
           .gte('updated_at', minTime)
           .lte('updated_at', maxTime),
       ]);
