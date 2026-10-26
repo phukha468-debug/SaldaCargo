@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Money } from '@saldacargo/ui';
 
-export type BrandKey = 'all' | 'valday' | 'gazelle' | 'canter' | 'consumables';
+export type BrandKey = 'all' | 'valday' | 'gazelle' | 'canter' | 'consumables' | 'client';
 
 interface PartItem {
   id: string;
@@ -63,6 +63,13 @@ const BRAND_CONFIG: Record<
     borderClass: 'border-emerald-300',
     bgClass: 'bg-emerald-500/10',
   },
+  client: {
+    label: 'Клиентские (Нива и др.)',
+    icon: '🚗',
+    badgeClass: 'bg-purple-50 text-purple-800 border-purple-200',
+    borderClass: 'border-purple-300',
+    bgClass: 'bg-purple-500/10',
+  },
 };
 
 export function WarehouseSection() {
@@ -80,7 +87,7 @@ export function WarehouseSection() {
   const [newPartForm, setNewPartForm] = useState({
     name: '',
     article: '',
-    brand: 'gazelle' as 'valday' | 'gazelle' | 'canter' | 'consumables',
+    brand: 'gazelle' as 'valday' | 'gazelle' | 'canter' | 'consumables' | 'client',
     unit: 'шт',
     initial_stock: '1',
     purchase_price: '0',
@@ -421,6 +428,18 @@ export function WarehouseSection() {
             <span>🛢️</span>
             <span>Масла / ГСМ</span>
           </button>
+
+          <button
+            onClick={() => setSelectedBrand('client')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              selectedBrand === 'client'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+            }`}
+          >
+            <span>🚗</span>
+            <span>Клиентские (Нива и др.)</span>
+          </button>
         </div>
       </div>
 
@@ -632,6 +651,7 @@ export function WarehouseSection() {
                       { id: 'valday', label: '🚛 Валдай' },
                       { id: 'canter', label: '🚚 Mitsubishi Canter' },
                       { id: 'consumables', label: '🛢️ Масла / ГСМ' },
+                      { id: 'client', label: '🚗 Клиентские (Нива и др.)' },
                     ] as const
                   ).map((b) => (
                     <button

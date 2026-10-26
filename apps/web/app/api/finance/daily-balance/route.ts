@@ -398,6 +398,7 @@ export async function GET(request: Request) {
     // Привязанные движения по складу запчастей (Гараж)
     const dayTxIds = (dayTxs ?? []).map((t: any) => t.id).filter(Boolean);
     const movementsMap = new Map<string, any>();
+    const movementsListMap = new Map<string, any[]>();
     if (dayTxIds.length > 0) {
       try {
         const { data: mvs } = await (supabase.from('part_movements') as any)
@@ -409,7 +410,7 @@ export async function GET(request: Request) {
         if (Array.isArray(mvs)) {
           for (const m of mvs) {
             if (m.transaction_id) {
-              movementsMap.set(m.transaction_id, {
+              const item = {
                 movement_id: m.id,
                 part_id: m.part_id,
                 name: m.part?.name || 'Запчасть',
@@ -417,7 +418,13 @@ export async function GET(request: Request) {
                 article: m.part?.article || null,
                 quantity: Number(m.quantity) || 1,
                 unit_price: Number(m.unit_price) || 0,
-              });
+              };
+              if (!movementsMap.has(m.transaction_id)) {
+                movementsMap.set(m.transaction_id, item);
+              }
+              const list = movementsListMap.get(m.transaction_id) || [];
+              list.push(item);
+              movementsListMap.set(m.transaction_id, list);
             }
           }
         }
@@ -464,6 +471,7 @@ export async function GET(request: Request) {
       transactions: (dayTxs ?? []).map((t: any) => ({
         ...t,
         warehouse_part: movementsMap.get(t.id) || null,
+        warehouse_parts: movementsListMap.get(t.id) || [],
       })),
       trip_orders: dayTripOrders ?? [],
       cash_collections: dayCollections ?? [],

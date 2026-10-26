@@ -65,6 +65,8 @@ export async function POST(req: Request) {
       obligation_id,
       related_user_id,
       warehouse_part,
+      warehouse_parts,
+      warehouse_enabled,
     } = body;
 
     if (!id) {
@@ -278,100 +280,132 @@ export async function POST(req: Request) {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     const validTxId = savedTx?.id && isUUID(savedTx.id) ? savedTx.id : null;
 
-    let savedPartMovement = null;
+    let savedPartMovements: any[] = [];
 
-    if (warehouse_part && warehouse_part.enabled && warehouse_part.name?.trim()) {
-      const brand = warehouse_part.brand || 'canter';
-      const partName = warehouse_part.name.trim();
-      const article = warehouse_part.article?.trim() || null;
-      const quantity = Math.max(1, Number(warehouse_part.quantity) || 1);
-      const unitPrice =
-        warehouse_part.unit_price !== undefined &&
-        warehouse_part.unit_price !== null &&
-        warehouse_part.unit_price !== ''
-          ? Number(warehouse_part.unit_price)
-          : Math.round(numAmount / quantity);
+    // Формируем список позиций для оприходования на склад
+    let partsToProcess: Array<{
+      part_id?: string | null;
+      brand: string;
+      client_car_model?: string | null;
+      name: string;
+      article?: string | null;
+      quantity: number;
+      unit_price: number;
+    }> = [];
 
-      let targetPartId = warehouse_part.part_id || null;
+    if (Array.isArray(warehouse_parts) && warehouse_parts.length > 0) {
+      partsToProcess = warehouse_parts
+        .filter((p: any) => p && p.name && String(p.name).trim().length > 0)
+        .map((p: any) => ({
+          part_id: p.part_id || null,
+          brand: p.brand || 'canter',
+          client_car_model: p.client_car_model ? String(p.client_car_model).trim() : null,
+          name: String(p.name).trim(),
+          article: p.article ? String(p.article).trim() : null,
+          quantity: Math.max(1, Number(p.quantity) || 1),
+          unit_price:
+            p.unit_price !== undefined && p.unit_price !== null && p.unit_price !== ''
+              ? Number(p.unit_price)
+              : 0,
+        }));
+    } else if (warehouse_part && warehouse_part.enabled && warehouse_part.name?.trim()) {
+      partsToProcess = [
+        {
+          part_id: warehouse_part.part_id || null,
+          brand: warehouse_part.brand || 'canter',
+          client_car_model: warehouse_part.client_car_model
+            ? String(warehouse_part.client_car_model).trim()
+            : null,
+          name: String(warehouse_part.name).trim(),
+          article: warehouse_part.article ? String(warehouse_part.article).trim() : null,
+          quantity: Math.max(1, Number(warehouse_part.quantity) || 1),
+          unit_price:
+            warehouse_part.unit_price !== undefined &&
+            warehouse_part.unit_price !== null &&
+            warehouse_part.unit_price !== ''
+              ? Number(warehouse_part.unit_price)
+              : Math.round(numAmount / Math.max(1, Number(warehouse_part.quantity) || 1)),
+        },
+      ];
+    }
 
-      if (!targetPartId) {
-        // Ищем существующую запчасть по бренду и названию
-        const { data: matchedPart } = await (supabase.from('parts') as any)
-          .select('id, name, purchase_price')
-          .eq('category', brand)
-          .ilike('name', partName)
+    if (partsToProcess.length > 0) {
+      let actorId = adminUserId;
+      if (!actorId) {
+        const { data: anyUser } = await (supabase.from('users') as any)
+          .select('id')
           .limit(1)
-          .maybeSingle();
-
-        if (matchedPart) {
-          targetPartId = matchedPart.id;
-          if (unitPrice > 0) {
-            await (supabase.from('parts') as any)
-              .update({
-                purchase_price: unitPrice,
-                article: article || undefined,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', matchedPart.id);
-          }
-        } else {
-          // Создаём новую позицию в номенклатуре склада
-          const clientPrice = Math.round(unitPrice * 1.3);
-          const { data: newPart, error: newPartErr } = await (supabase.from('parts') as any)
-            .insert({
-              name: partName,
-              article,
-              category: brand,
-              unit: 'шт',
-              purchase_price: unitPrice,
-              client_price: clientPrice,
-              min_stock: 1,
-              is_active: true,
-            })
-            .select('id')
-            .single();
-
-          if (!newPartErr && newPart) {
-            targetPartId = newPart.id;
-          } else {
-            console.error('Error creating warehouse part:', newPartErr);
-          }
-        }
+          .single();
+        actorId = anyUser?.id || 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
       }
 
-      if (targetPartId) {
-        let actorId = adminUserId;
-        if (!actorId) {
-          const { data: anyUser } = await (supabase.from('users') as any)
-            .select('id')
+      // Сначала удаляем старые движения этой транзакции, чтобы избежать дублей при перезаписи
+      if (validTxId) {
+        await (supabase.from('part_movements') as any).delete().eq('transaction_id', validTxId);
+      }
+
+      for (const item of partsToProcess) {
+        const brand = item.brand || 'canter';
+        let finalPartName = item.name;
+        if (brand === 'client' && item.client_car_model) {
+          const modelLower = item.client_car_model.toLowerCase();
+          if (!finalPartName.toLowerCase().includes(modelLower)) {
+            finalPartName = `[${item.client_car_model}] ${finalPartName}`;
+          }
+        }
+
+        const article = item.article || null;
+        const quantity = item.quantity;
+        const unitPrice = item.unit_price;
+
+        let targetPartId = item.part_id || null;
+
+        if (!targetPartId) {
+          // Ищем существующую деталь по бренду и наименованию
+          const { data: matchedPart } = await (supabase.from('parts') as any)
+            .select('id, name, purchase_price')
+            .eq('category', brand)
+            .ilike('name', finalPartName)
             .limit(1)
-            .single();
-          actorId = anyUser?.id || 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
-        }
-
-        // Проверяем, не было ли уже создано движение по этой транзакции
-        let existingMv = null;
-        if (validTxId) {
-          const { data: mv } = await (supabase.from('part_movements') as any)
-            .select('id')
-            .eq('transaction_id', validTxId)
             .maybeSingle();
-          existingMv = mv;
+
+          if (matchedPart) {
+            targetPartId = matchedPart.id;
+            if (unitPrice > 0) {
+              await (supabase.from('parts') as any)
+                .update({
+                  purchase_price: unitPrice,
+                  article: article || undefined,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', matchedPart.id);
+            }
+          } else {
+            // Создаём новую позицию в номенклатуре склада
+            const clientPrice = Math.round(unitPrice * 1.3);
+            const { data: newPart, error: newPartErr } = await (supabase.from('parts') as any)
+              .insert({
+                name: finalPartName,
+                article,
+                category: brand,
+                unit: 'шт',
+                purchase_price: unitPrice,
+                client_price: clientPrice,
+                min_stock: 1,
+                is_active: true,
+              })
+              .select('id')
+              .single();
+
+            if (!newPartErr && newPart) {
+              targetPartId = newPart.id;
+            } else {
+              console.error('Error creating warehouse part:', newPartErr);
+            }
+          }
         }
 
-        if (existingMv) {
-          const { data: updatedMv } = await (supabase.from('part_movements') as any)
-            .update({
-              part_id: targetPartId,
-              quantity,
-              unit_price: unitPrice,
-              notes: `Оприходовано из расхода: ${description || 'Запчасти'}`,
-            })
-            .eq('id', existingMv.id)
-            .select()
-            .single();
-          savedPartMovement = updatedMv;
-        } else {
+        if (targetPartId) {
           const { data: insertedMv, error: mvInsertErr } = await (
             supabase.from('part_movements') as any
           )
@@ -381,19 +415,23 @@ export async function POST(req: Request) {
               quantity,
               unit_price: unitPrice,
               transaction_id: validTxId,
-              notes: `Оприходовано из расхода: ${description || 'Запчасти'}`,
+              notes: `Оприходовано из расхода: ${description || 'Запчасти'} (${finalPartName})`,
               created_by: actorId,
             })
-            .select()
+            .select('id, part_id, quantity, unit_price, part:parts(id, name, category, article)')
             .single();
+
           if (mvInsertErr) {
             console.error('Error inserting part_movement:', mvInsertErr);
-          } else {
-            savedPartMovement = insertedMv;
+          } else if (insertedMv) {
+            savedPartMovements.push(insertedMv);
           }
         }
       }
-    } else if (warehouse_part && warehouse_part.enabled === false && validTxId) {
+    } else if (
+      (warehouse_enabled === false || (warehouse_part && warehouse_part.enabled === false)) &&
+      validTxId
+    ) {
       // Пользователь снял отметку оприходования со склада
       await (supabase.from('part_movements') as any).delete().eq('transaction_id', validTxId);
     }
@@ -407,7 +445,8 @@ export async function POST(req: Request) {
       success: true,
       transaction: savedTx,
       matched_obligation_id: matchedOblId || null,
-      warehouse_movement: savedPartMovement,
+      warehouse_movement: savedPartMovements[0] || null,
+      warehouse_movements: savedPartMovements,
     });
   } catch (err: any) {
     console.error('Error in POST /api/finance/categorize-op:', err);
