@@ -29,7 +29,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ manual
   }
 
   const body = await req.json().catch(() => ({}));
-  const partialAmount = body.partial_amount ? parseFloat(body.partial_amount) : null;
+  const rawPartial = body.partial_amount ?? body.amount;
+  const partialAmount =
+    rawPartial !== undefined && rawPartial !== null && rawPartial !== ''
+      ? parseFloat(String(rawPartial))
+      : null;
   const toWalletId: string = body.to_wallet_id ?? BANK_ID;
 
   const { data: manual, error: fetchErr } = await (supabase as any)

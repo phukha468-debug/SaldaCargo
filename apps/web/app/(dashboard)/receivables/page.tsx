@@ -1234,14 +1234,26 @@ export default function ReceivablesPage() {
     try {
       const isManual = partialModalOrder.type === 'manual';
       const endpoint = isManual
-        ? `/api/receivables/manual/${partialModalOrder.id}/partial`
-        : `/api/receivables/${partialModalOrder.id}/partial`;
+        ? `/api/receivables/manual/${partialModalOrder.id}`
+        : `/api/receivables/${partialModalOrder.id}`;
       const res = await fetch(endpoint, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amt, to_wallet_id: partialWallet }),
+        body: JSON.stringify({
+          partial_amount: amt.toFixed(2),
+          amount: amt.toFixed(2),
+          to_wallet_id: partialWallet,
+        }),
       });
-      const json = await res.json();
+
+      let json: { error?: string } = {};
+      const resText = await res.text();
+      try {
+        json = resText ? JSON.parse(resText) : {};
+      } catch {
+        json = { error: `Ошибка сервера (${res.status})` };
+      }
+
       if (!res.ok) throw new Error(json.error ?? 'Ошибка частичной оплаты');
       setPartialModalOrder(null);
       await queryClient.invalidateQueries({ queryKey: ['receivables'] });

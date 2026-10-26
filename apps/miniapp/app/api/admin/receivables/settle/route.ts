@@ -24,9 +24,16 @@ export async function POST(request: Request) {
     type?: 'trip_order' | 'manual';
     note?: string;
     to_wallet_id?: string;
+    partial_amount?: string | number;
+    amount?: string | number;
   };
 
   const recordType = body.type ?? 'trip_order';
+  const rawPartial = body.partial_amount ?? body.amount;
+  const partialAmount =
+    rawPartial !== undefined && rawPartial !== null && rawPartial !== ''
+      ? parseFloat(String(rawPartial))
+      : null;
   const supabase = createAdminClient();
 
   if (recordType === 'manual') {
@@ -40,23 +47,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Запись не найдена' }, { status: 404 });
     if (manual.settled) return NextResponse.json({ error: 'Долг уже погашен' }, { status: 400 });
 
-    const { error: updateErr } = await (supabase as any)
-      .from('manual_receivables')
-      .update({ settled: true, settled_at: new Date().toISOString() })
-      .eq('id', body.id)
-      .eq('settled', false);
+    const fullAmount = parseFloat(manual.amount);
+    const isPartial =
+      partialAmount !== null &&
+      !isNaN(partialAmount) &&
+      partialAmount > 0 &&
+      partialAmount < fullAmount;
+    const payAmount = isPartial ? partialAmount : fullAmount;
 
-    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    if (isPartial) {
+      const newAmount = (fullAmount - partialAmount).toFixed(2);
+      const { error: updateErr } = await (supabase as any)
+        .from('manual_receivables')
+        .update({ amount: newAmount })
+        .eq('id', body.id);
+      if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    } else {
+      const { error: updateErr } = await (supabase as any)
+        .from('manual_receivables')
+        .update({ settled: true, settled_at: new Date().toISOString() })
+        .eq('id', body.id)
+        .eq('settled', false);
+      if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
 
-    const description = body.note || 'Погашение исторического долга';
+    const description =
+      body.note || (isPartial ? 'Частичное погашение долга' : 'Погашение исторического долга');
     const meta = JSON.stringify({
       type: 'receivables_settlement',
-      orders: [{ id: body.id, type: 'manual', amount: manual.amount }],
+      orders: [
+        { id: body.id, type: 'manual', amount: payAmount.toFixed(2), is_partial: isPartial },
+      ],
     });
     const { error: txErr } = await (supabase as any).from('transactions').insert({
       direction: 'income',
       category_id: TRIP_REVENUE_CATEGORY,
-      amount: manual.amount,
+      amount: payAmount.toFixed(2),
       counterparty_id: manual.counterparty_id,
       to_wallet_id: body.to_wallet_id ?? CASH_ID,
       photo_url: meta,
@@ -68,7 +94,7 @@ export async function POST(request: Request) {
     });
 
     if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, paid: payAmount.toFixed(2), partial: isPartial });
   }
 
   // Default: trip_order
@@ -85,27 +111,54 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Долг уже погашен' }, { status: 400 });
   }
 
-  const { error: updateErr } = await (supabase
-    .from('trip_orders')
-    .update({ settlement_status: 'completed', updated_at: new Date().toISOString() })
-    .eq('id', body.id) as any);
+  const fullAmount = parseFloat(order.amount);
+  const isPartial =
+    partialAmount !== null &&
+    !isNaN(partialAmount) &&
+    partialAmount > 0 &&
+    partialAmount < fullAmount;
+  const payAmount = isPartial ? partialAmount : fullAmount;
 
-  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  if (isPartial) {
+    const newAmount = (fullAmount - partialAmount).toFixed(2);
+    const { error: updateErr } = await (supabase
+      .from('trip_orders')
+      .update({ amount: newAmount, updated_at: new Date().toISOString() })
+      .eq('id', body.id) as any);
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  } else {
+    const { error: updateErr } = await (supabase
+      .from('trip_orders')
+      .update({
+        settlement_status: 'completed',
+        invoice_status: 'paid',
+        invoice_paid_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', body.id) as any);
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
 
   const cpName = order.counterparty?.name ?? 'Должник';
   const isLegal = order.counterparty?.is_legal_entity ?? false;
   const toWalletId = body.to_wallet_id ?? walletForDebt(isLegal);
-  const description = body.note ? body.note : `Погашение: ${cpName}`;
+  const description = body.note
+    ? body.note
+    : isPartial
+      ? `Частичное погашение: ${cpName}`
+      : `Погашение: ${cpName}`;
 
   const meta = JSON.stringify({
     type: 'receivables_settlement',
-    orders: [{ id: body.id, type: 'trip_order', amount: order.amount }],
+    orders: [
+      { id: body.id, type: 'trip_order', amount: payAmount.toFixed(2), is_partial: isPartial },
+    ],
   });
 
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
-    amount: order.amount,
+    amount: payAmount.toFixed(2),
     counterparty_id: order.counterparty_id ?? null,
     trip_order_id: body.id,
     to_wallet_id: toWalletId,
@@ -118,5 +171,6 @@ export async function POST(request: Request) {
   });
 
   if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
+  return NextResponse.json({ ok: true, paid: payAmount.toFixed(2), partial: isPartial });
   return NextResponse.json({ ok: true });
 }
