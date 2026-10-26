@@ -659,7 +659,9 @@ object SaldaApiClient {
         partsProvidedByService: Boolean,
         parts: List<MechanicPartDraftInput>,
         mechanicNote: String? = null,
-        submitImmediately: Boolean = true
+        submitImmediately: Boolean = true,
+        startedAt: String? = null,
+        completedAt: String? = null
     ): Result<MechanicOrder> = withContext(Dispatchers.IO) {
         val worksArray = kotlinx.serialization.json.buildJsonArray {
             works.forEach { w ->
@@ -681,6 +683,8 @@ object SaldaApiClient {
         val body = buildJsonObject {
             put("mechanic_id", mechanicId)
             put("order_date", orderDate)
+            put("started_at", startedAt ?: orderDate)
+            put("completed_at", completedAt ?: orderDate)
             put("machine_type", machineType)
             if (!assetId.isNullOrBlank()) put("asset_id", assetId)
             if (!clientVehicleModel.isNullOrBlank()) {
@@ -879,11 +883,15 @@ object SaldaApiClient {
         odometer: Long? = null,
         mechanicPay: Double? = null,
         vehicleModel: String? = null,
-        vehicleReg: String? = null
+        vehicleReg: String? = null,
+        startedAt: String? = null,
+        completedAt: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             put("action", "edit_order")
             if (!adminId.isNullOrBlank()) put("admin_id", adminId)
+            if (!startedAt.isNullOrBlank()) put("started_at", startedAt)
+            if (!completedAt.isNullOrBlank()) put("completed_at", completedAt)
             if (odometer != null) put("odometer_end", odometer)
             if (mechanicPay != null) put("mechanic_pay", mechanicPay)
             if (!vehicleModel.isNullOrBlank()) put("client_vehicle_model", vehicleModel)

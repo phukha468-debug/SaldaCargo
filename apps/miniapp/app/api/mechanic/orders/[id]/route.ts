@@ -2,7 +2,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { isOilOrFilterWork } from '@saldacargo/shared';
+import {
+  isOilOrFilterWork,
+  extractOrderDates,
+  cleanOrderNotes,
+  formatOrderDatesNote,
+} from '@saldacargo/shared';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -117,8 +122,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
     }));
 
+    const orderDates = extractOrderDates(order);
+
     return NextResponse.json({
       ...order,
+      started_at: orderDates.started_at,
+      completed_at: orderDates.completed_at,
+      mechanic_note: cleanOrderNotes(order.mechanic_note),
+      admin_note: cleanOrderNotes(order.admin_note),
       parts: normalizedParts,
       hourly_rate: hourlyRate,
       salary_pct: salaryPct,
@@ -190,6 +201,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       update.mechanic_note = mechanic_note;
     } else if (parts_provided_by_service !== undefined) {
       update.mechanic_note = parts_provided_by_service ? '[Запчасти предоставил автосервис]' : null;
+    }
+
+    if (body.started_at !== undefined) {
+      const sVal = body.started_at ? String(body.started_at).trim() : null;
+      update.started_at = sVal ? (sVal.includes('T') ? sVal : `${sVal}T08:00:00.000Z`) : null;
+    }
+    if (body.completed_at !== undefined) {
+      const cVal = body.completed_at ? String(body.completed_at).trim() : null;
+      update.completed_at = cVal ? (cVal.includes('T') ? cVal : `${cVal}T17:00:00.000Z`) : null;
+    }
+    if (update.started_at !== undefined || update.completed_at !== undefined) {
+      update.mechanic_note = formatOrderDatesNote(update.mechanic_note as string | undefined, {
+        started_at: update.started_at as string | null,
+        completed_at: update.completed_at as string | null,
+      });
     }
 
     if (status === 'completed') {
@@ -299,12 +325,32 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    const { data, error } = await (supabase as any)
+    let data: any = null;
+    let error: any = null;
+
+    const resWithDates = await (supabase as any)
       .from('service_orders')
       .update(update)
       .eq('id', id)
       .select('id, status, lifecycle_status, odometer_end')
       .single();
+
+    if (resWithDates.error) {
+      const fallbackUpdate = { ...update };
+      delete fallbackUpdate.started_at;
+      delete fallbackUpdate.completed_at;
+      const resFallback = await (supabase as any)
+        .from('service_orders')
+        .update(fallbackUpdate)
+        .eq('id', id)
+        .select('id, status, lifecycle_status, odometer_end')
+        .single();
+      data = resFallback.data;
+      error = resFallback.error;
+    } else {
+      data = resWithDates.data;
+      error = resWithDates.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(data);

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { extractOrderDates, cleanOrderNotes } from '@saldacargo/shared';
 
 /** GET /api/admin/service-orders?filter=review|active|history&date=YYYY-MM-DD */
 export async function GET(request: Request) {
@@ -123,8 +124,14 @@ export async function GET(request: Request) {
         (o.parts ?? []).length > 0 ||
         Boolean(o.mechanic_note && o.mechanic_note.includes('[Запчасти предоставил автосервис]'));
 
+      const orderDates = extractOrderDates(o);
+
       return {
         ...o,
+        started_at: orderDates.started_at,
+        completed_at: orderDates.completed_at,
+        mechanic_note: cleanOrderNotes(o.mechanic_note),
+        admin_note: cleanOrderNotes(o.admin_note),
         hourly_rate: hourlyRate,
         salary_pct: pct,
         total_minutes: totalMinutes,

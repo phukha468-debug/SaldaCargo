@@ -2,7 +2,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { isOilOrFilterWork } from '@saldacargo/shared';
+import {
+  isOilOrFilterWork,
+  extractOrderDates,
+  cleanOrderNotes,
+  formatOrderDatesNote,
+} from '@saldacargo/shared';
 
 function getUserId(
   request: Request,
@@ -159,9 +164,13 @@ export async function GET(request: Request) {
           : 0;
 
       const effectivePay = approvedPay > 0 ? approvedPay : estimatedOrderPay;
+      const orderDates = extractOrderDates(o);
 
       return {
         ...o,
+        started_at: orderDates.started_at,
+        completed_at: orderDates.completed_at,
+        mechanic_note: cleanOrderNotes(o.mechanic_note),
         hourly_rate: hourlyRate,
         salary_pct: salaryPct,
         total_minutes: totalMinutes,
@@ -199,6 +208,8 @@ export async function POST(request: Request) {
 
     const {
       order_date,
+      started_at,
+      completed_at,
       machine_type = 'own',
       asset_id,
       client_vehicle_model,
@@ -212,6 +223,8 @@ export async function POST(request: Request) {
       submit_immediately = true,
     } = body as {
       order_date?: string;
+      started_at?: string;
+      completed_at?: string;
       machine_type: 'own' | 'client';
       asset_id?: string;
       client_vehicle_model?: string;
@@ -338,7 +351,23 @@ export async function POST(request: Request) {
       }
     }
 
-    const createdAtIso = order_date ? `${order_date}T12:00:00.000Z` : new Date().toISOString();
+    const startedAtIso = started_at
+      ? started_at.includes('T')
+        ? started_at
+        : `${started_at}T08:00:00.000Z`
+      : order_date
+        ? `${order_date}T08:00:00.000Z`
+        : new Date().toISOString();
+
+    const completedAtIso = completed_at
+      ? completed_at.includes('T')
+        ? completed_at
+        : `${completed_at}T17:00:00.000Z`
+      : order_date
+        ? `${order_date}T17:00:00.000Z`
+        : new Date().toISOString();
+
+    const createdAtIso = startedAtIso;
 
     const problemSummary =
       validWorks.length > 0
@@ -362,7 +391,11 @@ export async function POST(request: Request) {
     if (mechanic_note?.trim()) {
       noteParts.push(mechanic_note.trim());
     }
-    const finalMechanicNote = noteParts.length > 0 ? noteParts.join(' ') : null;
+    let finalMechanicNote = noteParts.length > 0 ? noteParts.join(' ') : null;
+    finalMechanicNote = formatOrderDatesNote(finalMechanicNote, {
+      started_at: startedAtIso,
+      completed_at: completedAtIso,
+    });
 
     let totalEstimatedMechanicPay = 0;
     for (const w of validWorks) {
@@ -372,32 +405,54 @@ export async function POST(request: Request) {
 
     const orderStatus = submit_immediately ? 'completed' : 'in_progress';
 
-    const { data: createdOrder, error: orderErr } = await (supabase.from('service_orders') as any)
+    const baseInsertPayload = {
+      machine_type: isOwn ? 'own' : 'client',
+      asset_id: isOwn ? asset_id : null,
+      client_vehicle_id: isOwn ? null : clientVehicleId,
+      client_vehicle_brand: isOwn ? null : cleanModel,
+      client_vehicle_model: isOwn ? null : cleanModel,
+      client_vehicle_reg: isOwn ? null : cleanReg,
+      odometer_start: odoNum && odoNum > 0 ? odoNum : null,
+      odometer_end: odoNum && odoNum > 0 ? odoNum : null,
+      problem_description: problemSummary,
+      mechanic_note: finalMechanicNote,
+      assigned_mechanic_id: mechanicId,
+      created_by: mechanicId,
+      status: orderStatus,
+      lifecycle_status: 'draft',
+      payment_received: isOwn,
+      mechanic_pay: totalEstimatedMechanicPay > 0 ? totalEstimatedMechanicPay.toFixed(2) : null,
+      priority: 'normal',
+      created_at: createdAtIso,
+      updated_at: new Date().toISOString(),
+    };
+
+    let createdOrder: any = null;
+    const { data: orderWithDates, error: datesInsertErr } = await (
+      supabase.from('service_orders') as any
+    )
       .insert({
-        machine_type: isOwn ? 'own' : 'client',
-        asset_id: isOwn ? asset_id : null,
-        client_vehicle_id: isOwn ? null : clientVehicleId,
-        client_vehicle_brand: isOwn ? null : cleanModel,
-        client_vehicle_model: isOwn ? null : cleanModel,
-        client_vehicle_reg: isOwn ? null : cleanReg,
-        odometer_start: odoNum && odoNum > 0 ? odoNum : null,
-        odometer_end: odoNum && odoNum > 0 ? odoNum : null,
-        problem_description: problemSummary,
-        mechanic_note: finalMechanicNote,
-        assigned_mechanic_id: mechanicId,
-        created_by: mechanicId,
-        status: orderStatus,
-        lifecycle_status: 'draft',
-        payment_received: isOwn,
-        mechanic_pay: totalEstimatedMechanicPay > 0 ? totalEstimatedMechanicPay.toFixed(2) : null,
-        priority: 'normal',
-        created_at: createdAtIso,
-        updated_at: new Date().toISOString(),
+        ...baseInsertPayload,
+        started_at: startedAtIso,
+        completed_at: completedAtIso,
       })
       .select('id, order_number, status, lifecycle_status, machine_type, created_at')
       .single();
 
-    if (orderErr) throw orderErr;
+    if (!datesInsertErr && orderWithDates) {
+      createdOrder = orderWithDates;
+    } else {
+      // Фолбэк: если физические колонки еще не созданы в БД до запуска миграции,
+      // вставляем без них (даты уже зафиксированы в finalMechanicNote)
+      const { data: fallbackOrder, error: fallbackErr } = await (
+        supabase.from('service_orders') as any
+      )
+        .insert(baseInsertPayload)
+        .select('id, order_number, status, lifecycle_status, machine_type, created_at')
+        .single();
+      if (fallbackErr) throw fallbackErr;
+      createdOrder = fallbackOrder;
+    }
 
     // Вставляем перечень работ
     if (validWorks.length > 0) {
@@ -489,6 +544,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ...createdOrder,
+        started_at: startedAtIso,
+        completed_at: completedAtIso,
         estimated_pay: totalEstimatedMechanicPay.toFixed(2),
         mechanic_pay: totalEstimatedMechanicPay.toFixed(2),
       },

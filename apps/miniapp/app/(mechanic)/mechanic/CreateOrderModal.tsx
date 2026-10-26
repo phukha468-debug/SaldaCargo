@@ -39,8 +39,9 @@ export default function CreateOrderModal({
   const queryClient = useQueryClient();
   const todayStr = new Date().toISOString().split('T')[0] ?? '';
 
-  // 1. Дата
-  const [orderDate, setOrderDate] = useState<string>(todayStr);
+  // 1. Даты начала и окончания
+  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [endDate, setEndDate] = useState<string>(todayStr);
   // 2. Свой или клиентский
   const [machineType, setMachineType] = useState<'own' | 'client'>('client');
   // 3. Данные автомобиля
@@ -183,7 +184,9 @@ export default function CreateOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mechanic_id: mechanicId,
-          order_date: orderDate,
+          order_date: startDate,
+          started_at: startDate,
+          completed_at: endDate,
           machine_type: machineType,
           asset_id: machineType === 'own' ? selectedAssetId : undefined,
           client_vehicle_model: machineType === 'client' ? clientModel.trim() : undefined,
@@ -259,14 +262,32 @@ export default function CreateOrderModal({
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                1. Дата выполнения работ
+                1. Даты проведения работ (начало и окончание)
               </label>
-              <input
-                type="date"
-                value={orderDate}
-                onChange={(e) => setOrderDate(e.target.value)}
-                className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="block text-[10px] font-bold text-slate-400 mb-1">Начат</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (endDate < e.target.value) setEndDate(e.target.value);
+                    }}
+                    className="w-full h-11 px-3 rounded-xl bg-[#F2F4F7] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
+                  />
+                </div>
+                <div>
+                  <span className="block text-[10px] font-bold text-slate-400 mb-1">Закончен</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full h-11 px-3 rounded-xl bg-[#F2F4F7] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>

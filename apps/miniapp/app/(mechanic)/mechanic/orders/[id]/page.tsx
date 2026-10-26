@@ -24,6 +24,8 @@ interface OrderDetail {
   lifecycle_status: string;
   machine_type: 'own' | 'client';
   created_at: string;
+  started_at?: string;
+  completed_at?: string;
   asset?: { id: string; short_name: string; reg_number: string };
   client_vehicle_brand?: string;
   client_vehicle_model?: string;
@@ -286,7 +288,12 @@ export default function OrderDetailPage() {
               </span>
             </div>
             <p className="text-xs font-semibold text-slate-400 mt-0.5">
-              Дата: {formatDate(order.created_at)}
+              Даты:{' '}
+              {order.started_at &&
+              order.completed_at &&
+              order.started_at.slice(0, 10) !== order.completed_at.slice(0, 10)
+                ? `${formatDate(order.started_at)} — ${formatDate(order.completed_at)}`
+                : formatDate(order.started_at || order.created_at)}
             </p>
           </div>
 

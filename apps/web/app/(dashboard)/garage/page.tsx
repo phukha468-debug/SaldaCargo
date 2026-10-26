@@ -53,6 +53,8 @@ type OrderRow = {
   machine_type: 'own' | 'client';
   problem_description: string;
   created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   asset: Asset | null;
   client_vehicle_brand: string | null;
   client_vehicle_reg: string | null;
@@ -769,6 +771,8 @@ function OrderDetailModal({
   const [editPriority, setEditPriority] = useState<string | null>(null);
   const [editOdometerStart, setEditOdometerStart] = useState<string | null>(null);
   const [editOdometerEnd, setEditOdometerEnd] = useState<string | null>(null);
+  const [editStartedAt, setEditStartedAt] = useState<string | null>(null);
+  const [editCompletedAt, setEditCompletedAt] = useState<string | null>(null);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   const [showAddWork, setShowAddWork] = useState(false);
@@ -825,6 +829,8 @@ function OrderDetailModal({
       setEditPriority(null);
       setEditOdometerStart(null);
       setEditOdometerEnd(null);
+      setEditStartedAt(null);
+      setEditCompletedAt(null);
       onClose();
     },
     onError: (err: Error) => {
@@ -836,6 +842,7 @@ function OrderDetailModal({
   const [closeRecommendation, setCloseRecommendation] = useState<string>('');
   const [closeDueKm, setCloseDueKm] = useState<string>('');
   const [closeDueDate, setCloseDueDate] = useState<string>('');
+  const [closeCompletedAt, setCloseCompletedAt] = useState<string>('');
   const [closeOdometerStart, setCloseOdometerStart] = useState<string>('');
   const [closeOdometerEnd, setCloseOdometerEnd] = useState<string>('');
 
@@ -844,6 +851,9 @@ function OrderDetailModal({
     setCloseRecommendation(order.mechanic_note || '');
     setCloseDueKm('');
     setCloseDueDate('');
+    setCloseCompletedAt(
+      order.completed_at ? order.completed_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    );
     setCloseOdometerStart(order.odometer_start != null ? String(order.odometer_start) : '');
     setCloseOdometerEnd(
       order.odometer_end != null
@@ -1380,6 +1390,85 @@ function OrderDetailModal({
                           }}
                           disabled={patchMutation.isPending}
                           className="text-xs bg-blue-600 text-white font-semibold px-2 py-1.5 rounded-lg shrink-0 hover:bg-blue-700"
+                        >
+                          ✓
+                        </button>
+                      )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
+                    Дата начала наряда
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="date"
+                      value={
+                        editStartedAt ??
+                        (order.started_at
+                          ? order.started_at.slice(0, 10)
+                          : order.created_at
+                            ? order.created_at.slice(0, 10)
+                            : '')
+                      }
+                      onChange={(e) => setEditStartedAt(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm"
+                    />
+                    {editStartedAt !== null &&
+                      editStartedAt !==
+                        (order.started_at
+                          ? order.started_at.slice(0, 10)
+                          : order.created_at
+                            ? order.created_at.slice(0, 10)
+                            : '') && (
+                        <button
+                          onClick={() => {
+                            patchMutation.mutate({
+                              started_at: editStartedAt ? `${editStartedAt}T08:00:00.000Z` : null,
+                            });
+                            setEditStartedAt(null);
+                          }}
+                          disabled={patchMutation.isPending}
+                          className="text-xs bg-blue-600 text-white font-semibold px-2 py-1.5 rounded-lg shrink-0 hover:bg-blue-700"
+                          title="Сохранить дату начала"
+                        >
+                          ✓
+                        </button>
+                      )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1 font-semibold uppercase">
+                    Дата окончания наряда
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="date"
+                      value={
+                        editCompletedAt ??
+                        (order.completed_at ? order.completed_at.slice(0, 10) : '')
+                      }
+                      onChange={(e) => setEditCompletedAt(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm"
+                    />
+                    {editCompletedAt !== null &&
+                      editCompletedAt !==
+                        (order.completed_at ? order.completed_at.slice(0, 10) : '') && (
+                        <button
+                          onClick={() => {
+                            patchMutation.mutate({
+                              completed_at: editCompletedAt
+                                ? `${editCompletedAt}T17:00:00.000Z`
+                                : null,
+                            });
+                            setEditCompletedAt(null);
+                          }}
+                          disabled={patchMutation.isPending}
+                          className="text-xs bg-blue-600 text-white font-semibold px-2 py-1.5 rounded-lg shrink-0 hover:bg-blue-700"
+                          title="Сохранить дату окончания"
                         >
                           ✓
                         </button>
@@ -2743,14 +2832,13 @@ function OrderDetailModal({
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
-                                Пробег заезда (км)
+                                Дата окончания наряда
                               </label>
                               <input
-                                type="number"
-                                value={closeOdometerStart}
-                                onChange={(e) => setCloseOdometerStart(e.target.value)}
-                                placeholder="Одометр на входе..."
-                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono"
+                                type="date"
+                                value={closeCompletedAt}
+                                onChange={(e) => setCloseCompletedAt(e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-bold"
                               />
                             </div>
                             <div>
@@ -2765,6 +2853,18 @@ function OrderDetailModal({
                                 className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono font-bold"
                               />
                             </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">
+                              Пробег заезда (км)
+                            </label>
+                            <input
+                              type="number"
+                              value={closeOdometerStart}
+                              onChange={(e) => setCloseOdometerStart(e.target.value)}
+                              placeholder="Одометр на входе..."
+                              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white outline-none focus:ring-1 focus:ring-emerald-400 font-mono"
+                            />
                           </div>
                           <div className="flex items-center gap-1.5 pt-1">
                             <span className="text-[10px] text-slate-400 font-semibold">
@@ -2831,6 +2931,9 @@ function OrderDetailModal({
                             mechanic_note: closeRecommendation.trim() || null,
                             due_km: closeDueKm ? Number(closeDueKm) : null,
                             due_date: closeDueDate || null,
+                            completed_at: closeCompletedAt
+                              ? `${closeCompletedAt}T17:00:00.000Z`
+                              : new Date().toISOString(),
                           };
                           if (closeOdometerStart)
                             updates.odometer_start = Number(closeOdometerStart);

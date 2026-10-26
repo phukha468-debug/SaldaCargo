@@ -77,6 +77,8 @@ interface ReviewServiceOrder {
   status: string;
   lifecycle_status: string;
   created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   problem_description: string | null;
   admin_note?: string | null;
   mechanic_note: string | null;
@@ -2454,6 +2456,16 @@ function GarageOrderEditModal({
   const hourlyRate = isOwn ? 1600 : 2000;
   const salaryPct = Number(order.mechanic?.mechanic_salary_pct || 50);
 
+  const defaultStartDate = order.started_at
+    ? order.started_at.slice(0, 10)
+    : order.created_at
+      ? order.created_at.slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+  const defaultEndDate = order.completed_at ? order.completed_at.slice(0, 10) : defaultStartDate;
+
+  const [startDate, setStartDate] = useState<string>(defaultStartDate);
+  const [endDate, setEndDate] = useState<string>(defaultEndDate);
+
   const [odometer, setOdometer] = useState<string>(
     String(order.odometer_end || order.odometer_start || ''),
   );
@@ -2491,6 +2503,8 @@ function GarageOrderEditModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'edit_order',
+          started_at: startDate,
+          completed_at: endDate,
           odometer_start: odometer ? Number(odometer) : null,
           odometer_end: odometer ? Number(odometer) : null,
           client_vehicle_model: !isOwn ? clientModel : undefined,
@@ -2576,6 +2590,35 @@ function GarageOrderEditModal({
             placeholder="Пробег в км"
             className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold"
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label className="text-xs font-bold uppercase text-slate-500 block mb-1">
+              Дата начала
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                if (endDate < e.target.value) setEndDate(e.target.value);
+              }}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase text-slate-500 block mb-1">
+              Дата окончания
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800"
+            />
+          </div>
         </div>
 
         {/* Работы */}

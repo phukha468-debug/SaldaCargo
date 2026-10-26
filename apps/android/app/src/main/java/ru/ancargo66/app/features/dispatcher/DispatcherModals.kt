@@ -19,6 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 import ru.ancargo66.app.core.model.MechanicOrder
 import ru.ancargo66.app.core.model.WalletBalance
@@ -237,6 +240,12 @@ fun ServiceOrderEditDialog(
         }
     }
 
+    val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
+    val defaultStartDate = order.startedAt?.take(10) ?: order.createdAt?.take(10) ?: todayStr
+    val defaultEndDate = order.completedAt?.take(10) ?: defaultStartDate
+
+    var startDateText by remember { mutableStateOf(defaultStartDate) }
+    var endDateText by remember { mutableStateOf(defaultEndDate) }
     var odometerText by remember { mutableStateOf(if (order.odometerEnd > 0) order.odometerEnd.toString() else if (order.odometerStart > 0) order.odometerStart.toString() else "") }
     var mechanicPayText by remember { mutableStateOf(if (order.mechanicPay > 0.0) order.mechanicPay.toInt().toString() else "") }
     var isSubmitting by remember { mutableStateOf(false) }
@@ -277,6 +286,42 @@ fun ServiceOrderEditDialog(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Даты начала и окончания работ
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("НАЧАЛО НАPЯДА", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc500)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = startDateText,
+                                onValueChange = {
+                                    startDateText = it
+                                    if (endDateText < it) endDateText = it
+                                },
+                                placeholder = { Text("ГГГГ-ММ-ДД", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("ОКОНЧАНИЕ НАPЯДА", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Zinc500)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = endDateText,
+                                onValueChange = { endDateText = it },
+                                placeholder = { Text("ГГГГ-ММ-ДД", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp)
                             )
                         }
                     }
@@ -458,7 +503,9 @@ fun ServiceOrderEditDialog(
                                 works = validWorks,
                                 parts = validParts,
                                 odometer = odo,
-                                mechanicPay = pay
+                                mechanicPay = pay,
+                                startedAt = startDateText.takeIf { it.isNotBlank() },
+                                completedAt = endDateText.takeIf { it.isNotBlank() }
                             )
                             if (ok) {
                                 onSuccess()

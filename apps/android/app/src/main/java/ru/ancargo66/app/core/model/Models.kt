@@ -181,7 +181,9 @@ data class ServiceOrder(
     @SerialName("client_vehicle_reg") val clientVehicleReg: String? = null,
     @SerialName("client_name") val clientName: String? = null,
     val status: String = "in_progress",
-    @SerialName("admin_note") val adminNote: String? = null
+    @SerialName("admin_note") val adminNote: String? = null,
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("completed_at") val completedAt: String? = null
 )
 
 @Serializable
@@ -246,6 +248,8 @@ data class MechanicOrder(
     val status: String = "in_progress",
     @SerialName("lifecycle_status") val lifecycleStatus: String = "draft",
     @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("completed_at") val completedAt: String? = null,
     @Serializable(with = FlexibleLongSerializer::class)
     @SerialName("odometer_start") val odometerStart: Long = 0L,
     @Serializable(with = FlexibleLongSerializer::class)

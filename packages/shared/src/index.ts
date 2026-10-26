@@ -744,3 +744,72 @@ export function checkOdometerRequirement(
 
   return { required: false, reason: null, message: '' };
 }
+
+/**
+ * Извлекает даты начала и окончания заказ-наряда:
+ * 1. Из прямых полей started_at / completed_at если они заданы
+ * 2. Из служебного тега [ORDER_DATES:{"started_at":"...","completed_at":"..."}] в заметках
+ * 3. Fallback: started_at -> created_at, completed_at -> approved_at || (status === 'completed' ? updated_at : null)
+ */
+export function extractOrderDates(order: {
+  started_at?: string | null;
+  completed_at?: string | null;
+  mechanic_note?: string | null;
+  admin_note?: string | null;
+  created_at?: string | null;
+  approved_at?: string | null;
+  updated_at?: string | null;
+  status?: string | null;
+  lifecycle_status?: string | null;
+}): { started_at: string | null; completed_at: string | null } {
+  let startedAt = order.started_at || null;
+  let completedAt = order.completed_at || null;
+
+  if (!startedAt || !completedAt) {
+    const rawNotes = `${order.mechanic_note || ''} ${order.admin_note || ''}`;
+    const match = rawNotes.match(/\[ORDER_DATES:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (!startedAt && parsed.started_at) startedAt = parsed.started_at;
+        if (!completedAt && parsed.completed_at) completedAt = parsed.completed_at;
+      } catch {}
+    }
+  }
+
+  if (!startedAt && order.created_at) {
+    startedAt = order.created_at;
+  }
+  if (!completedAt) {
+    if (order.approved_at) {
+      completedAt = order.approved_at;
+    } else if (order.status === 'completed' || order.lifecycle_status === 'approved') {
+      completedAt = order.updated_at || order.created_at || null;
+    }
+  }
+
+  return { started_at: startedAt, completed_at: completedAt };
+}
+
+/**
+ * Очищает заметку от служебных тегов дат заказ-наряда
+ */
+export function cleanOrderNotes(note: string | null | undefined): string {
+  if (!note) return '';
+  return note.replace(/\[ORDER_DATES:.*?\]/g, '').trim();
+}
+
+/**
+ * Упаковывает тег дат в текст заметки
+ */
+export function formatOrderDatesNote(
+  existingNote: string | null | undefined,
+  dates: { started_at?: string | null; completed_at?: string | null },
+): string {
+  const clean = (existingNote || '').replace(/\[ORDER_DATES:.*?\]/g, '').trim();
+  const tag = `[ORDER_DATES:${JSON.stringify({
+    started_at: dates.started_at || null,
+    completed_at: dates.completed_at || null,
+  })}]`;
+  return clean ? `${clean}\n${tag}` : tag;
+}

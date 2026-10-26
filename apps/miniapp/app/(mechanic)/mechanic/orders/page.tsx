@@ -188,7 +188,11 @@ function WorkHistoryCard({ order }: { order: any }) {
                 {isOwn ? '🚛 Свой (1600 ₽/ч)' : '🚗 Клиент (2000 ₽/ч)'}
               </span>
               <span className="text-[11px] font-semibold text-slate-400">
-                {formatDate(order.created_at)}
+                {order.started_at &&
+                order.completed_at &&
+                order.started_at.slice(0, 10) !== order.completed_at.slice(0, 10)
+                  ? `${formatDate(order.started_at)} — ${formatDate(order.completed_at)}`
+                  : formatDate(order.started_at || order.created_at)}
               </span>
             </div>
 

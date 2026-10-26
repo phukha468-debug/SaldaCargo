@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { isOilOrFilterWork } from '@saldacargo/shared';
+import {
+  isOilOrFilterWork,
+  extractOrderDates,
+  cleanOrderNotes,
+  formatOrderDatesNote,
+} from '@saldacargo/shared';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -118,6 +123,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       data.executors = [];
     }
 
+    const orderDates = extractOrderDates(data);
+    data.started_at = orderDates.started_at;
+    data.completed_at = orderDates.completed_at;
+    if (data.admin_note) data.admin_note = cleanOrderNotes(data.admin_note);
+    if (data.mechanic_note) data.mechanic_note = cleanOrderNotes(data.mechanic_note);
+
     return NextResponse.json(data);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка' }, { status: 500 });
@@ -228,6 +239,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const mp = parseFloat(String(body.mechanic_pay));
         updates.mechanic_pay = !isNaN(mp) && mp >= 0 ? mp.toFixed(2) : null;
       }
+      if (body.started_at !== undefined) {
+        const sVal = body.started_at ? String(body.started_at).trim() : null;
+        updates.started_at = sVal ? (sVal.includes('T') ? sVal : `${sVal}T08:00:00.000Z`) : null;
+      }
+      if (body.completed_at !== undefined) {
+        const cVal = body.completed_at ? String(body.completed_at).trim() : null;
+        updates.completed_at = cVal ? (cVal.includes('T') ? cVal : `${cVal}T17:00:00.000Z`) : null;
+      }
+      if (updates.started_at !== undefined || updates.completed_at !== undefined) {
+        updates.admin_note = formatOrderDatesNote(updates.admin_note ?? (ord as any).admin_note, {
+          started_at: updates.started_at,
+          completed_at: updates.completed_at,
+        });
+      }
 
       if (Array.isArray(body.works)) {
         const validWorks = (body.works as any[])
@@ -285,9 +310,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
       }
 
-      const { error: updErr } = await (supabase.from('service_orders') as any)
+      let updErr: any = null;
+      const resWithDates = await (supabase.from('service_orders') as any)
         .update(updates)
         .eq('id', id);
+      if (resWithDates.error) {
+        const fallbackUpdates = { ...updates };
+        delete fallbackUpdates.started_at;
+        delete fallbackUpdates.completed_at;
+        const resFallback = await (supabase.from('service_orders') as any)
+          .update(fallbackUpdates)
+          .eq('id', id);
+        updErr = resFallback.error;
+      } else {
+        updErr = resWithDates.error;
+      }
       if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
       return NextResponse.json({ ok: true, action: 'edited' });
     }
@@ -791,10 +828,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       'odometer_end',
       'is_ready_for_pickup',
       'payment_received',
+      'started_at',
+      'completed_at',
     ];
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in body) updates[key] = body[key];
+    }
+    if (body.started_at !== undefined) {
+      const sVal = body.started_at ? String(body.started_at).trim() : null;
+      updates.started_at = sVal ? (sVal.includes('T') ? sVal : `${sVal}T08:00:00.000Z`) : null;
+    }
+    if (body.completed_at !== undefined) {
+      const cVal = body.completed_at ? String(body.completed_at).trim() : null;
+      updates.completed_at = cVal ? (cVal.includes('T') ? cVal : `${cVal}T17:00:00.000Z`) : null;
+    }
+    if (updates.started_at !== undefined || updates.completed_at !== undefined) {
+      updates.admin_note = formatOrderDatesNote(updates.admin_note as string | undefined, {
+        started_at: updates.started_at as string | null,
+        completed_at: updates.completed_at as string | null,
+      });
     }
 
     if (updates.status === 'completed') {
@@ -893,12 +946,32 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .eq('direction', 'income');
     }
 
-    const { data, error } = await (supabase as any)
+    let data: any = null;
+    let error: any = null;
+
+    const resWithDates = await (supabase as any)
       .from('service_orders')
       .update(updates)
       .eq('id', id)
       .select('id, status, priority, admin_note, assigned_mechanic_id, lifecycle_status')
       .single();
+
+    if (resWithDates.error) {
+      const fallbackUpdates = { ...updates };
+      delete fallbackUpdates.started_at;
+      delete fallbackUpdates.completed_at;
+      const resFallback = await (supabase as any)
+        .from('service_orders')
+        .update(fallbackUpdates)
+        .eq('id', id)
+        .select('id, status, priority, admin_note, assigned_mechanic_id, lifecycle_status')
+        .single();
+      data = resFallback.data;
+      error = resFallback.error;
+    } else {
+      data = resWithDates.data;
+      error = resWithDates.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(data);

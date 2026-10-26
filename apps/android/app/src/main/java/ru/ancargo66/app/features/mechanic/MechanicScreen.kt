@@ -879,8 +879,14 @@ private fun MechanicOrderCard(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
+                        val dateText = remember(order.startedAt, order.completedAt, order.createdAt) {
+                            val s = order.startedAt?.take(10) ?: order.createdAt?.take(10)
+                            val c = order.completedAt?.take(10)
+                            if (!s.isNullOrBlank() && !c.isNullOrBlank() && s != c) "$s — $c"
+                            else formatIsoDateShort(order.startedAt ?: order.createdAt)
+                        }
                         Text(
-                            text = formatIsoDateShort(order.createdAt),
+                            text = dateText,
                             fontSize = 11.sp,
                             color = SberTextSecondary
                         )
@@ -1010,8 +1016,9 @@ private fun CreateMechanicOrderScreen(
     val scope = rememberCoroutineScope()
     val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
 
-    // 1. Дата
-    var orderDate by remember { mutableStateOf(todayStr) }
+    // 1. Даты начала и окончания
+    var startDate by remember { mutableStateOf(todayStr) }
+    var endDate by remember { mutableStateOf(todayStr) }
     // 2. Свой автомобиль или клиентский
     var machineType by remember { mutableStateOf("client") } // "own" | "client"
     // 3. Данные автомобиля
@@ -1092,7 +1099,9 @@ private fun CreateMechanicOrderScreen(
             isSaving = true
             val res = SaldaApiClient.createMechanicOrder(
                 mechanicId = user.id,
-                orderDate = orderDate.ifBlank { todayStr },
+                orderDate = startDate.ifBlank { todayStr },
+                startedAt = startDate.ifBlank { todayStr },
+                completedAt = endDate.ifBlank { todayStr },
                 machineType = machineType,
                 assetId = if (machineType == "own") selectedAssetId else null,
                 clientVehicleModel = if (machineType == "client") clientModel.trim() else null,
@@ -1220,20 +1229,54 @@ private fun CreateMechanicOrderScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "1. ДАТА ВЫПОЛНЕНИЯ РАБОТ",
+                            text = "1. ДАТЫ ВЫПОЛНЕНИЯ РАБОТ",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = SberTextSecondary
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = orderDate,
-                            onValueChange = { orderDate = it },
-                            placeholder = { Text("ГГГГ-ММ-ДД") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Начало",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SberTextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = startDate,
+                                    onValueChange = {
+                                        startDate = it
+                                        if (endDate < it) endDate = it
+                                    },
+                                    placeholder = { Text("ГГГГ-ММ-ДД") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Окончание",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SberTextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = endDate,
+                                    onValueChange = { endDate = it },
+                                    placeholder = { Text("ГГГГ-ММ-ДД") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
