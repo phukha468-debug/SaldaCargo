@@ -3557,989 +3557,6 @@ function getArchiveWeekDates(dateStr: string) {
   return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
 }
 
-function calcOrderCosts(o: TabOrder) {
-  const works = o.works ?? [];
-  const parts = o.parts ?? [];
-  const isExternal =
-    Boolean(o.admin_note && o.admin_note.includes('[Сторонний сервис')) ||
-    Boolean(o.problem_description && o.problem_description.includes('[Сторонний сервис'));
-
-  const partsCost = parts.reduce((s, p) => {
-    const q = p.quantity || 1;
-    const price = parseFloat(p.unit_price ?? '0') || 0;
-    return s + q * price;
-  }, 0);
-
-  const worksPriceSum = works.reduce((s, w) => s + (parseFloat(w.price_client ?? '0') || 0), 0);
-
-  let laborSalaryCost = 0;
-  if (isExternal) {
-    laborSalaryCost = worksPriceSum;
-  } else {
-    const directSalary =
-      (parseFloat(String(o.mechanic_pay ?? '0')) || 0) +
-      (parseFloat(String(o.second_mechanic_pay ?? '0')) || 0);
-    laborSalaryCost = directSalary > 0 ? directSalary : worksPriceSum * 0.5;
-  }
-
-  const totalCost = partsCost + laborSalaryCost;
-
-  return {
-    partsCost,
-    laborSalaryCost,
-    worksPriceSum,
-    totalCost,
-    isExternal,
-  };
-}
-
-interface VehicleStatGroup {
-  key: string;
-  isOwn: boolean;
-  assetId?: string;
-  name: string;
-  regNumber: string;
-  odometerCurrent?: number | null;
-  clientName?: string | null;
-  clientPhone?: string | null;
-  orders: TabOrder[];
-  repairsCount: number;
-  totalPartsCost: number;
-  totalLaborSalaryCost: number;
-  totalExpenses: number;
-  lastRepairDate: string;
-  mechanicNames: string[];
-}
-
-function GarageArchiveSection({
-  orders,
-  isLoading,
-  mechanics,
-  onSelectOrder,
-  period,
-  setPeriod,
-  date,
-  setDate,
-  month,
-  setMonth,
-}: {
-  orders: TabOrder[];
-  isLoading: boolean;
-  mechanics: Mechanic[];
-  onSelectOrder: (id: string) => void;
-  period: 'day' | 'week' | 'month' | 'all';
-  setPeriod: (p: 'day' | 'week' | 'month' | 'all') => void;
-  date: string;
-  setDate: (d: string) => void;
-  month: string;
-  setMonth: (m: string) => void;
-}) {
-  const today = todayStr();
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
-  const [filterMechanic, setFilterMechanic] = useState('');
-  const [sortBy, setSortBy] = useState<'cost_desc' | 'cost_asc' | 'repairs_desc' | 'name'>(
-    'cost_desc',
-  );
-  const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
-
-  const toggleExpand = (key: string) => {
-    setExpandedVehicles((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const expandAll = () => {
-    setExpandedVehicles(new Set(vehicleGroups.map((g) => g.key)));
-  };
-
-  const collapseAll = () => {
-    setExpandedVehicles(new Set());
-  };
-
-  // ── Date Navigation Shift Helper ──
-  const shiftDate = (amount: number) => {
-    if (period === 'day') {
-      const d = new Date(date + 'T12:00:00');
-      d.setDate(d.getDate() + amount);
-      const s = d.toISOString().slice(0, 10);
-      if (s <= today) setDate(s);
-      else setDate(today);
-    } else if (period === 'week') {
-      const d = new Date(date + 'T12:00:00');
-      d.setDate(d.getDate() + amount * 7);
-      const s = d.toISOString().slice(0, 10);
-      if (s <= today) setDate(s);
-      else setDate(today);
-    } else if (period === 'month') {
-      const parts = month.split('-').map(Number);
-      const y = parts[0] || new Date().getFullYear();
-      const m = parts[1] || new Date().getMonth() + 1;
-      const d = new Date(y, m - 1 + amount, 1);
-      const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const curM = today.slice(0, 7);
-      if (s <= curM) setMonth(s);
-      else setMonth(curM);
-    }
-  };
-
-  // Quick Month Buttons
-  const monthButtons = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - (5 - i));
-    return {
-      label: d.toLocaleDateString('ru-RU', { month: 'short' }),
-      year: d.getFullYear(),
-      month: d.getMonth(),
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-    };
-  });
-
-  // Filter orders by period & search & mechanic
-  const filteredOrders = useMemo(() => {
-    let result = orders;
-
-    // Period filter
-    if (period === 'day') {
-      result = result.filter((o) => o.created_at?.startsWith(date));
-    } else if (period === 'week') {
-      const { weekStart, weekEnd } = getArchiveWeekDates(date);
-      result = result.filter((o) => {
-        const d = o.created_at?.slice(0, 10);
-        return d && d >= weekStart && d <= weekEnd;
-      });
-    } else if (period === 'month') {
-      result = result.filter((o) => o.created_at?.startsWith(month));
-    }
-
-    // Search filter
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter((o) => {
-        const orderNum = String(o.order_number);
-        const shortName = o.asset?.short_name?.toLowerCase() ?? '';
-        const regNum = o.asset?.reg_number?.toLowerCase() ?? '';
-        const clientBrand = o.client_vehicle_brand?.toLowerCase() ?? '';
-        const clientModel =
-          (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model?.toLowerCase() ??
-          '';
-        const clientReg = o.client_vehicle_reg?.toLowerCase() ?? '';
-        const clientName = (o.client_name as string | null)?.toLowerCase() ?? '';
-        const desc = o.problem_description?.toLowerCase() ?? '';
-        const mechanicName = o.mechanic?.name?.toLowerCase() ?? '';
-        const worksMatch = (o.works ?? []).some((w) =>
-          (w.work_catalog?.name ?? w.custom_work_name ?? '').toLowerCase().includes(q),
-        );
-        const partsMatch = (o.parts ?? []).some((p) =>
-          (p.custom_part_name ?? p.part?.name ?? '').toLowerCase().includes(q),
-        );
-
-        return (
-          orderNum.includes(q) ||
-          shortName.includes(q) ||
-          regNum.includes(q) ||
-          clientBrand.includes(q) ||
-          clientModel.includes(q) ||
-          clientReg.includes(q) ||
-          clientName.includes(q) ||
-          desc.includes(q) ||
-          mechanicName.includes(q) ||
-          worksMatch ||
-          partsMatch
-        );
-      });
-    }
-
-    // Type filter
-    if (filterType !== 'all') {
-      result = result.filter((o) => o.machine_type === filterType);
-    }
-
-    // Mechanic filter
-    if (filterMechanic) {
-      result = result.filter((o) => o.mechanic?.id === filterMechanic);
-    }
-
-    return result;
-  }, [orders, period, date, month, search, filterType, filterMechanic]);
-
-  // Group by vehicle
-  const vehicleGroups = useMemo(() => {
-    const map = new Map<string, VehicleStatGroup>();
-
-    for (const o of filteredOrders) {
-      const isOwn = o.machine_type === 'own';
-      const key = isOwn
-        ? (o.asset?.id ?? 'own_unknown')
-        : `cl_${o.client_vehicle_reg || o.client_name || o.id}`;
-
-      if (!map.has(key)) {
-        const name = isOwn
-          ? (o.asset?.short_name ?? 'Свой автомобиль')
-          : [
-              o.client_vehicle_brand,
-              (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
-            ]
-              .filter(Boolean)
-              .join(' ') || 'Клиентский автомобиль';
-        const regNumber = isOwn ? (o.asset?.reg_number ?? '—') : (o.client_vehicle_reg ?? '—');
-        const odometerCurrent = isOwn ? o.asset?.odometer_current : null;
-
-        map.set(key, {
-          key,
-          isOwn,
-          assetId: o.asset?.id,
-          name,
-          regNumber,
-          odometerCurrent,
-          clientName: isOwn ? null : (o.client_name as string | null),
-          clientPhone: isOwn ? null : (o.client_phone as string | null),
-          orders: [],
-          repairsCount: 0,
-          totalPartsCost: 0,
-          totalLaborSalaryCost: 0,
-          totalExpenses: 0,
-          lastRepairDate: o.created_at,
-          mechanicNames: [],
-        });
-      }
-
-      const grp = map.get(key)!;
-      grp.orders.push(o);
-      grp.repairsCount++;
-
-      const { partsCost, laborSalaryCost, totalCost } = calcOrderCosts(o);
-      grp.totalPartsCost += partsCost;
-      grp.totalLaborSalaryCost += laborSalaryCost;
-      grp.totalExpenses += totalCost;
-
-      if (new Date(o.created_at) > new Date(grp.lastRepairDate)) {
-        grp.lastRepairDate = o.created_at;
-      }
-
-      if (o.mechanic?.name && !grp.mechanicNames.includes(o.mechanic.name)) {
-        grp.mechanicNames.push(o.mechanic.name);
-      }
-    }
-
-    const list = Array.from(map.values());
-
-    // Sorting
-    list.sort((a, b) => {
-      if (sortBy === 'cost_desc') return b.totalExpenses - a.totalExpenses;
-      if (sortBy === 'cost_asc') return a.totalExpenses - b.totalExpenses;
-      if (sortBy === 'repairs_desc') return b.repairsCount - a.repairsCount;
-      if (sortBy === 'name') return a.name.localeCompare(b.name, 'ru');
-      return 0;
-    });
-
-    return list;
-  }, [filteredOrders, sortBy]);
-
-  // Summary Fleet Metrics for Selected Period
-  const ownGroups = useMemo(() => vehicleGroups.filter((g) => g.isOwn), [vehicleGroups]);
-  const clientGroups = useMemo(() => vehicleGroups.filter((g) => !g.isOwn), [vehicleGroups]);
-
-  const summary = useMemo(() => {
-    // If user filtered only client, summarize client, otherwise summarize own fleet
-    const targetGroups =
-      filterType === 'client' ? clientGroups : filterType === 'own' ? ownGroups : vehicleGroups;
-    const totalOrders = targetGroups.reduce((s, g) => s + g.repairsCount, 0);
-    const totalVehicles = targetGroups.length;
-    const partsCost = targetGroups.reduce((s, g) => s + g.totalPartsCost, 0);
-    const salaryCost = targetGroups.reduce((s, g) => s + g.totalLaborSalaryCost, 0);
-    const totalExpenses = partsCost + salaryCost;
-    const partsPct = totalExpenses > 0 ? Math.round((partsCost / totalExpenses) * 100) : 0;
-    const salaryPct = totalExpenses > 0 ? Math.round((salaryCost / totalExpenses) * 100) : 0;
-
-    return {
-      totalOrders,
-      totalVehicles,
-      partsCost,
-      salaryCost,
-      totalExpenses,
-      partsPct,
-      salaryPct,
-    };
-  }, [vehicleGroups, ownGroups, clientGroups, filterType]);
-
-  const isToday =
-    period === 'day' ? date === today : period === 'month' ? month === today.slice(0, 7) : false;
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* ── Review-Style Date Navigation Header ── */}
-      <div className="bg-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col border border-slate-700">
-        {/* Period Switcher Row */}
-        <div className="flex border-b border-slate-700 bg-slate-800/50 p-2">
-          <div className="flex bg-slate-700 p-1 rounded-lg mx-auto w-full max-w-lg text-xs font-bold uppercase tracking-wider">
-            <button
-              onClick={() => setPeriod('day')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md transition-colors',
-                period === 'day'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              День
-            </button>
-            <button
-              onClick={() => setPeriod('week')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md transition-colors',
-                period === 'week'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              Неделя
-            </button>
-            <button
-              onClick={() => setPeriod('month')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md transition-colors',
-                period === 'month'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              Месяц
-            </button>
-            <button
-              onClick={() => setPeriod('all')}
-              className={cn(
-                'flex-1 py-1.5 rounded-md transition-colors',
-                period === 'all'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              За всё время
-            </button>
-          </div>
-        </div>
-
-        {/* Main Date Display & Shift Arrows */}
-        <div className="flex items-stretch h-14">
-          <button
-            onClick={() => shiftDate(-1)}
-            disabled={period === 'all'}
-            className="flex items-center justify-center w-28 sm:w-36 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-r border-sky-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
-            aria-label="Назад"
-          >
-            <span className="text-2xl font-black group-hover:-translate-x-1 transition-transform select-none">
-              ←
-            </span>
-          </button>
-
-          <label className="flex-1 flex items-center justify-center gap-2.5 px-4 cursor-pointer">
-            <span className="material-symbols-outlined text-sky-400 text-[22px]">
-              calendar_today
-            </span>
-            <span className="text-base sm:text-lg font-black text-white whitespace-nowrap">
-              {period === 'day' &&
-                new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              {period === 'week' &&
-                (() => {
-                  const { weekStart, weekEnd } = getArchiveWeekDates(date);
-                  const ws = new Date(weekStart + 'T12:00:00');
-                  const we = new Date(weekEnd + 'T12:00:00');
-                  return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' })}`;
-                })()}
-              {period === 'month' &&
-                new Date(month + '-01T12:00:00').toLocaleDateString('ru-RU', {
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              {period === 'all' && 'Вся история ремонтов автопарка'}
-            </span>
-
-            {period === 'day' && (
-              <span className="text-xs font-medium text-slate-400 whitespace-nowrap hidden md:inline">
-                {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', { weekday: 'long' })}
-              </span>
-            )}
-
-            {!isToday && period !== 'all' && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDate(today);
-                  setMonth(today.slice(0, 7));
-                }}
-                className="text-[10px] font-bold text-sky-300 bg-sky-500/20 border border-sky-500/40 hover:bg-sky-500 hover:text-white transition-colors px-2 py-0.5 rounded-full whitespace-nowrap"
-              >
-                → сегодня
-              </button>
-            )}
-          </label>
-
-          <button
-            onClick={() => shiftDate(1)}
-            disabled={period === 'all' || isToday}
-            className="flex items-center justify-center w-28 sm:w-36 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition-colors text-white shrink-0 group border-l border-sky-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
-            aria-label="Вперёд"
-          >
-            <span className="text-2xl font-black group-hover:translate-x-1 transition-transform select-none">
-              →
-            </span>
-          </button>
-        </div>
-
-        {/* Quick Month Bar */}
-        {period !== 'all' && (
-          <div className="flex border-t border-slate-700 overflow-x-auto">
-            {monthButtons.map((m) => {
-              const active = period === 'month' && month === m.key;
-              return (
-                <button
-                  key={m.key}
-                  onClick={() => {
-                    setMonth(m.key);
-                    setPeriod('month');
-                  }}
-                  className={cn(
-                    'flex-1 py-2 px-2.5 min-w-[70px] text-[11px] font-bold uppercase tracking-wider transition-all border-r border-slate-700 last:border-r-0 whitespace-nowrap',
-                    active
-                      ? 'bg-sky-500 text-white'
-                      : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200',
-                  )}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Summary 4 KPI Cards (Total Fleet Maintenance) ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Ремонты */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Всего ремонтов
-            </span>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              {summary.totalOrders} наряд
-              {summary.totalOrders === 1
-                ? ''
-                : summary.totalOrders >= 2 && summary.totalOrders <= 4
-                  ? 'а'
-                  : 'ов'}
-            </div>
-            <span className="text-[11px] text-sky-600 font-bold">
-              по {summary.totalVehicles} автомобил{summary.totalVehicles === 1 ? 'ю' : 'ям'}
-            </span>
-          </div>
-          <div className="w-11 h-11 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center font-black shrink-0">
-            <span className="material-symbols-outlined text-[24px]">car_repair</span>
-          </div>
-        </div>
-
-        {/* 2. Запчасти */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Потрачено на запчасти
-            </span>
-            <div className="text-2xl font-black text-rose-600 mt-1">
-              <Money amount={summary.partsCost.toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-rose-500 font-bold">
-              {summary.partsPct}% бюджета ТО
-            </span>
-          </div>
-          <div className="w-11 h-11 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center font-black shrink-0">
-            <span className="material-symbols-outlined text-[24px]">construction</span>
-          </div>
-        </div>
-
-        {/* 3. Зарплата водителя / слесаря */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              ЗП водителя / слесаря
-            </span>
-            <div className="text-2xl font-black text-amber-600 mt-1">
-              <Money amount={summary.salaryCost.toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-amber-600 font-bold">
-              {summary.salaryPct}% бюджета ТО
-            </span>
-          </div>
-          <div className="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center font-black shrink-0">
-            <span className="material-symbols-outlined text-[24px]">badge</span>
-          </div>
-        </div>
-
-        {/* 4. Итоговый бюджет ТО */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 shadow-md flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Итоговые расходы
-            </span>
-            <div className="text-2xl font-black text-emerald-400 mt-1">
-              <Money amount={summary.totalExpenses.toFixed(2)} />
-            </div>
-            <span className="text-[11px] text-emerald-300 font-bold">Запчасти + ЗП/Работы</span>
-          </div>
-          <div className="w-11 h-11 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center font-black shrink-0">
-            <span className="material-symbols-outlined text-[24px]">payments</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Filter & Search Control Bar ── */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[240px]">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-            search
-          </span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по госномеру, авто, детали, неисправности, слесарю..."
-            className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm font-bold"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Type Toggle: All / Own / Client */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0">
-          {(
-            [
-              ['all', 'Все'],
-              ['own', 'Свои'],
-              ['client', 'Клиент'],
-            ] as const
-          ).map(([v, l]) => (
-            <button
-              key={v}
-              onClick={() => setFilterType(v)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg transition-colors',
-                filterType === v
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800',
-              )}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {/* Mechanic Selector */}
-        <select
-          value={filterMechanic}
-          onChange={(e) => setFilterMechanic(e.target.value)}
-          className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0 text-slate-700"
-        >
-          <option value="">Все механики</option>
-          {mechanics.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Sorting Dropdown */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs font-semibold text-slate-400">Сортировка:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
-          >
-            <option value="cost_desc">По сумме расходов (убыв)</option>
-            <option value="cost_asc">По сумме расходов (возр)</option>
-            <option value="repairs_desc">По кол-ву ремонтов</option>
-            <option value="name">По названию машины</option>
-          </select>
-        </div>
-
-        {/* Expand / Collapse All */}
-        {vehicleGroups.length > 0 && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={expandAll}
-              className="text-[11px] font-bold text-slate-500 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
-            >
-              Развернуть все
-            </button>
-            <span className="text-slate-300">·</span>
-            <button
-              onClick={collapseAll}
-              className="text-[11px] font-bold text-slate-500 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
-            >
-              Свернуть
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Vehicle Cards List (Option 1: Review Flow) ── */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
-          ))}
-        </div>
-      ) : vehicleGroups.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-xs">
-          <p className="text-5xl mb-3">📋</p>
-          <p className="font-bold text-slate-700 text-base">
-            Нет завершённых заказ-нарядов за выбранный период
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            Попробуйте изменить период на «Месяц» или «За всё время»
-          </p>
-          {(search || filterType !== 'all' || filterMechanic) && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setFilterType('all');
-                setFilterMechanic('');
-              }}
-              className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-            >
-              Сбросить фильтры поиска
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {vehicleGroups.map((vg) => {
-            const isExpanded = expandedVehicles.has(vg.key);
-            const accentBorder =
-              vg.totalExpenses > 50000
-                ? 'border-l-sky-500'
-                : vg.totalExpenses > 20000
-                  ? 'border-l-emerald-500'
-                  : 'border-l-amber-500';
-
-            return (
-              <div
-                key={vg.key}
-                className={cn(
-                  'bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all duration-200 border-l-4 hover:shadow-md',
-                  accentBorder,
-                )}
-              >
-                {/* ── Collapsed / Summary Row in Review Style ── */}
-                <div
-                  onClick={() => toggleExpand(vg.key)}
-                  className="p-4 cursor-pointer hover:bg-slate-50/60 transition-colors select-none flex flex-wrap items-center justify-between gap-4"
-                >
-                  {/* Left: Vehicle Identity */}
-                  <div className="flex items-center gap-3 min-w-[260px] flex-1">
-                    <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-black shrink-0">
-                      <span className="material-symbols-outlined text-[26px]">
-                        {vg.name.toLowerCase().includes('самосвал')
-                          ? 'dump_truck'
-                          : 'local_shipping'}
-                      </span>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-base font-black text-slate-900 truncate">
-                          {vg.name}
-                        </span>
-                        {vg.regNumber && vg.regNumber !== '—' && (
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-xs rounded border border-slate-200">
-                            {vg.regNumber}
-                          </span>
-                        )}
-                        {vg.odometerCurrent ? (
-                          <span className="px-2 py-0.5 bg-sky-50 text-sky-700 font-bold text-[10px] rounded-full border border-sky-200">
-                            {vg.odometerCurrent.toLocaleString('ru-RU')} км
-                          </span>
-                        ) : null}
-                        {!vg.isOwn && (
-                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded border border-amber-200">
-                            Клиент: {vg.clientName || '—'}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-2.5 flex-wrap">
-                        <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded font-black text-[11px]">
-                          {vg.repairsCount} ремонт
-                          {vg.repairsCount === 1
-                            ? ''
-                            : vg.repairsCount >= 2 && vg.repairsCount <= 4
-                              ? 'а'
-                              : 'ов'}
-                        </span>
-                        <span>·</span>
-                        <span className="text-slate-400">
-                          Посл. заезд:{' '}
-                          {new Date(vg.lastRepairDate).toLocaleDateString('ru-RU', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        {vg.mechanicNames.length > 0 && (
-                          <>
-                            <span>·</span>
-                            <span className="text-slate-500">
-                              Слесари: {vg.mechanicNames.join(', ')}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right: Review-Style Cost Formula [Запчасти + ЗП = Итого] */}
-                  <div className="flex items-center gap-2 sm:gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/80">
-                    {/* Запчасти */}
-                    <div className="text-center min-w-[90px]">
-                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
-                        Запчасти
-                      </span>
-                      <span className="text-sm font-black text-rose-600">
-                        <Money amount={vg.totalPartsCost.toFixed(2)} />
-                      </span>
-                    </div>
-
-                    <span className="text-slate-300 font-bold text-sm">+</span>
-
-                    {/* ЗП водителя / слесаря */}
-                    <div className="text-center min-w-[100px]">
-                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
-                        ЗП / Работы
-                      </span>
-                      <span className="text-sm font-black text-amber-600">
-                        <Money amount={vg.totalLaborSalaryCost.toFixed(2)} />
-                      </span>
-                    </div>
-
-                    <span className="text-slate-300 font-bold text-sm">=</span>
-
-                    {/* Итого */}
-                    <div className="text-center min-w-[100px] pl-1">
-                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
-                        Всего затрат
-                      </span>
-                      <span className="text-base font-black text-slate-900">
-                        <Money amount={vg.totalExpenses.toFixed(2)} />
-                      </span>
-                    </div>
-
-                    {/* Expand Arrow */}
-                    <div className="pl-1">
-                      <span
-                        className={cn(
-                          'material-symbols-outlined text-slate-400 text-[22px] transition-transform duration-300',
-                          isExpanded ? 'rotate-180 text-sky-600' : '',
-                        )}
-                      >
-                        expand_circle_down
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Expanded Content: Service Orders Breakdown for this vehicle ── */}
-                {isExpanded && (
-                  <div className="border-t border-slate-200 bg-slate-50/40 p-4 space-y-3 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-500">
-                        Заказ-наряды по машине «{vg.name}» ({vg.orders.length})
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        Нажмите на наряд для просмотра полного акта
-                      </span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {vg.orders.map((o) => {
-                        const { partsCost, laborSalaryCost, totalCost } = calcOrderCosts(o);
-                        const works = o.works ?? [];
-                        const parts = o.parts ?? [];
-
-                        return (
-                          <div
-                            key={o.id}
-                            onClick={() => onSelectOrder(o.id)}
-                            className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs hover:border-sky-300 hover:shadow-sm transition-all cursor-pointer space-y-3"
-                          >
-                            {/* Order Header */}
-                            <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="px-2.5 py-0.5 bg-slate-900 text-white font-mono font-bold text-xs rounded">
-                                  #НЗ-{o.order_number}
-                                </span>
-                                <span className="text-xs font-semibold text-slate-500">
-                                  {new Date(o.created_at).toLocaleDateString('ru-RU', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                  })}
-                                </span>
-                                {o.odometer_start ? (
-                                  <span className="text-xs text-slate-400 font-mono">
-                                    · {o.odometer_start.toLocaleString('ru-RU')} км
-                                  </span>
-                                ) : null}
-                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
-                                  Завершён
-                                </span>
-                              </div>
-
-                              {/* Costs Formula on Order */}
-                              <div className="flex items-center gap-3 text-xs">
-                                <div>
-                                  <span className="text-slate-400 mr-1">Запчасти:</span>
-                                  <strong className="text-rose-600 font-black">
-                                    <Money amount={partsCost.toFixed(2)} />
-                                  </strong>
-                                </div>
-                                <span className="text-slate-300">+</span>
-                                <div>
-                                  <span className="text-slate-400 mr-1">ЗП:</span>
-                                  <strong className="text-amber-600 font-black">
-                                    <Money amount={laborSalaryCost.toFixed(2)} />
-                                  </strong>
-                                </div>
-                                <span className="text-slate-300">=</span>
-                                <div className="bg-slate-100 px-2 py-0.5 rounded font-black text-slate-900">
-                                  <Money amount={totalCost.toFixed(2)} />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Problem description if present */}
-                            {o.problem_description && (
-                              <div className="text-xs text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-                                <span className="font-bold text-slate-400 uppercase text-[10px] mr-1.5">
-                                  Причина / Неисправность:
-                                </span>
-                                <span className="font-semibold">{o.problem_description}</span>
-                              </div>
-                            )}
-
-                            {/* 2-Column Details: Works & Parts */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                              {/* Works List */}
-                              <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-100 space-y-1.5">
-                                <span className="font-extrabold text-slate-500 uppercase text-[10px] block">
-                                  Выполненные работы ({works.length}):
-                                </span>
-                                {works.length === 0 ? (
-                                  <p className="text-slate-400 italic">Работы не указаны</p>
-                                ) : (
-                                  <ul className="space-y-1 text-slate-700">
-                                    {works.map((w, idx) => (
-                                      <li
-                                        key={idx}
-                                        className="flex justify-between items-center gap-2"
-                                      >
-                                        <span className="truncate">
-                                          • {w.work_catalog?.name ?? w.custom_work_name ?? 'Работа'}
-                                          {w.norm_minutes
-                                            ? ` (${(w.norm_minutes / 60).toFixed(1)} нч)`
-                                            : ''}
-                                        </span>
-                                        <span className="font-semibold text-slate-600 shrink-0">
-                                          {moneyVal(w.price_client) > 0 ? (
-                                            <Money amount={String(w.price_client)} />
-                                          ) : (
-                                            '—'
-                                          )}
-                                        </span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-
-                              {/* Parts List */}
-                              <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-100 space-y-1.5">
-                                <span className="font-extrabold text-slate-500 uppercase text-[10px] block">
-                                  Установленные запчасти ({parts.length}):
-                                </span>
-                                {parts.length === 0 ? (
-                                  <p className="text-slate-400 italic">
-                                    Запчасти не использовались
-                                  </p>
-                                ) : (
-                                  <ul className="space-y-1 text-slate-700">
-                                    {parts.map((p, idx) => {
-                                      const pName = p.custom_part_name ?? p.part?.name ?? 'Деталь';
-                                      const pUnit = p.unit ?? p.part?.unit ?? 'шт';
-                                      const pCost =
-                                        (p.quantity || 1) * (parseFloat(p.unit_price ?? '0') || 0);
-                                      return (
-                                        <li
-                                          key={idx}
-                                          className="flex justify-between items-center gap-2"
-                                        >
-                                          <span className="truncate">
-                                            • {pName} ({p.quantity} {pUnit})
-                                          </span>
-                                          <span className="font-semibold text-slate-600 shrink-0">
-                                            {pCost > 0 ? <Money amount={pCost.toFixed(2)} /> : '—'}
-                                          </span>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Footer info line */}
-                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                              <div>
-                                {o.mechanic?.name && (
-                                  <span>
-                                    Слесарь:{' '}
-                                    <strong className="text-slate-600">{o.mechanic.name}</strong>
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-sky-600 font-bold hover:underline flex items-center gap-1">
-                                Открыть наряд #{o.order_number} ↗
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Order card (компактный однострочный вид) ─────────────────────────────────
 function OrderCard({ o, onSelect }: { o: TabOrder; onSelect: (id: string) => void }) {
   const qc = useQueryClient();
@@ -5769,90 +4786,163 @@ function ClientsSection() {
   });
 
   return (
-    <div className="flex h-full gap-0 min-h-0">
-      {/* ── Левая панель: список клиентов ── */}
-      <div className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-white">
-        <div className="p-4 border-b border-slate-100">
-          <div className="flex items-center gap-2 mb-3">
-            <h2 className="text-base font-bold text-slate-900 flex-1">Клиенты СТО</h2>
-            <button
-              onClick={() => setShowCreateClient(true)}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
-            >
-              + Клиент
-            </button>
-            <button
-              onClick={() => setShowCreateVehicle(true)}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700"
-            >
-              + Авто
-            </button>
-          </div>
+    <div className="space-y-3">
+      {/* Шапка раздела клиентов и поиск */}
+      <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-2 flex-1 max-w-md">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по имени, телефону..."
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            placeholder="🔍 Поиск клиента по названию, телефону..."
+            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium focus:bg-white focus:outline-hidden focus:border-sky-400"
           />
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 text-sm text-slate-400">Загрузка...</div>
-          ) : clientsError ? (
-            <div className="p-4 text-sm text-red-500">
-              Ошибка: {(clientsError as Error).message}
-            </div>
-          ) : clients.length === 0 ? (
-            <div className="p-4 text-sm text-slate-400">
-              {search ? 'Ничего не найдено' : 'Клиентов пока нет'}
-            </div>
-          ) : (
-            clients.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedId(c.id)}
-                className={cn(
-                  'w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors',
-                  selectedId === c.id && 'bg-blue-50 border-l-2 border-l-blue-500',
-                )}
-              >
-                <div className="font-semibold text-sm text-slate-900">{c.name}</div>
-                {c.phone && <div className="text-xs text-slate-500 mt-0.5">{c.phone}</div>}
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs text-slate-400">
-                    {c.vehicles_count} авто · {c.orders_count} нарядов
-                  </span>
-                  {parseFloat(c.total_revenue) > 0 && (
-                    <span className="text-xs font-semibold text-emerald-700">
-                      {parseFloat(c.total_revenue).toLocaleString('ru-RU')} ₽
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="text-xs text-slate-400 hover:text-slate-600"
+            >
+              ✕
+            </button>
           )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCreateClient(true)}
+            className="text-xs font-bold px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>➕</span>
+            <span>Новый клиент</span>
+          </button>
+          <button
+            onClick={() => setShowCreateVehicle(true)}
+            className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>🚗</span>
+            <span>Добавить авто</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Правая панель: карточка клиента ── */}
-      <div className="flex-1 overflow-y-auto bg-slate-50">
-        {!selectedId ? (
-          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-            Выберите клиента из списка
+      {/* Список клиентов в виде красивых строчных карточек (как заказ-наряды) */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-14 bg-slate-100 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : clientsError ? (
+        <div className="p-8 text-center text-rose-500 text-xs font-bold bg-white rounded-2xl border border-rose-200">
+          Ошибка: {(clientsError as Error).message}
+        </div>
+      ) : clients.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+          <p className="text-4xl mb-2">👥</p>
+          <p className="font-bold text-slate-600">Клиентов СТО пока нет</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Добавляйте сторонних клиентов для учёта коммерческих ремонтов и расширения базы
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {clients.map((c) => (
+            <div
+              key={c.id}
+              onClick={() => setSelectedId(c.id)}
+              className="bg-white border border-slate-200 hover:border-indigo-300 rounded-xl px-4 py-2.5 cursor-pointer hover:shadow-xs transition-all flex items-center justify-between gap-3 group"
+            >
+              {/* Левая часть: иконка, имя, телефон, количество авто и нарядов */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200/70 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  🏢
+                </div>
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="font-bold text-sm text-slate-900 truncate">{c.name}</span>
+                  {c.phone && (
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">
+                      📞 {c.phone}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200/60">
+                    🚗 {c.vehicles_count} {c.vehicles_count === 1 ? 'авто' : 'авто'}
+                  </span>
+                  <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
+                    📋 {c.orders_count} нарядов
+                  </span>
+                </div>
+              </div>
+
+              {/* Правая часть: выручка и кнопка шестеренки */}
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                    Выручка
+                  </span>
+                  <span className="font-black text-sm text-emerald-700">
+                    {parseFloat(c.total_revenue || '0') > 0
+                      ? `${parseFloat(c.total_revenue).toLocaleString('ru-RU')} ₽`
+                      : '0 ₽'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedId(c.id);
+                  }}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer"
+                  title="Открыть карточку и настройки"
+                >
+                  ⚙️
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Модальное окно 100% информации о клиенте (с редактированием по шестерёнке) ── */}
+      {selectedId && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedId(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-indigo-50/60">
+              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                <span>🏢</span>
+                <span>Карточка клиента СТО</span>
+              </h3>
+              <button
+                onClick={() => setSelectedId(null)}
+                className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1">
+              {detailLoading ? (
+                <div className="p-12 text-center text-slate-400 text-sm font-semibold">
+                  Загрузка полной информации о клиенте...
+                </div>
+              ) : detail ? (
+                <StoClientDetailView
+                  detail={detail}
+                  onUpdate={() => {
+                    qc.invalidateQueries({ queryKey: ['sto-client-detail', selectedId] });
+                    qc.invalidateQueries({ queryKey: ['sto-clients'] });
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
-        ) : detailLoading ? (
-          <div className="p-8 text-slate-400 text-sm">Загрузка...</div>
-        ) : detail ? (
-          <StoClientDetailView
-            detail={detail}
-            onUpdate={() => {
-              qc.invalidateQueries({ queryKey: ['sto-client-detail', selectedId] });
-              qc.invalidateQueries({ queryKey: ['sto-clients'] });
-            }}
-          />
-        ) : null}
-      </div>
+        </div>
+      )}
 
       {showCreateClient && (
         <CreateClientModal
@@ -7184,24 +6274,166 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
 
 // ═══════════════════════════ MAIN PAGE ═══════════════════════════════════════
 
+// ── Date & Period Navigation (Clean Sky/Emerald Theme) ───────────────────────
+function DatePeriodNav({
+  period,
+  setPeriod,
+  date,
+  setDate,
+}: {
+  period: 'all' | 'day' | 'week' | 'month';
+  setPeriod: (p: 'all' | 'day' | 'week' | 'month') => void;
+  date: string;
+  setDate: (d: string) => void;
+}) {
+  const today = todayStr();
+
+  const shift = (amount: number) => {
+    const d = new Date(date + 'T12:00:00');
+    if (period === 'day') {
+      d.setDate(d.getDate() + amount);
+    } else if (period === 'week') {
+      d.setDate(d.getDate() + amount * 7);
+    } else if (period === 'month') {
+      d.setMonth(d.getMonth() + amount);
+    }
+    const s = d.toISOString().slice(0, 10);
+    setDate(s <= today ? s : today);
+  };
+
+  const getWeekRangeLabel = (dateStr: string) => {
+    const { weekStart, weekEnd } = getArchiveWeekDates(dateStr);
+    const ws = new Date(weekStart + 'T12:00:00');
+    const we = new Date(weekEnd + 'T12:00:00');
+    return `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`;
+  };
+
+  const getMonthLabel = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+  };
+
+  const getDayLabel = (dateStr: string) => {
+    if (dateStr === today) return 'Сегодня';
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200/80 rounded-2xl p-2.5 gap-2 shadow-2xs">
+      {/* Кнопки переключения периода */}
+      <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-bold">
+        <button
+          type="button"
+          onClick={() => setPeriod('all')}
+          className={cn(
+            'px-3 py-1 rounded-lg transition-all cursor-pointer',
+            period === 'all'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900',
+          )}
+        >
+          Все время
+        </button>
+        <button
+          type="button"
+          onClick={() => setPeriod('day')}
+          className={cn(
+            'px-3 py-1 rounded-lg transition-all cursor-pointer',
+            period === 'day'
+              ? 'bg-white text-sky-700 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900',
+          )}
+        >
+          День
+        </button>
+        <button
+          type="button"
+          onClick={() => setPeriod('week')}
+          className={cn(
+            'px-3 py-1 rounded-lg transition-all cursor-pointer',
+            period === 'week'
+              ? 'bg-white text-sky-700 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900',
+          )}
+        >
+          Неделя
+        </button>
+        <button
+          type="button"
+          onClick={() => setPeriod('month')}
+          className={cn(
+            'px-3 py-1 rounded-lg transition-all cursor-pointer',
+            period === 'month'
+              ? 'bg-white text-sky-700 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900',
+          )}
+        >
+          Месяц
+        </button>
+      </div>
+
+      {/* Селектор даты для периода != 'all' */}
+      {period !== 'all' && (
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => shift(-1)}
+            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer"
+            title="Предыдущий период"
+          >
+            ←
+          </button>
+
+          <span className="font-bold text-slate-800 min-w-[130px] text-center capitalize">
+            {period === 'day' && getDayLabel(date)}
+            {period === 'week' && getWeekRangeLabel(date)}
+            {period === 'month' && getMonthLabel(date)}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => shift(1)}
+            disabled={date >= today}
+            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Следующий период"
+          >
+            →
+          </button>
+
+          {date !== today && (
+            <button
+              type="button"
+              onClick={() => setDate(today)}
+              className="text-[11px] font-bold text-sky-600 hover:text-sky-800 bg-sky-50 px-2 py-1 rounded-lg border border-sky-200 transition-colors cursor-pointer ml-1"
+            >
+              Сегодня
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GaragePage() {
   const searchParams = useSearchParams();
   const orderFromQuery =
     searchParams.get('order') || searchParams.get('order_id') || searchParams.get('id');
 
+  // 3 основные кнопки: 1. В работе, 2. Ждут оплаты, 3. Архив + Дополнительные вкладки
   const [activeTab, setActiveTab] = useState<
-    'active' | 'pending_payment' | 'warehouse' | 'clients' | 'maintenance' | 'archive'
+    'active' | 'pending_payment' | 'archive' | 'warehouse' | 'clients' | 'maintenance'
   >('active');
   const [showCreate, setShowCreate] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(orderFromQuery || null);
 
-  // Filters for Active & Pending
+  // Фильтры и навигация по дням, неделям, месяцам
+  const [period, setPeriod] = useState<'all' | 'day' | 'week' | 'month'>('all');
+  const [periodDate, setPeriodDate] = useState(todayStr());
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
-  const [archivePeriod, setArchivePeriod] = useState<'day' | 'week' | 'month' | 'all'>('month');
-  const [archiveDate, setArchiveDate] = useState(todayStr());
-  const [archiveMonth, setArchiveMonth] = useState(todayStr().slice(0, 7));
 
   useEffect(() => {
     if (orderFromQuery) {
@@ -7220,22 +6452,6 @@ export default function GaragePage() {
         .then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 30000,
     refetchInterval: 60000,
-  });
-
-  const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
-    queryKey: ['garage-orders-history', archivePeriod, archiveDate, archiveMonth],
-    queryFn: () => {
-      const p = new URLSearchParams();
-      p.set('period', archivePeriod);
-      if (archivePeriod === 'day') p.set('date', archiveDate);
-      if (archivePeriod === 'week') p.set('week_date', archiveDate);
-      if (archivePeriod === 'month') p.set('month', archiveMonth);
-      return fetch(`/api/garage/orders/history?${p.toString()}`)
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : []));
-    },
-    staleTime: 60000,
-    enabled: activeTab === 'archive',
   });
 
   const { data: assets = [] } = useQuery<Asset[]>({
@@ -7271,37 +6487,75 @@ export default function GaragePage() {
     staleTime: 60000,
   });
 
-  // Active pool: status in ('created', 'in_progress') or (completed & draft)
-  const activeOrders = useMemo(
-    () =>
-      allOrders.filter(
-        (o) =>
-          o.lifecycle_status !== 'cancelled' &&
-          o.status !== 'cancelled' &&
-          !(o.lifecycle_status === 'approved' && o.status === 'completed'),
-      ),
-    [allOrders],
-  );
+  // 1. В РАБОТЕ: ТОЛЬКО ТЕ МАШИНЫ, ПО КОТОРЫМ ЕЩЕ БУДУТ ПРОХОДИТЬ РАБОТЫ (НЕТ ЗАКРЫТЫХ!)
+  const activeOrders = useMemo(() => {
+    return allOrders.filter((o) => {
+      const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
+      if (isCancelled) return false;
+      // Если наряд закрыт или подтверждён — он не в работе!
+      if (o.status === 'completed') return false;
+      if (o.lifecycle_status === 'approved') return false;
+      return o.status === 'in_progress' || o.status === 'created' || o.lifecycle_status === 'draft';
+    });
+  }, [allOrders]);
 
-  // Pending payment pool: client vehicle + approved + not payment_received
-  const pendingPaymentOrders = useMemo(
-    () =>
-      allOrders.filter(
-        (o) =>
-          o.lifecycle_status === 'approved' && o.machine_type === 'client' && !o.payment_received,
-      ),
-    [allOrders],
-  );
+  // 2. ЖДУТ ОПЛАТЫ: МАШИНЫ КЛИЕНТОВ, РАБОТЫ ПО КОТОРЫМ ЗАКОНЧЕНЫ, НО НЕТ ОПЛАТЫ
+  const pendingPaymentOrders = useMemo(() => {
+    return allOrders.filter((o) => {
+      const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
+      if (isCancelled) return false;
+      return (
+        o.machine_type === 'client' &&
+        !o.payment_received &&
+        (o.status === 'completed' || o.lifecycle_status === 'approved')
+      );
+    });
+  }, [allOrders]);
 
-  // Filtered active
-  const filteredActiveOrders = useMemo(() => {
-    let result = activeOrders;
+  // 3. АРХИВ: ОПЛАЧЕННЫЕ КЛИЕНТСКИЕ МАШИНЫ И НАШИ МАШИНЫ, ПО КОТОРЫМ ЗАКОНЧЕНА РАБОТА
+  const archiveOrders = useMemo(() => {
+    return allOrders.filter((o) => {
+      const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
+      if (isCancelled) return true;
+      if (o.machine_type === 'own') {
+        return o.status === 'completed' || o.lifecycle_status === 'approved';
+      }
+      if (o.machine_type === 'client') {
+        return (
+          o.payment_received === true || (o.lifecycle_status === 'approved' && o.payment_received)
+        );
+      }
+      return false;
+    });
+  }, [allOrders]);
+
+  // Фильтрация текущего пула по типу авто, поиску и выбранному периоду
+  const filterByDateAndSearch = (list: TabOrder[]) => {
+    let res = list;
+
+    // Фильтр по принадлежности
     if (filterType !== 'all') {
-      result = result.filter((o) => o.machine_type === filterType);
+      res = res.filter((o) => o.machine_type === filterType);
     }
+
+    // Фильтр по дате (день, неделя, месяц)
+    if (period === 'day') {
+      res = res.filter((o) => o.created_at?.startsWith(periodDate));
+    } else if (period === 'week') {
+      const { weekStart, weekEnd } = getArchiveWeekDates(periodDate);
+      res = res.filter((o) => {
+        const d = o.created_at?.slice(0, 10);
+        return d && d >= weekStart && d <= weekEnd;
+      });
+    } else if (period === 'month') {
+      const mPrefix = periodDate.slice(0, 7);
+      res = res.filter((o) => o.created_at?.startsWith(mPrefix));
+    }
+
+    // Текстовый поиск
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(
+      res = res.filter(
         (o) =>
           o.order_number?.toString().includes(q) ||
           o.asset?.short_name?.toLowerCase().includes(q) ||
@@ -7312,12 +6566,27 @@ export default function GaragePage() {
           o.problem_description?.toLowerCase().includes(q),
       );
     }
-    return result;
-  }, [activeOrders, filterType, search]);
+
+    return res;
+  };
+
+  const filteredActiveOrders = useMemo(
+    () => filterByDateAndSearch(activeOrders),
+    [activeOrders, filterType, period, periodDate, search],
+  );
+  const filteredPendingOrders = useMemo(
+    () => filterByDateAndSearch(pendingPaymentOrders),
+    [pendingPaymentOrders, filterType, period, periodDate, search],
+  );
+  const filteredArchiveOrders = useMemo(
+    () => filterByDateAndSearch(archiveOrders),
+    [archiveOrders, filterType, period, periodDate, search],
+  );
 
   // Counts for badges & summary
   const inWorkCount = activeOrders.length;
   const pendingPaymentCount = pendingPaymentOrders.length;
+  const archiveCount = archiveOrders.length;
   const maintenanceAlertsCount = maintenanceItems.filter(
     (item) => item.alert_status === 'overdue' || item.alert_status === 'soon',
   ).length;
@@ -7384,7 +6653,7 @@ export default function GaragePage() {
         </div>
       </header>
 
-      {/* ── 2. СВОДНЫЕ МЕТРИКИ СВЕРХУ (КАК В РАЗДЕЛЕ РЕВЬЮ) ── */}
+      {/* ── 2. СВОДНЫЕ МЕТРИКИ СВЕРХУ ── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
         {/* В боксах */}
         <div
@@ -7422,7 +6691,7 @@ export default function GaragePage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
-              Ждёт оплаты
+              Ждут оплаты
             </span>
             <span className="text-sm">💳</span>
           </div>
@@ -7437,29 +6706,51 @@ export default function GaragePage() {
           </div>
         </div>
 
-        {/* Капитал склада */}
+        {/* Архив */}
         <div
-          onClick={() => setActiveTab('warehouse')}
+          onClick={() => setActiveTab('archive')}
           className={cn(
             'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
-            activeTab === 'warehouse'
+            activeTab === 'archive'
               ? 'border-emerald-300 ring-2 ring-emerald-100'
               : 'border-emerald-100 hover:border-emerald-200',
           )}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+              Архив
+            </span>
+            <span className="text-sm">📚</span>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-emerald-900">{archiveCount} нарядов</div>
+            <div className="text-[11px] text-emerald-600 font-bold mt-0.5">
+              Закрытые и оплаченные
+            </div>
+          </div>
+        </div>
+
+        {/* Склад запчастей */}
+        <div
+          onClick={() => setActiveTab('warehouse')}
+          className={cn(
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
+            activeTab === 'warehouse'
+              ? 'border-sky-300 ring-2 ring-sky-100'
+              : 'border-sky-100 hover:border-sky-200',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Склад (ТМЦ)
             </span>
             <span className="text-sm">📦</span>
           </div>
           <div className="mt-2">
-            <div className="text-xl font-black text-emerald-900">
+            <div className="text-xl font-black text-slate-800">
               <Money amount={totalWarehouseVal} />
             </div>
-            <div className="text-[11px] text-emerald-600 font-bold mt-0.5">
-              Оценка (+30%): <Money amount={Math.round(totalWarehouseVal * 1.3)} />
-            </div>
+            <div className="text-[11px] text-slate-500 font-bold mt-0.5">Оценка: +30%</div>
           </div>
         </div>
 
@@ -7467,7 +6758,7 @@ export default function GaragePage() {
         <div
           onClick={() => setActiveTab('clients')}
           className={cn(
-            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between col-span-2 lg:col-span-1',
             activeTab === 'clients'
               ? 'border-indigo-300 ring-2 ring-indigo-100'
               : 'border-indigo-100 hover:border-indigo-200',
@@ -7486,33 +6777,12 @@ export default function GaragePage() {
             <div className="text-[11px] text-indigo-600 font-bold mt-0.5">Коммерческий сервис</div>
           </div>
         </div>
-
-        {/* Регламенты ТО */}
-        <div
-          onClick={() => setActiveTab('maintenance')}
-          className={cn(
-            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between col-span-2 lg:col-span-1',
-            activeTab === 'maintenance'
-              ? 'border-rose-300 ring-2 ring-rose-100'
-              : 'border-rose-100 hover:border-rose-200',
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">
-              Внимание ТО
-            </span>
-            <span className="text-sm">🛢️</span>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl font-black text-rose-900">{maintenanceAlertsCount} авто</div>
-            <div className="text-[11px] text-rose-600 font-bold mt-0.5">Подошёл пробег масла</div>
-          </div>
-        </div>
       </div>
 
-      {/* ── 3. ВКЛАДКИ НАВИГАЦИИ (КОМПАКТНО, БЕЗ ЛЕВОГО САЙДБАРА) ── */}
+      {/* ── 3. ВКЛАДКИ НАВИГАЦИИ (3 ГЛАВНЫЕ КНОПКИ НАРЯДОВ + СКЛАД, КЛИЕНТЫ, ТО) ── */}
       <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 pb-2">
         <div className="flex flex-wrap gap-1 bg-slate-100/90 p-1 rounded-xl">
+          {/* 1. В работе */}
           <button
             onClick={() => setActiveTab('active')}
             className={cn(
@@ -7523,7 +6793,7 @@ export default function GaragePage() {
             )}
           >
             <span>🔧</span>
-            <span>В боксах (В работе)</span>
+            <span>В работе</span>
             {inWorkCount > 0 && (
               <span className="bg-sky-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                 {inWorkCount}
@@ -7531,6 +6801,7 @@ export default function GaragePage() {
             )}
           </button>
 
+          {/* 2. Ждут оплаты */}
           <button
             onClick={() => setActiveTab('pending_payment')}
             className={cn(
@@ -7541,7 +6812,7 @@ export default function GaragePage() {
             )}
           >
             <span>💳</span>
-            <span>Ждёт оплаты</span>
+            <span>Ждут оплаты</span>
             {pendingPaymentCount > 0 && (
               <span className="bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                 {pendingPaymentCount}
@@ -7549,6 +6820,26 @@ export default function GaragePage() {
             )}
           </button>
 
+          {/* 3. Архив */}
+          <button
+            onClick={() => setActiveTab('archive')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'archive'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>📚</span>
+            <span>Архив</span>
+            {archiveCount > 0 && (
+              <span className="bg-emerald-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {archiveCount}
+              </span>
+            )}
+          </button>
+
+          {/* Дополнительные разделы */}
           <button
             onClick={() => setActiveTab('warehouse')}
             className={cn(
@@ -7597,19 +6888,6 @@ export default function GaragePage() {
               </span>
             )}
           </button>
-
-          <button
-            onClick={() => setActiveTab('archive')}
-            className={cn(
-              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
-              activeTab === 'archive'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800',
-            )}
-          >
-            <span>📚</span>
-            <span>Архив ремонтов</span>
-          </button>
         </div>
 
         {/* Быстрая ссылка на раздел согласования: Ревью Механики */}
@@ -7625,9 +6903,19 @@ export default function GaragePage() {
         </div>
       </div>
 
+      {/* ── НАВИГАЦИЯ ПО ДНЯМ, НЕДЕЛЯМ, МЕСЯЦАМ (В СТИЛЕ РЕВЬЮ) ── */}
+      {(activeTab === 'active' || activeTab === 'pending_payment' || activeTab === 'archive') && (
+        <DatePeriodNav
+          period={period}
+          setPeriod={setPeriod}
+          date={periodDate}
+          setDate={setPeriodDate}
+        />
+      )}
+
       {/* ── 4. СОДЕРЖИМОЕ АКТИВНОЙ ВКЛАДКИ ── */}
 
-      {/* Вкладка 1: В боксах (В работе) */}
+      {/* Вкладка 1: В РАБОТЕ (ТОЛЬКО МАШИНЫ, ГДЕ ЕЩЕ БУДУТ ПРОХОДИТЬ РАБОТЫ) */}
       {activeTab === 'active' && (
         <div className="space-y-3">
           {/* Панель фильтров: поиск и принадлежность (свой/клиент) */}
@@ -7659,7 +6947,7 @@ export default function GaragePage() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                 )}
               >
-                Все ({activeOrders.length})
+                Все ({filteredActiveOrders.length})
               </button>
               <button
                 onClick={() => setFilterType('own')}
@@ -7670,7 +6958,7 @@ export default function GaragePage() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                 )}
               >
-                🚛 Свой парк ({ownActiveCount})
+                🚛 Свой парк ({filteredActiveOrders.filter((o) => o.machine_type === 'own').length})
               </button>
               <button
                 onClick={() => setFilterType('client')}
@@ -7681,7 +6969,8 @@ export default function GaragePage() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                 )}
               >
-                🏢 Сторонние клиенты ({clientActiveCount})
+                🏢 Сторонние клиенты (
+                {filteredActiveOrders.filter((o) => o.machine_type === 'client').length})
               </button>
             </div>
           </div>
@@ -7696,9 +6985,9 @@ export default function GaragePage() {
           ) : filteredActiveOrders.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
               <p className="text-4xl mb-2">🔧</p>
-              <p className="font-bold text-slate-600">Нарядов в боксах нет</p>
+              <p className="font-bold text-slate-600">Нарядов в работе по фильтру не найдено</p>
               <p className="text-xs text-slate-400 mt-1">
-                Все автомобили отремонтированы или наряды переведены на ревью
+                Здесь отображаются только автомобили, ремонт которых ещё выполняется
               </p>
             </div>
           ) : (
@@ -7711,7 +7000,7 @@ export default function GaragePage() {
         </div>
       )}
 
-      {/* Вкладка 2: Ждёт оплаты */}
+      {/* Вкладка 2: ЖДУТ ОПЛАТЫ (МАШИНЫ КЛИЕНТОВ БЕЗ ОПЛАТЫ) */}
       {activeTab === 'pending_payment' && (
         <div className="space-y-3">
           <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-2">
@@ -7733,7 +7022,7 @@ export default function GaragePage() {
             </div>
           </div>
 
-          {pendingPaymentOrders.length === 0 ? (
+          {filteredPendingOrders.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
               <p className="text-4xl mb-2">💳</p>
               <p className="font-bold text-slate-600">Нет неоплаченных нарядов</p>
@@ -7743,7 +7032,7 @@ export default function GaragePage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {pendingPaymentOrders.map((o) => (
+              {filteredPendingOrders.map((o) => (
                 <OrderCard key={o.id} o={o} onSelect={(id) => setSelectedOrderId(id)} />
               ))}
             </div>
@@ -7751,30 +7040,99 @@ export default function GaragePage() {
         </div>
       )}
 
-      {/* Вкладка 3: Склад запчастей (Вариант 3) */}
+      {/* Вкладка 3: АРХИВ (ОПЛАЧЕННЫЕ КЛИЕНТСКИЕ И ЗАВЕРШЁННЫЕ СВОИ МАШИНЫ) */}
+      {activeTab === 'archive' && (
+        <div className="space-y-3">
+          {/* Фильтры по типу авто и поиск */}
+          <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="🔍 Поиск в архиве по номеру наряда, авто или механику..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium focus:bg-white focus:outline-hidden focus:border-sky-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-bold">
+              <button
+                onClick={() => setFilterType('all')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                  filterType === 'all'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                Все закрытые ({filteredArchiveOrders.length})
+              </button>
+              <button
+                onClick={() => setFilterType('own')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                  filterType === 'own'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                🚛 Свой парк ({filteredArchiveOrders.filter((o) => o.machine_type === 'own').length}
+                )
+              </button>
+              <button
+                onClick={() => setFilterType('client')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                  filterType === 'client'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                🏢 Оплаченные клиенты (
+                {filteredArchiveOrders.filter((o) => o.machine_type === 'client').length})
+              </button>
+            </div>
+          </div>
+
+          {ordersLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : filteredArchiveOrders.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+              <p className="text-4xl mb-2">📚</p>
+              <p className="font-bold text-slate-600">В архиве за выбранный период нет нарядов</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Выберите другой день, неделю или переключитесь на «Все время»
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredArchiveOrders.map((o) => (
+                <OrderCard key={o.id} o={o} onSelect={(id) => setSelectedOrderId(id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Вкладка 4: Склад запчастей (Вариант 3) */}
       {activeTab === 'warehouse' && <WarehouseSection />}
 
-      {/* Вкладка 4: Клиенты СТО */}
+      {/* Вкладка 5: Клиенты СТО */}
       {activeTab === 'clients' && <ClientsSection />}
 
-      {/* Вкладка 5: Регламенты ТО */}
+      {/* Вкладка 6: Регламенты ТО */}
       {activeTab === 'maintenance' && <MaintenanceSection />}
-
-      {/* Вкладка 6: Архив нарядов */}
-      {activeTab === 'archive' && (
-        <GarageArchiveSection
-          orders={historyOrders}
-          isLoading={histLoading}
-          mechanics={mechanics}
-          onSelectOrder={(id) => setSelectedOrderId(id)}
-          period={archivePeriod}
-          setPeriod={setArchivePeriod}
-          date={archiveDate}
-          setDate={setArchiveDate}
-          month={archiveMonth}
-          setMonth={setArchiveMonth}
-        />
-      )}
 
       {/* ── 5. МОДАЛЬНЫЕ ОКНА ── */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
