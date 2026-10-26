@@ -48,6 +48,94 @@ function formatPeriodHeader(dateStr: string, periodMode: 'day' | 'week' | 'month
   return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).toUpperCase();
 }
 
+interface WarehousePartItem {
+  movement_id?: string;
+  part_id?: string;
+  name: string;
+  brand: string;
+  article?: string | null;
+  quantity: number;
+  unit_price?: number;
+}
+
+/** Получить локальную дату операции (YYYY-MM-DD) в часовом поясе Верхней Салды (UTC+5) */
+function getOpLocalDate(
+  dateOrOp:
+    | string
+    | {
+        trxnPostDate?: string;
+        authorizationDate?: string;
+        operationDate?: string;
+        operationTime?: string;
+      }
+    | null
+    | undefined,
+  tzHours = 5,
+): string {
+  if (!dateOrOp) return '';
+  const raw =
+    typeof dateOrOp === 'string'
+      ? dateOrOp
+      : dateOrOp.trxnPostDate ||
+        dateOrOp.authorizationDate ||
+        dateOrOp.operationDate ||
+        dateOrOp.operationTime;
+  if (!raw) return '';
+  const d = new Date(new Date(raw).getTime() + tzHours * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Фильтрация статей: убирает доходы из расходов и схлопывает подстатьи ЗП в одну «Зарплата (ФОТ)» */
+function getFilteredCategories(
+  categories: CategoryItem[] = [],
+  direction: 'income' | 'expense' | 'transfer' = 'expense',
+  currentCatId?: string | null,
+): Array<{ id: string; name: string }> {
+  if (direction === 'income') {
+    return categories
+      .filter((c) => c.direction === 'income')
+      .map((c) => ({ id: c.id, name: c.name }));
+  }
+
+  const list: Array<{ id: string; name: string }> = [];
+  const payrollCategories = categories.filter(
+    (c) =>
+      c.code === 'PAYROLL_DRIVER' ||
+      c.code === 'PAYROLL_LOADER' ||
+      c.code === 'PAYROLL_MECHANIC' ||
+      c.code === 'PAYROLL' ||
+      c.name.toLowerCase().startsWith('зп '),
+  );
+
+  const matchedPayroll = payrollCategories.find((c) => c.id === currentCatId);
+  const payrollId =
+    matchedPayroll?.id || payrollCategories[0]?.id || 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
+
+  let addedPayroll = false;
+  for (const c of categories) {
+    if (c.direction === 'income') continue;
+
+    const isPayroll =
+      c.code === 'PAYROLL_DRIVER' ||
+      c.code === 'PAYROLL_LOADER' ||
+      c.code === 'PAYROLL_MECHANIC' ||
+      c.code === 'PAYROLL' ||
+      c.name.toLowerCase().startsWith('зп ');
+
+    if (isPayroll) {
+      if (!addedPayroll) {
+        list.push({ id: payrollId, name: 'Зарплата (ФОТ)' });
+        addedPayroll = true;
+      }
+      continue;
+    }
+
+    list.push({ id: c.id, name: c.name });
+  }
+
+  return list;
+}
+
 function cleanExpenseDescription(rawText: string | null | undefined): string {
   if (!rawText) return 'Расход';
   let t = rawText.trim();
@@ -99,6 +187,7 @@ interface CategoryItem {
   id: string;
   name: string;
   code: string;
+  direction?: 'income' | 'expense' | 'transfer' | string;
 }
 
 interface RawTx {
@@ -119,15 +208,7 @@ interface RawTx {
   category: { id: string; name: string; code: string } | null;
   counterparty: { id: string; name: string } | null;
   related_user: { id: string; name: string } | null;
-  warehouse_part?: {
-    movement_id?: string;
-    part_id: string;
-    name: string;
-    brand: string;
-    article?: string | null;
-    quantity: number;
-    unit_price?: number;
-  } | null;
+  warehouse_part?: WarehousePartItem | null;
 }
 
 interface TripOrderTx {
@@ -464,11 +545,26 @@ export function DailyControlPanel() {
           (t) => t.id === cleanId || t.idempotency_key === cleanId,
         );
 
+        // Убираем операцию из буфера неклассифицированных банковских операций
+        const updatedBankOps = (previousData.bank_operations || []).filter(
+          (op) => op.operationId !== cleanId,
+        );
+
         const categoryObj = newOp.category_id
           ? previousData.categories?.find((c) => c.id === newOp.category_id) || {
               id: newOp.category_id,
               name: newOp.categoryName || 'Обновлено',
               code: 'UPDATED',
+            }
+          : null;
+
+        const warehousePartObj = newOp.warehouse_part?.enabled
+          ? {
+              name: newOp.warehouse_part.name || newOp.description,
+              brand: newOp.warehouse_part.brand || 'canter',
+              quantity: newOp.warehouse_part.quantity || 1,
+              unit_price: newOp.warehouse_part.unit_price || newOp.amount,
+              article: newOp.warehouse_part.article || null,
             }
           : null;
 
@@ -479,6 +575,7 @@ export function DailyControlPanel() {
             description: newOp.description,
             category_id: newOp.category_id,
             category: categoryObj,
+            warehouse_part: warehousePartObj !== null ? warehousePartObj : target.warehouse_part,
             to_wallet_id:
               newOp.to_wallet_id !== undefined ? newOp.to_wallet_id : target.to_wallet_id,
             from_wallet_id:
@@ -500,6 +597,7 @@ export function DailyControlPanel() {
             category_id: newOp.category_id,
             idempotency_key: cleanId,
             category: categoryObj,
+            warehouse_part: warehousePartObj,
             counterparty: null,
             related_user: null,
           });
@@ -508,10 +606,44 @@ export function DailyControlPanel() {
         queryClient.setQueryData<DailyBalanceData>(['daily-balance', selectedDate, period], {
           ...previousData,
           transactions: updatedTxList,
+          bank_operations: updatedBankOps,
         });
       }
 
       return { previousData };
+    },
+    onSuccess: (res) => {
+      // При успешном ответе обновляем сохраненную запись точными данными с сервера
+      if (res?.transaction) {
+        queryClient.setQueryData<DailyBalanceData>(
+          ['daily-balance', selectedDate, period],
+          (old) => {
+            if (!old) return old;
+            const txs = [...(old.transactions || [])];
+            const idx = txs.findIndex(
+              (t) =>
+                t.id === res.transaction.id ||
+                t.idempotency_key === res.transaction.idempotency_key,
+            );
+            if (idx >= 0) {
+              txs[idx] = {
+                ...txs[idx],
+                ...res.transaction,
+                warehouse_part: res.warehouse_movement
+                  ? {
+                      name: res.warehouse_movement.part?.name || txs[idx]?.warehouse_part?.name,
+                      brand:
+                        res.warehouse_movement.part?.category || txs[idx]?.warehouse_part?.brand,
+                      quantity: res.warehouse_movement.quantity || 1,
+                      unit_price: res.warehouse_movement.unit_price,
+                    }
+                  : txs[idx]?.warehouse_part,
+              };
+            }
+            return { ...old, transactions: txs };
+          },
+        );
+      }
     },
     onError: (err, _newOp, context) => {
       // При ошибке откатываем кэш и сообщаем пользователю
@@ -521,21 +653,15 @@ export function DailyControlPanel() {
       alert('Ошибка при сохранении: ' + (err.message || 'Сбой сети'));
     },
     onSettled: () => {
-      // В фоне актуализируем данные без блокировки интерфейса
-      queryClient.invalidateQueries({
-        queryKey: ['daily-balance', selectedDate],
-        refetchType: 'active',
-      });
-      // Второстепенные запросы инвалидируем как неактивные, чтобы не перегружать пул запросов
+      // Фоновое обновление только связанных списков склада без блокировки экрана
+      queryClient.invalidateQueries({ queryKey: ['garage-parts'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['garage-parts-all'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['garage-inventory'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['finance-month'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['payment-calendar'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['wallets'], refetchType: 'none' });
       queryClient.invalidateQueries({ queryKey: ['staff-payroll'], refetchType: 'none' });
-      queryClient.invalidateQueries({ queryKey: ['garage-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-parts-all'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
@@ -944,7 +1070,14 @@ export function DailyControlPanel() {
   // 1. Поступления на Р/С БАНК:
   // Если пришли прямые операции по API Т-Банка, отображаем их в Р/С (Credit)
   const bankOps = data?.bank_operations ?? [];
-  const creditBankOps = bankOps.filter((op) => op.typeOfOperation === 'Credit');
+  const creditBankOps = bankOps.filter((op) => {
+    if (op.typeOfOperation !== 'Credit') return false;
+    if (period === 'day') {
+      const opDay = getOpLocalDate(op);
+      return !opDay || opDay === selectedDate;
+    }
+    return true;
+  });
 
   if (activeWallet === 'all' || activeWallet === 'bank') {
     if (creditBankOps.length > 0) {
@@ -1342,12 +1475,15 @@ export function DailyControlPanel() {
 
   // 2. Банковские списания напрямую из API Т-Банка (если ещё не заведены в transactions)
   if (data?.bank_operations && data.bank_operations.length > 0) {
-    const debitBankOps = data.bank_operations.filter(
-      (op) =>
-        op.typeOfOperation === 'Debit' &&
-        (activeWallet === 'all' || activeWallet === 'bank') &&
-        !(data?.transactions ?? []).some((t) => t.idempotency_key === op.operationId),
-    );
+    const debitBankOps = data.bank_operations.filter((op) => {
+      if (op.typeOfOperation !== 'Debit') return false;
+      if (activeWallet !== 'all' && activeWallet !== 'bank') return false;
+      if (period === 'day') {
+        const opDay = getOpLocalDate(op);
+        if (opDay && opDay !== selectedDate) return false;
+      }
+      return !(data?.transactions ?? []).some((t) => t.idempotency_key === op.operationId);
+    });
 
     debitBankOps.forEach((op) => {
       const desc = (op.description || op.payPurpose || '').toLowerCase();
@@ -2115,109 +2251,178 @@ export function DailyControlPanel() {
                     : 'период (месяц)'}
               </div>
             ) : (
-              expenseItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-xl border border-slate-300 hover:border-slate-400 shadow-2xs flex flex-col overflow-hidden group transition border-l-4 border-l-rose-500"
-                >
-                  <div className="flex items-stretch flex-1">
-                    {/* Accent strip 6px */}
-                    <div
-                      className={`w-1.5 flex-shrink-0 group-hover:w-2 transition-all ${
-                        item.wallet === 'fuel_card'
-                          ? 'bg-amber-500'
-                          : item.wallet === 'cash'
-                            ? 'bg-emerald-500'
-                            : 'bg-rose-500'
-                      }`}
-                    />
-
-                    {/* Card Content (3 zones) */}
-                    <div className="p-3 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
-                      {/* Zone 1: Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className="text-xs font-black text-slate-900 line-clamp-2 leading-tight break-words max-w-[420px]"
-                            title={item.title}
-                          >
-                            {item.title}
-                          </span>
-                          <span className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
-                            {item.category}
-                          </span>
-                          {item.isGroup && (
+              expenseItems.map((item) =>
+                item.isGroup ? (
+                  /* ── СГРУППИРОВАННЫЕ ПЛАТЕЖИ (КОМИССИИ И Т.Д.) — ОТДЕЛЬНЫЙ ВЫДЕЛЯЮЩИЙСЯ ДИЗАЙН ── */
+                  <div
+                    key={item.id}
+                    className="bg-slate-50/90 rounded-2xl border-2 border-indigo-200/90 shadow-2xs flex flex-col overflow-hidden transition-all ring-1 ring-indigo-100"
+                  >
+                    <div className="flex items-stretch flex-1">
+                      <div className="w-2 flex-shrink-0 bg-indigo-500" />
+                      <div className="p-3.5 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-950 font-black text-xs uppercase tracking-wider border border-indigo-300">
+                              <span>🗂️</span> ГРУППА ПЛАТЕЖЕЙ
+                            </span>
+                            <span className="text-xs font-black text-slate-900">{item.title}</span>
+                            <span className="px-2.5 py-1 rounded-lg bg-white text-indigo-900 text-xs font-black uppercase tracking-wide border border-indigo-200">
+                              {item.category}
+                            </span>
                             <button
                               onClick={() => toggleGroup(item.id)}
-                              className="text-[9px] font-extrabold bg-rose-100 text-rose-800 px-2 py-0.5 rounded hover:bg-rose-200 transition cursor-pointer flex items-center gap-1"
+                              className="text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
                             >
-                              <span>{expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть'}</span>
-                              <span className="bg-rose-200/80 px-1 rounded-sm text-[8px]">
-                                {item.subItems?.length}
+                              <span>
+                                {expandedGroups[item.id] ? '▲ Свернуть' : '▼ Раскрыть детализацию'}
+                              </span>
+                              <span className="bg-indigo-800 text-indigo-100 px-1.5 py-0.2 rounded text-[10px]">
+                                {item.subItems?.length} списаний
                               </span>
                             </button>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1.5 flex-wrap">
+                            <span className="px-1.5 py-0.2 rounded font-bold border text-[10px] bg-sky-50 text-sky-800 border-sky-200">
+                              🏦 {item.walletName}
+                            </span>
+                            <span>·</span>
+                            <span className="text-slate-600 font-medium">{item.author}</span>
+                            <span className="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
+                              {item.subItems?.length} микро-платежей объединены, чтобы не засорять
+                              ленту
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200">
+                          <div className="text-sm font-black font-mono text-indigo-950 bg-indigo-100/80 px-2.5 py-1 rounded-xl border border-indigo-200">
+                            -{rub(item.amount)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {expandedGroups[item.id] && item.subItems && (
+                      <div className="w-full bg-white/95 border-t border-indigo-200 p-3 space-y-1.5 pl-6">
+                        <div className="text-[10px] font-black uppercase text-indigo-900 tracking-wider">
+                          СПИСОК ВСЕХ СПИСАНИЙ В ГРУППЕ ({item.subItems.length}):
+                        </div>
+                        <div className="space-y-1">
+                          {item.subItems.map((sub) => (
+                            <div
+                              key={sub.id}
+                              className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 px-2 rounded-lg"
+                            >
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-mono text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {sub.time}
+                                </span>
+                                <span className="font-semibold text-slate-800">{sub.title}</span>
+                                <span className="text-[10px] text-slate-400">({sub.author})</span>
+                              </div>
+                              <div className="font-mono font-black text-rose-600 ml-2 flex-shrink-0">
+                                -{rub(sub.amount)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* ── СТАНДАРТНОЕ СПИСАНИЕ: СТАТЬЯ РАСХОДОВ КРУПНО И НАГЛЯДНО ── */
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-xl border border-slate-200 hover:border-slate-300 shadow-2xs flex flex-col overflow-hidden group transition border-l-4 border-l-rose-500"
+                  >
+                    <div className="flex items-stretch flex-1">
+                      <div
+                        className={`w-1 flex-shrink-0 group-hover:w-1.5 transition-all ${
+                          item.wallet === 'fuel_card'
+                            ? 'bg-amber-500'
+                            : item.wallet === 'cash'
+                              ? 'bg-emerald-500'
+                              : 'bg-rose-500'
+                        }`}
+                      />
+                      <div className="p-3 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+                        {/* Zone 1: Info with PROMINENT Category Tag */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {/* 🏷️ СТАТЬЯ РАСХОДОВ КРУПНО */}
+                            <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-950 text-xs font-black uppercase tracking-wide border border-rose-300 shadow-2xs flex items-center gap-1 flex-shrink-0">
+                              <span>🏷️</span>
+                              <span>{item.category || 'Без статьи'}</span>
+                            </span>
+
+                            <span
+                              className="text-xs font-black text-slate-900 line-clamp-2 leading-tight break-words max-w-[420px]"
+                              title={item.title}
+                            >
+                              {item.title}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1.5 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.2 rounded font-bold border text-[10px] ${
+                                item.wallet === 'bank'
+                                  ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                  : item.wallet === 'cash'
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-900 border-amber-200'
+                              }`}
+                            >
+                              {item.wallet === 'bank' ? '🏦' : item.wallet === 'cash' ? '🔒' : '⛽'}{' '}
+                              {item.walletName}
+                            </span>
+                            {item.time && (
+                              <>
+                                <span>·</span>
+                                <span className="font-mono text-slate-400 font-bold">
+                                  {item.time}
+                                </span>
+                              </>
+                            )}
+                            <span>·</span>
+                            <span className="text-slate-500">{item.author}</span>
+                          </div>
+                        </div>
+
+                        {/* Zone 2: Plan Link & Warehouse Badge */}
+                        <div className="flex-shrink-0 self-start sm:self-center flex flex-col sm:flex-row items-start sm:items-center gap-1.5">
+                          {item.linkedObligationTitle ? (
+                            <div className="inline-flex items-center gap-1.5 bg-blue-50/90 text-blue-950 border-2 border-blue-200 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
+                              <span>📅</span>
+                              <span>{item.linkedObligationTitle}</span>
+                              <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded text-[10px]">
+                                ✓ Закрыт
+                              </span>
+                            </div>
+                          ) : null}
+
+                          {item.rawTx?.warehouse_part ? (
+                            <div className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-950 border-2 border-sky-300 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
+                              <span>📦</span>
+                              <span>Склад: {item.rawTx.warehouse_part.name}</span>
+                              <span className="text-sky-700 bg-sky-100 font-black px-1.5 py-0.2 rounded text-[10px]">
+                                +{item.rawTx.warehouse_part.quantity} шт
+                              </span>
+                            </div>
+                          ) : null}
+
+                          {!item.linkedObligationTitle && !item.rawTx?.warehouse_part && (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Без привязки
+                            </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1 flex-wrap">
-                          <span
-                            className={`px-1.5 py-0.2 rounded font-bold border text-[10px] ${
-                              item.wallet === 'bank'
-                                ? 'bg-sky-50 text-sky-800 border-sky-200'
-                                : item.wallet === 'cash'
-                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                  : 'bg-amber-50 text-amber-900 border-amber-200'
-                            }`}
-                          >
-                            {item.wallet === 'bank' ? '🏦' : item.wallet === 'cash' ? '🔒' : '⛽'}{' '}
-                            {item.walletName}
-                          </span>
-                          {item.time && (
-                            <>
-                              <span>·</span>
-                              <span className="font-mono text-slate-400">{item.time}</span>
-                            </>
-                          )}
-                          <span>·</span>
-                          <span className="text-slate-500">{item.author}</span>
-                        </div>
-                      </div>
-
-                      {/* Zone 2: Plan Link & Warehouse Badge */}
-                      <div className="flex-shrink-0 self-start sm:self-center flex flex-col sm:flex-row items-start sm:items-center gap-1.5">
-                        {item.linkedObligationTitle ? (
-                          <div className="inline-flex items-center gap-1.5 bg-blue-50/90 text-blue-950 border-2 border-blue-200 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
-                            <span>📅</span>
-                            <span>{item.linkedObligationTitle}</span>
-                            <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded text-[10px]">
-                              ✓ Закрыт
-                            </span>
+                        {/* Zone 3: Amount + Edit Button */}
+                        <div className="text-right flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                          <div className="text-sm font-black font-mono text-rose-600">
+                            -{rub(item.amount)}
                           </div>
-                        ) : null}
-
-                        {item.rawTx?.warehouse_part ? (
-                          <div className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-950 border-2 border-sky-300 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-2xs">
-                            <span>📦</span>
-                            <span>Склад: {item.rawTx.warehouse_part.name}</span>
-                            <span className="text-sky-700 bg-sky-100 font-black px-1.5 py-0.2 rounded text-[10px]">
-                              +{item.rawTx.warehouse_part.quantity} шт
-                            </span>
-                          </div>
-                        ) : null}
-
-                        {!item.linkedObligationTitle && !item.rawTx?.warehouse_part && (
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            Без привязки
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Zone 3: Amount + Edit Button */}
-                      <div className="text-right flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                        <div className="text-sm font-black font-mono text-rose-600">
-                          -{rub(item.amount)}
-                        </div>
-                        {!item.isGroup && (
                           <button
                             onClick={() => {
                               const raw = item.rawTx;
@@ -2267,106 +2472,12 @@ export function DailyControlPanel() {
                           >
                             ✏️
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Group details */}
-                  {item.isGroup && expandedGroups[item.id] && item.subItems && (
-                    <div className="w-full bg-slate-50/90 border-t-2 border-slate-200 p-2.5 space-y-1.5 pl-6">
-                      <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
-                        ДЕТАЛИЗАЦИЯ СГРУППИРОВАННЫХ ОПЕРАЦИЙ:
-                      </div>
-                      {item.subItems.map((sub) => (
-                        <div
-                          key={sub.id}
-                          className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60 last:border-0 hover:bg-slate-100/60 px-2 rounded-lg"
-                        >
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-mono text-slate-400">{sub.time}</span>
-                            <span className="font-semibold text-slate-800">{sub.title}</span>
-                            <span className="text-[10px] text-slate-400">({sub.author})</span>
-                            {sub.category && (
-                              <span className="text-[9px] bg-slate-200/70 text-slate-700 px-1 rounded font-medium">
-                                {sub.category}
-                              </span>
-                            )}
-                            {sub.linkedObligationTitle && (
-                              <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 border border-blue-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded shadow-xs">
-                                <span>📅</span>
-                                <span>{sub.linkedObligationTitle}</span>
-                                <span className="text-emerald-700 font-black">✓</span>
-                              </span>
-                            )}
-                            {sub.rawTx?.warehouse_part && (
-                              <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded shadow-xs">
-                                <span>📦</span>
-                                <span>{sub.rawTx.warehouse_part.name}</span>
-                                <span className="text-sky-700 font-black">
-                                  +{sub.rawTx.warehouse_part.quantity} шт
-                                </span>
-                              </span>
-                            )}
-                            <button
-                              onClick={() => {
-                                const raw = sub.rawTx;
-                                const op = sub.bankOp;
-                                setEditingTx({
-                                  id: raw ? raw.id : op ? op.operationId : sub.id,
-                                  description: raw
-                                    ? raw.description || ''
-                                    : op
-                                      ? op.description || op.payPurpose || ''
-                                      : sub.title,
-                                  amount: sub.amount,
-                                  categoryId: raw?.category_id || sub.categoryId || null,
-                                  categoryName: raw?.category?.name || sub.category,
-                                  direction:
-                                    (raw?.direction === 'income' || raw?.direction === 'transfer'
-                                      ? raw.direction
-                                      : 'expense') ||
-                                    (sub.wallet === 'fuel_card' ? 'transfer' : 'expense'),
-                                  fromWalletId:
-                                    raw?.from_wallet_id ||
-                                    (sub.wallet === 'cash'
-                                      ? CASH_ID
-                                      : sub.wallet === 'fuel_card'
-                                        ? FUEL_CARD_ID
-                                        : BANK_ID),
-                                  toWalletId:
-                                    raw?.to_wallet_id ||
-                                    (sub.wallet === 'fuel_card' ? FUEL_CARD_ID : null),
-                                  transactionDate:
-                                    raw?.transaction_date ||
-                                    raw?.created_at ||
-                                    (op
-                                      ? op.trxnPostDate ||
-                                        op.authorizationDate ||
-                                        op.operationDate ||
-                                        op.operationTime
-                                      : selectedDate),
-                                  obligationId: sub.linkedObligationId || null,
-                                  relatedUserId:
-                                    raw?.related_user_id || raw?.related_user?.id || null,
-                                  warehousePart: raw?.warehouse_part || null,
-                                });
-                              }}
-                              className="text-[9px] text-sky-600 hover:text-sky-800 cursor-pointer ml-1 font-bold underline"
-                              title="Классифицировать / изменить"
-                            >
-                              ✎ изменить статью / имя
-                            </button>
-                          </div>
-                          <div className="font-mono font-bold text-rose-600 ml-2 flex-shrink-0">
-                            -{rub(sub.amount)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))
+                ),
+              )
             )}
           </div>
         </div>
@@ -2937,7 +3048,11 @@ export function DailyControlPanel() {
                       ? '(Выберите статью поступления)'
                       : '(Выберите статью расходов)'}
                   </option>
-                  {(data?.categories ?? []).map((c) => (
+                  {getFilteredCategories(
+                    data?.categories,
+                    editingTx.direction,
+                    editingTx.categoryId,
+                  ).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
@@ -4186,11 +4301,13 @@ export function DailyControlPanel() {
                   className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
                 >
                   <option value="">(Выберите категорию)</option>
-                  {(data?.categories ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  {getFilteredCategories(data?.categories, manualType, manualCategoryId).map(
+                    (c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
 

@@ -152,7 +152,23 @@ export async function GET(request: Request) {
       }
 
       if (Array.isArray(statementResult)) {
-        bankStatementOps = statementResult;
+        // Фильтруем операции строго по реальной локальной дате совершения (trxnPostDate / authorizationDate в UTC+5)
+        const getOpLocalDate = (op: any) => {
+          const raw = op.trxnPostDate || op.authorizationDate || op.operationDate;
+          if (!raw) return '';
+          return new Date(new Date(raw).getTime() + TIMEZONE_OFFSET_HOURS * 3600 * 1000)
+            .toISOString()
+            .slice(0, 10);
+        };
+
+        if (period === 'day') {
+          bankStatementOps = statementResult.filter((op: any) => getOpLocalDate(op) === date);
+        } else {
+          bankStatementOps = statementResult.filter((op: any) => {
+            const opDate = getOpLocalDate(op);
+            return opDate >= displayRangeStart && opDate <= displayRangeEnd;
+          });
+        }
       }
     } catch (e) {
       console.error('TBank auto-sync/statement error in daily-balance:', e);
@@ -206,7 +222,7 @@ export async function GET(request: Request) {
 
       // Available categories for editing
       (supabase.from('transaction_categories') as any)
-        .select('id, name, code')
+        .select('id, name, code, direction')
         .order('name', { ascending: true }),
 
       // Payment calendar overrides for the month to match paid obligations
