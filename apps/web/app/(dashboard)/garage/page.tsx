@@ -1,4 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
+
+const DEFAULT_WORK_DESCRIPTIONS: Record<string, string> = {};
 
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -115,98 +118,11 @@ type OrderDetail = Omit<OrderRow, 'works' | 'mechanic'> & {
   }>;
 };
 
-type DashboardData = {
-  repairRequests: Array<{
-    id: string;
-    created_at: string;
-    custom_description: string;
-    asset: { short_name: string; reg_number: string } | null;
-    driver: { name: string } | null;
-    fault: { name: string; category: string } | null;
-  }>;
-  activeOrders: Array<{
-    id: string;
-    order_number: number;
-    status: string;
-    created_at: string;
-    machine_type: string;
-    asset: { short_name: string; reg_number: string } | null;
-    mechanic: { name: string } | null;
-    second_mechanic: { name: string } | null;
-  }>;
-  pendingApproval: Array<{
-    id: string;
-    order_number: number;
-    created_at: string;
-    machine_type: string;
-    asset: { short_name: string; reg_number: string } | null;
-    mechanic: { name: string } | null;
-    service_order_works: Array<{ norm_minutes: number; actual_minutes: number; status: string }>;
-  }>;
-  maintenanceAlerts: Array<{
-    id: string;
-    work_name: string;
-    alert_status: string;
-    next_due_km: number | null;
-    next_due_at: string | null;
-    asset: { short_name: string; reg_number: string; odometer_current: number } | null;
-  }>;
-  counts: {
-    repairRequests: number;
-    pendingApproval: number;
-    activeOrders: number;
-    maintenanceAlerts: number;
-    vehiclesInRepair: number;
-  };
-  month: {
-    completedOrders: number;
-    revenue: string;
-    salaryAccrued: string;
-    garageBalance?: string;
-  };
-  stats?: GarageStats;
-};
+// type DashboardData removed
 
-type ServiceJson = {
-  problem_description?: string;
-  priority?: string;
-  mechanic_note?: string;
-  works?: Array<{ name: string; norm_minutes?: number }>;
-};
+// interface ReminderItem removed
 
-interface ReminderItem {
-  id: string;
-  text: string;
-  due_km?: number | null;
-  due_date?: string | null;
-  is_done: boolean;
-  vehicle?: {
-    brand?: string | null;
-    model?: string | null;
-    reg_number?: string | null;
-    counterparty?: {
-      name?: string | null;
-      phone?: string | null;
-    } | null;
-  } | null;
-  order?: {
-    order_number?: number | null;
-  } | null;
-}
-
-type RepairRequest = {
-  id: string;
-  status: string;
-  custom_description: string | null;
-  admin_note: string | null;
-  service_json: ServiceJson | null;
-  created_at: string;
-  reviewed_at: string | null;
-  asset: { id: string; short_name: string; reg_number: string } | null;
-  driver: { id: string; name: string } | null;
-  fault: { id: string; name: string; category: string } | null;
-  service_order: { id: string; order_number: number; status: string } | null;
-};
+// type RepairRequest removed
 
 type MaintenanceItem = {
   id: string;
@@ -222,94 +138,18 @@ type MaintenanceItem = {
   asset: { id: string; short_name: string; reg_number: string; odometer_current: number } | null;
 };
 
-type WorkCatalogItem = {
-  id: string;
-  code: string | null;
-  name: string;
-  category: string | null;
-  norm_minutes: number | null;
-  norm_minutes_valdai: number | null;
-  default_price_client: string | null;
-  default_price_client_valdai: string | null;
-  internal_cost_rate: string | null;
-  is_active: boolean;
-};
+// type WorkCatalogItem removed
 
-type FaultCatalogItem = {
-  id: string;
-  name: string;
-  category: string;
-  is_active: boolean;
-  created_at: string;
-};
+// type FaultCatalogItem removed
 
-type MechanicStat = {
-  mechanic_id: string;
-  mechanic_name: string;
-  salary_pct: number;
-  orders_count: number;
-  plan_norm_hours: number;
-  fact_norm_hours: number;
-  total_works_cost: string;
-  accrued_salary: string;
-  orders: Array<{
-    id: string;
-    order_number: number;
-    created_at: string;
-    machine_type: string;
-    vehicle: string;
-    works: Array<{
-      name: string;
-      norm_minutes: number;
-      actual_minutes: number;
-      price_client: string;
-    }>;
-  }>;
-};
+// type MechanicStat removed
 
-type VehicleHistoryItem = {
-  id: string;
-  order_number: number;
-  created_at: string;
-  status: string;
-  lifecycle_status: string;
-  machine_type: string;
-  problem_description: string;
-  odometer_start: number | null;
-  mechanic: { name: string } | null;
-  works: Array<{
-    norm_minutes: number;
-    actual_minutes: number;
-    price_client: string;
-    status: string;
-    work_catalog: { name: string } | null;
-  }>;
-  parts: Array<{ quantity: number; unit_price: string; part: { name: string; unit: string } }>;
-  works_cost: string;
-  parts_cost: string;
-  total_cost: string;
-  total_norm_minutes: number;
-  total_actual_minutes: number;
-};
+// type VehicleHistoryItem removed
 
 type SettingsData = {
   sto: { hourly_rate: string; hourly_rate_own: string };
   mechanics: Array<{ id: string; name: string; mechanic_salary_pct: string }>;
 };
-
-type GarageSection =
-  | 'dashboard'
-  | 'requests'
-  | 'workorders'
-  | 'warehouse'
-  | 'maintenance'
-  | 'worktypes'
-  | 'faultcatalog'
-  | 'repvehicles'
-  | 'repmechanics'
-  | 'clients'
-  | 'settings';
-type ReportTab = 'vehicles' | 'mechanics';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -344,15 +184,6 @@ const ALERT_COLOR: Record<string, string> = {
   soon: 'bg-amber-100 text-amber-700',
   ok: 'bg-emerald-100 text-emerald-700',
   active_order: 'bg-slate-100 text-slate-600',
-};
-const FAULT_CATEGORIES: Record<string, string> = {
-  engine: 'Двигатель',
-  suspension: 'Ходовая',
-  brakes: 'Тормоза',
-  transmission: 'Трансмиссия',
-  electrical: 'Электрика',
-  body: 'Кузов',
-  other: 'Прочее',
 };
 
 const emptyForm = {
@@ -400,361 +231,11 @@ function moneyVal(s: string | null | undefined): number {
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
-function todayLabel() {
-  return new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' });
-}
+// todayLabel removed
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
-const Icons = {
-  dashboard: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-      />
-    </svg>
-  ),
-  requests: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-      />
-    </svg>
-  ),
-  workorders: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-      />
-    </svg>
-  ),
-  maintenance: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  ),
-  worktypes: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-      />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ),
-  faultcatalog: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  ),
-  repvehicles: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-      />
-    </svg>
-  ),
-  repmechanics: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"
-      />
-    </svg>
-  ),
-  clients: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-      />
-    </svg>
-  ),
-  settings: (
-    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-      />
-    </svg>
-  ),
-};
-
-// ═══════════════════════════ SIDEBAR ══════════════════════════════════════════
-
-const ICON_MAP: Record<string, React.ReactNode> = {
-  dashboard: Icons.dashboard,
-  requests: Icons.requests,
-  workorders: Icons.workorders,
-  maintenance: Icons.maintenance,
-  worktypes: Icons.worktypes,
-  faultcatalog: Icons.faultcatalog,
-  repvehicles: Icons.repvehicles,
-  repmechanics: Icons.repmechanics,
-  clients: Icons.clients,
-  settings: Icons.settings,
-};
-
-type NavGroup = { label: string; items: { id: GarageSection; label: string; badgeKey?: string }[] };
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    label: 'Главное',
-    items: [
-      { id: 'dashboard', label: 'Дашборд', badgeKey: 'total' },
-      { id: 'requests', label: 'Заявки', badgeKey: 'repairRequests' },
-      { id: 'workorders', label: 'Заказ-наряды' },
-      { id: 'warehouse', label: 'Склад запчастей' },
-      { id: 'maintenance', label: 'Регламенты ТО' },
-    ],
-  },
-  {
-    label: 'Справочники',
-    items: [
-      { id: 'worktypes', label: 'Виды работ' },
-      { id: 'faultcatalog', label: 'Каталог неисправностей' },
-    ],
-  },
-  {
-    label: 'Отчёты',
-    items: [
-      { id: 'repvehicles', label: 'История автомобилей' },
-      { id: 'repmechanics', label: 'По механикам' },
-    ],
-  },
-  { label: 'Клиенты СТО', items: [{ id: 'clients', label: 'Карточки клиентов' }] },
-  { label: 'Система', items: [{ id: 'settings', label: 'Настройки СТО' }] },
-];
-
-function Sidebar({
-  section,
-  onChange,
-  counts,
-}: {
-  section: GarageSection;
-  onChange: (s: GarageSection) => void;
-  counts: DashboardData['counts'] | null;
-}) {
-  const getBadge = (key?: string) => {
-    if (!key || !counts) return null;
-    if (key === 'total') {
-      const total = counts.repairRequests + counts.pendingApproval + counts.maintenanceAlerts;
-      return total > 0 ? total : null;
-    }
-    if (key === 'repairRequests') return counts.repairRequests > 0 ? counts.repairRequests : null;
-    return null;
-  };
-
-  return (
-    <aside className="w-56 min-h-full bg-slate-900 flex flex-col flex-shrink-0">
-      <div className="px-5 py-5 border-b border-slate-700">
-        <div className="text-white font-bold text-base">TK501</div>
-        <div className="text-slate-400 text-xs mt-0.5">Раздел: Гараж</div>
-      </div>
-      <nav className="flex-1 py-3 px-2 overflow-y-auto">
-        {NAV_GROUPS.map((group, gi) => (
-          <div key={gi}>
-            <div className="text-slate-500 text-xs font-semibold px-3 mb-1 mt-4 uppercase tracking-wider">
-              {group.label}
-            </div>
-            {group.items.map((item) => {
-              const badge = getBadge(item.badgeKey);
-              const isActive =
-                section === 'repvehicles' || section === 'repmechanics'
-                  ? item.id === section
-                  : section === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onChange(item.id)}
-                  className={cn(
-                    'nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer mb-0.5 text-left transition-all',
-                    isActive
-                      ? 'bg-white/10 text-white'
-                      : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-300',
-                  )}
-                >
-                  {ICON_MAP[item.id]}
-                  {item.label}
-                  {badge &&
-                    (item.label === 'Дашборд' ? (
-                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                        {badge}
-                      </span>
-                    ) : (
-                      <span className="ml-auto bg-amber-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                        {badge}
-                      </span>
-                    ))}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-    </aside>
-  );
-}
-
-// ─── Default work descriptions (pre-filled on edit open) ─────────────────────
-
-const DEFAULT_WORK_DESCRIPTIONS: Record<string, string> = {
-  TO_1: 'ТО-1 выполнено: замена моторного масла, воздушного и топливного фильтров. Визуальный осмотр агрегатов проведён.',
-  TO_2: 'ТО-2 выполнено: замена масла, всех фильтров, свечей, проверка тормозной системы, ходовой, уровней технических жидкостей.',
-  OIL_CHANGE: 'Замена моторного масла и масляного фильтра. Уровень проверен после замены.',
-  AIR_FILTER: 'Заменён воздушный фильтр двигателя.',
-  FUEL_FILTER: 'Заменён топливный фильтр.',
-  CABIN_FILTER: 'Заменён салонный фильтр.',
-  ANTIFREEZE: 'Замена охлаждающей жидкости (антифриз). Система промыта, заправлена до нормы.',
-  BRAKE_FLUID: 'Замена тормозной жидкости. Система прокачана, воздух удалён.',
-  GUR_FLUID: 'Замена жидкости гидроусилителя руля.',
-  TIMING_BELT:
-    'Заменён ремень ГРМ в сборе с натяжителем и роликами. Метки установлены по регламенту.',
-  TIMING_CHAIN:
-    'Заменена цепь ГРМ, натяжитель и успокоитель. Фазы газораспределения выставлены по меткам.',
-  ENGINE_DIAG:
-    'Диагностика двигателя проведена. Считаны коды ошибок, составлен перечень неисправностей.',
-  HEAD_GASKET:
-    'Заменена прокладка ГБЦ. Головка снята, проверена на плоскостность, плоскость обработана.',
-  VALVE_ADJUST: 'Регулировка тепловых зазоров клапанов выполнена по заводскому регламенту.',
-  INJECTORS: 'Заменены форсунки. Давление топливной системы проверено после установки.',
-  GLOW_PLUGS:
-    'Заменены свечи накала. Резьба в колодцах очищена, затяжка выполнена с требуемым моментом.',
-  SPARK_PLUGS: 'Заменены свечи зажигания. Зазоры выставлены по регламенту.',
-  TURBO_REPLACE:
-    'Заменён турбокомпрессор. Маслоподводящая и сливная трубки проверены, масло заменено.',
-  TURBO_DIAG:
-    'Диагностика турбокомпрессора: давление наддува, осевой и радиальный люфт крыльчатки проверены.',
-  EGR_CLEAN: 'Клапан EGR очищен от нагара. Подвижность клапана проверена, установлен на место.',
-  ENGINE_MOUNT: 'Заменены подушки (опоры) двигателя.',
-  RADIATOR_REPLACE: 'Заменён радиатор системы охлаждения. Система промыта и заправлена антифризом.',
-  THERMOSTAT: 'Заменён термостат. Система охлаждения проверена на герметичность.',
-  WATER_PUMP: 'Заменена водяная помпа. ОЖ заменена, система прокачана.',
-  BELT_DRIVE: 'Заменён приводной ремень навесного оборудования.',
-  BELT_TENSIONER: 'Заменён натяжитель приводного ремня.',
-  SEALS_GASKETS: 'Заменены сальники и прокладки двигателя. Подтёки устранены.',
-  CLUTCH:
-    'Заменён комплект сцепления: диск, корзина, выжимной подшипник. Коробка снята и установлена.',
-  CLUTCH_CABLE: 'Заменён трос сцепления. Свободный ход педали отрегулирован.',
-  CLUTCH_CYLINDER: 'Заменён главный/рабочий цилиндр сцепления. Система прокачана.',
-  GEARBOX_OIL: 'Замена масла в коробке переключения передач.',
-  REAR_AXLE_OIL: 'Замена масла в редукторе заднего моста.',
-  GEARBOX_REPLACE: 'Заменена КПП. Установлена и отрегулирована.',
-  GEARBOX_ADJUST: 'Регулировка механизма переключения передач / кулисы выполнена.',
-  CARDAN_REPLACE: 'Заменён карданный вал в сборе. Крестовины и шлицевые соединения проверены.',
-  CARDAN_CROSS: 'Заменена крестовина карданного вала. Вал сбалансирован после установки.',
-  CARDAN_CROSS_150:
-    'Заменена крестовина карданного вала (2.5 нч): карданный вал снят, крестовина выпрессована и запрессована, вал установлен обратно.',
-  HUB_BEARING_FRONT: 'Заменён ступичный подшипник передней оси. Затяжка выполнена по регламенту.',
-  HUB_BEARING_REAR: 'Заменён ступичный подшипник задней оси.',
-  BRAKE_PADS_FRONT:
-    'Заменены тормозные колодки передней оси. Суппорты очищены, направляющие смазаны.',
-  BRAKE_PADS_REAR: 'Заменены тормозные колодки задней оси.',
-  BRAKE_DISCS_FRONT: 'Заменены тормозные диски передней оси.',
-  BRAKE_DRUMS_REAR: 'Заменены тормозные барабаны задней оси.',
-  SHOCK_FRONT: 'Заменены амортизаторы передней подвески.',
-  SHOCK_REAR: 'Заменены амортизаторы задней подвески.',
-  ALIGNMENT: 'Регулировка развал-схождения выполнена. Параметры выставлены по заводским нормам.',
-  SUSPENSION_DIAG:
-    'Диагностика ходовой части: проверка люфтов, износ сайлентблоков, шаровых, рулевых наконечников.',
-  BALL_JOINT: 'Заменена шаровая опора. Люфт в соединении устранён.',
-  TIE_ROD: 'Заменена рулевая тяга. Схождение проверено после установки.',
-  TIE_ROD_END: 'Заменён рулевой наконечник.',
-  SILENTBLOCK_FRONT: 'Заменены сайлентблоки передних рычагов подвески.',
-  SILENTBLOCK_REAR: 'Заменены сайлентблоки задней подвески.',
-  SPRING_REPLACE: 'Заменена рессора / пружина подвески.',
-  STABILIZER_BUSH: 'Заменены втулки стабилизатора поперечной устойчивости.',
-  STABILIZER_LINK: 'Заменены стойки стабилизатора.',
-  STEERING_RACK: 'Заменена рулевая рейка. Схождение передних колёс отрегулировано.',
-  STEERING_PUMP: 'Заменён насос ГУР. Жидкость заменена, система прокачана.',
-  WHEEL_BEARING: 'Заменён подшипник колеса.',
-  ABS_SENSOR: 'Заменён датчик ABS. Работа системы проверена.',
-  ALTERNATOR: 'Заменён генератор. Напряжение в бортсети после замены 14,0–14,5 В — норма.',
-  STARTER: 'Заменён стартер. Работа проверена — запуск двигателя штатный.',
-  ELECTRIC_DIAG:
-    'Диагностика электрооборудования проведена. Коды ошибок считаны, неисправности задокументированы.',
-  BATTERY_REPLACE: 'Заменена аккумуляторная батарея.',
-  WIRING_REPAIR: 'Поиск и ремонт обрыва / КЗ в проводке. Повреждённый участок восстановлен.',
-  HEADLIGHT_REPLACE: 'Заменена фара / задний фонарь.',
-  LAMP_REPLACE: 'Заменены лампы освещения.',
-  IGNITION_COIL: 'Заменена катушка зажигания.',
-  WIRING_HARNESS: 'Заменён жгут проводки.',
-  WIRING_HARNESS_PARTIAL:
-    'Ремонт участка кабельной трассы: изоляция восстановлена, соединения обжаты и защищены термоусадкой.',
-  ELECTRIC_CIRCUIT_CHECK:
-    'Выходной контроль электрических цепей: все цепи прозвонены, обрывов и КЗ не выявлено.',
-  ABS_EBS_DIAG:
-    'Диагностика ABS/EBS проведена. Коды ошибок считаны, неисправности задокументированы.',
-  ABS_CIRCUIT_CHECK:
-    'Проверка цепи датчика ABS: сопротивление, питание, сигнал соответствуют норме.',
-  ABS_SENSOR_REMOVE: 'Датчик ABS демонтирован.',
-  ABS_SENSOR_INSTALL_ADJ:
-    'Датчик ABS установлен, зазор между датчиком и ротором выставлен по регламенту.',
-  ECU_RESET_TEST:
-    'Ошибки ЭБУ сброшены. Финальное тестирование на ХХ и в движении — нарушений не выявлено.',
-  BODY_REPAIR: 'Кузовной ремонт: правка, шпаклёвка, грунтование повреждённого участка.',
-  BODY_PAINT: 'Окраска элемента кузова. Цвет подобран по заводскому коду.',
-  GLASS_REPLACE: 'Заменено стекло. Герметик нанесён по периметру, выдержан до полимеризации.',
-  DOOR_HANDLE: 'Заменена ручка двери / замок.',
-  MIRROR_REPLACE: 'Заменено зеркало заднего вида.',
-  WIPER_MECH: 'Заменена трапеция дворников.',
-  HEATER_CORE:
-    'Заменён радиатор печки. Приборная панель частично демонтирована, система охлаждения промыта.',
-  HEATER_FAN: 'Заменён вентилятор отопителя (моторчик печки).',
-  AC_CHARGE: 'Заправка кондиционера хладагентом. Давление в системе соответствует норме.',
-  AC_COMPRESSOR: 'Заменён компрессор кондиционера.',
-  EXHAUST_MUFFLER: 'Заменён глушитель.',
-  EXHAUST_PIPE: 'Заменена приёмная труба выхлопной системы.',
-  EXHAUST_GASKET: 'Заменена прокладка выпускного коллектора. Течь выхлопных газов устранена.',
-  EXHAUST_FLEX: 'Заменена гофрированная вставка глушителя.',
-  FUEL_PUMP: 'Заменён топливный насос.',
-  FUEL_TANK: 'Заменён топливный бак.',
-  FUEL_LINES: 'Заменены топливные магистрали (трубки / шланги).',
-  TYRE_MOUNT_SET: 'Шиномонтаж комплекта (4 колеса): бортировка и балансировка.',
-  TYRE_MOUNT_ONE: 'Шиномонтаж 1 колеса: бортировка и балансировка.',
-  TYRE_BALANCE: 'Балансировка колеса выполнена.',
-  TYRE_REPAIR: 'Ремонт прокола: жгутование / установка грибка.',
-  GBO_BALLOON_LP:
-    'Снятие и установка газового баллона (пропан). Соединения проверены на герметичность.',
-  REAR_AXLE_REMOVE: 'Снятие и установка заднего моста в сборе.',
-  REAR_AXLE_OVERHAUL: 'Разборка, дефектовка и сборка заднего моста. Изношенные детали заменены.',
-  AXLE_WELD_PAINT:
-    'Сварочно-восстановительные работы на чулке моста (заварка трещины / деформации), поверхность окрашена грунтом.',
-  SPRING_STUD_REMOVE: 'Срезание закисших стремянок рессор.',
-  SPRING_SILENTBLOCK_REPLACE: 'Заменены сайлентблоки рессор.',
-  SHOCK_ABSORBER_BUSH: 'Заменены втулки амортизаторов.',
-  BRAKE_BLEED: 'Прокачка тормозного контура. Воздух удалён, уровень ТЖ доведён до нормы.',
-};
+// Icons removed
 
 // ═══════════════════════════ MODALS (unchanged) ═══════════════════════════════
 
@@ -4059,1373 +3540,9 @@ type TabOrder = Omit<OrderRow, 'works'> & {
 
 // ─── Date Navigation ─────────────────────────────────────────────────────────
 
-function DateNav({ date, onChange }: { date: string; onChange: (d: string) => void }) {
-  const today = todayStr();
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => {
-          const d = new Date(date);
-          d.setDate(d.getDate() - 1);
-          onChange(d.toISOString().slice(0, 10));
-        }}
-        className="p-1.5 rounded-lg hover:bg-slate-100"
-      >
-        <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_left</span>
-      </button>
-      <input
-        type="date"
-        value={date}
-        max={today}
-        onChange={(e) => onChange(e.target.value)}
-        className="text-sm font-semibold text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5"
-      />
-      <button
-        onClick={() => {
-          const d = new Date(date);
-          d.setDate(d.getDate() + 1);
-          onChange(d.toISOString().slice(0, 10));
-        }}
-        disabled={date >= today}
-        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30"
-      >
-        <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_right</span>
-      </button>
-      {date !== today && (
-        <button
-          onClick={() => onChange(today)}
-          className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded border border-slate-200"
-        >
-          Сегодня
-        </button>
-      )}
-    </div>
-  );
-}
+// DateNav removed
 
-function MonthNav({ month, onChange }: { month: string; onChange: (m: string) => void }) {
-  const [y, mn] = month.split('-').map(Number) as [number, number];
-  const shift = (delta: number) => {
-    let newM = mn + delta;
-    let newY = y;
-    if (newM > 12) {
-      newM = 1;
-      newY += 1;
-    }
-    if (newM < 1) {
-      newM = 12;
-      newY -= 1;
-    }
-    onChange(`${newY}-${String(newM).padStart(2, '0')}`);
-  };
-  const currentMonth = todayStr().slice(0, 7);
-  const label = new Date(y, mn - 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-  return (
-    <div className="flex items-center gap-2">
-      <button onClick={() => shift(-1)} className="p-1.5 rounded-lg hover:bg-slate-100">
-        <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_left</span>
-      </button>
-      <span className="text-sm font-semibold text-slate-700 capitalize min-w-[120px] text-center">
-        {label}
-      </span>
-      <button
-        onClick={() => shift(1)}
-        disabled={month >= currentMonth}
-        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30"
-      >
-        <span className="material-symbols-outlined text-slate-500 text-[18px]">chevron_right</span>
-      </button>
-    </div>
-  );
-}
-
-// ═══════════════════════════ DASHBOARD ═══════════════════════════════════════
-
-function DashboardSection({
-  onNav,
-  onCreateOrder,
-}: {
-  onNav: (s: GarageSection) => void;
-  onCreateOrder: () => void;
-}) {
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery<DashboardData>({
-    queryKey: ['garage-dashboard'],
-    queryFn: () => fetch('/api/garage/dashboard').then((r) => r.json()),
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
-
-  const approveReq = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/garage/repair-requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
-    },
-  });
-  const rejectReq = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/garage/repair-requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject' }),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
-    },
-  });
-  const approveOrder = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/garage/orders/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lifecycle_status: 'approved' }),
-      }).then((r) => {
-        if (!r.ok) throw new Error('Ошибка утверждения');
-        return r.json();
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-      qc.invalidateQueries({ queryKey: ['garage-orders'] });
-    },
-  });
-
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showBalanceModal, setShowBalanceModal] = useState(false);
-
-  if (isLoading)
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-5 gap-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-
-  const c = data?.counts ?? {
-    repairRequests: 0,
-    pendingApproval: 0,
-    activeOrders: 0,
-    maintenanceAlerts: 0,
-    vehiclesInRepair: 0,
-  };
-  const m = data?.month ?? { completedOrders: 0, revenue: '0.00', salaryAccrued: '0.00' };
-  const st = data?.stats ?? {
-    garageBalance: parseFloat(
-      data?.stats?.garageBalance !== undefined
-        ? String(data.stats.garageBalance)
-        : m.garageBalance || '0',
-    ),
-    clientRevenueThisMonth: parseFloat(m.revenue || '0'),
-    clientRevenueAllTime: parseFloat(m.revenue || '0'),
-    clientProfitThisMonth: parseFloat(m.revenue || '0') - parseFloat(m.salaryAccrued || '0'),
-    clientProfitAllTime: parseFloat(m.revenue || '0') - parseFloat(m.salaryAccrued || '0'),
-    clientActiveSum: 0,
-    clientActiveCount: 0,
-    salaryThisMonth: parseFloat(m.salaryAccrued || '0'),
-    salaryAllTime: parseFloat(m.salaryAccrued || '0'),
-    ownFleetThisMonth: 0,
-    ownFleetAllTime: 0,
-    completedOrdersThisMonth: m.completedOrders,
-    completedOrdersAllTime: m.completedOrders,
-    inProgressOrdersCount: c.activeOrders,
-  };
-  const monthName = new Date().toLocaleDateString('ru-RU', { month: 'long' });
-  const clientProfit = st.clientProfitThisMonth ?? st.clientRevenueThisMonth - st.salaryThisMonth;
-  const currentGarageBalance =
-    typeof st.garageBalance === 'number'
-      ? st.garageBalance
-      : parseFloat(String(st.garageBalance || '0'));
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Дашборд Гараж</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{todayLabel()} — оперативная сводка</p>
-        </div>
-        <button
-          onClick={onCreateOrder}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8" />
-          </svg>
-          Новый наряд
-        </button>
-      </div>
-
-      {/* ── ОБОСОБЛЕННЫЙ ФИНАНСОВЫЙ СЧЁТ ГАРАЖА (СТО) ── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-indigo-500/30 group">
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Шапка плашки счёта */}
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-800/60 pb-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-indigo-500/25 border border-indigo-400/40 text-indigo-200 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5">
-                <span>🛠️</span>
-                <span>СЧЁТ ГАРАЖА И СТО</span>
-              </span>
-              <span className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold px-2.5 py-1 rounded-full">
-                Обособленный учёт
-              </span>
-            </div>
-            <p className="text-xs text-indigo-200/80 mt-1 font-medium">
-              Финансы автосервиса ведутся строго отдельно от расчётного счёта и кассы ТК
-              «СалдаКарго»
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowBalanceModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <span>⚙️ Управление кассой СТО</span>
-            </button>
-            <button
-              onClick={() => setShowStatsModal(true)}
-              className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <span>📊 Аналитика</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Сетка баланса и ключевых показателей счёта Гаража */}
-        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
-          {/* Баланс кассы/счёта СТО */}
-          <div className="bg-slate-800/80 border border-indigo-500/40 rounded-2xl p-4 flex flex-col justify-between shadow-inner">
-            <div>
-              <div className="flex items-center justify-between text-xs text-indigo-300 font-bold uppercase tracking-wider mb-1">
-                <span>Остаток кассы СТО</span>
-                <span className="text-[10px] text-indigo-400 font-normal">нал / safe</span>
-              </div>
-              <div className="text-3xl font-black text-white tracking-tight mt-1">
-                <Money amount={currentGarageBalance} />
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-indigo-200/70">
-              <span>Счёт № 1000...005</span>
-              <button
-                onClick={() => setShowBalanceModal(true)}
-                className="text-indigo-300 hover:text-white font-bold underline cursor-pointer"
-              >
-                Изменить
-              </button>
-            </div>
-          </div>
-
-          {/* Выручка с клиентов */}
-          <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">
-                Выручка с клиентов ({monthName})
-              </div>
-              <div className="text-2xl font-black text-emerald-400 tracking-tight mt-1">
-                <Money amount={st.clientRevenueThisMonth} />
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[11px] text-slate-400">
-              За всё время:{' '}
-              <span className="text-slate-200 font-bold">
-                <Money amount={st.clientRevenueAllTime} />
-              </span>
-            </div>
-          </div>
-
-          {/* Чистая прибыль Гаража */}
-          <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="text-xs text-indigo-300 font-bold uppercase tracking-wider mb-1">
-                Чистая прибыль ({monthName})
-              </div>
-              <div className="text-2xl font-black text-white tracking-tight mt-1">
-                <Money amount={clientProfit} />
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[11px] text-slate-400">
-              За всё время:{' '}
-              <span className="text-slate-200 font-bold">
-                <Money amount={st.clientProfitAllTime ?? 0} />
-              </span>
-            </div>
-          </div>
-
-          {/* ФОТ Механиков */}
-          <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="text-xs text-violet-400 font-bold uppercase tracking-wider mb-1">
-                ЗП Механиков ({monthName})
-              </div>
-              <div className="text-2xl font-black text-violet-400 tracking-tight mt-1">
-                <Money amount={st.salaryThisMonth} />
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[11px] text-slate-400">
-              {st.clientActiveCount > 0 ? (
-                <span>
-                  В работе:{' '}
-                  <strong className="text-amber-300">
-                    <Money amount={st.clientActiveSum} />
-                  </strong>{' '}
-                  ({st.clientActiveCount} н.)
-                </span>
-              ) : (
-                <span>
-                  Всего начислено: <Money amount={st.salaryAllTime} />
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 5 KPI tiles */}
-      <div className="grid grid-cols-5 gap-3">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
-          <div className="text-xs text-slate-400 mb-1">В ремонте сейчас</div>
-          <div className="text-3xl font-bold text-slate-900">{c.vehiclesInRepair}</div>
-          <div className="text-xs text-slate-500 mt-1">из {c.activeOrders} нарядов</div>
-        </div>
-        <div
-          onClick={() => onNav('workorders')}
-          className="bg-white border border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-slate-400"
-        >
-          <div className="text-xs text-slate-400 mb-1">Активных нарядов</div>
-          <div className="text-3xl font-bold text-blue-600">{c.activeOrders}</div>
-          <div className="text-xs text-slate-500 mt-1">открыт / в работе</div>
-        </div>
-        <div
-          onClick={() => onNav('workorders')}
-          className="bg-white border border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-slate-400"
-        >
-          <div className="text-xs text-amber-600 mb-1">На утверждении</div>
-          <div className="text-3xl font-bold text-amber-600">{c.pendingApproval}</div>
-          <div className="text-xs text-slate-500 mt-1">ждут Администратора</div>
-        </div>
-        <div
-          onClick={() => onNav('maintenance')}
-          className={cn(
-            'bg-white border rounded-2xl p-4 cursor-pointer',
-            c.maintenanceAlerts > 0 ? 'border-red-200 bg-red-50' : 'border-slate-200',
-          )}
-        >
-          <div className="text-xs text-red-500 mb-1 font-medium">Алертов ТО</div>
-          <div className="text-3xl font-bold text-red-600">{c.maintenanceAlerts}</div>
-          <div className="text-xs text-red-400 mt-1">требуют внимания</div>
-        </div>
-        <div
-          onClick={() => onNav('requests')}
-          className="bg-white border border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-slate-400"
-        >
-          <div className="text-xs text-slate-400 mb-1">Заявок от водителей</div>
-          <div className="text-3xl font-bold text-violet-600">{c.repairRequests}</div>
-          <div className="text-xs text-slate-500 mt-1">ожидают одобрения</div>
-        </div>
-      </div>
-
-      {/* Быстрая сводка за месяц */}
-      <div className="grid grid-cols-3 gap-3">
-        <div
-          onClick={() => setShowStatsModal(true)}
-          className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 cursor-pointer hover:bg-emerald-100/60 transition-all"
-        >
-          <div className="text-xs text-emerald-600 font-semibold mb-1 uppercase tracking-wide">
-            Выручка с клиентов ({monthName})
-          </div>
-          <div className="text-2xl font-bold text-emerald-700">
-            <Money amount={st.clientRevenueThisMonth} />
-          </div>
-          <div className="text-xs text-emerald-600 mt-1 font-medium">
-            Всего: <Money amount={st.clientRevenueAllTime} />
-          </div>
-        </div>
-        <div
-          onClick={() => setShowStatsModal(true)}
-          className="bg-violet-50/80 border border-violet-200 rounded-2xl p-4 cursor-pointer hover:bg-violet-100/60 transition-all"
-        >
-          <div className="text-xs text-violet-600 font-semibold mb-1 uppercase tracking-wide">
-            Выплачено ЗП механикам ({monthName})
-          </div>
-          <div className="text-2xl font-bold text-violet-700">
-            <Money amount={st.salaryThisMonth} />
-          </div>
-          <div className="text-xs text-violet-600 mt-1 font-medium">
-            Всего: <Money amount={st.salaryAllTime} />
-          </div>
-        </div>
-        <div
-          onClick={() => setShowStatsModal(true)}
-          className="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 cursor-pointer hover:bg-sky-100/60 transition-all"
-        >
-          <div className="text-xs text-sky-600 font-semibold mb-1 uppercase tracking-wide">
-            Обслуживание своего автопарка ({monthName})
-          </div>
-          <div className="text-2xl font-bold text-sky-700">
-            <Money amount={st.ownFleetThisMonth} />
-          </div>
-          <div className="text-xs text-sky-600 mt-1 font-medium">
-            Всего: <Money amount={st.ownFleetAllTime} />
-          </div>
-        </div>
-      </div>
-
-      {showStatsModal && (
-        <GarageStatsModal
-          stats={st}
-          monthName={monthName}
-          onClose={() => setShowStatsModal(false)}
-        />
-      )}
-
-      {showBalanceModal && (
-        <GarageBalanceModal
-          currentBalance={currentGarageBalance}
-          onClose={() => setShowBalanceModal(false)}
-          onSuccess={() => {
-            qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-            qc.invalidateQueries({ queryKey: ['wallets'] });
-          }}
-        />
-      )}
-
-      {/* 3-column grid */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Alerts TO */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-red-500 rounded-full alert-pulse" />
-            <h3 className="font-semibold text-slate-900 text-sm">Алерты ТО</h3>
-          </div>
-          {(data?.maintenanceAlerts ?? []).length === 0 ? (
-            <p className="text-sm text-slate-400">Нет просроченных или ближайших ТО</p>
-          ) : (
-            <div className="space-y-2">
-              {(data?.maintenanceAlerts ?? []).slice(0, 5).map((a) => (
-                <div
-                  key={a.id}
-                  className={cn(
-                    'rounded-xl p-3',
-                    a.alert_status === 'overdue'
-                      ? 'bg-red-50 border border-red-200'
-                      : 'bg-amber-50 border border-amber-200',
-                  )}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div
-                        className={cn(
-                          'font-medium text-sm',
-                          a.alert_status === 'overdue' ? 'text-red-700' : 'text-amber-700',
-                        )}
-                      >
-                        {a.asset?.short_name ?? '—'} {a.asset?.reg_number ?? ''}
-                      </div>
-                      <div
-                        className={cn(
-                          'text-xs mt-0.5',
-                          a.alert_status === 'overdue' ? 'text-red-500' : 'text-amber-600',
-                        )}
-                      >
-                        {a.work_name}
-                      </div>
-                    </div>
-                    <span
-                      className={cn(
-                        'badge text-xs px-2 py-0.5 rounded-full font-medium',
-                        ALERT_COLOR[a.alert_status],
-                      )}
-                    >
-                      {ALERT_LABEL[a.alert_status]}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => onNav('workorders')}
-                      className="text-xs font-medium px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                    >
-                      Создать наряд
-                    </button>
-                    <button className="text-xs font-medium px-3 py-1 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50">
-                      Закрыть
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Driver Requests + Pending Approval */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
-          <h3 className="font-semibold text-slate-900 text-sm mb-3">Заявки от водителей</h3>
-          {(data?.repairRequests ?? []).length === 0 ? (
-            <p className="text-sm text-slate-400 mb-4">Нет новых заявок</p>
-          ) : (
-            <div className="space-y-2 mb-4">
-              {(data?.repairRequests ?? []).slice(0, 3).map((r) => (
-                <div key={r.id} className="bg-violet-50 border border-violet-200 rounded-xl p-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium text-slate-900 text-sm">
-                        {r.asset?.short_name ?? '—'}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        «{r.fault?.name ?? r.custom_description}»
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        Водитель: {r.driver?.name ?? '—'} · {fmtDate(r.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => approveReq.mutate(r.id)}
-                      disabled={approveReq.isPending}
-                      className="text-xs font-medium px-3 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                    >
-                      Одобрить
-                    </button>
-                    <button
-                      onClick={() => rejectReq.mutate(r.id)}
-                      disabled={rejectReq.isPending}
-                      className="text-xs font-medium px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                    >
-                      Отклонить
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="border-t border-slate-100 pt-3">
-            <h3 className="font-semibold text-slate-900 text-sm mb-2">На утверждении</h3>
-            {(data?.pendingApproval ?? []).length === 0 ? (
-              <p className="text-sm text-slate-400">Нет нарядов на утверждении</p>
-            ) : (
-              <div className="space-y-2">
-                {(data?.pendingApproval ?? []).slice(0, 3).map((o) => {
-                  const normH =
-                    (o.service_order_works ?? []).reduce(
-                      (s: number, w: { norm_minutes?: number | null }) => s + (w.norm_minutes ?? 0),
-                      0,
-                    ) / 60;
-                  const factH =
-                    (o.service_order_works ?? []).reduce(
-                      (s: number, w: { actual_minutes?: number | null }) =>
-                        s + (w.actual_minutes ?? 0),
-                      0,
-                    ) / 60;
-                  return (
-                    <div key={o.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <div className="flex justify-between">
-                        <div>
-                          <div className="font-medium text-slate-900 text-sm">
-                            НЗ-{o.order_number}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {o.asset?.short_name ?? '—'} · {o.mechanic?.name ?? '—'}
-                          </div>
-                        </div>
-                        <span className="badge bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
-                          {factH.toFixed(1)} / {normH.toFixed(1)} нч
-                        </span>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => approveOrder.mutate(o.id)}
-                          disabled={approveOrder.isPending}
-                          className="text-xs font-medium px-3 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                          Утвердить
-                        </button>
-                        <button
-                          onClick={() => onNav('workorders')}
-                          className="text-xs font-medium px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                        >
-                          Детали
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Active Orders */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
-          <h3 className="font-semibold text-slate-900 text-sm mb-3">Активные наряды</h3>
-          {(data?.activeOrders ?? []).length === 0 ? (
-            <p className="text-sm text-slate-400">Нет активных нарядов</p>
-          ) : (
-            <div className="space-y-2">
-              {(data?.activeOrders ?? []).slice(0, 5).map((o) => (
-                <div key={o.id} className="border border-blue-200 bg-blue-50 rounded-xl p-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium text-slate-900 text-sm">НЗ-{o.order_number}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        {o.asset?.short_name ?? '—'} · {o.mechanic?.name ?? 'Не назначен'}
-                      </div>
-                    </div>
-                    <span className="badge bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
-                      В работе
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════ REQUESTS (TABLE) ════════════════════════════════
-
-function RequestsSection() {
-  const qc = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState('new');
-
-  const { data: requests = [], isLoading } = useQuery<RepairRequest[]>({
-    queryKey: ['garage-repair-requests', statusFilter],
-    queryFn: () =>
-      fetch(`/api/garage/repair-requests?status=${statusFilter}`)
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 30000,
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      fetch(`/api/garage/repair-requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
-      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-    },
-  });
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Заявки от водителей</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Одобрение или отклонение заявок на ремонт</p>
-      </div>
-
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {[
-          { key: 'new', label: 'Новые' },
-          { key: 'approved', label: 'Одобренные' },
-          { key: 'rejected', label: 'Отклонённые' },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setStatusFilter(f.key)}
-            className={cn(
-              'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
-              statusFilter === f.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="h-48 bg-slate-100 rounded-2xl animate-pulse" />
-      ) : requests.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-          <p className="text-5xl mb-3">📋</p>
-          <p className="font-medium text-slate-500">Заявок нет</p>
-        </div>
-      ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Дата
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Автомобиль
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Водитель
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Описание
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Статус
-                </th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {requests.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 text-slate-500">{fmtDate(r.created_at)}</td>
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-slate-900">{r.asset?.short_name ?? '—'}</span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{r.driver?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {r.fault?.name ?? r.custom_description}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        'badge text-xs px-2 py-0.5 rounded-full',
-                        r.status === 'new'
-                          ? 'bg-violet-100 text-violet-700'
-                          : r.status === 'approved'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-slate-100 text-slate-600',
-                      )}
-                    >
-                      {r.status === 'new'
-                        ? 'Новая'
-                        : r.status === 'approved'
-                          ? 'Одобрена'
-                          : 'Отклонена'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {r.status === 'new' && (
-                      <div className="flex gap-1 justify-end">
-                        <button
-                          onClick={() =>
-                            approveMutation.mutate({ id: r.id, body: { action: 'approve' } })
-                          }
-                          disabled={approveMutation.isPending}
-                          className="text-xs font-medium px-3 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                        >
-                          Одобрить
-                        </button>
-                        <button
-                          onClick={() =>
-                            approveMutation.mutate({ id: r.id, body: { action: 'reject' } })
-                          }
-                          disabled={approveMutation.isPending}
-                          className="text-xs font-medium px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                        >
-                          Отклонить
-                        </button>
-                      </div>
-                    )}
-                    {r.status === 'approved' && r.service_order && (
-                      <span className="text-xs text-slate-500">
-                        → Наряд #{r.service_order.order_number}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════ AI IMPORT MODAL ═════════════════════════════════
-
-type AiWork = {
-  group?: string;
-  custom_work_name: string;
-  work_description?: string;
-  norm_minutes: number;
-  price_client: string;
-};
-type AiPart = {
-  name: string;
-  quantity: number;
-  unit?: string;
-  unit_price: string;
-  total_price?: string;
-};
-type AiParsed = {
-  order: {
-    machine_type: 'client' | 'own';
-    client_vehicle_brand?: string;
-    client_vehicle_model?: string;
-    client_vehicle_reg?: string;
-    client_name?: string;
-    client_phone?: string;
-    odometer_start?: number | null;
-    problem_description: string;
-    priority?: string;
-  };
-  works: AiWork[];
-  parts: AiPart[];
-  totals: { works: string; parts: string; complications: string; total: string };
-  recommendations?: string[];
-  warranty_note?: string;
-  delivery_note?: string | null;
-};
-
-function tryParseJson(raw: string): AiParsed | null {
-  try {
-    const parsed = JSON.parse(raw.trim());
-    if (parsed && typeof parsed === 'object' && 'order' in parsed && 'works' in parsed) {
-      if (parsed.order?.machine_type && !['own', 'client'].includes(parsed.order.machine_type)) {
-        parsed.order.machine_type = 'own';
-      }
-      if (parsed.order?.priority && !['low', 'normal', 'urgent'].includes(parsed.order.priority)) {
-        parsed.order.priority = 'normal';
-      }
-      return parsed as AiParsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function parseAiResponse(text: string): AiParsed | null {
-  // 1. Точный маркер ```json-order
-  const m1 = text.match(/```json-order\s*([\s\S]*?)```/);
-  if (m1) return tryParseJson(m1[1] ?? '');
-
-  // 2. Любой ```json блок с нужными ключами (LLM часто игнорирует нестандартный маркер)
-  const jsonBlocks = [...text.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/g)];
-  for (const m of jsonBlocks) {
-    const result = tryParseJson(m[1] ?? '');
-    if (result) return result;
-  }
-
-  // 3. Последний JSON-объект {...} в тексте — крайний случай
-  const rawBlocks = [...text.matchAll(/(\{[\s\S]*?"order"[\s\S]*?"works"[\s\S]*?\})\s*(?:```|$)/g)];
-  for (const m of rawBlocks) {
-    const result = tryParseJson(m[1] ?? '');
-    if (result) return result;
-  }
-
-  return null;
-}
-
-function AiImportModal({
-  onClose,
-  assets,
-  mechanics = [],
-  onCreated,
-}: {
-  onClose: () => void;
-  assets: Asset[];
-  mechanics?: Mechanic[];
-  onCreated: (id: string) => void;
-}) {
-  const aiBackdropDown = useRef(false);
-  const [pasted, setPasted] = useState('');
-  const [parsed, setParsed] = useState<AiParsed | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
-
-  const [selectedAssetId, setSelectedAssetId] = useState('');
-  const [selectedClientVehicle, setSelectedClientVehicle] = useState<ClientVehicle | null>(null);
-  const [selectedMechanicId, setSelectedMechanicId] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  function handleRecognize() {
-    setParseError(null);
-    const result = parseAiResponse(pasted);
-    if (!result) {
-      setParseError(
-        'JSON не найден. Убедитесь, что в тексте есть блок с полями "order", "works", "parts".',
-      );
-      return;
-    }
-    setParsed(result);
-
-    // Авто-подбор машины из автопарка по госномеру или модели
-    if (result.order.machine_type === 'own') {
-      const reg = (result.order.client_vehicle_reg || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9а-я]/g, '');
-      const model = (result.order.client_vehicle_model || '').toLowerCase().trim();
-      const matched = assets.find((a) => {
-        const aReg = (a.reg_number || '').toLowerCase().replace(/[^a-z0-9а-я]/g, '');
-        const aName = (a.short_name || '').toLowerCase().trim();
-        return (reg && aReg && aReg.includes(reg)) || (model && aName && aName.includes(model));
-      });
-      if (matched) {
-        setSelectedAssetId(matched.id);
-      } else if (assets.length === 1 && assets[0]) {
-        setSelectedAssetId(assets[0].id);
-      }
-    }
-  }
-
-  async function handleCreate() {
-    if (!parsed) return;
-    if (parsed.order.machine_type === 'own' && !selectedAssetId) {
-      setCreateError('Выберите машину из автопарка');
-      return;
-    }
-    if (parsed.order.machine_type === 'client' && !selectedClientVehicle) {
-      setCreateError('Выберите или создайте автомобиль клиента');
-      return;
-    }
-
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const r = await fetch('/api/garage/orders/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order: {
-            ...parsed.order,
-
-            asset_id: parsed.order.machine_type === 'own' ? selectedAssetId : undefined,
-            client_vehicle_id:
-              parsed.order.machine_type === 'client' ? selectedClientVehicle?.id : undefined,
-            assigned_mechanic_id: selectedMechanicId || undefined,
-          },
-          works: parsed.works,
-          parts: parsed.parts ?? [],
-          ai_generated_text: pasted,
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? 'Ошибка');
-      onCreated(d.id);
-      onClose();
-    } catch (e: unknown) {
-      setCreateError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  const worksTotal = parsed?.works?.reduce((s, w) => s + parseFloat(w.price_client || '0'), 0) ?? 0;
-  const partsTotal =
-    parsed?.parts?.reduce((s, p) => s + parseFloat(p.unit_price || '0') * (p.quantity || 1), 0) ??
-    0;
-  const grandTotal = worksTotal + partsTotal;
-  const totalNormH = parsed?.works?.reduce((s, w) => s + (w.norm_minutes || 0), 0) ?? 0;
-
-  const canCreate =
-    !creating &&
-    !!parsed &&
-    (parsed.order.machine_type === 'own' ? !!selectedAssetId : !!selectedClientVehicle);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onMouseDown={(e) => {
-        aiBackdropDown.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (aiBackdropDown.current && e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className={cn(
-          'bg-white rounded-2xl shadow-2xl flex flex-col transition-all',
-          parsed ? 'w-full max-w-4xl max-h-[92vh]' : 'w-full max-w-xl max-h-[80vh]',
-        )}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ── Шапка ── */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
-              <svg
-                className="w-4 h-4 text-violet-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Создать наряд через ИИ</h2>
-              <p className="text-xs text-slate-400">
-                {parsed
-                  ? `Распознано: ${parsed.works.length} работ · ${grandTotal.toLocaleString('ru-RU')} ₽`
-                  : 'Вставьте JSON-ответ от ИИ'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* ── Контент ── */}
-        {!parsed ? (
-          /* ─── Шаг 1: Ввод JSON ─── */
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-              <p className="font-semibold text-slate-800 mb-1">Как использовать</p>
-              <p className="text-xs leading-relaxed">
-                Получите ответ ИИ со сметой (через наш промпт или свой), скопируйте его целиком и
-                вставьте сюда. Система автоматически найдёт JSON с данными наряда.
-              </p>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest block mb-2">
-                Ответ от ИИ
-              </label>
-              <textarea
-                rows={12}
-                value={pasted}
-                onChange={(e) => {
-                  setPasted(e.target.value);
-                  setParseError(null);
-                }}
-                placeholder={
-                  'Вставьте сюда ответ от ChatGPT / Claude / другого ИИ...\n\nСистема найдёт JSON с данными наряда автоматически.'
-                }
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 leading-relaxed"
-              />
-            </div>
-            {parseError && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
-                <span className="text-red-500 mt-0.5 shrink-0">✕</span>
-                <p className="text-sm text-red-700">{parseError}</p>
-              </div>
-            )}
-            <button
-              onClick={handleRecognize}
-              disabled={!pasted.trim()}
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl text-sm disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              Распознать наряд
-            </button>
-          </div>
-        ) : (
-          /* ─── Шаг 2: Подтверждение ─── */
-          <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
-            {/* Левая колонка: данные из ИИ */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 border-r border-slate-100">
-              {/* Шапка авто */}
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="bg-slate-900 px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-white font-bold text-sm">
-                      {parsed.order.machine_type === 'client'
-                        ? [parsed.order.client_vehicle_brand, parsed.order.client_vehicle_model]
-                            .filter(Boolean)
-                            .join(' ') || 'Клиентский авт.'
-                        : 'Автопарк компании'}
-                    </p>
-                    <p className="text-slate-400 text-xs mt-0.5">
-                      {parsed.order.client_vehicle_reg
-                        ? `Госномер: ${parsed.order.client_vehicle_reg}`
-                        : (parsed.order.client_name ?? '')}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      'text-xs font-black px-2 py-1 rounded-full',
-                      parsed.order.priority === 'urgent'
-                        ? 'bg-red-500 text-white'
-                        : parsed.order.priority === 'low'
-                          ? 'bg-blue-200 text-blue-800'
-                          : 'bg-slate-700 text-slate-200',
-                    )}
-                  >
-                    {PRIORITY_LABEL[parsed.order.priority ?? 'normal']}
-                  </span>
-                </div>
-                <div className="px-4 py-3 bg-slate-50 text-sm text-slate-700 border-t border-slate-200">
-                  {parsed.order.problem_description}
-                </div>
-              </div>
-
-              {/* Метрики */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Работы</p>
-                  <p className="text-base font-black text-slate-900">
-                    {worksTotal.toLocaleString('ru-RU')} ₽
-                  </p>
-                </div>
-                {partsTotal > 0 && (
-                  <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
-                    <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">
-                      Запчасти
-                    </p>
-                    <p className="text-base font-black text-slate-900">
-                      {partsTotal.toLocaleString('ru-RU')} ₽
-                    </p>
-                  </div>
-                )}
-                <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
-                  <p className="text-[10px] text-emerald-600 uppercase font-semibold mb-1">Итого</p>
-                  <p className="text-base font-black text-emerald-800">
-                    {grandTotal.toLocaleString('ru-RU')} ₽
-                  </p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">
-                    Нормочасы
-                  </p>
-                  <p className="text-base font-black text-slate-900">
-                    {(totalNormH / 60).toFixed(1)} ч
-                  </p>
-                </div>
-              </div>
-
-              {/* Работы */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Работы · {parsed.works.length}
-                  </span>
-                </div>
-                {parsed.works.map((w, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5',
-                      i > 0 && 'border-t border-slate-100',
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <input
-                        type="text"
-                        value={w.custom_work_name}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setParsed((prev) => {
-                            if (!prev) return prev;
-                            const nextWorks = [...prev.works];
-                            const cur = nextWorks[i];
-                            if (!cur) return prev;
-                            nextWorks[i] = { ...cur, custom_work_name: val };
-                            return { ...prev, works: nextWorks };
-                          });
-                        }}
-                        className="text-sm font-semibold text-slate-800 w-full border border-slate-200 rounded px-2 py-0.5"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="w-20">
-                        <input
-                          type="number"
-                          value={w.price_client}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setParsed((prev) => {
-                              if (!prev) return prev;
-                              const nextWorks = [...prev.works];
-                              const cur = nextWorks[i];
-                              if (!cur) return prev;
-                              nextWorks[i] = { ...cur, price_client: val };
-                              return { ...prev, works: nextWorks };
-                            });
-                          }}
-                          className="text-sm font-bold text-slate-900 w-full border border-slate-200 rounded px-2 py-0.5 text-right"
-                          placeholder="Цена"
-                        />
-                      </div>
-                      <span className="text-xs text-slate-400">₽</span>
-                      <div className="w-16">
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={(w.norm_minutes / 60).toFixed(1)}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value || '0');
-                            setParsed((prev) => {
-                              if (!prev) return prev;
-                              const nextWorks = [...prev.works];
-                              const cur = nextWorks[i];
-                              if (!cur) return prev;
-                              nextWorks[i] = {
-                                ...cur,
-                                norm_minutes: Math.max(1, Math.round(val * 60)),
-                              };
-                              return { ...prev, works: nextWorks };
-                            });
-                          }}
-                          className="text-xs text-slate-700 w-full border border-slate-200 rounded px-1.5 py-0.5 text-center"
-                          placeholder="Часы"
-                        />
-                      </div>
-                      <span className="text-xs text-slate-400">ч</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Запчасти */}
-              {parsed.parts && parsed.parts.length > 0 && (
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Запчасти · {parsed.parts.length}
-                    </span>
-                  </div>
-                  {parsed.parts.map((p, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5',
-                        i > 0 && 'border-t border-slate-100',
-                      )}
-                    >
-                      <p className="flex-1 text-sm text-slate-800">{p.name}</p>
-                      <p className="text-xs text-slate-400 shrink-0">
-                        {p.quantity} {p.unit || 'шт'}
-                      </p>
-                      <p className="text-sm font-semibold text-slate-900 shrink-0">
-                        {(parseFloat(p.unit_price) * p.quantity).toLocaleString('ru-RU')} ₽
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Правая колонка: выбор машины и механика */}
-            <div className="w-full lg:w-80 flex-shrink-0 flex flex-col border-t lg:border-t-0 border-slate-100">
-              <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Привязка
-                </p>
-
-                {/* Машина */}
-                {parsed.order.machine_type === 'own' ? (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                      Машина из автопарка *
-                    </label>
-                    <select
-                      value={selectedAssetId}
-                      onChange={(e) => setSelectedAssetId(e.target.value)}
-                      className={cn(
-                        'w-full border rounded-xl px-3 py-2.5 text-sm bg-white',
-                        !selectedAssetId ? 'border-red-300 bg-red-50' : 'border-slate-200',
-                      )}
-                    >
-                      <option value="">— Выберите машину —</option>
-                      {assets.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.short_name} · {a.reg_number}
-                        </option>
-                      ))}
-                    </select>
-                    {!selectedAssetId && <p className="text-xs text-red-500 mt-1">Обязательно</p>}
-                  </div>
-                ) : (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                      Автомобиль клиента *
-                    </label>
-                    <ClientVehicleSelector
-                      value={selectedClientVehicle}
-                      onChange={setSelectedClientVehicle}
-                    />
-                    {!selectedClientVehicle && (
-                      <p className="text-xs text-red-500 mt-1">Обязательно</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Исполнитель */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                    Исполнитель (опционально)
-                  </label>
-                  <select
-                    value={selectedMechanicId}
-                    onChange={(e) => setSelectedMechanicId(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                  >
-                    <option value="">— Выберите исполнителя —</option>
-                    {mechanics.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {createError && (
-                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
-                    <span className="text-red-500 shrink-0 mt-0.5">✕</span>
-                    <p className="text-sm text-red-700">{createError}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Кнопки */}
-              <div className="flex-shrink-0 border-t border-slate-100 px-5 py-4 space-y-2">
-                <button
-                  onClick={handleCreate}
-                  disabled={!canCreate}
-                  className={cn(
-                    'w-full font-bold py-3.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2',
-                    canCreate
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 active:scale-[0.98]'
-                      : 'bg-amber-100 border border-amber-300 text-amber-800 cursor-not-allowed',
-                  )}
-                >
-                  {creating
-                    ? 'Создаём наряд...'
-                    : parsed.order.machine_type === 'own' && !selectedAssetId
-                      ? '⚠️ Выберите машину из автопарка'
-                      : parsed.order.machine_type === 'client' && !selectedClientVehicle
-                        ? '⚠️ Выберите клиентский автомобиль'
-                        : '✅ Создать наряд →'}
-                </button>
-                <button
-                  onClick={() => {
-                    setParsed(null);
-                    setParseError(null);
-                    setCreateError(null);
-                  }}
-                  className="w-full border border-slate-200 text-slate-500 hover:bg-slate-50 font-semibold py-2 rounded-xl text-sm transition-colors"
-                >
-                  ← Вставить другой ответ
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// MonthNav removed
 
 // ─── Archive Analytics & Review-Style Flow ───────────────────────────────────
 
@@ -6423,1247 +4540,165 @@ function GarageArchiveSection({
   );
 }
 
-// ═══════════════════════════ WORK ORDERS ═════════════════════════════════════
-
-function WorkOrdersSection() {
-  const [showCreate, setShowCreate] = useState(false);
-  const [showAiImport, setShowAiImport] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<
-    'active' | 'pending_payment' | 'archive' | 'requests' | 'warehouse'
-  >('active');
-  // Unified date filter — applies to all tabs
-  const [dateMode, setDateMode] = useState<'all' | 'month' | 'day'>('all');
-  const [filterDate, setFilterDate] = useState(todayStr());
-  const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
-  // Archive dedicated period filter ('day' | 'week' | 'month' | 'all')
-  const [archivePeriod, setArchivePeriod] = useState<'day' | 'week' | 'month' | 'all'>('month');
-  const [archiveDate, setArchiveDate] = useState(todayStr());
-  const [archiveMonth, setArchiveMonth] = useState(todayStr().slice(0, 7));
-  // Text / type / status / mechanic filters (all client-side — instant)
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
-  const [filterMechanic, setFilterMechanic] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'in_progress' | 'completed' | 'review'>(
-    'all',
-  );
-  const [groupByVehicle, setGroupByVehicle] = useState(false);
+// ── Order card (компактный однострочный вид) ─────────────────────────────────
+function OrderCard({ o, onSelect }: { o: TabOrder; onSelect: (id: string) => void }) {
   const qc = useQueryClient();
-
-  // One "all" query covers active + review. Archive by date is separate.
-  const { data: allOrders = [], isLoading: allLoading } = useQuery<TabOrder[]>({
-    queryKey: ['garage-orders', 'all'],
-    queryFn: () =>
-      fetch('/api/garage/orders?filter=all')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 60000,
-    refetchInterval: 60000,
-  });
-  const archiveUrl =
-    archivePeriod === 'day'
-      ? `/api/garage/orders?filter=history&date=${archiveDate}`
-      : archivePeriod === 'month'
-        ? `/api/garage/orders?filter=history&month=${archiveMonth}`
-        : `/api/garage/orders?filter=history`;
-  const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
-    queryKey: [
-      'garage-orders',
-      'history',
-      archivePeriod,
-      archivePeriod === 'day'
-        ? archiveDate
-        : archivePeriod === 'month'
-          ? archiveMonth
-          : archivePeriod === 'week'
-            ? archiveDate
-            : 'all',
-    ],
-    queryFn: () =>
-      fetch(archiveUrl)
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 60000,
-    enabled: activeTab === 'archive',
-  });
-
-  const { data: pendingPaymentOrders = [], isLoading: pendingLoading } = useQuery<TabOrder[]>({
-    queryKey: ['garage-orders', 'pending_payment'],
-    queryFn: () =>
-      fetch('/api/garage/orders?filter=pending_payment')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 30000,
-    refetchInterval: 60000,
-    enabled: activeTab === 'pending_payment',
-  });
-
-  const { data: reminders = [] } = useQuery<ReminderItem[]>({
-    queryKey: ['garage-reminders'],
-    queryFn: () =>
-      fetch('/api/garage/reminders')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
-
-  const markReminderDoneMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const r = await fetch('/api/garage/reminders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, is_done: true }),
-      });
-      if (!r.ok) throw new Error('Ошибка');
-      return r.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-reminders'] });
-    },
-  });
-
-  // ── Repair requests (заявки водителей) ──
-  const { data: repairRequests = [] } = useQuery<RepairRequest[]>({
-    queryKey: ['garage-repair-requests', 'new'],
-    queryFn: () =>
-      fetch('/api/garage/repair-requests?status=pending_json')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
-
-  // Attach JSON state
-  const [attachId, setAttachId] = useState<string | null>(null);
-  const [jsonText, setJsonText] = useState('');
-  const [jsonError, setJsonError] = useState('');
-
-  // Approve modal state
-  const [approveReqId, setApproveReqId] = useState<string | null>(null);
-  const [approveMechanicId, setApproveMechanicId] = useState('');
-  const [approveOdometer, setApproveOdometer] = useState('');
-  const [approving, setApproving] = useState(false);
-
-  const attachJsonMutation = useMutation({
-    mutationFn: ({ id, service_json }: { id: string; service_json: unknown }) =>
-      fetch(`/api/garage/repair-requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'attach_json', service_json }),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
-      setAttachId(null);
-      setJsonText('');
-      setJsonError('');
-    },
-  });
-
-  const approveReqMutation = useMutation({
-    mutationFn: ({
-      id,
-      mechanic_id,
-      odometer,
-    }: {
-      id: string;
-      mechanic_id: string;
-      odometer?: number;
-    }) =>
-      fetch(`/api/garage/repair-requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', mechanic_id, odometer }),
-      }).then(async (r) => {
-        const json = await r.json();
-        if (!r.ok) throw new Error(json.error ?? 'Ошибка');
-        return json;
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-repair-requests'] });
-      qc.invalidateQueries({ queryKey: ['garage-orders'] });
-      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-      setApproveReqId(null);
-      setApproveMechanicId('');
-      setApproveOdometer('');
-    },
-  });
-
-  const rejectReqMutation = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/garage/repair-requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject' }),
-      }).then((r) => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['garage-repair-requests'] }),
-  });
-
-  const handleAttachJson = (id: string) => {
-    setJsonError('');
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      setJsonError('Невалидный JSON');
-      return;
-    }
-    attachJsonMutation.mutate({ id, service_json: parsed });
-  };
-
-  const handleApproveRequest = async (id: string) => {
-    if (!approveMechanicId) return;
-    setApproving(true);
-    try {
-      await approveReqMutation.mutateAsync({
-        id,
-        mechanic_id: approveMechanicId,
-        odometer: approveOdometer ? parseInt(approveOdometer) : undefined,
-      });
-    } finally {
-      setApproving(false);
-    }
-  };
-
-  const { data: mechanics = [] } = useQuery<Mechanic[]>({
-    queryKey: ['mechanics-list'],
-    queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
-    staleTime: 300000,
-  });
-  const { data: assets = [] } = useQuery<Asset[]>({
-    queryKey: ['assets-select'],
-    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
-    staleTime: 300000,
-  });
-
   const patch = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
       fetch(`/api/garage/orders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }).then((r) => {
-        if (!r.ok) throw new Error('Ошибка');
-        return r.json();
-      }),
+      }).then((r) => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['garage-orders'] });
-      qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
     },
   });
 
-  // Draft orders (in work)
-  const activePool = useMemo(
-    () => allOrders.filter((o) => o.lifecycle_status === 'draft'),
-    [allOrders],
+  const works = o.works ?? [];
+  const parts = o.parts ?? [];
+  const worksCost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
+  const partsCost = parts.reduce(
+    (s, p) => s + (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1),
+    0,
   );
+  const cost = worksCost + partsCost;
+  const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
+  const isReview = !isCancelled && o.lifecycle_status === 'draft' && o.status === 'completed';
+  const isPendingPayment =
+    !isCancelled &&
+    o.lifecycle_status === 'approved' &&
+    o.machine_type === 'client' &&
+    !o.payment_received;
+  const isClosed = !isCancelled && o.lifecycle_status === 'approved' && !isPendingPayment;
 
-  // Client orders approved but not yet paid — dedicated query, no limit issues
-  const pendingPaymentPool = pendingPaymentOrders;
+  const vehicleLabel =
+    o.machine_type === 'own'
+      ? [o.asset?.short_name, o.asset?.reg_number].filter(Boolean).join(' · ')
+      : [
+          o.client_vehicle_brand,
+          (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
+          o.client_vehicle_reg,
+        ]
+          .filter(Boolean)
+          .join(' ');
+  const clientLabel = o.machine_type === 'client' ? (o.client_name as string | null) : null;
 
-  // Counters for tab badges
-  const inWorkCount = activePool.filter((o) => o.status === 'in_progress').length;
-  const reviewCount = activePool.filter(
-    (o) => o.lifecycle_status === 'draft' && o.status === 'completed',
-  ).length;
-  const pendingPaymentCount = pendingPaymentOrders.length;
-
-  // Client-side filtered list (instant)
-  const filteredOrders = useMemo(() => {
-    const pool =
-      activeTab === 'archive'
-        ? historyOrders
-        : activeTab === 'pending_payment'
-          ? pendingPaymentPool
-          : activePool;
-    let result = pool;
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (o) =>
-          String(o.order_number).includes(q) ||
-          o.asset?.short_name?.toLowerCase().includes(q) ||
-          o.asset?.reg_number?.toLowerCase().includes(q) ||
-          o.client_vehicle_brand?.toLowerCase().includes(q) ||
-          (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model
-            ?.toLowerCase()
-            .includes(q) ||
-          o.client_vehicle_reg?.toLowerCase().includes(q) ||
-          (o.client_name as string | null)?.toLowerCase().includes(q) ||
-          o.mechanic?.name?.toLowerCase().includes(q) ||
-          o.problem_description?.toLowerCase().includes(q) ||
-          (o.works ?? []).some((w) =>
-            (w.work_catalog?.name ?? w.custom_work_name ?? '').toLowerCase().includes(q),
-          ),
-      );
-    }
-    if (filterType !== 'all') result = result.filter((o) => o.machine_type === filterType);
-    if (filterMechanic) result = result.filter((o) => o.mechanic?.id === filterMechanic);
-    if (filterStatus !== 'all') {
-      if (filterStatus === 'review') {
-        result = result.filter((o) => o.lifecycle_status === 'draft' && o.status === 'completed');
-      } else if (filterStatus === 'in_progress') {
-        result = result.filter((o) => o.status === 'in_progress' || o.status === 'created');
-      } else {
-        result = result.filter((o) => o.status === filterStatus);
-      }
-    }
-    // Date filter for non-archive tabs (archive uses server-side filtering)
-    if (activeTab !== 'archive' && dateMode !== 'all') {
-      const prefix = dateMode === 'day' ? filterDate : filterMonth;
-      result = result.filter((o) => o.created_at?.startsWith(prefix));
-    }
-    return result;
-  }, [
-    activePool,
-    pendingPaymentOrders,
-    historyOrders,
-    activeTab,
-    search,
-    filterType,
-    filterMechanic,
-    filterStatus,
-    dateMode,
-    filterDate,
-    filterMonth,
-  ]);
-
-  const totalCost = useMemo(
-    () =>
-      filteredOrders.reduce((s, o) => {
-        const worksCost = (o.works ?? []).reduce((ws, w) => ws + moneyVal(w.price_client), 0);
-        const partsCost = (o.parts ?? []).reduce(
-          (ps, p) =>
-            ps + (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1),
-          0,
-        );
-        return s + worksCost + partsCost;
-      }, 0),
-    [filteredOrders],
-  );
-
-  const hasFilters = !!(
-    search ||
-    filterType !== 'all' ||
-    filterMechanic ||
-    filterStatus !== 'all' ||
-    dateMode !== 'all'
-  );
-
-  function clearFilters() {
-    setSearch('');
-    setFilterType('all');
-    setFilterMechanic('');
-    setFilterStatus('all');
-    setDateMode('all');
-  }
-
-  // ── Order card (компактный однострочный вид) ─────────────────────────────────
-  function OrderCard({ o }: { o: TabOrder }) {
-    const works = o.works ?? [];
-    const parts = o.parts ?? [];
-    const worksCost = works.reduce((s, w) => s + moneyVal(w.price_client), 0);
-    const partsCost = parts.reduce(
-      (s, p) => s + (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1),
-      0,
-    );
-    const cost = worksCost + partsCost;
-    const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
-    const isReview = !isCancelled && o.lifecycle_status === 'draft' && o.status === 'completed';
-    const isPendingPayment =
-      !isCancelled &&
-      o.lifecycle_status === 'approved' &&
-      o.machine_type === 'client' &&
-      !o.payment_received;
-    const isClosed = !isCancelled && o.lifecycle_status === 'approved' && !isPendingPayment;
-
-    const vehicleLabel =
-      o.machine_type === 'own'
-        ? [o.asset?.short_name, o.asset?.reg_number].filter(Boolean).join(' · ')
-        : [
-            o.client_vehicle_brand,
-            (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
-            o.client_vehicle_reg,
-          ]
-            .filter(Boolean)
-            .join(' ');
-    const clientLabel = o.machine_type === 'client' ? (o.client_name as string | null) : null;
-
-    const statusBadge = isCancelled
-      ? { label: 'Отменён', cls: 'bg-red-100 text-red-700' }
-      : isClosed
-        ? { label: 'Закрыт', cls: 'bg-emerald-100 text-emerald-700' }
-        : isPendingPayment
-          ? { label: 'Ждёт оплаты', cls: 'bg-orange-100 text-orange-700' }
-          : isReview
-            ? { label: 'На проверке', cls: 'bg-amber-100 text-amber-700' }
-            : o.status === 'completed'
-              ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
-              : { label: 'В работе', cls: 'bg-blue-100 text-blue-700' };
-
-    return (
-      <div
-        onClick={() => setSelectedOrderId(o.id)}
-        className={cn(
-          'bg-white border rounded-xl px-4 py-2.5 cursor-pointer hover:border-slate-300 hover:shadow-xs transition-all flex items-center justify-between gap-3',
-          isReview ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200',
-        )}
-      >
-        {/* Left: number + type + vehicle + tags */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="font-mono text-xs font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-            НЗ-{o.order_number}
-          </span>
-          <span
-            className={cn(
-              'text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0',
-              o.machine_type === 'own'
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-amber-100 text-amber-700',
-            )}
-          >
-            {o.machine_type === 'own' ? 'Свой' : 'Клиент'}
-          </span>
-          <span
-            className="font-bold text-sm text-slate-900 truncate max-w-[200px]"
-            title={vehicleLabel || '—'}
-          >
-            {vehicleLabel || '—'}
-          </span>
-          {clientLabel && (
-            <span className="text-xs text-slate-400 truncate max-w-[120px] hidden sm:block">
-              · {clientLabel}
-            </span>
-          )}
-          <span className="text-[11px] text-slate-400 shrink-0 hidden md:block">
-            {new Date(o.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-          </span>
-          {/* Работы/запчасти в виде коротких тегов */}
-          <div className="hidden lg:flex items-center gap-1 overflow-hidden max-w-[320px]">
-            {works.slice(0, 2).map((w) => (
-              <span
-                key={w.id}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 truncate max-w-[140px]"
-              >
-                {w.work_catalog?.name ?? w.custom_work_name ?? '—'}
-              </span>
-            ))}
-            {parts.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                📦 {parts.length} з/ч
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Right: mechanic + cost + status */}
-        <div className="shrink-0 flex items-center gap-4">
-          {o.mechanic?.name && (
-            <span className="text-xs text-slate-500 truncate max-w-[110px] hidden sm:block">
-              👨‍🔧 {o.mechanic.name.split(' ')[0]}
-            </span>
-          )}
-          <div className="text-right min-w-[90px]">
-            <span className="text-sm font-bold text-slate-900 block">
-              {cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : '0 ₽'}
-            </span>
-            {partsCost > 0 && worksCost > 0 && (
-              <span className="text-[9px] text-slate-400 block">
-                раб: {Math.round(worksCost).toLocaleString('ru-RU')} | з/ч:{' '}
-                {Math.round(partsCost).toLocaleString('ru-RU')}
-              </span>
-            )}
-          </div>
-          <span
-            className={cn(
-              'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
-              statusBadge.cls,
-            )}
-          >
-            {statusBadge.label}
-          </span>
-          {isPendingPayment && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!confirm(`Подтвердить оплату наряда НЗ-${o.order_number}?`)) return;
-                patch.mutate({ id: o.id, body: { payment_received: true } });
-              }}
-              className="text-[11px] font-bold px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs shrink-0 cursor-pointer"
-            >
-              Оплачено ✓
-            </button>
-          )}
-          {isClosed && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                patch.mutate({ id: o.id, body: { lifecycle_status: 'draft' } });
-              }}
-              className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200"
-            >
-              Открыть заново
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Grouped by vehicle ──────────────────────────────────────────────────────
-  const vehicleGroups = useMemo(() => {
-    if (!groupByVehicle) return null;
-    const map = new Map<string, { label: string; sublabel: string; orders: TabOrder[] }>();
-    for (const o of filteredOrders) {
-      const key = o.asset?.id ?? `cl:${o.client_vehicle_reg ?? o.id}`;
-      if (!map.has(key)) {
-        const label =
-          o.machine_type === 'own'
-            ? (o.asset?.short_name ?? 'Свой ТС')
-            : [
-                o.client_vehicle_brand,
-                (o as TabOrder & { client_vehicle_model?: string }).client_vehicle_model,
-              ]
-                .filter(Boolean)
-                .join(' ') || 'Клиентский ТС';
-        const sublabel =
-          o.machine_type === 'own'
-            ? (o.asset?.reg_number ?? '')
-            : (o.client_vehicle_reg ?? (o.client_name as string | null) ?? '');
-        map.set(key, { label, sublabel, orders: [] });
-      }
-      map.get(key)!.orders.push(o);
-    }
-    return Array.from(map.values());
-  }, [filteredOrders, groupByVehicle]);
-
-  const isLoading =
-    activeTab === 'archive'
-      ? histLoading
-      : activeTab === 'pending_payment'
-        ? pendingLoading
-        : allLoading;
+  const statusBadge = isCancelled
+    ? { label: 'Отменён', cls: 'bg-red-100 text-red-700' }
+    : isClosed
+      ? { label: 'Закрыт', cls: 'bg-emerald-100 text-emerald-700' }
+      : isPendingPayment
+        ? { label: 'Ждёт оплаты', cls: 'bg-orange-100 text-orange-700' }
+        : isReview
+          ? { label: 'На ревью', cls: 'bg-amber-100 text-amber-700' }
+          : o.status === 'completed'
+            ? { label: 'Завершён', cls: 'bg-slate-100 text-slate-600' }
+            : { label: 'В работе', cls: 'bg-blue-100 text-blue-700' };
 
   return (
-    <div className="space-y-4">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Заказ-наряды</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            {isLoading
-              ? 'Загрузка...'
-              : `${filteredOrders.length} нарядов${totalCost > 0 ? ` · ${totalCost.toLocaleString('ru-RU')} ₽` : ''}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAiImport(true)}
-            className="bg-violet-600 text-white text-sm font-semibold px-3 py-2 rounded-xl hover:bg-violet-700 flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-              />
-            </svg>
-            ИИ
-          </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-slate-900 text-white text-sm font-semibold px-3 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Новый наряд
-          </button>
+    <div
+      onClick={() => onSelect(o.id)}
+      className={cn(
+        'bg-white border rounded-xl px-4 py-2.5 cursor-pointer hover:border-slate-300 hover:shadow-xs transition-all flex items-center justify-between gap-3',
+        isReview ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200',
+      )}
+    >
+      {/* Left: number + type + vehicle + tags */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="font-mono text-xs font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+          НЗ-{o.order_number}
+        </span>
+        <span
+          className={cn(
+            'text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0',
+            o.machine_type === 'own' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
+          )}
+        >
+          {o.machine_type === 'own' ? 'Свой' : 'Клиент'}
+        </span>
+        <span
+          className="font-bold text-sm text-slate-900 truncate max-w-[200px]"
+          title={vehicleLabel || '—'}
+        >
+          {vehicleLabel || '—'}
+        </span>
+        {clientLabel && (
+          <span className="text-xs text-slate-400 truncate max-w-[120px] hidden sm:block">
+            · {clientLabel}
+          </span>
+        )}
+        <span className="text-[11px] text-slate-400 shrink-0 hidden md:block">
+          {new Date(o.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+        </span>
+        {/* Работы/запчасти в виде коротких тегов */}
+        <div className="hidden lg:flex items-center gap-1 overflow-hidden max-w-[320px]">
+          {works.slice(0, 2).map((w) => (
+            <span
+              key={w.id}
+              className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 truncate max-w-[140px]"
+            >
+              {w.work_catalog?.name ?? w.custom_work_name ?? '—'}
+            </span>
+          ))}
+          {parts.length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+              📦 {parts.length} з/ч
+            </span>
+          )}
         </div>
       </div>
 
-      {/* ── Compact Single-Line Reminders Banner ── */}
-      {reminders.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 via-amber-50/70 to-orange-50/80 border border-amber-300/80 rounded-xl px-4 py-2.5 shadow-xs flex items-center justify-between gap-3 flex-wrap text-xs animate-in fade-in duration-150">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white font-bold shrink-0 shadow-xs text-sm">
-              🔔
+      {/* Right: mechanic + cost + status */}
+      <div className="shrink-0 flex items-center gap-4">
+        {o.mechanic?.name && (
+          <span className="text-xs text-slate-500 truncate max-w-[110px] hidden sm:block">
+            👨‍🔧 {o.mechanic.name.split(' ')[0]}
+          </span>
+        )}
+        <div className="text-right min-w-[90px]">
+          <span className="text-sm font-bold text-slate-900 block">
+            {cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : '0 ₽'}
+          </span>
+          {partsCost > 0 && worksCost > 0 && (
+            <span className="text-[9px] text-slate-400 block">
+              раб: {Math.round(worksCost).toLocaleString('ru-RU')} | з/ч:{' '}
+              {Math.round(partsCost).toLocaleString('ru-RU')}
             </span>
-            <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-              <span className="font-extrabold text-amber-950 shrink-0">
-                Напоминание по ТО ({reminders.length}):
-              </span>
-              {reminders.slice(0, 1).map((rem: ReminderItem) => {
-                const clientName = rem.vehicle?.counterparty?.name || 'Клиент';
-                const clientPhone = rem.vehicle?.counterparty?.phone || '';
-                const vehicleStr = [rem.vehicle?.brand, rem.vehicle?.model, rem.vehicle?.reg_number]
-                  .filter(Boolean)
-                  .join(' ');
-
-                return (
-                  <div key={rem.id} className="flex items-center gap-2 min-w-0 flex-wrap">
-                    <span className="font-bold text-slate-900 shrink-0">
-                      {clientName} {vehicleStr ? `(${vehicleStr})` : ''}
-                    </span>
-                    <span
-                      className="text-slate-500 truncate max-w-md hidden sm:inline"
-                      title={rem.text}
-                    >
-                      — «{rem.text}»
-                    </span>
-                    {clientPhone && (
-                      <a
-                        href={`tel:${clientPhone}`}
-                        className="font-bold text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-0.5 rounded-md text-[11px] shrink-0 hover:bg-blue-50 transition-colors"
-                      >
-                        📞 {clientPhone}
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {reminders.length > 0 && reminders[0] && (
-              <button
-                type="button"
-                onClick={() => markReminderDoneMutation.mutate(reminders[0]!.id)}
-                disabled={markReminderDoneMutation.isPending}
-                className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                <span>✓</span>
-                <span>Позвонил</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
-      )}
-
-      {/* ── Tabs ── */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => setActiveTab('active')}
+        <span
           className={cn(
-            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'active'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700',
+            'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
+            statusBadge.cls,
           )}
         >
-          В работе
-          {inWorkCount > 0 && (
-            <span className="bg-blue-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-              {inWorkCount}
-            </span>
-          )}
-          {reviewCount > 0 && (
-            <span className="bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-              {reviewCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('pending_payment')}
-          className={cn(
-            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'pending_payment'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700',
-          )}
-        >
-          Ждёт оплаты
-          {pendingPaymentCount > 0 && (
-            <span className="bg-orange-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-              {pendingPaymentCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('archive')}
-          className={cn(
-            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors',
-            activeTab === 'archive'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700',
-          )}
-        >
-          Архив
-        </button>
-        <button
-          onClick={() => setActiveTab('requests')}
-          className={cn(
-            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'requests'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700',
-          )}
-        >
-          Заявки
-          {repairRequests.filter((r) => r.status === 'new').length > 0 && (
-            <span className="bg-rose-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-              {repairRequests.filter((r) => r.status === 'new').length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('warehouse')}
-          className={cn(
-            'px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'warehouse'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700',
-          )}
-        >
-          📦 Склад и остатки
-        </button>
-      </div>
-
-      {/* ── Global filter bar (только для вкладок В работе и Ждёт оплаты) ── */}
-      {activeTab !== 'archive' && activeTab !== 'requests' && activeTab !== 'warehouse' && (
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Поиск */}
-          <div className="relative flex-1 min-w-52">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="НЗ-42, авто, клиент, механик, работа..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Тип */}
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
-            {(
-              [
-                ['all', 'Все'],
-                ['own', 'Свои'],
-                ['client', 'Клиент'],
-              ] as const
-            ).map(([v, l]) => (
-              <button
-                key={v}
-                onClick={() => setFilterType(v)}
-                className={cn(
-                  'px-3 py-1 rounded-lg font-medium transition-colors',
-                  filterType === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-                )}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-
-          {/* Статус */}
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
-          >
-            <option value="all">Все статусы</option>
-            <option value="in_progress">В работе</option>
-            <option value="review">На проверке</option>
-            <option value="completed">Завершён</option>
-          </select>
-
-          {/* Механик */}
-          <select
-            value={filterMechanic}
-            onChange={(e) => setFilterMechanic(e.target.value)}
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0"
-          >
-            <option value="">Все механики</option>
-            {mechanics.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Диапазон дат */}
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-sm shrink-0">
-            {(
-              [
-                ['all', 'Все даты'],
-                ['month', 'Месяц'],
-                ['day', 'День'],
-              ] as const
-            ).map(([v, l]) => (
-              <button
-                key={v}
-                onClick={() => setDateMode(v)}
-                className={cn(
-                  'px-3 py-1 rounded-lg font-medium transition-colors',
-                  dateMode === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-                )}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-          {dateMode === 'day' && <DateNav date={filterDate} onChange={setFilterDate} />}
-          {dateMode === 'month' && <MonthNav month={filterMonth} onChange={setFilterMonth} />}
-
-          {/* Группировка по машинам */}
+          {statusBadge.label}
+        </span>
+        {isPendingPayment && (
           <button
-            onClick={() => setGroupByVehicle((v) => !v)}
-            className={cn(
-              'text-sm font-semibold px-3 py-1.5 rounded-xl border transition-colors shrink-0',
-              groupByVehicle
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 text-slate-500 hover:border-slate-400',
-            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!confirm(`Подтвердить оплату наряда НЗ-${o.order_number}?`)) return;
+              patch.mutate({ id: o.id, body: { payment_received: true } });
+            }}
+            className="text-[11px] font-bold px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs shrink-0 cursor-pointer"
           >
-            По машинам
+            Оплачено ✓
           </button>
-
-          {/* Сброс */}
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
-            >
-              × Сбросить
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Вкладка Архив (Вариант 1 в стиле Ревью с детализацией по автопарку) ── */}
-      {activeTab === 'archive' && (
-        <GarageArchiveSection
-          orders={historyOrders}
-          isLoading={histLoading}
-          mechanics={mechanics}
-          onSelectOrder={(id) => setSelectedOrderId(id)}
-          period={archivePeriod}
-          setPeriod={setArchivePeriod}
-          date={archiveDate}
-          setDate={setArchiveDate}
-          month={archiveMonth}
-          setMonth={setArchiveMonth}
-        />
-      )}
-
-      {/* ── Склад и инвентаризация остатков (Вариант 3) ── */}
-      {activeTab === 'warehouse' && <WarehouseSection />}
-
-      {/* ── Заявки водителей ── */}
-      {activeTab === 'requests' && (
-        <div className="space-y-3">
-          {repairRequests.length === 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-              <p className="text-5xl mb-3">📋</p>
-              <p className="font-semibold text-slate-500">Новых заявок нет</p>
-            </div>
-          )}
-          {repairRequests.map((req) => {
-            const sj = req.service_json;
-            const isAttaching = attachId === req.id;
-            const isApproving = approveReqId === req.id;
-            return (
-              <div
-                key={req.id}
-                className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
-              >
-                {/* Заголовок */}
-                <div className="px-4 py-3 flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-xs shrink-0">
-                      🚚
-                    </span>
-                    <div>
-                      <p className="font-bold text-slate-900 text-sm">
-                        {req.asset
-                          ? `${req.asset.short_name} (${req.asset.reg_number})`
-                          : 'Автомобиль не указан'}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {req.driver?.name ?? 'Водитель не указан'} · {fmtDate(req.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {req.fault && (
-                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
-                        {FAULT_CATEGORIES[req.fault.category] ?? req.fault.category}
-                      </span>
-                    )}
-                    {req.status === 'approved' ? (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
-                        Одобрена
-                      </span>
-                    ) : (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">
-                        Новая
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Описание проблемы */}
-                {req.custom_description && (
-                  <div className="px-4 pb-3">
-                    <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      {req.custom_description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Превью JSON если прикреплён */}
-                {sj && (
-                  <div className="mx-4 mb-3 p-3 bg-violet-50/60 border border-violet-100 rounded-xl space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">
-                        Данные от ИИ
-                      </span>
-                      {req.service_order && (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                          Наряд #{req.service_order.order_number}
-                        </span>
-                      )}
-                    </div>
-                    {sj.problem_description && (
-                      <p className="text-xs text-slate-800 font-medium">{sj.problem_description}</p>
-                    )}
-                    {sj.mechanic_note && (
-                      <p className="text-xs text-slate-500 italic">
-                        Примечание: {sj.mechanic_note}
-                      </p>
-                    )}
-                    {sj.works && sj.works.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {sj.works.map((w, i) => (
-                          <span
-                            key={i}
-                            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full"
-                          >
-                            {w.name}
-                            {w.norm_minutes ? ` (${w.norm_minutes} мин)` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {sj.priority && sj.priority !== 'normal' && (
-                      <span
-                        className={cn(
-                          'inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1',
-                          sj.priority === 'urgent'
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-slate-100 text-slate-500',
-                        )}
-                      >
-                        {sj.priority === 'urgent' ? 'Срочно' : sj.priority}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Блок прикрепления JSON */}
-                {isAttaching && (
-                  <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-2">
-                    <p className="text-xs font-semibold text-slate-600">Вставьте JSON от ИИ:</p>
-                    <textarea
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
-                      rows={6}
-                      placeholder={
-                        '{\n  "order": {\n    "problem_description": "...",\n    "priority": "normal"\n  },\n  "works": [\n    { "custom_work_name": "Замена колодок", "norm_minutes": 90, "price_client": "0" }\n  ],\n  "parts": []\n}'
-                      }
-                      value={jsonText}
-                      onChange={(e) => setJsonText(e.target.value)}
-                    />
-                    {jsonError && <p className="text-xs text-rose-600 font-medium">{jsonError}</p>}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAttachJson(req.id)}
-                        disabled={!jsonText.trim() || attachJsonMutation.isPending}
-                        className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-colors"
-                      >
-                        {attachJsonMutation.isPending ? 'Сохранение...' : 'Прикрепить'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAttachId(null);
-                          setJsonText('');
-                          setJsonError('');
-                        }}
-                        className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200"
-                      >
-                        Отмена
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Форма одобрения */}
-                {isApproving && (
-                  <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
-                    <p className="text-xs font-semibold text-slate-700">Создать наряд</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Механик *
-                        </label>
-                        <select
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
-                          value={approveMechanicId}
-                          onChange={(e) => setApproveMechanicId(e.target.value)}
-                        >
-                          <option value="">— выбрать —</option>
-                          {mechanics.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Одометр (км)
-                        </label>
-                        <input
-                          type="number"
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
-                          placeholder="0"
-                          value={approveOdometer}
-                          onChange={(e) => setApproveOdometer(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApproveRequest(req.id)}
-                        disabled={!approveMechanicId || approving}
-                        className="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                      >
-                        {approving ? 'Создание...' : 'Создать наряд'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setApproveReqId(null);
-                          setApproveMechanicId('');
-                          setApproveOdometer('');
-                        }}
-                        className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200"
-                      >
-                        Отмена
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Кнопки действий */}
-                {!isAttaching && !isApproving && (
-                  <div className="px-4 pb-3 border-t border-slate-100 pt-2.5 flex flex-col gap-2">
-                    {req.status === 'approved' ? (
-                      /* Заявка одобрена — наряд уже существует */
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {req.service_order && (
-                          <button
-                            onClick={() => setSelectedOrderId(req.service_order!.id)}
-                            className="text-sm font-bold bg-slate-900 text-white hover:bg-slate-700 px-4 py-2 rounded-xl transition-colors"
-                          >
-                            Открыть наряд #{req.service_order.order_number}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setAttachId(req.id);
-                            setJsonText(sj ? JSON.stringify(sj, null, 2) : '');
-                            setJsonError('');
-                          }}
-                          className="text-xs font-semibold text-violet-600 hover:text-violet-800 border border-violet-200 hover:border-violet-400 px-3 py-2 rounded-xl transition-colors"
-                        >
-                          {sj ? '✏️ Изменить JSON' : '+ Прикрепить JSON к наряду'}
-                        </button>
-                      </div>
-                    ) : sj ? (
-                      /* Новая заявка с JSON — одобрить */
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setApproveReqId(req.id);
-                            setApproveMechanicId('');
-                            setApproveOdometer('');
-                          }}
-                          className="text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors"
-                        >
-                          ✓ Одобрить → Наряд
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAttachId(req.id);
-                            setJsonText(JSON.stringify(sj, null, 2));
-                            setJsonError('');
-                          }}
-                          className="text-xs text-slate-400 hover:text-slate-600 underline"
-                        >
-                          изменить JSON
-                        </button>
-                      </div>
-                    ) : (
-                      /* Новая заявка без JSON */
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => {
-                            setAttachId(req.id);
-                            setJsonText('');
-                            setJsonError('');
-                          }}
-                          className="w-full text-sm font-bold bg-violet-600 text-white hover:bg-violet-700 px-4 py-2 rounded-xl transition-colors"
-                        >
-                          Шаг 1: Прикрепить JSON от ИИ
-                        </button>
-                        <p className="text-[10px] text-slate-400 text-center">
-                          Возьми описание водителя, дай ИИ — вставь сюда JSON
-                        </p>
-                        <button
-                          onClick={() => {
-                            setApproveReqId(req.id);
-                            setApproveMechanicId('');
-                            setApproveOdometer('');
-                          }}
-                          className="w-full text-xs text-slate-400 hover:text-slate-600 py-1 underline"
-                        >
-                          Одобрить без JSON (наряд без описания работ)
-                        </button>
-                      </div>
-                    )}
-                    {/* Удалить заявку */}
-                    <button
-                      onClick={() => {
-                        if (confirm('Удалить заявку?')) rejectReqMutation.mutate(req.id);
-                      }}
-                      className="text-[10px] text-slate-300 hover:text-rose-500 self-start transition-colors"
-                    >
-                      удалить заявку
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── List (только для вкладок В работе и Ждёт оплаты) ── */}
-      {(activeTab === 'active' || activeTab === 'pending_payment') &&
-        (isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />
-            ))}
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-            <p className="text-5xl mb-3">🔧</p>
-            <p className="font-semibold text-slate-500">
-              {hasFilters ? 'Нарядов по фильтру не найдено' : 'Нарядов нет'}
-            </p>
-            {hasFilters && (
-              <button onClick={clearFilters} className="mt-3 text-sm text-slate-400 underline">
-                Сбросить фильтры
-              </button>
-            )}
-          </div>
-        ) : groupByVehicle && vehicleGroups ? (
-          /* ── По машинам ── */
-          <div className="space-y-3">
-            {vehicleGroups.map((g) => (
-              <div
-                key={g.label + g.sublabel}
-                className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
-              >
-                <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
-                    <svg
-                      className="w-3.5 h-3.5 text-slate-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1"
-                      />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 text-sm">{g.label}</p>
-                    {g.sublabel && <p className="text-xs text-slate-400">{g.sublabel}</p>}
-                  </div>
-                  <span className="text-xs font-semibold text-slate-400 shrink-0">
-                    {g.orders.length} нар.
-                  </span>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {g.orders.map((o) => (
-                    <OrderCard key={o.id} o={o} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* ── Плоский список карточек ── */
-          <div className="space-y-2">
-            {filteredOrders.map((o) => (
-              <OrderCard key={o.id} o={o} />
-            ))}
-          </div>
-        ))}
-
-      {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} assets={assets} />}
-      {showAiImport && (
-        <AiImportModal
-          onClose={() => setShowAiImport(false)}
-          assets={assets}
-          mechanics={mechanics}
-          onCreated={(id) => {
-            qc.invalidateQueries({ queryKey: ['garage-orders'] });
-            setShowAiImport(false);
-            setSelectedOrderId(id);
-          }}
-        />
-      )}
-      {selectedOrderId && (
-        <OrderDetailModal
-          orderId={selectedOrderId}
-          onClose={() => setSelectedOrderId(null)}
-          mechanics={mechanics}
-        />
-      )}
+        )}
+        {isClosed && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              patch.mutate({ id: o.id, body: { lifecycle_status: 'draft' } });
+            }}
+            className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200"
+          >
+            Открыть заново
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -8343,1133 +5378,6 @@ function MaintenanceSection() {
             </tbody>
           </table>
         </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════ WORK CATALOG ════════════════════════════════════
-
-function WorkCatalogSection() {
-  const qc = useQueryClient();
-  const [showCreate, setShowCreate] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<WorkCatalogItem>>({});
-  const [createForm, setCreateForm] = useState({
-    name: '',
-    category: '',
-    hours_gazelle: '',
-    hours_valdai: '',
-  });
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  const { data: items = [], isLoading } = useQuery<WorkCatalogItem[]>({
-    queryKey: ['garage-work-catalog'],
-    queryFn: () =>
-      fetch('/api/garage/work-catalog')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-  });
-  const { data: settings } = useQuery<SettingsData>({
-    queryKey: ['garage-settings'],
-    queryFn: () => fetch('/api/garage/settings').then((r) => r.json()),
-    staleTime: 300000,
-  });
-
-  const rateClient = parseFloat(settings?.sto?.hourly_rate ?? '2000');
-  const rateOwn = parseFloat(settings?.sto?.hourly_rate_own ?? '1600');
-
-  const calcPrice = (minutes: number | null, rate: number): number => {
-    if (!minutes) return 0;
-    return Math.round((minutes / 60) * rate);
-  };
-
-  const minToH = (m: number | null): string => {
-    if (m == null) return '—';
-    const h = m / 60;
-    return h % 1 === 0 ? h.toFixed(0) : h.toFixed(1);
-  };
-
-  const createMutation = useMutation({
-    mutationFn: async (body: Record<string, unknown>) => {
-      const r = await fetch('/api/garage/work-catalog', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? 'Ошибка создания');
-      return d;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-work-catalog'] });
-      setShowCreate(false);
-      setCreateError(null);
-      setCreateForm({ name: '', category: '', hours_gazelle: '', hours_valdai: '' });
-    },
-    onError: (err: Error) => setCreateError(err.message),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      fetch(`/api/garage/work-catalog/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-work-catalog'] });
-      setEditingId(null);
-    },
-  });
-
-  const filteredItems = categoryFilter ? items.filter((i) => i.category === categoryFilter) : items;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Виды работ</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Справочник нормачасов по типам автомобилей
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          Добавить вид работы
-        </button>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setCategoryFilter(null)}
-          className={cn(
-            'text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors',
-            categoryFilter === null
-              ? 'bg-slate-900 text-white border-slate-900'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400',
-          )}
-        >
-          Все
-        </button>
-        {[...new Set(items.map((i) => i.category ?? 'Прочее'))].sort().map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCategoryFilter(cat === categoryFilter ? null : cat)}
-            className={cn(
-              'text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors',
-              categoryFilter === cat
-                ? 'bg-slate-900 text-white border-slate-900'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400',
-            )}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="h-48 bg-slate-100 rounded-2xl animate-pulse" />
-      ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Вид работы
-                </th>
-                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">
-                  Категория
-                </th>
-                <th
-                  className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase bg-slate-100"
-                  colSpan={3}
-                >
-                  Газель
-                </th>
-                <th
-                  className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase bg-blue-50/50"
-                  colSpan={3}
-                >
-                  Валдай
-                </th>
-                <th className="px-3 py-3"></th>
-              </tr>
-              <tr>
-                <th className="px-3"></th>
-                <th className="px-3"></th>
-                <th className="text-right px-2 py-2 text-[10px] font-medium text-slate-400 uppercase bg-slate-50">
-                  нч
-                </th>
-                <th className="text-right px-2 py-2 text-[10px] font-medium text-slate-400 uppercase bg-slate-50">
-                  клиент ₽
-                </th>
-                <th className="text-right px-2 py-2 text-[10px] font-medium text-slate-400 uppercase bg-slate-50">
-                  свой ₽
-                </th>
-                <th className="text-right px-2 py-2 text-[10px] font-medium text-slate-400 uppercase bg-blue-50/30">
-                  нч
-                </th>
-                <th className="text-right px-2 py-2 text-[10px] font-medium text-slate-400 uppercase bg-blue-50/30">
-                  клиент ₽
-                </th>
-                <th className="text-right px-2 py-2 text-[10px] font-medium text-slate-400 uppercase bg-blue-50/30">
-                  свой ₽
-                </th>
-                <th className="px-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredItems.map((item) => {
-                const isEditing = editingId === item.id;
-                const nG = item.norm_minutes;
-                const nV = item.norm_minutes_valdai;
-                return (
-                  <tr
-                    key={item.id}
-                    className={cn('hover:bg-slate-50/60', !item.is_active && 'opacity-50')}
-                  >
-                    <td className="px-3 py-3 text-slate-800 font-medium">
-                      {isEditing ? (
-                        <input
-                          value={editForm.name ?? ''}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-full"
-                        />
-                      ) : (
-                        item.name
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-slate-500">
-                      {isEditing ? (
-                        <input
-                          value={editForm.category ?? ''}
-                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-24"
-                        />
-                      ) : (
-                        (item.category ?? '—')
-                      )}
-                    </td>
-                    <td className="px-2 py-3 text-right font-mono text-slate-600 bg-slate-50/50">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={
-                            editForm.norm_minutes != null
-                              ? (editForm.norm_minutes / 60).toString()
-                              : ''
-                          }
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              norm_minutes: parseFloat(e.target.value || '0') * 60,
-                            })
-                          }
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-14 text-right"
-                        />
-                      ) : (
-                        minToH(nG)
-                      )}
-                    </td>
-                    <td className="px-2 py-3 text-right font-semibold text-slate-700 bg-slate-50/50">
-                      {isEditing
-                        ? ''
-                        : nG
-                          ? `${calcPrice(nG, rateClient).toLocaleString('ru-RU')}`
-                          : '—'}
-                    </td>
-                    <td className="px-2 py-3 text-right font-semibold text-emerald-700 bg-slate-50/50">
-                      {isEditing
-                        ? ''
-                        : nG
-                          ? `${calcPrice(nG, rateOwn).toLocaleString('ru-RU')}`
-                          : '—'}
-                    </td>
-                    <td className="px-2 py-3 text-right font-mono text-slate-600 bg-blue-50/20">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={
-                            editForm.norm_minutes_valdai != null
-                              ? (editForm.norm_minutes_valdai / 60).toString()
-                              : ''
-                          }
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              norm_minutes_valdai: parseFloat(e.target.value || '0') * 60,
-                            })
-                          }
-                          className="border border-slate-200 rounded px-2 py-1 text-sm w-14 text-right"
-                        />
-                      ) : (
-                        minToH(nV)
-                      )}
-                    </td>
-                    <td className="px-2 py-3 text-right font-semibold text-slate-700 bg-blue-50/20">
-                      {isEditing
-                        ? ''
-                        : nV
-                          ? `${calcPrice(nV, rateClient).toLocaleString('ru-RU')}`
-                          : '—'}
-                    </td>
-                    <td className="px-2 py-3 text-right font-semibold text-emerald-700 bg-blue-50/20">
-                      {isEditing
-                        ? ''
-                        : nV
-                          ? `${calcPrice(nV, rateOwn).toLocaleString('ru-RU')}`
-                          : '—'}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      {isEditing ? (
-                        <div className="flex gap-1 justify-end">
-                          <button
-                            onClick={() =>
-                              updateMutation.mutate({ id: item.id, body: { ...editForm } })
-                            }
-                            className="text-xs font-bold px-2 py-1 rounded bg-emerald-600 text-white"
-                          >
-                            ✓
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="text-xs font-bold px-2 py-1 rounded border border-slate-200 text-slate-500"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingId(item.id);
-                            setEditForm(item);
-                          }}
-                          className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded border border-slate-200"
-                        >
-                          ✏️
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {showCreate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-          onClick={() => setShowCreate(false)}
-        >
-          <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-bold text-slate-900 mb-4">Новый вид работы</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">
-                  Название *
-                </label>
-                <input
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">Категория</label>
-                <input
-                  value={createForm.category}
-                  onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">
-                    Газель (нч)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="2.0"
-                    value={createForm.hours_gazelle}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, hours_gazelle: e.target.value })
-                    }
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">
-                    Валдай (нч)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="2.5"
-                    value={createForm.hours_valdai}
-                    onChange={(e) => setCreateForm({ ...createForm, hours_valdai: e.target.value })}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="text-xs text-slate-400">
-                Цены: клиент = нч × {rateClient} ₽, свой парк = нч × {rateOwn} ₽
-              </div>
-              {createError && (
-                <p className="text-xs text-red-600 font-medium bg-red-50 rounded-lg px-3 py-2">
-                  {createError}
-                </p>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    setShowCreate(false);
-                    setCreateError(null);
-                  }}
-                  className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={() =>
-                    createMutation.mutate({
-                      name: createForm.name,
-                      category: createForm.category || null,
-                      norm_minutes: parseFloat(createForm.hours_gazelle || '0') * 60 || null,
-                      norm_minutes_valdai: parseFloat(createForm.hours_valdai || '0') * 60 || null,
-                    })
-                  }
-                  disabled={createMutation.isPending || !createForm.name.trim()}
-                  className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
-                >
-                  Создать
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════ FAULT CATALOG ═══════════════════════════════════
-
-function FaultCatalogSection() {
-  const qc = useQueryClient();
-  const [showCreate, setShowCreate] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<FaultCatalogItem>>({});
-  const [createForm, setCreateForm] = useState({ name: '', category: 'other' });
-
-  const { data: items = [], isLoading } = useQuery<FaultCatalogItem[]>({
-    queryKey: ['garage-fault-catalog'],
-    queryFn: () =>
-      fetch('/api/garage/fault-catalog')
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-  });
-  const createMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      fetch('/api/garage/fault-catalog', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-fault-catalog'] });
-      setShowCreate(false);
-      setCreateForm({ name: '', category: 'other' });
-    },
-  });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      fetch(`/api/garage/fault-catalog/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['garage-fault-catalog'] });
-      setEditingId(null);
-    },
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Каталог неисправностей</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Симптомы на языке водителя — быстрый выбор при заявке
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          Добавить симптом
-        </button>
-      </div>
-
-      {isLoading ? (
-        <div className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {items.map((item) => {
-            const isEditing = editingId === item.id;
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  'bg-white border border-slate-200 rounded-2xl p-4',
-                  !item.is_active && 'opacity-50',
-                )}
-              >
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <input
-                      value={editForm.name ?? ''}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                    <select
-                      value={editForm.category ?? ''}
-                      onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    >
-                      {Object.entries(FAULT_CATEGORIES).map(([v, l]) => (
-                        <option key={v} value={v}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => updateMutation.mutate({ id: item.id, body: editForm })}
-                        className="text-xs font-bold px-3 py-1 rounded bg-emerald-600 text-white"
-                      >
-                        ✓ Сохранить
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="text-xs px-3 py-1 rounded border border-slate-200 text-slate-500"
-                      >
-                        Отмена
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium text-slate-900 text-sm">{item.name}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {FAULT_CATEGORIES[item.category] ?? item.category}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setEditingId(item.id);
-                        setEditForm(item);
-                      }}
-                      className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded border border-slate-200"
-                    >
-                      ✏️
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {showCreate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-          onClick={() => setShowCreate(false)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-bold text-slate-900 mb-4">Новый симптом</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">
-                  Название *
-                </label>
-                <input
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  placeholder="Скрип при торможении"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">Категория</label>
-                <select
-                  value={createForm.category}
-                  onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                >
-                  {Object.entries(FAULT_CATEGORIES).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowCreate(false)}
-                  className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-semibold"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={() => createMutation.mutate(createForm)}
-                  disabled={createMutation.isPending || !createForm.name.trim()}
-                  className="flex-[2] bg-slate-900 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
-                >
-                  Создать
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════ REPORTS ═════════════════════════════════════════
-
-function ReportsSection({ tab }: { tab: ReportTab }) {
-  const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [selectedAssetId, setSelectedAssetId] = useState('');
-
-  const { data: assets = [] } = useQuery<Asset[]>({
-    queryKey: ['assets-select'],
-    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
-    staleTime: 300000,
-  });
-  const { data: vehicleHistory = [], isLoading: vhLoading } = useQuery<VehicleHistoryItem[]>({
-    queryKey: ['garage-vehicle-history', selectedAssetId],
-    queryFn: () =>
-      selectedAssetId
-        ? fetch(`/api/garage/vehicle-history?asset_id=${selectedAssetId}`)
-            .then((r) => r.json())
-            .then((d) => (Array.isArray(d) ? d : []))
-        : Promise.resolve([]),
-    enabled: tab === 'vehicles' && !!selectedAssetId,
-  });
-  const { data: mechanicStats = [], isLoading: msLoading } = useQuery<MechanicStat[]>({
-    queryKey: ['garage-mechanic-stats', reportMonth],
-    queryFn: () =>
-      fetch(`/api/garage/mechanic-stats?month=${reportMonth}`)
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : [])),
-    enabled: tab === 'mechanics',
-  });
-
-  if (tab === 'vehicles')
-    return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">История автомобилей</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Наряды на ремонт по конкретному автомобилю
-          </p>
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-500 block mb-1">
-            Выберите автомобиль
-          </label>
-          <select
-            value={selectedAssetId}
-            onChange={(e) => setSelectedAssetId(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-64"
-          >
-            <option value="">— Выберите —</option>
-            {assets.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.short_name} · {a.reg_number}
-              </option>
-            ))}
-          </select>
-        </div>
-        {!selectedAssetId ? (
-          <p className="text-sm text-slate-400">
-            Выберите автомобиль для просмотра истории нарядов
-          </p>
-        ) : vhLoading ? (
-          <div className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
-        ) : vehicleHistory.length === 0 ? (
-          <p className="text-sm text-slate-400">Нет нарядов</p>
-        ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                    Дата
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                    Наряд
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                    Работы
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                    Пробег
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                    Нч
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">
-                    Стоимость
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {vehicleHistory.map((o) => (
-                  <tr key={o.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(o.created_at)}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-700">
-                      #{o.order_number}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 text-xs">
-                      {(o.works ?? []).map((w) => w.work_catalog?.name ?? '—').join(', ')}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">
-                      {o.odometer_start?.toLocaleString('ru-RU') ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs">
-                      {o.total_actual_minutes > 0
-                        ? (o.total_actual_minutes / 60).toFixed(1)
-                        : (o.total_norm_minutes / 60).toFixed(1)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900 text-xs">
-                      {moneyVal(o.total_cost).toLocaleString('ru-RU')} ₽
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Статистика по механикам</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Нормачасы, наряды, план / факт, начисленная ЗП
-          </p>
-        </div>
-        <MonthNav month={reportMonth} onChange={setReportMonth} />
-      </div>
-      {msLoading ? (
-        <div className="h-48 bg-slate-100 rounded-2xl animate-pulse" />
-      ) : mechanicStats.length === 0 ? (
-        <p className="text-sm text-slate-400">Нет данных</p>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {mechanicStats.map((stat) => (
-            <div
-              key={stat.mechanic_id}
-              className="bg-white border border-slate-200 rounded-2xl p-5"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <div className="font-bold text-slate-900 text-lg">{stat.mechanic_name}</div>
-                  <div className="text-sm text-slate-400">Механик · ставка {stat.salary_pct}%</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-slate-900">
-                    {moneyVal(stat.accrued_salary).toLocaleString('ru-RU')} ₽
-                  </div>
-                  <div className="text-xs text-slate-400">начислено за месяц</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-slate-50 rounded-xl p-3 text-center">
-                  <div className="text-xl font-bold text-slate-900">{stat.orders_count}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">нарядов</div>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 text-center">
-                  <div className="text-xl font-bold text-slate-900">
-                    {stat.plan_norm_hours.toFixed(1)}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-0.5">план нч</div>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 text-center">
-                  <div
-                    className={cn(
-                      'text-xl font-bold',
-                      stat.fact_norm_hours >= stat.plan_norm_hours
-                        ? 'text-emerald-600'
-                        : 'text-amber-600',
-                    )}
-                  >
-                    {stat.fact_norm_hours.toFixed(1)}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-0.5">факт нч</div>
-                </div>
-              </div>
-              {stat.plan_norm_hours > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs text-slate-500 mb-1.5 flex justify-between">
-                    <span>Выполнение плана</span>
-                    <span className="font-medium">
-                      {Math.round((stat.fact_norm_hours / stat.plan_norm_hours) * 100)}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full">
-                    <div
-                      className={cn(
-                        'h-2 rounded-full',
-                        stat.fact_norm_hours >= stat.plan_norm_hours
-                          ? 'bg-emerald-500'
-                          : 'bg-blue-500',
-                      )}
-                      style={{
-                        width: `${Math.min(Math.round((stat.fact_norm_hours / stat.plan_norm_hours) * 100), 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="border-t border-slate-100 pt-3 space-y-1.5">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Начислено</span>
-                  <span className="font-semibold text-slate-900">
-                    {moneyVal(stat.accrued_salary).toLocaleString('ru-RU')} ₽
-                  </span>
-                </div>
-              </div>
-              {stat.orders.length > 0 && (
-                <div className="mt-4 border-t border-slate-100 pt-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Наряды</p>
-                  <div className="space-y-1">
-                    {stat.orders.map((o) => (
-                      <div key={o.id} className="flex justify-between text-xs">
-                        <span className="text-slate-700">
-                          #{o.order_number} · {o.vehicle}
-                        </span>
-                        <span className="text-slate-500">
-                          {(
-                            (o.works ?? []).reduce(
-                              (s, w) => s + (w.actual_minutes ?? w.norm_minutes ?? 0),
-                              0,
-                            ) / 60
-                          ).toFixed(1)}{' '}
-                          нч
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════ SETTINGS ════════════════════════════════════════
-
-function SettingsSection() {
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery<SettingsData>({
-    queryKey: ['garage-settings'],
-    queryFn: () => fetch('/api/garage/settings').then((r) => r.json()),
-  });
-  const [rate, setRate] = useState('');
-  const [rateOwn, setRateOwn] = useState('');
-  const [mechPct, setMechPct] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!data) return;
-    setRate(data.sto?.hourly_rate ?? '2000');
-    setRateOwn(data.sto?.hourly_rate_own ?? '1600');
-    const pctMap: Record<string, string> = {};
-    for (const m of data.mechanics ?? []) pctMap[m.id] = m.mechanic_salary_pct ?? '50';
-    setMechPct(pctMap);
-  }, [data]);
-
-  const saveMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      fetch('/api/garage/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['garage-settings'] }),
-  });
-
-  if (isLoading) return <div className="h-48 bg-slate-100 rounded-2xl animate-pulse" />;
-
-  const sto = data?.sto ?? { hourly_rate: '2000.00', hourly_rate_own: '1600.00' };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Настройки СТО</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Ставки нормачаса и проценты механикам</p>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <h3 className="font-semibold text-slate-900 mb-4">Финансовые параметры</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Ставка СТО — клиент (₽ за нормачас)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              />
-              <button
-                onClick={() => saveMutation.mutate({ hourly_rate: rate || sto.hourly_rate })}
-                disabled={saveMutation.isPending}
-                className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl"
-              >
-                Сохранить
-              </button>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Цена нормачаса для клиента / расчёта стоимости работ
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Ставка СТО — свой автопарк (₽ за нормачас)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={rateOwn}
-                onChange={(e) => setRateOwn(e.target.value)}
-                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              />
-              <button
-                onClick={() =>
-                  saveMutation.mutate({ hourly_rate_own: rateOwn || sto.hourly_rate_own })
-                }
-                disabled={saveMutation.isPending}
-                className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl"
-              >
-                Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <h3 className="font-semibold text-slate-900 mb-4">Ставки механиков</h3>
-        <div className="space-y-3">
-          {(data?.mechanics ?? []).map((m) => {
-            const pct = parseFloat(m.mechanic_salary_pct ?? '50');
-            const rateNum = parseFloat(sto.hourly_rate);
-            const perHour = ((rateNum * pct) / 100).toFixed(0);
-            return (
-              <div key={m.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="flex-1">
-                  <div className="font-medium text-slate-900 text-sm">{m.name}</div>
-                  <div className="text-xs text-slate-400">
-                    При ставке СТО {rateNum} ₽/нч → получает {perHour} ₽/нч
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={mechPct[m.id] ?? pct.toString()}
-                    onChange={(e) => setMechPct((prev) => ({ ...prev, [m.id]: e.target.value }))}
-                    className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1 text-sm"
-                    min="0"
-                    max="100"
-                  />
-                  <span className="text-slate-500 text-sm">%</span>
-                  <button
-                    onClick={() =>
-                      saveMutation.mutate({
-                        mechanic_id: m.id,
-                        mechanic_salary_pct: mechPct[m.id] ?? pct.toString(),
-                      })
-                    }
-                    disabled={saveMutation.isPending}
-                    className="text-xs font-medium px-3 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                  >
-                    OK
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════ MAIN PAGE ═══════════════════════════════════════
-
-export default function GaragePage() {
-  const searchParams = useSearchParams();
-  const orderFromQuery =
-    searchParams.get('order') || searchParams.get('order_id') || searchParams.get('id');
-
-  const [section, setSection] = useState<GarageSection>('dashboard');
-  const [showCreate, setShowCreate] = useState(false);
-  const [showAiImport, setShowAiImport] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(orderFromQuery || null);
-
-  useEffect(() => {
-    if (orderFromQuery) {
-      setSelectedOrderId(orderFromQuery);
-    }
-  }, [orderFromQuery]);
-
-  const { data: dashData } = useQuery<DashboardData>({
-    queryKey: ['garage-dashboard'],
-    queryFn: () => fetch('/api/garage/dashboard').then((r) => r.json()),
-    staleTime: 30000,
-  });
-
-  const { data: assets = [] } = useQuery<Asset[]>({
-    queryKey: ['assets-select'],
-    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
-    staleTime: 300000,
-  });
-
-  const { data: mechanics = [] } = useQuery<Mechanic[]>({
-    queryKey: ['mechanics-list'],
-    queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
-    staleTime: 300000,
-  });
-
-  const qc = useQueryClient();
-  const counts = dashData?.counts ?? null;
-
-  return (
-    <div className="flex -mx-6 -mt-4" style={{ minHeight: 'calc(100vh - 64px - 32px)' }}>
-      <Sidebar section={section} onChange={setSection} counts={counts} />
-      <main className="flex-1 overflow-auto p-6 space-y-5">
-        {/* ── PERMANENT ACTION BAR (ВСЕГДА НА ЭКРАНЕ ГАРАЖА) ── */}
-        <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
-          <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">🛠️ Гараж и СТО</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Быстрое создание заказ-нарядов вручную или с помощью ИИ
-            </p>
-          </div>
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
-            <button
-              onClick={() => setShowAiImport(true)}
-              className="flex-1 sm:flex-initial bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
-              ✨ ИИ наряд
-            </button>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              + Новый наряд
-            </button>
-          </div>
-        </div>
-
-        {section === 'dashboard' && (
-          <DashboardSection onNav={setSection} onCreateOrder={() => setShowCreate(true)} />
-        )}
-        {section === 'requests' && <RequestsSection />}
-        {section === 'workorders' && <WorkOrdersSection />}
-        {section === 'warehouse' && <WarehouseSection />}
-        {section === 'maintenance' && <MaintenanceSection />}
-        {section === 'worktypes' && <WorkCatalogSection />}
-        {section === 'faultcatalog' && <FaultCatalogSection />}
-        {section === 'repvehicles' && <ReportsSection tab="vehicles" />}
-        {section === 'repmechanics' && <ReportsSection tab="mechanics" />}
-        {section === 'clients' && <ClientsSection />}
-        {section === 'settings' && <SettingsSection />}
-      </main>
-
-      {showCreate && (
-        <CreateOrderModal
-          onClose={() => setShowCreate(false)}
-          assets={assets}
-          mechanics={mechanics}
-          onCreated={(id) => {
-            qc.invalidateQueries({ queryKey: ['garage-orders'] });
-            qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-            setShowCreate(false);
-            setSelectedOrderId(id);
-          }}
-        />
-      )}
-      {showAiImport && (
-        <AiImportModal
-          onClose={() => setShowAiImport(false)}
-          assets={assets}
-          mechanics={mechanics}
-          onCreated={(id) => {
-            qc.invalidateQueries({ queryKey: ['garage-orders'] });
-            qc.invalidateQueries({ queryKey: ['garage-dashboard'] });
-            setShowAiImport(false);
-            setSelectedOrderId(id);
-          }}
-        />
-      )}
-      {selectedOrderId && (
-        <OrderDetailModal
-          orderId={selectedOrderId}
-          onClose={() => setSelectedOrderId(null)}
-          mechanics={mechanics}
-        />
       )}
     </div>
   );
@@ -11104,359 +7012,793 @@ function CreateVehicleModal({
   );
 }
 
-type GarageStats = {
-  garageBalance?: number;
-  clientRevenueThisMonth: number;
-  clientRevenueAllTime: number;
-  clientProfitThisMonth?: number;
-  clientProfitAllTime?: number;
-  clientActiveSum: number;
-  clientActiveCount: number;
-  salaryThisMonth: number;
-  salaryAllTime: number;
-  ownFleetThisMonth: number;
-  ownFleetAllTime: number;
-  completedOrdersThisMonth: number;
-  completedOrdersAllTime: number;
-  inProgressOrdersCount: number;
-};
+// ═══════════════════════════ SETTINGS MODAL ═══════════════════════════════════
 
-function GarageStatsModal({
-  stats,
-  monthName,
-  onClose,
-}: {
-  stats: GarageStats;
-  monthName: string;
-  onClose: () => void;
-}) {
-  const profitMonth =
-    stats.clientProfitThisMonth ?? stats.clientRevenueThisMonth - stats.salaryThisMonth;
-  const profitAllTime =
-    stats.clientProfitAllTime ?? stats.clientRevenueAllTime - stats.salaryAllTime;
+function SettingsModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<SettingsData>({
+    queryKey: ['garage-settings'],
+    queryFn: () => fetch('/api/garage/settings').then((r) => r.json()),
+  });
+  const [rate, setRate] = useState('');
+  const [rateOwn, setRateOwn] = useState('');
+  const [mechPct, setMechPct] = useState<Record<string, string>>({});
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setRate(data.sto?.hourly_rate ?? '2000');
+    setRateOwn(data.sto?.hourly_rate_own ?? '1600');
+    const pctMap: Record<string, string> = {};
+    for (const m of data.mechanics ?? []) pctMap[m.id] = m.mechanic_salary_pct ?? '40';
+    setMechPct(pctMap);
+  }, [data]);
+
+  const saveMutation = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetch('/api/garage/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['garage-settings'] });
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setSavedSuccess(false);
+        onClose();
+      }, 1000);
+    },
+  });
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl w-full max-w-2xl p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="px-5 py-4 bg-sky-50/70 border-b border-sky-100 flex items-center justify-between">
           <div>
-            <p className="text-xs font-extrabold text-indigo-600 uppercase tracking-widest">
-              Сводная аналитика
+            <h3 className="font-bold text-base text-slate-900">⚙️ Настройки СТО и ставок</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Ставки нормо-часа и базовый процент оплаты механикам
             </p>
-            <h2 className="text-2xl font-black text-slate-900 mt-0.5">
-              📊 Финансовые показатели гаража
-            </h2>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 active:scale-95 transition-all"
+            className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center text-sm font-bold cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* 1. Заработано с клиентов (Чистая прибыль) */}
-          <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">💰</span>
-              <h3 className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider">
-                Заработано с клиентов (Чистая прибыль)
-              </h3>
-            </div>
+        {isLoading ? (
+          <div className="p-8 text-center text-slate-400">Загрузка настроек...</div>
+        ) : (
+          <div className="p-5 space-y-4 text-xs">
             <div>
-              <p className="text-2xl font-black text-emerald-900">
-                <Money amount={profitMonth} />
-              </p>
-              <p className="text-[11px] font-medium text-emerald-700 mt-0.5">
-                чистая прибыль за {monthName}
-              </p>
-            </div>
-            <div className="pt-2 border-t border-emerald-200/60 space-y-1 text-xs font-semibold text-emerald-900">
-              <div className="flex justify-between">
-                <span className="text-emerald-700">Выручка брутто:</span>
-                <span>
-                  <Money amount={stats.clientRevenueThisMonth} />
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-emerald-700">Выплачено ЗП:</span>
-                <span className="text-violet-700">
-                  -<Money amount={stats.salaryThisMonth} />
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-emerald-200/40">
-                <span className="text-emerald-700">Чистая прибыль за всё время:</span>
-                <span>
-                  <Money amount={profitAllTime} />
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-emerald-700">
-                  В работе сейчас ({stats.clientActiveCount}):
-                </span>
-                <span>
-                  <Money amount={stats.clientActiveSum} />
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Выплачено зарплаты */}
-          <div className="bg-violet-50/80 border border-violet-200/80 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">👨‍🔧</span>
-              <h3 className="text-xs font-extrabold text-violet-800 uppercase tracking-wider">
-                Выплачено зарплаты
-              </h3>
-            </div>
-            <div>
-              <p className="text-2xl font-black text-violet-900">
-                <Money amount={stats.salaryThisMonth} />
-              </p>
-              <p className="text-[11px] font-medium text-violet-700 mt-0.5">
-                механикам за {monthName}
-              </p>
-            </div>
-            <div className="pt-2 border-t border-violet-200/60 flex justify-between text-xs font-semibold text-violet-900">
-              <span className="text-violet-700">Всего за всё время:</span>
-              <span>
-                <Money amount={stats.salaryAllTime} />
+              <label className="block font-bold text-slate-700 mb-1">
+                Ставка нормо-часа для своего автопарка (₽/час)
+              </label>
+              <input
+                type="number"
+                value={rateOwn}
+                onChange={(e) => setRateOwn(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-800"
+              />
+              <span className="text-[10px] text-slate-400">
+                Используется для калькуляции себестоимости обслуживания
               </span>
             </div>
-          </div>
 
-          {/* 3. Заработано со своих машин */}
-          <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🚛</span>
-              <h3 className="text-xs font-extrabold text-sky-800 uppercase tracking-wider">
-                Обслуживание своего автопарка
-              </h3>
-            </div>
             <div>
-              <p className="text-2xl font-black text-sky-900">
-                <Money amount={stats.ownFleetThisMonth} />
-              </p>
-              <p className="text-[11px] font-medium text-sky-700 mt-0.5">
-                затраты на ремонт за {monthName}
-              </p>
-            </div>
-            <div className="pt-2 border-t border-sky-200/60 flex justify-between text-xs font-semibold text-sky-900">
-              <span className="text-sky-700">Всего за всё время:</span>
-              <span>
-                <Money amount={stats.ownFleetAllTime} />
+              <label className="block font-bold text-slate-700 mb-1">
+                Ставка нормо-часа для сторонних клиентов (₽/час)
+              </label>
+              <input
+                type="number"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                className="w-full px-3 py-2 bg-emerald-50 border border-emerald-300 rounded-xl font-black text-emerald-900"
+              />
+              <span className="text-[10px] text-slate-400">
+                Выставляется в заказ-нарядах коммерческим клиентам
               </span>
             </div>
-          </div>
 
-          {/* 4. Всего нарядов сделано */}
-          <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📋</span>
-              <h3 className="text-xs font-extrabold text-amber-800 uppercase tracking-wider">
-                Всего сделано нарядов
-              </h3>
-            </div>
-            <div>
-              <p className="text-2xl font-black text-amber-900">
-                {stats.completedOrdersThisMonth}{' '}
-                <span className="text-sm font-bold text-amber-700">нарядов</span>
-              </p>
-              <p className="text-[11px] font-medium text-amber-700 mt-0.5">
-                завершено за {monthName}
-              </p>
-            </div>
-            <div className="pt-2 border-t border-amber-200/60 space-y-1 text-xs font-semibold text-amber-900">
-              <div className="flex justify-between">
-                <span className="text-amber-700">Завершено за всё время:</span>
-                <span>{stats.completedOrdersAllTime}</span>
+            <div className="border-t border-slate-100 pt-3">
+              <label className="block font-bold text-slate-700 mb-1">
+                Базовый процент зарплаты механиков (%)
+              </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {(data?.mechanics ?? []).map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/70"
+                  >
+                    <span className="font-semibold text-slate-800 truncate">{m.name}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={mechPct[m.id] ?? '40'}
+                        onChange={(e) => setMechPct({ ...mechPct, [m.id]: e.target.value })}
+                        className="w-14 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center font-bold text-xs"
+                      />
+                      <span className="text-slate-400 font-bold">%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between">
-                <span className="text-amber-700">Сейчас в процессе:</span>
-                <span>{stats.inProgressOrdersCount}</span>
-              </div>
             </div>
+
+            {savedSuccess && (
+              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-center font-bold">
+                ✓ Настройки успешно сохранены
+              </div>
+            )}
           </div>
+        )}
+
+        <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-200 font-bold"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={async () => {
+              await saveMutation.mutateAsync({
+                hourly_rate: rate,
+                hourly_rate_own: rateOwn,
+              });
+              for (const [mId, pct] of Object.entries(mechPct)) {
+                await fetch('/api/garage/settings', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ mechanic_id: mId, mechanic_salary_pct: pct }),
+                });
+              }
+              qc.invalidateQueries({ queryKey: ['garage-settings'] });
+              setSavedSuccess(true);
+              setTimeout(() => {
+                setSavedSuccess(false);
+                onClose();
+              }, 800);
+            }}
+            disabled={saveMutation.isPending}
+            className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold cursor-pointer disabled:opacity-50"
+          >
+            {saveMutation.isPending ? 'Сохранение...' : 'Сохранить'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function GarageBalanceModal({
-  currentBalance,
-  onClose,
-  onSuccess,
-}: {
-  currentBalance: number;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [mode, setMode] = useState<'set' | 'deposit' | 'withdraw'>('set');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// ═══════════════════════════ MAIN PAGE ═══════════════════════════════════════
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(amount.replace(/\s+/g, '').replace(',', '.'));
-    if (isNaN(val) || val < 0) {
-      setError('Введите корректную сумму');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      let target = val;
-      if (mode === 'deposit') target = currentBalance + val;
-      if (mode === 'withdraw') target = Math.max(0, currentBalance - val);
+export default function GaragePage() {
+  const searchParams = useSearchParams();
+  const orderFromQuery =
+    searchParams.get('order') || searchParams.get('order_id') || searchParams.get('id');
 
-      const res = await fetch('/api/wallets/set-balance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet: 'garage', target_amount: target.toFixed(2), note }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ошибка установки баланса');
-      onSuccess();
-      onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Ошибка установки баланса');
-    } finally {
-      setLoading(false);
+  const [activeTab, setActiveTab] = useState<
+    'active' | 'pending_payment' | 'warehouse' | 'clients' | 'maintenance' | 'archive'
+  >('active');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(orderFromQuery || null);
+
+  // Filters for Active & Pending
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'own' | 'client'>('all');
+  const [archivePeriod, setArchivePeriod] = useState<'day' | 'week' | 'month' | 'all'>('month');
+  const [archiveDate, setArchiveDate] = useState(todayStr());
+  const [archiveMonth, setArchiveMonth] = useState(todayStr().slice(0, 7));
+
+  useEffect(() => {
+    if (orderFromQuery) {
+      setSelectedOrderId(orderFromQuery);
     }
-  };
+  }, [orderFromQuery]);
+
+  const qc = useQueryClient();
+
+  // Queries
+  const { data: allOrders = [], isLoading: ordersLoading } = useQuery<TabOrder[]>({
+    queryKey: ['garage-orders', 'all'],
+    queryFn: () =>
+      fetch('/api/garage/orders?filter=all')
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : [])),
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  const { data: historyOrders = [], isLoading: histLoading } = useQuery<TabOrder[]>({
+    queryKey: ['garage-orders-history', archivePeriod, archiveDate, archiveMonth],
+    queryFn: () => {
+      const p = new URLSearchParams();
+      p.set('period', archivePeriod);
+      if (archivePeriod === 'day') p.set('date', archiveDate);
+      if (archivePeriod === 'week') p.set('week_date', archiveDate);
+      if (archivePeriod === 'month') p.set('month', archiveMonth);
+      return fetch(`/api/garage/orders/history?${p.toString()}`)
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : []));
+    },
+    staleTime: 60000,
+    enabled: activeTab === 'archive',
+  });
+
+  const { data: assets = [] } = useQuery<Asset[]>({
+    queryKey: ['assets-select'],
+    queryFn: () => fetch('/api/garage/assets').then((r) => r.json()),
+    staleTime: 300000,
+  });
+
+  const { data: mechanics = [] } = useQuery<Mechanic[]>({
+    queryKey: ['mechanics-list'],
+    queryFn: () => fetch('/api/users?role=mechanic').then((r) => r.json()),
+    staleTime: 300000,
+  });
+
+  const { data: partsData } = useQuery<{ totals?: { totalStockVal: number } }>({
+    queryKey: ['garage-parts', 'all', ''],
+    queryFn: () => fetch('/api/garage/parts').then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const { data: clientsData = [] } = useQuery<any[]>({
+    queryKey: ['garage-clients'],
+    queryFn: () => fetch('/api/garage/clients').then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const { data: maintenanceItems = [] } = useQuery<MaintenanceItem[]>({
+    queryKey: ['garage-maintenance'],
+    queryFn: () =>
+      fetch('/api/garage/maintenance')
+        .then((r) => r.json())
+        .then((d) => (Array.isArray(d) ? d : [])),
+    staleTime: 60000,
+  });
+
+  // Active pool: status in ('created', 'in_progress') or (completed & draft)
+  const activeOrders = useMemo(
+    () =>
+      allOrders.filter(
+        (o) =>
+          o.lifecycle_status !== 'cancelled' &&
+          o.status !== 'cancelled' &&
+          !(o.lifecycle_status === 'approved' && o.status === 'completed'),
+      ),
+    [allOrders],
+  );
+
+  // Pending payment pool: client vehicle + approved + not payment_received
+  const pendingPaymentOrders = useMemo(
+    () =>
+      allOrders.filter(
+        (o) =>
+          o.lifecycle_status === 'approved' && o.machine_type === 'client' && !o.payment_received,
+      ),
+    [allOrders],
+  );
+
+  // Filtered active
+  const filteredActiveOrders = useMemo(() => {
+    let result = activeOrders;
+    if (filterType !== 'all') {
+      result = result.filter((o) => o.machine_type === filterType);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (o) =>
+          o.order_number?.toString().includes(q) ||
+          o.asset?.short_name?.toLowerCase().includes(q) ||
+          o.asset?.reg_number?.toLowerCase().includes(q) ||
+          o.client_vehicle_brand?.toLowerCase().includes(q) ||
+          o.client_vehicle_reg?.toLowerCase().includes(q) ||
+          o.mechanic?.name?.toLowerCase().includes(q) ||
+          o.problem_description?.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [activeOrders, filterType, search]);
+
+  // Counts for badges & summary
+  const inWorkCount = activeOrders.length;
+  const pendingPaymentCount = pendingPaymentOrders.length;
+  const maintenanceAlertsCount = maintenanceItems.filter(
+    (item) => item.alert_status === 'overdue' || item.alert_status === 'soon',
+  ).length;
+
+  const totalPendingPaymentSum = useMemo(() => {
+    return pendingPaymentOrders.reduce((sum, o) => {
+      const worksSum = (o.works ?? []).reduce(
+        (s, w) => s + (parseFloat(w.price_client ?? '0') || 0),
+        0,
+      );
+      const partsSum = (o.parts ?? []).reduce(
+        (s, p) => s + (parseFloat(p.client_price ?? p.unit_price ?? '0') || 0) * (p.quantity || 1),
+        0,
+      );
+      return sum + worksSum + partsSum;
+    }, 0);
+  }, [pendingPaymentOrders]);
+
+  const totalWarehouseVal = partsData?.totals?.totalStockVal ?? 405000;
+  const ownActiveCount = activeOrders.filter((o) => o.machine_type === 'own').length;
+  const clientActiveCount = activeOrders.filter((o) => o.machine_type === 'client').length;
 
   return (
-    <div
-      className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+    <div className="space-y-4 max-w-7xl mx-auto pb-12">
+      {/* ── 1. ВЕРХНЯЯ ШАПКА УПРАВЛЕНИЯ (БЕЗ ЧЁРНОГО ЦВЕТА) ── */}
+      <header className="bg-white border border-sky-100 rounded-2xl px-5 py-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-emerald-400 flex items-center justify-center text-xl shadow-xs shrink-0 text-white">
+            🛠️
+          </div>
           <div>
-            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-              🛠️ Касса Гаража (СТО)
-            </h2>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                Гараж и СТО
+              </h1>
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Свой парк + Клиенты
+              </span>
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Текущий остаток: <strong>{currentBalance.toLocaleString('ru-RU')} ₽</strong>
+              Управление заказ-нарядами, складом запчастей и обслуживанием автопарка
             </p>
           </div>
+        </div>
+
+        {/* Кнопки быстрых действий */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 transition-colors cursor-pointer"
+            onClick={() => setShowSettings(true)}
+            className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+            title="Настройки ставок СТО и % зарплат"
           >
-            ✕
+            <span>⚙️</span>
+            <span className="hidden md:inline">Ставки нормо-часа</span>
+          </button>
+
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          >
+            <span>➕</span>
+            <span>Новый заказ-наряд</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ── 2. СВОДНЫЕ МЕТРИКИ СВЕРХУ (КАК В РАЗДЕЛЕ РЕВЬЮ) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
+        {/* В боксах */}
+        <div
+          onClick={() => setActiveTab('active')}
+          className={cn(
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
+            activeTab === 'active'
+              ? 'border-sky-300 ring-2 ring-sky-100'
+              : 'border-sky-100 hover:border-sky-200',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              В боксах СТО
+            </span>
+            <span className="text-sm">🔧</span>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-sky-950">{inWorkCount} наряда</div>
+            <div className="text-[11px] text-sky-700 font-bold mt-0.5 flex items-center gap-1">
+              <span>{ownActiveCount} своих</span> · <span>{clientActiveCount} клиент</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Ждёт оплаты */}
+        <div
+          onClick={() => setActiveTab('pending_payment')}
+          className={cn(
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
+            activeTab === 'pending_payment'
+              ? 'border-amber-300 ring-2 ring-amber-100'
+              : 'border-amber-100 hover:border-amber-200',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
+              Ждёт оплаты
+            </span>
+            <span className="text-sm">💳</span>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-amber-900">
+              <Money amount={totalPendingPaymentSum} />
+            </div>
+            <div className="text-[11px] text-amber-600 font-bold mt-0.5">
+              {pendingPaymentCount}{' '}
+              {pendingPaymentCount === 1 ? 'наряд клиента' : 'наряда клиентов'}
+            </div>
+          </div>
+        </div>
+
+        {/* Капитал склада */}
+        <div
+          onClick={() => setActiveTab('warehouse')}
+          className={cn(
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
+            activeTab === 'warehouse'
+              ? 'border-emerald-300 ring-2 ring-emerald-100'
+              : 'border-emerald-100 hover:border-emerald-200',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+              Склад (ТМЦ)
+            </span>
+            <span className="text-sm">📦</span>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-emerald-900">
+              <Money amount={totalWarehouseVal} />
+            </div>
+            <div className="text-[11px] text-emerald-600 font-bold mt-0.5">
+              Оценка (+30%): <Money amount={Math.round(totalWarehouseVal * 1.3)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Клиенты СТО */}
+        <div
+          onClick={() => setActiveTab('clients')}
+          className={cn(
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between',
+            activeTab === 'clients'
+              ? 'border-indigo-300 ring-2 ring-indigo-100'
+              : 'border-indigo-100 hover:border-indigo-200',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
+              Клиенты СТО
+            </span>
+            <span className="text-sm">👥</span>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-indigo-950">
+              {clientsData.length} контрагентов
+            </div>
+            <div className="text-[11px] text-indigo-600 font-bold mt-0.5">Коммерческий сервис</div>
+          </div>
+        </div>
+
+        {/* Регламенты ТО */}
+        <div
+          onClick={() => setActiveTab('maintenance')}
+          className={cn(
+            'bg-white border rounded-2xl p-3 shadow-2xs transition-all cursor-pointer flex flex-col justify-between col-span-2 lg:col-span-1',
+            activeTab === 'maintenance'
+              ? 'border-rose-300 ring-2 ring-rose-100'
+              : 'border-rose-100 hover:border-rose-200',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">
+              Внимание ТО
+            </span>
+            <span className="text-sm">🛢️</span>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-rose-900">{maintenanceAlertsCount} авто</div>
+            <div className="text-[11px] text-rose-600 font-bold mt-0.5">Подошёл пробег масла</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3. ВКЛАДКИ НАВИГАЦИИ (КОМПАКТНО, БЕЗ ЛЕВОГО САЙДБАРА) ── */}
+      <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 pb-2">
+        <div className="flex flex-wrap gap-1 bg-slate-100/90 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('active')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'active'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>🔧</span>
+            <span>В боксах (В работе)</span>
+            {inWorkCount > 0 && (
+              <span className="bg-sky-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {inWorkCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pending_payment')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'pending_payment'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>💳</span>
+            <span>Ждёт оплаты</span>
+            {pendingPaymentCount > 0 && (
+              <span className="bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {pendingPaymentCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('warehouse')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'warehouse'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>📦</span>
+            <span>Склад запчастей</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('clients')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'clients'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>👥</span>
+            <span>Клиенты СТО</span>
+            {clientsData.length > 0 && (
+              <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {clientsData.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('maintenance')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'maintenance'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>🛢️</span>
+            <span>Регламенты ТО</span>
+            {maintenanceAlertsCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {maintenanceAlertsCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('archive')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+              activeTab === 'archive'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800',
+            )}
+          >
+            <span>📚</span>
+            <span>Архив ремонтов</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setMode('set')}
-            className={cn(
-              'py-1.5 rounded-lg transition-all cursor-pointer',
-              mode === 'set'
-                ? 'bg-white shadow-xs text-slate-900'
-                : 'text-slate-500 hover:text-slate-900',
-            )}
+        {/* Быстрая ссылка на раздел согласования: Ревью Механики */}
+        <div className="hidden sm:flex items-center gap-2 text-xs">
+          <span className="text-slate-400">Приёмка работ и зарплаты:</span>
+          <a
+            href="/review"
+            className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1"
           >
-            Установить
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('deposit')}
-            className={cn(
-              'py-1.5 rounded-lg transition-all cursor-pointer',
-              mode === 'deposit'
-                ? 'bg-white shadow-xs text-emerald-700'
-                : 'text-slate-500 hover:text-slate-900',
-            )}
-          >
-            + Внести
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('withdraw')}
-            className={cn(
-              'py-1.5 rounded-lg transition-all cursor-pointer',
-              mode === 'withdraw'
-                ? 'bg-white shadow-xs text-red-700'
-                : 'text-slate-500 hover:text-slate-900',
-            )}
-          >
-            - Выдать
-          </button>
+            <span>👁️</span>
+            <span>Ревью (Механики) ↗</span>
+          </a>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
-              {mode === 'set'
-                ? 'Фактическая сумма в кассе (₽)'
-                : mode === 'deposit'
-                  ? 'Сумма внесения (₽)'
-                  : 'Сумма выдачи (₽)'}
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder={mode === 'set' ? currentBalance.toFixed(2) : '0.00'}
-              className="w-full text-xl font-bold p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
-              autoFocus
-            />
+      {/* ── 4. СОДЕРЖИМОЕ АКТИВНОЙ ВКЛАДКИ ── */}
+
+      {/* Вкладка 1: В боксах (В работе) */}
+      {activeTab === 'active' && (
+        <div className="space-y-3">
+          {/* Панель фильтров: поиск и принадлежность (свой/клиент) */}
+          <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="🔍 Поиск по номеру наряда, авто или механику..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium focus:bg-white focus:outline-hidden focus:border-sky-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-bold">
+              <button
+                onClick={() => setFilterType('all')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                  filterType === 'all'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                Все ({activeOrders.length})
+              </button>
+              <button
+                onClick={() => setFilterType('own')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                  filterType === 'own'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                🚛 Свой парк ({ownActiveCount})
+              </button>
+              <button
+                onClick={() => setFilterType('client')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                  filterType === 'client'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                🏢 Сторонние клиенты ({clientActiveCount})
+              </button>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
-              Примечание (необязательно)
-            </label>
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Инвентаризация кассы, выдача подотчёта и т.д."
-              className="w-full text-sm p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
-            />
-          </div>
-
-          {error && (
-            <div className="text-xs text-red-600 font-semibold bg-red-50 p-2.5 rounded-xl border border-red-200">
-              {error}
+          {/* Список нарядов */}
+          {ordersLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : filteredActiveOrders.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+              <p className="text-4xl mb-2">🔧</p>
+              <p className="font-bold text-slate-600">Нарядов в боксах нет</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Все автомобили отремонтированы или наряды переведены на ревью
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredActiveOrders.map((o) => (
+                <OrderCard key={o.id} o={o} onSelect={(id) => setSelectedOrderId(id)} />
+              ))}
             </div>
           )}
+        </div>
+      )}
 
-          <div className="flex items-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !amount}
-              className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-black rounded-xl transition-colors shadow-md cursor-pointer"
-            >
-              {loading ? 'Сохранение...' : 'Подтвердить'}
-            </button>
+      {/* Вкладка 2: Ждёт оплаты */}
+      {activeTab === 'pending_payment' && (
+        <div className="space-y-3">
+          <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="font-bold text-sm text-amber-950">
+                Заказ-наряды сторонних клиентов, ожидающие оплаты
+              </h3>
+              <p className="text-xs text-amber-800 mt-0.5">
+                После приёма оплаты заказ-наряд закрывается и выручка поступает в кассу
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-bold uppercase text-amber-800 block">
+                Всего к оплате:
+              </span>
+              <span className="text-xl font-black text-amber-950">
+                <Money amount={totalPendingPaymentSum} />
+              </span>
+            </div>
           </div>
-        </form>
-      </div>
+
+          {pendingPaymentOrders.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+              <p className="text-4xl mb-2">💳</p>
+              <p className="font-bold text-slate-600">Нет неоплаченных нарядов</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Все завершённые наряды клиентов полностью рассчитаны
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {pendingPaymentOrders.map((o) => (
+                <OrderCard key={o.id} o={o} onSelect={(id) => setSelectedOrderId(id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Вкладка 3: Склад запчастей (Вариант 3) */}
+      {activeTab === 'warehouse' && <WarehouseSection />}
+
+      {/* Вкладка 4: Клиенты СТО */}
+      {activeTab === 'clients' && <ClientsSection />}
+
+      {/* Вкладка 5: Регламенты ТО */}
+      {activeTab === 'maintenance' && <MaintenanceSection />}
+
+      {/* Вкладка 6: Архив нарядов */}
+      {activeTab === 'archive' && (
+        <GarageArchiveSection
+          orders={historyOrders}
+          isLoading={histLoading}
+          mechanics={mechanics}
+          onSelectOrder={(id) => setSelectedOrderId(id)}
+          period={archivePeriod}
+          setPeriod={setArchivePeriod}
+          date={archiveDate}
+          setDate={setArchiveDate}
+          month={archiveMonth}
+          setMonth={setArchiveMonth}
+        />
+      )}
+
+      {/* ── 5. МОДАЛЬНЫЕ ОКНА ── */}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
+      {showCreate && (
+        <CreateOrderModal
+          onClose={() => setShowCreate(false)}
+          assets={assets}
+          mechanics={mechanics}
+          onCreated={(id) => {
+            qc.invalidateQueries({ queryKey: ['garage-orders'] });
+            setShowCreate(false);
+            setSelectedOrderId(id);
+          }}
+        />
+      )}
+
+      {selectedOrderId && (
+        <OrderDetailModal
+          orderId={selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          mechanics={mechanics}
+        />
+      )}
     </div>
   );
 }
