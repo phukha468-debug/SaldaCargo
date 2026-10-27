@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
   const { data: user, error } = await (supabase.from('users') as any)
-    .select('id, name, role, roles, pin_code, is_active')
+    .select('id, name, roles, pin_code, is_active')
     .eq('id', user_id)
     .maybeSingle();
 
@@ -34,11 +34,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Неверный PIN-код' }, { status: 403 });
   }
 
+  const isProd = process.env.NODE_ENV === 'production';
   const cookieStore = await cookies();
   cookieStore.set('salda_user_id', user.id, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    httpOnly: false,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: 60 * 60 * 24 * 30, // 30 дней
     path: '/',
   });
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
     user: {
       id: user.id,
       name: user.name,
-      role: user.role,
+      role: Array.isArray(user.roles) ? user.roles[0] : null,
       roles: user.roles,
     },
   });

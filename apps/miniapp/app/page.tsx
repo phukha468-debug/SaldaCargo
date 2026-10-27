@@ -268,7 +268,7 @@ export default function RootDispatcher() {
       });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setPinError('Неверный PIN-код');
+        setPinError(data.error || 'Неверный PIN-код');
         setPinValue('');
         return;
       }

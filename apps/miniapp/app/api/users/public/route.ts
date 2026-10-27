@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     // Expose has_pin flag (not the pin itself)
     const safeUsers = filteredUsers.map(({ pin_code, ...u }: any) => ({
       ...u,
-      has_pin: Boolean(pin_code),
+      has_pin: Boolean(pin_code && String(pin_code).trim()),
     }));
 
     return NextResponse.json(safeUsers, {

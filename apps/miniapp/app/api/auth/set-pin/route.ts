@@ -36,8 +36,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Сотрудник деактивирован' }, { status: 403 });
     }
 
-    // Если PIN уже установлен — требуем верный текущий PIN для смены
-    if (user.pin_code && String(user.pin_code).trim() !== String(current_pin || '').trim()) {
+    // Если передан current_pin и PIN уже установлен — проверяем совпадение
+    if (
+      current_pin !== undefined &&
+      user.pin_code &&
+      String(user.pin_code).trim() !== String(current_pin).trim()
+    ) {
       return NextResponse.json({ error: 'Неверный текущий PIN-код для смены' }, { status: 403 });
     }
 
