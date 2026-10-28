@@ -199,12 +199,20 @@ object SaldaApiClient {
         tripId: String,
         endOdometer: Long?,
         driverNote: String?,
+        isCarryover: Boolean = false,
+        carryoverAmount: Double? = null,
+        carryoverNote: String? = null,
         userId: String? = null
     ): Result<TripDetail> = withContext(Dispatchers.IO) {
         cachedDriverSummary = null
         val body = buildJsonObject {
             if (endOdometer != null) put("odometer_end", endOdometer)
             if (driverNote != null) put("driver_note", driverNote)
+            if (isCarryover) {
+                put("is_carryover", true)
+                if (carryoverAmount != null) put("carryover_amount", carryoverAmount.toString())
+                if (!carryoverNote.isNullOrBlank()) put("carryover_note", carryoverNote)
+            }
         }.toString()
         val request = buildRequest("/api/trips/$tripId/finish", method = "POST", bodyJson = body, userId = userId)
         try {

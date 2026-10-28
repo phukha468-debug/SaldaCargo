@@ -267,6 +267,9 @@ export default function AdminDashboard() {
           </div>
         </Link>
       )}
+
+      {/* Секция: Остатки подотчёта на руках у водителей (переносы) */}
+      <DriverCashHoldsSection />
     </div>
   );
 }
@@ -396,6 +399,398 @@ function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         >
           Отмена
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// СЕКЦИЯ: ОСТАТКИ ПОДОТЧЁТА НА РУКАХ У ВОДИТЕЛЕЙ (ПЕРЕНОСЫ)
+// ─────────────────────────────────────────────────────────────────────────────
+function DriverCashHoldsSection() {
+  const qc = useQueryClient();
+  const [showFixModal, setShowFixModal] = useState(false);
+  const [collectTarget, setCollectTarget] = useState<any | null>(null);
+
+  const { data: holds = [], isLoading } = useQuery<any[]>({
+    queryKey: ['admin-driver-cash-holds'],
+    queryFn: () => fetch('/api/admin/driver-cash-holds').then((r) => r.json()),
+    staleTime: 10000,
+    refetchInterval: 30000,
+  });
+
+  const totalHoldAmount = (holds ?? []).reduce(
+    (sum: number, h: any) => sum + parseFloat(h.amount || '0'),
+    0,
+  );
+
+  return (
+    <div className="bg-amber-50/60 border-2 border-amber-200 rounded-3xl p-4 shadow-xs space-y-3">
+      {/* Заголовок */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">💵</span>
+          <div>
+            <h2 className="text-xs font-black uppercase tracking-wider text-amber-950">
+              Остатки подотчёта на руках
+            </h2>
+            <p className="text-[10px] text-amber-700 font-bold">
+              Несданная наличная выручка / переносы
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {holds.length > 0 && (
+            <span className="bg-amber-600 text-white text-xs font-black px-2.5 py-1 rounded-xl shadow-xs">
+              {totalHoldAmount.toLocaleString('ru-RU')} ₽
+            </span>
+          )}
+          <button
+            onClick={() => setShowFixModal(true)}
+            className="text-[10px] font-black uppercase tracking-wider bg-white border border-amber-300 text-amber-900 px-2.5 py-1.5 rounded-xl active:bg-amber-100 transition-colors"
+          >
+            + Зафиксировать
+          </button>
+        </div>
+      </div>
+
+      {/* Список активных переносов */}
+      {isLoading ? (
+        <div className="h-16 bg-amber-100/50 rounded-2xl animate-pulse" />
+      ) : holds.length === 0 ? (
+        <div className="bg-white/80 border border-amber-100 rounded-2xl p-3 text-center">
+          <p className="text-xs font-bold text-amber-800">
+            Все наличные сданы в кассу. Зависших остатков на руках нет.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {holds.map((hold: any) => (
+            <div
+              key={hold.id}
+              className="bg-white border border-amber-200 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-sm text-zinc-900 truncate">
+                    {hold.driver_name}
+                  </span>
+                  {hold.driver_phone && (
+                    <span className="text-[10px] text-zinc-400 font-medium">
+                      {hold.driver_phone}
+                    </span>
+                  )}
+                </div>
+                {hold.note && (
+                  <p className="text-xs text-zinc-600 mt-0.5 line-clamp-1">{hold.note}</p>
+                )}
+                <p className="text-[10px] text-amber-700 font-medium mt-0.5">
+                  {new Date(hold.created_at).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+
+              <div className="text-right shrink-0 space-y-1.5">
+                <p className="text-base font-black text-amber-900">
+                  {parseFloat(hold.amount).toLocaleString('ru-RU')} ₽
+                </p>
+                <button
+                  onClick={() => setCollectTarget(hold)}
+                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-xl transition-all shadow-xs"
+                >
+                  Принять
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Модалка фиксации переноса */}
+      {showFixModal && (
+        <FixHoldModal
+          onClose={() => setShowFixModal(false)}
+          onSuccess={() => {
+            setShowFixModal(false);
+            qc.invalidateQueries({ queryKey: ['admin-driver-cash-holds'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
+          }}
+        />
+      )}
+
+      {/* Модалка приёма денег в кассу */}
+      {collectTarget && (
+        <CollectHoldModal
+          hold={collectTarget}
+          onClose={() => setCollectTarget(null)}
+          onSuccess={() => {
+            setCollectTarget(null);
+            qc.invalidateQueries({ queryKey: ['admin-driver-cash-holds'] });
+            qc.invalidateQueries({ queryKey: ['wallets'] });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// МОДАЛКА: ЗАФИКСИРОВАТЬ ОСТАТОК ПОДОТЧЁТА НА РУКАХ
+// ─────────────────────────────────────────────────────────────────────────────
+function FixHoldModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [driverId, setDriverId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const { data: drivers = [], isLoading: driversLoading } = useQuery<any[]>({
+    queryKey: ['users-drivers'],
+    queryFn: () => fetch('/api/users/public?role=driver').then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/admin/driver-cash-holds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driver_id: driverId,
+          amount: parseFloat(amount.replace(',', '.')),
+          note: note || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Ошибка фиксации остатка');
+      return data;
+    },
+    onSuccess,
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const handleSubmit = () => {
+    if (!driverId) return setError('Выберите водителя');
+    const num = parseFloat(amount.replace(',', '.'));
+    if (isNaN(num) || num <= 0) return setError('Укажите корректную сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-zinc-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+          <h3 className="font-black text-sm uppercase tracking-wider text-zinc-900">
+            📋 Зафиксировать остаток подотчёта
+          </h3>
+          <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+            ✕
+          </button>
+        </div>
+
+        <p className="text-xs text-zinc-500">
+          Используется, когда водитель не сдал наличные в кассу и они остаются у него на руках до
+          следующего рейса.
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1">
+              Водитель
+            </label>
+            {driversLoading ? (
+              <div className="h-10 bg-zinc-100 rounded-xl animate-pulse" />
+            ) : (
+              <select
+                value={driverId}
+                onChange={(e) => setDriverId(e.target.value)}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">Выберите водителя...</option>
+                {drivers.map((d: any) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1">
+              Сумма на руках (₽)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-base font-black text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1">
+              Комментарий / Причина
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Поздний возврат / перенос на завтра"
+              className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+
+          {error && <p className="text-xs font-bold text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-zinc-100">
+          <button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {mutation.isPending ? 'Сохранение...' : 'Зафиксировать перенос'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 text-xs font-black text-zinc-500 uppercase tracking-widest border border-zinc-200 rounded-xl active:bg-zinc-100 transition-colors"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// МОДАЛКА: ПРИНЯТЬ ПОДОТЧЁТ В КАССУ (ИНКАССИРОВАТЬ)
+// ─────────────────────────────────────────────────────────────────────────────
+function CollectHoldModal({
+  hold,
+  onClose,
+  onSuccess,
+}: {
+  hold: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [collectAmount, setCollectAmount] = useState(hold.amount ?? '');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/admin/driver-cash-holds', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hold_id: hold.id,
+          collected_amount: parseFloat(collectAmount.replace(',', '.')),
+          note: note || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Ошибка приёма денег');
+      return data;
+    },
+    onSuccess,
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const handleSubmit = () => {
+    const num = parseFloat(collectAmount.replace(',', '.'));
+    if (isNaN(num) || num <= 0) return setError('Укажите корректную сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-zinc-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+          <h3 className="font-black text-sm uppercase tracking-wider text-emerald-800">
+            💵 Принять подотчёт в кассу
+          </h3>
+          <button onClick={onClose} className="text-zinc-400 font-bold text-lg">
+            ✕
+          </button>
+        </div>
+
+        <div className="bg-zinc-50 rounded-2xl p-3 border border-zinc-200/80 space-y-1">
+          <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Водитель</p>
+          <p className="text-sm font-black text-zinc-900">{hold.driver_name}</p>
+          {hold.note && <p className="text-xs text-zinc-600 mt-1">{hold.note}</p>}
+          <p className="text-xs text-amber-800 font-bold mt-1">
+            Всего на руках: {parseFloat(hold.amount).toLocaleString('ru-RU')} ₽
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1">
+              Сумма к сдаче в сейф (₽)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={collectAmount}
+              onChange={(e) => setCollectAmount(e.target.value)}
+              className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-base font-black text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1">
+              Примечание (необязательно)
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Сдано в кассу"
+              className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {error && <p className="text-xs font-bold text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-zinc-100">
+          <button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {mutation.isPending ? 'Приём денег...' : 'Принять в сейф'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 text-xs font-black text-zinc-500 uppercase tracking-widest border border-zinc-200 rounded-xl active:bg-zinc-100 transition-colors"
+          >
+            Отмена
+          </button>
+        </div>
       </div>
     </div>
   );

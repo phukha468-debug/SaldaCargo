@@ -1745,6 +1745,17 @@ function TripCard({
     calcTrip(trip);
   const totalCosts = driverPay + loaderPay + totalExpenses;
 
+  const cashRevenue = activeOrders
+    .filter((o) => o.payment_method === 'cash')
+    .reduce((s, o) => s + parseFloat(o.amount), 0);
+  const cashExpenses = expenses
+    .filter((e) => e.payment_method === 'cash')
+    .reduce((s, e) => s + parseFloat(e.amount), 0);
+  const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
+  const hasCarryover =
+    (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip.driver_note ?? '').includes('[CARRYOVER]');
+
   const loaderNames = [
     ...new Set(
       activeOrders.flatMap((o) => [
@@ -1824,7 +1835,12 @@ function TripCard({
               )}
               {activeOrders.some((o) => o.payment_method === 'cash') && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-xs flex items-center gap-0.5">
-                  💵 Нал
+                  💵 Нал: {cashToSurrender.toLocaleString('ru-RU')} ₽
+                </span>
+              )}
+              {hasCarryover && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-xs flex items-center gap-0.5">
+                  ⚠️ Перенос
                 </span>
               )}
             </div>
@@ -2029,12 +2045,20 @@ function TripCard({
           </div>
 
           {/* Summary bar */}
-          <div className="px-5 py-4 grid grid-cols-6 gap-3 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+          <div className="px-5 py-4 grid grid-cols-7 gap-3 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white">
             {[
               {
                 label: 'Выручка',
                 value: <Money amount={revenue.toFixed(2)} />,
                 cls: 'text-slate-800 text-base font-black',
+              },
+              {
+                label: 'Сдать нал',
+                value: cashToSurrender > 0 ? <Money amount={cashToSurrender.toFixed(2)} /> : '—',
+                cls:
+                  cashToSurrender > 0
+                    ? 'text-emerald-700 text-base font-black'
+                    : 'text-slate-300 text-base font-bold',
               },
               {
                 label: `ЗП ${trip.driver.name.split(' ')[0]}`,
@@ -2099,6 +2123,26 @@ function TripCard({
               </div>
             ))}
           </div>
+
+          {/* Плашка сдачи наличных и статуса переноса */}
+          {(cashToSurrender > 0 || hasCarryover) && (
+            <div className="px-5 py-2.5 bg-emerald-50/80 border-t border-emerald-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                <span>💵</span>
+                <span>
+                  Итого наличных к сдаче за рейс:{' '}
+                  <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong> (Выручка налом:{' '}
+                  {cashRevenue.toLocaleString('ru-RU')} ₽ − Расходы налом:{' '}
+                  {cashExpenses.toLocaleString('ru-RU')} ₽)
+                </span>
+              </span>
+              {hasCarryover && (
+                <span className="font-black text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider">
+                  ⚠️ Водитель зафиксировал перенос на следующий рейс
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Driver note */}
           {trip.driver_note && (

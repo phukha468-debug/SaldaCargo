@@ -88,6 +88,20 @@ export default function AdminTripDetailPage() {
   const isPendingReview = trip.status === 'completed' && trip.lifecycle_status === 'draft';
   const isApproved = trip.lifecycle_status === 'approved';
 
+  const cashRevenue = activeOrders
+    .filter((o: any) => o.payment_method === 'cash')
+    .reduce((s: number, o: any) => s + parseFloat(o.amount || '0'), 0);
+  const cashExpenses = (trip.trip_expenses ?? [])
+    .filter((e: any) => e.payment_method === 'cash')
+    .reduce((s: number, e: any) => s + parseFloat(e.amount || '0'), 0);
+  const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
+
+  const carryoverMatch = (trip.driver_note ?? '').match(
+    /\[ПЕРЕНОС НАЛИЧНЫХ:\s*([^—\]]+)(?:—\s*([^\]]+))?\]/,
+  );
+  const carryoverAmountStr = carryoverMatch ? carryoverMatch[1].trim() : null;
+  const carryoverReasonStr = carryoverMatch ? (carryoverMatch[2] ?? '').trim() : null;
+
   // Анализ статуса ЗП
   const payrollTxns: any[] = trip.payroll_txns ?? [];
   const hasDisputed = payrollTxns.some(
@@ -196,6 +210,44 @@ export default function AdminTripDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Блок наличных к сдаче в кассу */}
+        {(cashRevenue > 0 || cashExpenses > 0 || carryoverAmountStr) && (
+          <section className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 shadow-sm space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                  💵 Сдать в кассу за рейс
+                </span>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Выручка налом ({cashRevenue.toLocaleString('ru-RU')} ₽) − Расходы (
+                  {cashExpenses.toLocaleString('ru-RU')} ₽)
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-black text-emerald-900 block">
+                  <Money amount={cashToSurrender.toString()} />
+                </span>
+              </div>
+            </div>
+
+            {carryoverAmountStr && (
+              <div className="pt-2 border-t border-emerald-200/80 flex items-start justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                  <span>⚠️</span>
+                  <span>
+                    Водитель перенёс на руках:{' '}
+                    <strong className="text-amber-950 font-black">{carryoverAmountStr}</strong>
+                    {carryoverReasonStr ? ` (${carryoverReasonStr})` : ''}
+                  </span>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-md shrink-0">
+                  Перенос
+                </span>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Итоги */}
         <section className={`grid gap-3 ${loaderPay > 0 ? 'grid-cols-2' : 'grid-cols-3'}`}>

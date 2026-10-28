@@ -968,6 +968,10 @@ fun DispatcherScreen(
                             }
                             val expensesSum = trip.tripExpenses.sumOf { it.amount }
                             val profit = rev - driverPay - loaderPay - expensesSum
+                            val cashRevenue = activeOrders.filter { it.paymentMethod == "cash" }.sumOf { it.amount }
+                            val cashExpenses = trip.tripExpenses.filter { it.paymentMethod == "cash" }.sumOf { it.amount }
+                            val cashToSurrender = maxOf(0.0, cashRevenue - cashExpenses)
+                            val hasCarryover = (trip.driverNote ?: "").contains("[ПЕРЕНОС НАЛИЧНЫХ") || (trip.driverNote ?: "").contains("[CARRYOVER]")
                             val isApproving = approvingTripId == trip.id
                             val isReturning = returningTripId == trip.id
 
@@ -1139,6 +1143,59 @@ fun DispatcherScreen(
                                     }
 
                                     Spacer(modifier = Modifier.height(12.dp))
+
+                                    if (cashToSurrender > 0 || hasCarryover) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Surface(
+                                            color = Color(0xFFECFDF5),
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        text = "💵 СДАТЬ В КАССУ ЗА РЕЙС:",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = Color(0xFF065F46)
+                                                    )
+                                                    Text(
+                                                        text = "Нал (${cashRevenue.toInt()} ₽) − расходы (${cashExpenses.toInt()} ₽)",
+                                                        fontSize = 9.sp,
+                                                        color = Color(0xFF047857)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "${cashToSurrender.toInt()} ₽",
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = Color(0xFF065F46)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (hasCarryover) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Surface(
+                                            color = Color(0xFFFEF3C7),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = "⚠️ Водитель зафиксировал перенос на следующий рейс",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF92400E),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
 
                                     // Кнопки управления: Детали, Удалить (🗑️), Вернуть, Одобрить
                                     Row(

@@ -922,6 +922,17 @@ function SimpleTripCard({ trip }: { trip: any }) {
     0,
   );
 
+  const cashRevenue = (trip.trip_orders ?? [])
+    .filter((o: any) => o.payment_method === 'cash' && o.lifecycle_status !== 'cancelled')
+    .reduce((s: number, o: any) => s + parseFloat(o.amount || '0'), 0);
+  const cashExpenses = (trip.trip_expenses ?? [])
+    .filter((e: any) => e.payment_method === 'cash')
+    .reduce((s: number, e: any) => s + parseFloat(e.amount || '0'), 0);
+  const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
+  const hasCarryover =
+    (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip.driver_note ?? '').includes('[CARRYOVER]');
+
   return (
     <Link href={`/admin/trips/${trip.id}`}>
       <div className="bg-white rounded-2xl p-4 border-2 border-zinc-100 shadow-sm active:scale-[0.98] transition-all relative overflow-hidden">
@@ -941,7 +952,7 @@ function SimpleTripCard({ trip }: { trip: any }) {
             </div>
             <LifecycleBadge status={trip.lifecycle_status} />
           </div>
-          <div className="flex gap-4 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-zinc-900 font-bold">
               Выручка: <Money amount={revenue.toString()} className="font-black" />
             </span>
@@ -951,6 +962,16 @@ function SimpleTripCard({ trip }: { trip: any }) {
             {expenses > 0 && (
               <span className="text-red-500 font-bold">
                 Расх: <Money amount={expenses.toString()} />
+              </span>
+            )}
+            {cashToSurrender > 0 && (
+              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-bold text-[11px]">
+                💵 Нал: <Money amount={cashToSurrender.toString()} className="font-black" />
+              </span>
+            )}
+            {hasCarryover && (
+              <span className="bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-md font-bold text-[10px]">
+                ⚠️ Перенос
               </span>
             )}
           </div>

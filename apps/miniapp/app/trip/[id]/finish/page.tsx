@@ -29,6 +29,9 @@ export default function FinishTripPage() {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isCarryover, setIsCarryover] = useState(false);
+  const [carryoverAmount, setCarryoverAmount] = useState('');
+  const [carryoverNote, setCarryoverNote] = useState('');
 
   const { data: trip } = useQuery({
     queryKey: ['trip', id],
@@ -135,10 +138,22 @@ export default function FinishTripPage() {
     setSubmitting(true);
     setError('');
 
+    const parsedCarryAmount =
+      isCarryover && carryoverAmount
+        ? parseFloat(carryoverAmount.replace(',', '.'))
+        : isCarryover
+          ? cashToSurrender
+          : undefined;
+
     const res = await fetch(`/api/trips/${id}/finish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        is_carryover: isCarryover,
+        carryover_amount: parsedCarryAmount,
+        carryover_note: isCarryover ? carryoverNote || undefined : undefined,
+      }),
     });
 
     if (!res.ok) {
@@ -211,6 +226,76 @@ export default function FinishTripPage() {
             <span className="text-base font-black text-emerald-600">
               <Money amount={cashToSurrender.toString()} />
             </span>
+          </div>
+
+          {/* Блок переноса наличных на следующий день / рейс */}
+          <div className="pt-2 border-t border-zinc-100 space-y-2">
+            <label className="flex items-start gap-2.5 p-3 bg-amber-50/80 border border-amber-200 rounded-xl cursor-pointer active:bg-amber-100/70 transition-colors">
+              <input
+                type="checkbox"
+                checked={isCarryover}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setIsCarryover(checked);
+                  if (checked && !carryoverAmount) {
+                    setCarryoverAmount(cashToSurrender > 0 ? cashToSurrender.toString() : '');
+                  }
+                }}
+                className="mt-0.5 w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+              />
+              <div className="flex-1 text-xs">
+                <span className="font-bold text-amber-900 block leading-tight">
+                  Перенести наличные на следующий рейс (не сдал в кассу)
+                </span>
+                <span className="text-[11px] text-amber-700 block mt-0.5 leading-snug">
+                  Если вернулись поздно или сдать некому. Сумма зафиксируется на вашем подотчёте.
+                </span>
+              </div>
+            </label>
+
+            {isCarryover && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in duration-200">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-black text-amber-900 uppercase tracking-wider block">
+                      Сумма переноса на руках, ₽
+                    </label>
+                    {cashToSurrender > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCarryoverAmount(cashToSurrender.toString())}
+                        className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-1.5 py-0.5 rounded"
+                      >
+                        Вся сумма ({cashToSurrender} ₽)
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={carryoverAmount}
+                    onChange={(e) => setCarryoverAmount(e.target.value)}
+                    placeholder={cashToSurrender.toString()}
+                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-sm font-black text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <p className="text-[10px] text-amber-700 mt-1">
+                    Укажите, сколько именно осталось на руках (если часть уже сдали утром).
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-amber-900 uppercase tracking-wider block mb-1">
+                    Причина / комментарий
+                  </label>
+                  <input
+                    type="text"
+                    value={carryoverNote}
+                    onChange={(e) => setCarryoverNote(e.target.value)}
+                    placeholder="Поздний возврат, сдам завтра"
+                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
           {debtOrders.length > 0 && (
             <SummaryRow

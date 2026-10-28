@@ -68,6 +68,9 @@ fun TripDetailScreen(
     // Поля завершения рейса
     var endOdometerInput by rememberSaveable { mutableStateOf("") }
     var driverNoteInput by rememberSaveable { mutableStateOf("") }
+    var isCarryoverInput by rememberSaveable { mutableStateOf(false) }
+    var carryoverAmountInput by rememberSaveable { mutableStateOf("") }
+    var carryoverNoteInput by rememberSaveable { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
 
@@ -908,6 +911,70 @@ fun TripDetailScreen(
                         }
                     }
 
+                    // Блок переноса наличных на следующий рейс
+                    Surface(
+                        color = Color(0xFFFFFBEB),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        isCarryoverInput = !isCarryoverInput
+                                        if (isCarryoverInput && carryoverAmountInput.isBlank() && cashToSurrender > 0) {
+                                            carryoverAmountInput = cashToSurrender.toInt().toString()
+                                        }
+                                    }
+                            ) {
+                                Checkbox(
+                                    checked = isCarryoverInput,
+                                    onCheckedChange = {
+                                        isCarryoverInput = it
+                                        if (it && carryoverAmountInput.isBlank() && cashToSurrender > 0) {
+                                            carryoverAmountInput = cashToSurrender.toInt().toString()
+                                        }
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column {
+                                    Text(
+                                        "Перенести нал на след. рейс",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF78350F)
+                                    )
+                                    Text(
+                                        "Если вернулись поздно или некому сдать",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFFB45309)
+                                    )
+                                }
+                            }
+
+                            if (isCarryoverInput) {
+                                OutlinedTextField(
+                                    value = carryoverAmountInput,
+                                    onValueChange = { carryoverAmountInput = it },
+                                    label = { Text("Сумма переноса на руках (₽)") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = carryoverNoteInput,
+                                    onValueChange = { carryoverNoteInput = it },
+                                    label = { Text("Причина (напр. поздний возврат)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = endOdometerInput,
                         onValueChange = { endOdometerInput = it },
@@ -943,6 +1010,9 @@ fun TripDetailScreen(
                             isSubmitting = true
                             finishError = null
                             val res = SaldaApiClient.finishTrip(
+                                isCarryover = isCarryoverInput,
+                                carryoverAmount = if (isCarryoverInput) carryoverAmountInput.toDoubleOrNull() ?: cashToSurrender else null,
+                                carryoverNote = carryoverNoteInput.ifBlank { null },
                                 tripId = tripId,
                                 endOdometer = endOdo,
                                 driverNote = driverNoteInput.ifBlank { null },

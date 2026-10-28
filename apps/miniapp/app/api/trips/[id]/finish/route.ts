@@ -15,6 +15,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     driver_note?: string;
     fuel_amount?: number;
     fuel_payment_method?: 'fuel_card' | 'cash';
+    is_carryover?: boolean;
+    carryover_amount?: number | string;
+    carryover_note?: string;
   };
 
   const supabase = createAdminClient();
@@ -22,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // 1. Получаем рейс и данные автомобиля
   const { data: trip, error: tripErr } = await (supabase.from('trips') as any)
     .select(
-      'id, asset_id, odometer_start, status, trip_type, asset:assets(id, short_name, reg_number, odometer_current, asset_type:asset_types(code))',
+      'id, driver_id, trip_number, asset_id, odometer_start, status, trip_type, asset:assets(id, short_name, reg_number, odometer_current, asset_type:asset_types(code))',
     )
     .eq('id', id)
     .maybeSingle();
@@ -99,6 +102,45 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     driver_note: body.driver_note ?? null,
     ended_at: new Date().toISOString(),
   };
+
+  const carryAmt =
+    body.is_carryover && body.carryover_amount
+      ? parseFloat(String(body.carryover_amount).replace(',', '.'))
+      : 0;
+
+  if (carryAmt > 0 && trip.driver_id) {
+    const carryNote = body.carryover_note?.trim() || 'Поздний возврат, перенос на следующий день';
+    const carryMarker = `[ПЕРЕНОС НАЛИЧНЫХ: ${carryAmt.toLocaleString('ru-RU')} ₽ — ${carryNote}]`;
+    updatePayload.driver_note = body.driver_note
+      ? `${body.driver_note}\n${carryMarker}`
+      : carryMarker;
+
+    const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
+    const CASH_WALLET_ID = '10000000-0000-0000-0000-000000000002';
+
+    const { data: driverWallet } = await (supabase.from('wallets') as any)
+      .select('id')
+      .eq('owner_user_id', trip.driver_id)
+      .eq('type', 'driver_accountable')
+      .limit(1)
+      .maybeSingle();
+
+    await (supabase.from('transactions') as any).insert({
+      direction: 'transfer',
+      amount: carryAmt.toFixed(2),
+      category_id: CASH_COLLECT_CAT,
+      from_wallet_id: driverWallet?.id ?? null,
+      to_wallet_id: CASH_WALLET_ID,
+      lifecycle_status: 'approved',
+      settlement_status: 'pending',
+      related_user_id: trip.driver_id,
+      trip_id: trip.id,
+      description: `[CARRYOVER] Рейс №${trip.trip_number ?? ''}: ${carryNote}`,
+      created_by: trip.driver_id,
+      idempotency_key: crypto.randomUUID(),
+      transaction_date: new Date().toISOString(),
+    });
+  }
 
   if (odoEnd) {
     updatePayload.odometer_end = odoEnd;
