@@ -3815,7 +3815,7 @@ function PayrollRow({
         onClick={() => setExpanded((v) => !v)}
       >
         {/* Name + roles */}
-        <div className="w-44 shrink-0 min-w-0">
+        <div className="w-40 shrink-0 min-w-0">
           <div className="flex flex-wrap items-center gap-1 mb-0.5">
             {user.roles.slice(0, 2).map((role) => (
               <span
@@ -3870,13 +3870,13 @@ function PayrollRow({
         </div>
 
         {/* Shifts/orders */}
-        <div className="w-16 shrink-0 text-center">
+        <div className="w-14 shrink-0 text-center">
           <p className="text-xs font-black text-slate-700">{user.shifts > 0 ? user.shifts : '—'}</p>
           <p className="text-[9px] text-slate-400">смен</p>
         </div>
 
         {/* Earned */}
-        <div className="w-28 shrink-0 text-right">
+        <div className="w-24 shrink-0 text-right">
           {earned > 0 ? (
             <p className="text-sm font-bold text-slate-700">
               <Money amount={user.earned} />
@@ -3888,7 +3888,7 @@ function PayrollRow({
         </div>
 
         {/* Paid */}
-        <div className="w-28 shrink-0 text-right">
+        <div className="w-24 shrink-0 text-right">
           {parseFloat(user.paid) > 0 ? (
             <p className="text-sm font-bold text-emerald-600">
               <Money amount={user.paid} />
@@ -3900,7 +3900,7 @@ function PayrollRow({
         </div>
 
         {/* Debt / Advance */}
-        <div className="w-28 shrink-0 text-right relative z-10">
+        <div className="w-28 shrink-0 text-right">
           {hasDebt ? (
             <>
               <p className="text-sm font-black text-amber-600">
@@ -3950,18 +3950,17 @@ function PayrollRow({
         </div>
 
         {/* Action */}
-        <div className="flex-1 min-w-[240px] flex items-center justify-end gap-1 sm:gap-1.5 ml-auto">
+        <div className="flex-1 flex items-center justify-end gap-1.5 ml-auto">
           {hasDebt && !user.auto_settle && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onSettle();
               }}
-              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center gap-1"
+              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
               title="Рассчитаться с сотрудником"
             >
-              <span className="hidden xl:inline">Рассчитаться</span>
-              <span className="xl:hidden">Расчёт</span>
+              Расчёт
             </button>
           )}
           {isAdminOrOwner && (
@@ -3970,11 +3969,10 @@ function PayrollRow({
                 e.stopPropagation();
                 onManualPay();
               }}
-              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center gap-1"
+              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
               title="Выплатить заработную плату"
             >
-              <span className="hidden xl:inline">Выплатить ЗП</span>
-              <span className="xl:hidden">Выплата</span>
+              Выплата
             </button>
           )}
           {onAdvance && (
@@ -3983,7 +3981,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onAdvance();
               }}
-              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center"
               title="Выдать аванс"
             >
               Аванс
@@ -3995,11 +3993,11 @@ function PayrollRow({
                 e.stopPropagation();
                 onAdjustDebt();
               }}
-              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center gap-1"
+              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
               title="Редактировать целевую сумму долга"
             >
               <span>✏️</span>
-              <span className="hidden sm:inline">Долг</span>
+              <span>Долг</span>
             </button>
           )}
           {onOpenShifts && user.roles.includes('cleaner') && (
@@ -4008,24 +4006,11 @@ function PayrollRow({
                 e.stopPropagation();
                 onOpenShifts();
               }}
-              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-2xs transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-2xs transition-colors shrink-0 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
               title="Календарь смен и ставка (отметить дни работы)"
             >
               <span>📅</span>
               <span>Смены</span>
-            </button>
-          )}
-          {onOpenShifts && !user.roles.includes('cleaner') && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenShifts();
-              }}
-              className="h-7 px-2 py-1 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
-              title="Календарь смен и ставка (отметить дни работы)"
-            >
-              <span>📅</span>
-              <span className="hidden 2xl:inline">Смены</span>
             </button>
           )}
           {onPayslip && (
@@ -4034,11 +4019,11 @@ function PayrollRow({
                 e.stopPropagation();
                 onPayslip();
               }}
-              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
               title="Сформировать расчётный лист сотрудника"
             >
               <span>📄</span>
-              <span className="hidden xl:inline">Лист</span>
+              <span>Лист</span>
             </button>
           )}
           <span
@@ -4193,28 +4178,28 @@ function PayrollSection({
         <div className="min-w-[1020px]">
           {/* Coloured column headers */}
           <div className={cn('flex items-center gap-3 px-4 py-2.5', headerBg)}>
-            <div className="w-44 shrink-0">
+            <div className="w-40 shrink-0">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
                 Сотрудник
               </span>
             </div>
-            <div className="w-16 shrink-0 text-center">
+            <div className="w-14 shrink-0 text-center">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
                 Смен
               </span>
             </div>
-            <div className="w-28 shrink-0 text-right">
+            <div className="w-24 shrink-0 text-right">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
                 Заработал
               </span>
             </div>
-            <div className="w-28 shrink-0 text-right">
+            <div className="w-24 shrink-0 text-right">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
