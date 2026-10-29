@@ -12,6 +12,7 @@ const PAYROLL_CATEGORIES: Record<string, string> = {
   painter: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
   electrician: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
   handyman: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
+  cleaner: '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6',
 };
 const OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 

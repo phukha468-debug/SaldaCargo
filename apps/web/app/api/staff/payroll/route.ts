@@ -409,6 +409,7 @@ export async function GET(request: Request) {
 
     const drivers = byRole('driver');
     const loaders = byRole('loader');
+    const cleaners = byRole('cleaner');
     const office = all.filter(
       (u) =>
         !u.roles.some((r: string) =>
@@ -421,6 +422,7 @@ export async function GET(request: Request) {
             'handyman',
             'driver',
             'loader',
+            'cleaner',
           ].includes(r),
         ),
     );
@@ -429,6 +431,7 @@ export async function GET(request: Request) {
       drivers,
       loaders,
       mechanics,
+      cleaners,
       office,
       total_earned_month: all.reduce((s, u) => s + parseFloat(u.earned), 0).toFixed(2),
       total_paid_month: all.reduce((s, u) => s + parseFloat(u.paid), 0).toFixed(2),

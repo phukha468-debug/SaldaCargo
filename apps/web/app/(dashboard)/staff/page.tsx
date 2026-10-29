@@ -8,6 +8,7 @@ import { cn } from '@saldacargo/ui';
 import { DriverDocuments } from '@/components/DriverDocuments';
 import { PayslipModal } from './payslip-modal';
 import { AccountableSection } from './accountable-section';
+import { ShiftCalendarModal } from './shift-calendar-modal';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type UserRole =
@@ -21,7 +22,8 @@ type UserRole =
   | 'welder'
   | 'painter'
   | 'electrician'
-  | 'handyman';
+  | 'handyman'
+  | 'cleaner';
 
 export type PayrollUser = {
   id: string;
@@ -69,6 +71,7 @@ type PayrollResponse = {
   loaders: PayrollUser[];
   mechanics: PayrollUser[];
   office: PayrollUser[];
+  cleaners?: PayrollUser[];
   total_earned_month: string;
   total_paid_month: string;
   total_debt_alltime: string;
@@ -112,6 +115,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   painter: 'Маляр',
   electrician: 'Электрик',
   handyman: 'Разнорабочий',
+  cleaner: 'Уборщица',
 };
 
 const ROLE_COLOR: Record<UserRole, string> = {
@@ -126,6 +130,7 @@ const ROLE_COLOR: Record<UserRole, string> = {
   painter: 'bg-pink-100 text-pink-700',
   electrician: 'bg-yellow-100 text-yellow-700',
   handyman: 'bg-stone-100 text-stone-600',
+  cleaner: 'bg-teal-100 text-teal-800',
 };
 
 const ALL_ROLES: UserRole[] = [
@@ -133,6 +138,7 @@ const ALL_ROLES: UserRole[] = [
   'mechanic',
   'mechanic_lead',
   'loader',
+  'cleaner',
   'welder',
   'painter',
   'electrician',
@@ -3756,6 +3762,7 @@ function PayrollRow({
   onHistory,
   onAdjustDebt,
   onPayslip,
+  onOpenShifts,
 }: {
   user: PayrollUser;
   onSettle: () => void;
@@ -3766,6 +3773,7 @@ function PayrollRow({
   onHistory: () => void;
   onAdjustDebt?: () => void;
   onPayslip?: () => void;
+  onOpenShifts?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
@@ -3989,6 +3997,24 @@ function PayrollRow({
               ✏️ Долг
             </button>
           )}
+          {onOpenShifts && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenShifts();
+              }}
+              className={cn(
+                'text-xs font-black px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 flex items-center gap-1 cursor-pointer',
+                user.roles.includes('cleaner')
+                  ? 'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100 shadow-2xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100',
+              )}
+              title="Календарь смен и ставка (отметить дни работы)"
+            >
+              <span>📅</span>
+              <span>{user.roles.includes('cleaner') ? 'Смены' : 'Смены'}</span>
+            </button>
+          )}
           {onPayslip && (
             <button
               onClick={(e) => {
@@ -4043,6 +4069,24 @@ function PayrollRow({
           {user.notes && <span className="text-xs text-slate-400 italic">{user.notes}</span>}
 
           <div className="ml-auto flex items-center gap-2">
+            {onOpenShifts && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenShifts();
+                }}
+                className={cn(
+                  'text-xs font-bold rounded-lg py-1 px-3 transition-colors flex items-center gap-1 border cursor-pointer',
+                  user.roles.includes('cleaner')
+                    ? 'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100',
+                )}
+                title="Календарь смен и ставка"
+              >
+                <span>📅</span>
+                <span>Табель смен</span>
+              </button>
+            )}
             {onPayslip && (
               <button
                 onClick={(e) => {
@@ -4105,6 +4149,7 @@ function PayrollSection({
   onHistory,
   onAdjustDebt,
   onPayslip,
+  onOpenShifts,
 }: {
   users: PayrollUser[];
   headerBg: string;
@@ -4117,6 +4162,7 @@ function PayrollSection({
   onHistory: (u: PayrollUser) => void;
   onAdjustDebt?: (u: PayrollUser) => void;
   onPayslip?: (u: PayrollUser) => void;
+  onOpenShifts?: (u: PayrollUser) => void;
 }) {
   if (users.length === 0)
     return (
@@ -4184,6 +4230,7 @@ function PayrollSection({
           onHistory={() => onHistory(u)}
           onAdjustDebt={onAdjustDebt ? () => onAdjustDebt(u) : undefined}
           onPayslip={onPayslip ? () => onPayslip(u) : undefined}
+          onOpenShifts={onOpenShifts ? () => onOpenShifts(u) : undefined}
         />
       ))}
     </div>
@@ -4612,7 +4659,7 @@ function AdvanceModal({
 
 // ─── Group config ─────────────────────────────────────────────────────────────
 
-type GroupKey = 'drivers' | 'loaders' | 'workshop' | 'debts' | 'accountable';
+type GroupKey = 'drivers' | 'loaders' | 'workshop' | 'cleaners' | 'debts' | 'accountable';
 
 const GROUP_CONFIG: Record<
   GroupKey,
@@ -4664,6 +4711,18 @@ const GROUP_CONFIG: Record<
     getUsers: (p) => [...p.mechanics, ...p.office],
     getCount: (p) => p.mechanics.length + p.office.length,
   },
+  cleaners: {
+    label: 'Уборщицы',
+    headerBg: 'bg-teal-700',
+    headerTextColor: 'text-teal-100',
+    tabActive: 'bg-teal-700 text-white shadow-sm',
+    tabInactive:
+      'bg-white border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700',
+    countActive: 'bg-white/25 text-white',
+    countInactive: 'bg-slate-100 text-slate-500',
+    getUsers: (p) => p.cleaners || [],
+    getCount: (p) => (p.cleaners ? p.cleaners.length : 0),
+  },
   debts: {
     label: 'Долги сотрудников',
     headerBg: 'bg-violet-600',
@@ -4674,11 +4733,11 @@ const GROUP_CONFIG: Record<
     countActive: 'bg-white/25 text-white',
     countInactive: 'bg-slate-100 text-slate-500',
     getUsers: (p) => {
-      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office];
+      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office, ...(p.cleaners || [])];
       return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0);
     },
     getCount: (p) => {
-      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office];
+      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office, ...(p.cleaners || [])];
       return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0).length;
     },
   },
@@ -5008,6 +5067,7 @@ export default function StaffPage() {
   const [editUser, setEditUser] = useState<StaffUser | 'new' | null>(null);
   const [historyUser, setHistoryUser] = useState<PayrollUser | null>(null);
   const [payslipUser, setPayslipUser] = useState<PayrollUser | null>(null);
+  const [shiftModalUser, setShiftModalUser] = useState<PayrollUser | null>(null);
   const [debtModalUser, setDebtModalUser] = useState<{
     user?: PayrollUser;
     action?: 'add' | 'repay' | 'adjust';
@@ -5073,9 +5133,13 @@ export default function StaffPage() {
   };
 
   const allStaffUsers = payroll
-    ? [...payroll.drivers, ...payroll.loaders, ...payroll.mechanics, ...payroll.office].sort(
-        (a, b) => a.name.localeCompare(b.name, 'ru'),
-      )
+    ? [
+        ...payroll.drivers,
+        ...payroll.loaders,
+        ...payroll.mechanics,
+        ...payroll.office,
+        ...(payroll.cleaners || []),
+      ].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
     : [];
 
   const totalDebt = payroll ? parseFloat(payroll.total_debt_alltime) : 0;
@@ -5230,6 +5294,18 @@ export default function StaffPage() {
           })}
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {activeGroup === 'cleaners' && activeUsers.length > 0 && (
+            <button
+              onClick={() => {
+                if (activeUsers[0]) setShiftModalUser(activeUsers[0]);
+              }}
+              className="bg-teal-700 text-white text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-teal-800 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Открыть табель смен для первой уборщицы"
+            >
+              <span>📅</span>
+              <span>Табель смен</span>
+            </button>
+          )}
           {activeUsers.length > 0 && (
             <button
               onClick={() => {
@@ -5338,6 +5414,7 @@ export default function StaffPage() {
               : undefined
           }
           onPayslip={setPayslipUser}
+          onOpenShifts={setShiftModalUser}
         />
       )}
 
@@ -5357,6 +5434,24 @@ export default function StaffPage() {
           }}
           onOpenPayslip={(u) => {
             setHistoryUser(null);
+            setPayslipUser(u);
+          }}
+        />
+      )}
+
+      {/* Модал календаря смен (для уборщиц и сменных сотрудников) */}
+      {shiftModalUser && (
+        <ShiftCalendarModal
+          user={shiftModalUser}
+          initialYear={year}
+          initialMonth={month}
+          onClose={() => setShiftModalUser(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+          }}
+          onOpenPayslip={() => {
+            const u = shiftModalUser;
+            setShiftModalUser(null);
             setPayslipUser(u);
           }}
         />

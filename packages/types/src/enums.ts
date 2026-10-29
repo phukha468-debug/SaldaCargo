@@ -60,6 +60,7 @@ export const UserRole = {
   MECHANIC: 'mechanic',
   MECHANIC_LEAD: 'mechanic_lead',
   ACCOUNTANT: 'accountant',
+  CLEANER: 'cleaner',
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
