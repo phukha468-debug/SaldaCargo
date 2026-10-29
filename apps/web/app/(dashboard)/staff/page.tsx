@@ -3811,12 +3811,15 @@ function PayrollRow({
     >
       {/* Main row */}
       <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
+        className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-slate-50/60 transition-colors select-none"
         onClick={() => setExpanded((v) => !v)}
       >
         {/* Name + roles */}
-        <div className="w-40 shrink-0 min-w-0">
-          <div className="flex flex-wrap items-center gap-1 mb-0.5">
+        <div className="w-60 shrink-0 min-w-0">
+          <div className="flex items-center gap-1.5 leading-tight">
+            <span className="font-bold text-slate-900 text-xs truncate block">{user.name}</span>
+          </div>
+          <div className="flex items-center gap-1 mt-0.5 leading-tight overflow-hidden whitespace-nowrap">
             {user.roles.slice(0, 2).map((role) => (
               <span
                 key={role}
@@ -3829,7 +3832,9 @@ function PayrollRow({
               </span>
             ))}
             {user.roles.length > 2 && (
-              <span className="text-[9px] text-slate-400 font-bold">+{user.roles.length - 2}</span>
+              <span className="text-[9px] text-slate-400 font-bold shrink-0">
+                +{user.roles.length - 2}
+              </span>
             )}
             {user.auto_settle && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
@@ -3857,183 +3862,192 @@ function PayrollRow({
                 className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0"
                 title={`Подотчёт на руках: ${user.accountable_hold.toLocaleString('ru-RU')} ₽`}
               >
-                💵 Подотчёт {user.accountable_hold.toLocaleString('ru-RU')} ₽
+                💵 {user.accountable_hold.toLocaleString('ru-RU')} ₽
               </span>
             ) : null}
+            {user.asset && (
+              <span className="text-[10px] text-slate-400 font-mono truncate">
+                {user.asset.reg_number}
+              </span>
+            )}
           </div>
-          <span className="font-bold text-slate-900 text-sm truncate block">{user.name}</span>
-          {user.asset && (
-            <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-              {user.asset.reg_number}
-            </p>
-          )}
         </div>
 
         {/* Shifts/orders */}
-        <div className="w-14 shrink-0 text-center">
-          <p className="text-xs font-black text-slate-700">{user.shifts > 0 ? user.shifts : '—'}</p>
-          <p className="text-[9px] text-slate-400">смен</p>
+        <div className="w-16 shrink-0 text-center">
+          <p className="text-xs font-black text-slate-800 leading-tight">
+            {user.shifts > 0 ? user.shifts : '—'}
+          </p>
+          <p className="text-[9px] text-slate-400 uppercase tracking-wider leading-tight">смен</p>
         </div>
 
         {/* Earned */}
-        <div className="w-24 shrink-0 text-right">
+        <div className="w-28 shrink-0 text-right">
           {earned > 0 ? (
-            <p className="text-sm font-bold text-slate-700">
+            <p className="text-xs font-bold text-slate-800 leading-tight">
               <Money amount={user.earned} />
             </p>
           ) : (
-            <p className="text-xs text-slate-300">—</p>
+            <p className="text-xs text-slate-300 leading-tight">—</p>
           )}
-          <p className="text-[9px] text-slate-400">заработал</p>
+          <p className="text-[9px] text-slate-400 leading-tight">начислено</p>
         </div>
 
         {/* Paid */}
-        <div className="w-24 shrink-0 text-right">
+        <div className="w-28 shrink-0 text-right">
           {parseFloat(user.paid) > 0 ? (
-            <p className="text-sm font-bold text-emerald-600">
+            <p className="text-xs font-bold text-emerald-600 leading-tight">
               <Money amount={user.paid} />
             </p>
           ) : (
-            <p className="text-xs text-slate-300">—</p>
+            <p className="text-xs text-slate-300 leading-tight">—</p>
           )}
-          <p className="text-[9px] text-slate-400">выплачено</p>
+          <p className="text-[9px] text-slate-400 leading-tight">выплачено</p>
         </div>
 
         {/* Debt / Advance */}
-        <div className="w-28 shrink-0 text-right">
+        <div className="w-32 shrink-0 text-right">
           {hasDebt ? (
             <>
-              <p className="text-sm font-black text-amber-600">
-                <Money amount={user.debt} />
-              </p>
-              {hasAdvance && (
-                <>
-                  <p className="text-[9px] text-violet-600 font-bold">
-                    аванс: <Money amount={user.advance_balance} />
-                  </p>
-                  <p className="text-[8px] text-slate-400">
-                    зачёт <Money amount={user.advance_offset} /> · к выдаче{' '}
-                    <Money amount={user.payout} />
-                  </p>
-                </>
+              <div className="flex items-center justify-end gap-1 leading-tight">
+                <p className="text-xs font-black text-amber-600">
+                  <Money amount={user.debt} />
+                </p>
+                {parseFloat(user.unconfirmed_debt) > 0 && (
+                  <span
+                    className="material-symbols-outlined text-rose-500 text-[13px]"
+                    title="Не подтверждено сотрудником"
+                  >
+                    pending_actions
+                  </span>
+                )}
+              </div>
+              {hasAdvance ? (
+                <p className="text-[9px] text-violet-600 font-bold leading-tight truncate">
+                  аванс: <Money amount={user.advance_balance} />
+                </p>
+              ) : (
+                <p className="text-[9px] text-slate-400 leading-tight">к выплате</p>
               )}
-              {!hasAdvance && <p className="text-[9px] text-slate-400">к выплате</p>}
             </>
           ) : hasAdvance ? (
             <>
-              <p className="text-sm font-black text-violet-600">
+              <p className="text-xs font-black text-violet-600 leading-tight">
                 <Money amount={user.advance_balance} />
               </p>
-              <p className="text-[9px] text-violet-400">аванс долг</p>
+              <p className="text-[9px] text-violet-400 leading-tight">аванс долг</p>
             </>
           ) : earned > 0 ? (
             <>
-              <p className="text-xs font-bold text-emerald-500">✓ выплачено</p>
-              <p className="text-[9px] text-slate-400">&nbsp;</p>
+              <p className="text-xs font-bold text-emerald-600 leading-tight">✓ 0 ₽</p>
+              <p className="text-[9px] text-slate-400 leading-tight">расчёт закрыт</p>
             </>
           ) : (
-            <p className="text-xs text-slate-300">—</p>
-          )}
-
-          {/* Unconfirmed debt warning */}
-          {parseFloat(user.unconfirmed_debt) > 0 && (
-            <div
-              className="mt-1 flex items-center justify-end gap-1 text-rose-500"
-              title="Сотрудник ещё не подтвердил это начисление в приложении"
-            >
-              <span className="text-[10px] font-bold">
-                <Money amount={user.unconfirmed_debt} />
-              </span>
-              <span className="material-symbols-outlined text-[14px]">pending_actions</span>
-            </div>
+            <>
+              <p className="text-xs text-slate-300 leading-tight">—</p>
+              <p className="text-[9px] text-slate-400 leading-tight">&nbsp;</p>
+            </>
           )}
         </div>
 
         {/* Action */}
-        <div className="flex-1 flex items-center justify-end gap-1.5 ml-auto">
-          {hasDebt && !user.auto_settle && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSettle();
-              }}
-              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
-              title="Рассчитаться с сотрудником"
-            >
-              Расчёт
-            </button>
-          )}
-          {isAdminOrOwner && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onManualPay();
-              }}
-              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
-              title="Выплатить заработную плату"
-            >
-              Выплата
-            </button>
-          )}
-          {onAdvance && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdvance();
-              }}
-              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center"
-              title="Выдать аванс"
-            >
-              Аванс
-            </button>
-          )}
-          {onAdjustDebt && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdjustDebt();
-              }}
-              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
-              title="Редактировать целевую сумму долга"
-            >
-              <span>✏️</span>
-              <span>Долг</span>
-            </button>
-          )}
-          {onOpenShifts && user.roles.includes('cleaner') && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenShifts();
-              }}
-              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-2xs transition-colors shrink-0 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
-              title="Календарь смен и ставка (отметить дни работы)"
-            >
-              <span>📅</span>
-              <span>Смены</span>
-            </button>
-          )}
-          {onPayslip && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onPayslip();
-              }}
-              className="h-7 px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
-              title="Сформировать расчётный лист сотрудника"
-            >
-              <span>📄</span>
-              <span>Лист</span>
-            </button>
-          )}
-          <span
-            className={cn(
-              'material-symbols-outlined text-slate-300 text-[18px] shrink-0 transition-transform duration-200',
-              expanded && 'rotate-180',
+        <div className="flex-1 flex flex-col items-end justify-center min-w-[200px] leading-tight ml-auto">
+          {/* Line 1: Primary payouts */}
+          <div className="flex items-center gap-3">
+            {hasDebt && !user.auto_settle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSettle();
+                }}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                title="Рассчитаться с сотрудником"
+              >
+                Расчёт
+              </button>
             )}
-          >
-            expand_more
-          </span>
+            {isAdminOrOwner && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onManualPay();
+                }}
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                title="Выплатить заработную плату"
+              >
+                Выплата
+              </button>
+            )}
+            {onAdvance && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdvance();
+                }}
+                className="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline cursor-pointer"
+                title="Выдать аванс"
+              >
+                Аванс
+              </button>
+            )}
+          </div>
+
+          {/* Line 2: Debt, Shifts, Payslip */}
+          <div className="flex items-center gap-3 mt-0.5">
+            {onAdjustDebt && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdjustDebt();
+                }}
+                className="text-[11px] font-bold text-amber-700 hover:text-amber-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Редактировать целевую сумму долга"
+              >
+                <span>✏️</span>
+                <span>Долг</span>
+              </button>
+            )}
+            {onOpenShifts && user.roles.includes('cleaner') && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenShifts();
+                }}
+                className="text-[11px] font-bold text-teal-700 hover:text-teal-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Календарь смен и ставка (отметить дни работы)"
+              >
+                <span>📅</span>
+                <span>Смены</span>
+              </button>
+            )}
+            {onPayslip && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPayslip();
+                }}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Сформировать расчётный лист сотрудника"
+              >
+                <span>📄</span>
+                <span>Лист</span>
+              </button>
+            )}
+            <span
+              className={cn(
+                'material-symbols-outlined text-slate-300 text-[18px] shrink-0 transition-transform duration-200 ml-1',
+                expanded && 'rotate-180',
+              )}
+            >
+              expand_more
+            </span>
+          </div>
         </div>
       </div>
 
@@ -4177,40 +4191,40 @@ function PayrollSection({
       <div className="overflow-x-auto">
         <div className="min-w-[1020px]">
           {/* Coloured column headers */}
-          <div className={cn('flex items-center gap-3 px-4 py-2.5', headerBg)}>
-            <div className="w-40 shrink-0">
+          <div className={cn('flex items-center gap-3 px-4 py-2', headerBg)}>
+            <div className="w-60 shrink-0">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
-                Сотрудник
+                Сотрудник / Роль
               </span>
             </div>
-            <div className="w-14 shrink-0 text-center">
+            <div className="w-16 shrink-0 text-center">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
                 Смен
               </span>
             </div>
-            <div className="w-24 shrink-0 text-right">
+            <div className="w-28 shrink-0 text-right">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
                 Заработал
               </span>
             </div>
-            <div className="w-24 shrink-0 text-right">
+            <div className="w-28 shrink-0 text-right">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
                 Выплачено
               </span>
             </div>
-            <div className="w-28 shrink-0 text-right">
+            <div className="w-32 shrink-0 text-right">
               <span
                 className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
               >
-                Долг / Аванс
+                К выплате
               </span>
             </div>
             <div className="flex-1 text-right">
