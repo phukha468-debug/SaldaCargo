@@ -4708,8 +4708,14 @@ const GROUP_CONFIG: Record<
       'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700',
     countActive: 'bg-white/25 text-white',
     countInactive: 'bg-slate-100 text-slate-500',
-    getUsers: (p) => [...p.mechanics, ...p.office],
-    getCount: (p) => p.mechanics.length + p.office.length,
+    getUsers: (p) => {
+      const all = [...p.mechanics, ...p.office, ...(p.cleaners || [])];
+      return all.filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i);
+    },
+    getCount: (p) => {
+      const all = [...p.mechanics, ...p.office, ...(p.cleaners || [])];
+      return all.filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i).length;
+    },
   },
   cleaners: {
     label: 'Уборщицы',
@@ -4733,11 +4739,23 @@ const GROUP_CONFIG: Record<
     countActive: 'bg-white/25 text-white',
     countInactive: 'bg-slate-100 text-slate-500',
     getUsers: (p) => {
-      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office, ...(p.cleaners || [])];
+      const all = [
+        ...p.drivers,
+        ...p.loaders,
+        ...p.mechanics,
+        ...p.office,
+        ...(p.cleaners || []),
+      ].filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i);
       return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0);
     },
     getCount: (p) => {
-      const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office, ...(p.cleaners || [])];
+      const all = [
+        ...p.drivers,
+        ...p.loaders,
+        ...p.mechanics,
+        ...p.office,
+        ...(p.cleaners || []),
+      ].filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i);
       return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0).length;
     },
   },
@@ -5139,7 +5157,9 @@ export default function StaffPage() {
         ...payroll.mechanics,
         ...payroll.office,
         ...(payroll.cleaners || []),
-      ].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+      ]
+        .filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
     : [];
 
   const totalDebt = payroll ? parseFloat(payroll.total_debt_alltime) : 0;

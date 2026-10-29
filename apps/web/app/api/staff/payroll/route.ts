@@ -422,7 +422,6 @@ export async function GET(request: Request) {
             'handyman',
             'driver',
             'loader',
-            'cleaner',
           ].includes(r),
         ),
     );
