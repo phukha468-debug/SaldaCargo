@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { cn } from '@saldacargo/ui';
 import type { PayrollUser } from './page';
 
 interface ShiftCalendarModalProps {
@@ -239,14 +240,12 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
       );
       if (onSaved) onSaved();
 
-      if (andOpenPayslip) {
-        setTimeout(() => {
-          onClose();
-          if (onOpenPayslip) onOpenPayslip();
-        }, 300);
-      } else {
-        setTimeout(() => setSuccessMsg(''), 3000);
-      }
+      setTimeout(() => {
+        onClose();
+        if (andOpenPayslip && onOpenPayslip) {
+          onOpenPayslip();
+        }
+      }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -551,34 +550,49 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
         </div>
 
         {/* Подвал с действиями */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-bold transition-colors order-3 sm:order-1"
-          >
-            Закрыть
-          </button>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col gap-2.5 shrink-0">
+          {(error || successMsg) && (
+            <div
+              className={cn(
+                'p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in',
+                error
+                  ? 'bg-rose-50 border border-rose-200 text-rose-700'
+                  : 'bg-emerald-50 border border-emerald-200 text-emerald-800',
+              )}
+            >
+              <span>{error ? '⚠️' : '✓'}</span>
+              <span>{error || successMsg}</span>
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
             <button
               type="button"
-              disabled={saving}
-              onClick={() => handleSave(false)}
-              className="px-4 py-2.5 rounded-xl border border-teal-300 bg-white hover:bg-teal-50 text-teal-800 text-sm font-bold transition-all disabled:opacity-50"
+              onClick={onClose}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-bold transition-colors order-3 sm:order-1"
             >
-              {saving ? 'Сохранение...' : 'Сохранить табель'}
+              Закрыть
             </button>
 
-            <button
-              type="button"
-              disabled={saving || selectedCount === 0}
-              onClick={() => handleSave(true)}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white text-sm font-black transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
-            >
-              <span>📄</span>
-              <span>{saving ? 'Формирование...' : 'Сформировать расчётный лист'}</span>
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => handleSave(false)}
+                className="px-4 py-2.5 rounded-xl border border-teal-300 bg-white hover:bg-teal-50 text-teal-800 text-sm font-bold transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? 'Сохранение...' : 'Сохранить табель'}
+              </button>
+
+              <button
+                type="button"
+                disabled={saving || selectedCount === 0}
+                onClick={() => handleSave(true)}
+                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white text-sm font-black transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>📄</span>
+                <span>{saving ? 'Формирование...' : 'Сформировать расчётный лист'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

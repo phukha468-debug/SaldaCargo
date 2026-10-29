@@ -1,9 +1,44 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { generateDeterministicUuid } from '@saldacargo/shared';
 
 const PAYROLL_CATEGORY_ID = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'; // Категория начисления ЗП персонала / цеха
+
+async function getAdminId(request: Request, supabase: any): Promise<string> {
+  const authHeader = request.headers.get('Authorization');
+  let adminId = authHeader?.startsWith('Bearer ') ? authHeader.split('Bearer ')[1] : null;
+
+  if (!adminId) {
+    try {
+      const cookieStore = await cookies();
+      adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!adminId) {
+    const { data: adminUser } = await (supabase.from('users') as any)
+      .select('id')
+      .filter('roles', 'cs', '{"admin"}')
+      .limit(1)
+      .maybeSingle();
+    adminId = adminUser?.id ?? null;
+  }
+
+  if (!adminId) {
+    const { data: anyUser } = await (supabase.from('users') as any)
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+    adminId = anyUser?.id ?? 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
+  }
+
+  return adminId || 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
+}
 
 function parseRateFromNotes(notes: string | null | undefined): number | null {
   if (!notes) return null;
@@ -69,7 +104,6 @@ export async function GET(request: Request) {
       .eq('related_user_id', userId)
       .eq('direction', 'expense')
       .neq('lifecycle_status', 'cancelled')
-      .or(`photo_url.ilike.%"period":"${periodStr}"%,description.ilike.%смен%`)
       .order('created_at', { ascending: false });
 
     let existingTx: any = null;
@@ -188,15 +222,38 @@ export async function POST(request: Request) {
     const shiftCount = sortedDates.length;
     const totalAmount = shiftCount * numRate;
 
+    const adminId = await getAdminId(request, supabase);
+
     // Ищем существующую транзакцию начисления за этот месяц
-    const { data: existingTxs } = await (supabase.from('transactions') as any)
+    const { data: userTxs } = await (supabase.from('transactions') as any)
       .select('*')
       .eq('related_user_id', user_id)
       .eq('direction', 'expense')
       .neq('lifecycle_status', 'cancelled')
-      .ilike('photo_url', `%"period":"${periodStr}"%`);
+      .order('created_at', { ascending: false });
 
-    const existingTx = existingTxs?.[0] || null;
+    const idempotencyKey = generateDeterministicUuid(`shifts-${user_id}-${periodStr}`);
+
+    let existingTx: any = null;
+    if (userTxs && userTxs.length > 0) {
+      for (const tx of userTxs) {
+        if (tx.photo_url) {
+          try {
+            const meta = JSON.parse(tx.photo_url);
+            if (meta?.type === 'staff_shifts' && meta?.period === periodStr) {
+              existingTx = tx;
+              break;
+            }
+          } catch {
+            // ignore
+          }
+        }
+        if (tx.idempotency_key === idempotencyKey) {
+          existingTx = tx;
+          break;
+        }
+      }
+    }
 
     // Если уже выплачено (settlement_status === 'completed' && from_wallet_id !== null)
     if (existingTx && existingTx.settlement_status === 'completed' && existingTx.from_wallet_id) {
@@ -288,6 +345,7 @@ export async function POST(request: Request) {
             description,
             photo_url: JSON.stringify(metadata),
             idempotency_key: idempotencyKey,
+            created_by: adminId,
           })
           .select('id')
           .single();
