@@ -3900,7 +3900,7 @@ function PayrollRow({
         </div>
 
         {/* Debt / Advance */}
-        <div className="w-28 shrink-0 text-right">
+        <div className="w-28 shrink-0 text-right relative z-10">
           {hasDebt ? (
             <>
               <p className="text-sm font-black text-amber-600">
@@ -3950,16 +3950,18 @@ function PayrollRow({
         </div>
 
         {/* Action */}
-        <div className="flex-1 min-w-[200px] flex items-center justify-end gap-1 sm:gap-1.5">
+        <div className="flex-1 min-w-[240px] flex items-center justify-end gap-1 sm:gap-1.5 ml-auto">
           {hasDebt && !user.auto_settle && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onSettle();
               }}
-              className="text-xs font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center gap-1"
+              title="Рассчитаться с сотрудником"
             >
-              Рассчитаться
+              <span className="hidden xl:inline">Рассчитаться</span>
+              <span className="xl:hidden">Расчёт</span>
             </button>
           )}
           {isAdminOrOwner && (
@@ -3968,9 +3970,11 @@ function PayrollRow({
                 e.stopPropagation();
                 onManualPay();
               }}
-              className="text-xs font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center gap-1"
+              title="Выплатить заработную плату"
             >
-              Выплатить ЗП
+              <span className="hidden xl:inline">Выплатить ЗП</span>
+              <span className="xl:hidden">Выплата</span>
             </button>
           )}
           {onAdvance && (
@@ -3979,7 +3983,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onAdvance();
               }}
-              className="text-xs font-bold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
               title="Выдать аванс"
             >
               Аванс
@@ -3991,10 +3995,11 @@ function PayrollRow({
                 e.stopPropagation();
                 onAdjustDebt();
               }}
-              className="text-xs font-bold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap flex items-center gap-1"
               title="Редактировать целевую сумму долга"
             >
-              ✏️ Долг
+              <span>✏️</span>
+              <span className="hidden sm:inline">Долг</span>
             </button>
           )}
           {onOpenShifts && user.roles.includes('cleaner') && (
@@ -4003,7 +4008,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onOpenShifts();
               }}
-              className="text-xs font-black px-2.5 py-1 sm:py-1.5 rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-2xs transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-2xs transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
               title="Календарь смен и ставка (отметить дни работы)"
             >
               <span>📅</span>
@@ -4016,7 +4021,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onOpenShifts();
               }}
-              className="text-xs font-bold px-2 py-1 sm:py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+              className="h-7 px-2 py-1 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
               title="Календарь смен и ставка (отметить дни работы)"
             >
               <span>📅</span>
@@ -4029,7 +4034,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onPayslip();
               }}
-              className="text-xs font-bold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+              className="h-7 px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
               title="Сформировать расчётный лист сотрудника"
             >
               <span>📄</span>
@@ -4185,7 +4190,7 @@ function PayrollSection({
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <div className="min-w-[840px]">
+        <div className="min-w-[1020px]">
           {/* Coloured column headers */}
           <div className={cn('flex items-center gap-3 px-4 py-2.5', headerBg)}>
             <div className="w-44 shrink-0">
