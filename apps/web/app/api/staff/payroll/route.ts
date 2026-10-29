@@ -8,6 +8,7 @@ const SALARY_CATEGORY_IDS = [
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // PAYROLL_MECHANIC
 ];
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
+const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
 export async function GET(request: Request) {
   try {
@@ -40,6 +41,8 @@ export async function GET(request: Request) {
       { data: payHistory },
       // Кошельки для привязки к выплатам
       { data: walletsData },
+      // Активные зафиксированные переносы подотчёта (holds)
+      { data: activeHoldsData },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
@@ -133,6 +136,15 @@ export async function GET(request: Request) {
 
       // Кошельки для привязки к выплатам
       (supabase as any).from('wallets').select('id, name, type'),
+
+      // Активные зафиксированные переносы подотчёта (holds)
+      (supabase as any)
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('category_id', CASH_COLLECT_CAT)
+        .eq('settlement_status', 'pending')
+        .neq('lifecycle_status', 'cancelled')
+        .not('related_user_id', 'is', null),
     ]);
 
     const walletMap = new Map<string, { id: string; name: string; type: string }>();
@@ -163,6 +175,12 @@ export async function GET(request: Request) {
       }
       return map;
     };
+
+    const holdsMap = new Map<string, number>();
+    for (const h of (activeHoldsData as any[]) ?? []) {
+      const uid = h.related_user_id;
+      if (uid) holdsMap.set(uid, (holdsMap.get(uid) ?? 0) + parseFloat(h.amount ?? '0'));
+    }
 
     const countByUser = (rows: any[] | null) => {
       const map = new Map<string, number>();
@@ -366,6 +384,7 @@ export async function GET(request: Request) {
         advance_balance: advanceBalance.toFixed(2), // остаток долга по авансу
         advance_offset: offsetNow.toFixed(2), // сколько зачтётся
         payout: payoutNow.toFixed(2), // сколько реально выплатить деньгами
+        accountable_hold: holdsMap.get(u.id) ?? 0, // зафиксированный подотчёт на руках
         // Статистика
         all_time_paid: paidAlltime.toFixed(2),
         // История выплат и авансов
@@ -416,6 +435,7 @@ export async function GET(request: Request) {
       total_debt_alltime: all.reduce((s, u) => s + parseFloat(u.debt), 0).toFixed(2),
       total_payout_alltime: all.reduce((s, u) => s + parseFloat(u.payout), 0).toFixed(2),
       total_paid_alltime: all.reduce((s, u) => s + parseFloat(u.all_time_paid), 0).toFixed(2),
+      total_accountable_hold: all.reduce((s, u) => s + (u.accountable_hold || 0), 0).toFixed(2),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

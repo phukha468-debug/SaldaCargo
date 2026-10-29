@@ -7,6 +7,7 @@ import { formatPhone } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 import { DriverDocuments } from '@/components/DriverDocuments';
 import { PayslipModal } from './payslip-modal';
+import { AccountableSection } from './accountable-section';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type UserRole =
@@ -47,6 +48,7 @@ export type PayrollUser = {
   advance_balance: string; // остаток долга по авансу
   advance_offset: string; // сколько зачтётся при выплате
   payout: string; // сколько реально выплатить деньгами
+  accountable_hold?: number; // зафиксированный подотчёт на руках
   all_time_paid: string;
   history: Array<{
     id: string;
@@ -72,6 +74,7 @@ type PayrollResponse = {
   total_debt_alltime: string;
   total_payout_alltime: string;
   total_paid_alltime: string;
+  total_accountable_hold?: string;
 };
 
 type StaffUser = {
@@ -3841,6 +3844,14 @@ function PayrollRow({
                 ⚖️ ФССП {Math.round(parseFloat(user.court_order_pct || '50'))}%
               </span>
             )}
+            {user.accountable_hold && user.accountable_hold > 0 ? (
+              <span
+                className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0"
+                title={`Подотчёт на руках: ${user.accountable_hold.toLocaleString('ru-RU')} ₽`}
+              >
+                💵 Подотчёт {user.accountable_hold.toLocaleString('ru-RU')} ₽
+              </span>
+            ) : null}
           </div>
           <span className="font-bold text-slate-900 text-sm truncate block">{user.name}</span>
           {user.asset && (
@@ -4601,7 +4612,7 @@ function AdvanceModal({
 
 // ─── Group config ─────────────────────────────────────────────────────────────
 
-type GroupKey = 'drivers' | 'loaders' | 'workshop' | 'debts';
+type GroupKey = 'drivers' | 'loaders' | 'workshop' | 'debts' | 'accountable';
 
 const GROUP_CONFIG: Record<
   GroupKey,
@@ -4670,6 +4681,18 @@ const GROUP_CONFIG: Record<
       const all = [...p.drivers, ...p.loaders, ...p.mechanics, ...p.office];
       return all.filter((u) => parseFloat(u.advance_balance ?? '0') > 0).length;
     },
+  },
+  accountable: {
+    label: '💵 Подотчёт',
+    headerBg: 'bg-amber-600',
+    headerTextColor: 'text-amber-100',
+    tabActive: 'bg-amber-600 text-white shadow-sm',
+    tabInactive:
+      'bg-white border border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700',
+    countActive: 'bg-white/25 text-white',
+    countInactive: 'bg-amber-100 text-amber-900 font-black',
+    getUsers: (p) => p.drivers.filter((d) => (d.accountable_hold ?? 0) > 0),
+    getCount: (p) => p.drivers.filter((d) => (d.accountable_hold ?? 0) > 0).length,
   },
 };
 
@@ -5114,7 +5137,7 @@ export default function StaffPage() {
       </div>
 
       {/* Сводка — компактная */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           {
             label: 'Сотрудников',
@@ -5144,6 +5167,25 @@ export default function StaffPage() {
             label: 'Долг (всего)',
             value: isLoading ? '—' : <Money amount={totalDebt.toFixed(2)} />,
             color: totalDebt > 0 ? 'text-amber-600' : 'text-slate-400',
+          },
+          {
+            label: 'Подотчёт (на руках)',
+            value: isLoading ? (
+              '—'
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveGroup('accountable')}
+                className="hover:underline cursor-pointer flex items-baseline gap-1 text-left"
+                title="Перейти к подотчёту водителей"
+              >
+                <Money amount={payroll?.total_accountable_hold ?? '0.00'} />
+              </button>
+            ),
+            color:
+              parseFloat(payroll?.total_accountable_hold ?? '0') > 0
+                ? 'text-amber-600'
+                : 'text-slate-400',
           },
         ].map(({ label, value, color }) => (
           <div
@@ -5274,9 +5316,11 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* Таблица активной группы */}
+      {/* Таблица активной группы или секция подотчёта */}
       {isLoading ? (
         <div className="h-48 bg-slate-100 rounded-2xl animate-pulse" />
+      ) : activeGroup === 'accountable' ? (
+        <AccountableSection />
       ) : (
         <PayrollSection
           users={activeUsers}
