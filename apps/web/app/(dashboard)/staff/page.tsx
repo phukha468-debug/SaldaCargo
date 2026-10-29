@@ -3950,14 +3950,14 @@ function PayrollRow({
         </div>
 
         {/* Action */}
-        <div className="flex-1 flex items-center justify-end gap-1.5">
+        <div className="flex-1 min-w-[200px] flex items-center justify-end gap-1 sm:gap-1.5">
           {hasDebt && !user.auto_settle && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onSettle();
               }}
-              className="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0"
+              className="text-xs font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
             >
               Рассчитаться
             </button>
@@ -3968,7 +3968,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onManualPay();
               }}
-              className="text-xs font-black px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0"
+              className="text-xs font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
             >
               Выплатить ЗП
             </button>
@@ -3979,7 +3979,7 @@ function PayrollRow({
                 e.stopPropagation();
                 onAdvance();
               }}
-              className="text-xs font-black px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0"
+              className="text-xs font-bold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
               title="Выдать аванс"
             >
               Аванс
@@ -3991,28 +3991,36 @@ function PayrollRow({
                 e.stopPropagation();
                 onAdjustDebt();
               }}
-              className="text-xs font-black px-2.5 py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0"
+              className="text-xs font-bold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
               title="Редактировать целевую сумму долга"
             >
               ✏️ Долг
             </button>
           )}
-          {onOpenShifts && (
+          {onOpenShifts && user.roles.includes('cleaner') && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenShifts();
               }}
-              className={cn(
-                'text-xs font-black px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 flex items-center gap-1 cursor-pointer',
-                user.roles.includes('cleaner')
-                  ? 'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100 shadow-2xs'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100',
-              )}
+              className="text-xs font-black px-2.5 py-1 sm:py-1.5 rounded-lg border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-2xs transition-colors shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap"
               title="Календарь смен и ставка (отметить дни работы)"
             >
               <span>📅</span>
-              <span>{user.roles.includes('cleaner') ? 'Смены' : 'Смены'}</span>
+              <span>Смены</span>
+            </button>
+          )}
+          {onOpenShifts && !user.roles.includes('cleaner') && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenShifts();
+              }}
+              className="text-xs font-bold px-2 py-1 sm:py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+              title="Календарь смен и ставка (отметить дни работы)"
+            >
+              <span>📅</span>
+              <span className="hidden 2xl:inline">Смены</span>
             </button>
           )}
           {onPayslip && (
@@ -4021,11 +4029,11 @@ function PayrollRow({
                 e.stopPropagation();
                 onPayslip();
               }}
-              className="text-xs font-black px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center gap-1"
+              className="text-xs font-bold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
               title="Сформировать расчётный лист сотрудника"
             >
               <span>📄</span>
-              <span className="hidden sm:inline">Лист</span>
+              <span className="hidden xl:inline">Лист</span>
             </button>
           )}
           <span
@@ -4176,63 +4184,77 @@ function PayrollSection({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      {/* Coloured column headers */}
-      <div className={cn('flex items-center gap-3 px-4 py-2.5', headerBg)}>
-        <div className="w-44 shrink-0">
-          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
-            Сотрудник
-          </span>
-        </div>
-        <div className="w-16 shrink-0 text-center">
-          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
-            Смен
-          </span>
-        </div>
-        <div className="w-28 shrink-0 text-right">
-          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
-            Заработал
-          </span>
-        </div>
-        <div className="w-28 shrink-0 text-right">
-          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
-            Выплачено
-          </span>
-        </div>
-        <div className="w-28 shrink-0 text-right">
-          <span className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}>
-            Долг / Аванс
-          </span>
-        </div>
-        <div className="flex-1 text-right">
-          {totalDebt > 0 && (
-            <span className="text-xs font-black text-white">
-              Долг: <Money amount={totalDebt.toFixed(2)} />
-            </span>
-          )}
-          {totalDebt === 0 && totalAdvance > 0 && (
-            <span className="text-xs font-black text-white/80">
-              Авансы: <Money amount={totalAdvance.toFixed(2)} />
-            </span>
-          )}
+      <div className="overflow-x-auto">
+        <div className="min-w-[840px]">
+          {/* Coloured column headers */}
+          <div className={cn('flex items-center gap-3 px-4 py-2.5', headerBg)}>
+            <div className="w-44 shrink-0">
+              <span
+                className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
+              >
+                Сотрудник
+              </span>
+            </div>
+            <div className="w-16 shrink-0 text-center">
+              <span
+                className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
+              >
+                Смен
+              </span>
+            </div>
+            <div className="w-28 shrink-0 text-right">
+              <span
+                className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
+              >
+                Заработал
+              </span>
+            </div>
+            <div className="w-28 shrink-0 text-right">
+              <span
+                className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
+              >
+                Выплачено
+              </span>
+            </div>
+            <div className="w-28 shrink-0 text-right">
+              <span
+                className={cn('text-[10px] font-bold uppercase tracking-widest', headerTextColor)}
+              >
+                Долг / Аванс
+              </span>
+            </div>
+            <div className="flex-1 text-right">
+              {totalDebt > 0 && (
+                <span className="text-xs font-black text-white">
+                  Долг: <Money amount={totalDebt.toFixed(2)} />
+                </span>
+              )}
+              {totalDebt === 0 && totalAdvance > 0 && (
+                <span className="text-xs font-black text-white/80">
+                  Авансы: <Money amount={totalAdvance.toFixed(2)} />
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Rows */}
+          {users.map((u) => (
+            <PayrollRow
+              key={u.id}
+              user={u}
+              onSettle={() => onSettle(u)}
+              onEdit={() => onEdit(u)}
+              onDeactivate={() => onDeactivate(u)}
+              onAdvance={onAdvance ? () => onAdvance(u) : undefined}
+              onManualPay={() => onManualPay(u)}
+              onHistory={() => onHistory(u)}
+              onAdjustDebt={onAdjustDebt ? () => onAdjustDebt(u) : undefined}
+              onPayslip={onPayslip ? () => onPayslip(u) : undefined}
+              onOpenShifts={onOpenShifts ? () => onOpenShifts(u) : undefined}
+            />
+          ))}
         </div>
       </div>
-
-      {/* Rows */}
-      {users.map((u) => (
-        <PayrollRow
-          key={u.id}
-          user={u}
-          onSettle={() => onSettle(u)}
-          onEdit={() => onEdit(u)}
-          onDeactivate={() => onDeactivate(u)}
-          onAdvance={onAdvance ? () => onAdvance(u) : undefined}
-          onManualPay={() => onManualPay(u)}
-          onHistory={() => onHistory(u)}
-          onAdjustDebt={onAdjustDebt ? () => onAdjustDebt(u) : undefined}
-          onPayslip={onPayslip ? () => onPayslip(u) : undefined}
-          onOpenShifts={onOpenShifts ? () => onOpenShifts(u) : undefined}
-        />
-      ))}
     </div>
   );
 }
