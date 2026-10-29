@@ -199,7 +199,8 @@ object SaldaApiClient {
         tripId: String,
         endOdometer: Long?,
         driverNote: String?,
-        isCarryover: Boolean = false,
+        isHandedToAccountant: Boolean = false,
+        isCarryover: Boolean = !isHandedToAccountant,
         carryoverAmount: Double? = null,
         carryoverNote: String? = null,
         userId: String? = null
@@ -208,7 +209,8 @@ object SaldaApiClient {
         val body = buildJsonObject {
             if (endOdometer != null) put("odometer_end", endOdometer)
             if (driverNote != null) put("driver_note", driverNote)
-            if (isCarryover) {
+            put("is_handed_to_accountant", isHandedToAccountant)
+            if (!isHandedToAccountant && (isCarryover || carryoverAmount != null)) {
                 put("is_carryover", true)
                 if (carryoverAmount != null) put("carryover_amount", carryoverAmount.toString())
                 if (!carryoverNote.isNullOrBlank()) put("carryover_note", carryoverNote)
@@ -974,13 +976,15 @@ object SaldaApiClient {
     }
 
     suspend fun collectDriverCashHold(
-        holdId: String,
+        holdId: String? = null,
+        driverId: String? = null,
         collectedAmount: Double? = null,
         note: String? = null,
         adminId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
-            put("hold_id", holdId)
+            if (!holdId.isNullOrBlank()) put("hold_id", holdId)
+            if (!driverId.isNullOrBlank()) put("driver_id", driverId)
             if (collectedAmount != null) put("collected_amount", collectedAmount.toString())
             if (note != null) put("note", note)
         }.toString()

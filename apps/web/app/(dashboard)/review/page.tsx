@@ -115,6 +115,7 @@ interface ReviewServiceOrder {
     mechanic_id: string | null;
     second_mechanic_id: string | null;
     work_catalog?: { name: string } | null;
+    notes?: string | null;
   }>;
   parts?: Array<{
     id: string;
@@ -233,7 +234,14 @@ function calcServiceOrder(o: ReviewServiceOrder) {
     if (salaryCost <= 0) {
       salaryCost = works
         .filter((w) => w.status !== 'cancelled')
-        .reduce((sum, w) => sum + (Number(w.price_client) || 0) * 0.5, 0);
+        .reduce((sum, w) => {
+          const customPctMatch = w.notes
+            ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+            : null;
+          const pct =
+            customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) / 100 : 0.5;
+          return sum + (Number(w.price_client) || 0) * pct;
+        }, 0);
     }
   }
 
@@ -1342,7 +1350,20 @@ function EditModal({
                         </div>
                       );
                     }
-                    return null;
+                    return (
+                      <div className="mt-2.5">
+                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wide block mb-1">
+                          💬 Комментарий / примечание водителя к заказу
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Детали: адрес, холодильник, этаж, клиент обещал перевести..."
+                          className={inputCls}
+                          value={order.description || ''}
+                          onChange={(e) => update(order.id, 'description', e.target.value)}
+                        />
+                      </div>
+                    );
                   })()}
                 </div>
 
@@ -1945,7 +1966,20 @@ function TripCard({
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-900">
-                        {order.counterparty?.name ?? '—'}
+                        <div className="font-bold text-slate-900">
+                          {order.counterparty?.name ?? '—'}
+                        </div>
+                        {order.description && (
+                          <div className="mt-1 text-xs font-semibold text-amber-950 bg-amber-50 border border-amber-300 rounded-lg p-2 max-w-sm shadow-2xs">
+                            <div className="flex items-center gap-1 text-[10px] font-black text-amber-900 uppercase tracking-tight mb-0.5">
+                              <span>💬</span>
+                              <span>Замечание / комментарий водителя:</span>
+                            </div>
+                            <div className="text-slate-800 font-medium whitespace-pre-wrap text-xs">
+                              {order.description}
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-sm font-bold text-slate-800">
                         <Money amount={order.amount} />
@@ -2381,10 +2415,17 @@ function MaintenanceDetailModal({
                     </div>
                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 divide-y divide-slate-100 text-xs">
                       {so.works.map((w) => {
+                        const customPctMatch = w.notes
+                          ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+                          : null;
+                        const pct =
+                          customPctMatch && customPctMatch[1]
+                            ? parseFloat(customPctMatch[1]) / 100
+                            : 0.5;
                         const wage = cso.isExternal
                           ? Number(w.price_client) || 0
                           : w.status !== 'cancelled'
-                            ? (Number(w.price_client) || 0) * 0.5
+                            ? (Number(w.price_client) || 0) * pct
                             : 0;
                         return (
                           <div
@@ -2502,14 +2543,17 @@ function GarageOrderEditModal({
     order.client_vehicle_model || order.client_vehicle_brand || '',
   );
   const [clientReg, setClientReg] = useState<string>(order.client_vehicle_reg || '');
-  const [works, setWorks] = useState<Array<{ name: string; minutes: string }>>(() => {
-    const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
-    if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
-    return active.map((w) => ({
-      name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
-      minutes: String(w.actual_minutes || w.norm_minutes || 30),
-    }));
-  });
+  const [works, setWorks] = useState<Array<{ name: string; minutes: string; notes?: string }>>(
+    () => {
+      const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
+      if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
+      return active.map((w) => ({
+        name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
+        minutes: String(w.actual_minutes || w.norm_minutes || 30),
+        notes: w.notes || undefined,
+      }));
+    },
+  );
   const [parts, setParts] = useState<
     Array<{
       name: string;
@@ -2541,7 +2585,16 @@ function GarageOrderEditModal({
   const [saving, setSaving] = useState(false);
 
   const totalMinutes = works.reduce((s, w) => s + (parseInt(w.minutes, 10) || 0), 0);
-  const autoPay = ((totalMinutes / 60) * hourlyRate * (salaryPct / 100)).toFixed(2);
+  const autoPay = works
+    .reduce((s, w) => {
+      const mins = parseInt(w.minutes, 10) || 0;
+      const customPctMatch = w.notes
+        ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+        : null;
+      const wPct = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+      return s + (mins / 60) * hourlyRate * (wPct / 100);
+    }, 0)
+    .toFixed(2);
 
   const totalPartsCost = parts.reduce((s, p) => {
     const qty = parseFloat(p.quantity) || 1;
@@ -2574,6 +2627,7 @@ function GarageOrderEditModal({
           works: works.map((w) => ({
             name: w.name,
             minutes: parseInt(w.minutes, 10) || 0,
+            notes: w.notes,
           })),
           parts: parts.map((p) => {
             const uPrice = parseFloat(p.unit_price) || 0;
@@ -3030,7 +3084,15 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
     return s + (explicit > 0 ? explicit : (mins / 60) * hourlyRate);
   }, 0);
 
-  const estimatedPay = (worksSum * salaryPct) / 100;
+  const estimatedPay = activeWorks.reduce((s, w) => {
+    const mins =
+      Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
+    const explicit = parseFloat(w.price_client || '0');
+    const wPrice = explicit > 0 ? explicit : (mins / 60) * hourlyRate;
+    const customPctMatch = w.notes ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/) : null;
+    const wPct = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+    return s + (wPrice * wPct) / 100;
+  }, 0);
   const mechanicPay =
     parseFloat(order.mechanic_pay || '0') > 0 ? parseFloat(order.mechanic_pay!) : estimatedPay;
 
@@ -3050,10 +3112,13 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
     partsClientSum += cPrice * qty;
   }
 
-  const partsMargin = Math.max(0, partsClientSum - partsUnitSum);
+  const partsMargin = isOwn ? 0 : Math.max(0, partsClientSum - partsUnitSum);
   const totalRevenue = worksSum + partsClientSum;
-  // Для своего парка внутренняя выработка = worksSum, чистая прибыль сервиса
-  const netProfit = totalRevenue - mechanicPay - partsUnitSum;
+  // Для своего парка реальной чистой прибыли нет — это внутренние расходы компании-перевозчика.
+  // Чистая прибыль считается ТОЛЬКО с клиентских авто.
+  // А цифра, которую гараж берёт с компании-перевозчика (счёт перевозчику): totalRevenue (работы + запчасти)
+  const billedToCarrier = isOwn ? totalRevenue : 0;
+  const netProfit = isOwn ? 0 : totalRevenue - mechanicPay - partsUnitSum;
 
   return {
     isOwn,
@@ -3068,6 +3133,7 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
     partsClientSum,
     partsMargin,
     totalRevenue,
+    billedToCarrier,
     netProfit,
   };
 }
@@ -3106,6 +3172,7 @@ function GarageOrderRow({
     partsClientSum,
     partsMargin,
     totalRevenue,
+    billedToCarrier,
     netProfit,
   } = calcGarageOrder(order);
 
@@ -3120,8 +3187,9 @@ function GarageOrderRow({
     .replace('[Запчасти предоставил автосервис]', '')
     .trim();
 
-  const accentColor =
-    netProfit > 0
+  const accentColor = isOwn
+    ? 'border-l-sky-500'
+    : netProfit > 0
       ? 'border-l-emerald-500'
       : netProfit < 0
         ? 'border-l-rose-500'
@@ -3190,10 +3258,10 @@ function GarageOrderRow({
           <div className="shrink-0 flex items-center">
             <div className="w-[90px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                Выручка
+                {isOwn ? 'Работы' : 'Выручка'}
               </span>
               <span className="text-sm font-bold text-slate-700">
-                <Money amount={totalRevenue.toFixed(2)} />
+                <Money amount={(isOwn ? worksSum : totalRevenue).toFixed(2)} />
               </span>
             </div>
             <span className="w-4 text-center text-slate-200 text-sm">−</span>
@@ -3208,30 +3276,46 @@ function GarageOrderRow({
             <span className="w-4 text-center text-slate-200 text-sm">+</span>
             <div className="w-[90px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                Маржа з/ч
+                {isOwn ? 'Запчасти' : 'Маржа з/ч'}
               </span>
-              <span className="text-sm font-bold text-emerald-600">
-                <Money amount={partsMargin.toFixed(2)} />
+              <span
+                className={cn('text-sm font-bold', isOwn ? 'text-slate-700' : 'text-emerald-600')}
+              >
+                {isOwn ? (
+                  <Money amount={partsUnitSum.toFixed(2)} />
+                ) : (
+                  <Money amount={partsMargin.toFixed(2)} />
+                )}
               </span>
             </div>
             <span className="w-4 text-center text-slate-200 text-sm">=</span>
-            <div className="w-[95px] text-center">
+            <div className="w-[105px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                Прибыль
+                {isOwn ? 'Счёт перевозчику' : 'Прибыль СТО'}
               </span>
-              <span
-                className={cn(
-                  'text-base font-black',
-                  netProfit > 0
-                    ? 'text-emerald-600'
-                    : netProfit < 0
-                      ? 'text-rose-600'
-                      : 'text-slate-500',
-                )}
-              >
-                {netProfit < 0 ? '−' : ''}
-                <Money amount={Math.abs(netProfit).toFixed(2)} />
-              </span>
+              {isOwn ? (
+                <span
+                  className="text-sm font-black text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md inline-block"
+                  title={`Сумма, которую Гараж берёт с компании-перевозчика (работы + запчасти): ${Math.round(billedToCarrier).toLocaleString('ru-RU')} ₽\nРеальной чистой прибыли нет — это внутреннее обслуживание автопарка`}
+                >
+                  <Money amount={billedToCarrier.toFixed(2)} />
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    'text-base font-black',
+                    netProfit > 0
+                      ? 'text-emerald-600'
+                      : netProfit < 0
+                        ? 'text-rose-600'
+                        : 'text-slate-500',
+                  )}
+                  title={`Реальная чистая прибыль гаража с клиента: ${Math.round(netProfit).toLocaleString('ru-RU')} ₽`}
+                >
+                  {netProfit < 0 ? '−' : ''}
+                  <Money amount={Math.abs(netProfit).toFixed(2)} />
+                </span>
+              )}
             </div>
           </div>
 
@@ -3344,7 +3428,12 @@ function GarageOrderRow({
                     parseFloat(w.price_client || '0') > 0
                       ? parseFloat(w.price_client!)
                       : (mins / 60) * hourlyRate;
-                  const wPay = (wPrice * salaryPct) / 100;
+                  const customPctMatch = w.notes
+                    ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+                    : null;
+                  const wPct =
+                    customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+                  const wPay = (wPrice * wPct) / 100;
                   return (
                     <div
                       key={w.id || idx}
@@ -3360,6 +3449,11 @@ function GarageOrderRow({
                         </p>
                         <p className="text-xs font-extrabold text-emerald-700 mt-0.5">
                           ⏱ {mins} мин · ЗП: {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                          {customPctMatch && (
+                            <span className="text-[10px] text-emerald-600 font-bold ml-1.5 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                              {wPct}%
+                            </span>
+                          )}
                         </p>
                       </div>
                       <span className="text-xs font-black text-slate-800 whitespace-nowrap bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
@@ -3380,8 +3474,12 @@ function GarageOrderRow({
                   <span className="text-emerald-600">☑</span>
                   <span>Запчасти сервиса ({parts.length})</span>
                 </span>
-                <span className="text-emerald-700 font-black">
-                  Заработок на запчастях: +{Math.round(partsMargin).toLocaleString('ru-RU')} ₽
+                <span
+                  className={isOwn ? 'text-slate-600 font-bold' : 'text-emerald-700 font-black'}
+                >
+                  {isOwn
+                    ? `Запчасти автопарка: ${Math.round(partsUnitSum).toLocaleString('ru-RU')} ₽`
+                    : `Заработок на запчастях: +${Math.round(partsMargin).toLocaleString('ru-RU')} ₽`}
                 </span>
               </div>
 
@@ -3393,7 +3491,9 @@ function GarageOrderRow({
                       <th className="px-3 py-2 text-center">Кол-во</th>
                       <th className="px-3 py-2 text-right">Закупка</th>
                       <th className="px-3 py-2 text-right">Клиенту (+30%)</th>
-                      <th className="px-3.5 py-2 text-right">Заработок СТО</th>
+                      <th className="px-3.5 py-2 text-right">
+                        {isOwn ? 'Себестоимость' : 'Заработок СТО'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -3423,16 +3523,18 @@ function GarageOrderRow({
                           </td>
                           <td className="px-3 py-2.5 text-right font-bold text-slate-800">
                             <span>{(cPrice * qty).toLocaleString('ru-RU')} ₽</span>
-                            {markupPct > 0 && (
+                            {markupPct > 0 && !isOwn && (
                               <span className="ml-1.5 text-[9px] font-black bg-amber-100 text-amber-800 px-1 py-0.5 rounded">
                                 +{markupPct}%
                               </span>
                             )}
                           </td>
                           <td className="px-3.5 py-2.5 text-right font-black text-emerald-700">
-                            {margin > 0
-                              ? `+${Math.round(margin).toLocaleString('ru-RU')} ₽`
-                              : '0 ₽'}
+                            {isOwn
+                              ? '—'
+                              : margin > 0
+                                ? `+${Math.round(margin).toLocaleString('ru-RU')} ₽`
+                                : '0 ₽'}
                           </td>
                         </tr>
                       );
@@ -3450,7 +3552,7 @@ function GarageOrderRow({
                         {Math.round(partsClientSum).toLocaleString('ru-RU')} ₽
                       </td>
                       <td className="px-3.5 py-2 text-right font-black text-emerald-700">
-                        +{Math.round(partsMargin).toLocaleString('ru-RU')} ₽
+                        {isOwn ? '—' : `+${Math.round(partsMargin).toLocaleString('ru-RU')} ₽`}
                       </td>
                     </tr>
                   </tfoot>
@@ -3783,13 +3885,25 @@ export default function ReviewPage() {
   }, [garageOrders, garageMachineFilter]);
 
   const garageSummary = useMemo(() => {
-    let totalRevenue = 0;
+    let clientRevenue = 0;
+    let clientMechanicPay = 0;
+    let clientPartsCost = 0;
+    let clientPartsClient = 0;
+    let clientPartsMargin = 0;
+    let clientNetProfit = 0;
+
+    let ownBilledToCarrier = 0;
+    let ownWorks = 0;
+    let ownMechanicPay = 0;
+    let ownPartsCost = 0;
+    let ownPartsClient = 0;
+
     let totalWorks = 0;
+    let totalRevenue = 0;
     let totalMechanicPay = 0;
     let totalPartsClient = 0;
     let totalPartsCost = 0;
     let totalPartsMargin = 0;
-    let totalNetProfit = 0;
     let totalMinutes = 0;
 
     for (const o of filteredGarageOrders) {
@@ -3800,11 +3914,25 @@ export default function ReviewPage() {
       totalPartsClient += m.partsClientSum;
       totalPartsCost += m.partsUnitSum;
       totalPartsMargin += m.partsMargin;
-      totalNetProfit += m.netProfit;
       totalMinutes += m.totalMinutes;
+
+      if (m.isOwn) {
+        ownBilledToCarrier += m.billedToCarrier;
+        ownWorks += m.worksSum;
+        ownMechanicPay += m.mechanicPay;
+        ownPartsCost += m.partsUnitSum;
+        ownPartsClient += m.partsClientSum;
+      } else {
+        clientRevenue += m.totalRevenue;
+        clientMechanicPay += m.mechanicPay;
+        clientPartsCost += m.partsUnitSum;
+        clientPartsClient += m.partsClientSum;
+        clientPartsMargin += m.partsMargin;
+        clientNetProfit += m.netProfit;
+      }
     }
 
-    const ownTotalSpent = totalMechanicPay + totalPartsCost;
+    const ownTotalSpent = ownMechanicPay + ownPartsCost;
     const allCount = garageOrders.length;
     const clientCount = garageOrders.filter((o) => o.machine_type === 'client').length;
     const ownCount = garageOrders.filter((o) => o.machine_type === 'own').length;
@@ -3820,9 +3948,21 @@ export default function ReviewPage() {
       totalPartsClient,
       totalPartsCost,
       totalPartsMargin,
-      totalNetProfit,
-      ownTotalSpent,
       totalMinutes,
+      // Чистая прибыль считается ТОЛЬКО с клиентских автомобилей!
+      clientRevenue,
+      clientMechanicPay,
+      clientPartsCost,
+      clientPartsClient,
+      clientPartsMargin,
+      clientNetProfit,
+      // Цифра, которую компания Гараж берёт с компании-перевозчика (счёт перевозчику)
+      ownBilledToCarrier,
+      ownWorks,
+      ownMechanicPay,
+      ownPartsCost,
+      ownPartsClient,
+      ownTotalSpent,
     };
   }, [filteredGarageOrders, garageOrders]);
 
@@ -4186,10 +4326,10 @@ export default function ReviewPage() {
     return { totalFleetExternalDebtCollected: externalSum, externalSettlements: items };
   }, [periodSettlementsData, periodTripOrderIds]);
 
-  // Фактическая прибыль (Cash Flow): реально поступившие средства от клиентов (включая погашение долгов прошлых периодов) минус прямые затраты и ТО
+  // Фактическая прибыль: фактически поступившая оплата по рейсам периода (за вычетом неоплаченной дебиторки) минус прямые затраты рейсов и ТО
   const totalFleetActualProfit = useMemo(
-    () => totalFleetNetProfit - totalFleetPendingDebt + totalFleetExternalDebtCollected,
-    [totalFleetNetProfit, totalFleetPendingDebt, totalFleetExternalDebtCollected],
+    () => totalFleetNetProfit - totalFleetPendingDebt,
+    [totalFleetNetProfit, totalFleetPendingDebt],
   );
   const totalFleetLoaderProfit = useMemo(
     () => combinedAssetGroups.reduce((s, g) => s + g.loaderProfit, 0),
@@ -4422,16 +4562,20 @@ export default function ReviewPage() {
             </div>
 
             {/* Полоса цифр Гаража на светлом фоне */}
-            <div className="px-4 py-2.5 flex items-center justify-center flex-wrap gap-3 sm:gap-6">
+            <div className="px-4 py-2.5 flex items-center justify-center flex-wrap gap-3 sm:gap-5">
               <div className="text-center">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
-                  {garageMachineFilter === 'own' ? 'Работы (свои авто)' : 'Выручка СТО'}
+                  {garageMachineFilter === 'own'
+                    ? 'Работы (свой парк)'
+                    : garageMachineFilter === 'client'
+                      ? 'Выручка (клиенты)'
+                      : 'Выручка (клиенты)'}
                 </span>
                 <span className="text-sm sm:text-base font-black text-sky-950">
                   <Money
                     amount={(garageMachineFilter === 'own'
-                      ? garageSummary.totalWorks
-                      : garageSummary.totalRevenue
+                      ? garageSummary.ownWorks
+                      : garageSummary.clientRevenue
                     ).toFixed(2)}
                   />
                 </span>
@@ -4442,70 +4586,100 @@ export default function ReviewPage() {
                   ЗП Механиков
                 </span>
                 <span className="text-sm sm:text-base font-black text-amber-600">
-                  −<Money amount={garageSummary.totalMechanicPay.toFixed(2)} />
+                  −
+                  <Money
+                    amount={(garageMachineFilter === 'own'
+                      ? garageSummary.ownMechanicPay
+                      : garageMachineFilter === 'client'
+                        ? garageSummary.clientMechanicPay
+                        : garageSummary.clientMechanicPay
+                    ).toFixed(2)}
+                  />
                 </span>
               </div>
               <span className="text-sky-200">|</span>
               <div className="text-center">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
-                  {garageMachineFilter === 'own' ? 'Запчасти (закуп)' : 'Запчасти всего'}
+                  {garageMachineFilter === 'own' ? 'Запчасти парка' : 'Запчасти (закуп)'}
                 </span>
                 <span className="text-sm sm:text-base font-black text-sky-700">
                   <Money
                     amount={(garageMachineFilter === 'own'
-                      ? garageSummary.totalPartsCost
-                      : garageSummary.totalPartsClient
+                      ? garageSummary.ownPartsCost
+                      : garageSummary.clientPartsCost
                     ).toFixed(2)}
                   />
                 </span>
               </div>
-              <span className="text-sky-200">+</span>
-              <div className="text-center bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1">
-                <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest block">
-                  Заработок на з/ч (+30%)
-                </span>
-                <span className="text-sm sm:text-base font-black text-emerald-700">
-                  +<Money amount={garageSummary.totalPartsMargin.toFixed(2)} />
-                </span>
-              </div>
+              {garageMachineFilter !== 'own' && (
+                <>
+                  <span className="text-sky-200">+</span>
+                  <div className="text-center bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1">
+                    <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest block">
+                      Наценка з/ч (+30%)
+                    </span>
+                    <span className="text-sm sm:text-base font-black text-emerald-700">
+                      +<Money amount={garageSummary.clientPartsMargin.toFixed(2)} />
+                    </span>
+                  </div>
+                </>
+              )}
               <span className="text-sky-200">=</span>
-              <div
-                className={cn(
-                  'text-center border rounded-xl px-3.5 py-1 shadow-2xs',
-                  garageMachineFilter === 'own'
-                    ? 'bg-sky-100/80 border-sky-300 text-sky-900'
-                    : garageSummary.totalNetProfit >= 0
+
+              {/* 1. ЧИСТАЯ ПРИБЫЛЬ СТО — ТОЛЬКО С КЛИЕНТСКИХ АВТОМОБИЛЕЙ */}
+              {garageMachineFilter !== 'own' && (
+                <div
+                  className={cn(
+                    'text-center border rounded-xl px-3.5 py-1 shadow-2xs cursor-help',
+                    garageSummary.clientNetProfit >= 0
                       ? 'bg-emerald-600 border-emerald-600 text-white'
                       : 'bg-rose-600 border-rose-600 text-white',
-                )}
-              >
-                <span
-                  className={cn(
-                    'text-[9px] font-bold uppercase tracking-widest block',
-                    garageMachineFilter === 'own'
-                      ? 'text-sky-700'
-                      : garageSummary.totalNetProfit >= 0
-                        ? 'text-emerald-100'
-                        : 'text-rose-100',
                   )}
+                  title={`Реальная чистая прибыль гаража со сторонних клиентов:\nВыручка с клиентов: ${Math.round(garageSummary.clientRevenue).toLocaleString('ru-RU')} ₽\n− ЗП механиков (клиенты): ${Math.round(garageSummary.clientMechanicPay).toLocaleString('ru-RU')} ₽\n− Закуп запчастей (клиенты): ${Math.round(garageSummary.clientPartsCost).toLocaleString('ru-RU')} ₽\n───────────────────────\nЧистая прибыль СТО: ${Math.round(garageSummary.clientNetProfit).toLocaleString('ru-RU')} ₽`}
                 >
-                  {garageMachineFilter === 'own'
-                    ? 'Расход на свои авто (ЗП + з/ч)'
-                    : 'Чистая прибыль гаража'}
-                </span>
-                <span className="text-base sm:text-lg font-black">
-                  {garageMachineFilter === 'own' ? (
-                    <>
-                      −<Money amount={garageSummary.ownTotalSpent.toFixed(2)} />
-                    </>
-                  ) : (
-                    <>
-                      {garageSummary.totalNetProfit < 0 ? '−' : ''}
-                      <Money amount={Math.abs(garageSummary.totalNetProfit).toFixed(2)} />
-                    </>
-                  )}
-                </span>
-              </div>
+                  <span
+                    className={cn(
+                      'text-[9px] font-bold uppercase tracking-widest block',
+                      garageSummary.clientNetProfit >= 0 ? 'text-emerald-100' : 'text-rose-100',
+                    )}
+                  >
+                    Чистая прибыль (клиенты)
+                  </span>
+                  <span className="text-base sm:text-lg font-black">
+                    {garageSummary.clientNetProfit < 0 ? '−' : ''}
+                    <Money amount={Math.abs(garageSummary.clientNetProfit).toFixed(2)} />
+                  </span>
+                </div>
+              )}
+
+              {/* 2. ЦИФРА, КОТОРУЮ ГАРАЖ БЕРЁТ С ПЕРЕВОЗЧИКА — РЯДОМ! */}
+              {garageMachineFilter !== 'client' && (
+                <div
+                  className="text-center border border-sky-300 bg-sky-50 rounded-xl px-3.5 py-1 shadow-2xs cursor-help"
+                  title={`Сумма, которую Гараж берёт с компании-перевозчика за обслуживание автопарка:\n• Работы: ${Math.round(garageSummary.ownWorks).toLocaleString('ru-RU')} ₽\n• Запчасти: ${Math.round(garageSummary.ownPartsCost).toLocaleString('ru-RU')} ₽\n───────────────────────\nВсего счёт перевозчику: ${Math.round(garageSummary.ownBilledToCarrier).toLocaleString('ru-RU')} ₽\n(Прямые затраты гаража: ЗП слесарей ${Math.round(garageSummary.ownMechanicPay).toLocaleString('ru-RU')} ₽ + закуп з/ч ${Math.round(garageSummary.ownPartsCost).toLocaleString('ru-RU')} ₽ = ${Math.round(garageSummary.ownTotalSpent).toLocaleString('ru-RU')} ₽)\nРеальной чистой прибыли нет — это внутреннее обслуживание автопарка`}
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-widest block text-sky-800">
+                    Счёт перевозчику (свой парк)
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-sky-950">
+                    <Money amount={garageSummary.ownBilledToCarrier.toFixed(2)} />
+                  </span>
+                </div>
+              )}
+
+              {garageMachineFilter === 'own' && (
+                <div
+                  className="text-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 cursor-help"
+                  title={`Прямые расходы гаража: ЗП слесарей (${Math.round(garageSummary.ownMechanicPay).toLocaleString('ru-RU')} ₽) + закупка запчастей (${Math.round(garageSummary.ownPartsCost).toLocaleString('ru-RU')} ₽). Реальной чистой прибыли нет, так как это внутреннее обслуживание автопарка.`}
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-widest block text-slate-400">
+                    Прямые затраты парка
+                  </span>
+                  <span className="text-sm sm:text-base font-bold text-slate-700">
+                    −<Money amount={garageSummary.ownTotalSpent.toFixed(2)} />
+                  </span>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -4672,7 +4846,7 @@ export default function ReviewPage() {
                     ? 'bg-emerald-600 text-white'
                     : 'bg-rose-600 text-white',
                 )}
-                title={`Фактическая прибыль (Cash Flow):\n• Поступило по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽\n• Не оплачено клиентами по рейсам (в долгах): ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n${totalFleetExternalDebtCollected > 0 ? `• Погашение долгов за прошлые периоды: +${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽\n` : ''}• Все расходы (ЗП + Топливо + ТО): ${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
+                title={`Фактическая прибыль:\n• Поступило по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽\n• Не оплачено клиентами по рейсам (в долгах): ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n• Все расходы (ЗП + Топливо + ТО): ${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
               >
                 <span
                   className={cn(

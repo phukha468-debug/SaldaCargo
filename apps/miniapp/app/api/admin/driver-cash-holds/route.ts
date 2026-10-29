@@ -25,6 +25,8 @@ export async function GET() {
         created_at,
         created_by,
         related_user_id,
+        trip_id,
+        trip:trips(id, trip_number, started_at, ended_at, asset:assets(short_name, reg_number)),
         driver:users!transactions_related_user_id_fkey(id, name, phone)
       `,
       )
@@ -42,6 +44,9 @@ export async function GET() {
       if (cleanNote.startsWith('[CARRYOVER] ')) {
         cleanNote = cleanNote.substring('[CARRYOVER] '.length);
       }
+      const matchTrip = cleanNote.match(/Рейс\s*№?\s*(\d+)/i);
+      const parsedTripNum = h.trip?.trip_number ?? (matchTrip ? parseInt(matchTrip[1], 10) : null);
+
       return {
         id: h.id,
         driver_id: h.related_user_id,
@@ -51,6 +56,10 @@ export async function GET() {
         note: cleanNote,
         created_at: h.created_at,
         transaction_date: h.transaction_date,
+        trip_id: h.trip?.id ?? h.trip_id ?? null,
+        trip_number: parsedTripNum,
+        trip_date: h.trip?.started_at ?? h.transaction_date ?? h.created_at,
+        asset_name: h.trip?.asset?.short_name || h.trip?.asset?.reg_number || null,
       };
     });
 
@@ -177,13 +186,103 @@ export async function PATCH(request: Request) {
     }
 
     const body = (await request.json()) as {
-      hold_id: string;
+      hold_id?: string;
+      driver_id?: string;
       collected_amount?: string | number;
       note?: string;
     };
 
-    if (!body.hold_id) {
-      return NextResponse.json({ error: 'Параметр hold_id обязателен' }, { status: 400 });
+    if (!body.hold_id && !body.driver_id) {
+      return NextResponse.json(
+        { error: 'Параметр hold_id или driver_id обязателен' },
+        { status: 400 },
+      );
+    }
+
+    if (body.driver_id && !body.hold_id) {
+      const { data: driverHolds, error: fetchErr } = await (supabase.from('transactions') as any)
+        .select('*')
+        .eq('related_user_id', body.driver_id)
+        .eq('category_id', CASH_COLLECT_CAT)
+        .eq('settlement_status', 'pending')
+        .neq('lifecycle_status', 'cancelled')
+        .order('created_at', { ascending: true });
+
+      if (fetchErr || !driverHolds || driverHolds.length === 0) {
+        return NextResponse.json(
+          { error: 'У водителя нет активных остатков подотчёта' },
+          { status: 404 },
+        );
+      }
+
+      const totalHoldsAmount = driverHolds.reduce(
+        (s: number, h: any) => s + parseFloat(h.amount || '0'),
+        0,
+      );
+      const collectAmount = body.collected_amount
+        ? parseFloat(String(body.collected_amount))
+        : totalHoldsAmount;
+      if (isNaN(collectAmount) || collectAmount <= 0) {
+        return NextResponse.json({ error: 'Некорректная сумма приёма' }, { status: 400 });
+      }
+
+      // 1. Создаём запись в cash_collections
+      await (supabase.from('cash_collections') as any).insert({
+        driver_id: body.driver_id,
+        amount: collectAmount.toFixed(2),
+        collected_by: resolvedAdminId,
+        note:
+          body.note?.trim() || `Инкассация подотчёта водителя (${driverHolds.length} перенос/-ов)`,
+      });
+
+      // 2. Погашаем переносы от старых к новым
+      let remainingToSettle = collectAmount;
+      const nowStr = new Date().toLocaleDateString('ru-RU');
+
+      for (const h of driverHolds) {
+        if (remainingToSettle <= 0) break;
+        const hAmt = parseFloat(h.amount);
+        if (remainingToSettle >= hAmt) {
+          await (supabase.from('transactions') as any)
+            .update({
+              settlement_status: 'completed',
+              updated_at: new Date().toISOString(),
+              description: `${h.description || ''} [Сдано в кассу ${nowStr}]`,
+            })
+            .eq('id', h.id);
+          remainingToSettle -= hAmt;
+        } else {
+          const rest = hAmt - remainingToSettle;
+          await (supabase.from('transactions') as any)
+            .update({
+              amount: rest.toFixed(2),
+              updated_at: new Date().toISOString(),
+              description: `${h.description || ''} [Частично сдано: ${remainingToSettle.toLocaleString('ru-RU')} ₽]`,
+            })
+            .eq('id', h.id);
+
+          await (supabase.from('transactions') as any).insert({
+            direction: 'transfer',
+            amount: remainingToSettle.toFixed(2),
+            category_id: CASH_COLLECT_CAT,
+            from_wallet_id: h.from_wallet_id,
+            to_wallet_id: CASH_WALLET_ID,
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            related_user_id: h.related_user_id,
+            description: `Инкассация части переноса: ${remainingToSettle.toLocaleString('ru-RU')} ₽`,
+            created_by: resolvedAdminId,
+            idempotency_key: crypto.randomUUID(),
+            transaction_date: new Date().toISOString(),
+          });
+          remainingToSettle = 0;
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: `Принято ${collectAmount.toFixed(2)} ₽ в кассу`,
+      });
     }
 
     // Загружаем текущий hold

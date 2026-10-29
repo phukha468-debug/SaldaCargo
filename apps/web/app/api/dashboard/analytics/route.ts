@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getOrderEffectiveDate } from '@saldacargo/shared';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -164,24 +165,29 @@ export async function GET(request: Request) {
       vehicleMap[vId].profit += tRev - (tPay + tFuel + tExp);
     }
 
-    // 2. Fetch Garage Service Orders in range
+    // 2. Fetch Garage Service Orders in range (filtered by effective date: payment date or completion date)
     const { data: serviceOrders } = await supabase
       .from('service_orders')
       .select(
         `
-        id, order_number, created_at,
+        id, order_number, created_at, updated_at, admin_note, mechanic_note,
         service_order_works(price_client, wage_amount, status),
-        service_order_parts(client_price, unit_price, quantity, status)
+        service_order_parts(client_price, unit_price, quantity, status),
+        transactions(id, direction, amount, transaction_date, created_at)
       `,
       )
-      .gte('created_at', startIso)
-      .lte('created_at', endIso);
+      .or(
+        `and(created_at.gte.${startIso},created_at.lte.${endIso}),and(updated_at.gte.${startIso},updated_at.lte.${endIso})`,
+      );
 
     let garageRev = 0;
     let garageMechanicPay = 0;
     let garagePartsCost = 0;
 
     for (const so of serviceOrders || []) {
+      const effDate = getOrderEffectiveDate(so as any);
+      if (effDate < startIso || effDate > endIso) continue;
+
       for (const w of so.service_order_works || []) {
         garageRev += parseFloat(w.price_client || '0');
         garageMechanicPay += parseFloat(w.wage_amount || '0');

@@ -500,6 +500,18 @@ function EditModal({
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                    💬 Комментарий / примечание к заказу
+                  </label>
+                  <input
+                    type="text"
+                    className={inputCls}
+                    value={order.description || ''}
+                    placeholder="Детали заказа, примечание водителя"
+                    onChange={(e) => update(order.id, 'description', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
                     Сумма, ₽
                   </label>
                   <input
@@ -743,6 +755,12 @@ function HistoryTripCard({
                       <p className="text-sm font-semibold text-zinc-900 truncate">
                         {order.counterparty?.name ?? `Заявка ${i + 1}`}
                       </p>
+                      {order.description && (
+                        <div className="mt-0.5 p-1.5 bg-amber-50 border border-amber-200/90 rounded text-[11px] text-amber-950 font-medium line-clamp-2">
+                          <span className="font-bold text-amber-900">💬 Водитель:</span>{' '}
+                          {order.description}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[11px] text-emerald-600 font-medium">
                           ЗП {split}% · <Money amount={order.driver_pay} />
@@ -1015,14 +1033,17 @@ function ServiceOrderEditModal({
     order.client_vehicle_model || order.client_vehicle_brand || '',
   );
   const [clientReg, setClientReg] = useState<string>(order.client_vehicle_reg || '');
-  const [works, setWorks] = useState<Array<{ name: string; minutes: string }>>(() => {
-    const active = (order.works ?? []).filter((w: any) => w.status !== 'cancelled');
-    if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
-    return active.map((w: any) => ({
-      name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
-      minutes: String(w.actual_minutes || w.norm_minutes || 30),
-    }));
-  });
+  const [works, setWorks] = useState<Array<{ name: string; minutes: string; notes?: string }>>(
+    () => {
+      const active = (order.works ?? []).filter((w: any) => w.status !== 'cancelled');
+      if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
+      return active.map((w: any) => ({
+        name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
+        minutes: String(w.actual_minutes || w.norm_minutes || 30),
+        notes: w.notes || undefined,
+      }));
+    },
+  );
   const [parts, setParts] = useState<Array<{ name: string; quantity: string; unit: string }>>(() =>
     (order.parts ?? []).map((p: any) => ({
       name: p.custom_part_name || p.part?.name || '',
@@ -1035,7 +1056,16 @@ function ServiceOrderEditModal({
   const [saving, setSaving] = useState(false);
 
   const totalMinutes = works.reduce((s, w) => s + (parseInt(w.minutes, 10) || 0), 0);
-  const autoPay = ((totalMinutes / 60) * hourlyRate * (salaryPct / 100)).toFixed(2);
+  const autoPay = works
+    .reduce((s, w) => {
+      const mins = parseInt(w.minutes, 10) || 0;
+      const customPctMatch = w.notes
+        ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+        : null;
+      const wPct = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+      return s + (mins / 60) * hourlyRate * (wPct / 100);
+    }, 0)
+    .toFixed(2);
 
   async function handleSave() {
     setSaving(true);
@@ -1052,6 +1082,7 @@ function ServiceOrderEditModal({
           works: works.map((w) => ({
             name: w.name,
             minutes: parseInt(w.minutes, 10) || 0,
+            notes: w.notes,
           })),
           parts: parts.map((p) => ({
             name: p.name,
@@ -1399,7 +1430,12 @@ function ServiceOrderReviewCard({
                     parseFloat(w.price_client || '0') > 0
                       ? parseFloat(w.price_client)
                       : (mins / 60) * hourlyRate;
-                  const wPay = (wPrice * salaryPct) / 100;
+                  const customPctMatch = w.notes
+                    ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+                    : null;
+                  const wPct =
+                    customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+                  const wPay = (wPrice * wPct) / 100;
                   return (
                     <div
                       key={w.id || i}
@@ -1415,6 +1451,11 @@ function ServiceOrderReviewCard({
                         </p>
                         <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">
                           ⏱ Время: {mins} мин · ЗП: {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                          {customPctMatch && (
+                            <span className="text-[10px] text-emerald-600 font-bold ml-1.5 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              {wPct}%
+                            </span>
+                          )}
                         </p>
                       </div>
                       <span className="text-xs font-black text-zinc-700 shrink-0">

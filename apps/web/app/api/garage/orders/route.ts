@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { extractOrderDates, cleanOrderNotes, getOrderEffectiveDate } from '@saldacargo/shared';
 
 /** GET /api/garage/orders?filter=review|active|history&date=YYYY-MM-DD */
 export async function GET(request: Request) {
@@ -21,29 +22,35 @@ export async function GET(request: Request) {
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, work_description, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, notes, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
         id, custom_part_name, quantity, unit_price, client_price, unit,
         part:parts(name, unit)
+      ),
+      transactions:transactions(
+        id, direction, amount, transaction_date, created_at, category_id
       )
     `;
 
     const activeSelect = `
-      id, order_number, machine_type, status, lifecycle_status, priority, payment_received, created_at,
+      id, order_number, machine_type, status, lifecycle_status, priority, payment_received, created_at, updated_at,
       problem_description, mechanic_note, admin_note, odometer_start, odometer_end, mechanic_pay,
       asset:assets(id, short_name, reg_number, odometer_current),
       mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
       second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg, client_name,
       works:service_order_works(
-        id, custom_work_name, work_description, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, notes, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
         id, custom_part_name, quantity, unit_price, client_price, unit,
         part:parts(name, unit)
+      ),
+      transactions:transactions(
+        id, direction, amount, transaction_date, created_at, category_id
       )
     `;
 
@@ -66,9 +73,13 @@ export async function GET(request: Request) {
       }
 
       if (date) {
-        q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
+        q = q.or(
+          `and(created_at.gte.${date}T00:00:00Z,created_at.lte.${date}T23:59:59Z),and(updated_at.gte.${date}T00:00:00Z,updated_at.lte.${date}T23:59:59Z)`,
+        );
       } else if (weekStart && weekEnd) {
-        q = q.gte('created_at', `${weekStart}T00:00:00Z`).lte('created_at', `${weekEnd}T23:59:59Z`);
+        q = q.or(
+          `and(created_at.gte.${weekStart}T00:00:00Z,created_at.lte.${weekEnd}T23:59:59Z),and(updated_at.gte.${weekStart}T00:00:00Z,updated_at.lte.${weekEnd}T23:59:59Z)`,
+        );
       } else if (month) {
         const [yStr, mStr] = month.split('-');
         const y = Number(yStr);
@@ -78,13 +89,46 @@ export async function GET(request: Request) {
           const nextM = m === 12 ? 1 : m + 1;
           const nextY = m === 12 ? y + 1 : y;
           const end = `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000Z`;
-          q = q.gte('created_at', start).lt('created_at', end);
+          q = q.or(
+            `and(created_at.gte.${start},created_at.lt.${end}),and(updated_at.gte.${start},updated_at.lt.${end})`,
+          );
         }
       }
 
       const { data, error } = await q;
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json(data ?? []);
+
+      const enriched = (data ?? []).map((o: any) => {
+        const dates = extractOrderDates(o);
+        const effectiveDate = getOrderEffectiveDate(o);
+        const copy = {
+          ...o,
+          started_at: dates.started_at,
+          completed_at: dates.completed_at,
+          effective_date: effectiveDate,
+        };
+        if (copy.admin_note) copy.admin_note = cleanOrderNotes(copy.admin_note);
+        if (copy.mechanic_note) copy.mechanic_note = cleanOrderNotes(copy.mechanic_note);
+        return copy;
+      });
+
+      let finalHistory = enriched;
+      if (date) {
+        finalHistory = finalHistory.filter(
+          (o: any) => (o.effective_date || o.created_at)?.slice(0, 10) === date,
+        );
+      } else if (weekStart && weekEnd) {
+        finalHistory = finalHistory.filter((o: any) => {
+          const d = (o.effective_date || o.created_at)?.slice(0, 10);
+          return d && d >= weekStart && d <= weekEnd;
+        });
+      } else if (month) {
+        finalHistory = finalHistory.filter((o: any) =>
+          (o.effective_date || o.created_at)?.startsWith(month),
+        );
+      }
+
+      return NextResponse.json(finalHistory);
     }
 
     // 'all' needs fullSelect to include lifecycle_status and works for client-side filtering
@@ -118,7 +162,22 @@ export async function GET(request: Request) {
 
     const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data ?? []);
+
+    const mapped = (data ?? []).map((o: any) => {
+      const dates = extractOrderDates(o);
+      const effectiveDate = getOrderEffectiveDate(o);
+      const copy = {
+        ...o,
+        started_at: dates.started_at,
+        completed_at: dates.completed_at,
+        effective_date: effectiveDate,
+      };
+      if (copy.admin_note) copy.admin_note = cleanOrderNotes(copy.admin_note);
+      if (copy.mechanic_note) copy.mechanic_note = cleanOrderNotes(copy.mechanic_note);
+      return copy;
+    });
+
+    return NextResponse.json(mapped);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

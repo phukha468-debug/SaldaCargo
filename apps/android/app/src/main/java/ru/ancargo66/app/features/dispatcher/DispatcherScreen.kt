@@ -77,8 +77,22 @@ fun DispatcherScreen(
 
     // Управление подотчётом и переносом остатка на руках
     var cashHolds by remember { mutableStateOf<List<ru.ancargo66.app.core.model.DriverCashHold>>(emptyList()) }
+    var expandedHoldDrivers by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     var showCashHoldDialog by remember { mutableStateOf(false) }
     var selectedHoldForCollect by remember { mutableStateOf<ru.ancargo66.app.core.model.DriverCashHold?>(null) }
+
+    val groupedHolds = remember(cashHolds) {
+        cashHolds.groupBy { it.driverId.ifBlank { it.driverName } }
+            .map { (driverKey, items) ->
+                val driverName = items.firstOrNull()?.driverName?.ifBlank { "Водитель" } ?: "Водитель"
+                val driverId = items.firstOrNull()?.driverId ?: driverKey
+                val totalAmount = items.sumOf {
+                    if (it.amountDouble > 0.0) it.amountDouble else (it.amount.toDoubleOrNull() ?: 0.0)
+                }
+                Triple(driverId, driverName, items) to totalAmount
+            }
+            .sortedByDescending { it.second }
+    }
 
     // Диалоги Дохода и Расхода
     var showAddIncomeDialog by rememberSaveable { mutableStateOf(false) }
@@ -513,26 +527,27 @@ fun DispatcherScreen(
                 }
             }
 
-            // Блок активных остатков на руках у водителей (переносы)
+            // Блок активных остатков на руках у водителей (переносы) со слиянием по водителю
             if (cashHolds.isNotEmpty()) {
                 item {
                     Surface(
                         color = Color(0xFFFFF7ED),
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFDBA74)),
-                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFED7AA)),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            // Компактный заголовок блока
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("⚠️", fontSize = 16.sp)
+                                    Text("⚠️", fontSize = 13.sp)
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "ОСТАТКИ НА РУКАХ (ПЕРЕНОСЫ)",
+                                        text = "ПОДОТЧЁТНЫЕ ДЕНЬГИ / ПЕРЕНОСЫ",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Color(0xFFC2410C),
@@ -541,11 +556,11 @@ fun DispatcherScreen(
                                 }
                                 Surface(
                                     color = Color(0xFFEA580C),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(6.dp)
                                 ) {
                                     Text(
-                                        text = "${cashHolds.size}",
-                                        fontSize = 11.sp,
+                                        text = "${groupedHolds.size} вод. / ${cashHolds.size} рейс.",
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -553,56 +568,209 @@ fun DispatcherScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                            cashHolds.forEach { hold ->
-                                Surface(
-                                    color = Color.White,
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFED7AA)),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    Row(
+                            // Сгруппированные карточки водителей в виде компактных строк
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                groupedHolds.forEach { (driverInfo, totalAmount) ->
+                                    val (dId, dName, items) = driverInfo
+                                    val isExpanded = expandedHoldDrivers.contains(dId)
+
+                                    Surface(
+                                        color = Color.White,
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isExpanded) Color(0xFFF97316) else Color(0xFFFED7AA)
+                                        ),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(12.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .clip(RoundedCornerShape(10.dp))
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = hold.driverName,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Zinc900
-                                            )
-                                            if (hold.note.isNotBlank()) {
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = hold.note,
-                                                    fontSize = 12.sp,
-                                                    color = Zinc600,
-                                                    maxLines = 2
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = "${hold.amount} ₽",
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = Color(0xFFEA580C)
-                                            )
-                                        }
+                                        Column {
+                                            // Компактная строка-аккордеон
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        expandedHoldDrivers = if (isExpanded) {
+                                                            expandedHoldDrivers - dId
+                                                        } else {
+                                                            expandedHoldDrivers + dId
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Левая часть: иконка водителя + имя + бейдж рейсов
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Color(0xFFFFF7ED),
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Text("👤", fontSize = 12.sp)
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = dName,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Zinc900
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Surface(
+                                                        color = Color(0xFFF1F5F9),
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "${items.size} ${if (items.size == 1) "рейс" else if (items.size in 2..4) "рейса" else "рейсов"}",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Zinc600,
+                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                        )
+                                                    }
+                                                }
 
-                                        Button(
-                                            onClick = { selectedHoldForCollect = hold },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21A038)),
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text("Принять", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                // Правая часть: общая сумма + кнопка «Принять» + стрелка
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "${totalAmount.toLong()} ₽",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = Color(0xFFEA580C)
+                                                    )
+
+                                                    Button(
+                                                        onClick = {
+                                                            selectedHoldForCollect = ru.ancargo66.app.core.model.DriverCashHold(
+                                                                id = "",
+                                                                driverId = dId,
+                                                                driverName = dName,
+                                                                amount = "${totalAmount.toLong()}"
+                                                            )
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21A038)),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(28.dp)
+                                                    ) {
+                                                        Text("Принять", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    Icon(
+                                                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = if (isExpanded) "Свернуть" else "Раскрыть",
+                                                        tint = Zinc400,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            // Раскрывающийся блок деталей по рейсам
+                                            if (isExpanded) {
+                                                HorizontalDivider(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    thickness = 1.dp,
+                                                    color = Color(0xFFFED7AA)
+                                                )
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(Color(0xFFFFFDFB))
+                                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    items.forEach { holdItem ->
+                                                        val tripAmt = if (holdItem.amountDouble > 0.0) holdItem.amountDouble else (holdItem.amount.toDoubleOrNull() ?: 0.0)
+                                                        Surface(
+                                                            color = Color.White,
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(8.dp),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Column(modifier = Modifier.weight(1f)) {
+                                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                        Text(
+                                                                            text = if (holdItem.tripNumber != null) "🚛 Рейс №${holdItem.tripNumber}" else "📌 Ручная фиксация",
+                                                                            fontSize = 12.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = Zinc900
+                                                                        )
+                                                                        if (!holdItem.tripDate.isNullOrBlank()) {
+                                                                            Text(
+                                                                                text = " • ${holdItem.tripDate}",
+                                                                                fontSize = 11.sp,
+                                                                                color = Zinc500
+                                                                            )
+                                                                        }
+                                                                        if (!holdItem.assetName.isNullOrBlank()) {
+                                                                            Text(
+                                                                                text = " (${holdItem.assetName})",
+                                                                                fontSize = 11.sp,
+                                                                                fontWeight = FontWeight.SemiBold,
+                                                                                color = SaldaOrangePrimary
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                    if (holdItem.note.isNotBlank()) {
+                                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                                        Text(
+                                                                            text = "💬 ${holdItem.note}",
+                                                                            fontSize = 11.sp,
+                                                                            color = Zinc600,
+                                                                            maxLines = 2
+                                                                        )
+                                                                    }
+                                                                }
+
+                                                                Spacer(modifier = Modifier.width(8.dp))
+
+                                                                Row(
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "${tripAmt.toLong()} ₽",
+                                                                        fontSize = 13.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color(0xFFC2410C)
+                                                                    )
+                                                                    if (holdItem.id.isNotBlank()) {
+                                                                        OutlinedButton(
+                                                                            onClick = { selectedHoldForCollect = holdItem },
+                                                                            shape = RoundedCornerShape(6.dp),
+                                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                                            modifier = Modifier.height(26.dp),
+                                                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF21A038)),
+                                                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF21A038))
+                                                                        ) {
+                                                                            Text("Сдать", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1057,11 +1225,27 @@ fun DispatcherScreen(
                                                     ) {
                                                         Column(modifier = Modifier.weight(1f)) {
                                                             Text(
-                                                                text = ord.counterparty?.name ?: ord.description ?: "Заявка",
+                                                                text = ord.counterparty?.name ?: "Заявка",
                                                                 fontSize = 12.sp,
                                                                 fontWeight = FontWeight.Bold,
-                                                                color = Zinc800
+                                                                color = Zinc900
                                                             )
+                                                            if (!ord.description.isNullOrBlank()) {
+                                                                Spacer(modifier = Modifier.height(3.dp))
+                                                                Surface(
+                                                                    color = Color(0xFFFEF3C7),
+                                                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                                                                    shape = RoundedCornerShape(6.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "💬 ${ord.description}",
+                                                                        fontSize = 10.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color(0xFF78350F),
+                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                    )
+                                                                }
+                                                            }
                                                             Text(
                                                                 text = "ЗП водителя: ${ord.driverPay.toInt()} ₽",
                                                                 fontSize = 10.sp,

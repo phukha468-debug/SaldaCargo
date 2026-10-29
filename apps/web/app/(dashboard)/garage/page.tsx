@@ -59,6 +59,7 @@ type OrderRow = {
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;
+  effective_date?: string | null;
   asset: Asset | null;
   client_vehicle_brand: string | null;
   client_vehicle_reg: string | null;
@@ -305,11 +306,10 @@ function OrderDetailModal({
       if (!r.ok) throw new Error(data.error ?? 'Ошибка при сохранении наряда');
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables: Record<string, unknown>) => {
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
       queryClient.invalidateQueries({ queryKey: ['garage-dashboard'] });
-      setShowCloseDialog(false);
       setEditNote(null);
       setEditStatus(null);
       setEditPriority(null);
@@ -317,7 +317,14 @@ function OrderDetailModal({
       setEditOdometerEnd(null);
       setEditStartedAt(null);
       setEditCompletedAt(null);
-      onClose();
+      if (
+        showCloseDialog ||
+        variables?.status === 'completed' ||
+        variables?.lifecycle_status === 'approved'
+      ) {
+        setShowCloseDialog(false);
+        onClose();
+      }
     },
     onError: (err: Error) => {
       alert(`Ошибка: ${err.message}`);
@@ -669,7 +676,12 @@ function OrderDetailModal({
             <h2 className="text-lg font-bold text-slate-900">
               Наряд #{order?.order_number ?? '...'}
             </h2>
-            {order && <p className="text-xs text-slate-400">{fmtDate(order.created_at)}</p>}
+            {order && (
+              <p className="text-xs text-slate-400">
+                Создан: {fmtDate(order.created_at)}
+                {order.completed_at && ` · Завершён: ${fmtDate(order.completed_at)}`}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {isClosed && (
@@ -3645,8 +3657,23 @@ function OrderCard({ o, onSelect }: { o: TabOrder; onSelect: (id: string) => voi
             · {clientLabel}
           </span>
         )}
-        <span className="text-[11px] text-slate-400 shrink-0 hidden md:block">
-          {new Date(o.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+        <span
+          className="text-[11px] text-slate-400 shrink-0 hidden md:block"
+          title={
+            o.completed_at
+              ? `Завершён: ${fmtDate(o.completed_at)} (создан: ${fmtDate(o.created_at)})`
+              : `Создан: ${fmtDate(o.created_at)}`
+          }
+        >
+          {o.completed_at
+            ? new Date(o.completed_at).toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'short',
+              })
+            : new Date(o.created_at).toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'short',
+              })}
         </span>
         {/* Работы/запчасти в виде коротких тегов */}
         <div className="hidden lg:flex items-center gap-1 overflow-hidden max-w-[320px]">
@@ -6547,18 +6574,20 @@ export default function GaragePage() {
       res = res.filter((o) => o.machine_type === filterType);
     }
 
-    // Фильтр по дате (день, неделя, месяц)
+    // Фильтр по дате (день, неделя, месяц): дата оплаты/завершения является датой отчёта
+    const getOrderDate = (o: TabOrder) => o.completed_at || o.effective_date || o.created_at;
+
     if (period === 'day') {
-      res = res.filter((o) => o.created_at?.startsWith(periodDate));
+      res = res.filter((o) => getOrderDate(o)?.startsWith(periodDate));
     } else if (period === 'week') {
       const { weekStart, weekEnd } = getArchiveWeekDates(periodDate);
       res = res.filter((o) => {
-        const d = o.created_at?.slice(0, 10);
+        const d = getOrderDate(o)?.slice(0, 10);
         return d && d >= weekStart && d <= weekEnd;
       });
     } else if (period === 'month') {
       const mPrefix = periodDate.slice(0, 7);
-      res = res.filter((o) => o.created_at?.startsWith(mPrefix));
+      res = res.filter((o) => getOrderDate(o)?.startsWith(mPrefix));
     }
 
     // Текстовый поиск

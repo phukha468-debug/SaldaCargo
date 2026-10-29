@@ -68,9 +68,9 @@ fun TripDetailScreen(
     // Поля завершения рейса
     var endOdometerInput by rememberSaveable { mutableStateOf("") }
     var driverNoteInput by rememberSaveable { mutableStateOf("") }
-    var isCarryoverInput by rememberSaveable { mutableStateOf(false) }
-    var carryoverAmountInput by rememberSaveable { mutableStateOf("") }
-    var carryoverNoteInput by rememberSaveable { mutableStateOf("") }
+    var isHandedToAccountant by rememberSaveable { mutableStateOf(false) }
+    var unhandedAmountInput by rememberSaveable { mutableStateOf("") }
+    var unhandedNoteInput by rememberSaveable { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
 
@@ -911,11 +911,16 @@ fun TripDetailScreen(
                         }
                     }
 
-                    // Блок переноса наличных на следующий рейс
+                    val cachedSumm = SaldaApiClient.getCachedSummary()
+                    val prevDebtVal = cachedSumm?.activeCarryover?.amount?.toDoubleOrNull() ?: cachedSumm?.accountableBalance?.toDoubleOrNull() ?: 0.0
+                    val enteredDebtVal = if (!isHandedToAccountant && unhandedAmountInput.isNotBlank()) unhandedAmountInput.toDoubleOrNull() ?: cashToSurrender else if (!isHandedToAccountant) cashToSurrender else 0.0
+                    val totalDebtVal = prevDebtVal + enteredDebtVal
+
+                    // Блок подтверждения передачи денег бухгалтеру
                     Surface(
-                        color = Color(0xFFFFFBEB),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
-                        shape = RoundedCornerShape(8.dp),
+                        color = if (isHandedToAccountant) Color(0xFFECFDF5) else Color(0xFFFFFBEB),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (isHandedToAccountant) GreenOnline else Color(0xFFFDE68A)),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -924,53 +929,93 @@ fun TripDetailScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        isCarryoverInput = !isCarryoverInput
-                                        if (isCarryoverInput && carryoverAmountInput.isBlank() && cashToSurrender > 0) {
-                                            carryoverAmountInput = cashToSurrender.toInt().toString()
+                                        isHandedToAccountant = !isHandedToAccountant
+                                        if (!isHandedToAccountant && unhandedAmountInput.isBlank() && cashToSurrender > 0) {
+                                            unhandedAmountInput = cashToSurrender.toInt().toString()
                                         }
                                     }
                             ) {
                                 Checkbox(
-                                    checked = isCarryoverInput,
+                                    checked = isHandedToAccountant,
                                     onCheckedChange = {
-                                        isCarryoverInput = it
-                                        if (it && carryoverAmountInput.isBlank() && cashToSurrender > 0) {
-                                            carryoverAmountInput = cashToSurrender.toInt().toString()
+                                        isHandedToAccountant = it
+                                        if (!it && unhandedAmountInput.isBlank() && cashToSurrender > 0) {
+                                            unhandedAmountInput = cashToSurrender.toInt().toString()
                                         }
-                                    }
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = GreenOnline)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Column {
                                     Text(
-                                        "Перенести нал на след. рейс",
+                                        "Все деньги передал в руки бухгалтеру",
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF78350F)
+                                        fontWeight = FontWeight.Black,
+                                        color = if (isHandedToAccountant) Color(0xFF065F46) else Color(0xFF78350F)
                                     )
                                     Text(
-                                        "Если вернулись поздно или некому сдать",
+                                        if (isHandedToAccountant) "Вся смена сдана (долг по рейсу 0 ₽)" else "Если не передали — укажите сумму к сдаче ниже",
                                         fontSize = 10.sp,
-                                        color = Color(0xFFB45309)
+                                        color = if (isHandedToAccountant) Color(0xFF047857) else Color(0xFFB45309)
                                     )
                                 }
                             }
 
-                            if (isCarryoverInput) {
-                                OutlinedTextField(
-                                    value = carryoverAmountInput,
-                                    onValueChange = { carryoverAmountInput = it },
-                                    label = { Text("Сумма переноса на руках (₽)") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                OutlinedTextField(
-                                    value = carryoverNoteInput,
-                                    onValueChange = { carryoverNoteInput = it },
-                                    label = { Text("Причина (напр. поздний возврат)") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                            if (!isHandedToAccountant) {
+                                Surface(
+                                    color = Color(0xFFFEF3C7).copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCD34D))
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            "⚠️ Деньги не переданы бухгалтеру (на руках)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFF78350F)
+                                        )
+                                        OutlinedTextField(
+                                            value = if (unhandedAmountInput.isBlank() && cashToSurrender > 0) cashToSurrender.toInt().toString() else unhandedAmountInput,
+                                            onValueChange = { unhandedAmountInput = it },
+                                            label = { Text("Сумма, которую должен сдать (₽) *") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        // Накопительный расчёт
+                                        Surface(
+                                            color = Color.White.copy(alpha = 0.9f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("Ранее не сдал:", fontSize = 10.sp, color = Color(0xFF78350F))
+                                                    Text("${prevDebtVal.toInt()} ₽", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF78350F))
+                                                }
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("+ За эту смену:", fontSize = 10.sp, color = Color(0xFF78350F))
+                                                    Text("+${enteredDebtVal.toInt()} ₽", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF78350F))
+                                                }
+                                                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = Color(0xFFFDE68A))
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("= Итого долг станет:", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF78350F))
+                                                    Text("${totalDebtVal.toInt()} ₽", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFFB45309))
+                                                }
+                                            }
+                                        }
+
+                                        OutlinedTextField(
+                                            value = unhandedNoteInput,
+                                            onValueChange = { unhandedNoteInput = it },
+                                            label = { Text("Причина (напр. поздний возврат)") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1009,10 +1054,19 @@ fun TripDetailScreen(
                         scope.launch {
                             isSubmitting = true
                             finishError = null
+                            if (!isHandedToAccountant && cashToSurrender > 0) {
+                                val amt = unhandedAmountInput.toDoubleOrNull() ?: cashToSurrender
+                                if (amt <= 0) {
+                                    finishError = "Укажите сумму, которую вы должны сдать"
+                                    isSubmitting = false
+                                    return@launch
+                                }
+                            }
                             val res = SaldaApiClient.finishTrip(
-                                isCarryover = isCarryoverInput,
-                                carryoverAmount = if (isCarryoverInput) carryoverAmountInput.toDoubleOrNull() ?: cashToSurrender else null,
-                                carryoverNote = carryoverNoteInput.ifBlank { null },
+                                isHandedToAccountant = isHandedToAccountant,
+                                isCarryover = !isHandedToAccountant,
+                                carryoverAmount = if (!isHandedToAccountant) unhandedAmountInput.toDoubleOrNull() ?: cashToSurrender else null,
+                                carryoverNote = if (!isHandedToAccountant) unhandedNoteInput.ifBlank { null } else null,
                                 tripId = tripId,
                                 endOdometer = endOdo,
                                 driverNote = driverNoteInput.ifBlank { null },

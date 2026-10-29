@@ -391,8 +391,15 @@ data class DriverCashHold(
     val amount: String = "0.00",
     val note: String = "",
     @SerialName("created_at") val createdAt: String? = null,
-    @SerialName("transaction_date") val transactionDate: String? = null
-)
+    @SerialName("transaction_date") val transactionDate: String? = null,
+    @SerialName("trip_id") val tripId: String? = null,
+    @SerialName("trip_number") val tripNumber: Int? = null,
+    @SerialName("trip_date") val tripDate: String? = null,
+    @SerialName("asset_name") val assetName: String? = null
+) {
+    val amountDouble: Double
+        get() = amount.toDoubleOrNull() ?: 0.0
+}
 
 @Serializable
 data class DriverSummary(

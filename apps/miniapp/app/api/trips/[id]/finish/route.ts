@@ -15,6 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     driver_note?: string;
     fuel_amount?: number;
     fuel_payment_method?: 'fuel_card' | 'cash';
+    is_handed_to_accountant?: boolean;
     is_carryover?: boolean;
     carryover_amount?: number | string;
     carryover_note?: string;
@@ -103,14 +104,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ended_at: new Date().toISOString(),
   };
 
+  const isHanded = body.is_handed_to_accountant === true;
   const carryAmt =
-    body.is_carryover && body.carryover_amount
+    !isHanded && (body.is_carryover || body.carryover_amount)
       ? parseFloat(String(body.carryover_amount).replace(',', '.'))
       : 0;
 
   if (carryAmt > 0 && trip.driver_id) {
-    const carryNote = body.carryover_note?.trim() || 'Поздний возврат, перенос на следующий день';
-    const carryMarker = `[ПЕРЕНОС НАЛИЧНЫХ: ${carryAmt.toLocaleString('ru-RU')} ₽ — ${carryNote}]`;
+    const carryNote =
+      body.carryover_note?.trim() || 'Деньги не переданы бухгалтеру, остаток на руках';
+    const carryMarker = `[НЕ СДАНО В КАССУ: ${carryAmt.toLocaleString('ru-RU')} ₽ — ${carryNote}]`;
     updatePayload.driver_note = body.driver_note
       ? `${body.driver_note}\n${carryMarker}`
       : carryMarker;
@@ -140,6 +143,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       idempotency_key: crypto.randomUUID(),
       transaction_date: new Date().toISOString(),
     });
+  } else if (isHanded && trip.driver_id) {
+    const handedMarker = `[ВСЕ ДЕНЬГИ ПЕРЕДАЛ В РУКИ БУХГАЛТЕРУ]`;
+    updatePayload.driver_note = body.driver_note
+      ? `${body.driver_note}\n${handedMarker}`
+      : handedMarker;
   }
 
   if (odoEnd) {

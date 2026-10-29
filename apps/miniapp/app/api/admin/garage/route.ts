@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { getOrderEffectiveDate } from '@saldacargo/shared';
 
 const PAYROLL_MECHANIC_CAT = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
 
@@ -61,7 +62,7 @@ export async function GET() {
 
     // Все наряды с работами и запчастями
     (supabase.from('service_orders') as any).select(
-      'id, machine_type, client_vehicle_id, status, lifecycle_status, created_at, service_order_works(price_client, status), service_order_parts(client_price, quantity)',
+      'id, machine_type, client_vehicle_id, status, lifecycle_status, created_at, updated_at, admin_note, mechanic_note, service_order_works(price_client, status), service_order_parts(client_price, quantity), transactions(id, direction, amount, transaction_date, created_at, category_id)',
     ),
 
     // Начислено ЗП механикам (без транзакций выплат)
@@ -92,7 +93,8 @@ export async function GET() {
 
     const isClient = o.machine_type === 'client' || o.client_vehicle_id != null;
     const isApproved = o.lifecycle_status === 'approved';
-    const isThisMonth = o.created_at >= monthStart;
+    const effectiveDate = getOrderEffectiveDate(o);
+    const isThisMonth = (effectiveDate || o.created_at) >= monthStart;
     const isActive = o.lifecycle_status === 'draft' && o.status !== 'completed';
 
     if (isActive) inProgressOrdersCount++;

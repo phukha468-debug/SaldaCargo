@@ -782,6 +782,23 @@ fun DriverCashCollectDialog(
                             fontWeight = FontWeight.Bold,
                             color = Zinc900
                         )
+                        if (hold.tripNumber != null) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Рейс №${hold.tripNumber}${if (!hold.tripDate.isNullOrBlank()) " • ${hold.tripDate}" else ""}${if (!hold.assetName.isNullOrBlank()) " (${hold.assetName})" else ""}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Zinc700
+                            )
+                        } else if (hold.id.isBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Сдача всех накопленных переносов водителя",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Zinc600
+                            )
+                        }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Зафиксировано к сдаче: ${hold.amount} ₽",
@@ -851,7 +868,8 @@ fun DriverCashCollectDialog(
                         errorMessage = null
                         try {
                             val ok = SaldaApiClient.collectDriverCashHold(
-                                holdId = hold.id,
+                                holdId = hold.id.ifBlank { null },
+                                driverId = hold.driverId.ifBlank { null },
                                 collectedAmount = amt,
                                 note = note.trim().ifBlank { null },
                                 adminId = adminId

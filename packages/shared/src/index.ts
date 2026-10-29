@@ -800,16 +800,67 @@ export function cleanOrderNotes(note: string | null | undefined): string {
 }
 
 /**
- * Упаковывает тег дат в текст заметки
+ * Упаковывает тег дат в текст заметки, сохраняя существующие даты, если они не переданы явно
  */
 export function formatOrderDatesNote(
   existingNote: string | null | undefined,
   dates: { started_at?: string | null; completed_at?: string | null },
 ): string {
+  let existingStarted: string | null = null;
+  let existingCompleted: string | null = null;
+  if (existingNote) {
+    const match = existingNote.match(/\[ORDER_DATES:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        existingStarted = parsed.started_at || null;
+        existingCompleted = parsed.completed_at || null;
+      } catch {}
+    }
+  }
+
+  const finalStarted = dates.started_at !== undefined ? dates.started_at : existingStarted;
+  const finalCompleted = dates.completed_at !== undefined ? dates.completed_at : existingCompleted;
+
   const clean = (existingNote || '').replace(/\[ORDER_DATES:.*?\]/g, '').trim();
   const tag = `[ORDER_DATES:${JSON.stringify({
-    started_at: dates.started_at || null,
-    completed_at: dates.completed_at || null,
+    started_at: finalStarted || null,
+    completed_at: finalCompleted || null,
   })}]`;
   return clean ? `${clean}\n${tag}` : tag;
+}
+
+/**
+ * Определяет эффективную финансовую дату заказ-наряда (для отчетов и фильтров по периодам)
+ * Приоритет:
+ * 1. Дата доходной транзакции (фактическое поступление денег)
+ * 2. Дата завершения наряда (completed_at)
+ * 3. Дата утверждения / обновления (approved_at / updated_at)
+ * 4. Дата создания наряда (created_at)
+ */
+export function getOrderEffectiveDate(order: {
+  created_at: string;
+  completed_at?: string | null;
+  payment_received?: boolean;
+  admin_note?: string | null;
+  mechanic_note?: string | null;
+  updated_at?: string | null;
+  approved_at?: string | null;
+  transactions?: Array<{
+    direction: string;
+    transaction_date?: string | null;
+    created_at?: string | null;
+  }>;
+}): string {
+  const incomeTx = (order.transactions || []).find((t) => t.direction === 'income');
+  if (incomeTx?.transaction_date) return incomeTx.transaction_date;
+  if (incomeTx?.created_at) return incomeTx.created_at;
+
+  if (order.completed_at) return order.completed_at;
+
+  const dates = extractOrderDates(order);
+  if (dates.completed_at) return dates.completed_at;
+
+  if (order.approved_at) return order.approved_at;
+  return order.created_at;
 }

@@ -382,7 +382,7 @@ export default function AdminTripDetailPage() {
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="font-bold text-zinc-900 text-sm">
-                      {order.counterparty?.name ?? order.description ?? 'Без названия'}
+                      {order.counterparty?.name ?? 'Без названия'}
                     </p>
                     {order.direction && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
@@ -395,6 +395,17 @@ export default function AdminTripDetailPage() {
                       </span>
                     )}
                   </div>
+                  {order.description && (
+                    <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-950 flex items-start gap-1.5">
+                      <span className="shrink-0 text-sm">💬</span>
+                      <div>
+                        <span className="font-black text-amber-900 block text-[10px] uppercase">
+                          Замечание водителя:
+                        </span>
+                        <span className="text-zinc-800 font-medium">{order.description}</span>
+                      </div>
+                    </div>
+                  )}
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mt-0.5">
                     {PAYMENT_LABELS[order.payment_method] ?? order.payment_method} · Вод:{' '}
                     <Money amount={order.driver_pay} />

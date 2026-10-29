@@ -37,9 +37,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   try {
     const supabase = createAdminClient();
-    const { data, error } = await (supabase.from('service_orders') as any)
-      .select(
-        `
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const cleanNum = id.replace(/[^0-9]/g, '');
+
+    let query = (supabase.from('service_orders') as any).select(
+      `
         id, order_number, machine_type, status, lifecycle_status, priority, payment_received,
         problem_description, mechanic_note, admin_note, created_at, updated_at,
         mechanic_pay, second_mechanic_pay, odometer_start, odometer_end,
@@ -57,9 +59,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           part:parts(id, name, unit)
         )
       `,
-      )
-      .eq('id', id)
-      .maybeSingle();
+    );
+
+    if (isUuid) {
+      query = query.eq('id', id);
+    } else if (cleanNum) {
+      query = query.or(`order_number.eq.${cleanNum},id.eq.${id}`);
+    } else {
+      query = query.eq('id', id);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
@@ -109,6 +119,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       name: string;
       minutes: number | string;
       price_client?: number | string;
+      notes?: string | null;
     }>;
     parts?: Array<{
       id?: string;
@@ -122,6 +133,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   };
 
   const supabase = createAdminClient();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const cleanNum = id.replace(/[^0-9]/g, '');
+  let targetId = id;
+  if (!isUuid) {
+    let q = (supabase.from('service_orders') as any).select('id');
+    if (cleanNum) {
+      q = q.or(`order_number.eq.${cleanNum},id.eq.${id}`);
+    } else {
+      q = q.eq('id', id);
+    }
+    const { data: found } = await q.maybeSingle();
+    if (!found) {
+      return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
+    }
+    targetId = found.id;
+  }
+
   const adminId = await resolveAdminId(request, cookieStore, supabase, body.admin_id);
   const action =
     body.action ||
@@ -136,8 +164,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // ── Редактирование заказ-наряда на ревью ──────────────────────────────
   if (action === 'edit_order') {
     const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
-      .select('id, machine_type, assigned_mechanic_id')
-      .eq('id', id)
+      .select('id, machine_type, assigned_mechanic_id, admin_note, mechanic_note')
+      .eq('id', targetId)
       .single();
     if (ordErr || !ord) {
       return NextResponse.json({ error: ordErr?.message ?? 'Наряд не найден' }, { status: 404 });
@@ -189,10 +217,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       updates.completed_at = cVal ? (cVal.includes('T') ? cVal : `${cVal}T17:00:00.000Z`) : null;
     }
     if (updates.started_at !== undefined || updates.completed_at !== undefined) {
-      updates.admin_note = formatOrderDatesNote(updates.admin_note ?? (ord as any).admin_note, {
-        started_at: updates.started_at,
-        completed_at: updates.completed_at,
+      const currDates = extractOrderDates(ord ?? {});
+      const effectiveStarted =
+        updates.started_at !== undefined ? updates.started_at : currDates.started_at;
+      const effectiveCompleted =
+        updates.completed_at !== undefined ? updates.completed_at : currDates.completed_at;
+      const baseNote =
+        typeof updates.admin_note === 'string' ? updates.admin_note : (ord?.admin_note ?? '');
+      updates.admin_note = formatOrderDatesNote(baseNote, {
+        started_at: effectiveStarted as string | null,
+        completed_at: effectiveCompleted as string | null,
       });
+      delete updates.started_at;
+      delete updates.completed_at;
     }
 
     if (Array.isArray(body.works)) {
@@ -200,6 +237,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .map((w) => ({
           name: (w.name || '').trim(),
           minutes: Math.max(1, Math.round(Number(w.minutes) || 0)),
+          notes: typeof w.notes === 'string' && w.notes.trim() ? w.notes.trim() : null,
           price_client:
             w.price_client != null && !isNaN(Number(w.price_client)) && Number(w.price_client) > 0
               ? Number(w.price_client).toFixed(2)
@@ -207,15 +245,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }))
         .filter((w) => w.name.length > 0);
 
-      await (supabase.from('service_order_works') as any).delete().eq('service_order_id', id);
+      await (supabase.from('service_order_works') as any).delete().eq('service_order_id', targetId);
       if (validWorks.length > 0) {
         await (supabase.from('service_order_works') as any).insert(
           validWorks.map((w) => ({
-            service_order_id: id,
+            service_order_id: targetId,
             custom_work_name: w.name,
             norm_minutes: w.minutes,
             actual_minutes: w.minutes,
             price_client: w.price_client,
+            notes: w.notes,
             quantity: 1,
             status: 'completed',
             mechanic_id: ord.assigned_mechanic_id,
@@ -246,11 +285,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         })
         .filter((p) => p.name.length > 0);
 
-      await (supabase.from('service_order_parts') as any).delete().eq('service_order_id', id);
+      await (supabase.from('service_order_parts') as any).delete().eq('service_order_id', targetId);
       if (validParts.length > 0) {
         await (supabase.from('service_order_parts') as any).insert(
           validParts.map((p) => ({
-            service_order_id: id,
+            service_order_id: targetId,
             custom_part_name: p.name,
             quantity: p.quantity,
             unit: p.unit,
@@ -262,23 +301,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    let updErr: any = null;
-    const resWithDates = await (supabase.from('service_orders') as any)
+    const { error: updErr } = await (supabase.from('service_orders') as any)
       .update(updates)
-      .eq('id', id);
-    if (resWithDates.error) {
-      const fallbackUpdates = { ...updates };
-      delete fallbackUpdates.started_at;
-      delete fallbackUpdates.completed_at;
-      const resFallback = await (supabase.from('service_orders') as any)
-        .update(fallbackUpdates)
-        .eq('id', id);
-      updErr = resFallback.error;
-    } else {
-      updErr = resWithDates.error;
-    }
+      .eq('id', targetId);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-    return NextResponse.json({ ok: true, action: 'edited' });
+    return NextResponse.json({ ok: true, action: 'edited', id: targetId });
   }
 
   // ── Утверждение наряда + начисление ЗП ────────────────────────────────
@@ -289,7 +316,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           assigned_mechanic_id: body.mechanic_id || null,
           second_mechanic_id: body.second_mechanic_id || null,
         })
-        .eq('id', id);
+        .eq('id', targetId);
     }
 
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
@@ -302,7 +329,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         service_order_works(id, norm_minutes, actual_minutes, price_client, quantity, status, extra_work_status, custom_work_name, work_description, work_catalog:work_catalog(name))
       `,
       )
-      .eq('id', id)
+      .eq('id', targetId)
       .single();
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
@@ -438,10 +465,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const [{ error }] = await Promise.all([
-      (supabase.from('service_orders') as any).update(updatePayload).eq('id', id),
+      (supabase.from('service_orders') as any).update(updatePayload).eq('id', targetId),
       (supabase.from('service_order_works') as any)
         .update({ status: 'completed', salary_paid: true })
-        .eq('service_order_id', id)
+        .eq('service_order_id', targetId)
         .neq('status', 'cancelled'),
     ]);
 
@@ -500,10 +527,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // ── Возврат на доработку ───────────────────────────────────────────────
   if (action === 'return') {
-    await (supabase.from('transactions') as any).delete().eq('service_order_id', id);
+    await (supabase.from('transactions') as any).delete().eq('service_order_id', targetId);
     await (supabase.from('service_order_works') as any)
       .update({ salary_paid: false })
-      .eq('service_order_id', id);
+      .eq('service_order_id', targetId);
 
     const { error } = await (supabase.from('service_orders') as any)
       .update({
@@ -512,21 +539,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         admin_note: body.admin_note ?? null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', targetId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: 'returned' });
   }
 
   // ── Отмена ────────────────────────────────────────────────────────────
   if (action === 'cancel') {
-    await (supabase.from('transactions') as any).delete().eq('service_order_id', id);
+    await (supabase.from('transactions') as any).delete().eq('service_order_id', targetId);
     const { error } = await (supabase.from('service_orders') as any)
       .update({
         lifecycle_status: 'cancelled',
         status: 'cancelled',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', targetId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: 'cancelled' });
   }
@@ -535,7 +562,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (action === 'edit_note') {
     const { error } = await (supabase.from('service_orders') as any)
       .update({ admin_note: body.admin_note?.trim() ?? null })
-      .eq('id', id);
+      .eq('id', targetId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
@@ -579,9 +606,26 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id } = await params;
   try {
     const supabase = createAdminClient();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const cleanNum = id.replace(/[^0-9]/g, '');
+    let targetId = id;
+    if (!isUuid) {
+      let q = (supabase.from('service_orders') as any).select('id');
+      if (cleanNum) {
+        q = q.or(`order_number.eq.${cleanNum},id.eq.${id}`);
+      } else {
+        q = q.eq('id', id);
+      }
+      const { data: found } = await q.maybeSingle();
+      if (!found) {
+        return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
+      }
+      targetId = found.id;
+    }
+
     const { data: workIds } = await (supabase.from('service_order_works') as any)
       .select('id')
-      .eq('service_order_id', id);
+      .eq('service_order_id', targetId);
     if (workIds?.length) {
       await (supabase.from('work_time_logs') as any).delete().in(
         'service_order_work_id',
@@ -590,16 +634,16 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     }
 
     await Promise.all([
-      (supabase.from('service_order_parts') as any).delete().eq('service_order_id', id),
-      (supabase.from('service_order_works') as any).delete().eq('service_order_id', id),
-      (supabase.from('transactions') as any).delete().eq('service_order_id', id),
-      (supabase.from('purchase_requests') as any).delete().eq('service_order_id', id),
+      (supabase.from('service_order_parts') as any).delete().eq('service_order_id', targetId),
+      (supabase.from('service_order_works') as any).delete().eq('service_order_id', targetId),
+      (supabase.from('transactions') as any).delete().eq('service_order_id', targetId),
+      (supabase.from('purchase_requests') as any).delete().eq('service_order_id', targetId),
       (supabase.from('repair_requests') as any)
         .update({ service_order_id: null })
-        .eq('service_order_id', id),
+        .eq('service_order_id', targetId),
     ]);
 
-    const { error } = await (supabase.from('service_orders') as any).delete().eq('id', id);
+    const { error } = await (supabase.from('service_orders') as any).delete().eq('id', targetId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (err: any) {

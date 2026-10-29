@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Money } from '@saldacargo/ui';
 import { performLogout } from '@/lib/auth/logout';
 
@@ -411,6 +411,7 @@ function DriverCashHoldsSection() {
   const qc = useQueryClient();
   const [showFixModal, setShowFixModal] = useState(false);
   const [collectTarget, setCollectTarget] = useState<any | null>(null);
+  const [expandedDrivers, setExpandedDrivers] = useState<Record<string, boolean>>({});
 
   const { data: holds = [], isLoading } = useQuery<any[]>({
     queryKey: ['admin-driver-cash-holds'],
@@ -424,8 +425,45 @@ function DriverCashHoldsSection() {
     0,
   );
 
+  // Слияние подотчётов одного водителя в одну запись
+  const groupedDrivers = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        driver_id: string;
+        driver_name: string;
+        driver_phone: string;
+        total_amount: number;
+        items: any[];
+      }
+    >();
+
+    for (const h of holds ?? []) {
+      const key = h.driver_id || h.driver_name || 'unknown';
+      const existing = map.get(key);
+      const amt = parseFloat(h.amount || '0');
+      if (existing) {
+        existing.total_amount += amt;
+        existing.items.push(h);
+      } else {
+        map.set(key, {
+          driver_id: h.driver_id,
+          driver_name: h.driver_name,
+          driver_phone: h.driver_phone,
+          total_amount: amt,
+          items: [h],
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [holds]);
+
+  const toggleDriver = (id: string) => {
+    setExpandedDrivers((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
-    <div className="bg-amber-50/60 border-2 border-amber-200 rounded-3xl p-4 shadow-xs space-y-3">
+    <div className="bg-amber-50/60 border-2 border-amber-200 rounded-3xl p-3.5 shadow-xs space-y-2.5">
       {/* Заголовок */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -435,7 +473,9 @@ function DriverCashHoldsSection() {
               Остатки подотчёта на руках
             </h2>
             <p className="text-[10px] text-amber-700 font-bold">
-              Несданная наличная выручка / переносы
+              {groupedDrivers.length > 0
+                ? `${groupedDrivers.length} ${groupedDrivers.length === 1 ? 'водитель' : 'водителя(-ей)'} с остатками`
+                : 'Несданная наличная выручка / переносы'}
             </p>
           </div>
         </div>
@@ -455,59 +495,141 @@ function DriverCashHoldsSection() {
         </div>
       </div>
 
-      {/* Список активных переносов */}
+      {/* Список сгруппированных компактных строчек по водителям */}
       {isLoading ? (
-        <div className="h-16 bg-amber-100/50 rounded-2xl animate-pulse" />
-      ) : holds.length === 0 ? (
-        <div className="bg-white/80 border border-amber-100 rounded-2xl p-3 text-center">
+        <div className="h-12 bg-amber-100/50 rounded-xl animate-pulse" />
+      ) : groupedDrivers.length === 0 ? (
+        <div className="bg-white/80 border border-amber-100 rounded-xl p-2.5 text-center">
           <p className="text-xs font-bold text-amber-800">
             Все наличные сданы в кассу. Зависших остатков на руках нет.
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {holds.map((hold: any) => (
-            <div
-              key={hold.id}
-              className="bg-white border border-amber-200 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-black text-sm text-zinc-900 truncate">
-                    {hold.driver_name}
-                  </span>
-                  {hold.driver_phone && (
-                    <span className="text-[10px] text-zinc-400 font-medium">
-                      {hold.driver_phone}
-                    </span>
-                  )}
-                </div>
-                {hold.note && (
-                  <p className="text-xs text-zinc-600 mt-0.5 line-clamp-1">{hold.note}</p>
-                )}
-                <p className="text-[10px] text-amber-700 font-medium mt-0.5">
-                  {new Date(hold.created_at).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-              </div>
-
-              <div className="text-right shrink-0 space-y-1.5">
-                <p className="text-base font-black text-amber-900">
-                  {parseFloat(hold.amount).toLocaleString('ru-RU')} ₽
-                </p>
-                <button
-                  onClick={() => setCollectTarget(hold)}
-                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-xl transition-all shadow-xs"
+        <div className="space-y-1.5">
+          {groupedDrivers.map((driverGroup) => {
+            const isExpanded = !!expandedDrivers[driverGroup.driver_id];
+            return (
+              <div
+                key={driverGroup.driver_id}
+                className="bg-white border border-amber-200/90 rounded-xl shadow-2xs overflow-hidden transition-all"
+              >
+                {/* Компактная основная строчка (как карточка машины в ревью) */}
+                <div
+                  onClick={() => toggleDriver(driverGroup.driver_id)}
+                  className="px-3 py-2 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-amber-50/50 active:bg-amber-100/40 transition-colors select-none"
                 >
-                  Принять
-                </button>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm shrink-0">👤</span>
+                    <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-xs sm:text-sm text-zinc-900 truncate">
+                        {driverGroup.driver_name}
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 shrink-0">
+                        {driverGroup.items.length}{' '}
+                        {driverGroup.items.length === 1
+                          ? 'перенос'
+                          : driverGroup.items.length < 5
+                            ? 'переноса'
+                            : 'переносов'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs sm:text-sm font-black text-amber-900">
+                      {driverGroup.total_amount.toLocaleString('ru-RU')} ₽
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCollectTarget({
+                          driver_id: driverGroup.driver_id,
+                          driver_name: driverGroup.driver_name,
+                          amount: driverGroup.total_amount.toFixed(2),
+                        });
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg transition-all shadow-xs"
+                    >
+                      Принять
+                    </button>
+                    <span className="text-zinc-400 text-[10px] font-bold w-3 text-center">
+                      {isExpanded ? '▲' : '▼'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Раскрывающийся аккордеон с деталями каждого рейса/переноса */}
+                {isExpanded && (
+                  <div className="bg-amber-50/60 border-t border-amber-100 p-2.5 space-y-1.5 animate-in fade-in duration-150">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                      Детализация ({driverGroup.items.length}):
+                    </p>
+                    <div className="space-y-1.5">
+                      {driverGroup.items.map((item: any) => (
+                        <div
+                          key={item.id}
+                          className="bg-white border border-amber-200/70 rounded-lg p-2 flex items-center justify-between gap-2 shadow-2xs"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-black text-zinc-900">
+                                {item.trip_number
+                                  ? `🚛 Рейс №${item.trip_number}`
+                                  : '📋 Фиксация вручную'}
+                              </span>
+                              {item.asset_name && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700">
+                                  {item.asset_name}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-medium text-amber-800">
+                                📅{' '}
+                                {new Date(item.trip_date || item.created_at).toLocaleDateString(
+                                  'ru-RU',
+                                  {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  },
+                                )}
+                              </span>
+                            </div>
+                            {item.note && (
+                              <p className="text-[11px] text-zinc-600 font-medium mt-0.5 line-clamp-2">
+                                💬 {item.note}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs font-black text-amber-900">
+                              {parseFloat(item.amount).toLocaleString('ru-RU')} ₽
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCollectTarget({
+                                  id: item.id,
+                                  driver_id: driverGroup.driver_id,
+                                  driver_name: driverGroup.driver_name,
+                                  amount: item.amount,
+                                })
+                              }
+                              className="bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 text-[10px] font-bold px-2 py-0.5 rounded-md active:scale-95 transition-all"
+                            >
+                              Сдать
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -699,7 +821,8 @@ function CollectHoldModal({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          hold_id: hold.id,
+          hold_id: hold.id || undefined,
+          driver_id: hold.driver_id || undefined,
           collected_amount: parseFloat(collectAmount.replace(',', '.')),
           note: note || undefined,
         }),

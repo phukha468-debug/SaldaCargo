@@ -29,9 +29,21 @@ export default function FinishTripPage() {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [isCarryover, setIsCarryover] = useState(false);
-  const [carryoverAmount, setCarryoverAmount] = useState('');
-  const [carryoverNote, setCarryoverNote] = useState('');
+  const [isHandedToAccountant, setIsHandedToAccountant] = useState(false);
+  const [unhandedAmount, setUnhandedAmount] = useState('');
+  const [unhandedNote, setUnhandedNote] = useState('');
+
+  const { data: driverSummary } = useQuery({
+    queryKey: ['driver-summary'],
+    queryFn: async () => {
+      const res = await fetch('/api/driver/summary');
+      if (!res.ok) return null;
+      return res.json() as Promise<{
+        accountableBalance?: string;
+        activeCarryover?: { id: string; amount: string; note: string; date: string } | null;
+      }>;
+    },
+  });
 
   const { data: trip } = useQuery({
     queryKey: ['trip', id],
@@ -135,24 +147,34 @@ export default function FinishTripPage() {
       return;
     }
 
+    const parsedUnhandedAmount =
+      !isHandedToAccountant && unhandedAmount
+        ? parseFloat(unhandedAmount.replace(',', '.'))
+        : !isHandedToAccountant
+          ? cashToSurrender
+          : 0;
+
+    if (!isHandedToAccountant && cashToSurrender > 0 && parsedUnhandedAmount <= 0) {
+      setError(
+        'Если вы не передали все деньги бухгалтеру, укажите сумму, которую вы должны сдать.',
+      );
+      return;
+    }
+
     setSubmitting(true);
     setError('');
-
-    const parsedCarryAmount =
-      isCarryover && carryoverAmount
-        ? parseFloat(carryoverAmount.replace(',', '.'))
-        : isCarryover
-          ? cashToSurrender
-          : undefined;
 
     const res = await fetch(`/api/trips/${id}/finish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...data,
-        is_carryover: isCarryover,
-        carryover_amount: parsedCarryAmount,
-        carryover_note: isCarryover ? carryoverNote || undefined : undefined,
+        is_handed_to_accountant: isHandedToAccountant,
+        is_carryover: !isHandedToAccountant,
+        carryover_amount: parsedUnhandedAmount,
+        carryover_note: !isHandedToAccountant
+          ? unhandedNote.trim() || 'Деньги не переданы бухгалтеру, остаток на руках'
+          : undefined,
       }),
     });
 
@@ -175,6 +197,17 @@ export default function FinishTripPage() {
 
     router.replace('/driver');
   }
+
+  const prevDebt = parseFloat(
+    driverSummary?.activeCarryover?.amount ?? driverSummary?.accountableBalance ?? '0',
+  );
+  const currentEnteredDebt =
+    !isHandedToAccountant && unhandedAmount
+      ? parseFloat(unhandedAmount.replace(',', '.')) || 0
+      : !isHandedToAccountant
+        ? cashToSurrender
+        : 0;
+  const totalAccumulatedDebt = prevDebt + currentEnteredDebt;
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -228,70 +261,117 @@ export default function FinishTripPage() {
             </span>
           </div>
 
-          {/* Блок переноса наличных на следующий день / рейс */}
-          <div className="pt-2 border-t border-zinc-100 space-y-2">
-            <label className="flex items-start gap-2.5 p-3 bg-amber-50/80 border border-amber-200 rounded-xl cursor-pointer active:bg-amber-100/70 transition-colors">
+          {/* Блок подтверждения сдачи смены: передал деньги бухгалтеру или вписал сумму к сдаче */}
+          <div className="pt-2 border-t border-zinc-100 space-y-2.5">
+            <label
+              className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                isHandedToAccountant
+                  ? 'bg-emerald-50 border-emerald-500 shadow-xs'
+                  : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
+              }`}
+            >
               <input
                 type="checkbox"
-                checked={isCarryover}
+                checked={isHandedToAccountant}
                 onChange={(e) => {
                   const checked = e.target.checked;
-                  setIsCarryover(checked);
-                  if (checked && !carryoverAmount) {
-                    setCarryoverAmount(cashToSurrender > 0 ? cashToSurrender.toString() : '');
+                  setIsHandedToAccountant(checked);
+                  if (!checked && !unhandedAmount) {
+                    setUnhandedAmount(cashToSurrender > 0 ? cashToSurrender.toString() : '');
                   }
                 }}
-                className="mt-0.5 w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                className="mt-0.5 w-5 h-5 rounded-md border-2 border-emerald-600 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
               />
               <div className="flex-1 text-xs">
-                <span className="font-bold text-amber-900 block leading-tight">
-                  Перенести наличные на следующий рейс (не сдал в кассу)
+                <span
+                  className={`font-black block leading-tight ${
+                    isHandedToAccountant ? 'text-emerald-950 text-sm' : 'text-zinc-900 text-xs'
+                  }`}
+                >
+                  ✅ Все деньги передал в руки бухгалтеру
                 </span>
-                <span className="text-[11px] text-amber-700 block mt-0.5 leading-snug">
-                  Если вернулись поздно или сдать некому. Сумма зафиксируется на вашем подотчёте.
+                <span
+                  className={`text-[11px] block mt-0.5 leading-snug font-medium ${
+                    isHandedToAccountant ? 'text-emerald-700' : 'text-zinc-500'
+                  }`}
+                >
+                  {isHandedToAccountant
+                    ? 'Вся сумма смены сдана. На подотчёте за эту смену долг не появится.'
+                    : 'Если галочка не стоит — обязательно впишите сумму к сдаче. Она автоматически прибавится к вашему подотчёту.'}
                 </span>
               </div>
             </label>
 
-            {isCarryover && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in duration-200">
+            {!isHandedToAccountant && (
+              <div className="p-3.5 bg-amber-50 border-2 border-amber-300 rounded-xl space-y-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-tight">
+                  <span>⚠️</span>
+                  <span>Деньги не переданы бухгалтеру (остаются на руках)</span>
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] font-black text-amber-900 uppercase tracking-wider block">
-                      Сумма переноса на руках, ₽
+                      Сумма, которую должен сдать, ₽ <span className="text-red-500">*</span>
                     </label>
                     {cashToSurrender > 0 && (
                       <button
                         type="button"
-                        onClick={() => setCarryoverAmount(cashToSurrender.toString())}
-                        className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-1.5 py-0.5 rounded"
+                        onClick={() => setUnhandedAmount(cashToSurrender.toString())}
+                        className="text-[10px] font-bold text-amber-900 bg-amber-200 hover:bg-amber-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
                       >
-                        Вся сумма ({cashToSurrender} ₽)
+                        Вся сумма смены ({cashToSurrender.toLocaleString('ru-RU')} ₽)
                       </button>
                     )}
                   </div>
                   <input
                     type="number"
                     inputMode="numeric"
-                    value={carryoverAmount}
-                    onChange={(e) => setCarryoverAmount(e.target.value)}
-                    placeholder={cashToSurrender.toString()}
-                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-sm font-black text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    value={
+                      unhandedAmount ||
+                      (cashToSurrender > 0 && unhandedAmount === ''
+                        ? cashToSurrender.toString()
+                        : unhandedAmount)
+                    }
+                    onChange={(e) => setUnhandedAmount(e.target.value)}
+                    placeholder={cashToSurrender > 0 ? cashToSurrender.toString() : '0'}
+                    className="w-full bg-white border-2 border-amber-300 rounded-lg px-3 py-2 text-base font-black text-zinc-900 focus:outline-none focus:border-amber-600"
                   />
-                  <p className="text-[10px] text-amber-700 mt-1">
-                    Укажите, сколько именно осталось на руках (если часть уже сдали утром).
+                  <p className="text-[10px] text-amber-800 mt-1 font-medium">
+                    Укажите точную сумму, которая осталась на руках (если сдали только часть).
                   </p>
                 </div>
+
+                {/* Накопительный расчёт */}
+                <div className="bg-amber-100/70 border border-amber-300 rounded-lg p-2.5 text-xs space-y-1">
+                  <div className="flex justify-between text-amber-900 font-medium">
+                    <span>Ранее не сдал (подотчёт):</span>
+                    <span className="font-bold">{prevDebt.toLocaleString('ru-RU')} ₽</span>
+                  </div>
+                  <div className="flex justify-between text-amber-900 font-medium">
+                    <span>+ К сдаче за этот рейс:</span>
+                    <span className="font-bold">
+                      +{currentEnteredDebt.toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                  <div className="pt-1 border-t border-amber-200/80 flex justify-between text-amber-950 font-black">
+                    <span>= Итого долг по подотчёту станет:</span>
+                    <span className="text-amber-950">
+                      {totalAccumulatedDebt.toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[10px] font-black text-amber-900 uppercase tracking-wider block mb-1">
                     Причина / комментарий
                   </label>
                   <input
                     type="text"
-                    value={carryoverNote}
-                    onChange={(e) => setCarryoverNote(e.target.value)}
-                    placeholder="Поздний возврат, сдам завтра"
-                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    value={unhandedNote}
+                    onChange={(e) => setUnhandedNote(e.target.value)}
+                    placeholder="Поздний возврат, сдам завтра утром"
+                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:border-amber-600"
                   />
                 </div>
               </div>

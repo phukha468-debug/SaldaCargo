@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       client_vehicle_id, client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, work_description, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, notes, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(id, name, norm_minutes)
       ),
       parts:service_order_parts(
