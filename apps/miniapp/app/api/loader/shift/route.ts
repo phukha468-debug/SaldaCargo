@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id');
+    const cookieStore = await cookies();
+    const userId =
+      searchParams.get('user_id') ||
+      request.headers.get('x-salda-user-id') ||
+      cookieStore.get('salda_user_id')?.value;
+
     if (!userId) {
       return NextResponse.json({ error: 'user_id required' }, { status: 400 });
     }
@@ -47,9 +53,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { user_id, is_online, address, has_transport } = body;
+    const cookieStore = await cookies();
+    const userId =
+      body.user_id ||
+      request.headers.get('x-salda-user-id') ||
+      cookieStore.get('salda_user_id')?.value;
 
-    if (!user_id) {
+    const { is_online, address, has_transport } = body;
+
+    if (!userId) {
       return NextResponse.json({ error: 'user_id required' }, { status: 400 });
     }
 
@@ -67,7 +79,7 @@ export async function POST(request: Request) {
         notes: JSON.stringify(shiftData),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', user_id);
+      .eq('id', userId);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

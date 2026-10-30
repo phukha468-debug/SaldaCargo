@@ -15,6 +15,18 @@ interface PayslipModalProps {
 type PayrollHistoryItem = NonNullable<PayrollUser['history']>[number] & {
   from_wallet?: { id: string; name: string; type: string } | null;
   transaction_date?: string | null;
+  trip?: {
+    id: string;
+    trip_number: number;
+    vehicle_label?: string;
+    driver_name?: string;
+    driver?: { id: string; name: string } | null;
+  } | null;
+  service_order?: {
+    id: string;
+    order_number: number;
+    vehicle_label?: string;
+  } | null;
 };
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
@@ -722,6 +734,24 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                       </td>
                       <td className="p-1 sm:p-1.5 font-medium text-slate-950">
                         {item.description || 'Начисление за смену / рейс'}
+                        {/* Машина и водитель рейса */}
+                        {item.trip &&
+                          (item.trip.vehicle_label ||
+                            item.trip.driver_name ||
+                            item.trip.driver?.name) && (
+                            <div className="flex flex-wrap gap-2 mt-0.5">
+                              {item.trip.vehicle_label && (
+                                <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                  🚚 {item.trip.vehicle_label}
+                                </span>
+                              )}
+                              {(item.trip.driver_name || item.trip.driver?.name) && (
+                                <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                  👤 {item.trip.driver_name || item.trip.driver?.name}
+                                </span>
+                              )}
+                            </div>
+                          )}
                       </td>
                       <td className="p-1 sm:p-1.5 text-center whitespace-nowrap">
                         <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border border-slate-400 text-slate-950 bg-white">

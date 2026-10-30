@@ -275,7 +275,7 @@ export async function GET(request: Request) {
       let trQuery = (supabase as any)
         .from('trips')
         .select(
-          `id, trip_number, started_at, created_at, asset_id, asset:assets(id, short_name, reg_number)`,
+          `id, trip_number, started_at, created_at, asset_id, asset:assets(id, short_name, reg_number), driver:users!trips_driver_id_fkey(id, name)`,
         );
       if (tripIds.size > 0 && tripNums.size > 0) {
         trQuery = trQuery.or(
@@ -293,9 +293,11 @@ export async function GET(request: Request) {
         const carName = carAsset?.short_name || '';
         const reg = carAsset?.reg_number ? `(${carAsset.reg_number})` : '';
         const vehicleLabel = carName || reg ? `${carName} ${reg}`.trim() : '';
+        const driverName = tr.driver?.name || '';
         const enrichedTrip = {
           ...tr,
           vehicle_label: vehicleLabel,
+          driver_name: driverName,
           started_at: tr.started_at,
           created_at: tr.created_at,
           trip_date: tr.started_at || tr.created_at || null,
