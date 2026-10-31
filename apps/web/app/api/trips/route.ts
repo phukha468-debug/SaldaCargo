@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isInternalCounterparty } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips — рейсы для ревью или истории */
@@ -130,23 +131,41 @@ export async function POST(request: Request) {
 
   // Создаём заказы
   if (body.orders && body.orders.length > 0) {
-    const ordersToInsert = body.orders.map((o) => ({
-      trip_id: trip.id,
-      amount: o.amount,
-      driver_pay: o.driver_pay,
-      loader_pay: o.loader_pay || '0',
-      loader2_pay: o.loader2_pay || '0',
-      loader_id: body.loader_id || null,
-      loader2_id: body.loader2_id || null,
-      payment_method: o.payment_method === 'card_driver' ? 'qr' : o.payment_method,
-      counterparty_id: o.counterparty_id || null,
-      settlement_status: ['debt_cash', 'debt', 'debt_bank'].includes(o.payment_method)
-        ? 'pending'
-        : 'completed',
-      lifecycle_status: 'draft',
-      description: o.description || null,
-      idempotency_key: crypto.randomUUID(),
-    }));
+    const cpIds = Array.from(
+      new Set(body.orders.map((o) => o.counterparty_id).filter(Boolean)),
+    ) as string[];
+    const cpMap = new Map<string, string>();
+    if (cpIds.length > 0) {
+      const { data: cps } = await supabase
+        .from('counterparties')
+        .select('id, name')
+        .in('id', cpIds);
+      (cps || []).forEach((c: any) => cpMap.set(c.id, c.name));
+    }
+
+    const ordersToInsert = body.orders.map((o) => {
+      const isInternal = isInternalCounterparty(
+        o.counterparty_id ? cpMap.get(o.counterparty_id) : undefined,
+      );
+      return {
+        trip_id: trip.id,
+        amount: isInternal ? '0.00' : o.amount,
+        driver_pay: o.driver_pay,
+        loader_pay: o.loader_pay || '0',
+        loader2_pay: o.loader2_pay || '0',
+        loader_id: body.loader_id || null,
+        loader2_id: body.loader2_id || null,
+        payment_method: o.payment_method === 'card_driver' ? 'qr' : o.payment_method,
+        counterparty_id: o.counterparty_id || null,
+        settlement_status:
+          isInternal || !['debt_cash', 'debt', 'debt_bank'].includes(o.payment_method)
+            ? 'completed'
+            : 'pending',
+        lifecycle_status: 'draft',
+        description: o.description || null,
+        idempotency_key: crypto.randomUUID(),
+      };
+    });
 
     const { error: ordersError } = await supabase.from('trip_orders').insert(ordersToInsert);
     if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });

@@ -2,6 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { isInternalCounterparty } from '@saldacargo/shared';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -38,6 +39,7 @@ export async function GET() {
     const grouped = new Map<string, any>();
 
     for (const order of orders ?? []) {
+      if (isInternalCounterparty(order.counterparty?.name)) continue;
       // counterparty takes priority over description — once linked, must group under counterparty
       const isGenericClient = order.counterparty?.name === 'Частное лицо (разовый заказ)';
       const hasCounterparty = !!order.counterparty?.id && !isGenericClient;

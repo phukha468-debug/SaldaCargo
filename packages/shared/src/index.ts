@@ -508,6 +508,32 @@ export function isGeostroyCounterparty(
 }
 
 /**
+ * Паттерны названий собственной компании и внутренних хоз. нужд.
+ */
+export const INTERNAL_COMPANY_COUNTERPARTY_PATTERNS = [
+  /^(?:тк\s*501|тк\s*510|тк501|тк510)/i,
+  /^наша\s*компания/i,
+  /^собственные\s*нужды/i,
+];
+
+/**
+ * Проверяет, является ли контрагент собственной компанией (ТК501 / ТК510 / Внутренние работы).
+ * Для собственной компании заказы — это чистый расход без клиентской выручки:
+ * выручка = 0 ₽, в дебиторку долг не идёт (settlement_status: completed),
+ * начисляется только зарплата грузчикам / водителям за выполненную работу.
+ */
+export function isInternalCounterparty(
+  cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+): boolean {
+  if (!cp) return false;
+  const name = typeof cp === 'string' ? cp : cp.name || '';
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return INTERNAL_COMPANY_COUNTERPARTY_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/**
  * Маска ввода даты: принимает пользовательский ввод и форматирует в "ДД.ММ.ГГГГ".
  */
 export function maskDateInput(val: string): string {

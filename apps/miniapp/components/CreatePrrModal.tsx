@@ -14,6 +14,7 @@ import {
   isValidDateString,
   getTodayDateString,
   getYesterdayDateString,
+  isInternalCounterparty,
 } from '@saldacargo/shared';
 import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
 
@@ -163,6 +164,7 @@ export function CreatePrrModal({
   }, [isOpen]);
 
   const selectedCounterparty = counterparties.find((c) => c.id === selectedCounterpartyId);
+  const isInternal = isInternalCounterparty(selectedCounterparty?.name);
 
   // Проверка запрета наличных
   const isNoCash = isNoCashCounterparty(selectedCounterparty?.name);
@@ -183,7 +185,24 @@ export function CreatePrrModal({
 
   // Автоматический расчет по формуле:
   // Сумма делится на N грузчиков, 70% каждому грузчику, 30% компании
+  // Для собственных работ ТК501: 100% сумма идёт рабочим, выручка с клиента 0
   const payroll = useMemo(() => {
+    if (isInternal) {
+      const nominalPerLoader =
+        selectedLoaders.length > 0 && amount > 0 ? Math.round(amount / selectedLoaders.length) : 0;
+      const totalCustomPay = selectedLoaders.reduce((sum, l) => {
+        const custom =
+          l.customPay !== undefined && l.customPay !== '' ? parseFloat(l.customPay) : null;
+        return sum + (custom !== null && !isNaN(custom) ? custom : nominalPerLoader);
+      }, 0);
+      return {
+        loaderPayEach: nominalPerLoader,
+        totalLoadersPay: totalCustomPay,
+        companyShare: 0,
+        nominalPerLoader,
+      };
+    }
+
     if (amount <= 0 || selectedLoaders.length === 0) {
       return {
         loaderPayEach: 0,
@@ -215,7 +234,7 @@ export function CreatePrrModal({
       companyShare: Math.max(0, amount - totalCustomPay),
       nominalPerLoader,
     };
-  }, [amount, selectedLoaders]);
+  }, [amount, selectedLoaders, isInternal]);
 
   const toggleLoader = (loader: Loader) => {
     setError('');
@@ -240,7 +259,7 @@ export function CreatePrrModal({
     setError('');
     setSuccessMsg('');
 
-    if (amount <= 0) {
+    if (!isInternal && amount <= 0) {
       setError('Укажите корректную сумму заказа');
       return;
     }
@@ -250,6 +269,10 @@ export function CreatePrrModal({
     }
     if (!selectedCounterpartyId) {
       setError('Выберите клиента');
+      return;
+    }
+    if (isInternal && payroll.totalLoadersPay <= 0) {
+      setError('Укажите сумму оплаты назначенным грузчикам/разнорабочим');
       return;
     }
 
@@ -301,10 +324,12 @@ export function CreatePrrModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           counterparty_id: selectedCounterpartyId,
-          amount,
-          payment_method: paymentMethod,
+          amount: isInternal ? 0 : amount,
+          payment_method: isInternal ? 'cash' : paymentMethod,
           loaders: loadersPayload,
-          description: finalDescription || 'Погрузо-разгрузочные работы (без авто)',
+          description:
+            finalDescription ||
+            (isInternal ? 'Внутренние хоз. работы' : 'Погрузо-разгрузочные работы (без авто)'),
           user_id: defaultCreatorId,
           auto_approve: autoApprove,
         }),
@@ -459,12 +484,25 @@ export function CreatePrrModal({
                 )}
               </div>
             )}
+
+            {isInternal && (
+              <div className="mt-2.5 p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl text-xs space-y-1">
+                <div className="font-black text-amber-950 flex items-center gap-1.5">
+                  <span className="text-base">🏢</span>
+                  <span>Собственные хоз. работы (ТК501 / ТК510)</span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-snug">
+                  Это внутренний расход компании. Клиентский долг и выручка = 0 ₽. 100% указанной
+                  суммы пойдёт в начисление рабочим без удержания комиссии компании.
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* 2. Общая сумма заказа */}
+          {/* 2. Общая сумма заказа / бюджет на рабочих */}
           <div>
             <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
-              Общая сумма заказа (₽)
+              {isInternal ? 'Бюджет на оплату работникам (₽)' : 'Общая сумма заказа (₽)'}
             </label>
             <div className="relative">
               <input
@@ -474,7 +512,9 @@ export function CreatePrrModal({
                 step="50"
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="Например: 3000"
+                placeholder={
+                  isInternal ? 'Сумма на всех рабочих (например: 4000)' : 'Например: 3000'
+                }
                 className="w-full px-4 py-3 rounded-xl border-2 border-zinc-300 text-lg font-black text-zinc-900 focus:outline-none focus:border-orange-500 bg-white"
               />
               <span className="absolute right-4 top-3 text-lg font-black text-zinc-400">₽</span>
@@ -501,46 +541,55 @@ export function CreatePrrModal({
           </div>
 
           {/* 3. Способ оплаты */}
-          <div>
-            <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
-              Способ оплаты
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {PAYMENT_METHODS.map((pm) => {
-                const disabled = pm.value === 'cash' && isNoCash;
-                const isSelected = paymentMethod === pm.value;
-                return (
-                  <button
-                    key={pm.value}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => setPaymentMethod(pm.value)}
-                    className={cn(
-                      'p-2.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between',
-                      disabled && 'opacity-40 cursor-not-allowed bg-zinc-100',
-                      isSelected
-                        ? pm.activeClass
-                        : 'border-zinc-200 bg-white hover:border-zinc-300 text-zinc-700',
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-base">{pm.icon}</span>
-                      {isSelected && <span className="w-2 h-2 rounded-full bg-current"></span>}
-                    </div>
-                    <div className="mt-2">
-                      <div className="text-xs font-black">{pm.label}</div>
-                      <div className="text-[10px] font-medium opacity-70 truncate">{pm.desc}</div>
-                    </div>
-                  </button>
-                );
-              })}
+          {!isInternal ? (
+            <div>
+              <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
+                Способ оплаты
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {PAYMENT_METHODS.map((pm) => {
+                  const disabled = pm.value === 'cash' && isNoCash;
+                  const isSelected = paymentMethod === pm.value;
+                  return (
+                    <button
+                      key={pm.value}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setPaymentMethod(pm.value)}
+                      className={cn(
+                        'p-2.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between',
+                        disabled && 'opacity-40 cursor-not-allowed bg-zinc-100',
+                        isSelected
+                          ? pm.activeClass
+                          : 'border-zinc-200 bg-white hover:border-zinc-300 text-zinc-700',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-base">{pm.icon}</span>
+                        {isSelected && <span className="w-2 h-2 rounded-full bg-current"></span>}
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-xs font-black">{pm.label}</div>
+                        <div className="text-[10px] font-medium opacity-70 truncate">{pm.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {isNoCash && (
+                <p className="text-[11px] font-bold text-rose-600 mt-1.5">
+                  ⚠️ Для корпоративных клиентов (ВСМПО и др.) оплата только по безналу/в долг!
+                </p>
+              )}
             </div>
-            {isNoCash && (
-              <p className="text-[11px] font-bold text-rose-600 mt-1.5">
-                ⚠️ Для корпоративных клиентов (ВСМПО и др.) оплата только по безналу/в долг!
-              </p>
-            )}
-          </div>
+          ) : (
+            <div className="p-3 bg-zinc-100 rounded-xl border border-zinc-200 text-xs">
+              <span className="font-bold text-zinc-700">Оплата: </span>
+              <span className="text-zinc-600 font-medium">
+                Внутренние расходы ТК501 (без образования дебиторской задолженности)
+              </span>
+            </div>
+          )}
 
           {/* 4. Выбор грузчиков */}
           <div>
@@ -585,22 +634,34 @@ export function CreatePrrModal({
             </div>
           </div>
 
-          {/* 5. Карточка автоматического расчёта (Калькулятор 70/30) */}
-          {amount > 0 && selectedLoaders.length > 0 && (
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-orange-200 rounded-2xl p-4 space-y-3">
+          {/* 5. Карточка автоматического расчёта (Калькулятор 70/30 или 100% рабочим) */}
+          {((amount > 0 && selectedLoaders.length > 0) ||
+            (isInternal && payroll.totalLoadersPay > 0)) && (
+            <div
+              className={cn(
+                'rounded-2xl p-4 space-y-3 border-2',
+                isInternal
+                  ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
+                  : 'bg-gradient-to-br from-amber-50 to-orange-50 border-orange-200',
+              )}
+            >
               <div className="flex items-center justify-between border-b border-orange-200/60 pb-2">
                 <span className="text-[11px] font-black uppercase tracking-wider text-orange-950">
-                  📊 Расчёт распределения (70% / 30%)
+                  {isInternal
+                    ? '🏢 Внутренний расход на зарплату'
+                    : '📊 Расчёт распределения (70% / 30%)'}
                 </span>
                 <span className="text-xs font-bold text-orange-800">
-                  {amount.toLocaleString('ru-RU')} ₽ всего
+                  {isInternal
+                    ? `${payroll.totalLoadersPay.toLocaleString('ru-RU')} ₽ рабочим`
+                    : `${amount.toLocaleString('ru-RU')} ₽ всего`}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-white/80 rounded-xl p-2.5 border border-orange-100">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase block">
-                    Грузчикам всего (70%)
+                    {isInternal ? 'Рабочим начислено (100%)' : 'Грузчикам всего (70%)'}
                   </span>
                   <span className="text-sm font-black text-emerald-700">
                     <Money amount={payroll.totalLoadersPay.toString()} />
@@ -612,12 +673,14 @@ export function CreatePrrModal({
 
                 <div className="bg-white/80 rounded-xl p-2.5 border border-orange-100">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase block">
-                    Доход компании (30%)
+                    {isInternal ? 'Выручка с клиента' : 'Доход компании (30%)'}
                   </span>
                   <span className="text-sm font-black text-zinc-900">
-                    <Money amount={payroll.companyShare.toString()} />
+                    <Money amount={isInternal ? '0' : payroll.companyShare.toString()} />
                   </span>
-                  <span className="text-[10px] text-zinc-400 block mt-0.5">комиссия TK501</span>
+                  <span className="text-[10px] text-zinc-400 block mt-0.5">
+                    {isInternal ? 'собственные нужды' : 'комиссия TK501'}
+                  </span>
                 </div>
               </div>
 
@@ -841,15 +904,25 @@ export function CreatePrrModal({
           <button
             type="button"
             onClick={(e) => handleSubmit(e)}
-            disabled={submitting || amount <= 0 || selectedLoaders.length === 0}
+            disabled={
+              submitting ||
+              (isInternal ? payroll.totalLoadersPay <= 0 : amount <= 0) ||
+              selectedLoaders.length === 0
+            }
             className={cn(
               'w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all active:scale-[0.98]',
-              submitting || amount <= 0 || selectedLoaders.length === 0
+              submitting ||
+                (isInternal ? payroll.totalLoadersPay <= 0 : amount <= 0) ||
+                selectedLoaders.length === 0
                 ? 'bg-zinc-300 cursor-not-allowed text-zinc-500'
                 : 'bg-orange-600 hover:bg-orange-700 shadow-orange-200',
             )}
           >
-            {submitting ? 'Создаём заявку...' : '🚀 Создать заказ ПРР'}
+            {submitting
+              ? 'Создаём заявку...'
+              : isInternal
+                ? '🏢 Провести внутренние работы'
+                : '🚀 Создать заказ ПРР'}
           </button>
         </div>
       </div>

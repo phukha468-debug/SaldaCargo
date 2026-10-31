@@ -6,6 +6,7 @@ import {
   isTerritoryCounterparty,
   isGeostroyCounterparty,
   isGeostroyOrderValid,
+  isInternalCounterparty,
 } from '@saldacargo/shared';
 
 /** PATCH /api/trips/:id/orders/:orderId — отменить или отредактировать заказ */
@@ -47,12 +48,16 @@ export async function PATCH(
 
     const pendingMethods = ['debt_cash', 'debt', 'debt_bank'];
     let paymentMethod = body.payment_method === 'card_driver' ? 'qr' : body.payment_method;
+    let isInternal = false;
     if (body.counterparty_id) {
       const { data: cp } = await (supabase.from('counterparties') as any)
         .select('name')
         .eq('id', body.counterparty_id)
         .maybeSingle();
-      if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
+      isInternal = isInternalCounterparty(cp?.name);
+      if (isInternal) {
+        paymentMethod = 'cash';
+      } else if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
         paymentMethod = 'debt_cash';
       }
       if (isTerritoryCounterparty(cp?.name)) {
@@ -78,7 +83,8 @@ export async function PATCH(
         }
       }
     }
-    const settlementStatus = pendingMethods.includes(paymentMethod) ? 'pending' : 'completed';
+    const settlementStatus =
+      !isInternal && pendingMethods.includes(paymentMethod) ? 'pending' : 'completed';
 
     const loaders = Array.isArray(body.loaders_data) ? body.loaders_data : [];
     const loader1 =
@@ -90,7 +96,7 @@ export async function PATCH(
     const updatePayload: Record<string, any> = {
       counterparty_id: body.counterparty_id || null,
       description: body.description || null,
-      amount: body.amount,
+      amount: isInternal ? '0' : body.amount,
       driver_pay: body.driver_pay,
       payment_method: paymentMethod,
       settlement_status: settlementStatus,

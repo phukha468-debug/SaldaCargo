@@ -8,6 +8,7 @@ import {
   isTerritoryCounterparty,
   isGeostroyCounterparty,
   isGeostroyOrderValid,
+  isInternalCounterparty,
 } from '@saldacargo/shared';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 
@@ -38,11 +39,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
     }
 
-    const numAmount = Number(body.amount);
-    if (!numAmount || isNaN(numAmount) || numAmount <= 0) {
-      return NextResponse.json({ error: 'Укажите корректную сумму заказа' }, { status: 400 });
-    }
-
     const loaders = Array.isArray(body.loaders) ? body.loaders : [];
     if (loaders.length === 0) {
       return NextResponse.json({ error: 'Выберите хотя бы одного грузчика' }, { status: 400 });
@@ -50,7 +46,58 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    // 1. Находим виртуальный объект "Без авто (ПРР)"
+    // 1. Проверка контрагента (запрет наличных, внутренние хоз. работы, обязательные поля)
+    let paymentMethod = body.payment_method || 'cash';
+    let isInternal = false;
+    if (body.counterparty_id) {
+      const { data: cp } = await (supabase.from('counterparties') as any)
+        .select('name')
+        .eq('id', body.counterparty_id)
+        .maybeSingle();
+
+      isInternal = isInternalCounterparty(cp?.name);
+      if (isInternal) {
+        paymentMethod = 'cash';
+      } else if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
+        paymentMethod = 'debt_cash';
+      }
+      if (isTerritoryCounterparty(cp?.name)) {
+        if (!body.description?.trim()) {
+          return NextResponse.json(
+            {
+              error:
+                'Для контрагента «Территория» обязательно укажите адрес (улица + дом) и описание работы',
+            },
+            { status: 400 },
+          );
+        }
+      }
+      if (isGeostroyCounterparty(cp?.name)) {
+        if (!isGeostroyOrderValid(body.description)) {
+          return NextResponse.json(
+            {
+              error:
+                'Для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут и дату начала маршрута по маске (ДД.ММ.ГГГГ)',
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
+    let numAmount = Number(body.amount) || 0;
+    const hasLoaderPay = loaders.some((l) => Number(l.pay) > 0);
+    if (!isInternal && numAmount <= 0) {
+      return NextResponse.json({ error: 'Укажите корректную сумму заказа' }, { status: 400 });
+    }
+    if (isInternal && numAmount <= 0 && !hasLoaderPay) {
+      return NextResponse.json(
+        { error: 'Укажите сумму оплаты назначенным грузчикам/разнорабочим' },
+        { status: 400 },
+      );
+    }
+
+    // 2. Находим виртуальный объект "Без авто (ПРР)"
     let { data: asset } = await (supabase
       .from('assets')
       .select('id')
@@ -82,14 +129,26 @@ export async function POST(request: Request) {
       asset = createdAsset;
     }
 
-    // 2. Расчет ЗП грузчиков и компании
-    // Формула: Общая сумма делится на кол-во грузчиков, 30% удерживается компании, 70% грузчику
-    const payroll = calculateOrderPayroll({
-      direction: 'loaders_only',
-      amount: numAmount,
-      isDriverLoader: false,
-      loadersCount: loaders.length,
-    });
+    // 3. Расчет ЗП грузчиков и компании
+    // Для клиентов: Общая сумма делится на кол-во грузчиков, 30% компании, 70% грузчику
+    // Для собственных нужд ТК501: 100% начисление рабочим без удержания компании, выручка клиента = 0
+    const rawTotalBudget = Number(body.amount) || 0;
+    const payroll = isInternal
+      ? {
+          loaderPayEach: loaders.length > 0 ? Math.round(rawTotalBudget / loaders.length) : 0,
+          totalLoadersPay: rawTotalBudget,
+          companyShare: 0,
+        }
+      : calculateOrderPayroll({
+          direction: 'loaders_only',
+          amount: numAmount,
+          isDriverLoader: false,
+          loadersCount: loaders.length,
+        });
+
+    if (isInternal) {
+      numAmount = 0;
+    }
 
     const loadersData = loaders.map((l) => ({
       id: l.id,
@@ -100,41 +159,7 @@ export async function POST(request: Request) {
           : String(payroll.loaderPayEach),
     }));
 
-    // Проверка запрета наличных и обязательного адреса для корпоративных клиентов
-    let paymentMethod = body.payment_method || 'cash';
-    if (body.counterparty_id) {
-      const { data: cp } = await (supabase.from('counterparties') as any)
-        .select('name')
-        .eq('id', body.counterparty_id)
-        .maybeSingle();
-      if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
-        paymentMethod = 'debt_cash';
-      }
-      if (isTerritoryCounterparty(cp?.name)) {
-        if (!body.description?.trim()) {
-          return NextResponse.json(
-            {
-              error:
-                'Для контрагента «Территория» обязательно укажите адрес (улица + дом) и описание работы',
-            },
-            { status: 400 },
-          );
-        }
-      }
-      if (isGeostroyCounterparty(cp?.name)) {
-        if (!isGeostroyOrderValid(body.description)) {
-          return NextResponse.json(
-            {
-              error:
-                'Для контрагента «ООО Геостройиндустрия» обязательно укажите маршрут и дату начала маршрута по маске (ДД.ММ.ГГГГ)',
-            },
-            { status: 400 },
-          );
-        }
-      }
-    }
-
-    const settlementStatus = paymentMethod === 'debt_cash' ? 'pending' : 'completed';
+    const settlementStatus = isInternal || paymentMethod !== 'debt_cash' ? 'completed' : 'pending';
 
     const orderDescription = body.description?.trim() || 'Погрузо-разгрузочные работы (без авто)';
     const tripNote = body.creator_note?.trim() || orderDescription;

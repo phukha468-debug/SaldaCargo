@@ -16,6 +16,7 @@ import {
   parseGeostroyDescription,
   isGeostroyOrderValid,
   maskDateInput,
+  isInternalCounterparty,
 } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
@@ -274,8 +275,9 @@ function calcOrderLoaderMetrics(o: TripOrder, tripStartedAt?: string | null) {
   }
 
   // До 01.09.2026 система 30% с грузчиков не действовала — маржа компании 0, весь пул шёл рабочим
-  if (!isLoaderProfitEligible(tripStartedAt)) {
-    return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: totalPaid };
+  // Также для собственных внутренних работ компании (ТК501 / ТК510) маржа не начисляется
+  if (!isLoaderProfitEligible(tripStartedAt) || isInternalCounterparty(o.counterparty)) {
+    return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: 0 };
   }
 
   const dcp = parseFloat(String(o.driver_car_pay || '0'));
@@ -299,7 +301,10 @@ function calcOrderLoaderProfit(o: TripOrder, tripStartedAt?: string | null): num
 function calcTrip(trip: TripForReview) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
   const expenses = trip.trip_expenses ?? [];
-  const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
+  const revenue = activeOrders.reduce(
+    (s, o) => s + (isInternalCounterparty(o.counterparty) ? 0 : parseFloat(o.amount || '0')),
+    0,
+  );
   const driverPay = activeOrders.reduce((s, o) => s + parseFloat(o.driver_pay), 0);
   const loaderPay = activeOrders.reduce(
     (s, o) => s + parseFloat(o.loader_pay) + parseFloat(o.loader2_pay ?? '0'),
@@ -324,10 +329,10 @@ function calcTrip(trip: TripForReview) {
   const totalLoadingPayroll = thirdPartyLoaderPay + driverLoaderPay;
 
   const collectedRevenue = activeOrders
-    .filter((o) => o.settlement_status === 'completed')
+    .filter((o) => o.settlement_status === 'completed' && !isInternalCounterparty(o.counterparty))
     .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
   const pendingDebt = activeOrders
-    .filter((o) => o.settlement_status === 'pending')
+    .filter((o) => o.settlement_status === 'pending' && !isInternalCounterparty(o.counterparty))
     .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
 
   const fuelExpense = expenses

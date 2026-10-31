@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { isInternalCounterparty } from '@saldacargo/shared';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -37,6 +38,7 @@ export async function GET() {
     const grouped = new Map<string, any>();
 
     for (const order of ordersRes.data ?? []) {
+      if (isInternalCounterparty(order.counterparty?.name)) continue;
       const isGenericClient = order.counterparty?.name === 'Частное лицо (разовый заказ)';
       const hasCounterparty = !!order.counterparty?.id && !isGenericClient;
       const hasDescription = !hasCounterparty && !!order.description?.trim();

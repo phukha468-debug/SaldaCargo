@@ -3,6 +3,7 @@ import {
   generateDeterministicUuid,
   FINANCIAL_WALLETS,
   FINANCIAL_CATEGORIES,
+  isInternalCounterparty,
 } from '@saldacargo/shared';
 
 const TRIP_REVENUE_CATEGORY = FINANCIAL_CATEGORIES.TRIP_REVENUE;
@@ -49,7 +50,10 @@ export async function syncTripFinancials(
   // 2. Synchronize settlement_status of each order based on payment_method
   for (const o of orders) {
     let expectedSettlement: 'pending' | 'completed' = 'completed';
-    if (
+    const isInternal = isInternalCounterparty((o.counterparty as any)?.name);
+    if (isInternal) {
+      expectedSettlement = 'completed';
+    } else if (
       o.payment_method === 'debt_cash' ||
       o.payment_method === 'debt' ||
       o.payment_method === 'debt_bank'
@@ -88,8 +92,11 @@ export async function syncTripFinancials(
       .join(' · ');
   }
 
-  // 3. Sync Cash Income (strictly cash)
-  const cashOrders = orders.filter((o: any) => o.payment_method === 'cash');
+  // 3. Sync Cash Income (strictly cash, excluding internal company orders)
+  const cashOrders = orders.filter(
+    (o: any) =>
+      o.payment_method === 'cash' && !isInternalCounterparty((o.counterparty as any)?.name),
+  );
   const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
   const cashIdempotency = generateDeterministicUuid(`trip-income-cash-${tripId}`);
 
@@ -133,9 +140,11 @@ export async function syncTripFinancials(
     await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
   }
 
-  // 4. Sync QR / Bank Income (qr + legacy card_driver)
+  // 4. Sync QR / Bank Income (qr + legacy card_driver, excluding internal company orders)
   const qrOrders = orders.filter(
-    (o: any) => o.payment_method === 'qr' || o.payment_method === 'card_driver',
+    (o: any) =>
+      (o.payment_method === 'qr' || o.payment_method === 'card_driver') &&
+      !isInternalCounterparty((o.counterparty as any)?.name),
   );
   const qrTotal = qrOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
   const qrIdempotency = generateDeterministicUuid(`trip-income-qr-${tripId}`);

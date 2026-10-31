@@ -6,6 +6,7 @@ import {
   isTerritoryCounterparty,
   isGeostroyCounterparty,
   isGeostroyOrderValid,
+  isInternalCounterparty,
 } from '@saldacargo/shared';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -174,14 +175,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
 
         let paymentMethod = order.payment_method || 'debt_cash';
-        if (paymentMethod === 'cash' && isNoCashCounterparty(cpName)) {
+        const isInternal = isInternalCounterparty(cpName);
+        if (isInternal) {
+          paymentMethod = 'cash';
+        } else if (paymentMethod === 'cash' && isNoCashCounterparty(cpName)) {
           paymentMethod = 'debt_cash';
         }
 
         const isDebt =
-          paymentMethod === 'debt_cash' ||
-          paymentMethod === 'debt' ||
-          paymentMethod === 'debt_bank';
+          !isInternal &&
+          (paymentMethod === 'debt_cash' ||
+            paymentMethod === 'debt' ||
+            paymentMethod === 'debt_bank');
         const settlementStatus = isDebt ? 'pending' : 'completed';
 
         if (isNew) {
@@ -190,7 +195,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             trip_id: id,
             counterparty_id: resolvedCounterpartyId,
             description: order.description?.trim() || null,
-            amount: parseFloat(order.amount ?? '0').toFixed(2),
+            amount: isInternal ? '0.00' : parseFloat(order.amount ?? '0').toFixed(2),
             driver_pay: parseFloat(order.driver_pay ?? '0').toFixed(2),
             loader_id: order.loader_id ?? trip.loader_id ?? null,
             loader_pay: parseFloat(order.loader_pay ?? '0').toFixed(2),
@@ -224,6 +229,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           }
           if (order.counterparty_id !== undefined || order.counterparty_name !== undefined) {
             update.counterparty_id = resolvedCounterpartyId;
+          }
+          if (isInternal) {
+            update.amount = '0.00';
+            update.payment_method = 'cash';
+            update.settlement_status = 'completed';
           }
 
           if (Object.keys(update).length > 0) {
