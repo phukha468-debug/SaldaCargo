@@ -17,7 +17,8 @@ export async function GET(request: Request) {
     .from('trips')
     .select(
       `id, trip_number, status, lifecycle_status, started_at, ended_at,
-       asset:assets(short_name),
+       trip_type, odometer_start, odometer_end, driver_note,
+       asset:assets(short_name, reg_number),
        trip_orders(amount, driver_pay, lifecycle_status)`,
     )
     .eq('driver_id', driverId)

@@ -871,15 +871,22 @@ function HistoryTripCard({
           })()}
 
           {/* Пробег + заметка водителя */}
-          {(mileage || trip.driver_note) && (
-            <div className="px-4 py-2.5 border-t border-zinc-100 flex items-center gap-3">
-              {mileage !== null && mileage > 0 && (
-                <span className="text-xs text-zinc-500">
-                  🛣 <span className="font-bold">{mileage} км</span>
+          {(mileage || trip.driver_note || trip.odometer_end) && (
+            <div className="px-4 py-2.5 border-t border-zinc-100 flex items-center justify-between gap-3">
+              {((mileage !== null && mileage > 0) || trip.odometer_end != null) && (
+                <span className="text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    🛣 <span className="font-bold">{mileage ?? 0} км</span>
+                  </span>
+                  {trip.odometer_end != null && (
+                    <span className="text-[11px] text-zinc-400 font-normal">
+                      (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
+                    </span>
+                  )}
                 </span>
               )}
               {trip.driver_note && (
-                <span className="text-xs text-amber-700 flex-1">
+                <span className="text-xs text-amber-700 flex-1 text-right">
                   💬 <span className="font-medium">{trip.driver_note}</span>
                 </span>
               )}

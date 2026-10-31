@@ -2045,27 +2045,57 @@ export function DailyControlPanel() {
             </button>
 
             {data?.audit?.status === 'confirmed' ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-1 rounded-lg">
-                ✓ СЕЙФ ПОДТВЕРЖДЁН (19:30)
-              </span>
+              <button
+                onClick={() => {
+                  setAuditForm({
+                    audited_by: data.audit?.audited_by || 'Директор',
+                    actualCash: String(data.audit?.safe_cash_actual ?? cashWallet?.evening ?? ''),
+                    actualFuel: String(
+                      data.audit?.fuel_card_balance ?? Math.max(0, fuelWallet?.evening ?? 0),
+                    ),
+                    notes: data.audit?.notes || '',
+                  });
+                  setIsAuditModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                title="Нажмите для коррекции сейфа"
+              >
+                <span>✓ СЕЙФ: {rub(data.audit.safe_cash_actual)}</span>
+                <span className="text-[10px] opacity-70">✏️</span>
+              </button>
             ) : data?.audit?.status === 'discrepancy' ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-lg">
-                ⚠️ РАСХОЖДЕНИЕ В СЕЙФЕ ({rub(data.audit.safe_discrepancy)})
-              </span>
+              <button
+                onClick={() => {
+                  setAuditForm({
+                    audited_by: data.audit?.audited_by || 'Директор',
+                    actualCash: String(data.audit?.safe_cash_actual ?? cashWallet?.evening ?? ''),
+                    actualFuel: String(
+                      data.audit?.fuel_card_balance ?? Math.max(0, fuelWallet?.evening ?? 0),
+                    ),
+                    notes: data.audit?.notes || '',
+                  });
+                  setIsAuditModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                title="Нажмите для устранения расхождения и коррекции сейфа"
+              >
+                <span>⚠️ РАСХОЖДЕНИЕ ({rub(data.audit.safe_discrepancy)})</span>
+                <span className="text-[10px] underline font-black">Исправить ✏️</span>
+              </button>
             ) : (
               <button
                 onClick={() => {
                   setAuditForm({
                     audited_by: 'Директор',
                     actualCash: String(cashWallet?.evening ?? ''),
-                    actualFuel: String(fuelWallet?.evening ?? ''),
+                    actualFuel: String(Math.max(0, fuelWallet?.evening ?? 0)),
                     notes: '',
                   });
                   setIsAuditModalOpen(true);
                 }}
-                className="text-[11px] font-black bg-amber-100 hover:bg-amber-200 text-amber-950 px-2.5 py-1 rounded-lg transition border border-amber-400 shadow-2xs cursor-pointer"
+                className="text-[11px] font-black bg-amber-100 hover:bg-amber-200 text-amber-950 px-2.5 py-1 rounded-lg transition border border-amber-400 shadow-2xs cursor-pointer flex items-center gap-1"
               >
-                🔒 ПРОВЕРИТЬ СЕЙФ (19:30)
+                <span>🔒 ПРОВЕРИТЬ СЕЙФ (19:30)</span>
               </button>
             )}
 
@@ -2269,7 +2299,7 @@ export function DailyControlPanel() {
                 : 'bg-amber-50 text-amber-800 border border-amber-100'
             }`}
           >
-            {rub(fuelWallet?.evening ?? 0)}
+            {rub(Math.max(0, fuelWallet?.evening ?? 0))}
           </span>
         </button>
       </div>

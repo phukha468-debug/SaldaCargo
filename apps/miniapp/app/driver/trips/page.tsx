@@ -67,6 +67,19 @@ function TripHistoryCard({ trip }: { trip: any }) {
           <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
             {formatDate(trip.started_at)}
           </p>
+          {(trip.odometer_end != null || trip.odometer_start != null) && (
+            <p className="text-[11px] text-zinc-500 font-semibold mt-1">
+              🛣{' '}
+              {trip.odometer_end && trip.odometer_start && trip.odometer_end >= trip.odometer_start
+                ? `${(trip.odometer_end - trip.odometer_start).toLocaleString('ru-RU')} км`
+                : '—'}
+              {trip.odometer_end != null && (
+                <span className="text-zinc-400 font-normal ml-1">
+                  (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
+                </span>
+              )}
+            </p>
+          )}
         </div>
         <div className="text-right">
           <Money amount={revenue.toString()} className="text-sm font-black text-zinc-900" />

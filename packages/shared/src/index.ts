@@ -772,6 +772,100 @@ export function checkOdometerRequirement(
 }
 
 /**
+ * Максимально допустимый прирост одометра за один рейс/смену:
+ * - Все Газели: максимум +1 000 км
+ * - Валдаи и другие грузовики: максимум +5 000 км
+ */
+export function getMaxOdometerDelta(
+  asset:
+    | {
+        short_name?: string | null;
+        reg_number?: string | null;
+        asset_type_code?: string | null;
+        asset_type?: { code?: string | null } | null;
+      }
+    | null
+    | undefined,
+): number {
+  if (isGazelleAsset(asset)) {
+    return 1000;
+  }
+  return 5000;
+}
+
+export type OdometerValidationResult = {
+  valid: boolean;
+  error?: string;
+  delta?: number;
+  maxDelta?: number;
+};
+
+/**
+ * Валидация показаний одометра при завершении рейса.
+ * Защищает от случайных опечаток (например, лишний ноль) и нереального пробега:
+ * 1. Конечный одометр не может быть меньше начального.
+ * 2. Для Газелей: прирост пробега от предыдущего не более 1 000 км.
+ * 3. Для Валдаев и грузовиков: прирост пробега от предыдущего не более 5 000 км.
+ * 4. Абсолютный предел: одометр не может превышать 999 999 км.
+ */
+export function validateTripOdometer(
+  asset:
+    | {
+        short_name?: string | null;
+        reg_number?: string | null;
+        asset_type_code?: string | null;
+        asset_type?: { code?: string | null } | null;
+      }
+    | null
+    | undefined,
+  startOdo: number | null | undefined,
+  endOdo: number | null | undefined,
+): OdometerValidationResult {
+  if (endOdo == null || isNaN(Number(endOdo)) || Number(endOdo) <= 0) {
+    return { valid: true };
+  }
+
+  const end = Number(endOdo);
+  const start = startOdo != null && !isNaN(Number(startOdo)) ? Number(startOdo) : 0;
+
+  if (end > 999999) {
+    return {
+      valid: false,
+      error: `Недопустимое значение одометра (${end.toLocaleString('ru-RU')} км). Пробег не может быть более 999 999 км! Проверьте, нет ли лишнего нуля.`,
+      delta: start > 0 ? end - start : undefined,
+    };
+  }
+
+  if (start > 0 && end < start) {
+    return {
+      valid: false,
+      error: `Конечный одометр (${end.toLocaleString('ru-RU')} км) не может быть меньше начального (${start.toLocaleString('ru-RU')} км).`,
+      delta: end - start,
+    };
+  }
+
+  if (start > 0) {
+    const isGazelle = isGazelleAsset(asset);
+    const maxDelta = isGazelle ? 1000 : 5000;
+    const vehicleTypeTitle = isGazelle ? 'Газелей' : 'Валдаев';
+    const delta = end - start;
+
+    if (delta > maxDelta) {
+      return {
+        valid: false,
+        error: `Пробег за рейс (+${delta.toLocaleString('ru-RU')} км) превышает лимит ${maxDelta.toLocaleString('ru-RU')} км для ${vehicleTypeTitle}! Предыдущий пробег: ${start.toLocaleString('ru-RU')} км. Проверьте цифры.`,
+        delta,
+        maxDelta,
+      };
+    }
+
+    return { valid: true, delta, maxDelta };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Извлекает даты начала и окончания заказ-наряда:
  * 1. Из прямых полей started_at / completed_at если они заданы
  * 2. Из служебного тега [ORDER_DATES:{"started_at":"...","completed_at":"..."}] в заметках

@@ -184,9 +184,11 @@ export async function GET(request: Request) {
       collectionsTotal +
       sumWhereRows(txIn ?? [], 'to_wallet_id', CASH_ID) -
       sumWhereRows(txOut ?? [], 'from_wallet_id', CASH_ID);
-    const fuelBalance =
+    const fuelBalance = Math.max(
+      0,
       sumWhereRows(txIn ?? [], 'to_wallet_id', FUEL_CARD_ID) -
-      sumWhereRows(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID);
+        sumWhereRows(txOut ?? [], 'from_wallet_id', FUEL_CARD_ID),
+    );
     const totalCash = bankBalance + cashBalance;
 
     const liveSalaryDebt = (salaryPendingRes ?? []).reduce((sum: number, tx: any) => {

@@ -503,7 +503,9 @@ object SaldaApiClient {
                             val id = v["id"]?.let { (it as? JsonPrimitive)?.content } ?: k
                             val name = v["name"]?.let { (it as? JsonPrimitive)?.content } ?: k
                             val balanceStr = v["balance"]?.let { (it as? JsonPrimitive)?.content } ?: "0"
-                            val balance = balanceStr.toDoubleOrNull() ?: 0.0
+                            val rawBalance = balanceStr.toDoubleOrNull() ?: 0.0
+                            // Топливный кошелёк не может иметь отрицательное значение, минимум 0
+                            val balance = if (k == "fuel_card") maxOf(0.0, rawBalance) else rawBalance
                             list.add(WalletBalance(id = id, name = name, type = k, balance = balance))
                         }
                     }

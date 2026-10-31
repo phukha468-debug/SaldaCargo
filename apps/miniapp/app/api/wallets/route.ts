@@ -112,11 +112,12 @@ export async function GET(request: Request) {
       .select('*')
       .eq('status', 'confirmed')
       .order('date', { ascending: false })
+      .order('audited_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     const baseCash = Number(latestAudit?.safe_cash_actual ?? 29000);
-    const baseFuel = Number(latestAudit?.fuel_card_balance ?? 926.13);
+    const baseFuel = Math.max(0, Number(latestAudit?.fuel_card_balance ?? 926.13));
     const auditCutoff = latestAudit?.audited_at || `${latestAudit?.date ?? '2026-10-14'}T09:57:13Z`;
 
     const [
@@ -208,7 +209,11 @@ export async function GET(request: Request) {
       sum(cashInAfterAudit ?? []) -
       sum(cashOutAfterAudit ?? []);
 
-    const fuelBalance = baseFuel + sum(fuelInAfterAudit ?? []) - sum(fuelOutAfterAudit ?? []);
+    // Топливный кошелёк не может иметь отрицательное значение, минимум 0
+    const fuelBalance = Math.max(
+      0,
+      baseFuel + sum(fuelInAfterAudit ?? []) - sum(fuelOutAfterAudit ?? []),
+    );
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 

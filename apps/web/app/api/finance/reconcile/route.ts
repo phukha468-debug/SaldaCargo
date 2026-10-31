@@ -105,7 +105,8 @@ export async function GET() {
 
     const cashBalance = collectionsTotal + sum(cashIn ?? []) - sum(cashOut ?? []);
 
-    const fuelBalance = sum(fuelIn ?? []) - sum(fuelOut ?? []);
+    // Топливный кошелёк не может быть отрицательным (минимум 0)
+    const fuelBalance = Math.max(0, sum(fuelIn ?? []) - sum(fuelOut ?? []));
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 

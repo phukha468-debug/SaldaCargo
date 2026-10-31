@@ -10,6 +10,8 @@ import {
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   checkOdometerRequirement,
+  validateTripOdometer,
+  getMaxOdometerDelta,
 } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
 import { useState, useEffect, useRef } from 'react';
@@ -312,6 +314,23 @@ export default function TripDetailPage() {
                 formatDate(trip.started_at)
               )}
             </p>
+            {(trip.odometer_end != null || trip.odometer_start != null) && (
+              <p className="text-xs font-bold text-zinc-600 flex items-center gap-1.5 pt-1 flex-wrap">
+                <span>
+                  🛣 Пробег:{' '}
+                  {trip.odometer_end &&
+                  trip.odometer_start &&
+                  trip.odometer_end >= trip.odometer_start
+                    ? `${(trip.odometer_end - trip.odometer_start).toLocaleString('ru-RU')} км`
+                    : '—'}
+                </span>
+                {trip.odometer_end != null && (
+                  <span className="text-zinc-400 font-normal">
+                    (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </section>
 
@@ -761,8 +780,12 @@ export default function TripDetailPage() {
               const inputNum = odometerInput.trim() ? Number(odometerInput) : null;
               const delta =
                 inputNum && startOdo > 0 && inputNum >= startOdo ? inputNum - startOdo : null;
-              const isInvalidLower = inputNum != null && startOdo > 0 && inputNum < startOdo;
+              const maxDelta = getMaxOdometerDelta(trip.asset);
               const isRequiredMissing = odoReq.required && (!inputNum || inputNum <= 0);
+              const odoValidation =
+                inputNum != null && inputNum > 0
+                  ? validateTripOdometer(trip.asset, startOdo, inputNum)
+                  : { valid: true };
 
               return (
                 <>
@@ -791,7 +814,7 @@ export default function TripDetailPage() {
                       <span>Начальный пробег:</span>
                       <span className="font-mono text-zinc-800">
                         {startOdo > 0
-                          ? `${startOdo.toLocaleString('ru-RU')} км`
+                          ? `${startOdo.toLocaleString('ru-RU')} км (макс: +${maxDelta.toLocaleString('ru-RU')} км)`
                           : 'Не зафиксирован'}
                       </span>
                     </div>
@@ -820,16 +843,15 @@ export default function TripDetailPage() {
                       </div>
                     </div>
 
-                    {delta != null && (
+                    {odoValidation.valid && delta != null && (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center text-xs font-black text-emerald-700">
                         Пробег за смену: +{delta.toLocaleString('ru-RU')} км
                       </div>
                     )}
 
-                    {isInvalidLower && (
-                      <div className="bg-rose-50 border border-rose-300 rounded-lg p-2 text-center text-xs font-bold text-rose-700">
-                        Одометр не может быть меньше начального ({startOdo.toLocaleString('ru-RU')}{' '}
-                        км)
+                    {!odoValidation.valid && odoValidation.error && (
+                      <div className="bg-rose-50 border border-rose-300 rounded-lg p-2.5 text-center text-xs font-bold text-rose-700">
+                        🛑 {odoValidation.error}
                       </div>
                     )}
                   </div>
@@ -860,17 +882,15 @@ export default function TripDetailPage() {
                           );
                           return;
                         }
-                        if (isInvalidLower) {
-                          setOdometerError(
-                            `Одометр не может быть меньше начального (${startOdo} км)`,
-                          );
+                        if (!odoValidation.valid) {
+                          setOdometerError(odoValidation.error || 'Недопустимый одометр');
                           return;
                         }
                         finishTrip.mutate({
                           odometer_end: inputNum && inputNum > 0 ? inputNum : undefined,
                         });
                       }}
-                      disabled={finishTrip.isPending || isInvalidLower || isRequiredMissing}
+                      disabled={finishTrip.isPending || !odoValidation.valid || isRequiredMissing}
                       className="flex-1 h-12 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
                     >
                       <span>🏁</span>

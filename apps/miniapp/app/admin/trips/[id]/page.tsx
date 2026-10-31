@@ -200,7 +200,16 @@ export default function AdminTripDetailPage() {
             {formatDate(trip.started_at)}
             {trip.ended_at && ` → ${formatDate(trip.ended_at)}`}
           </p>
-          {mileage && <p className="text-sm font-bold text-zinc-500">Пробег: {mileage} км</p>}
+          {(mileage != null || trip.odometer_end != null) && (
+            <p className="text-sm font-bold text-zinc-500 flex items-center gap-1.5 flex-wrap">
+              <span>Пробег: {mileage ?? 0} км</span>
+              {trip.odometer_end != null && (
+                <span className="text-xs text-zinc-400 font-normal">
+                  (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
+                </span>
+              )}
+            </p>
+          )}
           {trip.driver_note && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
               <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">

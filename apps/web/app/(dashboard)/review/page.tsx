@@ -339,7 +339,10 @@ function calcTrip(trip: TripForReview) {
     .filter((e) => e.category?.name === 'ГСМ')
     .reduce((s, e) => s + parseFloat(e.amount), 0);
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-  const mileage = trip.odometer_end ? trip.odometer_end - trip.odometer_start : 0;
+  const mileage =
+    trip.odometer_end && trip.odometer_start && trip.odometer_end >= trip.odometer_start
+      ? trip.odometer_end - trip.odometer_start
+      : 0;
   const profit = revenue - driverPay - loaderPay - totalExpenses;
   return {
     activeOrders,
@@ -2150,7 +2153,16 @@ function TripCard({
               },
               {
                 label: 'Пробег',
-                value: `${mileage} км`,
+                value: (
+                  <span>
+                    {mileage} км
+                    {trip.odometer_end != null && (
+                      <span className="text-[11px] font-normal text-slate-400 block sm:inline sm:ml-1.5 whitespace-nowrap">
+                        (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
+                      </span>
+                    )}
+                  </span>
+                ),
                 cls: 'text-slate-700 text-base font-bold',
               },
             ].map(({ label, value, cls }) => (

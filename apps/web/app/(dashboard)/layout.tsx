@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Suspense, useState } from 'react';
 import { cn } from '@saldacargo/ui';
+import { SafeAdjustmentModal } from '@/components/SafeAdjustmentModal';
 
 const navItems = [
   { href: '/', label: 'Главная', icon: 'dashboard' },
@@ -84,9 +85,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     placeholderData: (previousData) => previousData,
   });
 
+  const [isSafeAdjustOpen, setIsSafeAdjustOpen] = useState(false);
+
   const bankNum = parseFloat(wallets?.bank?.balance ?? '0');
   const cashNum = parseFloat(wallets?.cash?.balance ?? '0');
-  const fuelNum = parseFloat(wallets?.fuel_card?.balance ?? '0');
+  const fuelNum = Math.max(0, parseFloat(wallets?.fuel_card?.balance ?? '0'));
   const totalBalance = bankNum + cashNum + fuelNum;
 
   const tripsForReview = summary?.alerts?.tripsForReview ?? 0;
@@ -278,9 +281,16 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     />
                   )}
                 </div>
-                <div>
-                  <span className="text-emerald-400 font-bold">Сейф:</span>{' '}
-                  {cashNum.toLocaleString('ru-RU')} ₽
+                <div
+                  onClick={() => setIsSafeAdjustOpen(true)}
+                  className="flex items-center gap-1 cursor-pointer group hover:text-white transition"
+                  title="Нажмите для быстрой коррекции наличных в сейфе"
+                >
+                  <span className="text-emerald-400 font-bold group-hover:underline">Сейф:</span>{' '}
+                  <span className="font-semibold">{cashNum.toLocaleString('ru-RU')} ₽</span>
+                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 group-hover:text-emerald-300 transition">
+                    ✏️
+                  </span>
                 </div>
                 <div>
                   <span className="text-amber-400 font-bold">ГСМ:</span>{' '}
@@ -378,6 +388,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       <footer className="py-2.5 px-6 border-t border-slate-200 text-center text-xs text-slate-500 bg-white flex-shrink-0 font-medium">
         © 2026 TK501 ERP · ИП Нигамедьянов А.С. · Верхняя Салда
       </footer>
+
+      {/* Быстрая коррекция наличных в сейфе */}
+      <SafeAdjustmentModal
+        isOpen={isSafeAdjustOpen}
+        onClose={() => setIsSafeAdjustOpen(false)}
+        currentCashBalance={cashNum}
+      />
     </div>
   );
 }

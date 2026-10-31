@@ -5,6 +5,7 @@ import {
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   checkOdometerRequirement,
+  validateTripOdometer,
 } from '@saldacargo/shared';
 
 /** POST /api/trips/:id/finish — завершить рейс */
@@ -52,21 +53,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const odoRequirement = checkOdometerRequirement(trip.asset);
 
-  if (odoRequirement.required) {
-    if (!odoEnd) {
-      return NextResponse.json(
-        {
-          error: `${odoRequirement.message} Укажите показания одометра для завершения смены.`,
-        },
-        { status: 400 },
-      );
-    }
+  if (odoRequirement.required && !odoEnd) {
+    return NextResponse.json(
+      {
+        error: `${odoRequirement.message} Укажите показания одометра для завершения смены.`,
+      },
+      { status: 400 },
+    );
+  }
 
+  if (odoEnd) {
     const minOdo = trip.odometer_start || trip.asset?.odometer_current || 0;
-    if (minOdo > 0 && odoEnd < minOdo) {
+    const odoValidation = validateTripOdometer(trip.asset, minOdo, odoEnd);
+    if (!odoValidation.valid) {
       return NextResponse.json(
         {
-          error: `Конечный одометр (${odoEnd.toLocaleString('ru-RU')} км) не может быть меньше начального (${minOdo.toLocaleString('ru-RU')} км).`,
+          error: odoValidation.error,
         },
         { status: 400 },
       );

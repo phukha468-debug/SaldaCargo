@@ -408,19 +408,19 @@ export async function GET(request: Request) {
       actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
     }
 
-    let actualEveningFuel = morningFuel + fuelDayIn - fuelDayOut;
-    let actualMorningFuel = morningFuel;
+    let actualEveningFuel = Math.max(0, morningFuel + fuelDayIn - fuelDayOut);
+    let actualMorningFuel = Math.max(0, morningFuel);
 
     if (
       auditRow &&
       auditRow.fuel_card_balance !== undefined &&
       auditRow.fuel_card_balance !== null
     ) {
-      actualEveningFuel = Number(auditRow.fuel_card_balance);
-      actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
+      actualEveningFuel = Math.max(0, Number(auditRow.fuel_card_balance));
+      actualMorningFuel = Math.max(0, actualEveningFuel - fuelDayIn + fuelDayOut);
     } else if (isCurrentPeriod) {
-      actualEveningFuel = BASE_ACTUAL_FUEL;
-      actualMorningFuel = actualEveningFuel - fuelDayIn + fuelDayOut;
+      actualEveningFuel = Math.max(0, BASE_ACTUAL_FUEL);
+      actualMorningFuel = Math.max(0, actualEveningFuel - fuelDayIn + fuelDayOut);
     }
 
     // Привязанные движения по складу запчастей (Гараж)

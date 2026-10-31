@@ -49,6 +49,8 @@ export default function AdminDashboard() {
     refetchOnWindowFocus: false,
   });
 
+  const [showSafeAdjustModal, setShowSafeAdjustModal] = useState(false);
+
   const handleRefreshWallets = () => {
     fetch('/api/wallets?fresh=true')
       .then(() => refetchWallets())
@@ -58,7 +60,7 @@ export default function AdminDashboard() {
   const totalBalance = (
     parseFloat(wallets?.bank?.balance || '0') +
     parseFloat(wallets?.cash?.balance || '0') +
-    parseFloat(wallets?.fuel_card?.balance || '0')
+    Math.max(0, parseFloat(wallets?.fuel_card?.balance || '0'))
   ).toFixed(2);
 
   return (
@@ -155,9 +157,16 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-2.5">
-            <div className="flex items-center gap-1 text-[9px] font-black uppercase text-emerald-700">
-              <span>💵</span> Сейф
+          <div
+            onClick={() => setShowSafeAdjustModal(true)}
+            className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-2.5 cursor-pointer active:scale-95 transition-transform"
+            title="Нажмите для коррекции сейфа"
+          >
+            <div className="flex items-center justify-between text-[9px] font-black uppercase text-emerald-700">
+              <span className="flex items-center gap-1">
+                <span>💵</span> Сейф
+              </span>
+              <span className="text-[10px] text-emerald-600">✏️</span>
             </div>
             {walletsLoading ? (
               <div className="h-4 w-14 bg-emerald-200/50 rounded animate-pulse mt-1" />
@@ -177,7 +186,7 @@ export default function AdminDashboard() {
               <div className="h-4 w-14 bg-amber-200/50 rounded animate-pulse mt-1" />
             ) : (
               <Money
-                amount={wallets?.fuel_card?.balance ?? '0'}
+                amount={String(Math.max(0, parseFloat(wallets?.fuel_card?.balance ?? '0')))}
                 className="text-xs font-black text-amber-900 mt-0.5 block truncate"
               />
             )}
@@ -270,6 +279,18 @@ export default function AdminDashboard() {
 
       {/* Секция: Остатки подотчёта на руках у водителей (переносы) */}
       <DriverCashHoldsSection />
+
+      {/* Модальное окно быстрой коррекции наличных в сейфе */}
+      {showSafeAdjustModal && (
+        <SafeAdjustMiniappModal
+          currentBalance={parseFloat(wallets?.cash?.balance || '0')}
+          onClose={() => setShowSafeAdjustModal(false)}
+          onSuccess={() => {
+            setShowSafeAdjustModal(false);
+            refetchWallets();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -910,6 +931,158 @@ function CollectHoldModal({
           <button
             onClick={onClose}
             className="px-4 text-xs font-black text-zinc-500 uppercase tracking-widest border border-zinc-200 rounded-xl active:bg-zinc-100 transition-colors"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// МОДАЛЬНОЕ ОКНО: КОРРЕКЦИЯ НАЛИЧНЫХ В СЕЙФЕ (КОМПАКТНЫЙ ВИД)
+// ─────────────────────────────────────────────────────────────────────────────
+function SafeAdjustMiniappModal({
+  currentBalance,
+  onClose,
+  onSuccess,
+}: {
+  currentBalance: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [targetAmount, setTargetAmount] = useState<string>(
+    currentBalance >= 0 ? String(Math.round(currentBalance)) : '0',
+  );
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+
+  const targetNum = parseFloat(targetAmount.replace(',', '.')) || 0;
+  const delta = targetNum - currentBalance;
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      setError('');
+      const res = await fetch('/api/wallets/set-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallet: 'cash',
+          target_amount: targetNum,
+          notes: notes.trim() || 'Коррекция остатка сейфа в боте',
+          audited_by: 'Директор (Бот)',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Ошибка коррекции сейфа');
+      return data;
+    },
+    onSuccess,
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const handleSubmit = () => {
+    if (isNaN(targetNum)) return setError('Укажите корректную сумму');
+    setError('');
+    mutation.mutate();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl p-4 max-w-sm w-full space-y-2.5 shadow-2xl border-2 border-zinc-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-base">🔒</span>
+            <h3 className="font-black text-xs uppercase tracking-wider text-zinc-900">
+              Коррекция сейфа
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-700 font-bold text-base px-1"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Текущий расчетный остаток в 1 строку */}
+        <div className="flex items-center justify-between bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-xs">
+          <span className="text-zinc-500 font-bold">Расчетный остаток:</span>
+          <span
+            className={`font-mono font-black ${currentBalance < 0 ? 'text-rose-600' : 'text-zinc-900'}`}
+          >
+            {currentBalance.toLocaleString('ru-RU')} ₽
+          </span>
+        </div>
+
+        {/* Поле ввода фактической суммы + дельта справа в одну строку */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500 block">
+            Фактически в сейфе:
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="number"
+                step="any"
+                autoFocus
+                value={targetAmount}
+                onChange={(e) => setTargetAmount(e.target.value)}
+                placeholder="0"
+                className="w-full pl-2.5 pr-6 py-1.5 bg-white border-2 border-zinc-900 rounded-lg font-mono font-black text-sm text-zinc-950 focus:outline-none"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 font-bold text-zinc-400 text-xs">
+                ₽
+              </span>
+            </div>
+
+            {/* Дельта справа */}
+            <div
+              className={`px-2 py-1.5 rounded-lg border font-mono font-bold text-[10px] whitespace-nowrap shrink-0 ${
+                Math.abs(delta) < 0.01
+                  ? 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                  : delta > 0
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                    : 'bg-rose-50 text-rose-700 border-rose-300'
+              }`}
+            >
+              {delta >= 0 ? '▲ +' : '▼ '}
+              {delta.toLocaleString('ru-RU')} ₽
+            </div>
+          </div>
+        </div>
+
+        {/* Примечание */}
+        <input
+          type="text"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Причина (пересчёт, внесение)"
+          className="w-full px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+        />
+
+        {error && (
+          <p className="text-[11px] font-bold text-rose-600 bg-rose-50 p-1 rounded">{error}</p>
+        )}
+
+        <div className="flex gap-2 pt-1 border-t border-zinc-100">
+          <button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider py-2 rounded-xl active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {mutation.isPending ? 'Запись...' : 'Сохранить остаток ✓'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-3 text-xs font-bold text-zinc-500 rounded-xl active:bg-zinc-100 transition-colors"
           >
             Отмена
           </button>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isInternalCounterparty } from '@saldacargo/shared';
+import { isInternalCounterparty, validateTripOdometer } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips — рейсы для ревью или истории */
@@ -105,6 +105,19 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
 
   const loadersCount = (body.loader_id ? 1 : 0) + (body.loader2_id ? 1 : 0);
+
+  // Валидация одометра
+  if (body.asset_id && body.odometer_end != null && Number(body.odometer_end) > 0) {
+    const { data: asset } = await (supabase.from('assets') as any)
+      .select('id, short_name, reg_number, odometer_current, asset_type:asset_types(code)')
+      .eq('id', body.asset_id)
+      .maybeSingle();
+    const minOdo = body.odometer_start || asset?.odometer_current || 0;
+    const odoValidation = validateTripOdometer(asset, minOdo, body.odometer_end);
+    if (!odoValidation.valid) {
+      return NextResponse.json({ error: odoValidation.error }, { status: 400 });
+    }
+  }
 
   // Создаём рейс
   const { data: trip, error: tripError } = await supabase

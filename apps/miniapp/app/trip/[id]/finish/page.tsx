@@ -13,6 +13,8 @@ import {
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   checkOdometerRequirement,
+  validateTripOdometer,
+  getMaxOdometerDelta,
 } from '@saldacargo/shared';
 
 const schema = z.object({
@@ -91,6 +93,11 @@ export default function FinishTripPage() {
   const tripMileage =
     odoEndNum && startOdo > 0 && odoEndNum >= startOdo ? odoEndNum - startOdo : null;
   const odoReq = checkOdometerRequirement(trip?.asset);
+  const maxDelta = getMaxOdometerDelta(trip?.asset);
+  const odoValidation =
+    odoEndNum != null && odoEndNum > 0
+      ? validateTripOdometer(trip?.asset, startOdo, odoEndNum)
+      : { valid: true };
 
   const activeOrders = (trip?.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
   const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
@@ -140,11 +147,12 @@ export default function FinishTripPage() {
       return;
     }
 
-    if (odoNum != null && odoNum > 0 && minOdo > 0 && odoNum < minOdo) {
-      setError(
-        `Конечный одометр (${odoNum.toLocaleString('ru-RU')} км) не может быть меньше начального (${minOdo.toLocaleString('ru-RU')} км).`,
-      );
-      return;
+    if (odoNum != null && odoNum > 0) {
+      const validation = validateTripOdometer(trip?.asset, minOdo, odoNum);
+      if (!validation.valid) {
+        setError(validation.error || 'Недопустимое значение одометра.');
+        return;
+      }
     }
 
     const parsedUnhandedAmount =
@@ -393,7 +401,16 @@ export default function FinishTripPage() {
           {tripMileage != null && (
             <SummaryRow
               label="🛣️ Пробег за смену"
-              value={<span className="text-emerald-600 font-black">+{tripMileage} км</span>}
+              value={
+                <span className="text-emerald-600 font-black">
+                  +{tripMileage} км
+                  {odoEndNum != null && (
+                    <span className="text-zinc-400 font-normal text-xs ml-1.5">
+                      (на одометре: {odoEndNum.toLocaleString('ru-RU')} км)
+                    </span>
+                  )}
+                </span>
+              }
             />
           )}
         </div>
@@ -420,7 +437,8 @@ export default function FinishTripPage() {
             <div className="text-xs text-zinc-500 font-medium">
               {startOdo > 0 && (
                 <span>
-                  Начальный одометр: <strong>{startOdo.toLocaleString('ru-RU')} км</strong>.{' '}
+                  Начальный одометр: <strong>{startOdo.toLocaleString('ru-RU')} км</strong> (лимит:
+                  не более +{maxDelta.toLocaleString('ru-RU')} км).{' '}
                 </span>
               )}
               {odoReq.message}
@@ -439,7 +457,13 @@ export default function FinishTripPage() {
               </span>
             </div>
 
-            {tripMileage != null && tripMileage >= 0 && (
+            {!odoValidation.valid && odoValidation.error && (
+              <div className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 rounded-lg p-2.5 text-center">
+                🛑 {odoValidation.error}
+              </div>
+            )}
+
+            {odoValidation.valid && tripMileage != null && tripMileage >= 0 && (
               <div className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
                 Пробег за смену: +{tripMileage.toLocaleString('ru-RU')} км
               </div>
@@ -495,7 +519,7 @@ export default function FinishTripPage() {
         <Button
           type="submit"
           size="hero"
-          disabled={submitting || hasGeostroyValidationError}
+          disabled={submitting || hasGeostroyValidationError || !odoValidation.valid}
           className="font-black uppercase tracking-widest w-full disabled:opacity-50"
         >
           {submitting

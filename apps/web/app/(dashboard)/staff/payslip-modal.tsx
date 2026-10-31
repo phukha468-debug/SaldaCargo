@@ -86,16 +86,43 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
     window.print();
   };
 
-  // Авто-определение типа автомобиля: Валдай (по факту) или Газель (Чт-срез)
-  const isValdayDriver = Boolean(
-    user.asset?.short_name?.toLowerCase().includes('валдай') ||
-    (user.roles?.includes('driver') && user.asset?.short_name?.toLowerCase().includes('валдай')),
-  );
+  // Определение роли и типа транспорта сотрудника
+  const roles = user.roles || [];
+  const isDriver = roles.includes('driver');
+  const isMechanic = roles.includes('mechanic') || roles.includes('mechanic_lead');
+  const assetName = (user.asset?.short_name || '').toLowerCase();
+  const isValdayDriver = isDriver && assetName.includes('валдай');
+  const isGazelleDriver = isDriver && !isValdayDriver;
 
   type PeriodMode = 'valday' | 'gazelle' | 'custom' | 'month';
   const [periodMode, setPeriodMode] = useState<PeriodMode>(() =>
     isValdayDriver ? 'valday' : 'gazelle',
   );
+
+  // Динамические метки и подсказки для кнопок в зависимости от роли сотрудника
+  const weeklyButtonLabel = isGazelleDriver
+    ? '🚚 Неделя (Чт срез)'
+    : isValdayDriver
+      ? '📅 За неделю (Чт)'
+      : '📅 Недельный расчёт';
+
+  const weeklyButtonTitle = isGazelleDriver
+    ? 'Четверговый срез (Пт-Чт) для водителей городских Газелей'
+    : 'Расчёт за текущую неделю по четверг включительно';
+
+  const factualButtonLabel = isValdayDriver
+    ? '🚛 Валдай (По факту)'
+    : isMechanic
+      ? '🔧 Невыплаченные наряды'
+      : isGazelleDriver
+        ? '⚡ Все невыплаченные'
+        : '⚡ По факту (все смены)';
+
+  const factualButtonTitle = isValdayDriver
+    ? 'Все невыплаченные междугородние рейсы на Валдае'
+    : isMechanic
+      ? 'Все фактически выполненные, но ещё не закрытые заказ-наряды СТО'
+      : 'Все фактически выполненные невыплаченные смены без отсечения четвергом';
 
   // Для произвольного диапазона дат (по умолчанию последние 14 дней)
   const [customStart, setCustomStart] = useState(() => {
@@ -381,9 +408,15 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
 
   const modeBadge =
     periodMode === 'gazelle'
-      ? 'НЕДЕЛЬНЫЙ РАСЧЁТ (ГАЗЕЛЬ • ЧТ-СРЕЗ)'
+      ? isGazelleDriver
+        ? 'НЕДЕЛЬНЫЙ РАСЧЁТ (ЧТ-СРЕЗ)'
+        : 'НЕДЕЛЬНЫЙ РАСЧЁТ'
       : periodMode === 'valday'
-        ? 'РАСЧЁТ ПО ФАКТУ (ВАЛДАЙ • МЕЖГОРОД)'
+        ? isValdayDriver
+          ? 'РАСЧЁТ ПО ФАКТУ (ВАЛДАЙ • МЕЖГОРОД)'
+          : isMechanic
+            ? 'РАСЧЁТ ПО ФАКТУ (ЗАКАЗ-НАРЯДЫ СТО)'
+            : 'РАСЧЁТ ПО ФАКТУ (ВСЕ СМЕНЫ)'
         : periodMode === 'custom'
           ? 'РАСЧЁТ ЗА ПРОИЗВОЛЬНЫЙ ПЕРИОД'
           : 'МЕСЯЧНЫЙ РАСЧЁТ';
@@ -492,9 +525,9 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                     ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
                     : 'text-slate-300 hover:text-white'
                 }`}
-                title="Четверговый срез (Пт-Чт) для водителей Газелей"
+                title={weeklyButtonTitle}
               >
-                🚚 Газель (Чт срез)
+                {weeklyButtonLabel}
               </button>
 
               <button
@@ -504,9 +537,9 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                     ? 'bg-emerald-600 text-white font-black shadow-xs'
                     : 'text-slate-300 hover:text-white'
                 }`}
-                title="Все невыплаченные рейсы без привязки к четвергу (Валдай)"
+                title={factualButtonTitle}
               >
-                🚛 Валдай (По факту)
+                {factualButtonLabel}
               </button>
 
               <button
@@ -733,25 +766,27 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                         )}
                       </td>
                       <td className="p-1 sm:p-1.5 font-medium text-slate-950">
-                        {item.description || 'Начисление за смену / рейс'}
-                        {/* Машина и водитель рейса */}
-                        {item.trip &&
-                          (item.trip.vehicle_label ||
-                            item.trip.driver_name ||
-                            item.trip.driver?.name) && (
-                            <div className="flex flex-wrap gap-2 mt-0.5">
-                              {item.trip.vehicle_label && (
-                                <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                  🚚 {item.trip.vehicle_label}
-                                </span>
-                              )}
-                              {(item.trip.driver_name || item.trip.driver?.name) && (
-                                <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                  👤 {item.trip.driver_name || item.trip.driver?.name}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                        <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5">
+                          <span>{item.description || 'Начисление за смену / рейс'}</span>
+                          {/* Машина и водитель рейса — в одну строчку справа от описания */}
+                          {item.trip &&
+                            (item.trip.vehicle_label ||
+                              item.trip.driver_name ||
+                              item.trip.driver?.name) && (
+                              <span className="inline-flex items-center gap-1.5 shrink-0">
+                                {item.trip.vehicle_label && (
+                                  <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                                    🚚 {item.trip.vehicle_label}
+                                  </span>
+                                )}
+                                {(item.trip.driver_name || item.trip.driver?.name) && (
+                                  <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                                    👤 {item.trip.driver_name || item.trip.driver?.name}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                        </div>
                       </td>
                       <td className="p-1 sm:p-1.5 text-center whitespace-nowrap">
                         <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border border-slate-400 text-slate-950 bg-white">
