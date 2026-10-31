@@ -322,45 +322,34 @@ export default function RootPage() {
         </div>
       )}
 
-      {/* Конец месяца — обязательный ввод одометра для грузовиков (Валдай, Кантер) */}
+      {/* Конец месяца — компактная плашка ввода одометра для грузовиков (Валдай, Кантер) */}
       {!data?.activeTrip && activeAsset && isTruckAsset(activeAsset) && isEndOfMonth() && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 shadow-sm space-y-2.5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <span className="text-2xl mt-0.5">📅</span>
-              <div>
-                <h3 className="text-xs font-black text-amber-950 uppercase tracking-wide">
-                  Конец месяца — одометр грузовика
-                </h3>
-                <p className="text-[11px] font-medium text-amber-800 leading-tight mt-0.5">
-                  Для грузовиков ({activeAsset.short_name}) 1 раз в конце месяца обязателен ввод
-                  одометра.
-                </p>
-              </div>
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-1.5 shadow-2xs flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base shrink-0">📅</span>
+            <div className="min-w-0">
+              <span className="text-[11px] font-black text-amber-950 uppercase tracking-tight block leading-tight truncate">
+                Конец месяца
+              </span>
+              <span className="text-[9.5px] font-bold text-amber-700 block leading-none">
+                обязательно
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setTruckOdometerVal(
-                  activeAsset.odometer_current ? String(activeAsset.odometer_current) : '',
-                );
-                setTruckOdometerError('');
-                setTruckOdometerSuccess(false);
-                setShowTruckOdometerModal(true);
-              }}
-              className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider active:scale-95 transition-all shrink-0 shadow-sm"
-            >
-              Ввести одометр
-            </button>
           </div>
-          <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 pt-1.5 border-t border-amber-200/80">
-            <span className="text-amber-800">Текущий пробег в системе:</span>
-            <span className="font-mono font-black text-zinc-900">
-              {activeAsset.odometer_current
-                ? `${activeAsset.odometer_current.toLocaleString('ru-RU')} км`
-                : 'Не зафиксирован'}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setTruckOdometerVal(
+                activeAsset.odometer_current ? String(activeAsset.odometer_current) : '',
+              );
+              setTruckOdometerError('');
+              setTruckOdometerSuccess(false);
+              setShowTruckOdometerModal(true);
+            }}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-xs font-black uppercase tracking-wider transition-all shrink-0 shadow-2xs cursor-pointer"
+          >
+            Ввести одометр
+          </button>
         </div>
       )}
 
