@@ -5173,13 +5173,26 @@ export default function ReviewPage() {
                         </div>
                         <div
                           className="text-right hidden sm:block relative cursor-help"
-                          title={`ФОТ рейсов: Водители ${Math.round(group.driverPayroll).toLocaleString('ru-RU')} ₽ + Грузчики ${Math.round(group.loaderPayroll).toLocaleString('ru-RU')} ₽${group.loaderProfit > 0 ? `\nПрибыль компании с грузчиков: +${Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽ (маржа 30%)` : ''}`}
+                          title={
+                            group.assetKey === '👷 ПРР (без авто)'
+                              ? `ФОТ грузчиков: ${Math.round(group.loaderPayroll).toLocaleString('ru-RU')} ₽`
+                              : isTruckAsset(group.trips[0]?.asset)
+                                ? `Зарплата водителя: ${Math.round(group.driverPayroll).toLocaleString('ru-RU')} ₽`
+                                : `ФОТ рейсов: Водители ${Math.round(group.driverPayroll).toLocaleString('ru-RU')} ₽ + Грузчики ${Math.round(group.loaderPayroll).toLocaleString('ru-RU')} ₽${group.loaderProfit > 0 ? `\nПрибыль компании с грузчиков: +${Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽ (маржа 30%)` : ''}`
+                          }
                         >
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                             ЗП (ФОТ)
                           </span>
                           <span className="text-sm font-black text-amber-500">
-                            <Money amount={group.tripsPayroll.toFixed(2)} />
+                            <Money
+                              amount={(group.assetKey === '👷 ПРР (без авто)'
+                                ? group.loaderPayroll
+                                : isTruckAsset(group.trips[0]?.asset)
+                                  ? group.driverPayroll
+                                  : group.tripsPayroll
+                              ).toFixed(2)}
+                            />
                           </span>
                           {group.loaderProfit > 0 && (
                             <span className="text-[9px] font-bold text-emerald-600 block leading-tight">
