@@ -273,7 +273,7 @@ export async function GET(request: Request) {
         let tripLoaderOrders = 0;
 
         activeOrders.forEach((o: any) => {
-          const m = calcOrderLoaderMetrics(o, t.started_at);
+          const m = calcOrderLoaderMetrics(o, t.started_at, t.asset);
           if (m.totalPaid > 0) {
             tripLoadingBilled += m.loadersPool;
             tripLoaderProfit += m.profit;

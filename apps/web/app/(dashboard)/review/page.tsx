@@ -17,6 +17,7 @@ import {
   isGeostroyOrderValid,
   maskDateInput,
   isInternalCounterparty,
+  isTruckAsset,
 } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
@@ -261,7 +262,16 @@ function isLoaderProfitEligible(tripStartedAt?: string | null): boolean {
   return tripStartedAt.slice(0, 10) >= LOADER_PROFIT_START_DATE;
 }
 
-function calcOrderLoaderMetrics(o: TripOrder, tripStartedAt?: string | null) {
+function calcOrderLoaderMetrics(
+  o: TripOrder,
+  tripStartedAt?: string | null,
+  asset?: {
+    short_name?: string | null;
+    reg_number?: string | null;
+    asset_type_code?: string | null;
+    asset_type?: { code?: string | null } | null;
+  } | null,
+) {
   const lp1 = parseFloat(o.loader_pay || '0');
   const lp2 = parseFloat(o.loader2_pay || '0');
   let thirdPartyPay = 0;
@@ -276,10 +286,20 @@ function calcOrderLoaderMetrics(o: TripOrder, tripStartedAt?: string | null) {
     return { profit: 0, thirdPartyPay: 0, driverLoaderPay: 0, totalPaid: 0, loadersPool: 0 };
   }
 
-  // До 01.09.2026 система 30% с грузчиков не действовала — маржа компании 0, весь пул шёл рабочим
-  // Также для собственных внутренних работ компании (ТК501 / ТК510) маржа не начисляется
-  if (!isLoaderProfitEligible(tripStartedAt) || isInternalCounterparty(o.counterparty)) {
+  // Для собственных внутренних нужд компании (ТК501 / ТК510) маржа не начисляется и выручки нет
+  if (isInternalCounterparty(o.counterparty)) {
     return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: 0 };
+  }
+
+  // До 01.09.2026 система 30% с грузчиков не действовала — маржа компании 0, весь пул шёл рабочим
+  if (!isLoaderProfitEligible(tripStartedAt)) {
+    return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: totalPaid };
+  }
+
+  // Для тяжелых грузовиков (Валдаи, Кантер и т.п.) ставка водителя фиксированная / тарифная,
+  // деление на 30% Газелей категорически не применяется!
+  if (isTruckAsset(asset)) {
+    return { profit: 0, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool: totalPaid };
   }
 
   const dcp = parseFloat(String(o.driver_car_pay || '0'));
@@ -296,8 +316,17 @@ function calcOrderLoaderMetrics(o: TripOrder, tripStartedAt?: string | null) {
   return { profit, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool };
 }
 
-function calcOrderLoaderProfit(o: TripOrder, tripStartedAt?: string | null): number {
-  return calcOrderLoaderMetrics(o, tripStartedAt).profit;
+function calcOrderLoaderProfit(
+  o: TripOrder,
+  tripStartedAt?: string | null,
+  asset?: {
+    short_name?: string | null;
+    reg_number?: string | null;
+    asset_type_code?: string | null;
+    asset_type?: { code?: string | null } | null;
+  } | null,
+): number {
+  return calcOrderLoaderMetrics(o, tripStartedAt, asset).profit;
 }
 
 function calcTrip(trip: TripForReview, periodEndIso?: string) {
@@ -320,7 +349,7 @@ function calcTrip(trip: TripForReview, periodEndIso?: string) {
   let loadingBilled = 0;
 
   for (const o of activeOrders) {
-    const m = calcOrderLoaderMetrics(o, trip.started_at);
+    const m = calcOrderLoaderMetrics(o, trip.started_at, trip.asset);
     loaderProfit += m.profit;
     driverLoaderPay += m.driverLoaderPay;
     thirdPartyLoaderPay += m.thirdPartyPay;

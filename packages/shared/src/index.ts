@@ -156,8 +156,17 @@ export function isLoaderProfitEligible(tripStartedAt?: string | null): boolean {
  * 3. Если ставки машины нет, выручка ПРР берётся по базовой норме (ФОТ грузчиков / 70%).
  * 4. Чистая прибыль = Выручка ПРР - totalPaid.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function calcOrderLoaderMetrics(o: any, tripStartedAt?: string | null): OrderLoaderMetrics {
+export function calcOrderLoaderMetrics(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  o: any,
+  tripStartedAt?: string | null,
+  asset?: {
+    short_name?: string | null;
+    reg_number?: string | null;
+    asset_type_code?: string | null;
+    asset_type?: { code?: string | null } | null;
+  } | null,
+): OrderLoaderMetrics {
   const lp1 = parseFloat(o.loader_pay || '0');
   const lp2 = parseFloat(o.loader2_pay || '0');
   let thirdPartyPay = 0;
@@ -183,6 +192,19 @@ export function calcOrderLoaderMetrics(o: any, tripStartedAt?: string | null): O
     };
   }
 
+  // 1. Для внутренних нужд компании (ТК501 / ТК510) — это чистый внутренний расход, клиентской выручки и маржи нет
+  if (isInternalCounterparty(o.counterparty)) {
+    return {
+      profit: 0,
+      thirdPartyPay,
+      driverLoaderPay,
+      totalPaid,
+      loadersPool: 0,
+      margin: 0,
+    };
+  }
+
+  // 2. До 01.09.2026 система 30% с грузчиков не действовала — маржа компании 0, весь пул шёл рабочим
   if (!isLoaderProfitEligible(tripStartedAt)) {
     return {
       profit: 0,
@@ -194,6 +216,20 @@ export function calcOrderLoaderMetrics(o: any, tripStartedAt?: string | null): O
     };
   }
 
+  // 3. Для тяжелых грузовиков (Валдаи, Кантер и т.п.) водитель получает фикс/тариф за направление,
+  // а не 30% от заказа, поэтому формула деления ставки на 0.3 категорически неприменима!
+  if (isTruckAsset(asset)) {
+    return {
+      profit: 0,
+      thirdPartyPay,
+      driverLoaderPay,
+      totalPaid,
+      loadersPool: totalPaid,
+      margin: 0,
+    };
+  }
+
+  // 4. Для Газелей: почасовой пул или расчёт из ставки авто 30%
   const dcp = parseFloat(String(o.driver_car_pay || '0'));
   const amt = parseFloat(o.amount || '0');
   let loadersPool = 0;
