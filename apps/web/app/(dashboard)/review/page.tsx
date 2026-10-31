@@ -40,6 +40,8 @@ interface TripOrder {
   lifecycle_status: string;
   counterparty_id: string | null;
   counterparty: { name: string } | null;
+  invoice_paid_at?: string | null;
+  updated_at?: string | null;
   description?: string | null;
   direction?: string;
   is_driver_loader?: boolean;
@@ -298,7 +300,7 @@ function calcOrderLoaderProfit(o: TripOrder, tripStartedAt?: string | null): num
   return calcOrderLoaderMetrics(o, tripStartedAt).profit;
 }
 
-function calcTrip(trip: TripForReview) {
+function calcTrip(trip: TripForReview, periodEndIso?: string) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
   const expenses = trip.trip_expenses ?? [];
   const revenue = activeOrders.reduce(
@@ -328,11 +330,22 @@ function calcTrip(trip: TripForReview) {
   const driverCarPay = Math.max(0, driverPay - driverLoaderPay);
   const totalLoadingPayroll = thirdPartyLoaderPay + driverLoaderPay;
 
+  // Оплата считается поступившей ВНУТРИ периода, если:
+  // settlement_status === 'completed' И (нет invoice_paid_at — т.е. оплачено сразу в рейсе, либо invoice_paid_at <= periodEndIso).
+  // Если оплата пришла позже границы периода — на конец периода этот заказ фиксируется как долг (дебиторка)!
+  const isOrderPaidInPeriod = (o: TripOrder) => {
+    if (o.settlement_status !== 'completed') return false;
+    if (!periodEndIso) return true;
+    const paidAt = o.invoice_paid_at || null;
+    if (!paidAt) return true;
+    return paidAt <= periodEndIso;
+  };
+
   const collectedRevenue = activeOrders
-    .filter((o) => o.settlement_status === 'completed' && !isInternalCounterparty(o.counterparty))
+    .filter((o) => isOrderPaidInPeriod(o) && !isInternalCounterparty(o.counterparty))
     .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
   const pendingDebt = activeOrders
-    .filter((o) => o.settlement_status === 'pending' && !isInternalCounterparty(o.counterparty))
+    .filter((o) => !isOrderPaidInPeriod(o) && !isInternalCounterparty(o.counterparty))
     .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
 
   const fuelExpense = expenses
@@ -4147,6 +4160,22 @@ export default function ReviewPage() {
           : monthServiceOrders
       : [];
 
+  const currentPeriodEndIso = useMemo(() => {
+    if (mode !== 'history') return undefined;
+    if (statsPeriod === 'month') {
+      const parts = monthKey.split('-');
+      const y = parseInt(parts[0]!, 10);
+      const m = parseInt(parts[1]!, 10);
+      const nextM = m === 12 ? 1 : m + 1;
+      const nextY = m === 12 ? y + 1 : y;
+      return `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000Z`;
+    }
+    if (statsPeriod === 'week') {
+      return `${weekEnd}T23:59:59.999Z`;
+    }
+    return `${selectedDate}T23:59:59.999Z`;
+  }, [mode, statsPeriod, monthKey, weekStart, weekEnd, selectedDate]);
+
   // ── Combined Vehicle Groups ────────────────────────────────
   const combinedAssetGroups = useMemo(() => {
     const map = new Map<
@@ -4215,7 +4244,7 @@ export default function ReviewPage() {
       }
       const g = map.get(assetKey)!;
       g.trips.push(t);
-      const ct = calcTrip(t);
+      const ct = calcTrip(t, currentPeriodEndIso);
       g.tripsRevenue += ct.revenue;
       g.tripsPayroll += ct.totalPayroll;
       g.driverPayroll += ct.driverPay;
@@ -4280,7 +4309,7 @@ export default function ReviewPage() {
     });
 
     return groups.sort((a, b) => a.assetKey.localeCompare(b.assetKey));
-  }, [listTrips, listServiceOrders, mode]);
+  }, [listTrips, listServiceOrders, mode, currentPeriodEndIso]);
 
   // Aggregate Fleet Totals
   const totalFleetRevenue = useMemo(
@@ -4373,10 +4402,13 @@ export default function ReviewPage() {
     return { totalFleetExternalDebtCollected: externalSum, externalSettlements: items };
   }, [periodSettlementsData, periodTripOrderIds]);
 
-  // Фактическая прибыль: фактически поступившая оплата по рейсам периода (за вычетом неоплаченной дебиторки) минус прямые затраты рейсов и ТО
+  // Фактическая прибыль (Cash Flow):
+  // Собрано по рейсам периода (с фиксацией дебиторки на конец периода)
+  // + Погашения старых долгов прошлых периодов, поступившие в этом периоде
+  // − Все расходы периода (ЗП + Топливо + ТО)
   const totalFleetActualProfit = useMemo(
-    () => totalFleetNetProfit - totalFleetPendingDebt,
-    [totalFleetNetProfit, totalFleetPendingDebt],
+    () => totalFleetNetProfit - totalFleetPendingDebt + totalFleetExternalDebtCollected,
+    [totalFleetNetProfit, totalFleetPendingDebt, totalFleetExternalDebtCollected],
   );
   const totalFleetLoaderProfit = useMemo(
     () => combinedAssetGroups.reduce((s, g) => s + g.loaderProfit, 0),
@@ -4878,7 +4910,7 @@ export default function ReviewPage() {
                     ? 'bg-emerald-600 text-white'
                     : 'bg-rose-600 text-white',
                 )}
-                title={`Фактическая прибыль:\n• Поступило по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽\n• Не оплачено клиентами по рейсам (в долгах): ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n• Все расходы (ЗП + Топливо + ТО): ${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
+                title={`Фактическая прибыль («живой» кэш):\n• Собрано по рейсам периода: ${Math.round(totalFleetCollectedRevenue).toLocaleString('ru-RU')} ₽${totalFleetExternalDebtCollected > 0 ? `\n• Погашено долгов прошлых периодов (поступило сейчас): +${Math.round(totalFleetExternalDebtCollected).toLocaleString('ru-RU')} ₽` : ''}\n• В долгах клиентов на конец периода: ${Math.round(totalFleetPendingDebt).toLocaleString('ru-RU')} ₽\n• Все расходы (ЗП + Топливо + ТО): −${Math.round(totalFleetTripCosts + totalFleetMaintenance).toLocaleString('ru-RU')} ₽\n───────────────────────\nФактическая прибыль: ${Math.round(totalFleetActualProfit).toLocaleString('ru-RU')} ₽`}
               >
                 <span
                   className={cn(

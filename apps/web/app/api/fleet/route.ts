@@ -218,6 +218,7 @@ export async function GET(request: Request) {
           loaderProfit: number;
           loaderOrdersCount: number;
           maint: number;
+          otherExpenses: number;
           km: number;
           trips: number;
           profit: number;
@@ -235,6 +236,7 @@ export async function GET(request: Request) {
           loaderProfit: 0,
           loaderOrdersCount: 0,
           maint: 0,
+          otherExpenses: 0,
           km: 0,
           trips: 0,
           profit: 0,
@@ -279,14 +281,18 @@ export async function GET(request: Request) {
           }
         });
 
+        const isFuel = (e: any) =>
+          e.category?.name === 'ГСМ' ||
+          (e.description || '').toLowerCase().includes('гсм') ||
+          (e.description || '').toLowerCase().includes('топливо') ||
+          (e.description || '').toLowerCase().includes('заправ');
+
         const fuel = expenses
-          .filter(
-            (e: any) =>
-              e.category?.name === 'ГСМ' ||
-              (e.description || '').toLowerCase().includes('гсм') ||
-              (e.description || '').toLowerCase().includes('топливо') ||
-              (e.description || '').toLowerCase().includes('заправ'),
-          )
+          .filter(isFuel)
+          .reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+
+        const otherExp = expenses
+          .filter((e: any) => !isFuel(e))
           .reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
 
         const mileage =
@@ -296,6 +302,7 @@ export async function GET(request: Request) {
 
         monthly[dateKey].revenue += rev;
         monthly[dateKey].fuel += fuel;
+        monthly[dateKey].otherExpenses += otherExp;
         monthly[dateKey].driverPay += dPay;
         monthly[dateKey].loaderPay += lPay;
         monthly[dateKey].loadingBilled += tripLoadingBilled;
@@ -351,7 +358,8 @@ export async function GET(request: Request) {
       monthsList.forEach((m) => {
         const item = monthly[m.id];
         if (item) {
-          const costs = item.fuel + item.driverPay + item.loaderPay + item.maint;
+          const costs =
+            item.fuel + (item.otherExpenses || 0) + item.driverPay + item.loaderPay + item.maint;
           item.profit = item.revenue - costs;
           item.margin = item.revenue > 0 ? Math.round((item.profit / item.revenue) * 100) : 0;
         }
@@ -465,12 +473,14 @@ export async function GET(request: Request) {
         driverPay: 0,
         loaderPay: 0,
         maint: 0,
+        otherExpenses: 0,
         km: 0,
         trips: 0,
         profit: 0,
         margin: 0,
       };
-      const operCosts = curData.fuel + curData.driverPay + curData.loaderPay;
+      const operCosts =
+        curData.fuel + (curData.otherExpenses || 0) + curData.driverPay + curData.loaderPay;
       const fixedCost = parseFloat(asset.monthly_fixed_cost ?? '0') * periodMonths;
       const totalCosts = operCosts + curData.maint + fixedCost;
 

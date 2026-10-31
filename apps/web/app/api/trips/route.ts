@@ -30,7 +30,7 @@ export async function GET(request: Request) {
         direction, is_driver_loader, driver_car_pay, driver_loader_pay, loaders_data,
         loader:users!trip_orders_loader_id_fkey(id, name),
         loader2:users!trip_orders_loader2_id_fkey(id, name),
-        payment_method, settlement_status, lifecycle_status,
+        payment_method, settlement_status, lifecycle_status, invoice_paid_at, updated_at,
         counterparty_id,
         counterparty:counterparties(name)
       ),
