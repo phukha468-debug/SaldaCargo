@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редизайн меню и 2-строчных карточек авто | ТК501 Ревью</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 p-3 sm:p-6 min-h-screen">
+
+  <div class="max-w-6xl mx-auto space-y-4">
+
+    <!-- БАННЕР ПОЯСНЕНИЯ ДЛЯ УТВЕРЖДЕНИЯ -->
+    <div class="bg-indigo-900 text-white p-4 rounded-2xl shadow-md border-2 border-indigo-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="bg-indigo-500 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">ПРОТОТИП РЕДИЗАЙНА</span>
+          <h2 class="font-black text-sm sm:text-base">Разделение меню и 2-строчные карточки машин</h2>
+        </div>
+        <p class="text-xs text-indigo-200 mt-1">
+          1. Чёткое визуальное разделение на 3 контрастных яруса: Навигация ➔ Период ➔ Статистика.<br>
+          2. Карточка авто строго в <b>2 строчки</b>: все рейсы и наряды ТО скрыты под спойлеры (нажмите на бейдж рейсов или нарядов для раскрытия).
+        </p>
+      </div>
+      <div class="text-xs bg-indigo-800/80 px-3 py-2 rounded-xl border border-indigo-600 text-indigo-100 shrink-0">
+        Стандарт UI: <b>Dense 2-Line Layout</b>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════════
+         ЯРУС 1: ВЕРХНЕЕ МЕНЮ РАЗДЕЛА (КОНТРАСТНЫЙ ТЕМНЫЙ СТИЛЬ / ЧЕТКИЙ АКЦЕНТ)
+         Больше не сливается с периодом и статистикой!
+         ══════════════════════════════════════════════════════════════════════════ -->
+    <div class="bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <!-- Левая часть: Раздел + Переключатель Авто / Гараж -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 pr-3 border-r border-slate-700">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="font-black text-sm uppercase tracking-wide text-white">Ревью</span>
+        </div>
+
+        <!-- Контрастный сегментный переключатель разделов -->
+        <div class="bg-slate-800 p-1 rounded-xl border border-slate-700 flex items-center gap-1 text-xs font-bold">
+          <button class="bg-sky-500 text-white px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition">
+            <span>🚚</span>
+            <span>АВТО (ВОДИТЕЛИ)</span>
+          </button>
+          <button class="text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-700/60 transition flex items-center gap-1.5">
+            <span>🔧</span>
+            <span>ГАРАЖ (МЕХАНИКИ)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Правая часть: Фильтр статуса (На ревью / Активные / История) -->
+      <div class="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+        <div class="bg-slate-800/90 p-1 rounded-xl border border-slate-700 flex items-center gap-1 text-xs font-bold">
+          <button class="px-3 py-1.5 text-slate-400 hover:text-white rounded-lg transition">
+            НА РЕВЬЮ
+          </button>
+          <button class="px-3 py-1.5 text-slate-400 hover:text-white rounded-lg transition">
+            АКТИВНЫЕ
+          </button>
+          <button class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg shadow-sm font-black transition">
+            ИСТОРИЯ ✓
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════════
+         ЯРУС 2: ПАНЕЛЬ ВРЕМЕННОГО ПЕРИОДА (ОТДЕЛЬНАЯ ЧИСТАЯ БЕЛАЯ ПАНЕЛЬ С СЕТКОЙ)
+         Четко отделена от верхнего меню и от блока итогов!
+         ══════════════════════════════════════════════════════════════════════════ -->
+    <div class="bg-white px-4 py-2 rounded-xl shadow-xs border border-slate-300 flex flex-wrap items-center justify-between gap-2.5">
+      <!-- Слева: Переключатель День / Неделя / Месяц -->
+      <div class="flex items-center gap-1.5">
+        <span class="text-[10px] font-black uppercase text-slate-400 mr-1 hidden sm:inline">Период:</span>
+        <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex items-center gap-0.5 text-xs font-bold">
+          <button class="px-2.5 py-1 text-slate-600 hover:text-slate-900 rounded transition">ДЕНЬ</button>
+          <button class="px-2.5 py-1 text-slate-600 hover:text-slate-900 rounded transition">НЕДЕЛЯ</button>
+          <button class="px-2.5 py-1 bg-sky-600 text-white rounded shadow-2xs font-black">МЕСЯЦ</button>
+        </div>
+      </div>
+
+      <!-- По центру: Текущий месяц и стрелки листания -->
+      <div class="flex items-center gap-2">
+        <button class="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center transition">
+          ◀
+        </button>
+        <div class="flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+          <span class="text-sm">📅</span>
+          <span class="font-black text-xs sm:text-sm text-slate-900 uppercase">Сентябрь 2026 г.</span>
+          <button class="text-[10px] font-bold text-sky-600 hover:underline ml-1">сегодня</button>
+        </div>
+        <button class="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center transition">
+          ▶
+        </button>
+      </div>
+
+      <!-- Справа: Быстрый выбор месяцев -->
+      <div class="flex items-center gap-1 text-[11px] font-bold">
+        <button class="px-2 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded">ИЮНЬ</button>
+        <button class="px-2 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded">ИЮЛЬ</button>
+        <button class="px-2 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded">АВГ.</button>
+        <button class="px-2 py-1 bg-sky-100 text-sky-900 border border-sky-300 rounded font-black">СЕНТ.</button>
+        <button class="px-2 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded">ОКТ.</button>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════════
+         ЯРУС 3: ИТОГОВАЯ СТАТИСТИКА (КОМПАКТНАЯ СВОДКА БЕЗ РАЗДУВАНИЯ)
+         Четкая граница, компактное размещение в 2 строки!
+         ══════════════════════════════════════════════════════════════════════════ -->
+    <div class="bg-gradient-to-b from-sky-50/70 to-white p-3 rounded-2xl border-2 border-sky-200 shadow-xs space-y-2">
+      <!-- Строка 1 заголовка статистики: счетчик + доп. бейджи + свернуть/развернуть -->
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-black text-slate-900 uppercase tracking-wide">
+            ИТОГОВАЯ СТАТИСТИКА · <span class="text-sky-700">134 РЕЙСА</span> · <span class="text-purple-700">14 ТО</span>
+          </span>
+          <span class="text-slate-300">|</span>
+          <span class="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+            в т.ч. ПРР: <b class="text-emerald-700">+124 922 ₽</b>
+          </span>
+          <span class="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+            в долгах клиентов: <b class="text-amber-700">31 800 ₽</b>
+          </span>
+          <span class="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+            погашено долгов: <b class="text-sky-700">+585 020 ₽</b>
+          </span>
+        </div>
+
+        <button class="text-xs font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer">
+          <span>↕</span> <span>Развернуть все авто</span>
+        </button>
+      </div>
+
+      <!-- Строка 2: Финансовые KPI в компактную плотную линейку -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center">
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <div class="text-[9px] font-bold uppercase text-slate-400">ВЫРУЧКА</div>
+          <div class="text-xs sm:text-sm font-black text-slate-900 font-mono mt-0.5">1 995 410 ₽</div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <div class="text-[9px] font-bold uppercase text-slate-400">ЗАРПЛАТЫ (ФОТ)</div>
+          <div class="text-xs sm:text-sm font-black text-amber-600 font-mono mt-0.5">−698 672 ₽</div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <div class="text-[9px] font-bold uppercase text-slate-400">ТОПЛИВО (ГСМ)</div>
+          <div class="text-xs sm:text-sm font-black text-rose-500 font-mono mt-0.5">−437 400 ₽</div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <div class="text-[9px] font-bold uppercase text-slate-400">РЕМОНТЫ ТО</div>
+          <div class="text-xs sm:text-sm font-black text-rose-600 font-mono mt-0.5">−108 400 ₽</div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <div class="text-[9px] font-bold uppercase text-slate-400">ЧИСТЫЙ ИТОГ</div>
+          <div class="text-xs sm:text-sm font-black text-slate-800 font-mono mt-0.5">749 938 ₽</div>
+        </div>
+        <div class="bg-emerald-600 text-white p-2 rounded-xl shadow-xs border border-emerald-700">
+          <div class="text-[9px] font-black uppercase text-emerald-200">ФАКТ. ПРИБЫЛЬ</div>
+          <div class="text-xs sm:text-sm font-black font-mono mt-0.5">718 138 ₽</div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════════
+         ЯРУС 4: КАРТОЧКИ МАШИН (СТРОГО 2 СТРОЧКИ + СПОЙЛЕРЫ)
+         ══════════════════════════════════════════════════════════════════════════ -->
+    <div class="space-y-2.5">
+      <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500 px-1">
+        <span>СПИСОК АВТОМОБИЛЕЙ (12 АВТО)</span>
+        <span class="text-[11px] text-slate-400 font-medium">Нажмите на бейдж рейсов или нарядов, чтобы раскрыть номера</span>
+      </div>
+
+      <!-- КАРТОЧКА 1: ВАЛДАЙ 5м (было 3 строчки, стало ровно 2 строчки!) -->
+      <div class="bg-white rounded-xl border border-slate-300 hover:border-slate-400 shadow-xs transition-all overflow-hidden">
+        <div class="p-3 flex items-center justify-between gap-3">
+          <!-- Левая часть: 2 строчки данных -->
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-lg shrink-0">
+              🚚
+            </div>
+            <div class="min-w-0 flex-1">
+              <!-- СТРОКА 1: Название машины -->
+              <div class="flex items-center gap-2">
+                <h3 class="font-black text-sm text-slate-900 truncate">Валдай 5м (У883АР96)</h3>
+                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">тент 5.2м</span>
+              </div>
+
+              <!-- СТРОКА 2: Спойлеры рейсов и нарядов строго в одну строку -->
+              <div class="flex items-center gap-2 mt-1 text-xs">
+                <!-- СПОЙЛЕР РЕЙСОВ -->
+                <button onclick="toggleSpoiler('trips-883')" class="inline-flex items-center gap-1 font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded-md transition cursor-pointer text-[11px]">
+                  <span>📋</span>
+                  <span>7 рейсов</span>
+                  <span class="text-[9px] text-sky-500">▾</span>
+                </button>
+
+                <span class="text-slate-300">·</span>
+
+                <!-- СПОЙЛЕР НАРЯДОВ ТО -->
+                <button onclick="toggleSpoiler('orders-883')" class="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md transition cursor-pointer text-[11px]">
+                  <span>🔧</span>
+                  <span>1 наряд ТО (−800 ₽)</span>
+                  <span class="text-[9px] text-rose-500">▾</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Правая часть: Финансовые показатели в 1 компактную строку -->
+          <div class="flex items-center gap-3 sm:gap-4 shrink-0 text-right">
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">Выручка</span>
+              <span class="text-xs sm:text-sm font-black text-slate-800 font-mono">165 900 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">ЗП (ФОТ)</span>
+              <span class="text-xs sm:text-sm font-black text-amber-600 font-mono">39 070 ₽</span>
+              <span class="text-[8.5px] font-bold text-emerald-600 block leading-none">+1 200 ₽ ПРР</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">ГСМ</span>
+              <span class="text-xs sm:text-sm font-black text-rose-500 font-mono">40 000 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">Ремонт ТО</span>
+              <span class="text-xs sm:text-sm font-black text-rose-600 font-mono">−800 ₽</span>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              <span class="text-[9px] font-black uppercase text-emerald-600 block">Прибыль</span>
+              <span class="text-xs sm:text-sm font-black text-emerald-700 font-mono">86 030 ₽</span>
+            </div>
+            <button class="text-slate-400 hover:text-slate-700 p-1 rounded-lg text-lg">
+              ▾
+            </button>
+          </div>
+        </div>
+
+        <!-- СПОЙЛЕР ВЫПАДАЮЩИЙ: Номера рейсов (по умолчанию скрыт, открывается по клику) -->
+        <div id="trips-883" class="hidden bg-sky-50/70 border-t border-sky-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider text-sky-800 mr-1">Номера рейсов (7):</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#746</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#703</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#688</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#685</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#678</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#670</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#650</span>
+        </div>
+
+        <!-- СПОЙЛЕР ВЫПАДАЮЩИЙ: Заказ-наряды ТО (по умолчанию скрыт) -->
+        <div id="orders-883" class="hidden bg-rose-50/70 border-t border-rose-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider text-rose-800 mr-1">Заказ-наряды ТО (1):</span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold hover:bg-rose-600 hover:text-white cursor-pointer shadow-2xs">
+            🔧 #131 (−800 ₽)
+          </span>
+        </div>
+      </div>
+
+
+      <!-- КАРТОЧКА 2: ВАЛДАЙ 6м (было 7 СТРОК переносов на скриншоте, стало ровно 2 строчки!) -->
+      <div class="bg-white rounded-xl border border-slate-300 hover:border-slate-400 shadow-xs transition-all overflow-hidden">
+        <div class="p-3 flex items-center justify-between gap-3">
+          <!-- Левая часть: 2 строчки -->
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-lg shrink-0">
+              🚚
+            </div>
+            <div class="min-w-0 flex-1">
+              <!-- СТРОКА 1: Название машины -->
+              <div class="flex items-center gap-2">
+                <h3 class="font-black text-sm text-slate-900 truncate">Валдай 6м (А096МВ196)</h3>
+                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">тент 6.0м</span>
+              </div>
+
+              <!-- СТРОКА 2: Спойлеры рейсов и нарядов строго в одну строку -->
+              <div class="flex items-center gap-2 mt-1 text-xs">
+                <!-- СПОЙЛЕР РЕЙСОВ: 14 рейсов -->
+                <button onclick="toggleSpoiler('trips-096')" class="inline-flex items-center gap-1 font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded-md transition cursor-pointer text-[11px]">
+                  <span>📋</span>
+                  <span>14 рейсов</span>
+                  <span class="text-[9px] text-sky-500">▾</span>
+                </button>
+
+                <span class="text-slate-300">·</span>
+
+                <!-- СПОЙЛЕР НАРЯДОВ ТО: 5 нарядов -->
+                <button onclick="toggleSpoiler('orders-096')" class="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md transition cursor-pointer text-[11px]">
+                  <span>🔧</span>
+                  <span>5 нарядов ТО (−28 500 ₽)</span>
+                  <span class="text-[9px] text-rose-500">▾</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Правая часть: Финансовые показатели в 1 строку -->
+          <div class="flex items-center gap-3 sm:gap-4 shrink-0 text-right">
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">Выручка</span>
+              <span class="text-xs sm:text-sm font-black text-slate-800 font-mono">578 000 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">ЗП (ФОТ)</span>
+              <span class="text-xs sm:text-sm font-black text-amber-600 font-mono">133 600 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">ГСМ</span>
+              <span class="text-xs sm:text-sm font-black text-rose-500 font-mono">164 000 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">Ремонт ТО</span>
+              <span class="text-xs sm:text-sm font-black text-rose-600 font-mono">−28 500 ₽</span>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              <span class="text-[9px] font-black uppercase text-emerald-600 block">Прибыль</span>
+              <span class="text-xs sm:text-sm font-black text-emerald-700 font-mono">251 900 ₽</span>
+            </div>
+            <button class="text-slate-400 hover:text-slate-700 p-1 rounded-lg text-lg">
+              ▾
+            </button>
+          </div>
+        </div>
+
+        <!-- СПОЙЛЕР ВЫПАДАЮЩИЙ: 14 рейсов Валдая 096 -->
+        <div id="trips-096" class="hidden bg-sky-50/70 border-t border-sky-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider text-sky-800 mr-1">Номера рейсов (14):</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#741</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#727</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#725</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#711</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#702</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#693</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#683</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#679</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#667</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#660</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#658</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#635</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#626</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#610</span>
+        </div>
+
+        <!-- СПОЙЛЕР ВЫПАДАЮЩИЙ: 5 нарядов Валдая 096 -->
+        <div id="orders-096" class="hidden bg-rose-50/70 border-t border-rose-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider text-rose-800 mr-1">Заказ-наряды ТО (5):</span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold hover:bg-rose-600 hover:text-white cursor-pointer shadow-2xs">
+            🔧 #136 (−400 ₽)
+          </span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold hover:bg-rose-600 hover:text-white cursor-pointer shadow-2xs">
+            🔧 #135 (−12 700 ₽)
+          </span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold hover:bg-rose-600 hover:text-white cursor-pointer shadow-2xs">
+            🔧 #129 (−11 400 ₽)
+          </span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold hover:bg-rose-600 hover:text-white cursor-pointer shadow-2xs">
+            🔧 #127 (−2 400 ₽)
+          </span>
+          <span class="bg-white border border-amber-300 text-amber-800 px-2 py-0.5 rounded font-bold hover:bg-amber-600 hover:text-white cursor-pointer shadow-2xs">
+            ⚙️ #126 (−1 600 ₽)
+          </span>
+        </div>
+      </div>
+
+
+      <!-- КАРТОЧКА 3: ГАЗЕЛЬ (ПРИМЕР ДЛЯ СРАВНЕНИЯ) -->
+      <div class="bg-white rounded-xl border border-slate-300 hover:border-slate-400 shadow-xs transition-all overflow-hidden">
+        <div class="p-3 flex items-center justify-between gap-3">
+          <!-- Левая часть: 2 строчки -->
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg shrink-0">
+              🚚
+            </div>
+            <div class="min-w-0 flex-1">
+              <!-- СТРОКА 1 -->
+              <div class="flex items-center gap-2">
+                <h3 class="font-black text-sm text-slate-900 truncate">Газель 4.2м (Х866КМ66)</h3>
+                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">Полещук В.В.</span>
+              </div>
+
+              <!-- СТРОКА 2 -->
+              <div class="flex items-center gap-2 mt-1 text-xs">
+                <button onclick="toggleSpoiler('trips-866')" class="inline-flex items-center gap-1 font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded-md transition cursor-pointer text-[11px]">
+                  <span>📋</span>
+                  <span>19 рейсов</span>
+                  <span class="text-[9px] text-sky-500">▾</span>
+                </button>
+
+                <span class="text-slate-300">·</span>
+
+                <button onclick="toggleSpoiler('orders-866')" class="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md transition cursor-pointer text-[11px]">
+                  <span>🔧</span>
+                  <span>2 наряда ТО (−4 200 ₽)</span>
+                  <span class="text-[9px] text-rose-500">▾</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Правая часть: Показатели -->
+          <div class="flex items-center gap-3 sm:gap-4 shrink-0 text-right">
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">Выручка</span>
+              <span class="text-xs sm:text-sm font-black text-slate-800 font-mono">234 500 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">ЗП (ФОТ)</span>
+              <span class="text-xs sm:text-sm font-black text-amber-600 font-mono">68 400 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">ГСМ</span>
+              <span class="text-xs sm:text-sm font-black text-rose-500 font-mono">52 100 ₽</span>
+            </div>
+            <div class="hidden sm:block">
+              <span class="text-[9px] font-bold uppercase text-slate-400 block">Ремонт ТО</span>
+              <span class="text-xs sm:text-sm font-black text-rose-600 font-mono">−4 200 ₽</span>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              <span class="text-[9px] font-black uppercase text-emerald-600 block">Прибыль</span>
+              <span class="text-xs sm:text-sm font-black text-emerald-700 font-mono">109 800 ₽</span>
+            </div>
+            <button class="text-slate-400 hover:text-slate-700 p-1 rounded-lg text-lg">
+              ▾
+            </button>
+          </div>
+        </div>
+
+        <!-- СПОЙЛЕР: Рейсы Газели 866 -->
+        <div id="trips-866" class="hidden bg-sky-50/70 border-t border-sky-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider text-sky-800 mr-1">Номера рейсов (19):</span>
+          <span class="bg-white border border-sky-200 text-sky-700 px-2 py-0.5 rounded font-bold hover:bg-sky-600 hover:text-white cursor-pointer shadow-2xs">#901..#924</span>
+        </div>
+
+        <!-- СПОЙЛЕР: Наряды Газели 866 -->
+        <div id="orders-866" class="hidden bg-rose-50/70 border-t border-rose-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider text-rose-800 mr-1">Заказ-наряды ТО:</span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold shadow-2xs">🔧 #140 Замена колодок (−2 200 ₽)</span>
+          <span class="bg-white border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-bold shadow-2xs">🔧 #138 Замена масла (−2 000 ₽)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ТАБЛИЦА СРАВНЕНИЯ «БЫЛО vs СТАЛО» -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-300 shadow-xs mt-6 space-y-3">
+      <h3 class="font-black text-sm uppercase text-slate-800">Что конкретно изменилось в сравнении со скриншотом:</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="bg-rose-50/70 p-3 rounded-xl border border-rose-200 space-y-1.5">
+          <div class="font-black text-rose-800 uppercase flex items-center gap-1">
+            <span>❌</span> <span>БЫЛО (на вашем скриншоте):</span>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-slate-700">
+            <li>Всё меню сливается в одну светлую голубую полосу — трудно визуально отличить переключатель «Авто/Гараж» от календаря.</li>
+            <li>Карточка Валдая занимает <b>7 строк</b> из-за того, что все 14 номеров рейсов и 5 заказ-нарядов вывалены наружу кучей бейджей.</li>
+            <li>На экране помещается всего 1–2 машины, приходится постоянно скроллить.</li>
+          </ul>
+        </div>
+
+        <div class="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-1.5">
+          <div class="font-black text-emerald-800 uppercase flex items-center gap-1">
+            <span>✅</span> <span>СТАЛО (в этом прототипе):</span>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-slate-700">
+            <li><b>3 контрастных яруса</b>: Темный графитовый бар навигации ➔ Чистая белая полоса календаря ➔ Компактная карточка итогов.</li>
+            <li>Карточка машины строго в <b>2 строчки</b>: высота снизилась с 180px до <b>54px</b>!</li>
+            <li>Рейсы и ТО спрятаны под аккуратные кнопки-спойлеры: <code>[📋 14 рейсов ▾]</code> и <code>[🔧 5 нарядов ТО ▾]</code>.</li>
+            <li>При клике на бейдж плавно открывается список номеров. На экране теперь видно 8–10 машин сразу!</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleSpoiler(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.toggle('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

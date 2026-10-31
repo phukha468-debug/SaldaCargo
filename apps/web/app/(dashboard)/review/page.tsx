@@ -444,46 +444,51 @@ function DateNav({
   const isToday = date === today;
 
   return (
-    <div className="flex flex-wrap items-center justify-between border-b border-sky-100 px-3.5 py-1.5 gap-2 bg-sky-100/40">
+    <div className="flex flex-wrap items-center justify-between border border-slate-300 px-3.5 py-2 gap-2.5 bg-white rounded-xl shadow-xs">
       {/* Переключатель периода: День / Неделя / Месяц */}
       {setPeriod && (
-        <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-sky-200/70">
-          <button
-            type="button"
-            onClick={() => setPeriod('day')}
-            className={cn(
-              'px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
-              period === 'day'
-                ? 'bg-sky-500 text-white shadow-2xs'
-                : 'text-sky-700 hover:bg-sky-50',
-            )}
-          >
-            День
-          </button>
-          <button
-            type="button"
-            onClick={() => setPeriod('week')}
-            className={cn(
-              'px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
-              period === 'week'
-                ? 'bg-sky-500 text-white shadow-2xs'
-                : 'text-sky-700 hover:bg-sky-50',
-            )}
-          >
-            Неделя
-          </button>
-          <button
-            type="button"
-            onClick={() => setPeriod('month')}
-            className={cn(
-              'px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
-              period === 'month'
-                ? 'bg-sky-500 text-white shadow-2xs'
-                : 'text-sky-700 hover:bg-sky-50',
-            )}
-          >
-            Месяц
-          </button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-black uppercase text-slate-400 mr-0.5 hidden sm:inline">
+            Период:
+          </span>
+          <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setPeriod('day')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
+                period === 'day'
+                  ? 'bg-sky-600 text-white shadow-2xs font-black'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              День
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriod('week')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
+                period === 'week'
+                  ? 'bg-sky-600 text-white shadow-2xs font-black'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              Неделя
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriod('month')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer',
+                period === 'month'
+                  ? 'bg-sky-600 text-white shadow-2xs font-black'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              Месяц
+            </button>
+          </div>
         </div>
       )}
 
@@ -492,13 +497,13 @@ function DateNav({
         <button
           type="button"
           onClick={() => shift(-1)}
-          className="px-2.5 py-0.5 bg-sky-500 hover:bg-sky-600 active:bg-sky-700 rounded-lg text-white font-black text-xs cursor-pointer shadow-2xs transition-colors"
+          className="w-7 h-7 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 font-bold text-xs cursor-pointer shadow-2xs transition-colors flex items-center justify-center"
           aria-label="Предыдущий период"
         >
-          ←
+          ◀
         </button>
 
-        <label className="flex items-center gap-1.5 px-2 cursor-pointer">
+        <label className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:border-slate-300 transition-colors">
           <input
             type="date"
             value={date}
@@ -507,7 +512,7 @@ function DateNav({
             className="sr-only"
           />
           <span className="material-symbols-outlined text-sky-600 text-[16px]">calendar_today</span>
-          <span className="text-sm font-black text-sky-950 hover:text-sky-700 transition-colors whitespace-nowrap">
+          <span className="text-xs sm:text-sm font-black text-slate-900 uppercase hover:text-sky-700 transition-colors whitespace-nowrap">
             {period === 'day' &&
               new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
                 day: 'numeric',
@@ -527,11 +532,12 @@ function DateNav({
               })}
           </span>
           {period === 'day' && (
-            <span className="text-xs font-medium text-sky-700/70 whitespace-nowrap hidden sm:inline">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap hidden sm:inline capitalize">
+              (
               {new Date(date + 'T12:00:00').toLocaleDateString('ru-RU', {
                 weekday: 'short',
-                year: 'numeric',
               })}
+              )
             </span>
           )}
           {!isToday && (
@@ -541,9 +547,9 @@ function DateNav({
                 e.preventDefault();
                 onChange(today);
               }}
-              className="text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-300/70 px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer transition-colors"
+              className="text-[10px] font-bold text-sky-700 hover:underline ml-1"
             >
-              → сегодня
+              сегодня
             </button>
           )}
         </label>
@@ -552,16 +558,16 @@ function DateNav({
           type="button"
           onClick={() => shift(1)}
           disabled={date >= today}
-          className="px-2.5 py-0.5 bg-sky-500 hover:bg-sky-600 active:bg-sky-700 rounded-lg text-white font-black text-xs cursor-pointer shadow-2xs transition-colors disabled:bg-sky-100 disabled:text-sky-300 disabled:cursor-not-allowed disabled:shadow-none"
+          className="w-7 h-7 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 font-bold text-xs cursor-pointer shadow-2xs transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="Следующий период"
         >
-          →
+          ▶
         </button>
       </div>
 
       {/* Быстрые месяцы / недели справа */}
       {period !== 'week' ? (
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto text-[11px] font-bold">
           {months.map((m) => {
             const active = m.month === curMonth && m.year === curYear;
             return (
@@ -570,8 +576,10 @@ function DateNav({
                 key={`${m.year}-${m.month}`}
                 onClick={() => goMonth(m.year, m.month)}
                 className={cn(
-                  'px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap cursor-pointer',
-                  active ? 'bg-sky-500 text-white shadow-2xs' : 'text-sky-700 hover:bg-white',
+                  'px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer',
+                  active
+                    ? 'bg-sky-100 text-sky-900 border border-sky-300 font-black'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100',
                 )}
               >
                 {m.label}
@@ -3698,11 +3706,33 @@ export default function ReviewPage() {
     });
   };
 
+  const toggleTripsSpoiler = (assetKey: string) => {
+    setOpenTripsSpoilers((prev) => {
+      const next = new Set(prev);
+      if (next.has(assetKey)) next.delete(assetKey);
+      else next.add(assetKey);
+      return next;
+    });
+  };
+
+  const toggleOrdersSpoiler = (assetKey: string) => {
+    setOpenOrdersSpoilers((prev) => {
+      const next = new Set(prev);
+      if (next.has(assetKey)) next.delete(assetKey);
+      else next.add(assetKey);
+      return next;
+    });
+  };
+
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
   const [editServiceOrder, setEditServiceOrder] = useState<ReviewServiceOrder | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('month');
+  // Стартовая позиция фильтра — ДЕНЬ (по умолчанию)
+  const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('day');
+  // Интерактивные спойлеры для номеров рейсов и заказ-нарядов ТО внутри карточки авто
+  const [openTripsSpoilers, setOpenTripsSpoilers] = useState<Set<string>>(new Set());
+  const [openOrdersSpoilers, setOpenOrdersSpoilers] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -4363,41 +4393,32 @@ export default function ReviewPage() {
 
   return (
     <div className="space-y-3 max-w-5xl mx-auto animate-in fade-in duration-300">
-      {/* 1. Компактная светлая верхняя строка: Заголовок + Кнопки Авто/Гараж (Голубая и Изумрудная) + Режимы */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-sky-200/80 rounded-2xl px-3.5 py-1.5 shadow-2xs">
+      {/* 1. КОНТРАСТНЫЙ ЯРУС 1: ВЕРХНЕЕ МЕНЮ РАЗДЕЛА */}
+      <div className="bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-md border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-4 rounded-full bg-gradient-to-b from-sky-500 to-emerald-500" />
-            <h1 className="text-base font-black text-sky-950 tracking-tight">
+          <div className="flex items-center gap-2 pr-3 border-r border-slate-700">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <h1 className="font-black text-sm uppercase tracking-wide text-white">
               Ревью · {reviewSection === 'auto' ? 'Авто (Водители)' : 'Гараж (Механики)'}
             </h1>
           </div>
 
-          <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
-          {/* Уменьшенные в 2 раза кнопки: Голубая для Авто, Изумрудная для Гаража */}
-          <div className="flex items-center gap-1.5">
+          {/* Сегментный переключатель Авто / Гараж */}
+          <div className="bg-slate-800 p-1 rounded-xl border border-slate-700 flex items-center gap-1 text-xs font-bold">
             <button
               type="button"
               onClick={() => setReviewSection('auto')}
               className={cn(
-                'py-1.5 px-3.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer',
+                'py-1.5 px-3 rounded-lg font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer',
                 reviewSection === 'auto'
-                  ? 'bg-sky-600 text-white shadow-xs shadow-sky-200'
-                  : 'bg-sky-50/70 text-sky-800 hover:bg-sky-100 border border-sky-200/60',
+                  ? 'bg-sky-500 text-white shadow-xs'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/60',
               )}
             >
-              <span>🚛</span>
+              <span>🚚</span>
               <span>Авто (Водители)</span>
               {mode !== 'history' && trips.length > 0 && (
-                <span
-                  className={cn(
-                    'px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none',
-                    reviewSection === 'auto'
-                      ? 'bg-white text-sky-700'
-                      : 'bg-sky-200/80 text-sky-900',
-                  )}
-                >
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none bg-sky-900 text-sky-100">
                   {trips.length}
                 </span>
               )}
@@ -4407,23 +4428,16 @@ export default function ReviewPage() {
               type="button"
               onClick={() => setReviewSection('garage')}
               className={cn(
-                'py-1.5 px-3.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer',
+                'py-1.5 px-3 rounded-lg font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer',
                 reviewSection === 'garage'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-200'
-                  : 'bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60',
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/60',
               )}
             >
               <span>🔧</span>
               <span>Гараж (Механики)</span>
               {mode !== 'history' && garageOrders.length > 0 && (
-                <span
-                  className={cn(
-                    'px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none',
-                    reviewSection === 'garage'
-                      ? 'bg-white text-emerald-700'
-                      : 'bg-emerald-200/80 text-emerald-900',
-                  )}
-                >
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none bg-emerald-900 text-emerald-100">
                   {garageOrders.length}
                 </span>
               )}
@@ -4431,16 +4445,16 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        {/* Вкладки На ревью / Активные (В работе) / История в голубых тонах */}
-        <div className="flex items-center gap-1 bg-sky-50/80 p-1 rounded-xl border border-sky-100">
+        {/* Вкладки На ревью / Активные / История */}
+        <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700 self-stretch sm:self-auto justify-end">
           <button
             type="button"
             onClick={() => setMode('review')}
             className={cn(
-              'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
+              'px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
               mode === 'review'
-                ? 'bg-amber-500 text-white shadow-2xs shadow-amber-200'
-                : 'text-sky-700 hover:bg-white/70',
+                ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                : 'text-slate-400 hover:text-white',
             )}
           >
             На ревью
@@ -4456,10 +4470,10 @@ export default function ReviewPage() {
             type="button"
             onClick={() => setMode('active')}
             className={cn(
-              'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
+              'px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
               mode === 'active'
-                ? 'bg-sky-500 text-white shadow-2xs shadow-sky-200'
-                : 'text-sky-700 hover:bg-white/70',
+                ? 'bg-sky-500 text-white font-black shadow-xs'
+                : 'text-slate-400 hover:text-white',
             )}
           >
             {reviewSection === 'auto' ? 'Активные' : 'В работе'}
@@ -4475,28 +4489,29 @@ export default function ReviewPage() {
             type="button"
             onClick={() => setMode('history')}
             className={cn(
-              'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
+              'px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer',
               mode === 'history'
-                ? 'bg-sky-600 text-white shadow-2xs'
-                : 'text-sky-700 hover:bg-white/70',
+                ? 'bg-indigo-600 text-white font-black shadow-xs'
+                : 'text-slate-400 hover:text-white',
             )}
           >
-            История
+            История ✓
           </button>
         </div>
       </div>
 
-      {/* 2. Единый светло-голубой/мятный блок: Календарь + Фильтр парка + ИТОГОВАЯ СТАТИСТИКА СВЕРХУ */}
-      <div className="bg-gradient-to-r from-sky-50/90 via-white to-emerald-50/70 border border-sky-200 rounded-2xl shadow-2xs overflow-hidden">
-        {mode === 'history' && (
-          <DateNav
-            date={selectedDate}
-            period={statsPeriod}
-            onChange={setSelectedDate}
-            setPeriod={setStatsPeriod}
-          />
-        )}
+      {/* 2. ЯРУС 2: ВРЕМЕННОЙ ПЕРИОД (ОТДЕЛЬНАЯ ПАНЕЛЬ) */}
+      {mode === 'history' && (
+        <DateNav
+          date={selectedDate}
+          period={statsPeriod}
+          onChange={setSelectedDate}
+          setPeriod={setStatsPeriod}
+        />
+      )}
 
+      {/* 3. ЯРУС 3: ИТОГОВАЯ СТАТИСТИКА (ОТДЕЛЬНАЯ КАРТОЧКА С ЧЕТКИМИ ГРАНИЦАМИ) */}
+      <div className="bg-gradient-to-b from-sky-50/70 via-white to-white border-2 border-sky-200 rounded-2xl shadow-xs overflow-hidden">
         {reviewSection === 'garage' ? (
           <>
             {/* Подшапка фильтра Свои / Клиентские */}
@@ -4981,26 +4996,51 @@ export default function ReviewPage() {
             <>
               {combinedAssetGroups.map((group) => {
                 const isExpanded = expandedGroups.has(group.assetKey);
+                const isTripsOpen = openTripsSpoilers.has(group.assetKey);
+                const isOrdersOpen = openOrdersSpoilers.has(group.assetKey);
 
                 return (
                   <div
                     key={group.assetKey}
                     className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
                   >
-                    {/* Group Header */}
+                    {/* Group Header - Плотный 2-строчный вид (Dense 2-Line Layout) */}
                     <div
                       onClick={() => toggleGroup(group.assetKey)}
-                      className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-3 sm:p-3.5 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors gap-3"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-sky-100 p-2 rounded-xl text-sky-600">
-                          <span className="material-symbols-outlined block">local_shipping</span>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="bg-sky-100 p-2 sm:p-2.5 rounded-xl text-sky-600 shrink-0">
+                          <span className="material-symbols-outlined block text-xl sm:text-2xl">
+                            local_shipping
+                          </span>
                         </div>
-                        <div>
-                          <h3 className="font-bold text-slate-800 text-base">{group.assetKey}</h3>
-                          <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <div className="min-w-0 flex-1">
+                          {/* СТРОКА 1: Название машины */}
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 text-sm sm:text-base truncate">
+                              {group.assetKey}
+                            </h3>
+                          </div>
+
+                          {/* СТРОКА 2: Спойлеры рейсов и нарядов строго в одну строку */}
+                          <div className="flex items-center gap-2 mt-1 text-xs">
                             {group.trips.length > 0 ? (
-                              <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTripsSpoiler(group.assetKey);
+                                }}
+                                className={cn(
+                                  'inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-md transition cursor-pointer text-[11px] shadow-2xs',
+                                  isTripsOpen
+                                    ? 'bg-sky-600 text-white shadow-xs'
+                                    : 'bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200',
+                                )}
+                                title="Нажмите, чтобы показать или скрыть номера рейсов"
+                              >
+                                <span>📋</span>
                                 <span>
                                   {group.trips.length} рейс
                                   {group.trips.length === 1
@@ -5008,32 +5048,20 @@ export default function ReviewPage() {
                                     : group.trips.length < 5
                                       ? 'а'
                                       : 'ов'}
-                                  :
                                 </span>
-                                <div className="inline-flex flex-wrap gap-1 items-center">
-                                  {group.trips.map((t) => (
-                                    <span
-                                      key={t.id}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!expandedGroups.has(group.assetKey)) {
-                                          toggleGroup(group.assetKey);
-                                        }
-                                        if (!expandedIds.has(t.id)) {
-                                          toggleExpand(t.id);
-                                        }
-                                      }}
-                                      className="inline-flex items-center bg-sky-50 hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-1.5 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
-                                      title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
-                                    >
-                                      #{t.trip_number}
-                                    </span>
-                                  ))}
-                                </div>
-                              </>
+                                <span
+                                  className={cn(
+                                    'text-[9px] transition-transform',
+                                    isTripsOpen ? 'rotate-180' : '',
+                                  )}
+                                >
+                                  ▾
+                                </span>
+                              </button>
                             ) : (
-                              <span className="text-slate-400 italic">0 рейсов</span>
+                              <span className="text-slate-400 italic text-[11px]">0 рейсов</span>
                             )}
+
                             {mode === 'history' && group.serviceOrders.length > 0 && (
                               <>
                                 <span className="text-slate-300">·</span>
@@ -5041,62 +5069,39 @@ export default function ReviewPage() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setSelectedMaintenanceGroup(group);
+                                    toggleOrdersSpoiler(group.assetKey);
                                   }}
-                                  className="text-rose-600 hover:text-rose-800 font-bold underline decoration-rose-300 underline-offset-2 cursor-pointer transition-colors"
-                                  title="Нажмите для просмотра заказ-нарядов"
+                                  className={cn(
+                                    'inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-md transition cursor-pointer text-[11px] shadow-2xs',
+                                    isOrdersOpen
+                                      ? 'bg-rose-600 text-white shadow-xs'
+                                      : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200',
+                                  )}
+                                  title="Нажмите, чтобы показать или скрыть заказ-наряды ТО"
                                 >
-                                  {group.serviceOrders.length} наряд
-                                  {group.serviceOrders.length === 1 ? '' : 'а'} ТО (−
-                                  {group.maintenanceTotal.toLocaleString('ru-RU')} ₽)
+                                  <span>🔧</span>
+                                  <span>
+                                    {group.serviceOrders.length} наряд
+                                    {group.serviceOrders.length === 1 ? '' : 'а'} ТО (−
+                                    {Math.round(group.maintenanceTotal).toLocaleString('ru-RU')} ₽)
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      'text-[9px] transition-transform',
+                                      isOrdersOpen ? 'rotate-180' : '',
+                                    )}
+                                  >
+                                    ▾
+                                  </span>
                                 </button>
                               </>
                             )}
                           </div>
-                          {/* Service order badges directly in header */}
-                          {mode === 'history' && group.serviceOrders.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                              {group.serviceOrders.map((so) => {
-                                const cso = calcServiceOrder(so);
-                                return (
-                                  <span
-                                    key={so.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedMaintenanceGroup(group);
-                                    }}
-                                    className={cn(
-                                      'inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-[11px] cursor-pointer transition-all shadow-2xs',
-                                      cso.isExternal
-                                        ? 'bg-purple-50 hover:bg-purple-600 hover:text-white border border-purple-200 text-purple-800'
-                                        : cso.isEquipment
-                                          ? 'bg-amber-50 hover:bg-amber-600 hover:text-white border border-amber-300 text-amber-800'
-                                          : 'bg-rose-50 hover:bg-rose-600 hover:text-white border border-rose-200 text-rose-700',
-                                    )}
-                                    title={`Заказ-наряд #${so.order_number}: ${so.problem_description || ''}. Нажмите для просмотра`}
-                                  >
-                                    <span>
-                                      {cso.isExternal ? '🏢' : cso.isEquipment ? '⚙️' : '🔧'}
-                                    </span>
-                                    <span>#{so.order_number}</span>
-                                    {cso.contractorName && (
-                                      <span className="opacity-85 max-w-[120px] truncate">
-                                        {cso.contractorName.replace(/^ООО\s*["']?|["']$/g, '')}
-                                      </span>
-                                    )}
-                                    <span className="font-mono text-[10px] opacity-90">
-                                      (−{cso.totalCost.toLocaleString('ru-RU')} ₽)
-                                    </span>
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
                         </div>
                       </div>
 
                       {/* Header Metrics */}
-                      <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
                         <div className="text-right hidden sm:block">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                             Выручка
@@ -5192,6 +5197,74 @@ export default function ReviewPage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Выпадающий спойлер номеров рейсов */}
+                    {isTripsOpen && group.trips.length > 0 && (
+                      <div className="bg-sky-50/70 border-t border-sky-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-sky-800 mr-1">
+                          Номера рейсов ({group.trips.length}):
+                        </span>
+                        {group.trips.map((t) => (
+                          <span
+                            key={t.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!expandedGroups.has(group.assetKey)) {
+                                toggleGroup(group.assetKey);
+                              }
+                              if (!expandedIds.has(t.id)) {
+                                toggleExpand(t.id);
+                              }
+                            }}
+                            className="inline-flex items-center bg-white hover:bg-sky-500 hover:text-white border border-sky-200 text-sky-700 font-bold px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                            title={`Нажмите, чтобы открыть рейс #${t.trip_number}`}
+                          >
+                            #{t.trip_number}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Выпадающий спойлер заказ-нарядов ТО */}
+                    {isOrdersOpen && mode === 'history' && group.serviceOrders.length > 0 && (
+                      <div className="bg-rose-50/70 border-t border-rose-100 p-2.5 px-4 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 mr-1">
+                          Заказ-наряды ТО ({group.serviceOrders.length}):
+                        </span>
+                        {group.serviceOrders.map((so) => {
+                          const cso = calcServiceOrder(so);
+                          return (
+                            <span
+                              key={so.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedMaintenanceGroup(group);
+                              }}
+                              className={cn(
+                                'inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-[11px] cursor-pointer transition-all shadow-2xs',
+                                cso.isExternal
+                                  ? 'bg-white hover:bg-purple-600 hover:text-white border border-purple-200 text-purple-800'
+                                  : cso.isEquipment
+                                    ? 'bg-white hover:bg-amber-600 hover:text-white border border-amber-300 text-amber-800'
+                                    : 'bg-white hover:bg-rose-600 hover:text-white border border-rose-200 text-rose-700',
+                              )}
+                              title={`Заказ-наряд #${so.order_number}: ${so.problem_description || ''}. Нажмите для просмотра`}
+                            >
+                              <span>{cso.isExternal ? '🏢' : cso.isEquipment ? '⚙️' : '🔧'}</span>
+                              <span>#{so.order_number}</span>
+                              {cso.contractorName && (
+                                <span className="opacity-85 max-w-[120px] truncate">
+                                  {cso.contractorName.replace(/^ООО\s*["']?|["']$/g, '')}
+                                </span>
+                              )}
+                              <span className="font-mono text-[10px] opacity-90">
+                                (−{cso.totalCost.toLocaleString('ru-RU')} ₽)
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Group Content (Trips & Service Orders) */}
                     {isExpanded && (
