@@ -7,10 +7,14 @@ const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
 const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
 const DRIVER_PAYROLL_CATS = [PAYROLL_DRIVER_CAT, PAYROLL_LOADER_CAT];
 
-/** GET /api/driver/finance — финансовая информация текущего водителя */
-export async function GET() {
+/** GET /api/driver/finance — финансовая информация текущего водителя/грузчика */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
   const cookieStore = await cookies();
-  const driverId = cookieStore.get('salda_user_id')?.value;
+  const driverId =
+    searchParams.get('user_id') ||
+    request.headers.get('x-salda-user-id') ||
+    cookieStore.get('salda_user_id')?.value;
 
   if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -18,7 +22,6 @@ export async function GET() {
 
   // 1 & 2. Параллельный запуск всех запросов к БД в один такт
   const CASH_METHODS = ['cash'];
-  const now = new Date();
 
   const [
     { data: cashTrips },
@@ -27,6 +30,7 @@ export async function GET() {
     { data: accumulatedRows },
     { data: monthlyAccruals },
     { data: holds },
+    { data: payoutsRows },
   ] = await Promise.all([
     supabase
       .from('trips')
@@ -48,7 +52,7 @@ export async function GET() {
     (supabase.from('transactions') as any)
       .select(
         `id, amount, description, category_id, transaction_date,
-       trip:trips(id, trip_number, started_at, asset:assets(short_name))`,
+       trip:trips(id, trip_number, started_at, asset:assets(short_name), driver:users!trips_driver_id_fkey(name))`,
       )
       .eq('related_user_id', driverId)
       .eq('lifecycle_status', 'approved')
@@ -66,19 +70,19 @@ export async function GET() {
       .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', DRIVER_PAYROLL_CATS),
 
-    // История начислений за последние 10 дней (подтверждённые)
+    // История начислений (все последние начисления: к выплате и выплаченные)
     (supabase.from('transactions') as any)
       .select(
         `id, amount, description, category_id, settlement_status, transaction_date,
-       trip:trips(trip_number, started_at, asset:assets(short_name))`,
+       trip:trips(trip_number, started_at, asset:assets(short_name), driver:users!trips_driver_id_fkey(name))`,
       )
       .eq('related_user_id', driverId)
       .eq('lifecycle_status', 'approved')
       .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', DRIVER_PAYROLL_CATS)
       .is('from_wallet_id', null)
-      .gte('transaction_date', new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
-      .order('transaction_date', { ascending: false }),
+      .order('transaction_date', { ascending: false })
+      .limit(50),
 
     // Зафиксированные переносы подотчёта на руках
     (supabase.from('transactions') as any)
@@ -88,6 +92,15 @@ export async function GET() {
       .eq('settlement_status', 'pending')
       .neq('lifecycle_status', 'cancelled')
       .order('created_at', { ascending: false }),
+
+    // История выплат ЗП (выплаты из кассы/кошелька)
+    (supabase.from('transactions') as any)
+      .select('id, amount, description, created_at, transaction_date, from_wallet_id')
+      .eq('related_user_id', driverId)
+      .eq('lifecycle_status', 'approved')
+      .not('from_wallet_id', 'is', null)
+      .order('transaction_date', { ascending: false })
+      .limit(30),
   ]);
 
   const lastCollectedAt =
@@ -185,6 +198,21 @@ export async function GET() {
         date: t.trip?.started_at ?? t.transaction_date,
         trip_number: t.trip?.trip_number ?? null,
         asset_name: t.trip?.asset?.short_name ?? null,
+        driver_name: t.trip?.driver?.name ?? null,
+        description: t.description ?? null,
+      })),
+      payouts: (payoutsRows ?? []).map((t: any) => ({
+        id: t.id,
+        amount: t.amount,
+        date: t.transaction_date ?? t.created_at,
+        description: t.description || 'Выплата зарплаты',
+        wallet_name:
+          t.from_wallet_id === '10000000-0000-0000-0000-000000000002'
+            ? 'Касса (нал)'
+            : t.from_wallet_id === '10000000-0000-0000-0000-000000000001'
+              ? 'Б/Н (Карта)'
+              : 'Касса',
+        created_at: t.created_at,
       })),
     },
   });

@@ -263,7 +263,27 @@ fun CreatePrrDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "👷 ${loader.name}", fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, fontSize = 13.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
+                                Text(if (loader.effectiveIsOnline) "🟢" else "⚪", fontSize = 11.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = loader.name,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 13.sp,
+                                    color = Zinc900
+                                )
+                                if (loader.effectiveIsOnline) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (loader.effectiveHasTransport) "🚗" else "🚶", fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "· 📍 ${loader.effectiveAddress}",
+                                        fontSize = 11.sp,
+                                        color = Zinc500,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                             if (isSelected) {
                                 Text("Оплата: ${currentItem?.pay ?: "0"} ₽", color = GreenOnline, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }

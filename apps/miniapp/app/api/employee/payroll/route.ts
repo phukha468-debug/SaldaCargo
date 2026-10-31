@@ -14,19 +14,29 @@ const CATEGORY_LABELS: Record<string, string> = {
   [PAYROLL_MECHANIC_CAT]: 'ЗП механика',
 };
 
-/** GET /api/employee/payroll — ожидающие подтверждения + накопленная сумма */
+/** GET /api/employee/payroll — ожидающие подтверждения + накопленная сумма + история начислений и выплат */
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
   const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+  const userId =
+    searchParams.get('user_id') ||
+    request.headers.get('x-salda-user-id') ||
+    cookieStore.get('salda_user_id')?.value;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();
 
-  const [{ data: pendingConf }, { data: accumulatedRows }, { data: paidRows }] = await Promise.all([
+  const [
+    { data: pendingConf },
+    { data: accumulatedRows },
+    { data: paidRows },
+    { data: allAccruals },
+    { data: payoutsRows },
+  ] = await Promise.all([
     (supabase.from('transactions') as any)
       .select(
         `id, amount, description, category_id, created_at, transaction_date,
-         trip:trips(id, trip_number, started_at, asset:assets(short_name)),
+         trip:trips(id, trip_number, started_at, asset:assets(short_name), driver:users!trips_driver_id_fkey(name)),
          service_order:service_orders(id, order_number, asset:assets(short_name))`,
       )
       .eq('related_user_id', userId)
@@ -52,6 +62,29 @@ export async function GET(request: Request) {
       .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', ALL_PAYROLL_CATS)
       .is('from_wallet_id', null),
+
+    // Все начисления за последнее время (включая ожидающие и выплаченные)
+    (supabase.from('transactions') as any)
+      .select(
+        `id, amount, description, category_id, settlement_status, employee_confirmed, created_at, transaction_date,
+         trip:trips(id, trip_number, started_at, asset:assets(short_name), driver:users!trips_driver_id_fkey(name)),
+         service_order:service_orders(id, order_number, asset:assets(short_name))`,
+      )
+      .eq('related_user_id', userId)
+      .eq('lifecycle_status', 'approved')
+      .in('category_id', ALL_PAYROLL_CATS)
+      .is('from_wallet_id', null)
+      .order('transaction_date', { ascending: false })
+      .limit(50),
+
+    // История выплат (списания из кассы или переводы ЗП)
+    (supabase.from('transactions') as any)
+      .select('id, amount, description, created_at, transaction_date, from_wallet_id')
+      .eq('related_user_id', userId)
+      .eq('lifecycle_status', 'approved')
+      .not('from_wallet_id', 'is', null)
+      .order('transaction_date', { ascending: false })
+      .limit(30),
   ]);
 
   const accumulated_total = (accumulatedRows ?? [])
@@ -73,7 +106,12 @@ export async function GET(request: Request) {
 
     let context = '';
     if (t.trip) {
-      context = [`Рейс №${t.trip.trip_number}`, t.trip.asset?.short_name ?? null, dateStr]
+      context = [
+        `Рейс №${t.trip.trip_number}`,
+        t.trip.driver?.name ? `Водитель: ${t.trip.driver.name}` : null,
+        t.trip.asset?.short_name ?? null,
+        dateStr,
+      ]
         .filter(Boolean)
         .join(' · ');
     } else if (t.service_order) {
@@ -97,14 +135,51 @@ export async function GET(request: Request) {
       trip_id: t.trip?.id ?? null,
       service_order_id: t.service_order?.id ?? null,
       date: tripDate,
+      trip_number: t.trip?.trip_number ?? null,
+      driver_name: t.trip?.driver?.name ?? null,
+      asset_name: t.trip?.asset?.short_name ?? null,
     };
   });
+
+  const accrualItems = (allAccruals ?? []).map((t: any) => {
+    const tripDate = t.trip?.started_at ?? t.transaction_date;
+    return {
+      id: t.id,
+      amount: t.amount,
+      category_id: t.category_id,
+      label: CATEGORY_LABELS[t.category_id] ?? 'ЗП',
+      settlement_status: t.settlement_status,
+      employee_confirmed: t.employee_confirmed,
+      date: tripDate,
+      trip_id: t.trip?.id ?? null,
+      trip_number: t.trip?.trip_number ?? null,
+      driver_name: t.trip?.driver?.name ?? null,
+      asset_name: t.trip?.asset?.short_name ?? null,
+      description: t.description || null,
+    };
+  });
+
+  const payoutItems = (payoutsRows ?? []).map((t: any) => ({
+    id: t.id,
+    amount: t.amount,
+    date: t.transaction_date ?? t.created_at,
+    description: t.description || 'Выплата зарплаты',
+    wallet_name:
+      t.from_wallet_id === '10000000-0000-0000-0000-000000000002'
+        ? 'Касса (нал)'
+        : t.from_wallet_id === '10000000-0000-0000-0000-000000000001'
+          ? 'Б/Н (Карта)'
+          : 'Касса',
+    created_at: t.created_at,
+  }));
 
   return NextResponse.json({
     pending_confirmation: pendingItems,
     pending_count: pendingItems.length,
     accumulated_total,
     total_paid,
+    accruals: accrualItems,
+    payouts: payoutItems,
   });
 }
 

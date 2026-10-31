@@ -1470,8 +1470,19 @@ fun AddOrderDialog(
                                                 }
                                                 Spacer(modifier = Modifier.width(10.dp))
                                                 Column {
-                                                    Text(loader.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                    Text(loader.phone ?: "Сотрудник ПРР", fontSize = 11.sp, color = Zinc500)
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(loader.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                        if (loader.effectiveIsOnline) {
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text("🟢", fontSize = 10.sp)
+                                                            Text(if (loader.effectiveHasTransport) "🚗" else "🚶", fontSize = 11.sp)
+                                                        }
+                                                    }
+                                                    Text(
+                                                        if (loader.effectiveIsOnline) "На линии · 📍 " + loader.effectiveAddress else (loader.phone ?: "Сотрудник ПРР"),
+                                                        fontSize = 11.sp,
+                                                        color = if (loader.effectiveIsOnline) GreenOnline else Zinc500
+                                                    )
                                                 }
                                             }
                                         }

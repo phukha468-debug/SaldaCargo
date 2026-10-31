@@ -21,6 +21,9 @@ import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
 interface Loader {
   id: string;
   name: string;
+  is_online?: boolean;
+  address?: string;
+  has_transport?: boolean;
 }
 
 interface Counterparty {
@@ -625,7 +628,22 @@ export function CreatePrrModal({
                           : 'bg-white text-zinc-800 border-zinc-200 hover:border-zinc-300',
                       )}
                     >
-                      <span className="truncate">{loader.name}</span>
+                      <span className="truncate flex items-center gap-1">
+                        {loader.is_online && (
+                          <span className="text-[10px]" title="На линии">
+                            🟢
+                          </span>
+                        )}
+                        <span>{loader.name}</span>
+                        {loader.is_online && (
+                          <span
+                            className="text-[10px] shrink-0"
+                            title={loader.has_transport ? 'На авто' : 'Пеший'}
+                          >
+                            {loader.has_transport ? '🚗' : '🚶'}
+                          </span>
+                        )}
+                      </span>
                       <span className="text-xs shrink-0">{isChecked ? '✓' : '+'}</span>
                     </button>
                   );

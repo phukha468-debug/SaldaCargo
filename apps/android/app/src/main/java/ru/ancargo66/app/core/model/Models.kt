@@ -60,8 +60,26 @@ data class User(
     val phone: String? = null,
     val notes: String? = null,
     @SerialName("is_active") val isActive: Boolean = true,
-    @SerialName("current_asset_id") val currentAssetId: String? = null
-)
+    @SerialName("current_asset_id") val currentAssetId: String? = null,
+    @SerialName("is_online") val isOnline: Boolean = false,
+    val address: String? = null,
+    @SerialName("has_transport") val hasTransport: Boolean = false
+) {
+    val effectiveIsOnline: Boolean
+        get() = isOnline || (notes != null && (notes.contains("\"online\":true") || notes.contains("\"online\": true")))
+
+    val effectiveAddress: String
+        get() = address?.ifBlank { null } ?: run {
+            if (notes.isNullOrBlank()) "г. Верхняя Салда"
+            else {
+                val match = Regex("\"address\":\\s*\"([^\"]*)\"").find(notes)
+                match?.groupValues?.get(1)?.ifBlank { null } ?: "г. Верхняя Салда"
+            }
+        }
+
+    val effectiveHasTransport: Boolean
+        get() = hasTransport || (notes != null && (notes.contains("\"car\":true") || notes.contains("\"car\": true")))
+}
 
 @Serializable
 data class Asset(
@@ -475,7 +493,20 @@ data class SalaryAccrualItem(
     @SerialName("settlement_status") val settlementStatus: String = "pending",
     val date: String? = null,
     @SerialName("trip_number") val tripNumber: Long? = null,
-    @SerialName("asset_name") val assetName: String? = null
+    @SerialName("asset_name") val assetName: String? = null,
+    @SerialName("driver_name") val driverName: String? = null,
+    val description: String? = null
+)
+
+@Serializable
+data class PayoutItem(
+    val id: String = "",
+    @Serializable(with = FlexibleDoubleSerializer::class)
+    val amount: Double = 0.0,
+    val date: String? = null,
+    val description: String? = null,
+    @SerialName("wallet_name") val walletName: String? = null,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 @Serializable
@@ -483,7 +514,10 @@ data class SalaryFinance(
     @SerialName("pending_confirmation") val pendingConfirmation: List<PendingPayrollItem> = emptyList(),
     @Serializable(with = FlexibleStringSerializer::class)
     @SerialName("accumulated_total") val accumulatedTotal: String = "0.00",
-    val accruals: List<SalaryAccrualItem> = emptyList()
+    val accruals: List<SalaryAccrualItem> = emptyList(),
+    val payouts: List<PayoutItem> = emptyList(),
+    @Serializable(with = FlexibleStringSerializer::class)
+    @SerialName("total_paid") val totalPaid: String = "0.00"
 )
 
 @Serializable
@@ -530,6 +564,19 @@ data class PayrollEmployee(
     val debtDouble: Double get() = debt.toDoubleOrNull() ?: 0.0
     val advanceDouble: Double get() = advanceBalance.toDoubleOrNull() ?: 0.0
     val payoutDouble: Double get() = payout.toDoubleOrNull() ?: 0.0
+
+    val isOnline: Boolean
+        get() = notes != null && (notes.contains("\"online\":true") || notes.contains("\"online\": true"))
+
+    val shiftAddress: String?
+        get() {
+            if (notes.isNullOrBlank()) return null
+            val match = Regex("\"address\":\\s*\"([^\"]*)\"").find(notes)
+            return match?.groupValues?.get(1)?.ifBlank { null }
+        }
+
+    val hasTransport: Boolean
+        get() = notes != null && (notes.contains("\"car\":true") || notes.contains("\"car\": true"))
 }
 
 @Serializable

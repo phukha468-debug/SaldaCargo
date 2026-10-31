@@ -215,7 +215,7 @@ fun DispatcherScreen(
     val filteredStaff = remember(payrollStaffList, staffFilter) {
         when (staffFilter) {
             "driver" -> payrollStaffList.filter { it.roles.contains("driver") || it.role == "driver" }
-            "loader" -> payrollStaffList.filter { it.roles.contains("loader") || it.role == "loader" }
+            "loader" -> payrollStaffList.filter { it.roles.contains("loader") || it.role == "loader" }.sortedByDescending { it.isOnline }
             "workshop" -> payrollStaffList.filter {
                 it.roles.any { r -> listOf("mechanic", "mechanic_lead", "welder", "painter", "electrician", "handyman").contains(r) } ||
                 listOf("mechanic", "mechanic_lead", "welder", "painter", "electrician", "handyman").contains(it.role ?: "")
@@ -2161,6 +2161,21 @@ fun DispatcherScreen(
                                                             color = if (isCleaner) Color(0xFF7E22CE) else Zinc700,
                                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                         )
+                                                    }
+                                                    if (employee.isOnline) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Surface(
+                                                            color = GreenOnline.copy(alpha = 0.12f),
+                                                            shape = RoundedCornerShape(4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "🟢 На линии" + (if (employee.hasTransport) " 🚗" else " 🚶") + (if (!employee.shiftAddress.isNullOrBlank()) " · " + employee.shiftAddress else ""),
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = GreenOnline,
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            )
+                                                        }
                                                     }
                                                     if (!employee.phone.isNullOrBlank()) {
                                                         Spacer(modifier = Modifier.width(6.dp))

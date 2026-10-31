@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     ] = await Promise.all([
       (supabase as any)
         .from('users')
-        .select('id, name, roles, auto_settle, is_active')
+        .select('id, name, roles, auto_settle, is_active, notes')
         .eq('is_active', true)
         .order('name'),
 
@@ -146,6 +146,7 @@ export async function GET(request: Request) {
           id: u.id,
           name: u.name,
           roles: u.roles,
+          notes: u.notes,
           auto_settle: u.auto_settle,
           is_management: isManagement && !isOp,
           earned: earnedAmt.toFixed(2),
