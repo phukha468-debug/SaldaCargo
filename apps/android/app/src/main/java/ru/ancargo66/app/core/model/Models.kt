@@ -156,7 +156,9 @@ data class TripExpense(
 @Serializable
 data class TripAsset(
     @SerialName("short_name") val shortName: String = "",
-    @SerialName("reg_number") val regNumber: String = ""
+    @SerialName("reg_number") val regNumber: String = "",
+    @Serializable(with = FlexibleLongSerializer::class)
+    @SerialName("odometer_current") val odometerCurrent: Long = 0L
 )
 
 @Serializable

@@ -52,9 +52,9 @@ fun TripDetailScreen(
         val reg = (regNumber ?: "").uppercase()
         if (name.contains("валдай") || reg.contains("096") || reg.contains("188") || reg.contains("446") || reg.contains("883")) return 18.0
         if (name.contains("кантер") || reg.contains("661")) return 18.0
-        if (reg.contains("009") || reg.contains("099") || reg.contains("051") || name.contains("некст") || name.contains("next")) return 15.0
         if (reg.contains("866") || reg.contains("877") || reg.contains("914")) return 14.0
-        return 16.0
+        if (reg.contains("009") || reg.contains("099") || reg.contains("051") || name.contains("некст") || name.contains("next") || name.contains("газель")) return 15.0
+        return 15.0
     }
 
     // Диалоги
@@ -75,7 +75,7 @@ fun TripDetailScreen(
     // Поля нового расхода
     var expenseAmountInput by rememberSaveable { mutableStateOf("") }
     var selectedCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
-    var expensePaymentMethod by rememberSaveable { mutableStateOf("fuel_card") }
+    var expensePaymentMethod by rememberSaveable { mutableStateOf("cube") }
     var expenseDescInput by rememberSaveable { mutableStateOf("") }
 
     // Поля завершения рейса
@@ -283,7 +283,10 @@ fun TripDetailScreen(
                             }
 
                             Button(
-                                onClick = { showAddExpenseDialog = true },
+                                onClick = {
+                                    expensePaymentMethod = "cube"
+                                    showAddExpenseDialog = true
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = Zinc800),
                                 shape = RoundedCornerShape(10.dp)
@@ -784,42 +787,35 @@ fun TripDetailScreen(
         )
     }
 
-    // ── Диалог добавления расхода ───────────────────────────────────────────
+    // ── Диалог добавления расхода ГСМ ───────────────────────────────────────────
     if (showAddExpenseDialog) {
+        val fuelRate = getVehicleFuelRate(tripDetail?.asset?.shortName, tripDetail?.asset?.regNumber)
+        val startOdo = (tripDetail?.odometerStart ?: 0).toLong()
+        val endOdo = endOdometerInput.toLongOrNull()
+            ?: (tripDetail?.odometerEnd ?: 0L).takeIf { it > 0L }
+            ?: (tripDetail?.asset?.odometerCurrent ?: 0L).takeIf { it > startOdo }
+            ?: (startOdo + 100L)
+        val deltaKm = if (endOdo > startOdo) endOdo - startOdo else 100L
+        val autoCubeLiters = kotlin.math.round((deltaKm * fuelRate / 100.0) * 10.0) / 10.0
+        val autoCubeAmount = kotlin.math.round(autoCubeLiters * 60.0).toInt()
+
         AlertDialog(
             onDismissRequest = { showAddExpenseDialog = false },
-            title = { Text("Добавить расход (ГСМ)", fontWeight = FontWeight.Bold) },
+            title = { Text("Заправка ГСМ", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
             text = {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedTextField(
-                        value = expenseAmountInput,
-                        onValueChange = { expenseAmountInput = it },
-                        label = { Text("Сумма расхода (₽)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = expenseDescInput,
-                        onValueChange = { expenseDescInput = it },
-                        label = { Text("Примечание (литры, АЗС)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // 3 ЧИСТЫЕ КНОПКИ ВЫБОРА ГСМ: КУБИК, ТК, НАЛИЧКА (ТРЕБОВАНИЕ №6)
+                    // 3 кнопки: Кубик(база), ТК(карта), Наличные
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val fuelOptions = listOf(
-                            Triple("cube", "🛢️", "Кубик"),
-                            Triple("fuel_card", "⛽", "ТК"),
-                            Triple("cash", "💵", "Наличка")
+                            Triple("cube", "🛢️", "Кубик(база)"),
+                            Triple("fuel_card", "⛽", "ТК(топливная карта)"),
+                            Triple("cash", "💵", "Наличные")
                         )
                         fuelOptions.forEach { (method, icon, label) ->
                             val isSelected = expensePaymentMethod == method
@@ -828,20 +824,6 @@ fun TripDetailScreen(
                                     .weight(1f)
                                     .bouncyClick {
                                         expensePaymentMethod = method
-                                        if (method == "cube") {
-                                            val rate = getVehicleFuelRate(tripDetail?.asset?.shortName, tripDetail?.asset?.regNumber)
-                                            val startOdo = (tripDetail?.odometerStart ?: 0).toLong()
-                                            val endOdo = endOdometerInput.toLongOrNull() ?: (tripDetail?.odometerEnd ?: 0L).toLong()
-                                            val delta = if (endOdo > startOdo) endOdo - startOdo else 0L
-                                            if (delta > 0 && expenseAmountInput.isBlank()) {
-                                                val liters = kotlin.math.round((delta * rate / 100.0) * 10.0) / 10.0
-                                                val amt = kotlin.math.round(liters * 60.0).toInt()
-                                                expenseAmountInput = amt.toString()
-                                                if (expenseDescInput.isBlank()) {
-                                                    expenseDescInput = "Кубик: $liters л"
-                                                }
-                                            }
-                                        }
                                     },
                                 color = if (isSelected) {
                                     if (method == "cube") SaldaOrange50 else if (method == "cash") Color(0xFFECFDF5) else Color(0xFFFFFBEB)
@@ -855,37 +837,89 @@ fun TripDetailScreen(
                                 )
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 2.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
-                                    Text(icon, fontSize = 20.sp)
-                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(icon, fontSize = 22.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = label,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = if (isSelected) Zinc900 else Zinc600
+                                        color = if (isSelected) Zinc900 else Zinc600,
+                                        maxLines = 1
                                     )
                                 }
                             }
                         }
+                    }
+
+                    if (expensePaymentMethod == "cube") {
+                        // ПРИ ВЫБОРЕ КУБИКА: НИКАКИХ ПОЛЕЙ ВВОДА, НИКАКИХ ОБЪЯСНЕНИЙ
+                        // Просто автоматически рассчитанная сумма по одометру
+                        Surface(
+                            color = SaldaOrange50,
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, SaldaOrangePrimary.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Пробег: $deltaKm км", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Zinc800)
+                                    Text("$autoCubeLiters л по 60 ₽/л", fontSize = 12.sp, color = Zinc600)
+                                }
+                                Text(
+                                    text = "$autoCubeAmount ₽",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = SaldaOrangePrimary
+                                )
+                            }
+                        }
+                    } else {
+                        // ДЛЯ ТК ИЛИ НАЛИЧНЫХ: ТОЛЬКО ПОЛЕ ВВОДА СУММЫ
+                        OutlinedTextField(
+                            value = expenseAmountInput,
+                            onValueChange = { expenseAmountInput = it },
+                            label = { Text("Сумма заправки (₽)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = expenseDescInput,
+                            onValueChange = { expenseDescInput = it },
+                            label = { Text("Примечание (АЗС / литры)") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val amt = expenseAmountInput.toDoubleOrNull() ?: return@Button
+                        val finalAmount = if (expensePaymentMethod == "cube") autoCubeAmount.toDouble() else (expenseAmountInput.toDoubleOrNull() ?: return@Button)
+                        val finalDesc = if (expensePaymentMethod == "cube") "Кубик: $autoCubeLiters л" else expenseDescInput.ifBlank { null }
                         val catId = selectedCategoryId ?: categories.firstOrNull()?.id ?: return@Button
                         scope.launch {
                             isSubmitting = true
                             SaldaApiClient.addTripExpense(
                                 tripId = tripId,
                                 categoryId = catId,
-                                amount = amt,
+                                amount = finalAmount,
                                 paymentMethod = expensePaymentMethod,
-                                description = expenseDescInput.ifBlank { null },
+                                description = finalDesc,
                                 userId = userId
                             )
                             isSubmitting = false
@@ -896,9 +930,10 @@ fun TripDetailScreen(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
-                    enabled = !isSubmitting && expenseAmountInput.isNotBlank()
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !isSubmitting && (expensePaymentMethod == "cube" || expenseAmountInput.isNotBlank())
                 ) {
-                    Text(if (isSubmitting) "Сохранение..." else "Добавить")
+                    Text(if (isSubmitting) "Сохранение..." else "Добавить расход", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
