@@ -68,6 +68,15 @@ function parseVehicleDocs(
         ? docsObj.oil_interval_km
         : parseInt(docsObj.oil_interval_km) || 10000,
     fire_extinguisher_expires_at: docsObj.fire_extinguisher_expires_at || '',
+    fuel_tank_capacity:
+      typeof docsObj.fuel_tank_capacity === 'number'
+        ? docsObj.fuel_tank_capacity
+        : parseInt(docsObj.fuel_tank_capacity) || 50,
+    fuel_current_liters:
+      typeof docsObj.fuel_current_liters === 'number'
+        ? docsObj.fuel_current_liters
+        : parseFloat(docsObj.fuel_current_liters) || 0,
+    fuel_last_calibrated_at: docsObj.fuel_last_calibrated_at || '',
   };
 }
 

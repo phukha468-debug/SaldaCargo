@@ -1072,3 +1072,284 @@ export function getOrderEffectiveDate(order: {
   if (order.approved_at) return order.approved_at;
   return order.created_at;
 }
+
+// ─── Контроль емкости баков и аудит топлива ──────────────────────────────────
+
+export const DEFAULT_FUEL_TANK_CAPACITIES: Record<string, number> = {
+  gazelle: 50,
+  valday: 150,
+  valday_tipper_446: 80,
+  canter: 100,
+};
+
+/**
+ * Возвращает паспортный объём бака автомобиля в литрах:
+ * - Газели: 50 л
+ * - Валдай (кроме самосвала 446): 150 л
+ * - Валдай-самосвал 446: 80 л
+ * - Кантер: 100 л
+ */
+export function getVehicleTankCapacity(
+  assetInfo?: {
+    short_name?: string | null;
+    reg_number?: string | null;
+    notes?: string | null;
+    docs?: { fuel_tank_capacity?: number | string | null } | null;
+  } | null,
+): number {
+  if (assetInfo?.docs?.fuel_tank_capacity) {
+    const val = Number(assetInfo.docs.fuel_tank_capacity);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  if (assetInfo?.notes) {
+    const match = assetInfo.notes.match(/\[DOCS_DATA:(\{.*?\})\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.fuel_tank_capacity) {
+          const val = Number(parsed.fuel_tank_capacity);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      } catch {}
+    }
+  }
+
+  const reg = (assetInfo?.reg_number || '').toUpperCase();
+  const name = (assetInfo?.short_name || '').toLowerCase();
+
+  if (reg.includes('446')) return 80;
+  if (reg.includes('661') || name.includes('кантер') || name.includes('canter')) return 100;
+  if (
+    name.includes('валдай') ||
+    reg.includes('188') ||
+    reg.includes('096') ||
+    reg.includes('883')
+  ) {
+    return 150;
+  }
+  return 50;
+}
+
+/**
+ * Получает текущий откалиброванный остаток топлива в автомобиле
+ */
+export function getVehicleCurrentFuel(
+  assetInfo?: {
+    notes?: string | null;
+    docs?: {
+      fuel_current_liters?: number | string | null;
+      fuel_last_calibrated_at?: string | null;
+    } | null;
+  } | null,
+): { currentLiters: number; lastCalibratedAt: string | null } {
+  if (
+    assetInfo?.docs?.fuel_current_liters !== undefined &&
+    assetInfo?.docs?.fuel_current_liters !== null
+  ) {
+    const liters = Number(assetInfo.docs.fuel_current_liters);
+    return {
+      currentLiters: isNaN(liters) ? 0 : liters,
+      lastCalibratedAt: assetInfo.docs.fuel_last_calibrated_at || null,
+    };
+  }
+  if (assetInfo?.notes) {
+    const match = assetInfo.notes.match(/\[DOCS_DATA:(\{.*?\})\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.fuel_current_liters !== undefined && parsed.fuel_current_liters !== null) {
+          const liters = Number(parsed.fuel_current_liters);
+          return {
+            currentLiters: isNaN(liters) ? 0 : liters,
+            lastCalibratedAt: parsed.fuel_last_calibrated_at || null,
+          };
+        }
+      } catch {}
+    }
+  }
+  return { currentLiters: 0, lastCalibratedAt: null };
+}
+
+/**
+ * Извлекает литры топлива из записи расхода рейса (по описанию или сумме)
+ */
+export function extractFuelLitersFromExpense(exp: {
+  amount: string | number;
+  payment_method?: string | null;
+  description?: string | null;
+}): number {
+  const desc = (exp.description || '').toLowerCase();
+  const amt = typeof exp.amount === 'number' ? exp.amount : parseFloat(exp.amount || '0') || 0;
+
+  // 1. Попытка распарсить "XX л" или "XX.X л" из описания
+  const match = desc.match(/(\d+(?:[.,]\d+)?)\s*(?:л|литр)/);
+  if (match && match[1]) {
+    const parsed = parseFloat(match[1].replace(',', '.'));
+    if (!isNaN(parsed) && parsed > 0) return Math.round(parsed * 10) / 10;
+  }
+
+  // 2. Если заправка из кубика (тариф 60 ₽/л)
+  if (exp.payment_method === 'cube' || desc.includes('кубик') || desc.includes('база')) {
+    return Math.round((amt / 60) * 10) / 10;
+  }
+
+  // 3. Если заправка по ТК или наличным (средний тариф ДТ ~65 ₽/л)
+  if (exp.payment_method === 'fuel_card' || exp.payment_method === 'cash') {
+    return Math.round((amt / 65) * 10) / 10;
+  }
+
+  return 0;
+}
+
+export interface FuelAuditResult {
+  hasDiscrepancy: boolean;
+  type?: 'overflow' | 'dry_tank' | 'tank_limit_exceeded';
+  badgeText?: string;
+  badgeClass?: string;
+  tankCapacity: number;
+  currentTankLiters: number;
+  totalFuelAddedLiters: number;
+  fuelConsumedLiters: number;
+  estimatedRemainingLiters: number;
+  mileageKm: number;
+  ratePer100Km: number;
+}
+
+/**
+ * Проверяет рейс на расхождение топлива:
+ * 1. Заправка за рейс превышает физическую емкость бака
+ * 2. Заправка + остаток в баке превышают емкость бака
+ * 3. Расход по пробегу превышает всё топливо в машине (сухой бак)
+ *
+ * Возвращает компактный 1-строчный бейдж для пульта Администраторов (Dense 1-Line).
+ */
+export function auditTripFuel(trip: {
+  odometer_start?: number | null;
+  odometer_end?: number | null;
+  asset?: {
+    short_name?: string | null;
+    reg_number?: string | null;
+    notes?: string | null;
+    asset_type?: { code?: string | null } | null;
+    docs?: {
+      fuel_tank_capacity?: number | string | null;
+      fuel_current_liters?: number | string | null;
+      fuel_last_calibrated_at?: string | null;
+    } | null;
+  } | null;
+  trip_expenses?: Array<{
+    amount: string | number;
+    payment_method?: string | null;
+    description?: string | null;
+    category?: { name?: string | null } | null;
+  }> | null;
+}): FuelAuditResult {
+  const tankCapacity = getVehicleTankCapacity(trip.asset);
+  const currentFuelInfo = getVehicleCurrentFuel(trip.asset);
+  const currentTankLiters = currentFuelInfo.currentLiters;
+
+  const expenses = Array.isArray(trip.trip_expenses) ? trip.trip_expenses : [];
+  let totalFuelAddedLiters = 0;
+
+  for (const exp of expenses) {
+    const catName = (exp.category?.name || '').toLowerCase();
+    const pm = exp.payment_method || '';
+    const desc = (exp.description || '').toLowerCase();
+
+    // Считаем только заправки топлива
+    if (
+      pm === 'cube' ||
+      pm === 'fuel_card' ||
+      catName.includes('топлив') ||
+      catName.includes('гсм') ||
+      desc.includes('заправка') ||
+      desc.includes('кубик') ||
+      desc.includes('дт') ||
+      desc.includes('дизел')
+    ) {
+      totalFuelAddedLiters += extractFuelLitersFromExpense(exp);
+    }
+  }
+
+  totalFuelAddedLiters = Math.round(totalFuelAddedLiters * 10) / 10;
+
+  const odoStart = trip.odometer_start || 0;
+  const odoEnd = trip.odometer_end || 0;
+  const mileageKm = odoEnd > odoStart ? odoEnd - odoStart : 0;
+
+  const ratePer100Km = getVehicleFuelRate(trip.asset?.asset_type?.code, trip.asset);
+  const fuelConsumedLiters = Math.round(((mileageKm * ratePer100Km) / 100) * 10) / 10;
+
+  const estimatedRemainingLiters =
+    Math.round((currentTankLiters + totalFuelAddedLiters - fuelConsumedLiters) * 10) / 10;
+
+  // 1. Физический перелив: заправлено больше, чем емкость бака
+  if (totalFuelAddedLiters > tankCapacity * 1.05) {
+    const diff = Math.round(totalFuelAddedLiters - tankCapacity);
+    return {
+      hasDiscrepancy: true,
+      type: 'tank_limit_exceeded',
+      badgeText: `⚠️ Перелив бака: +${diff} л (заправлено ${totalFuelAddedLiters} л при баке ${tankCapacity} л)`,
+      badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+      tankCapacity,
+      currentTankLiters,
+      totalFuelAddedLiters,
+      fuelConsumedLiters,
+      estimatedRemainingLiters,
+      mileageKm,
+      ratePer100Km,
+    };
+  }
+
+  // 2. Перелив с учетом начального остатка: остаток + заправка > емкость бака (+ погрешность 5 л)
+  if (currentTankLiters > 0 && currentTankLiters + totalFuelAddedLiters > tankCapacity + 5) {
+    const diff = Math.round(currentTankLiters + totalFuelAddedLiters - tankCapacity);
+    return {
+      hasDiscrepancy: true,
+      type: 'overflow',
+      badgeText: `⚠️ Перелив с остатком: +${diff} л (в баке ${currentTankLiters} л + заправка ${totalFuelAddedLiters} л > бака ${tankCapacity} л)`,
+      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+      tankCapacity,
+      currentTankLiters,
+      totalFuelAddedLiters,
+      fuelConsumedLiters,
+      estimatedRemainingLiters,
+      mileageKm,
+      ratePer100Km,
+    };
+  }
+
+  // 3. Сухой бак: потрачено больше, чем было в баке с учетом заправки (если машина была откалибрована)
+  if (
+    currentFuelInfo.lastCalibratedAt &&
+    currentTankLiters + totalFuelAddedLiters - fuelConsumedLiters < -8
+  ) {
+    const diff = Math.round(
+      Math.abs(currentTankLiters + totalFuelAddedLiters - fuelConsumedLiters),
+    );
+    return {
+      hasDiscrepancy: true,
+      type: 'dry_tank',
+      badgeText: `⚠️ Нехватка топлива: -${diff} л (пробег ${mileageKm} км съел больше, чем было)`,
+      badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+      tankCapacity,
+      currentTankLiters,
+      totalFuelAddedLiters,
+      fuelConsumedLiters,
+      estimatedRemainingLiters,
+      mileageKm,
+      ratePer100Km,
+    };
+  }
+
+  return {
+    hasDiscrepancy: false,
+    tankCapacity,
+    currentTankLiters,
+    totalFuelAddedLiters,
+    fuelConsumedLiters,
+    estimatedRemainingLiters,
+    mileageKm,
+    ratePer100Km,
+  };
+}

@@ -3,7 +3,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { Money, cn } from '@saldacargo/ui';
-import { calculateVehicleLoad, TRUCKS_CODES, GAZELLE_CODES } from '@saldacargo/shared';
+import {
+  calculateVehicleLoad,
+  TRUCKS_CODES,
+  GAZELLE_CODES,
+  getVehicleTankCapacity,
+  getVehicleCurrentFuel,
+} from '@saldacargo/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,6 +32,9 @@ type VehicleDocs = {
   oil_last_km: number;
   oil_interval_km: number;
   fire_extinguisher_expires_at: string;
+  fuel_tank_capacity?: number;
+  fuel_current_liters?: number;
+  fuel_last_calibrated_at?: string;
 };
 
 type MonthlyData = {
@@ -339,6 +348,7 @@ export default function FleetPage() {
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [editingAsset, setEditingAsset] = useState<Asset | 'new' | null>(null);
   const [isAllDocsModalOpen, setIsAllDocsModalOpen] = useState(false);
+  const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
 
   // Initialize selected months once data is loaded
   const monthsList = data?.months ?? [];
@@ -992,6 +1002,16 @@ export default function FleetPage() {
             <span>Шахматка документов</span>
           </button>
           <button
+            onClick={() => setIsFuelModalOpen(true)}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            title="Калибровка начальных остатков топлива в баках автомобилей"
+          >
+            <span className="material-symbols-outlined text-[16px] text-amber-200">
+              local_gas_station
+            </span>
+            <span>Калибровка баков</span>
+          </button>
+          <button
             onClick={toggleAllRows}
             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition"
           >
@@ -1344,6 +1364,20 @@ export default function FleetPage() {
                       <div className="flex items-center gap-2 text-xs flex-wrap">
                         <span className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-bold text-slate-700">
                           Одометр: {v.odometer_current.toLocaleString('ru-RU')} км
+                        </span>
+                        <span
+                          className="px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg font-bold text-amber-900 flex items-center gap-1 cursor-pointer hover:bg-amber-100 transition"
+                          title="Кликните для быстрой калибровки топлива"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsFuelModalOpen(true);
+                          }}
+                        >
+                          <span>⛽ Бак {getVehicleTankCapacity(v)} л</span>
+                          <span>·</span>
+                          <span>
+                            В баке: <strong>{getVehicleCurrentFuel(v).currentLiters} л</strong>
+                          </span>
                         </span>
                         <select
                           value={v.status}
@@ -1833,6 +1867,17 @@ export default function FleetPage() {
         </div>
       )}
 
+      {/* ── MODAL: FUEL CALIBRATION ───────────────────────────────────────── */}
+      {isFuelModalOpen && (
+        <FuelCalibrationModal
+          assets={allAssets}
+          onClose={() => setIsFuelModalOpen(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['fleet-matrix'] });
+          }}
+        />
+      )}
+
       {/* ── MODAL: EDIT VEHICLE & REGULATIONS ───────────────────────────── */}
       {editingAsset !== null && (
         <VehicleEditModal
@@ -1893,6 +1938,12 @@ function VehicleEditModal({
     oil_last_date: asset?.docs?.oil_last_date ?? '',
     oil_last_km: asset?.docs?.oil_last_km?.toString() ?? '',
     oil_interval_km: asset?.docs?.oil_interval_km?.toString() ?? '10000',
+    fuel_tank_capacity: (
+      asset?.docs?.fuel_tank_capacity ?? getVehicleTankCapacity(asset)
+    ).toString(),
+    fuel_current_liters: (
+      asset?.docs?.fuel_current_liters ?? getVehicleCurrentFuel(asset).currentLiters
+    ).toString(),
   });
 
   const [saving, setSaving] = useState(false);
@@ -1930,6 +1981,9 @@ function VehicleEditModal({
       oil_last_date: form.oil_last_date || null,
       oil_last_km: form.oil_last_km ? parseInt(form.oil_last_km) : 0,
       oil_interval_km: form.oil_interval_km ? parseInt(form.oil_interval_km) : 10000,
+      fuel_tank_capacity: form.fuel_tank_capacity ? parseInt(form.fuel_tank_capacity) : 50,
+      fuel_current_liters: form.fuel_current_liters ? parseFloat(form.fuel_current_liters) : 0,
+      fuel_last_calibrated_at: new Date().toISOString(),
     };
 
     const payload = {
@@ -2242,7 +2296,46 @@ function VehicleEditModal({
             </div>
           </div>
 
-          {/* 5. Дополнительные примечания */}
+          {/* 5. Топливный бак и остаток ГСМ */}
+          <div className="space-y-3 pt-3 border-t border-slate-100">
+            <h3 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5 text-blue-700">
+              <span className="material-symbols-outlined text-[14px]">local_gas_station</span>
+              <span>5. Топливный бак и калибровка остатка ГСМ</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-3 bg-blue-50/40 p-3.5 rounded-2xl border border-blue-100">
+              <div>
+                <label className="text-slate-500 block mb-1">Паспортный объём бака (л)</label>
+                <input
+                  type="number"
+                  className={inputCls}
+                  placeholder="50"
+                  value={form.fuel_tank_capacity}
+                  onChange={f('fuel_tank_capacity')}
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Газели: 50 л · Валдаи: 150 л (самосвал 446: 80 л) · Кантер: 100 л
+                </span>
+              </div>
+              <div>
+                <label className="text-slate-500 block mb-1">
+                  Текущий остаток топлива в баке (л)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  className={inputCls}
+                  placeholder="0"
+                  value={form.fuel_current_liters}
+                  onChange={f('fuel_current_liters')}
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Начальное значение топлива для слежки и выявления переливов
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Дополнительные примечания */}
           <div className="pt-2">
             <label className="text-slate-500 block mb-1">Примечание</label>
             <textarea
@@ -2275,6 +2368,259 @@ function VehicleEditModal({
           >
             {saving ? 'Сохранение...' : 'Сохранить изменения'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Component for Fast Fuel Calibration ──────────────────────────────
+
+function FuelCalibrationModal({
+  assets,
+  onClose,
+  onSaved,
+}: {
+  assets: Asset[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [tankValues, setTankValues] = useState<
+    Record<
+      string,
+      { liters: string; capacity: number; status: 'idle' | 'saving' | 'saved' | 'error' }
+    >
+  >(() => {
+    const init: Record<
+      string,
+      { liters: string; capacity: number; status: 'idle' | 'saving' | 'saved' | 'error' }
+    > = {};
+    assets.forEach((a) => {
+      const cap = getVehicleTankCapacity(a);
+      const cur = getVehicleCurrentFuel(a);
+      init[a.id] = {
+        liters: cur.currentLiters > 0 ? cur.currentLiters.toString() : '',
+        capacity: cap,
+        status: 'idle',
+      };
+    });
+    return init;
+  });
+
+  const [savingAll, setSavingAll] = useState(false);
+
+  const updateLiters = (assetId: string, val: string) => {
+    setTankValues((prev) => ({
+      ...prev,
+      [assetId]: {
+        ...(prev[assetId] || { capacity: 50, status: 'idle' }),
+        liters: val,
+        status: 'idle',
+      },
+    }));
+  };
+
+  const saveOne = async (asset: Asset) => {
+    const item = tankValues[asset.id];
+    if (!item) return;
+
+    setTankValues((p) => ({ ...p, [asset.id]: { ...item, status: 'saving' } }));
+
+    const numLiters = item.liters.trim() ? parseFloat(item.liters.replace(',', '.')) : 0;
+    const existingDocs = asset.docs || {};
+
+    const updatedDocs = {
+      ...existingDocs,
+      fuel_tank_capacity: item.capacity,
+      fuel_current_liters: isNaN(numLiters) ? 0 : numLiters,
+      fuel_last_calibrated_at: new Date().toISOString(),
+    };
+
+    try {
+      const res = await fetch(`/api/fleet/${asset.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docs: updatedDocs }),
+      });
+      if (!res.ok) throw new Error('Ошибка сохранения');
+      setTankValues((p) => ({ ...p, [asset.id]: { ...item, status: 'saved' } }));
+      onSaved();
+    } catch {
+      setTankValues((p) => ({ ...p, [asset.id]: { ...item, status: 'error' } }));
+    }
+  };
+
+  const saveAll = async () => {
+    setSavingAll(true);
+    for (const asset of assets) {
+      await saveOne(asset);
+    }
+    setSavingAll(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+          <div>
+            <h2 className="text-base font-black flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-400">local_gas_station</span>
+              <span>Калибровка баков автомобилей автопарка</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Введите сколько сейчас литров топлива в баке каждой машины для выявления переливов и
+              несоответствий
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 overflow-y-auto space-y-2">
+          {/* Header Row */}
+          <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+            <div className="col-span-4">Автомобиль / Госномер</div>
+            <div className="col-span-2">Водитель</div>
+            <div className="col-span-2 text-center">Бак (паспорт)</div>
+            <div className="col-span-3 text-center">Остаток в баке (л)</div>
+            <div className="col-span-1 text-right">Действие</div>
+          </div>
+
+          {assets.map((asset) => {
+            const item = tankValues[asset.id] || {
+              liters: '',
+              capacity: getVehicleTankCapacity(asset),
+              status: 'idle',
+            };
+            const cur = getVehicleCurrentFuel(asset);
+            const isTruck =
+              (asset.short_name || '').toLowerCase().includes('валдай') ||
+              (asset.reg_number || '').includes('661');
+
+            return (
+              <div
+                key={asset.id}
+                className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 transition-colors text-xs"
+              >
+                {/* Vehicle */}
+                <div className="col-span-4 flex items-center gap-2 min-w-0">
+                  <span className="text-lg shrink-0">{isTruck ? '🚛' : '🚐'}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-slate-900 truncate">{asset.short_name}</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-1.5 py-0.2 rounded border border-slate-200 shrink-0">
+                        {asset.reg_number}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Driver */}
+                <div className="col-span-2 text-slate-600 truncate font-medium">
+                  {asset.driver?.name || '—'}
+                </div>
+
+                {/* Tank capacity */}
+                <div className="col-span-2 flex justify-center">
+                  <span className="text-[11px] font-mono font-black px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-200">
+                    {item.capacity} л
+                  </span>
+                </div>
+
+                {/* Input liters with quick buttons */}
+                <div className="col-span-3 flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max={item.capacity}
+                    placeholder="0"
+                    value={item.liters}
+                    onChange={(e) => updateLiters(asset.id, e.target.value)}
+                    className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-xs font-mono font-bold text-center bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateLiters(asset.id, Math.round(item.capacity / 2).toString())
+                      }
+                      className="px-1.5 py-0.5 text-[9px] font-bold bg-white hover:bg-slate-200 border border-slate-200 rounded text-slate-600"
+                      title="Половина бака"
+                    >
+                      ½
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateLiters(asset.id, item.capacity.toString())}
+                      className="px-1.5 py-0.5 text-[9px] font-bold bg-white hover:bg-slate-200 border border-slate-200 rounded text-slate-600"
+                      title="Полный бак"
+                    >
+                      Полн
+                    </button>
+                  </div>
+                  {cur.lastCalibratedAt && (
+                    <span
+                      className="text-[9px] text-slate-400 font-normal hidden md:inline truncate"
+                      title={`Откалиброван: ${new Date(cur.lastCalibratedAt).toLocaleString('ru-RU')}`}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </div>
+
+                {/* Action button */}
+                <div className="col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => saveOne(asset)}
+                    disabled={item.status === 'saving'}
+                    className={cn(
+                      'px-2 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-0.5',
+                      item.status === 'saved'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : item.status === 'error'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                          : 'bg-slate-900 hover:bg-slate-800 text-white shadow-2xs',
+                    )}
+                  >
+                    {item.status === 'saving'
+                      ? '...'
+                      : item.status === 'saved'
+                        ? '✓'
+                        : item.status === 'error'
+                          ? '!'
+                          : 'Сохр'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+          <span className="text-xs text-slate-500 font-medium">
+            Всего автомобилей: <strong>{assets.length}</strong>
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl font-bold transition text-xs"
+            >
+              Закрыть
+            </button>
+            <button
+              onClick={saveAll}
+              disabled={savingAll}
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold transition shadow-xs text-xs disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <span>{savingAll ? 'Сохранение всех...' : 'Сохранить все баки'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -3,7 +3,56 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { generateDeterministicUuid } from '@saldacargo/shared';
+import { generateDeterministicUuid, auditTripFuel } from '@saldacargo/shared';
+
+async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
+  try {
+    const { data: trip } = await supabase
+      .from('trips')
+      .select(
+        `
+        id, asset_id, odometer_start, odometer_end,
+        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code)),
+        trip_expenses(amount, payment_method, description, category:transaction_categories(name))
+      `,
+      )
+      .eq('id', tripId)
+      .maybeSingle();
+
+    if (!trip?.asset_id || !trip.asset) return;
+
+    const audit = auditTripFuel(trip);
+    const newLiters = Math.max(
+      0,
+      Math.min(audit.tankCapacity, Math.round(audit.estimatedRemainingLiters * 10) / 10),
+    );
+
+    const notes = trip.asset.notes || '';
+    let docsObj: Record<string, any> = {};
+    const match = notes.match(/\[DOCS_DATA:(\{.*?\})\]/);
+    if (match && match[1]) {
+      try {
+        docsObj = JSON.parse(match[1]);
+      } catch {}
+    }
+    docsObj.fuel_tank_capacity = audit.tankCapacity;
+    docsObj.fuel_current_liters = newLiters;
+    docsObj.fuel_last_calibrated_at = new Date().toISOString();
+
+    const cleanNotes = notes.replace(/\[DOCS_DATA:\{.*?\}\]/g, '').trim();
+    const updatedNotes = `${cleanNotes ? cleanNotes + '\n' : ''}[DOCS_DATA:${JSON.stringify(docsObj)}]`;
+
+    await supabase
+      .from('assets')
+      .update({
+        notes: updatedNotes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', trip.asset_id);
+  } catch (err) {
+    console.error('Ошибка обновления остатка топлива ТС после апрува рейса в miniapp:', err);
+  }
+}
 
 const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
 const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
@@ -22,7 +71,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         id, trip_number, status, lifecycle_status, started_at, ended_at,
         odometer_start, odometer_end, trip_type, driver_note,
         driver:users!trips_driver_id_fkey(id, name),
-        asset:assets(short_name, reg_number),
+        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code)),
         loader:users!trips_loader_id_fkey(name),
         trip_orders(
           id, amount, driver_pay, driver_car_pay, driver_loader_pay,
@@ -218,6 +267,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .neq('lifecycle_status', 'cancelled');
 
     await syncTripFinancials(supabase, id, adminId);
+    await updateAssetFuelAfterApproval(supabase, id);
 
     return NextResponse.json({ ok: true, action: 'approved' });
   }

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
-import { formatDate } from '@saldacargo/shared';
+import { formatDate, auditTripFuel } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
 
 export default function AdminTripDetailPage() {
@@ -166,6 +166,8 @@ export default function AdminTripDetailPage() {
     cube: '🛢️ Кубик',
   };
 
+  const fuelAudit = trip ? auditTripFuel(trip) : null;
+
   return (
     <div className="min-h-screen bg-zinc-50 pb-40">
       <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center gap-3 sticky top-0 z-40">
@@ -210,6 +212,13 @@ export default function AdminTripDetailPage() {
                 </span>
               )}
             </p>
+          )}
+          {fuelAudit?.hasDiscrepancy && (
+            <div
+              className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${fuelAudit.badgeClass}`}
+            >
+              <span>{fuelAudit.badgeText}</span>
+            </div>
           )}
           {trip.driver_note && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">

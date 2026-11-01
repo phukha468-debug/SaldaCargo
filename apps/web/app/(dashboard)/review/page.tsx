@@ -18,6 +18,7 @@ import {
   maskDateInput,
   isInternalCounterparty,
   isTruckAsset,
+  auditTripFuel,
 } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
@@ -61,7 +62,13 @@ interface TripForReview {
   odometer_start: number;
   odometer_end: number | null;
   driver_note: string | null;
-  asset: { short_name: string; reg_number: string };
+  asset: {
+    id?: string;
+    short_name: string;
+    reg_number: string;
+    notes?: string | null;
+    asset_type?: { code?: string | null; name?: string | null } | null;
+  };
   driver: { id: string; name: string };
   loader: { id: string; name: string } | null;
   trip_orders: TripOrder[];
@@ -1104,6 +1111,16 @@ function EditModal({
                   На проверке
                 </span>
               )}
+              {auditTripFuel(trip).hasDiscrepancy && (
+                <span
+                  className={cn(
+                    'text-xs font-bold px-2 py-0.5 rounded-full border',
+                    auditTripFuel(trip).badgeClass,
+                  )}
+                >
+                  {auditTripFuel(trip).badgeText}
+                </span>
+              )}
             </div>
             <h2 className="text-lg sm:text-xl font-black mt-1 text-white flex items-center gap-2">
               Редактирование рейса
@@ -1834,6 +1851,7 @@ function TripCard({
   const hasCarryover =
     (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
     (trip.driver_note ?? '').includes('[CARRYOVER]');
+  const fuelAudit = auditTripFuel(trip);
 
   const loaderNames = [
     ...new Set(
@@ -1920,6 +1938,17 @@ function TripCard({
               {hasCarryover && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-xs flex items-center gap-0.5">
                   ⚠️ Перенос
+                </span>
+              )}
+              {fuelAudit.hasDiscrepancy && (
+                <span
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow-xs flex items-center gap-0.5 border',
+                    fuelAudit.badgeClass,
+                  )}
+                  title={`В баке было: ${fuelAudit.currentTankLiters} л · Заправлено: ${fuelAudit.totalFuelAddedLiters} л · Расход по норме (${fuelAudit.ratePer100Km} л/100км на ${fuelAudit.mileageKm} км): ${fuelAudit.fuelConsumedLiters} л · Расчётный остаток: ${fuelAudit.estimatedRemainingLiters} л`}
+                >
+                  {fuelAudit.badgeText}
                 </span>
               )}
             </div>
